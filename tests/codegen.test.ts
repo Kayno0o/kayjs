@@ -50,6 +50,7 @@ describe('component shell', () => {
 
     expect(code).toContain('export default function TablePage()')
     expect(code).toContain('return <Table />')
+    expect(compileKay('--- server\nconst Table = 1\nconst TablePage = 2\n---\np {Table + TablePage}', 'table.kay').tsx).toContain('function TablePagePage(')
   })
 
   it('wraps several root nodes in a fragment', () => {

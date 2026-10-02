@@ -31,7 +31,7 @@ div.jumbotron
 table.table
   tbody
     for row of rows() key={row.id}
-      tr(class={selected() === row.id ? 'danger' : ''})
+      tr(class={selected() === row.id ? 'danger' : undefined})
         td.id {row.id}
         td.label: a(onClick={() => selected.set(row.id)}) {row.label}
         td.remove: a(onClick={() => rows.set(list => list.filter(item => item.id !== row.id))}) x

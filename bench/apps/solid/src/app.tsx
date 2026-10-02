@@ -126,7 +126,7 @@ function Table() {
         <tbody>
           <For each={rows()}>
             {row => (
-              <tr class={isSelected(row.id) ? 'danger' : ''}>
+              <tr class={isSelected(row.id) ? 'danger' : undefined}>
                 <td class="id">{row.id}</td>
                 <td class="label"><a onClick={() => setSelected(row.id)}>{row.label()}</a></td>
                 <td class="remove"><a onClick={() => setRows(rows().filter(item => item.id !== row.id))}>x</a></td>

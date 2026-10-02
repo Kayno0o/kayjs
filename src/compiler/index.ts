@@ -40,7 +40,9 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const file = parseKay(source)
   const script = analyzeScript(source, file.script)
   const server = analyzeServer(source, file.server)
-  const name = freeName(componentName(filename), [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n'))
+  // Every name the template uses comes from a fence, so the fences are all a clash can hide in.
+  const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
+  const name = freeName(componentName(filename), fences)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const generateOptions = { name, island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check }
   const analysis = generate(file, script, server, generateOptions)
