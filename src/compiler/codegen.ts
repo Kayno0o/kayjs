@@ -10,6 +10,8 @@ export interface GenerateOptions {
   island?: string
   // Path relative to the project root, naming the module's actions.
   moduleId: string
+  // Type-checking output: adds assertions on links, form fields and island props through globals `kay check` declares.
+  check?: boolean
   // Browser builds leave the `--- server` fence out entirely; type checking and SSR keep it.
   includeServer?: boolean
   // Route parameters, typing `ctx.params` in `load`.
@@ -29,6 +31,7 @@ const JSX_TEXT_ESCAPES = /[{}<>]/g
 const BINDABLE = new Set(['input', 'textarea', 'select'])
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
+const LINK_ELEMENTS = new Set(['a', 'area'])
 const CTX_REFERENCE = /\bctx\b/
 const DEFAULT_PREFIX = '__default_'
 
@@ -443,10 +446,10 @@ class Generator {
       return true
     }
 
-    if (!this.formTarget || attribute.kind !== 'static' || element.component || !FORM_FIELDS.has(element.name) || this.text(attribute.name) !== 'name')
+    if (!this.options.check || !this.formTarget || attribute.kind !== 'static' || element.component || !FORM_FIELDS.has(element.name) || this.text(attribute.name) !== 'name')
       return false
 
-    b.addSource(attribute.name).add(`={${kayAlias('field')}((`).addSource(this.formTarget).add('), ')
+    b.addSource(attribute.name).add('={KayField((').addSource(this.formTarget).add('), ')
     b.wrap(attribute.value, () => b.add(JSON.stringify(attribute.text)))
     b.add(')}')
 
@@ -483,6 +486,9 @@ class Generator {
 
   private emitAttribute(element: ElementNode, attribute: Attribute) {
     const { b } = this
+
+    if (this.options.check && this.emitCheckedAttribute(element, attribute))
+      return
 
     switch (attribute.kind) {
       case 'spread':
@@ -522,6 +528,36 @@ class Generator {
         b.addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
       }
     }
+  }
+
+  // Check-only wrappers: a site link must match a page, and a static parent passes an island JSON-safe props only.
+  private emitCheckedAttribute(element: ElementNode, attribute: Attribute): boolean {
+    const { b } = this
+
+    if (attribute.kind === 'spread' || attribute.kind === 'boolean')
+      return false
+
+    const name = this.text(attribute.name)
+
+    if (!element.component && LINK_ELEMENTS.has(element.name) && name === 'href') {
+      b.addSource(attribute.name).add('={KayHref(')
+
+      if (attribute.kind === 'static')
+        b.wrap(attribute.value, () => b.add(JSON.stringify(attribute.text)))
+      else
+        b.add('(').addSource(attribute.expression).add(')')
+
+      b.add(')}')
+
+      return true
+    }
+
+    if (!element.component || this.options.island || attribute.kind !== 'expression' || name.startsWith('bind:'))
+      return false
+
+    b.addSource(attribute.name).add('={KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
+
+    return true
   }
 
   // `bind:value={name}` reads the signal and writes it back from the matching input event.
@@ -636,7 +672,7 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return visit(file.template)
 }
 
-type KayHelper = 'formAction' | 'field' | 'registerActions' | 'actionStub'
+type KayHelper = 'formAction' | 'registerActions' | 'actionStub'
 
 function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
@@ -651,39 +687,26 @@ function actionOf(element: ElementNode, source: string): Extract<Attribute, { ki
   return attribute?.kind === 'expression' ? attribute : undefined
 }
 
-// The `kay` helpers the template's forms need: `formAction` for an action form, `field` when it has named fields.
+// The `kay` helpers the template's forms need: `formAction` when a form posts to an action.
 function formHelpers(file: KayFile): KayHelper[] {
-  let form = false
-  let field = false
-  const visit = (nodes: Node[], inForm: boolean) => {
-    for (const node of nodes) {
-      if (node.kind === 'element') {
-        const isForm = actionOf(node, file.source) !== undefined
-
-        form ||= isForm
-        field ||= inForm && !node.component && FORM_FIELDS.has(node.name) && node.attributes.some(attribute => attribute.kind === 'static' && file.source.slice(attribute.name.start, attribute.name.end) === 'name')
-        visit(node.children, inForm || isForm)
-      }
-      else if (node.kind === 'text') {
-        visit(node.parts.filter(part => part.kind === 'element'), inForm)
-      }
-      else if (node.kind === 'if') {
-        for (const branch of node.branches)
-          visit(branch.children, inForm)
-      }
-      else if (node.kind === 'for') {
-        visit(node.children, inForm)
-        visit(node.fallback ?? [], inForm)
-      }
-      else {
-        visit(node.children, inForm)
-      }
+  const hasActionForm = (nodes: Node[]): boolean => nodes.some((node) => {
+    switch (node.kind) {
+      case 'element':
+        return actionOf(node, file.source) !== undefined || hasActionForm(node.children)
+      case 'text':
+        return hasActionForm(node.parts.filter(part => part.kind === 'element'))
+      case 'if':
+        return node.branches.some(branch => hasActionForm(branch.children))
+      case 'for':
+        return hasActionForm(node.children) || hasActionForm(node.fallback ?? [])
+      case 'slot':
+        return hasActionForm(node.children)
     }
-  }
 
-  visit(file.template, false)
+    return false
+  })
 
-  return [...(form ? ['formAction' as const] : []), ...(field ? ['field' as const] : [])]
+  return hasActionForm(file.template) ? ['formAction'] : []
 }
 
 type Helper = 'For' | 'Show' | 'omit'

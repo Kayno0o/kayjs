@@ -35,4 +35,5 @@ export interface PageContext<Params extends Record<string, string> = Record<stri
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
 export type { Action, ActionContext, FieldName, ServerAction } from './action'
-export { action, ActionError, actionStub, field, formAction, isAction, registerActions } from './action'
+export { action, ActionError, actionStub, formAction, isAction, registerActions } from './action'
+export type { CheckedHref, IslandComponent, IslandProp, Register } from './checks'

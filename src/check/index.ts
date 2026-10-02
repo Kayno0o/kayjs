@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { findKayFiles } from '../build/files'
 import { compileKay } from '../compiler'
 import { offsetAt, positionAt } from '../compiler/mapping'
-import { routeOf } from '../server/routes'
+import { routeOf, scanRoutes } from '../server/routes'
 
 export const SHADOW_DIR = join('.kay', 'types')
 
@@ -45,7 +45,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   for (const file of await findKayFiles(root)) {
     const source = await Bun.file(file).text()
     const params = file.startsWith(routesDir) ? routeOf(routesDir, file)?.params : undefined
-    const { tsx, map, diagnostics: compileDiagnostics } = compileKay(source, file, { root, params })
+    const { tsx, map, diagnostics: compileDiagnostics } = compileKay(source, file, { root, params, check: true })
     const shadow = join(root, SHADOW_DIR, `${relative(root, file)}.tsx`)
 
     await mkdir(dirname(shadow), { recursive: true })
@@ -55,7 +55,36 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message })
   }
 
+  await Bun.write(join(root, SHADOW_DIR, 'kay-env.d.ts'), environment((await scanRoutes(routesDir)).map(route => route.pattern)))
+
   return { files, diagnostics }
+}
+
+// Declares the check-only helpers generated code calls, and the routes links are checked against.
+function environment(patterns: string[]): string {
+  const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
+
+  return [
+    'import type { Action, CheckedHref, FieldName, IslandProp } from \'kay\'',
+    '',
+    'declare module \'kay\' {',
+    `  interface Register { routes: ${routes} }`,
+    '}',
+    '',
+    'declare global {',
+    '  function KayHref<const Href extends string>(href: Href & CheckedHref<Href>): string',
+    '  function KayField<Target extends string | Action<never, unknown>>(target: Target, name: FieldName<Target>): string',
+    '  function KayProp<Component>(component: Component): <Value>(value: Value & IslandProp<Component, Value>) => Value',
+    '}',
+    '',
+  ].join('\n')
+}
+
+// `/todos/:id` becomes `['todos', ':']`, the shape `CheckedHref` matches paths against segment by segment.
+function routeTuple(pattern: string): string {
+  const segments = pattern.split('/').filter(segment => segment !== '').map(segment => segment.startsWith(':') ? ':' : segment)
+
+  return `[${segments.map(segment => JSON.stringify(segment)).join(', ')}]`
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

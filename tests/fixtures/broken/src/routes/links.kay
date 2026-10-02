@@ -1,0 +1,8 @@
+---
+import Clicker from '../clicker.kay'
+---
+a(href="/form") A page
+a(href="/form/extra?tab=1") No such page
+a(href={`/${1}`}) A param
+a(href="https://example.com/x/y") External
+Clicker(since={new Date()} format={count => `${count} clicks`})

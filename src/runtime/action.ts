@@ -74,11 +74,6 @@ export function formAction(target: string | Action<never, unknown>): string {
 
 export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> : string
 
-// A form field's `name`, checked against the input of the action its form posts to.
-export function field<Target>(_target: Target, name: FieldName<Target>): string {
-  return name
-}
-
 async function post<Output>(url: string, input: unknown): Promise<Output> {
   const response = await fetch(url, {
     method: 'POST',

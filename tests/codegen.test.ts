@@ -159,6 +159,27 @@ describe('elements', () => {
   })
 })
 
+describe('check-only assertions', () => {
+  const source = '---\nimport Island from \'./island.kay\'\n---\na(href=\'/docs\') Docs\nform(action={save})\n  input(name=\'title\')\nIsland(when={today})'
+
+  it('checks links, form fields and island props in type-checking output', () => {
+    const checked = compileKay(source, 'test.kay', { check: true }).tsx
+
+    expect(checked).toContain('<a href={KayHref("/docs")}>')
+    expect(checked).toContain('<input name={KayField((save), "title")} />')
+    expect(checked).toContain('<Island when={KayProp(Island)((today))} />')
+  })
+
+  it('keeps them out of the code that ships', () => {
+    const built = compileKay(source, 'test.kay').tsx
+
+    expect(built).toContain('<a href="/docs">')
+    expect(built).toContain('<input name="title" />')
+    expect(built).toContain('<Island when={today} />')
+    expect(built).toContain('<form action={KayFormAction((save))} method="post">')
+  })
+})
+
 describe('source mapping', () => {
   it('maps template expressions back to their exact source offsets', () => {
     const source = '---\nconst { todo } = props<{ todo: { title: string } }>()\n---\np {todo.title}'

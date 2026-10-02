@@ -1,4 +1,5 @@
 import type { JSX } from '@solidjs/web'
+import type { IslandComponent } from './checks'
 import { createComponent, escape, Hydration, renderToString, ssr } from '@solidjs/web'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
@@ -10,8 +11,8 @@ export class IslandPropsError extends Error {
 }
 
 // On the server an interactive component renders as its own hydration root inside `<kay-island>`, its props serialized for the client.
-export function island<P extends object>(id: string, component: (props: P) => JSX.Element): (props: P) => JSX.Element {
-  return (props: P) => {
+export function island<P extends object>(id: string, component: (props: P) => JSX.Element): IslandComponent<P> {
+  const render = (props: P) => {
     if (depth > 0)
       return component(props)
 
@@ -32,6 +33,8 @@ export function island<P extends object>(id: string, component: (props: P) => JS
       depth--
     }
   }
+
+  return render as IslandComponent<P>
 }
 
 function serializeProps(id: string, props: object): string {
