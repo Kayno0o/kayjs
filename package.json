@@ -13,7 +13,8 @@
       "default": "./src/runtime/island.server.ts"
     },
     "./client": "./src/runtime/client.ts",
-    "./compiler": "./src/compiler/index.ts"
+    "./compiler": "./src/compiler/index.ts",
+    "./server": "./src/server/index.ts"
   },
   "bin": {
     "kay": "./src/cli.ts"
