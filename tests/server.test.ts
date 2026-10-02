@@ -255,6 +255,25 @@ describe('request context', () => {
 })
 
 describe('special pages', () => {
+  it('answers a failing action with a generic 500 and logs its stack at the .kay line', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const response = await app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/boom.kay/explode', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-kay-action': '1' },
+        body: '{}',
+      }))
+
+      expect(response.status).toBe(500)
+      expect(await response.text()).toBe('Internal Server Error')
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^Error: Kaboom in an action\n\s+at \S+ \(\S+\/boom\.kay:6:13\)/))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('renders the nearest _404.kay inside its layouts, for notFound and for URLs no page serves', async () => {
     const missingTodo = await get('/todos/9')
     const unmatched = await get('/no/such/page')
@@ -280,7 +299,7 @@ describe('special pages', () => {
       expect(status).toBe(500)
       expect(html).toContain('<h1>Error 500</h1><p class="message">Internal Server Error</p>')
       expect(html).not.toContain('Kaboom')
-      expect(logged).toHaveBeenCalledWith(expect.objectContaining({ message: 'Kaboom' }))
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^Error: Kaboom\n\s+at load \(\S+\/boom\.kay:10:13\)/))
     }
     finally {
       logged.mockRestore()
@@ -295,7 +314,7 @@ describe('special pages', () => {
       const html = await (await dev.handle(new Request('http://localhost/boom?fail'))).text()
 
       expect(html).toContain('<p class="message">Kaboom</p>')
-      expect(html).toContain('<pre class="stack">Error: Kaboom')
+      expect(html).toMatch(/<pre class="stack">Error: Kaboom\n\s+at load \(\S+\/boom\.kay:10:13\)/)
       expect(html).toContain('new EventSource("/_kay/dev/events")')
       expect((await dev.handle(new Request('http://localhost/_kay/dev/events'))).headers.get('content-type')).toBe('text/event-stream')
     }

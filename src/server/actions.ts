@@ -2,18 +2,19 @@ import type { Elysia, TSchema } from 'elysia'
 import type { Locals } from '../runtime'
 import type { ActionContext, ServerAction } from '../runtime/action'
 import type { Route } from './routes'
+import { logError } from '../build/sourcemap'
 import { isAction } from '../runtime/action'
 import { cookieJar } from './cookies'
 import { Redirect } from './signals'
 
 // Registers every action the pages export as a POST route whose body Elysia validates against the action's schema.
-export async function registerActionRoutes(app: Elysia, routes: Route[]): Promise<void> {
+export async function registerActionRoutes(app: Elysia, routes: Route[], dev = false): Promise<void> {
   for (const route of routes) {
     const module = await import(route.file) as Record<string, unknown>
 
     for (const value of Object.values(module)) {
       if (isAction(value))
-        app.post(value.url, async context => runAction(value, context), { body: value.schema, beforeHandle: ({ request }) => crossSite(request) })
+        app.post(value.url, async context => runAction(value, context, dev), { body: value.schema, beforeHandle: ({ request }) => crossSite(request) })
     }
   }
 }
@@ -31,7 +32,7 @@ function sameHost(request: Request, url: string | null): url is string {
 }
 
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
-async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request }): Promise<Response> {
+async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request }, dev: boolean): Promise<Response> {
   const { request } = context
   const headers = new Headers()
   const jar = cookieJar(request)
@@ -68,8 +69,12 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     return new Response(null, { status: 303, headers })
   }
   catch (error) {
-    if (!(error instanceof Redirect))
-      throw error
+    // Elysia would answer with the error's message, which may say more than a visitor should read.
+    if (!(error instanceof Redirect)) {
+      logError(error)
+
+      return new Response(dev && error instanceof Error ? error.message : 'Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+    }
 
     headers.set('location', error.location)
     jar.writeTo(headers)

@@ -3,6 +3,7 @@ import type { ErrorPageContext, Locals, PageContext, PageError } from '../runtim
 import type { ClientBuild } from './client'
 import type { Route, SpecialPage, SpecialPages } from './routes'
 import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
+import { logError, mapStack } from '../build/sourcemap'
 import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
 import { errorPage } from './overlay'
@@ -126,7 +127,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   const notFound = error instanceof NotFound
 
   if (!notFound)
-    console.error(error)
+    logError(error)
 
   const pageError = notFound ? { status: 404, message: 'Not Found' } : describeError(error, options.dev)
   const page = (notFound ? special.notFound : undefined) ?? special.error
@@ -161,7 +162,7 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
       return renderDocument(modules, data, client, options)
     }
     catch (error) {
-      console.error(error)
+      logError(error)
     }
   }
 
@@ -200,7 +201,7 @@ function describeError(error: unknown, dev = false): PageError {
   if (!dev)
     return { status: 500, message: 'Internal Server Error' }
 
-  return error instanceof Error ? { status: 500, message: error.message, stack: error.stack } : { status: 500, message: String(error) }
+  return error instanceof Error ? { status: 500, message: error.message, stack: error.stack && mapStack(error.stack) } : { status: 500, message: String(error) }
 }
 
 // Elysia decodes named params already; only the catch-all arrives encoded. Undefined when it is malformed.

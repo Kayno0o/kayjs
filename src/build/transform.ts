@@ -3,6 +3,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { transform } from '@solidjs/compiler'
 import { compileKay, formatDiagnostic } from '../compiler'
+import { registerSourceMap } from './sourcemap'
 
 export type Target = 'dom' | 'ssr'
 
@@ -29,10 +30,17 @@ export class KayCompileError extends Error {
 
 // .kay source to TypeScript with its JSX compiled by Solid's native compiler; Bun strips the types when it loads the result.
 export function transformKay(source: string, filename: string, options: TransformOptions): string {
-  const { tsx, diagnostics } = compileKay(source, filename, { root: options.root, includeServer: options.target === 'ssr' })
+  const server = options.target === 'ssr'
+  const { tsx, map, diagnostics } = compileKay(source, filename, { root: options.root, includeServer: server })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file: filename, source })))
 
-  return transform(tsx, { filename: `${filename}.tsx`, generate: options.target, hydratable: options.hydratable ?? false }).code
+  // Server code is what throws inside loads and renders, so its stacks are the ones mapped back to the `.kay` source.
+  const output = transform(tsx, { filename: `${filename}.tsx`, generate: options.target, hydratable: options.hydratable ?? false, sourceMap: server })
+
+  if (server && output.map)
+    registerSourceMap(filename, { source, tsx, map, solidMap: output.map })
+
+  return output.code
 }

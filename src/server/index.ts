@@ -3,6 +3,7 @@ import process from 'node:process'
 import { plugin } from 'bun'
 import { Elysia } from 'elysia'
 import { kay } from '../build/plugin'
+import { logError } from '../build/sourcemap'
 import { registerActionRoutes } from './actions'
 import { ASSET_PREFIX, buildClient } from './client'
 import { bootFailure, DEV_EVENTS, devEvents } from './dev'
@@ -37,7 +38,7 @@ export async function pages(options: PagesOptions = {}) {
     return await servePages(root, { ...options, dev })
   }
   catch (error) {
-    console.error(error)
+    logError(error)
 
     return bootFailure(error, root)
   }
@@ -73,7 +74,7 @@ async function servePages(root: string, options: PagesOptions) {
     })
   }
 
-  await registerActionRoutes(app, routes)
+  await registerActionRoutes(app, routes, options.dev)
   for (const route of routes)
     app.get(route.pattern, async context => renderPage(route, context, client, renderOptions))
 

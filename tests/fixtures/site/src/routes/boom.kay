@@ -1,4 +1,11 @@
 --- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const explode = action(t.Object({}), () => {
+  throw new Error('Kaboom in an action')
+})
+
 if (ctx.url.searchParams.has('fail'))
   throw new Error('Kaboom')
 ---

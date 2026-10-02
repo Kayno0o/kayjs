@@ -161,7 +161,7 @@ Other files starting with `_` are not routes. Every top-level name the server fe
 
 Layout and page loads run in parallel; when several fail, the outermost one decides the response.
 
-The nearest special page wins, wrapped by the layouts of its own directory. `_error.kay` reads `ctx.error`: `status`, `message` and, in development only, `stack`. In production the message is generic and the real error goes to `console.error`; without an `_error.kay` the response is plain text, and development shows the stack instead.
+The nearest special page wins, wrapped by the layouts of its own directory. `_error.kay` reads `ctx.error`: `status`, `message` and, in development only, `stack`. Logged and displayed stacks point at `.kay` lines. In production the message is generic and the real error goes to `console.error`; without an `_error.kay` the response is plain text, and development shows the stack instead.
 
 ```kay
 --- server
@@ -206,6 +206,7 @@ form(action={add})
 
 - `form(action={add})` posts without JavaScript; `kay check` verifies every field `name` against the schema. After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
 - An island imports the action from the page and calls it: `import { add } from '../routes/index.kay'`, then `const id = await add({ title })`. The call is typed and throws `ActionError` with the status and body when it fails.
+- A handler that throws answers 500 with a generic message and logs the error.
 - The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers` and `redirect(location)`.
 
 ## Locals and guards
