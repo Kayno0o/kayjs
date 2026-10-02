@@ -5,6 +5,7 @@ import { Elysia } from 'elysia'
 import { kay } from '../build/plugin'
 import { registerActionRoutes } from './actions'
 import { ASSET_PREFIX, buildClient } from './client'
+import { bootFailure, DEV_EVENTS, devEvents } from './dev'
 import { renderPage, renderUnmatched } from './render'
 import { decodePath, scanRoutes, specialPagesOf } from './routes'
 
@@ -24,10 +25,27 @@ export interface PagesOptions {
 let runtimePluginRoot: string | undefined
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
+// In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
 export async function pages(options: PagesOptions = {}) {
   const root = resolve(options.root ?? process.cwd())
+  const dev = options.dev ?? process.env.NODE_ENV === 'development'
+
+  if (!dev)
+    return servePages(root, options)
+
+  try {
+    return await servePages(root, { ...options, dev })
+  }
+  catch (error) {
+    console.error(error)
+
+    return bootFailure(error, root)
+  }
+}
+
+async function servePages(root: string, options: PagesOptions) {
   const routesDir = resolve(root, options.routes ?? 'src/routes')
-  const renderOptions = { lang: options.lang, dev: options.dev ?? process.env.NODE_ENV === 'development' }
+  const renderOptions = { lang: options.lang, dev: options.dev }
 
   if (runtimePluginRoot === undefined) {
     plugin(kay({ target: 'ssr', root }))
@@ -39,6 +57,9 @@ export async function pages(options: PagesOptions = {}) {
 
   const [routes, client] = await Promise.all([scanRoutes(routesDir), buildClient(root, { minify: options.minify })])
   const app = new Elysia({ name: 'kay/pages', seed: root })
+
+  if (options.dev)
+    app.get(DEV_EVENTS, devEvents)
 
   if (client) {
     app.get(`${ASSET_PREFIX}*`, async ({ params, status }) => {

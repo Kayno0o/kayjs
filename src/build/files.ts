@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-const IGNORED_DIRS = new Set(['node_modules', '.kay', '.git', 'dist'])
+export const IGNORED_DIRS = new Set(['node_modules', '.kay', '.git', 'dist'])
 
 // Every .kay file under `root`, skipping dependencies and generated output without walking into them.
 export async function findKayFiles(root: string): Promise<string[]> {

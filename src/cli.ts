@@ -3,10 +3,11 @@ import { relative, resolve } from 'node:path'
 import process from 'node:process'
 import { check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
+import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
 
-const USAGE = 'Usage: kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay dev [entry]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 async function main(args: string[]): Promise<number> {
   const [command, ...rest] = args
@@ -19,6 +20,9 @@ async function main(args: string[]): Promise<number> {
 
   if (command === 'fmt')
     return fmt(rest)
+
+  if (command === 'dev')
+    return runDev(rest[0])
 
   if (command !== 'check') {
     console.error(USAGE)
@@ -51,6 +55,19 @@ async function main(args: string[]): Promise<number> {
     console.error(`${diagnostics.length} error${diagnostics.length === 1 ? '' : 's'}`)
 
   return diagnostics.length > 0 ? 1 : 0
+}
+
+// Restarts the server on every change until interrupted.
+async function runDev(entry: string | undefined): Promise<number> {
+  const stop = await dev(process.cwd(), { entry })
+  const { promise, resolve: interrupted } = Promise.withResolvers<void>()
+
+  process.once('SIGINT', interrupted)
+  process.once('SIGTERM', interrupted)
+  await promise
+  await stop()
+
+  return 0
 }
 
 // A diagnostic can point at a file that is gone by now, such as a tsconfig tsgo could not read.

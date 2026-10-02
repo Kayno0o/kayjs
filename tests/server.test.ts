@@ -296,6 +296,8 @@ describe('special pages', () => {
 
       expect(html).toContain('<p class="message">Kaboom</p>')
       expect(html).toContain('<pre class="stack">Error: Kaboom')
+      expect(html).toContain('new EventSource("/_kay/dev/events")')
+      expect((await dev.handle(new Request('http://localhost/_kay/dev/events'))).headers.get('content-type')).toBe('text/event-stream')
     }
     finally {
       logged.mockRestore()

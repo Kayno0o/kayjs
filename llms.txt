@@ -269,6 +269,7 @@ new Elysia().use(await pages()).listen(3000)
 
 ## Commands
 
+- `kay dev [entry]`: run the server entry (default `src/server.ts`) with `NODE_ENV=development`, restarting it on every change; open pages reload by themselves, and a project that fails to compile shows its errors in the browser.
 - `kay check [dir] [-p tsconfig.json]`: type-check the project, `.kay` files included.
 - `kay fmt [paths...] [--check]`: format `.kay` files; `--check` lists unformatted files and fails.
 - `kay lsp --stdio`: the language server behind the editor extension in `editors/vscode`.

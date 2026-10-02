@@ -4,6 +4,7 @@ import type { ClientBuild } from './client'
 import type { Route, SpecialPage, SpecialPages } from './routes'
 import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
 import { cookieJar } from './cookies'
+import { LIVE_RELOAD } from './dev'
 import { errorPage } from './overlay'
 import { decodePath } from './routes'
 import { NotFound, Redirect } from './signals'
@@ -139,7 +140,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
     return respond(rendering, html)
 
   if (options.dev && !notFound)
-    return new Response(errorPage(pageError), { status: pageError.status, headers: { 'content-type': 'text/html; charset=utf-8' } })
+    return new Response(errorPage(pageError) + LIVE_RELOAD, { status: pageError.status, headers: { 'content-type': 'text/html; charset=utf-8' } })
 
   return new Response(notFound ? 'Not found' : 'Internal Server Error', { status: pageError.status, headers: TEXT })
 }
@@ -192,7 +193,7 @@ function renderDocument(modules: PageModule[], data: Record<string, unknown>[], 
   } })
   const scripts = client && body.includes('<kay-island') ? `${generateHydrationScript()}<script type="module" src="${client.entry}"></script>` : ''
 
-  return `<!doctype html><html lang="${options.lang ?? 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${head}${scripts}</head><body>${body}</body></html>`
+  return `<!doctype html><html lang="${options.lang ?? 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${head}${scripts}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
 }
 
 function describeError(error: unknown, dev = false): PageError {
