@@ -3,13 +3,17 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { pages } from '../src/server'
+import { auth } from './fixtures/site/src/auth'
 
 const app = await pages({ routes: 'tests/fixtures/site/src/routes' })
 const MARKERS = /<!--[$/]-->/g
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
 const ENTRY = /<script type="module" src="\/_kay\/([^"]+)"><\/script>/
 const BODY = /<body>([\s\S]*)<\/body>/
+// happy-dom swaps in its own Request, which Elysia cannot read headers from.
+const NativeRequest = Request
 
 interface ClientEntry {
   ready: Promise<void>
@@ -172,7 +176,7 @@ describe('pages', () => {
     const realFetch = globalThis.fetch
 
     GlobalRegistrator.register()
-    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => app.handle(new Request(new URL(String(input), 'http://localhost'), init))) as typeof fetch
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => app.handle(new NativeRequest(new URL(String(input), 'http://localhost'), init))) as typeof fetch
 
     try {
       delete (globalThis as { _$HY?: unknown })._$HY
@@ -195,5 +199,57 @@ describe('pages', () => {
       await GlobalRegistrator.unregister()
     }
     expect((await get('/')).html).toContain('From an island</a></li>')
+  })
+})
+
+describe('request context', () => {
+  const ACCOUNT_ACTION = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/account.kay/remember'
+  // A guard registered before the pages covers their actions too, which a layout's load never runs for.
+  const guarded = new Elysia()
+    .use(auth)
+    .onBeforeHandle(({ user, path, status }) => user === undefined && path.includes('account') ? status(401, 'Sign in first') : undefined)
+    .use(app)
+  const request = (path: string, init: RequestInit = {}) => guarded.handle(new Request(`http://localhost${path}`, init))
+
+  it('passes what the app derives to pages as ctx.locals, behind its guard', async () => {
+    expect((await request('/account')).status).toBe(401)
+    expect(await (await request('/account', { headers: { 'x-user': 'ada' } })).text()).toContain('<p class="user">ada</p>')
+  })
+
+  it('passes ctx.locals to actions behind the same guard and sends the cookies they set', async () => {
+    const post = (headers: Record<string, string>) => guarded.handle(new Request(ACCOUNT_ACTION, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...headers },
+      body: JSON.stringify({ theme: 'dark' }),
+    }))
+    const refused = await post({})
+    const accepted = await post({ 'x-user': 'ada' })
+
+    expect(refused.status).toBe(401)
+    expect(await accepted.json()).toBe('ada')
+    expect(accepted.headers.get('set-cookie')).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
+  })
+
+  it('reads cookies in pages and keeps the ones an action sets across a form post', async () => {
+    const page = await request('/account', { headers: { 'x-user': 'ada', 'cookie': 'theme=dark' } })
+
+    expect(await page.text()).toContain('<p class="theme">dark</p>')
+    expect(page.headers.get('set-cookie')).toBeNull()
+    const form = await guarded.handle(new Request(ACCOUNT_ACTION, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/account', 'x-user': 'ada' },
+      body: new URLSearchParams({ theme: 'light' }),
+    }))
+
+    expect(form.status).toBe(303)
+    expect(form.headers.get('set-cookie')).toStartWith('theme=light;')
+  })
+
+  it('lets the outermost failing load decide the response', async () => {
+    expect((await get('/gate')).status).toBe(404)
+    const away = await app.handle(new Request('http://localhost/gate?away'))
+
+    expect(away.status).toBe(302)
+    expect(away.headers.get('location')).toBe('/about')
   })
 })

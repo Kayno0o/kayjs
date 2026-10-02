@@ -51,7 +51,7 @@ export async function pages(options: PagesOptions = {}) {
 
   await registerActionRoutes(app, routes)
   for (const route of routes)
-    app.get(route.pattern, ({ request, params }) => renderPage(route, request, params as Record<string, string>, client, options))
+    app.get(route.pattern, async context => renderPage(route, context, client, options))
 
   return app
 }

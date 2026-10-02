@@ -1,0 +1,4 @@
+--- server
+ctx.notFound()
+---
+p Never rendered

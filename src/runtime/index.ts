@@ -1,4 +1,6 @@
+import type { CookieMap } from 'bun'
 import type { Setter, SignalOptions } from 'solid-js'
+import type { Locals } from './checks'
 import { createSignal } from 'solid-js'
 
 export interface Signal<T> {
@@ -24,6 +26,10 @@ export interface PageContext<Params extends Record<string, string> = Record<stri
   request: Request
   url: URL
   params: Params
+  // Read on demand; what a page sets or deletes goes out as Set-Cookie headers, redirects included.
+  cookies: CookieMap
+  // What the app's Elysia `derive`, `resolve` and `decorate` add, typed through `Register`.
+  locals: Locals
   // Response status and headers of the page being rendered.
   status: (code: number) => void
   headers: Headers
@@ -36,4 +42,4 @@ export type PageData<Load extends (...args: never[]) => unknown> = Awaited<Retur
 
 export type { Action, ActionContext, FieldName, ServerAction } from './action'
 export { action, ActionError, actionStub, formAction, isAction, registerActions } from './action'
-export type { CheckedHref, IslandComponent, IslandProp, Register } from './checks'
+export type { CheckedHref, IslandComponent, IslandProp, Locals, LocalsOf, Register } from './checks'

@@ -152,8 +152,12 @@ Pages live in `src/routes/`:
 Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence may use top-level `await` and the `ctx` object:
 
 - `ctx.params`, typed from the file name, `ctx.url`, `ctx.request`
+- `ctx.cookies`, a `Bun.CookieMap`: `ctx.cookies.get('theme')`; what `set` and `delete` change is sent back, redirects included
+- `ctx.locals`, what the app's Elysia `derive`, `resolve` and `decorate` add, such as the signed-in user
 - `ctx.status(404)` and `ctx.headers` set the response
 - `ctx.redirect('/login')` and `ctx.notFound()` stop rendering
+
+Layout and page loads run in parallel; when several fail, the outermost one decides the response.
 
 ```kay
 --- server
@@ -190,7 +194,34 @@ form(action={add})
 
 - `form(action={add})` posts without JavaScript; `kay check` verifies every field `name` against the schema. After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
 - An island imports the action from the page and calls it: `import { add } from '../routes/index.kay'`, then `const id = await add({ title })`. The call is typed and throws `ActionError` with the status and body when it fails.
-- The handler's second argument has `request`, `status(code)`, `headers` and `redirect(location)`.
+- The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers` and `redirect(location)`.
+
+## Locals and guards
+
+`ctx.locals` is the Elysia context of the request. Declare what the app adds once, in a `.ts` module, and register its type:
+
+```ts
+import type { LocalsOf } from 'kay'
+import { Elysia } from 'elysia'
+
+export const auth = new Elysia({ name: 'auth' }).derive({ as: 'scoped' }, async ({ cookie }) => ({ user: await findSession(cookie.session?.value) }))
+
+declare module 'kay' {
+  interface Register {
+    locals: LocalsOf<typeof auth>
+  }
+}
+```
+
+A guard is an Elysia `onBeforeHandle` registered before `.use(await pages())`: it covers pages and actions alike. A layout's `ctx.redirect` is no guard, since actions never run layout loads.
+
+```ts
+new Elysia()
+  .use(auth)
+  .onBeforeHandle(({ user, path, redirect }) => user === undefined && path.startsWith('/account') ? redirect('/login') : undefined)
+  .use(await pages())
+  .listen(3000)
+```
 
 ## What `kay check` verifies
 

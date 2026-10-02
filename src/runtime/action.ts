@@ -1,10 +1,14 @@
+import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
+import type { Locals } from './checks'
 
 const ACTION = Symbol.for('kay.action')
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 
 export interface ActionContext {
   request: Request
+  cookies: CookieMap
+  locals: Locals
   // Response status and headers, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void
   headers: Headers

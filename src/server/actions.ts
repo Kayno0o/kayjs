@@ -1,7 +1,9 @@
 import type { Elysia, TSchema } from 'elysia'
+import type { Locals } from '../runtime'
 import type { ActionContext, ServerAction } from '../runtime/action'
 import type { Route } from './routes'
 import { isAction } from '../runtime/action'
+import { cookieJar } from './cookies'
 import { Redirect } from './signals'
 
 // Registers every action the pages export as a POST route whose body Elysia validates against the action's schema.
@@ -11,7 +13,7 @@ export async function registerActionRoutes(app: Elysia, routes: Route[]): Promis
 
     for (const value of Object.values(module)) {
       if (isAction(value))
-        app.post(value.url, ({ body, request }) => runAction(value, body, request), { body: value.schema, beforeHandle: ({ request }) => crossSite(request) })
+        app.post(value.url, async context => runAction(value, context), { body: value.schema, beforeHandle: ({ request }) => crossSite(request) })
     }
   }
 }
@@ -28,11 +30,19 @@ function sameHost(request: Request, url: string | null): url is string {
   return url !== null && URL.canParse(url) && new URL(url).host === new URL(request.url).host
 }
 
-async function runAction(action: ServerAction<TSchema, unknown>, input: unknown, request: Request): Promise<Response> {
+// The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
+async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request }): Promise<Response> {
+  const { request } = context
   const headers = new Headers()
+  const jar = cookieJar(request)
   let status = 200
   const ctx: ActionContext = {
     request,
+    get cookies() {
+      return jar.cookies
+    },
+    // The app's derive and resolve hooks ran before this handler, so the context carries what `Register` declares.
+    locals: context as unknown as Locals,
     headers,
     status: (code) => {
       status = code
@@ -43,7 +53,9 @@ async function runAction(action: ServerAction<TSchema, unknown>, input: unknown,
   }
 
   try {
-    const result = await action.handler(input, ctx)
+    const result = await action.handler(context.body, ctx)
+
+    jar.writeTo(headers)
 
     // A fetch from an island wants the result; a plain form post goes back to the page it came from.
     if (request.headers.get('x-kay-action') === '1')
@@ -60,6 +72,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, input: unknown,
       throw error
 
     headers.set('location', error.location)
+    jar.writeTo(headers)
 
     return new Response(null, { status: error.status, headers })
   }

@@ -1,0 +1,5 @@
+--- server
+if (ctx.url.searchParams.has('away'))
+  ctx.redirect('/about')
+---
+slot

@@ -1,4 +1,5 @@
 import type { JSX } from '@solidjs/web'
+import type { Elysia } from 'elysia'
 
 // Types behind the checks `kay check` adds to generated code; nothing here runs.
 
@@ -7,9 +8,15 @@ declare const ISLAND: unique symbol
 // What an interactive component's default export is: the brand lets the checker tell islands from plain components.
 export type IslandComponent<Props> = ((props: Props) => JSX.Element) & { readonly [ISLAND]: true }
 
-// Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes, listing every route the pages directory serves.
-
+// Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every route the pages directory serves, and by the app with `locals: LocalsOf<typeof auth>`.
 export interface Register {}
+
+// Nothing is readable off `ctx.locals` until the app registers its type.
+export type Locals = Register extends { locals: infer Values extends object } ? Values : object
+
+// The values an Elysia instance adds to every handler's context.
+export type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'>> = App['~Singleton']['decorator'] & App['~Singleton']['derive'] & App['~Singleton']['resolve']
+  & App['~Ephemeral']['derive'] & App['~Ephemeral']['resolve'] & App['~Volatile']['derive'] & App['~Volatile']['resolve']
 
 // Routes as segment tuples: `[]` is `/`, `':'` a parameter, `'*'` a catch-all.
 type RoutePatterns = Register extends { routes: infer Routes extends readonly string[] } ? Routes : never
