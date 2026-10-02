@@ -40,7 +40,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const file = parseKay(source)
   const script = analyzeScript(source, file.script)
   const server = analyzeServer(source, file.server)
-  const name = componentName(filename)
+  const name = freeName(componentName(filename), [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n'))
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const generateOptions = { name, island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check }
   const analysis = generate(file, script, server, generateOptions)
@@ -66,6 +66,11 @@ export function componentName(filename: string): string {
   const name = words.map(word => word[0]!.toUpperCase() + word.slice(1)).join('')
 
   return name === '' || LEADING_DIGIT.test(name) ? `Kay${name}` : name
+}
+
+// A page `table.kay` importing `components/table.kay` would otherwise declare a `Table` that shadows the import and renders itself.
+function freeName(name: string, code: string): string {
+  return new RegExp(`(?<![\\w$])${name}(?![\\w$])`).test(code) ? freeName(`${name}Page`, code) : name
 }
 
 export function formatDiagnostic(source: string, filename: string, diagnostic: Diagnostic): string {

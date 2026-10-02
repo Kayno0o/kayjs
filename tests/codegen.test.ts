@@ -45,6 +45,13 @@ describe('component shell', () => {
     expect(componentName('404.kay')).toBe('Kay404')
   })
 
+  it('renames the component when its script already uses the name, so an import of the same name is not shadowed', () => {
+    const code = compileKay('---\nimport Table from \'./components/table.kay\'\n---\nTable', 'table.kay').tsx
+
+    expect(code).toContain('export default function TablePage()')
+    expect(code).toContain('return <Table />')
+  })
+
   it('wraps several root nodes in a fragment', () => {
     expect(jsx('h1 a\np b')).toBe('<><h1>a</h1><p>b</p></>')
   })
