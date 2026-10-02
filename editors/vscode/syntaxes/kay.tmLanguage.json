@@ -1,0 +1,362 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Kay",
+  "scopeName": "source.kay",
+  "fileTypes": [
+    "kay"
+  ],
+  "patterns": [
+    {
+      "include": "#fence"
+    },
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#piped-text"
+    },
+    {
+      "include": "#slot"
+    },
+    {
+      "include": "#for"
+    },
+    {
+      "include": "#if"
+    },
+    {
+      "include": "#else"
+    },
+    {
+      "include": "#element"
+    }
+  ],
+  "repository": {
+    "fence": {
+      "begin": "^(---)(?:[ \\t]+(server))?[ \\t]*$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.fence.kay"
+        },
+        "2": {
+          "name": "keyword.other.server.kay"
+        }
+      },
+      "end": "^(---)[ \\t]*$",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.fence.kay"
+        }
+      },
+      "contentName": "meta.embedded.block.typescript",
+      "patterns": [
+        {
+          "include": "source.ts"
+        }
+      ]
+    },
+    "comment": {
+      "match": "^[ \\t]*(//.*)$",
+      "captures": {
+        "1": {
+          "name": "comment.line.double-slash.kay"
+        }
+      }
+    },
+    "piped-text": {
+      "begin": "^[ \\t]*(\\|)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.text.kay"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#text"
+        }
+      ]
+    },
+    "slot": {
+      "match": "^[ \\t]*(@)([A-Za-z_$][\\w$]*)",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.slot.kay"
+        },
+        "2": {
+          "name": "entity.other.attribute-name.slot.kay"
+        }
+      }
+    },
+    "for": {
+      "match": "^[ \\t]*(for)[ \\t]+([A-Za-z_$][\\w$]*)(?:[ \\t]*(,)[ \\t]*([A-Za-z_$][\\w$]*))?[ \\t]+(of)[ \\t]+(.*?)[ \\t]+(key)(=)(\\{.*\\})[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.loop.kay"
+        },
+        "2": {
+          "name": "variable.other.readwrite.kay"
+        },
+        "3": {
+          "name": "punctuation.separator.comma.kay"
+        },
+        "4": {
+          "name": "variable.other.readwrite.kay"
+        },
+        "5": {
+          "name": "keyword.control.loop.kay"
+        },
+        "6": {
+          "name": "meta.embedded.expression.kay",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        },
+        "7": {
+          "name": "entity.other.attribute-name.kay"
+        },
+        "8": {
+          "name": "punctuation.separator.key-value.kay"
+        },
+        "9": {
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      }
+    },
+    "if": {
+      "match": "^[ \\t]*(else[ \\t]+if|if)[ \\t]+(.*?)(?:[ \\t]+(as)[ \\t]+([a-z_$][\\w$]*))?[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.conditional.kay"
+        },
+        "2": {
+          "name": "meta.embedded.expression.kay",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        },
+        "3": {
+          "name": "keyword.control.as.kay"
+        },
+        "4": {
+          "name": "variable.other.readwrite.alias.kay"
+        }
+      }
+    },
+    "else": {
+      "match": "^[ \\t]*(else)[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.conditional.kay"
+        }
+      }
+    },
+    "element": {
+      "begin": "^[ \\t]*(?=[A-Za-z]|[.#][\\w-])(?:([A-Z][\\w-]*)|([a-z][\\w-]*))?((?:\\.(?:[\\w\\-/@!]|:(?=\\S))+|#[\\w-]+)*)",
+      "beginCaptures": {
+        "1": {
+          "name": "support.class.component.kay"
+        },
+        "2": {
+          "name": "entity.name.tag.kay"
+        },
+        "3": {
+          "patterns": [
+            {
+              "include": "#shorthand"
+            }
+          ]
+        }
+      },
+      "end": "$",
+      "name": "meta.element.kay",
+      "patterns": [
+        {
+          "include": "#element-rest"
+        }
+      ]
+    },
+    "element-rest": {
+      "patterns": [
+        {
+          "include": "#attributes"
+        },
+        {
+          "include": "#block-expansion"
+        },
+        {
+          "include": "#text"
+        }
+      ]
+    },
+    "block-expansion": {
+      "begin": "(?:\\G|(?<=\\)))(:)[ \\t]+",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.separator.block-expansion.kay"
+        }
+      },
+      "end": "(?=$)",
+      "patterns": [
+        {
+          "begin": "\\G(?:([A-Z][\\w-]*)|([a-z][\\w-]*))?((?:\\.(?:[\\w\\-/@!]|:(?=\\S))+|#[\\w-]+)*)",
+          "beginCaptures": {
+            "1": {
+              "name": "support.class.component.kay"
+            },
+            "2": {
+              "name": "entity.name.tag.kay"
+            },
+            "3": {
+              "patterns": [
+                {
+                  "include": "#shorthand"
+                }
+              ]
+            }
+          },
+          "end": "(?=$)",
+          "name": "meta.element.kay",
+          "patterns": [
+            {
+              "include": "#element-rest"
+            }
+          ]
+        }
+      ]
+    },
+    "shorthand": {
+      "patterns": [
+        {
+          "match": "\\.(?:[\\w\\-/@!]|:(?=\\S))+",
+          "name": "entity.other.attribute-name.class.kay"
+        },
+        {
+          "match": "#[\\w-]+",
+          "name": "entity.other.attribute-name.id.kay"
+        }
+      ]
+    },
+    "attributes": {
+      "begin": "\\G\\(",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.attributes.begin.kay"
+        }
+      },
+      "end": "\\)",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.attributes.end.kay"
+        }
+      },
+      "name": "meta.attributes.kay",
+      "patterns": [
+        {
+          "include": "#expression"
+        },
+        {
+          "match": "([A-Za-z_@:][\\w\\-:.@]*)(?:[ \\t]*(=))?",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.kay"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.kay"
+            }
+          }
+        },
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.kay"
+        },
+        {
+          "begin": "'",
+          "end": "'",
+          "name": "string.quoted.single.kay"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator.comma.kay"
+        }
+      ]
+    },
+    "expression": {
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.embedded.begin.kay"
+        }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.embedded.end.kay"
+        }
+      },
+      "name": "meta.embedded.expression.kay",
+      "contentName": "source.ts",
+      "patterns": [
+        {
+          "include": "source.ts"
+        }
+      ]
+    },
+    "text": {
+      "patterns": [
+        {
+          "match": "\\\\[{#]",
+          "name": "constant.character.escape.kay"
+        },
+        {
+          "include": "#expression"
+        },
+        {
+          "include": "#inline-element"
+        }
+      ]
+    },
+    "inline-element": {
+      "begin": "(#\\[)(?:([A-Z][\\w-]*)|([a-z][\\w-]*))?((?:\\.(?:[\\w\\-/@!]|:(?=\\S))+|#[\\w-]+)*)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.inline-element.begin.kay"
+        },
+        "2": {
+          "name": "support.class.component.kay"
+        },
+        "3": {
+          "name": "entity.name.tag.kay"
+        },
+        "4": {
+          "patterns": [
+            {
+              "include": "#shorthand"
+            }
+          ]
+        }
+      },
+      "end": "(\\])|(?=$)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.inline-element.end.kay"
+        }
+      },
+      "name": "meta.element.inline.kay",
+      "patterns": [
+        {
+          "include": "#element-rest"
+        }
+      ]
+    }
+  }
+}

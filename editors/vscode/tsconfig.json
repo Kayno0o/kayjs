@@ -12,5 +12,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src", "build.ts"]
+  "include": ["src", "tests", "build.ts"]
 }

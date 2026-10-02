@@ -4,33 +4,75 @@
   "displayName": "Kay",
   "version": "0.1.0",
   "private": true,
-  "description": "Language support for .kay components: diagnostics, hover, completion and go-to-definition through the kay language server",
+  "description": "Language support for .kay components: highlighting, diagnostics, hover, completion, go-to-definition and formatting through the kay language server",
   "license": "UNLICENSED",
   "repository": "https://git.kaynooo.fr/kaynooo/poc-framework",
-  "categories": ["Programming Languages"],
+  "categories": [
+    "Programming Languages"
+  ],
   "main": "./dist/extension.js",
-  "engines": { "vscode": "^1.91.0" },
-  "activationEvents": ["onLanguage:kay"],
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "activationEvents": [
+    "onLanguage:kay"
+  ],
   "contributes": {
     "languages": [
-      { "id": "kay", "aliases": ["Kay", "kay"], "extensions": [".kay"], "configuration": "./language-configuration.json" }
+      {
+        "id": "kay",
+        "aliases": [
+          "Kay",
+          "kay"
+        ],
+        "extensions": [
+          ".kay"
+        ],
+        "configuration": "./language-configuration.json"
+      }
     ],
     "configuration": {
       "title": "Kay",
       "properties": {
-        "kay.bun.path": { "type": "string", "default": "bun", "description": "The Bun executable that runs the language server." },
-        "kay.server.path": { "type": "string", "default": "", "description": "Path to the kay CLI, absolute or relative to the workspace. Empty uses the workspace's node_modules/kay, or src/cli.ts inside the kay repository itself." },
-        "kay.routes": { "type": "string", "default": "src/routes", "description": "Directory of the pages, relative to the workspace, so route params and links are typed." }
+        "kay.bun.path": {
+          "type": "string",
+          "default": "bun",
+          "description": "The Bun executable that runs the language server."
+        },
+        "kay.server.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the kay CLI, absolute or relative to the workspace. Empty uses the workspace's node_modules/kay, or src/cli.ts inside the kay repository itself."
+        },
+        "kay.routes": {
+          "type": "string",
+          "default": "src/routes",
+          "description": "Directory of the pages, relative to the workspace, so route params and links are typed."
+        }
       }
-    }
+    },
+    "grammars": [
+      {
+        "language": "kay",
+        "scopeName": "source.kay",
+        "path": "./syntaxes/kay.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.typescript": "typescript",
+          "meta.embedded.expression.kay": "typescript"
+        }
+      }
+    ]
   },
   "scripts": {
     "build": "bun build.ts",
     "check": "tsgo --noEmit -p tsconfig.json",
-    "package": "bun build.ts && bunx @vscode/vsce@4.0.0 package --no-dependencies --skip-license -o kay.vsix"
+    "package": "bun build.ts && bunx @vscode/vsce@4.0.0 package --no-dependencies --skip-license -o kay.vsix",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/vscode": "~1.91.0",
-    "vscode-languageclient": "10.1.2"
+    "vscode-languageclient": "10.1.2",
+    "vscode-oniguruma": "2.0.1",
+    "vscode-textmate": "9.3.2"
   }
 }
