@@ -1,0 +1,33 @@
+{
+  "name": "kay",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pug-like, fully typed web framework on Bun, Elysia, pg-orm and Solid's runtime",
+  "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
+  "license": "MIT",
+  "scripts": {
+    "check": "tsgo --noEmit",
+    "lint": "keslint --cache",
+    "lint:fix": "keslint --fix --cache",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/parser": "^7.29.7",
+    "@babel/preset-typescript": "^7.29.7",
+    "@babel/traverse": "^7.29.7",
+    "@babel/types": "^7.29.7",
+    "@solidjs/web": "^2.0.0-rc.13",
+    "babel-preset-solid": "^2.0.0-rc.2",
+    "solid-js": "^2.0.0-rc.13"
+  },
+  "devDependencies": {
+    "@kaynooo/eslint": "^6.0.1",
+    "@types/babel__core": "^7.20.5",
+    "@types/babel__traverse": "^7.28.0",
+    "@types/bun": "^1.4.2",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "typescript": "^6.0.3"
+  }
+}

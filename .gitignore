@@ -1,0 +1,6 @@
+node_modules
+dist
+.kay
+.eslintcache
+*.tsbuildinfo
+.env
