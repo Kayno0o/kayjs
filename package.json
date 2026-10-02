@@ -19,6 +19,11 @@
   "bin": {
     "kay": "./src/cli.ts"
   },
+  "files": [
+    "README.md",
+    "llms.txt",
+    "src"
+  ],
   "scripts": {
     "check": "tsgo --noEmit",
     "lint": "keslint --cache",
@@ -34,6 +39,7 @@
     "@babel/types": "^7.29.7",
     "@solidjs/compiler": "2.0.0-rc.13",
     "@solidjs/web": "2.0.0-rc.13",
+    "@types/babel__traverse": "^7.28.0",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "elysia": "^1.4.30",
     "solid-js": "2.0.0-rc.13"
@@ -41,7 +47,6 @@
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
     "@kaynooo/eslint": "^6.0.1",
-    "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.2",
     "bun-plugin-tailwind": "^0.1.2",
     "mitata": "1.0.34",

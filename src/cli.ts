@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { relative, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { KayCompileError } from './build/transform'
 import { check, formatCheckDiagnostic } from './check'
@@ -8,9 +8,10 @@ import { loadConfig } from './config'
 import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
+import { createProject } from './new'
 import { buildClient } from './server/client'
 
-const USAGE = 'Usage: kay dev [entry]\n       kay build [dir]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>]\n       kay dev [entry]\n       kay build [dir]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 async function main(args: string[]): Promise<number> {
   const [command, ...rest] = args
@@ -29,6 +30,9 @@ async function main(args: string[]): Promise<number> {
 
   if (command === 'build')
     return build(rest[0] ?? '.')
+
+  if (command === 'new')
+    return scaffold(rest)
 
   if (command !== 'check') {
     console.error(USAGE)
@@ -86,6 +90,30 @@ async function build(dir: string): Promise<number> {
 
 function count(amount: number, noun: string): string {
   return `${amount} ${noun}${amount === 1 ? '' : 's'}`
+}
+
+async function scaffold(args: string[]): Promise<number> {
+  const kayFlag = args.indexOf('--kay')
+  const dir = args.find((arg, index) => !arg.startsWith('-') && (kayFlag === -1 || index !== kayFlag + 1))
+
+  if (!dir || (kayFlag !== -1 && !args[kayFlag + 1])) {
+    console.error(USAGE)
+
+    return 1
+  }
+
+  try {
+    const files = await createProject(dir, { kay: kayFlag === -1 ? undefined : args[kayFlag + 1] })
+
+    console.error(`${files.map(file => `created ${join(dir, file)}`).join('\n')}\n\ncd ${dir} && bun install && bun run dev`)
+
+    return 0
+  }
+  catch (error) {
+    console.error(error instanceof Error ? error.message : error)
+
+    return 1
+  }
 }
 
 // Restarts the server on every change until interrupted.

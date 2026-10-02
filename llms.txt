@@ -301,6 +301,8 @@ new Elysia()
 
 ## Project setup
 
+`kay new my-app` writes a project that already checks, builds and runs: this setup, a layout, a page, a `_404.kay` and an island. By hand, the server entry is:
+
 ```ts
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
@@ -334,6 +336,7 @@ export default defineConfig({ routes: 'src/routes', lang: 'en', minify: true, pl
 
 ## Commands
 
+- `kay new <dir> [--kay <dependency>]`: scaffold a project in an empty directory; `--kay` sets the `kay` dependency, a packed copy of this checkout by default.
 - `kay dev [entry]`: run the server entry (default `src/server.ts`) with `NODE_ENV=development`, restarting it on every change; open pages reload by themselves, and a project that fails to compile shows its errors in the browser.
 - `kay build [dir]`: bundle the islands for production, minified, into `.kay/client`; then start the server with `NODE_ENV=production`. Each page preloads the chunks of the islands it renders.
 - `kay check [dir] [-p tsconfig.json]`: type-check the project, `.kay` files included.
