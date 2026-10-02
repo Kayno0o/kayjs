@@ -16,3 +16,11 @@ export async function listTodos(): Promise<Todo[]> {
 export async function findTodo(id: number): Promise<Todo | undefined> {
   return todos.find(todo => todo.id === id)
 }
+
+export async function addTodo(title: string): Promise<Todo> {
+  const todo = { id: todos.length + 1, title, done: false }
+
+  todos.push(todo)
+
+  return todo
+}

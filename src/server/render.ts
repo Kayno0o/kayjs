@@ -3,6 +3,7 @@ import type { PageContext } from '../runtime'
 import type { ClientBuild } from './client'
 import type { Route } from './routes'
 import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
+import { NotFound, Redirect } from './signals'
 
 interface PageModule {
   default: (props: Record<string, unknown>) => JSX.Element
@@ -12,12 +13,6 @@ interface PageModule {
 export interface RenderOptions {
   lang?: string
 }
-
-class Redirect {
-  constructor(readonly location: string, readonly status: number) {}
-}
-
-class NotFound {}
 
 export async function renderPage(route: Route, request: Request, rawParams: Record<string, string>, client: ClientBuild | undefined, options: RenderOptions = {}): Promise<Response> {
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })

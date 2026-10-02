@@ -40,7 +40,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const server = analyzeServer(source, file.server)
   const name = componentName(filename)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
-  const generateOptions = { name, island, includeServer: options.includeServer, params: options.params }
+  const generateOptions = { name, island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params }
   const analysis = generate(file, script, server, generateOptions)
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   const { rewrites, diagnostics } = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings)

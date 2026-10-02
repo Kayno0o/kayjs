@@ -1,0 +1,17 @@
+---
+import { signal } from 'kay'
+import { add } from '../routes/index.kay'
+
+const title = signal('')
+const saved = signal<number>()
+
+async function submit(event: SubmitEvent) {
+  event.preventDefault()
+  saved.set(await add({ title: title() }))
+}
+---
+form.quick(onSubmit={submit})
+  input(bind:value={title})
+  button Save
+  if saved() as id
+    p.saved Saved as {id}

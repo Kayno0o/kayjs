@@ -1,5 +1,9 @@
 --- server
-import { listTodos } from '../data'
+import { t } from 'elysia'
+import { action } from 'kay'
+import { addTodo, listTodos } from '../data'
+
+export const add = action(t.Object({ title: t.String({ minLength: 1 }) }), async ({ title }) => (await addTodo(title)).id)
 
 const todos = await listTodos()
 const open = todos.filter(todo => !todo.done).length
@@ -13,4 +17,7 @@ Card(title="Todos")
   ul
     for todo of todos key={todo.id}
       li: a(href={`/todos/${todo.id}`}) {todo.title}
+  form.add(action={add})
+    input(name="title" placeholder="New todo")
+    button Add
 Counter(start={open})

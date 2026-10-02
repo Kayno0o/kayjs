@@ -10,6 +10,21 @@ const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
 const ENTRY = /<script type="module" src="\/_kay\/([^"]+)"><\/script>/
 const BODY = /<body>([\s\S]*)<\/body>/
 
+interface ClientEntry {
+  ready: Promise<void>
+  hydrate: (root?: ParentNode) => Promise<void>
+}
+
+let hydrated = false
+
+// The entry hydrates the document it loads in; a module is evaluated once per process, so later documents go through its `hydrate`.
+async function hydrateFrom(html: string): Promise<void> {
+  const entry = await import(join(process.cwd(), '.kay/client/dist', ENTRY.exec(html)![1]!)) as ClientEntry
+
+  await (hydrated ? entry.hydrate() : entry.ready)
+  hydrated = true
+}
+
 async function get(path: string): Promise<{ status: number, html: string, headers: Headers }> {
   const response = await app.handle(new Request(`http://localhost${path}`))
 
@@ -80,8 +95,7 @@ describe('pages', () => {
       const button = document.querySelector('kay-island button')!
       const card = document.querySelector('article.card')!
 
-      await import(join(process.cwd(), '.kay/client/dist', ENTRY.exec(html)![1]!))
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await hydrateFrom(html)
       expect(document.querySelector('kay-island button')).toBe(button)
       button.dispatchEvent(new Event('click', { bubbles: true }))
       await new Promise(resolve => setTimeout(resolve, 0))
@@ -91,5 +105,65 @@ describe('pages', () => {
     finally {
       await GlobalRegistrator.unregister()
     }
+  })
+
+  it('posts a plain form to its action and returns to the page', async () => {
+    const home = await get('/')
+    const form = (/<form class="add" action="([^"]+)" method="post"><input name="title"/).exec(home.html)
+
+    expect(form?.[1]).toBe('/_kay/action/tests/fixtures/site/src/routes/index.kay/add')
+    const response = await app.handle(new Request(`http://localhost${form![1]}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/' },
+      body: new URLSearchParams({ title: 'From a form' }),
+    }))
+
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe('http://localhost/')
+    expect((await get('/')).html).toContain('From a form</a></li>')
+  })
+
+  it('answers a fetch call with the result and rejects input the schema refuses', async () => {
+    const call = (body: unknown) => app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-kay-action': '1' },
+      body: JSON.stringify(body),
+    }))
+    const created = await call({ title: 'From fetch' })
+
+    expect(created.status).toBe(200)
+    expect(typeof await created.json()).toBe('number')
+    expect((await call({ title: '' })).status).toBe(422)
+    expect((await call({})).status).toBe(422)
+  })
+
+  it('lets an island call a page action through its browser stub', async () => {
+    const html = await (await app.handle(new Request('http://localhost/new'))).text()
+    const realFetch = globalThis.fetch
+
+    GlobalRegistrator.register()
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => app.handle(new Request(new URL(String(input), 'http://localhost'), init))) as typeof fetch
+
+    try {
+      delete (globalThis as { _$HY?: unknown })._$HY
+      // eslint-disable-next-line no-new-func -- runs Solid's inline bootstrap script, which happy-dom does not execute from markup
+      new Function(INLINE_SCRIPT.exec(html)![1]!)()
+      document.body.innerHTML = BODY.exec(html)![1]!
+      await hydrateFrom(html)
+      const input = document.querySelector<HTMLInputElement>('form.quick input')!
+
+      input.value = 'From an island'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      // Solid 2 stages writes until a microtask; a person types and submits in separate tasks.
+      await new Promise(resolve => setTimeout(resolve, 0))
+      document.querySelector('form.quick')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await new Promise(resolve => setTimeout(resolve, 50))
+      expect(document.querySelector('p.saved')?.textContent).toStartWith('Saved as ')
+    }
+    finally {
+      globalThis.fetch = realFetch
+      await GlobalRegistrator.unregister()
+    }
+    expect((await get('/')).html).toContain('From an island</a></li>')
   })
 })

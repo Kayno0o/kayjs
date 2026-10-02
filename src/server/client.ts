@@ -33,7 +33,8 @@ export async function buildClient(root: string, options: { minify?: boolean } = 
 
   await rm(dir, { recursive: true, force: true })
   await mkdir(base, { recursive: true })
-  await Bun.write(entryFile, `import { hydrateIslands } from 'kay/client'\n\nvoid hydrateIslands({\n${registry}\n})\n`)
+  // `hydrate` re-runs over a root whose markup was swapped in after load.
+  await Bun.write(entryFile, `import { hydrateIslands } from 'kay/client'\n\nconst islands = {\n${registry}\n}\n\nexport const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)\nexport const ready = hydrate()\n`)
 
   const build = await Bun.build({
     entrypoints: [entryFile],

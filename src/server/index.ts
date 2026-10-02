@@ -3,6 +3,7 @@ import process from 'node:process'
 import { plugin } from 'bun'
 import { Elysia } from 'elysia'
 import { kay } from '../build/plugin'
+import { registerActionRoutes } from './actions'
 import { ASSET_PREFIX, buildClient } from './client'
 import { renderPage } from './render'
 import { scanRoutes } from './routes'
@@ -48,6 +49,7 @@ export async function pages(options: PagesOptions = {}) {
     })
   }
 
+  await registerActionRoutes(app, routes)
   for (const route of routes)
     app.get(route.pattern, ({ request, params }) => renderPage(route, request, params as Record<string, string>, client, options))
 

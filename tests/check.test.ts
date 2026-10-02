@@ -20,6 +20,7 @@ describe('kay check', () => {
     expect(brief).toEqual([
       { file: 'broken/src/routes/[id].kay', line: 2, column: 30, code: 'TS2339', message: 'Property \'slug\' does not exist on type \'{ id: string; }\'.' },
       { file: 'broken/src/routes/[id].kay', line: 5, column: 9, code: 'TS2551', message: expect.stringContaining('Property \'nam\' does not exist') },
+      { file: 'broken/src/routes/form.kay', line: 8, column: 15, code: 'TS2345', message: 'Argument of type \'"titel"\' is not assignable to parameter of type \'"title"\'.' },
       { file: 'broken/src/todo-item.kay', line: 7, column: 14, code: 'TS2551', message: 'Property \'titel\' does not exist on type \'Todo\'. Did you mean \'title\'?' },
       { file: 'broken/src/todo-item.kay', line: 8, column: 5, code: 'TS2322', message: expect.stringContaining('hreff') },
       { file: 'broken/src/todo-list.kay', line: 5, column: 3, code: 'TS2322', message: expect.stringContaining('IntrinsicAttributes & { todo: Todo; }') },

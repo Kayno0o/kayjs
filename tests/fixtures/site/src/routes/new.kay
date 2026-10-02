@@ -1,0 +1,5 @@
+---
+import QuickAdd from '../components/quick-add.kay'
+---
+h1 New todo
+QuickAdd

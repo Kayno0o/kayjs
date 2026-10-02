@@ -1,12 +1,15 @@
 import type { Attribute, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 import type { Rewrite } from './mapping'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
+import { actionUrl } from '../runtime/action'
 import { CodeBuilder } from './mapping'
 
 export interface GenerateOptions {
   name: string
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
   island?: string
+  // Path relative to the project root, naming the module's actions.
+  moduleId: string
   // Browser builds leave the `--- server` fence out entirely; type checking and SSR keep it.
   includeServer?: boolean
   // Route parameters, typing `ctx.params` in `load`.
@@ -25,6 +28,8 @@ export interface Generated {
 const JSX_TEXT_ESCAPES = /[{}<>]/g
 const BINDABLE = new Set(['input', 'textarea', 'select'])
 const NUMERIC_INPUTS = new Set(['number', 'range'])
+const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
+const CTX_REFERENCE = /\bctx\b/
 const DEFAULT_PREFIX = '__default_'
 
 export function defaultName(index: number): string {
@@ -40,6 +45,8 @@ class Generator {
   private readonly accessorSites = new Set<number>()
   private readonly diagnostics: Diagnostic[] = []
   private readonly src: string
+  // The action expression of the form being emitted, so its fields' names are checked against the action's input.
+  private formTarget: Span | undefined
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
     this.src = file.source
@@ -60,6 +67,19 @@ class Generator {
 
     if (server)
       b.add(`import type { PageContext as KayPageContext, PageData as KayPageData } from 'kay'\n`)
+
+    const kayHelpers = formHelpers(this.file)
+
+    if (server && server.exportNames.length > 0)
+      kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
+
+    if (kayHelpers.length > 0)
+      b.add(`import { ${kayHelpers.map(helper => `${helper} as ${kayAlias(helper)}`).join(', ')} } from 'kay'\n`)
+
+    if (server && !includeServer) {
+      for (const name of server.exportNames)
+        b.add(`export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`)
+    }
 
     const childrenSlot = usesChildrenSlot(this.file.template)
     const childrenType = ' & { children?: KayJSX.Element }'
@@ -120,9 +140,15 @@ class Generator {
     for (const span of server.exports)
       b.addSource(span).add('\n')
 
+    if (server.exportNames.length > 0)
+      b.add(`KayRegisterActions(${JSON.stringify(this.options.moduleId)}, { ${server.exportNames.join(', ')} })\n`)
+
     const params = this.options.params ? `{ ${this.options.params.map(name => `${JSON.stringify(name)}: string`).join(', ')} }` : 'Record<string, string>'
 
-    b.add(`\nexport async function load(ctx: KayPageContext<${params}>) {\n`)
+    // An unused parameter would trip `noUnusedParameters` in the user's tsconfig, so it is named `_ctx` when the fence never reads it.
+    const ctx = server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'
+
+    b.add(`\nexport async function load(${ctx}: KayPageContext<${params}>) {\n`)
     for (const span of server.body)
       b.addSource(span)
     b.add(`\nreturn { ${server.data.map(data => data.name).join(', ')} }\n}\n`)
@@ -363,7 +389,14 @@ class Generator {
       }
 
       b.add('>')
+      const outerForm = this.formTarget
+      const action = actionOf(element, this.src)
+
+      if (action)
+        this.formTarget = action.expression
+
       this.emitChildren(children)
+      this.formTarget = outerForm
       b.add(`</${element.name}>`)
     })
   }
@@ -391,8 +424,33 @@ class Generator {
         continue
 
       b.add(' ')
-      this.emitAttribute(element, attribute)
+
+      if (!this.emitFormAttribute(element, attribute))
+        this.emitAttribute(element, attribute)
     }
+
+    if (actionOf(element, this.src) && !element.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'method'))
+      b.add(' method="post"')
+  }
+
+  // `form(action={add})` posts to the action's URL, and each field `name` inside it must be a key of the action's input.
+  private emitFormAttribute(element: ElementNode, attribute: Attribute): boolean {
+    const { b } = this
+
+    if (attribute.kind === 'expression' && attribute === actionOf(element, this.src)) {
+      b.addSource(attribute.name).add(`={${kayAlias('formAction')}((`).addSource(attribute.expression).add('))}')
+
+      return true
+    }
+
+    if (!this.formTarget || attribute.kind !== 'static' || element.component || !FORM_FIELDS.has(element.name) || this.text(attribute.name) !== 'name')
+      return false
+
+    b.addSource(attribute.name).add(`={${kayAlias('field')}((`).addSource(this.formTarget).add('), ')
+    b.wrap(attribute.value, () => b.add(JSON.stringify(attribute.text)))
+    b.add(')}')
+
+    return true
   }
 
   private emitShorthandClass(element: ElementNode, attribute: Attribute | undefined) {
@@ -576,6 +634,56 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   })
 
   return visit(file.template)
+}
+
+type KayHelper = 'formAction' | 'field' | 'registerActions' | 'actionStub'
+
+function kayAlias(helper: KayHelper): string {
+  return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
+}
+
+function actionOf(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
+  if (element.component || element.name !== 'form')
+    return undefined
+
+  const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'action')
+
+  return attribute?.kind === 'expression' ? attribute : undefined
+}
+
+// The `kay` helpers the template's forms need: `formAction` for an action form, `field` when it has named fields.
+function formHelpers(file: KayFile): KayHelper[] {
+  let form = false
+  let field = false
+  const visit = (nodes: Node[], inForm: boolean) => {
+    for (const node of nodes) {
+      if (node.kind === 'element') {
+        const isForm = actionOf(node, file.source) !== undefined
+
+        form ||= isForm
+        field ||= inForm && !node.component && FORM_FIELDS.has(node.name) && node.attributes.some(attribute => attribute.kind === 'static' && file.source.slice(attribute.name.start, attribute.name.end) === 'name')
+        visit(node.children, inForm || isForm)
+      }
+      else if (node.kind === 'text') {
+        visit(node.parts.filter(part => part.kind === 'element'), inForm)
+      }
+      else if (node.kind === 'if') {
+        for (const branch of node.branches)
+          visit(branch.children, inForm)
+      }
+      else if (node.kind === 'for') {
+        visit(node.children, inForm)
+        visit(node.fallback ?? [], inForm)
+      }
+      else {
+        visit(node.children, inForm)
+      }
+    }
+  }
+
+  visit(file.template, false)
+
+  return [...(form ? ['formAction' as const] : []), ...(field ? ['field' as const] : [])]
 }
 
 type Helper = 'For' | 'Show' | 'omit'

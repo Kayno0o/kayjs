@@ -33,3 +33,6 @@ export interface PageContext<Params extends Record<string, string> = Record<stri
 
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
+
+export type { Action, ActionContext, FieldName, ServerAction } from './action'
+export { action, ActionError, actionStub, field, formAction, isAction, registerActions } from './action'

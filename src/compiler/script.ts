@@ -92,6 +92,8 @@ export interface ServerAnalysis {
   // Imports and types, plus exported values such as actions: module level, outside `load`.
   hoisted: Span[]
   exports: Span[]
+  // Names the exports declare: actions the server registers and browser builds replace with fetch stubs.
+  exportNames: string[]
   // Statements that run per request, inside `load(ctx)`.
   body: Span[]
   // Names declared at the top of the fence: `load` returns them and the template reads them.
@@ -104,7 +106,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], exports: [], body: [], data: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], exports: [], exportNames: [], body: [], data: [], diagnostics: [] }
   const parsed = parseFence(source, server, analysis.diagnostics)
 
   if (!parsed)
@@ -121,6 +123,8 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
     }
     else if (statement.type === 'ExportNamedDeclaration' && statement.declaration) {
       analysis.exports.push(span)
+      for (const identifier of declaredIdentifiers(statement.declaration))
+        analysis.exportNames.push(identifier.name)
     }
     else if (statement.type === 'ExportDefaultDeclaration' || statement.type === 'ExportAllDeclaration' || statement.type === 'ExportNamedDeclaration') {
       analysis.diagnostics.push({ ...span, message: 'A server fence exports declarations only: `export const add = action(...)`' })
