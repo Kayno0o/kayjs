@@ -4,6 +4,7 @@ import type { ClientBuild } from './client'
 import type { Route, SpecialPage, SpecialPages } from './routes'
 import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
 import { logError, mapStack } from '../build/sourcemap'
+import { collectIslands } from '../runtime/island.server'
 import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
 import { errorPage } from './overlay'
@@ -38,6 +39,8 @@ interface Rendering {
 
 const CHARSET = '<meta charset="utf-8">'
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
+// The scripts and preloads per set of islands a page renders: few sets exist, and they never change for a build.
+const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 
 export async function renderPage(route: Route, context: RequestContext, client: ClientBuild | undefined, options: RenderOptions = {}): Promise<Response> {
@@ -189,14 +192,39 @@ function renderDocument(modules: PageModule[], data: Record<string, unknown>[], 
   }
   let head = ''
   // Pages and layouts are static: only islands, rendered as their own roots, carry hydration keys. Without scripts, a `head` title renders as a `<title>`.
-  const body = renderToString(() => createComponent(NoHydration, { get children() {
+  const { result: body, islands } = collectIslands(() => renderToString(() => createComponent(NoHydration, { get children() {
     return view()
   } }), { noScripts: true, onHead: (html) => {
     head = html
-  } })
-  const scripts = client && body.includes('<kay-island') ? `${generateHydrationScript()}<script type="module" src="${client.entry}"></script>` : ''
+  } }))
+  const scripts = client && islands.size > 0 ? islandScripts(client, islands) : ''
 
   return `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${scripts}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
+}
+
+// Preloads every chunk the page's islands need, so the browser fetches them alongside the entry instead of one round trip after another.
+function islandScripts(client: ClientBuild, islands: Set<string>): string {
+  const key = [...islands].sort().join('\n')
+  let cached = scriptsCache.get(client)
+
+  if (!cached)
+    scriptsCache.set(client, cached = new Map())
+
+  let html = cached.get(key)
+
+  if (html === undefined) {
+    const chunks = new Set(client.entryImports)
+
+    for (const id of islands) {
+      for (const chunk of client.islands[id] ?? [])
+        chunks.add(chunk)
+    }
+
+    html = `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${generateHydrationScript()}<script type="module" src="${client.entry}"></script>`
+    cached.set(key, html)
+  }
+
+  return html
 }
 
 // A `head` block may set its own charset or viewport; registering the defaults through Solid instead would cost every render.

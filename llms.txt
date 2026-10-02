@@ -271,7 +271,15 @@ import { pages } from 'kay/server'
 new Elysia().use(await pages()).listen(3000)
 ```
 
-`pages()` takes `root`, `routes` (default `src/routes`), `minify`, `lang` and `dev` (default: `NODE_ENV` is `development`). A `.ts` file imports a component as `import Card from './card.kay'`, typed through the generated `.kay/types` tree. List `.kay/` in `.gitignore` and merge the tree in `tsconfig.json`:
+Project settings live in an optional `kay.config.ts` at the root, read by `pages()` and every command; options passed to `pages()` win over it.
+
+```ts
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({ routes: 'src/routes', lang: 'en', minify: true, plugins: [] })
+```
+
+`pages()` also takes `root`, `dev` (default: `NODE_ENV` is `development`) and `prebuilt` (default: `NODE_ENV` is `production`), which serves what `kay build` wrote instead of bundling at boot. A `.ts` file imports a component as `import Card from './card.kay'`, typed through the generated `.kay/types` tree. List `.kay/` in `.gitignore` and merge the tree in `tsconfig.json`:
 
 ```json
 {
@@ -290,6 +298,7 @@ new Elysia().use(await pages()).listen(3000)
 ## Commands
 
 - `kay dev [entry]`: run the server entry (default `src/server.ts`) with `NODE_ENV=development`, restarting it on every change; open pages reload by themselves, and a project that fails to compile shows its errors in the browser.
+- `kay build [dir]`: bundle the islands for production, minified, into `.kay/client`; then start the server with `NODE_ENV=production`. Each page preloads the chunks of the islands it renders.
 - `kay check [dir] [-p tsconfig.json]`: type-check the project, `.kay` files included.
 - `kay fmt [paths...] [--check]`: format `.kay` files; `--check` lists unformatted files and fails.
 - `kay lsp --stdio`: the language server behind the editor extension in `editors/vscode`.

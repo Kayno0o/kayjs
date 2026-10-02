@@ -1,3 +1,4 @@
+import type { ClientManifest } from '../src/server/client'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -82,6 +83,26 @@ describe('pages', () => {
     expect(about).toContain('content="What this site is"')
     expect(home).toContain('<title data-dh="title">Kay demo</title>')
     expect(home).toContain('content="Kay demo, a site of todos"')
+  })
+
+  it('preloads the chunks of the islands a page renders, from a manifest a prebuilt server reads', async () => {
+    const manifestFile = Bun.file(join(process.cwd(), '.kay/client/manifest.json'))
+    const manifest = await manifestFile.json() as ClientManifest
+    const counter = manifest.islands['tests/fixtures/site/src/components/counter.kay']!
+    const home = (await get('/')).html
+
+    expect(counter[0]).toMatch(/^\/_kay\/counter-\w+\.js$/)
+    for (const chunk of new Set([...manifest.entryImports, ...counter]))
+      expect(home).toContain(`<link rel="modulepreload" href="${chunk}">`)
+    expect(home).not.toContain(manifest.islands['tests/fixtures/site/src/components/quick-add.kay']![0])
+    expect(home).toContain(`<script type="module" src="${manifest.entry}"></script>`)
+    expect((await get('/about')).html).not.toContain('modulepreload')
+
+    const built = manifestFile.lastModified
+    const prebuilt = await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: true })
+
+    expect(await (await prebuilt.handle(new Request('http://localhost/'))).text()).toContain(`src="${manifest.entry}"`)
+    expect(Bun.file(manifestFile.name!).lastModified).toBe(built)
   })
 
   it('passes route params and honours notFound and redirect', async () => {

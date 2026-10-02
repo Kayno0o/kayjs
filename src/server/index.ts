@@ -1,26 +1,30 @@
+import type { KayConfig } from '../config'
+import type { ClientBuild } from './client'
 import { normalize, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { plugin } from 'bun'
 import { Elysia } from 'elysia'
 import { kay } from '../build/plugin'
 import { logError } from '../build/sourcemap'
+import { loadConfig } from '../config'
 import { registerActionRoutes } from './actions'
-import { ASSET_PREFIX, buildClient } from './client'
+import { ASSET_PREFIX, buildClient, readClient } from './client'
 import { bootFailure, DEV_EVENTS, devEvents } from './dev'
 import { renderPage, renderUnmatched } from './render'
 import { decodePath, scanRoutes, specialPagesOf } from './routes'
 
+export type { KayConfig } from '../config'
+export { defineConfig } from '../config'
 export type { Route } from './routes'
 
-export interface PagesOptions {
+// Options given here win over the project's `kay.config.ts`.
+export interface PagesOptions extends KayConfig {
   // Project root: island ids and `.kay/` output are relative to it. Defaults to the working directory.
   root?: string
-  // Page directory, relative to the root.
-  routes?: string
-  minify?: boolean
-  lang?: string
   // Shows thrown errors with their stack. Defaults to on when NODE_ENV is development.
   dev?: boolean
+  // Serves the bundle `kay build` wrote instead of bundling at boot. Defaults to on when NODE_ENV is production.
+  prebuilt?: boolean
 }
 
 let runtimePluginRoot: string | undefined
@@ -32,10 +36,10 @@ export async function pages(options: PagesOptions = {}) {
   const dev = options.dev ?? process.env.NODE_ENV === 'development'
 
   if (!dev)
-    return servePages(root, options)
+    return servePages(root, { ...await loadConfig(root), ...options })
 
   try {
-    return await servePages(root, { ...options, dev })
+    return await servePages(root, { ...await loadConfig(root), ...options, dev })
   }
   catch (error) {
     logError(error)
@@ -56,7 +60,7 @@ async function servePages(root: string, options: PagesOptions) {
     throw new Error(`kay: the .kay loader is registered for ${runtimePluginRoot}; one process serves one project`)
   }
 
-  const [routes, client] = await Promise.all([scanRoutes(routesDir), buildClient(root, { minify: options.minify })])
+  const [routes, client] = await Promise.all([scanRoutes(routesDir), clientFor(root, options)])
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
   if (options.dev)
@@ -85,4 +89,17 @@ async function servePages(root: string, options: PagesOptions) {
     app.get('/*', async context => renderUnmatched(fallback, context, client, renderOptions))
 
   return app
+}
+
+async function clientFor(root: string, options: PagesOptions): Promise<ClientBuild | undefined> {
+  if (options.prebuilt ?? process.env.NODE_ENV === 'production') {
+    const built = await readClient(root)
+
+    if (built !== undefined)
+      return built ?? undefined
+
+    console.warn('kay: no client build in .kay/client, bundling now; run `kay build` before starting in production')
+  }
+
+  return buildClient(root, { minify: options.minify, plugins: options.plugins })
 }

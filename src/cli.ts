@@ -1,13 +1,16 @@
 #!/usr/bin/env bun
 import { relative, resolve } from 'node:path'
 import process from 'node:process'
+import { KayCompileError } from './build/transform'
 import { check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
+import { loadConfig } from './config'
 import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
+import { buildClient } from './server/client'
 
-const USAGE = 'Usage: kay dev [entry]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay dev [entry]\n       kay build [dir]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 async function main(args: string[]): Promise<number> {
   const [command, ...rest] = args
@@ -23,6 +26,9 @@ async function main(args: string[]): Promise<number> {
 
   if (command === 'dev')
     return runDev(rest[0])
+
+  if (command === 'build')
+    return build(rest[0] ?? '.')
 
   if (command !== 'check') {
     console.error(USAGE)
@@ -40,7 +46,8 @@ async function main(args: string[]): Promise<number> {
     return 1
   }
 
-  const diagnostics = await check(resolve(dir), { tsconfig })
+  const root = resolve(dir)
+  const diagnostics = await check(root, { tsconfig, routes: (await loadConfig(root)).routes })
 
   const sources = new Map<string, string | undefined>()
 
@@ -57,9 +64,29 @@ async function main(args: string[]): Promise<number> {
   return diagnostics.length > 0 ? 1 : 0
 }
 
+// Bundles the browser code for production, minified unless kay.config.ts says otherwise; the server then boots without bundling.
+async function build(dir: string): Promise<number> {
+  const root = resolve(dir)
+  const config = await loadConfig(root)
+  const started = performance.now()
+
+  try {
+    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins })
+
+    console.error(client ? `built ${Object.keys(client.islands).length} island${Object.keys(client.islands).length === 1 ? '' : 's'} in ${Math.round(performance.now() - started)} ms` : 'no island to build: pages ship no JavaScript')
+
+    return 0
+  }
+  catch (error) {
+    console.error(error instanceof KayCompileError ? error.message.trimStart() : error)
+
+    return 1
+  }
+}
+
 // Restarts the server on every change until interrupted.
 async function runDev(entry: string | undefined): Promise<number> {
-  const stop = await dev(process.cwd(), { entry })
+  const stop = await dev(process.cwd(), { entry, routes: (await loadConfig(process.cwd())).routes })
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)

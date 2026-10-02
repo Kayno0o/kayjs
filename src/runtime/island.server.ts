@@ -6,6 +6,22 @@ import { sharedConfig } from 'solid-js/internal'
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
 let depth = 0
 let nextRenderId = 0
+// The ids of the islands the page being rendered holds, so it preloads their chunks and nothing else.
+let rendered: Set<string> | undefined
+
+// Runs a synchronous page render and lists the islands it rendered.
+export function collectIslands<T>(render: () => T): { result: T, islands: Set<string> } {
+  const islands = new Set<string>()
+
+  rendered = islands
+
+  try {
+    return { result: render(), islands }
+  }
+  finally {
+    rendered = undefined
+  }
+}
 
 export class IslandPropsError extends Error {
   override name = 'IslandPropsError'
@@ -23,6 +39,7 @@ export function island<P extends object>(id: string, component: (props: P) => JS
     const context = sharedConfig.context
 
     depth++
+    rendered?.add(id)
 
     try {
       // Pages render under NoHydration; an island re-enters hydration so its markup carries the keys the client claims.
