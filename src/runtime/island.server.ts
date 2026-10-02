@@ -1,6 +1,7 @@
 import type { JSX } from '@solidjs/web'
 import type { IslandComponent } from './checks'
 import { createComponent, escape, Hydration, renderToString, ssr } from '@solidjs/web'
+import { sharedConfig } from 'solid-js/internal'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
 let depth = 0
@@ -18,6 +19,8 @@ export function island<P extends object>(id: string, component: (props: P) => JS
 
     const serialized = serializeProps(id, props)
     const renderId = `k${(nextRenderId++).toString(36)}-`
+    // renderToString replaces the render context and never puts it back, which would drop the page's later `useHead` calls.
+    const context = sharedConfig.context
 
     depth++
 
@@ -30,6 +33,7 @@ export function island<P extends object>(id: string, component: (props: P) => JS
       return ssr([`<kay-island data-component="${escape(id, true)}" data-render-id="${renderId}" data-props="${escape(serialized, true)}">`, '</kay-island>'], html) as unknown as JSX.Element
     }
     finally {
+      sharedConfig.context = context
       depth--
     }
   }

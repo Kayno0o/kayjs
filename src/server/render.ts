@@ -64,8 +64,12 @@ export async function renderPage(route: Route, request: Request, rawParams: Reco
     return new Response(html, { status, headers })
   }
   catch (error) {
-    if (error instanceof Redirect)
-      return new Response(null, { status: error.status, headers: { location: error.location } })
+    if (error instanceof Redirect) {
+      headers.delete('content-type')
+      headers.set('location', error.location)
+
+      return new Response(null, { status: error.status, headers })
+    }
 
     if (error instanceof NotFound)
       return new Response('Not found', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } })

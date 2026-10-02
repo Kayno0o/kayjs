@@ -72,6 +72,8 @@ describe('pages', () => {
 
     expect(redirected.status).toBe(302)
     expect(redirected.headers.get('location')).toBe('/')
+    expect(redirected.headers.get('cache-control')).toBe('no-store')
+    expect(redirected.headers.get('content-type')).toBeNull()
   })
 
   it('binds a catch-all segment', async () => {

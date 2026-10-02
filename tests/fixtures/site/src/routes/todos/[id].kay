@@ -2,8 +2,10 @@
 import { findTodo } from '../../data'
 
 const id = Number(ctx.params.id)
-if (Number.isNaN(id))
+if (Number.isNaN(id)) {
+  ctx.headers.set('cache-control', 'no-store')
   ctx.redirect('/')
+}
 const todo = await findTodo(id) ?? ctx.notFound()
 ---
 h1 {todo.title}

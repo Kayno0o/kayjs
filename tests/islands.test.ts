@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { generateHydrationScript, renderToString } from '@solidjs/web'
+import { generateHydrationScript, renderToString, useHead } from '@solidjs/web'
 import { plugin } from 'bun'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
@@ -14,9 +14,10 @@ const HYDRATION_SCRIPT = /<script>([\s\S]*?)<\/script>/
 
 let outdir: string
 let pageHtml: string
+let Page: () => unknown
 
 beforeAll(async () => {
-  const { default: Page } = await import(join(fixtures, 'page.kay')) as { default: () => unknown }
+  Page = (await import(join(fixtures, 'page.kay')) as { default: () => unknown }).default
 
   pageHtml = renderToString(() => Page())
   outdir = await mkdtemp(join(tmpdir(), 'kay-islands-'))
@@ -40,6 +41,15 @@ describe('islands', () => {
     expect(pageHtml).toContain('data-props="{&quot;start&quot;:2}"')
     expect(pageHtml).toContain('Count <!--$-->2<!--/-->')
     expect(pageHtml).toContain('<p>after</p>')
+  })
+
+  it('keeps the page render context after an island, so head tags registered later still land', () => {
+    let head = ''
+
+    renderToString(() => [Page(), useHead({ tag: 'title', props: { children: 'After the island' } })], { noScripts: true, onHead: (html) => {
+      head = html
+    } })
+    expect(head).toContain('After the island</title>')
   })
 
   it('hydrates the island in place and keeps it reactive', async () => {
