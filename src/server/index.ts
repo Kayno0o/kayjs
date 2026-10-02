@@ -66,17 +66,15 @@ async function servePages(root: string, options: PagesOptions) {
   if (options.dev)
     app.get(DEV_EVENTS, devEvents)
 
-  if (client) {
-    app.get(`${ASSET_PREFIX}*`, async ({ params, status }) => {
-      const name = decodePath(params['*'])
-      const path = name === undefined ? '' : normalize(resolve(client.dir, name))
+  app.get(`${ASSET_PREFIX}*`, async ({ params, status }) => {
+    const name = decodePath(params['*'])
+    const path = name === undefined ? '' : normalize(resolve(client.dir, name))
 
-      if (!path.startsWith(client.dir + sep) || !await Bun.file(path).exists())
-        return status(404)
+    if (!path.startsWith(client.dir + sep) || !await Bun.file(path).exists())
+      return status(404)
 
-      return new Response(Bun.file(path), { headers: { 'cache-control': 'public, max-age=31536000, immutable' } })
-    })
-  }
+    return new Response(Bun.file(path), { headers: { 'cache-control': 'public, max-age=31536000, immutable' } })
+  })
 
   await registerActionRoutes(app, routes, options.dev)
   for (const route of routes)
@@ -91,15 +89,15 @@ async function servePages(root: string, options: PagesOptions) {
   return app
 }
 
-async function clientFor(root: string, options: PagesOptions): Promise<ClientBuild | undefined> {
+async function clientFor(root: string, options: PagesOptions): Promise<ClientBuild> {
   if (options.prebuilt ?? process.env.NODE_ENV === 'production') {
     const built = await readClient(root)
 
-    if (built !== undefined)
-      return built ?? undefined
+    if (built)
+      return built
 
     console.warn('kay: no client build in .kay/client, bundling now; run `kay build` before starting in production')
   }
 
-  return buildClient(root, { minify: options.minify, plugins: options.plugins })
+  return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes })
 }

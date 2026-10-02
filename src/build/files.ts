@@ -1,5 +1,5 @@
-import { readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readdir } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 export const IGNORED_DIRS = new Set(['node_modules', '.kay', '.git', 'dist'])
 
@@ -25,4 +25,15 @@ export async function findKayFiles(root: string): Promise<string[]> {
   await walk(root)
 
   return files.sort()
+}
+
+// Leaves an unchanged file alone, so watchers and editors reading it see no change.
+export async function writeIfChanged(path: string, content: string) {
+  const file = Bun.file(path)
+
+  if (await file.exists() && await file.text() === content)
+    return
+
+  await mkdir(dirname(path), { recursive: true })
+  await Bun.write(path, content)
 }

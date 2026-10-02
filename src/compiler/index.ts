@@ -1,4 +1,4 @@
-import type { Diagnostic } from './ast'
+import type { Diagnostic, Node } from './ast'
 import type { SourceMap } from './mapping'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
@@ -29,6 +29,8 @@ export interface CompileResult {
   map: SourceMap
   // Set when the component is interactive and renders as an island.
   island?: string
+  // The `.class` shorthand names, which CSS tools scanning for class names cannot read off `div.md:flex.w-1/2`.
+  classes: string[]
   diagnostics: Diagnostic[]
 }
 
@@ -57,8 +59,31 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     tsx: final.builder.code,
     map: final.builder.map(),
     island,
+    classes: shorthandClasses(file.template, source),
     diagnostics: [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...analysis.diagnostics, ...diagnostics].sort((a, b) => a.start - b.start),
   }
+}
+
+function shorthandClasses(nodes: Node[], source: string, found: string[] = []): string[] {
+  for (const node of nodes) {
+    if (node.kind === 'element') {
+      for (const span of node.classes)
+        found.push(source.slice(span.start, span.end))
+      shorthandClasses(node.children, source, found)
+    }
+    else if (node.kind === 'text') {
+      shorthandClasses(node.parts.filter(part => part.kind === 'element'), source, found)
+    }
+    else if (node.kind === 'if') {
+      for (const branch of node.branches)
+        shorthandClasses(branch.children, source, found)
+    }
+    else {
+      shorthandClasses([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], source, found)
+    }
+  }
+
+  return found
 }
 
 export function islandId(filename: string, root = process.cwd()): string {

@@ -105,6 +105,19 @@ describe('pages', () => {
     expect(Bun.file(manifestFile.name!).lastModified).toBe(built)
   })
 
+  it('links the stylesheets the layouts and the page import, through components, islands and modules', async () => {
+    const home = (await get('/')).html
+    const links = [...home.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(match => match[1]!)
+    const [layout, page] = await Promise.all(links.map(async link => (await app.handle(new Request(`http://localhost${link}`))).text()))
+
+    expect(links).toHaveLength(2)
+    expect(layout).toContain('background: url("/paper.png")')
+    expect(page).toContain('.card {')
+    expect(page).toContain('.counter {')
+    expect((await get('/about')).html).toContain(`<link rel="stylesheet" href="${links[0]}"></head>`)
+    expect((await Bun.file(join(process.cwd(), '.kay/classes.txt')).text()).split('\n')).toEqual(expect.arrayContaining(['card', 'counter']))
+  })
+
   it('passes route params and honours notFound and redirect', async () => {
     expect((await get('/todos/1')).html).toContain('<h1>Write the compiler</h1><p class="status">Done</p>')
     expect((await get('/todos/9')).status).toBe(404)

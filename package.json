@@ -43,8 +43,10 @@
     "@kaynooo/eslint": "^6.0.1",
     "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.2",
+    "bun-plugin-tailwind": "^0.1.2",
     "mitata": "1.0.34",
     "playwright-core": "1.62.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }
 }

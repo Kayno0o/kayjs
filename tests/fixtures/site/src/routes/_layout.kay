@@ -1,9 +1,13 @@
 --- server
 const site = 'Kay demo'
 ---
+---
+import { accent } from '../theme'
+---
 head
   title {site}
   meta(name="description" content={`${site}, a site of todos`})
+  meta(name="theme-color" content={accent})
 header
   a(href="/") {site}
 main

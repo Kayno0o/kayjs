@@ -1,9 +1,9 @@
 import type { Diagnostic, SourceMap } from '../compiler'
-import { mkdir, readdir, rm } from 'node:fs/promises'
+import { readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { findKayFiles } from '../build/files'
+import { findKayFiles, writeIfChanged } from '../build/files'
 import { compileKay } from '../compiler'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -44,6 +44,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const routesDir = resolve(root, options.routes ?? 'src/routes')
 
   const environmentPath = join(root, SHADOW_DIR, 'kay-env.d.ts')
+  const assetsPath = join(root, SHADOW_DIR, 'kay-assets.d.ts')
 
   for (const file of await findKayFiles(root)) {
     const source = await Bun.file(file).text()
@@ -57,26 +58,18 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   }
 
   await writeIfChanged(environmentPath, environment((await scanRoutes(routesDir)).map(route => route.pattern)))
+  // A script rather than a module, which is what lets it declare a wildcard module.
+  await writeIfChanged(assetsPath, 'declare module \'*.css\' {}\n')
 
   // Rewriting in place keeps every shadow file present for editors reading the tree meanwhile; only stale ones go.
   const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))
     .filter(entry => entry.isFile())
     .map(entry => join(entry.parentPath, entry.name))
-    .filter(path => path !== environmentPath && !files.has(path))
+    .filter(path => path !== environmentPath && path !== assetsPath && !files.has(path))
 
   await Promise.all(stale.map(async path => rm(path)))
 
   return { files, diagnostics }
-}
-
-async function writeIfChanged(path: string, content: string) {
-  const file = Bun.file(path)
-
-  if (await file.exists() && await file.text() === content)
-    return
-
-  await mkdir(dirname(path), { recursive: true })
-  await Bun.write(path, content)
 }
 
 export function shadowPath(root: string, file: string): string {

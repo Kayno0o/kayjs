@@ -39,11 +39,12 @@ interface Rendering {
 
 const CHARSET = '<meta charset="utf-8">'
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
-// The scripts and preloads per set of islands a page renders: few sets exist, and they never change for a build.
+// Per set of islands and per chain of layouts: few exist, and they never change for a build.
 const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()
+const stylesCache = new WeakMap<ClientBuild, Map<string, string>>()
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 
-export async function renderPage(route: Route, context: RequestContext, client: ClientBuild | undefined, options: RenderOptions = {}): Promise<Response> {
+export async function renderPage(route: Route, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const params = routeParams(route, context.params)
 
   if (!params)
@@ -68,7 +69,7 @@ export async function renderPage(route: Route, context: RequestContext, client: 
       return load.value
     })
 
-    return respond(rendering, renderDocument(modules, data, client, options))
+    return respond(rendering, renderDocument(files, modules, data, client, options))
   }
   catch (error) {
     return renderFailure(error, route.special, rendering, loaded, client, options)
@@ -76,7 +77,7 @@ export async function renderPage(route: Route, context: RequestContext, client: 
 }
 
 // A URL no page serves, answered by the routes directory's own `_404.kay` or `_error.kay`.
-export async function renderUnmatched(special: SpecialPages, context: RequestContext, client: ClientBuild | undefined, options: RenderOptions = {}): Promise<Response> {
+export async function renderUnmatched(special: SpecialPages, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   return renderFailure(new NotFound(), special, createRendering(context, {}), new Map(), client, options)
 }
 
@@ -120,7 +121,7 @@ function respond(rendering: Rendering, html: string): Response {
 }
 
 // A redirect goes out as is; anything else renders the nearest special page, falling back to plain text.
-async function renderFailure(error: unknown, special: SpecialPages, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild | undefined, options: RenderOptions): Promise<Response> {
+async function renderFailure(error: unknown, special: SpecialPages, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<Response> {
   if (error instanceof Redirect) {
     rendering.headers.delete('content-type')
     rendering.headers.set('location', error.location)
@@ -152,7 +153,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
 }
 
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.
-async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild | undefined, options: RenderOptions): Promise<string | undefined> {
+async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<string | undefined> {
   const layoutsFailed = page.layouts.some(file => loaded.get(file)?.status === 'rejected')
 
   for (const files of layoutsFailed ? [[page.file]] : [[...page.layouts, page.file], [page.file]]) {
@@ -164,7 +165,7 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
         return prior?.status === 'fulfilled' ? prior.value : await module.load?.(rendering.ctx) ?? {}
       }))
 
-      return renderDocument(modules, data, client, options)
+      return renderDocument(files, modules, data, client, options)
     }
     catch (error) {
       logError(error)
@@ -179,7 +180,7 @@ async function importAll(files: string[]): Promise<PageModule[]> {
 }
 
 // The last module is the page, the others its layouts, outermost first.
-function renderDocument(modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild | undefined, options: RenderOptions): string {
+function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, options: RenderOptions): string {
   const page = modules.length - 1
   let view = () => createComponent(modules[page]!.default, data[page]!)
 
@@ -197,9 +198,30 @@ function renderDocument(modules: PageModule[], data: Record<string, unknown>[], 
   } }), { noScripts: true, onHead: (html) => {
     head = html
   } }))
-  const scripts = client && islands.size > 0 ? islandScripts(client, islands) : ''
+  const scripts = client.entry !== undefined && islands.size > 0 ? islandScripts(client, islands) : ''
 
-  return `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${scripts}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
+  return `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${stylesheets(client, files)}${scripts}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
+}
+
+// The stylesheets of the layouts, outermost first, then the page's.
+function stylesheets(client: ClientBuild, files: string[]): string {
+  if (client.styles.size === 0)
+    return ''
+
+  const key = files.join('\n')
+  let cached = stylesCache.get(client)
+
+  if (!cached)
+    stylesCache.set(client, cached = new Map())
+
+  let html = cached.get(key)
+
+  if (html === undefined) {
+    html = [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined).map(url => `<link rel="stylesheet" href="${url}">`).join('')
+    cached.set(key, html)
+  }
+
+  return html
 }
 
 // Preloads every chunk the page's islands need, so the browser fetches them alongside the entry instead of one round trip after another.

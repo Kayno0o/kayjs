@@ -150,6 +150,26 @@ h1 {todo.title}
 - The page wins over its layouts: one `title`, and one `meta` per `name`, `property` or `http-equiv`. A `link` is one per `rel` and `href`.
 - Head elements hold text only. The default charset and viewport tags can be replaced the same way.
 
+## Styles
+
+A component script or any `.ts` module imports its stylesheet: `import './card.css'`. Each page links one stylesheet per layout, outermost first, then its own, holding the CSS of every component it renders, islands included. Bun bundles them: `@import`, nesting and relative `url()` assets work, and `url(/logo.png)` is left for a public file.
+
+Tailwind runs as a build plugin. `bun add -d tailwindcss bun-plugin-tailwind`, then:
+
+```ts
+import tailwind from 'bun-plugin-tailwind'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({ plugins: [tailwind] })
+```
+
+`src/app.css`, imported by the root `_layout.kay`, points Tailwind at the classes kay collects from the `.class` shorthand, which it cannot read off `div.md:flex.w-1/2` itself:
+
+```css
+@import 'tailwindcss';
+@source '../.kay/classes.txt';
+```
+
 ## Islands
 
 A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script imports a value from `kay` or `solid-js`, such as `signal`. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript. Interactive components rendered inside an island are part of it.

@@ -71,9 +71,9 @@ async function build(dir: string): Promise<number> {
   const started = performance.now()
 
   try {
-    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins })
+    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes })
 
-    console.error(client ? `built ${Object.keys(client.islands).length} island${Object.keys(client.islands).length === 1 ? '' : 's'} in ${Math.round(performance.now() - started)} ms` : 'no island to build: pages ship no JavaScript')
+    console.error(`built ${count(Object.keys(client.islands).length, 'island')} and ${count(client.styles.size, 'stylesheet')} in ${Math.round(performance.now() - started)} ms`)
 
     return 0
   }
@@ -82,6 +82,10 @@ async function build(dir: string): Promise<number> {
 
     return 1
   }
+}
+
+function count(amount: number, noun: string): string {
+  return `${amount} ${noun}${amount === 1 ? '' : 's'}`
 }
 
 // Restarts the server on every change until interrupted.

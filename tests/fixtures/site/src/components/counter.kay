@@ -1,5 +1,6 @@
 ---
 import { signal } from 'kay'
+import './counter.css'
 
 const { start } = props<{ start: number }>()
 const count = signal(start)
