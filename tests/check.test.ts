@@ -33,6 +33,7 @@ describe('kay check', () => {
       { file: 'broken/src/routes/[id].kay', line: 2, column: 30, code: 'TS2339', message: 'Property \'slug\' does not exist on type \'{ id: string; }\'.' },
       { file: 'broken/src/routes/[id].kay', line: 5, column: 9, code: 'TS2551', message: expect.stringContaining('Property \'nam\' does not exist') },
       { file: 'broken/src/routes/form.kay', line: 8, column: 15, code: 'TS2345', message: 'Argument of type \'"titel"\' is not assignable to parameter of type \'"title"\'.' },
+      { file: 'broken/src/routes/head.kay', line: 2, column: 8, code: 'TS2322', message: expect.stringContaining('nmae') },
       { file: 'broken/src/routes/links.kay', line: 5, column: 9, code: 'TS2345', message: expect.stringContaining('No page serves /form/extra') },
       { file: 'broken/src/routes/links.kay', line: 8, column: 16, code: 'TS2345', message: expect.stringContaining('An island receives its props as JSON') },
       { file: 'broken/src/routes/links.kay', line: 8, column: 36, code: 'TS2345', message: expect.stringContaining('An island receives its props as JSON') },
@@ -57,7 +58,7 @@ describe('kay check', () => {
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     expect(code).toBe(1)
-    expect(errors).toContain('10 errors')
+    expect(errors).toContain('11 errors')
     expect(errors).toContain('2 | const id = Number(ctx.params.slug)\n  |                              ^')
   })
 })

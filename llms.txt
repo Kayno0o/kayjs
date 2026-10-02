@@ -69,6 +69,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `for item, i of list key={i}` | Rows matched by position. |
 | `slot` | Where a layout or wrapper renders its children. |
 | `@name` | Directly under a component: passes the indented block as its `name` prop. |
+| `head` | At the top level: its `title`, `meta`, `link`, `style`, `script` and `base` children go in the document head. |
 
 ```kay
 ---
@@ -130,6 +131,24 @@ Card(title="Todos")
     a(href="/new") New
   p Body text
 ```
+
+### Head
+
+```kay
+--- server
+import { findTodo } from '../../data'
+
+const todo = await findTodo(Number(ctx.params.id)) ?? ctx.notFound()
+---
+head
+  title {todo.title} | Todos
+  meta(name="description" content={`Todo #${todo.id}`})
+h1 {todo.title}
+```
+
+- One `head` block per template, at its top level, in a page, a layout or a static component; an island has none.
+- The page wins over its layouts: one `title`, and one `meta` per `name`, `property` or `http-equiv`. A `link` is one per `rel` and `href`.
+- Head elements hold text only. The default charset and viewport tags can be replaced the same way.
 
 ## Islands
 

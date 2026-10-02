@@ -167,6 +167,30 @@ describe('elements', () => {
   })
 })
 
+describe('head', () => {
+  it('registers the head tags before rendering and leaves them out of the template', () => {
+    const code = tsx('---\nconst { name } = props<{ name: string }>()\n---\nhead\n  title {name} | Docs\n  meta(name="description" content={name} data-x)\nh1 {name}')
+
+    expect(code).toContain('import { useHead as KayUseHead } from \'@solidjs/web\'')
+    expect(code).toContain('KayUseHead([{ tag: "title", props: { "children": "" + (__props.name) + " | Docs" } }, { tag: "meta", props: { "name": "description", "content": (__props.name), "data-x": true,  } }, ]);\n\nreturn <h1>{__props.name}</h1>')
+  })
+
+  it('types the head tags as elements when checking', () => {
+    const checked = compileKay('head\n  link(rel="icon" href={icon})\np x', 'test.kay', { check: true }).tsx
+
+    expect(checked).toContain('void (<><link rel="icon" href={icon} /></>);')
+    expect(checked).not.toContain('KayUseHead')
+  })
+
+  it('rejects head blocks an island, a nested element or a second block holds, and content the head cannot', () => {
+    expect(errors('---\nimport { signal } from "kay"\n---\nhead\n  title x\np')).toEqual([expect.stringContaining('An island also renders in the browser')])
+    expect(errors('head\n  title a\nhead\n  title b')).toEqual(['A template has one `head` block'])
+    expect(errors('div\n  head\n    title a')).toEqual(['A `head` block sits at the top level of a template'])
+    expect(errors('head\n  div x\n  if a\n    title a')).toEqual([expect.stringContaining('holds `title`'), expect.stringContaining('holds `title`')])
+    expect(errors('head\n  title Read #[b this]')).toEqual(['`title` holds text only'])
+  })
+})
+
 describe('check-only assertions', () => {
   const source = '---\nimport Island from \'./island.kay\'\n---\na(href=\'/docs\') Docs\nform(action={save})\n  input(name=\'title\')\nIsland(when={today})'
 

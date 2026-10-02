@@ -69,6 +69,21 @@ describe('pages', () => {
     expect(about.html).not.toContain('<script')
   })
 
+  it('merges the head blocks of layouts and page, the page winning per title and meta name', async () => {
+    const about = (await get('/about')).html
+    const home = (await get('/')).html
+
+    expect(about).toStartWith('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="description"')
+    expect(about.match(/name="viewport"/g)).toHaveLength(1)
+    expect(about).toContain('<meta name="viewport" content="width=device-width" data-dh="meta:name:viewport">')
+    expect(home).toContain('<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">')
+    expect(about).toContain('<title data-dh="title">About</title>')
+    expect(about.match(/name="description"/g)).toHaveLength(1)
+    expect(about).toContain('content="What this site is"')
+    expect(home).toContain('<title data-dh="title">Kay demo</title>')
+    expect(home).toContain('content="Kay demo, a site of todos"')
+  })
+
   it('passes route params and honours notFound and redirect', async () => {
     expect((await get('/todos/1')).html).toContain('<h1>Write the compiler</h1><p class="status">Done</p>')
     expect((await get('/todos/9')).status).toBe(404)

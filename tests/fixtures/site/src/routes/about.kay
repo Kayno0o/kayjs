@@ -1,2 +1,6 @@
+head
+  title About
+  meta(name="description" content="What this site is")
+  meta(name="viewport" content="width=device-width")
 h1 About
 p A page with no island ships no JavaScript.

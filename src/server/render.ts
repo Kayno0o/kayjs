@@ -36,6 +36,8 @@ interface Rendering {
   writeCookies: () => void
 }
 
+const CHARSET = '<meta charset="utf-8">'
+const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 
 export async function renderPage(route: Route, context: RequestContext, client: ClientBuild | undefined, options: RenderOptions = {}): Promise<Response> {
@@ -186,15 +188,23 @@ function renderDocument(modules: PageModule[], data: Record<string, unknown>[], 
     } })
   }
   let head = ''
-  // Pages and layouts are static: only islands, rendered as their own roots, carry hydration keys.
+  // Pages and layouts are static: only islands, rendered as their own roots, carry hydration keys. Without scripts, a `head` title renders as a `<title>`.
   const body = renderToString(() => createComponent(NoHydration, { get children() {
     return view()
-  } }), { onHead: (html) => {
+  } }), { noScripts: true, onHead: (html) => {
     head = html
   } })
   const scripts = client && body.includes('<kay-island') ? `${generateHydrationScript()}<script type="module" src="${client.entry}"></script>` : ''
 
-  return `<!doctype html><html lang="${options.lang ?? 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${head}${scripts}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
+  return `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${scripts}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
+}
+
+// A `head` block may set its own charset or viewport; registering the defaults through Solid instead would cost every render.
+function defaultHead(head: string): string {
+  if (head === '')
+    return CHARSET + VIEWPORT
+
+  return (head.includes('data-dh="charset"') ? '' : CHARSET) + (head.includes('data-dh="meta:name:viewport"') ? '' : VIEWPORT)
 }
 
 function describeError(error: unknown, dev = false): PageError {

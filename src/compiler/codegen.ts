@@ -38,6 +38,8 @@ const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 const LINK_ELEMENTS = new Set(['a', 'area'])
 const CTX_REFERENCE = /\bctx\b/
 const DEFAULT_PREFIX = '__default_'
+const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
+const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script` and `base` elements only'
 
 export function defaultName(index: number): string {
   return `${DEFAULT_PREFIX}${index}`
@@ -102,6 +104,11 @@ class Generator {
     if (this.options.island)
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
 
+    const { head, template } = this.splitHead(this.file.template)
+
+    if (head && !this.options.check)
+      b.add(`import { useHead as KayUseHead } from '@solidjs/web'\n`)
+
     if (includeServer)
       this.emitLoad(server)
 
@@ -130,8 +137,12 @@ class Generator {
 
     b.add(') {\n')
     this.emitBody()
+
+    if (head)
+      this.emitHead(head)
+
     b.add('\nreturn ')
-    this.emitRoot(this.file.template)
+    this.emitRoot(template)
     b.add('\n}\n')
 
     if (this.options.island)
@@ -228,6 +239,120 @@ class Generator {
         b.add(`${JSON.stringify(binding.key)}: `).addSource(binding.local).add(', ')
       b.add('} = __props;\n')
     }
+  }
+
+  // The template's top-level `head` block, which renders into the document head rather than in place.
+  private splitHead(nodes: Node[]): { head?: ElementNode, template: Node[] } {
+    let head: ElementNode | undefined
+    const template: Node[] = []
+
+    for (const node of nodes) {
+      if (!isHead(node)) {
+        template.push(node)
+
+        continue
+      }
+
+      if (head)
+        this.error(node, 'A template has one `head` block')
+      else if (this.options.island)
+        this.error(node, 'An island also renders in the browser, so it cannot set the document head; move the `head` block to its page')
+      else if (node.attributes.length > 0 || node.classes.length > 0 || node.id)
+        this.error(node, 'A `head` block takes no attributes')
+
+      head ??= node
+    }
+
+    return { head, template }
+  }
+
+  // Registered before the template renders, so a page's title and meta tags win over its layouts': they render first and register first.
+  private emitHead(head: ElementNode) {
+    const { b } = this
+    const tags = head.children.filter((child): child is ElementNode => this.isHeadTag(child))
+
+    if (this.options.check) {
+      b.add('void (<>')
+      this.emitChildren(tags)
+      b.add('</>);\n')
+
+      return
+    }
+
+    b.add('KayUseHead([')
+    for (const tag of tags) {
+      this.emitHeadTag(tag)
+      b.add(', ')
+    }
+    b.add(']);\n')
+  }
+
+  private isHeadTag(node: Node): boolean {
+    if (node.kind !== 'element' || node.component || !HEAD_TAGS.has(node.name)) {
+      this.error(node, HEAD_CONTENT)
+
+      return false
+    }
+
+    const nested = node.children.find(child => child.kind !== 'text' || child.parts.some(part => part.kind === 'element'))
+
+    if (nested)
+      this.error(nested, `\`${node.name}\` holds text only`)
+
+    return nested === undefined
+  }
+
+  // The tag Solid's `useHead` takes: `{ tag: 'meta', props: { name: 'description', content: (description) } }`.
+  private emitHeadTag(element: ElementNode) {
+    const { b } = this
+
+    b.wrap(element, () => {
+      b.add(`{ tag: ${JSON.stringify(element.name)}, props: { `)
+
+      if (element.classes.length > 0)
+        b.add(`"class": ${JSON.stringify(element.classes.map(span => this.text(span)).join(' '))}, `)
+
+      if (element.id)
+        b.add(`"id": ${JSON.stringify(this.text(element.id))}, `)
+
+      for (const attribute of element.attributes) {
+        if (attribute.kind === 'spread') {
+          b.add('...(').addSource(attribute.expression).add('), ')
+
+          continue
+        }
+
+        b.add(`${JSON.stringify(this.text(attribute.name))}: `)
+
+        if (attribute.kind === 'static')
+          b.add(JSON.stringify(attribute.text))
+        else if (attribute.kind === 'expression')
+          b.add('(').addSource(attribute.expression).add(')')
+        else
+          b.add('true')
+
+        b.add(', ')
+      }
+
+      const lines = element.children.filter(child => child.kind === 'text')
+
+      if (lines.length > 0) {
+        b.add('"children": ""')
+        for (const [index, line] of lines.entries()) {
+          if (index > 0)
+            b.add(' + "\\n"')
+
+          for (const part of line.parts) {
+            if (part.kind === 'expression')
+              b.add(' + (').addSource(part.expression).add(')')
+            else if (part.kind === 'chunk')
+              b.add(` + ${JSON.stringify(part.text)}`)
+          }
+        }
+      }
+
+      b.add(' } }')
+    })
   }
 
   private emitRoot(nodes: Node[]) {
@@ -367,6 +492,9 @@ class Generator {
 
   private emitElement(element: ElementNode) {
     const { b } = this
+
+    if (isHead(element))
+      this.error(element, 'A `head` block sits at the top level of a template')
 
     if (isChildrenSlot(element)) {
       if (element.attributes.length > 0 || element.classes.length > 0 || element.id || element.children.length > 0)
@@ -729,6 +857,10 @@ type Helper = 'For' | 'Show' | 'omit'
 
 function helperAlias(helper: Helper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
+}
+
+function isHead(node: Node): node is ElementNode {
+  return node.kind === 'element' && !node.component && node.name === 'head'
 }
 
 // `slot` renders the children a layout or wrapper component receives, like Astro's `<slot />`.

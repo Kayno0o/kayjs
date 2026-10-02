@@ -1,6 +1,9 @@
 --- server
 const site = 'Kay demo'
 ---
+head
+  title {site}
+  meta(name="description" content={`${site}, a site of todos`})
 header
   a(href="/") {site}
 main
