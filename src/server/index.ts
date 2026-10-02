@@ -5,8 +5,8 @@ import { Elysia } from 'elysia'
 import { kay } from '../build/plugin'
 import { registerActionRoutes } from './actions'
 import { ASSET_PREFIX, buildClient } from './client'
-import { renderPage } from './render'
-import { decodePath, scanRoutes } from './routes'
+import { renderPage, renderUnmatched } from './render'
+import { decodePath, scanRoutes, specialPagesOf } from './routes'
 
 export type { Route } from './routes'
 
@@ -17,6 +17,8 @@ export interface PagesOptions {
   routes?: string
   minify?: boolean
   lang?: string
+  // Shows thrown errors with their stack. Defaults to on when NODE_ENV is development.
+  dev?: boolean
 }
 
 let runtimePluginRoot: string | undefined
@@ -25,6 +27,7 @@ let runtimePluginRoot: string | undefined
 export async function pages(options: PagesOptions = {}) {
   const root = resolve(options.root ?? process.cwd())
   const routesDir = resolve(root, options.routes ?? 'src/routes')
+  const renderOptions = { lang: options.lang, dev: options.dev ?? process.env.NODE_ENV === 'development' }
 
   if (runtimePluginRoot === undefined) {
     plugin(kay({ target: 'ssr', root }))
@@ -51,7 +54,13 @@ export async function pages(options: PagesOptions = {}) {
 
   await registerActionRoutes(app, routes)
   for (const route of routes)
-    app.get(route.pattern, async context => renderPage(route, context, client, options))
+    app.get(route.pattern, async context => renderPage(route, context, client, renderOptions))
+
+  const fallback = specialPagesOf(routesDir, routesDir)
+
+  // Every route above wins over this one, so it only answers what no page serves.
+  if (fallback.notFound ?? fallback.error)
+    app.get('/*', async context => renderUnmatched(fallback, context, client, renderOptions))
 
   return app
 }

@@ -16,6 +16,8 @@ export interface GenerateOptions {
   includeServer?: boolean
   // Route parameters, typing `ctx.params` in `load`.
   params?: string[]
+  // `_error.kay`, whose `ctx` carries the error it renders.
+  errorPage?: boolean
   // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
   relocateImport?: (specifier: string) => string | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
@@ -71,7 +73,7 @@ class Generator {
     }
 
     if (server)
-      b.add(`import type { PageContext as KayPageContext, PageData as KayPageData } from 'kay'\n`)
+      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData } from 'kay'\n`)
 
     const kayHelpers = formHelpers(this.file)
 

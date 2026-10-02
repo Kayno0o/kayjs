@@ -148,6 +148,8 @@ Pages live in `src/routes/`:
 | `todos/[id].kay` | `/todos/:id`, read as `ctx.params.id` |
 | `docs/[...path].kay` | `/docs/*`, read as `ctx.params.path` |
 | `_layout.kay` | Wraps every page in its directory and below, outermost first, rendering the page at its `slot`. |
+| `_404.kay` | Rendered with status 404 for `ctx.notFound()` in its directory and below; the root one also answers URLs no page serves. |
+| `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
 
 Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence may use top-level `await` and the `ctx` object:
 
@@ -158,6 +160,16 @@ Other files starting with `_` are not routes. Every top-level name the server fe
 - `ctx.redirect('/login')` and `ctx.notFound()` stop rendering
 
 Layout and page loads run in parallel; when several fail, the outermost one decides the response.
+
+The nearest special page wins, wrapped by the layouts of its own directory. `_error.kay` reads `ctx.error`: `status`, `message` and, in development only, `stack`. In production the message is generic and the real error goes to `console.error`; without an `_error.kay` the response is plain text, and development shows the stack instead.
+
+```kay
+--- server
+const { status, message } = ctx.error
+---
+h1 Error {status}
+p {message}
+```
 
 ```kay
 --- server
@@ -239,7 +251,7 @@ import { pages } from 'kay/server'
 new Elysia().use(await pages()).listen(3000)
 ```
 
-`pages()` takes `root`, `routes` (default `src/routes`), `minify` and `lang`. A `.ts` file imports a component as `import Card from './card.kay'`, typed through the generated `.kay/types` tree. List `.kay/` in `.gitignore` and merge the tree in `tsconfig.json`:
+`pages()` takes `root`, `routes` (default `src/routes`), `minify`, `lang` and `dev` (default: `NODE_ENV` is `development`). A `.ts` file imports a component as `import Card from './card.kay'`, typed through the generated `.kay/types` tree. List `.kay/` in `.gitignore` and merge the tree in `tsconfig.json`:
 
 ```json
 {

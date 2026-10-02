@@ -11,14 +11,29 @@ export interface Route {
   catchAll?: string
   // `_layout.kay` files wrapping the page, outermost first.
   layouts: string[]
+  special: SpecialPages
+}
+
+// A page rendered in place of another, wrapped by the layouts of its own directory.
+export interface SpecialPage {
+  file: string
+  layouts: string[]
+}
+
+// The nearest `_404.kay` and `_error.kay` up the directory tree.
+export interface SpecialPages {
+  notFound?: SpecialPage
+  error?: SpecialPage
 }
 
 const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)\]$/i
 const KAY_EXTENSION = /\.kay$/
 const LAYOUT = '_layout.kay'
+const NOT_FOUND = '_404.kay'
+const ERROR = '_error.kay'
 
 // The route a file under the routes directory serves; files starting with `_` (layouts, partials) serve none.
-export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts'> | undefined {
+export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts' | 'special'> | undefined {
   if (basename(file).startsWith('_'))
     return undefined
 
@@ -58,26 +73,38 @@ export async function scanRoutes(routesDir: string): Promise<Route[]> {
     const route = routeOf(routesDir, file)
 
     if (route)
-      routes.push({ ...route, layouts: layoutsOf(routesDir, file) })
+      routes.push({ ...route, layouts: layoutsOf(routesDir, file), special: specialPagesOf(routesDir, dirname(file)) })
   }
 
   return routes
 }
 
 function layoutsOf(routesDir: string, file: string): string[] {
-  const layouts: string[] = []
+  return directoriesUp(routesDir, dirname(file)).map(dir => join(dir, LAYOUT)).filter(layout => existsSync(layout)).reverse()
+}
 
-  for (let dir = dirname(file); dir.startsWith(routesDir); dir = dirname(dir)) {
-    const layout = join(dir, LAYOUT)
+export function specialPagesOf(routesDir: string, dir: string): SpecialPages {
+  const nearest = (name: string): SpecialPage | undefined => {
+    const file = directoriesUp(routesDir, dir).map(ancestor => join(ancestor, name)).find(path => existsSync(path))
 
-    if (existsSync(layout))
-      layouts.unshift(layout)
+    return file ? { file, layouts: layoutsOf(routesDir, file) } : undefined
+  }
 
-    if (dir === routesDir)
+  return { notFound: nearest(NOT_FOUND), error: nearest(ERROR) }
+}
+
+// From `dir` up to the routes directory, both included.
+function directoriesUp(routesDir: string, dir: string): string[] {
+  const dirs: string[] = []
+
+  for (let current = dir; current.startsWith(routesDir); current = dirname(current)) {
+    dirs.push(current)
+
+    if (current === routesDir)
       break
   }
 
-  return layouts
+  return dirs
 }
 
 // A percent-encoded URL path, or undefined when the encoding is malformed (`/100%`).

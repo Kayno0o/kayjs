@@ -37,6 +37,19 @@ export interface PageContext<Params extends Record<string, string> = Record<stri
   notFound: () => never
 }
 
+export interface PageError {
+  status: number
+  // The thrown error's message in development; production shows a generic one and logs the real error.
+  message: string
+  // Development only.
+  stack?: string
+}
+
+// The context of `_error.kay`, rendered when a page's load or render throws.
+export interface ErrorPageContext<Params extends Record<string, string> = Record<string, string>> extends PageContext<Params> {
+  error: PageError
+}
+
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 

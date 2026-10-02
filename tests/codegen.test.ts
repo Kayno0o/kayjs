@@ -42,7 +42,7 @@ describe('component shell', () => {
 
   it('names the component after its file', () => {
     expect(componentName('/app/src/todo-item.kay')).toBe('TodoItem')
-    expect(componentName('404.kay')).toBe('Kay404')
+    expect(componentName('_404.kay')).toBe('Page404')
   })
 
   it('renames the component when its script already uses the name, so an import of the same name is not shadowed', () => {

@@ -2,7 +2,7 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 import { auth } from './fixtures/site/src/auth'
@@ -251,5 +251,54 @@ describe('request context', () => {
 
     expect(away.status).toBe(302)
     expect(away.headers.get('location')).toBe('/about')
+  })
+})
+
+describe('special pages', () => {
+  it('renders the nearest _404.kay inside its layouts, for notFound and for URLs no page serves', async () => {
+    const missingTodo = await get('/todos/9')
+    const unmatched = await get('/no/such/page')
+
+    expect(missingTodo.status).toBe(404)
+    expect(missingTodo.html).toContain('<header><a href="/">Kay demo</a></header><main><p class="todo-missing">No such todo</p></main>')
+    expect(unmatched.status).toBe(404)
+    expect(unmatched.html).toContain('<main><h1>Nothing here</h1></main>')
+  })
+
+  it('leaves the routes the app adds after the pages alone', async () => {
+    const withApi = new Elysia().use(app).get('/api/ping', () => 'pong')
+
+    expect(await (await withApi.handle(new Request('http://localhost/api/ping'))).text()).toBe('pong')
+  })
+
+  it('renders _error.kay with a generic message in production and logs the error', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const { status, html } = await get('/boom?fail')
+
+      expect(status).toBe(500)
+      expect(html).toContain('<h1>Error 500</h1><p class="message">Internal Server Error</p>')
+      expect(html).not.toContain('Kaboom')
+      expect(logged).toHaveBeenCalledWith(expect.objectContaining({ message: 'Kaboom' }))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('shows the message and the stack in development', async () => {
+    const dev = await pages({ routes: 'tests/fixtures/site/src/routes', dev: true })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const html = await (await dev.handle(new Request('http://localhost/boom?fail'))).text()
+
+      expect(html).toContain('<p class="message">Kaboom</p>')
+      expect(html).toContain('<pre class="stack">Error: Kaboom')
+    }
+    finally {
+      logged.mockRestore()
+    }
   })
 })

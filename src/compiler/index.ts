@@ -35,6 +35,7 @@ export interface CompileResult {
 const WORD = /[a-z0-9]+/gi
 const LEADING_DIGIT = /^\d/
 const KAY_EXTENSION = /\.kay$/
+const ERROR_PAGE = '_error.kay'
 const BACKSLASH = /\\/g
 
 // Compiles a .kay component to TSX that is both type-checked and handed to Solid's compiler.
@@ -46,7 +47,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   const name = freeName(componentName(filename), fences)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
-  const generateOptions = { name, island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport }
+  const generateOptions = { name, island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE }
   const analysis = generate(file, script, server, generateOptions)
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   const { rewrites, diagnostics } = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings)
@@ -69,7 +70,7 @@ export function componentName(filename: string): string {
   const words = basename(filename).replace(KAY_EXTENSION, '').match(WORD) ?? []
   const name = words.map(word => word[0]!.toUpperCase() + word.slice(1)).join('')
 
-  return name === '' || LEADING_DIGIT.test(name) ? `Kay${name}` : name
+  return name === '' || LEADING_DIGIT.test(name) ? `Page${name}` : name
 }
 
 // A page `table.kay` importing `components/table.kay` would otherwise declare a `Table` that shadows the import and renders itself.
