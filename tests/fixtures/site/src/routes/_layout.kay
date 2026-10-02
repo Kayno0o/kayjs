@@ -1,0 +1,7 @@
+--- server
+const site = 'Kay demo'
+---
+header
+  a(href="/") {site}
+main
+  slot

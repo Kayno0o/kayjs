@@ -44,6 +44,8 @@ describe('islands', () => {
 
   it('hydrates the island in place and keeps it reactive', async () => {
     // The inline hydration script sets up the global the client runtime expects before any island hydrates.
+    // Solid's bootstrap assigns `_$HY` on globalThis, which outlives happy-dom's window between test files.
+    delete (globalThis as { _$HY?: unknown })._$HY
     // eslint-disable-next-line no-new-func -- runs Solid's own bootstrap script, which happy-dom does not execute from markup
     new Function(HYDRATION_SCRIPT.exec(generateHydrationScript())![1]!)()
     document.body.innerHTML = pageHtml

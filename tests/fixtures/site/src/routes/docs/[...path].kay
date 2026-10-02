@@ -1,0 +1,4 @@
+--- server
+const path = ctx.params.path
+---
+p.path Docs at {path}

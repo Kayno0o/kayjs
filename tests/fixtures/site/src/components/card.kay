@@ -1,0 +1,6 @@
+---
+const { title } = props<{ title: string }>()
+---
+article.card
+  h2 {title}
+  slot

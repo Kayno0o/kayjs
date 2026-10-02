@@ -1,7 +1,8 @@
 import type { Attribute, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 
-const FENCE = /^---[ \t]*\r?\n/
-const CLOSING_FENCE = /^---[ \t]*$/m
+const FENCE = /---(?:[ \t]+([a-z]+))?[ \t]*\r?\n/y
+const CLOSING_FENCE = /^---[ \t]*$/gm
+const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
 const TAG_NAME = /[A-Z][\w-]*/iy
 const CLASS_NAME = /[\w\-:/@!]+/y
 const ID_NAME = /[\w-]+/y
@@ -16,28 +17,42 @@ const TYPE_KEYWORDS = new Set(['any', 'unknown', 'never', 'string', 'number', 'b
 
 export function parseKay(source: string): KayFile {
   const diagnostics: Diagnostic[] = []
-  let script: Span | undefined
+  const fences: Partial<Record<'script' | 'server', Span>> = {}
   let templateStart = 0
-  const fence = FENCE.exec(source)
 
-  if (fence) {
-    const rest = source.slice(fence[0].length)
-    const closing = CLOSING_FENCE.exec(rest)
+  // Fences come first, in any order: `---` holds the component script, `--- server` the code that runs on the server only.
+  while (true) {
+    BLANK_LINES.lastIndex = templateStart
+    BLANK_LINES.exec(source)
+    FENCE.lastIndex = BLANK_LINES.lastIndex
+    const fence = FENCE.exec(source)
 
-    if (closing) {
-      script = { start: fence[0].length, end: fence[0].length + closing.index }
-      templateStart = script.end + closing[0].length
-    }
-    else {
-      diagnostics.push({ start: 0, end: 3, message: 'The script fence opened here is never closed with a `---` line' })
-      script = { start: fence[0].length, end: source.length }
-      templateStart = source.length
-    }
+    if (!fence)
+      break
+
+    const kind = fence[1] === undefined ? 'script' : fence[1]
+    const bodyStart = fence.index + fence[0].length
+
+    CLOSING_FENCE.lastIndex = bodyStart
+    const closing = CLOSING_FENCE.exec(source)
+    const span = { start: bodyStart, end: closing ? closing.index : source.length }
+
+    templateStart = closing ? closing.index + closing[0].length : source.length
+
+    if (!closing)
+      diagnostics.push({ start: fence.index, end: fence.index + 3, message: 'This fence is never closed with a `---` line' })
+
+    if (kind !== 'script' && kind !== 'server')
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`--- ${kind}\`; use \`---\` for the component script or \`--- server\` for server code` })
+    else if (fences[kind])
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `A file has one ${kind === 'server' ? '`--- server`' : 'script'} fence` })
+    else
+      fences[kind] = span
   }
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
 
-  return { source, script, template: parser.parseTemplate(), diagnostics }
+  return { source, script: fences.script, server: fences.server, template: parser.parseTemplate(), diagnostics }
 }
 
 class TemplateParser {

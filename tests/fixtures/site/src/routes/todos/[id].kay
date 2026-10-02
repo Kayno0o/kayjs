@@ -1,0 +1,10 @@
+--- server
+import { findTodo } from '../../data'
+
+const id = Number(ctx.params.id)
+if (Number.isNaN(id))
+  ctx.redirect('/')
+const todo = await findTodo(id) ?? ctx.notFound()
+---
+h1 {todo.title}
+p.status {todo.done ? 'Done' : 'Open'}

@@ -1,0 +1,5 @@
+--- server
+const id = Number(ctx.params.slug)
+const user = { name: 'Ada', id }
+---
+p {user.nam}

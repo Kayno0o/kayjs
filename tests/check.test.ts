@@ -9,11 +9,17 @@ describe('kay check', () => {
     expect(await check(join(fixtures, 'app'))).toEqual([])
   })
 
+  it('passes a site of pages, layouts and islands, with route params and server data typed', async () => {
+    expect(await check(join(fixtures, 'site'))).toEqual([])
+  })
+
   it('reports type errors at the line and column of the .kay source', async () => {
     const diagnostics = await check(join(fixtures, 'broken'))
     const brief = diagnostics.map(d => ({ file: d.file.slice(fixtures.length + 1), line: d.line, column: d.column, code: d.code, message: firstLine(d.message) }))
 
     expect(brief).toEqual([
+      { file: 'broken/src/routes/[id].kay', line: 2, column: 30, code: 'TS2339', message: 'Property \'slug\' does not exist on type \'{ id: string; }\'.' },
+      { file: 'broken/src/routes/[id].kay', line: 5, column: 9, code: 'TS2551', message: expect.stringContaining('Property \'nam\' does not exist') },
       { file: 'broken/src/todo-item.kay', line: 7, column: 14, code: 'TS2551', message: 'Property \'titel\' does not exist on type \'Todo\'. Did you mean \'title\'?' },
       { file: 'broken/src/todo-item.kay', line: 8, column: 5, code: 'TS2322', message: expect.stringContaining('hreff') },
       { file: 'broken/src/todo-list.kay', line: 5, column: 3, code: 'TS2322', message: expect.stringContaining('IntrinsicAttributes & { todo: Todo; }') },

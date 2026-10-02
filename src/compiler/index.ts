@@ -6,7 +6,7 @@ import { generate, isInteractive } from './codegen'
 import { positionAt } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
-import { analyzeScript } from './script'
+import { analyzeScript, analyzeServer } from './script'
 
 export type { Diagnostic } from './ast'
 export { SourceMap } from './mapping'
@@ -14,6 +14,10 @@ export { SourceMap } from './mapping'
 export interface CompileOptions {
   // Island ids are paths relative to this directory, so server and client agree on them.
   root?: string
+  // Browser builds pass false so `--- server` code never reaches the bundle.
+  includeServer?: boolean
+  // Parameters of the route this file serves, typing `ctx.params`.
+  params?: string[]
 }
 
 export interface CompileResult {
@@ -33,17 +37,20 @@ const BACKSLASH = /\\/g
 export function compileKay(source: string, filename: string, options: CompileOptions = {}): CompileResult {
   const file = parseKay(source)
   const script = analyzeScript(source, file.script)
+  const server = analyzeServer(source, file.server)
   const name = componentName(filename)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
-  const analysis = generate(file, script, { name, island })
-  const { rewrites, diagnostics } = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, script)
-  const final = generate(file, script, { name, island, rewrites })
+  const generateOptions = { name, island, includeServer: options.includeServer, params: options.params }
+  const analysis = generate(file, script, server, generateOptions)
+  const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
+  const { rewrites, diagnostics } = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings)
+  const final = generate(file, script, server, { ...generateOptions, rewrites })
 
   return {
     tsx: final.builder.code,
     map: final.builder.map(),
     island,
-    diagnostics: [...file.diagnostics, ...script.diagnostics, ...analysis.diagnostics, ...diagnostics].sort((a, b) => a.start - b.start),
+    diagnostics: [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...analysis.diagnostics, ...diagnostics].sort((a, b) => a.start - b.start),
   }
 }
 

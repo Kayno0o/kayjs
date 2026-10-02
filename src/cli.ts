@@ -24,7 +24,7 @@ async function main(args: string[]): Promise<number> {
     return 1
   }
 
-  const diagnostics = await check(resolve(dir), tsconfig)
+  const diagnostics = await check(resolve(dir), { tsconfig })
 
   for (const diagnostic of diagnostics)
     console.error(formatCheckDiagnostic(diagnostic))

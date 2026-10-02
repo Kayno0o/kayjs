@@ -1,0 +1,16 @@
+--- server
+import { listTodos } from '../data'
+
+const todos = await listTodos()
+const open = todos.filter(todo => !todo.done).length
+---
+---
+import Card from '../components/card.kay'
+import Counter from '../components/counter.kay'
+---
+Card(title="Todos")
+  p {open} open
+  ul
+    for todo of todos key={todo.id}
+      li: a(href={`/todos/${todo.id}`}) {todo.title}
+Counter(start={open})

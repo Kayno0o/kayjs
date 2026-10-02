@@ -2,7 +2,7 @@ import type { NodePath, Scope } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic } from './ast'
 import type { Rewrite, SourceMap } from './mapping'
-import type { PropsBinding, ScriptAnalysis } from './script'
+import type { PropsBinding } from './script'
 import { parse } from '@babel/parser'
 import traverseModule from '@babel/traverse'
 import { defaultName } from './codegen'
@@ -13,7 +13,8 @@ const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 export type Rewrites = Map<number, Rewrite & { end: number }>
 
 // Reads the analysis-pass TSX with real scope resolution, so shadowed names are left alone, and returns the rewrites to apply in the final pass.
-export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, script: ScriptAnalysis): { rewrites: Rewrites, diagnostics: Diagnostic[] } {
+// `bindings` are the names read off `__props`: destructured props first, so their indexes match the generated defaults, then server data.
+export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, bindings: PropsBinding[]): { rewrites: Rewrites, diagnostics: Diagnostic[] } {
   const rewrites: Rewrites = new Map()
   const diagnostics: Diagnostic[] = []
   let ast: t.File
@@ -27,7 +28,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
   }
   const propsByLocal = new Map<number, { binding: PropsBinding, index: number }>()
 
-  for (const [index, binding] of (script.props?.bindings ?? []).entries())
+  for (const [index, binding] of bindings.entries())
     propsByLocal.set(binding.local.start, { binding, index })
 
   const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Rewrite, readOnly: string) => {

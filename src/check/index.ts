@@ -1,12 +1,20 @@
 import type { SourceMap } from '../compiler'
 import { mkdir, rm } from 'node:fs/promises'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { findKayFiles } from '../build/files'
 import { compileKay } from '../compiler'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { routeOf } from '../server/routes'
 
 export const SHADOW_DIR = join('.kay', 'types')
+
+export interface CheckOptions {
+  tsconfig?: string
+  // Page directory relative to the root, so `ctx.params` is typed per route.
+  routes?: string
+}
 
 export interface CheckDiagnostic {
   file: string
@@ -23,24 +31,22 @@ interface ShadowFile {
   map: SourceMap
 }
 
-const IGNORED_DIRS = new Set(['node_modules', '.kay', '.git', 'dist'])
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
 const tsgo = join(dirname(fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))), 'bin', 'tsgo')
 
 // Compiles every .kay file under `root` to `.kay/types/<path>.kay.tsx`, the tree tsconfig `rootDirs` merges with the sources.
-export async function writeShadowTypes(root: string): Promise<{ files: Map<string, ShadowFile>, diagnostics: CheckDiagnostic[] }> {
+export async function writeShadowTypes(projectRoot: string, options: CheckOptions = {}): Promise<{ files: Map<string, ShadowFile>, diagnostics: CheckDiagnostic[] }> {
+  const root = resolve(projectRoot)
   const files = new Map<string, ShadowFile>()
   const diagnostics: CheckDiagnostic[] = []
+  const routesDir = resolve(root, options.routes ?? 'src/routes')
 
   await rm(join(root, SHADOW_DIR), { recursive: true, force: true })
-  for await (const path of new Bun.Glob('**/*.kay').scan({ cwd: root, onlyFiles: true, dot: true })) {
-    if (path.split(sep).some(segment => IGNORED_DIRS.has(segment)))
-      continue
-
-    const file = join(root, path)
+  for (const file of await findKayFiles(root)) {
     const source = await Bun.file(file).text()
-    const { tsx, map, diagnostics: compileDiagnostics } = compileKay(source, file)
-    const shadow = join(root, SHADOW_DIR, `${path}.tsx`)
+    const params = file.startsWith(routesDir) ? routeOf(routesDir, file)?.params : undefined
+    const { tsx, map, diagnostics: compileDiagnostics } = compileKay(source, file, { root, params })
+    const shadow = join(root, SHADOW_DIR, `${relative(root, file)}.tsx`)
 
     await mkdir(dirname(shadow), { recursive: true })
     await Bun.write(shadow, tsx)
@@ -53,8 +59,9 @@ export async function writeShadowTypes(root: string): Promise<{ files: Map<strin
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
-export async function check(root: string, tsconfig = 'tsconfig.json'): Promise<CheckDiagnostic[]> {
-  const { files, diagnostics } = await writeShadowTypes(root)
+export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
+  const tsconfig = options.tsconfig ?? 'tsconfig.json'
+  const { files, diagnostics } = await writeShadowTypes(root, options)
   const child = Bun.spawn([process.execPath, tsgo, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 

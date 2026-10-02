@@ -37,25 +37,12 @@ export function analyzeScript(source: string, script: Span | undefined): ScriptA
   if (!script)
     return analysis
 
-  const code = source.slice(script.start, script.end)
-  let ast: ParseResult<t.File>
+  const parsed = parseFence(source, script, analysis.diagnostics)
 
-  try {
-    ast = parse(code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
-  }
-  catch (error) {
-    const at = script.start + ((error as { pos?: number }).pos ?? 0)
-
-    analysis.diagnostics.push({ start: at, end: at + 1, message: (error as Error).message })
-
+  if (!parsed)
     return analysis
-  }
-  for (const error of ast.errors ?? []) {
-    const at = script.start + ((error as unknown as { pos?: number }).pos ?? 0)
 
-    analysis.diagnostics.push({ start: at, end: at + 1, message: error.reasonCode ?? 'Syntax error' })
-  }
-  const shift = (node: t.Node | t.Comment): Span => ({ start: script.start + node.start!, end: script.start + node.end! })
+  const { ast, shift } = parsed
   let cursor = script.start
 
   for (const statement of ast.program.body) {
@@ -94,6 +81,121 @@ export function analyzeScript(source: string, script: Span | undefined): ScriptA
   reportMisplacedProps(ast, analysis, shift)
 
   return analysis
+}
+
+export interface ServerData {
+  name: string
+  local: Span
+}
+
+export interface ServerAnalysis {
+  // Imports and types, plus exported values such as actions: module level, outside `load`.
+  hoisted: Span[]
+  exports: Span[]
+  // Statements that run per request, inside `load(ctx)`.
+  body: Span[]
+  // Names declared at the top of the fence: `load` returns them and the template reads them.
+  data: ServerData[]
+  diagnostics: Diagnostic[]
+}
+
+// Splits a `--- server` fence into module-level code and the body of `load(ctx)`, and lists the names the page receives.
+export function analyzeServer(source: string, server: Span | undefined): ServerAnalysis | undefined {
+  if (!server)
+    return undefined
+
+  const analysis: ServerAnalysis = { hoisted: [], exports: [], body: [], data: [], diagnostics: [] }
+  const parsed = parseFence(source, server, analysis.diagnostics)
+
+  if (!parsed)
+    return analysis
+
+  const { ast, shift } = parsed
+  let cursor = server.start
+
+  for (const statement of ast.program.body) {
+    const span = withLeadingComments(statement, shift)
+
+    if (isHoisted(statement)) {
+      analysis.hoisted.push(span)
+    }
+    else if (statement.type === 'ExportNamedDeclaration' && statement.declaration) {
+      analysis.exports.push(span)
+    }
+    else if (statement.type === 'ExportDefaultDeclaration' || statement.type === 'ExportAllDeclaration' || statement.type === 'ExportNamedDeclaration') {
+      analysis.diagnostics.push({ ...span, message: 'A server fence exports declarations only: `export const add = action(...)`' })
+    }
+    else {
+      if (span.start > cursor)
+        analysis.body.push({ start: cursor, end: span.start })
+
+      analysis.body.push(span)
+      for (const identifier of declaredIdentifiers(statement))
+        analysis.data.push({ name: identifier.name, local: shift(identifier) })
+    }
+
+    cursor = span.end
+  }
+
+  return analysis
+}
+
+function declaredIdentifiers(statement: t.Statement): t.Identifier[] {
+  if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration')
+    return statement.id ? [statement.id] : []
+
+  if (statement.type !== 'VariableDeclaration')
+    return []
+
+  const found: t.Identifier[] = []
+  const collect = (pattern: t.Node | null | undefined) => {
+    if (!pattern)
+      return
+
+    if (pattern.type === 'Identifier') {
+      found.push(pattern)
+    }
+    else if (pattern.type === 'ObjectPattern') {
+      for (const property of pattern.properties) collect(property.type === 'RestElement' ? property.argument : property.value)
+    }
+    else if (pattern.type === 'ArrayPattern') {
+      for (const element of pattern.elements) collect(element)
+    }
+    else if (pattern.type === 'AssignmentPattern') {
+      collect(pattern.left)
+    }
+    else if (pattern.type === 'RestElement') {
+      collect(pattern.argument)
+    }
+  }
+
+  for (const declarator of statement.declarations)
+    collect(declarator.id)
+
+  return found
+}
+
+function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): { ast: ParseResult<t.File>, shift: (node: t.Node | t.Comment) => Span } | undefined {
+  let ast: ParseResult<t.File>
+
+  try {
+    ast = parse(source.slice(span.start, span.end), { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+  }
+  catch (error) {
+    const at = span.start + ((error as { pos?: number }).pos ?? 0)
+
+    diagnostics.push({ start: at, end: at + 1, message: (error as Error).message })
+
+    return undefined
+  }
+
+  for (const error of ast.errors ?? []) {
+    const at = span.start + ((error as unknown as { pos?: number }).pos ?? 0)
+
+    diagnostics.push({ start: at, end: at + 1, message: error.reasonCode ?? 'Syntax error' })
+  }
+
+  return { ast, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }
 }
 
 function importsReactiveValue(statement: t.Statement): boolean {

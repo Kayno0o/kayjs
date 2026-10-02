@@ -72,6 +72,7 @@ export type Node = ElementNode | TextNode | IfNode | ForNode | SlotNode
 export interface KayFile {
   source: string
   script?: Span
+  server?: Span
   template: Node[]
   diagnostics: Diagnostic[]
 }

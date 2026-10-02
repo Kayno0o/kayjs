@@ -19,3 +19,17 @@ export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | und
 
   return Object.assign(read, { set })
 }
+
+export interface PageContext<Params extends Record<string, string> = Record<string, string>> {
+  request: Request
+  url: URL
+  params: Params
+  // Response status and headers of the page being rendered.
+  status: (code: number) => void
+  headers: Headers
+  redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => never
+  notFound: () => never
+}
+
+// What a page's template reads: every name its `--- server` fence declares.
+export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>

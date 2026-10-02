@@ -1,12 +1,16 @@
 import type { Attribute, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 import type { Rewrite } from './mapping'
-import type { ScriptAnalysis } from './script'
+import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { CodeBuilder } from './mapping'
 
 export interface GenerateOptions {
   name: string
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
   island?: string
+  // Browser builds leave the `--- server` fence out entirely; type checking and SSR keep it.
+  includeServer?: boolean
+  // Route parameters, typing `ctx.params` in `load`.
+  params?: string[]
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
   rewrites?: ReadonlyMap<number, Rewrite & { end: number }>
 }
@@ -27,8 +31,8 @@ export function defaultName(index: number): string {
   return `${DEFAULT_PREFIX}${index}`
 }
 
-export function generate(file: KayFile, script: ScriptAnalysis, options: GenerateOptions): Generated {
-  return new Generator(file, script, options).run()
+export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAnalysis | undefined, options: GenerateOptions): Generated {
+  return new Generator(file, script, server, options).run()
 }
 
 class Generator {
@@ -37,16 +41,32 @@ class Generator {
   private readonly diagnostics: Diagnostic[] = []
   private readonly src: string
 
-  constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly options: GenerateOptions) {
+  constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
     this.src = file.source
     this.b = new CodeBuilder(file.source, options.rewrites)
   }
 
   run(): Generated {
-    const { b, script } = this
+    const { b, script, server } = this
+    const includeServer = server !== undefined && this.options.includeServer !== false
 
     for (const span of script.hoisted)
       b.addSource(span).add('\n')
+
+    if (includeServer) {
+      for (const span of server.hoisted)
+        b.addSource(span).add('\n')
+    }
+
+    if (server)
+      b.add(`import type { PageContext as KayPageContext, PageData as KayPageData } from 'kay'\n`)
+
+    const childrenSlot = usesChildrenSlot(this.file.template)
+    const childrenType = ' & { children?: KayJSX.Element }'
+
+    if (childrenSlot)
+      b.add(`import type { JSX as KayJSX } from '@solidjs/web'\n`)
+
     const helpers = usedHelpers(this.file.template, script)
 
     if (helpers.length > 0)
@@ -55,15 +75,30 @@ class Generator {
     if (this.options.island)
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
 
+    if (includeServer)
+      this.emitLoad(server)
+
     b.add(`\n${this.options.island ? '' : 'export default '}function ${this.options.name}(`)
 
-    if (script.props) {
-      b.add('__props: ')
+    if (server) {
+      b.add(`__props: KayPageData<typeof load>${childrenSlot ? childrenType : ''}`)
+
+      if (script.props)
+        this.error(script.props.statement, 'A page gets its data from `--- server`, so it declares no props; read the server names directly')
+    }
+    else if (script.props) {
+      b.add(childrenSlot ? '__props: (' : '__props: ')
 
       if (script.props.type)
         b.addSource(script.props.type)
       else
         b.add('Record<string, unknown>')
+
+      if (childrenSlot)
+        b.add(`)${childrenType}`)
+    }
+    else if (childrenSlot) {
+      b.add('__props: { children?: KayJSX.Element }')
     }
 
     b.add(') {\n')
@@ -78,8 +113,32 @@ class Generator {
     return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
   }
 
+  // Server exports stay at module level; the rest of the fence becomes `load(ctx)`, returning every name it declares.
+  private emitLoad(server: ServerAnalysis) {
+    const { b } = this
+
+    for (const span of server.exports)
+      b.addSource(span).add('\n')
+
+    const params = this.options.params ? `{ ${this.options.params.map(name => `${JSON.stringify(name)}: string`).join(', ')} }` : 'Record<string, string>'
+
+    b.add(`\nexport async function load(ctx: KayPageContext<${params}>) {\n`)
+    for (const span of server.body)
+      b.addSource(span)
+    b.add(`\nreturn { ${server.data.map(data => data.name).join(', ')} }\n}\n`)
+  }
+
   // Script statements in source order, with the props declaration swapped for reads off `__props`.
   private emitBody() {
+    const data = this.server?.data ?? []
+
+    if (!this.options.rewrites && data.length > 0) {
+      this.b.add('\nconst { ')
+      for (const binding of data)
+        this.b.add(`${JSON.stringify(binding.name)}: `).addSource(binding.local).add(', ')
+      this.b.add('} = __props;\n')
+    }
+
     const props = this.script.props
     let propsDone = !props
 
@@ -125,7 +184,7 @@ class Generator {
   private emitRoot(nodes: Node[]) {
     const visible = this.withoutSlots(nodes)
 
-    if (visible.length === 1 && visible[0]!.kind === 'element') {
+    if (visible.length === 1 && visible[0]!.kind === 'element' && !isChildrenSlot(visible[0]!)) {
       this.emitElement(visible[0]!)
 
       return
@@ -263,6 +322,15 @@ class Generator {
 
   private emitElement(element: ElementNode) {
     const { b } = this
+
+    if (isChildrenSlot(element)) {
+      if (element.attributes.length > 0 || element.classes.length > 0 || element.id || element.children.length > 0)
+        this.error(element, '`slot` marks where a layout or wrapper renders its children; it takes no attributes or content')
+
+      b.wrap(element, () => b.add('{__props.children}'))
+
+      return
+    }
 
     b.wrap(element, () => {
       b.add('<')
@@ -514,6 +582,32 @@ type Helper = 'For' | 'Show' | 'omit'
 
 function helperAlias(helper: Helper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
+}
+
+// `slot` renders the children a layout or wrapper component receives, like Astro's `<slot />`.
+function isChildrenSlot(node: Node): boolean {
+  return node.kind === 'element' && node.name === 'slot' && !node.component
+}
+
+function usesChildrenSlot(nodes: Node[]): boolean {
+  return nodes.some((node) => {
+    if (isChildrenSlot(node))
+      return true
+
+    switch (node.kind) {
+      case 'element':
+      case 'slot':
+        return usesChildrenSlot(node.children)
+      case 'text':
+        return usesChildrenSlot(node.parts.filter(part => part.kind === 'element'))
+      case 'if':
+        return node.branches.some(branch => usesChildrenSlot(branch.children))
+      case 'for':
+        return usesChildrenSlot(node.children) || usesChildrenSlot(node.fallback ?? [])
+    }
+
+    return false
+  })
 }
 
 function usedHelpers(nodes: Node[], script: ScriptAnalysis): Helper[] {

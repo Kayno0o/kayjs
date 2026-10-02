@@ -1,5 +1,5 @@
 import type { JSX } from '@solidjs/web'
-import { escape, renderToString, ssr } from '@solidjs/web'
+import { createComponent, escape, Hydration, renderToString, ssr } from '@solidjs/web'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
 let depth = 0
@@ -21,7 +21,10 @@ export function island<P extends object>(id: string, component: (props: P) => JS
     depth++
 
     try {
-      const html = renderToString(() => component(props), { renderId, noScripts: true })
+      // Pages render under NoHydration; an island re-enters hydration so its markup carries the keys the client claims.
+      const html = renderToString(() => createComponent(Hydration, { id: renderId, get children() {
+        return component(props)
+      } }), { renderId, noScripts: true })
 
       return ssr([`<kay-island data-component="${escape(id, true)}" data-render-id="${renderId}" data-props="${escape(serialized, true)}">`, '</kay-island>'], html) as unknown as JSX.Element
     }
