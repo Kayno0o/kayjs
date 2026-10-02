@@ -1,3 +1,4 @@
+import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
@@ -86,6 +87,14 @@ describe('pages', () => {
   it('refuses asset paths outside the client build or malformed', async () => {
     expect((await app.handle(new Request('http://localhost/_kay/..%2F..%2Fpackage.json'))).status).toBe(404)
     expect((await app.handle(new Request('http://localhost/_kay/%E0'))).status).toBe(404)
+  })
+
+  it('ships Solid\'s production build, not its development one', async () => {
+    const dist = join(process.cwd(), '.kay/client/dist')
+    const chunks = await Promise.all((await readdir(dist)).map(async file => Bun.file(join(dist, file)).text()))
+
+    // Only solid-js's dev build points at its diagnostics package.
+    expect(chunks.filter(chunk => chunk.includes('@solidjs/diagnostics'))).toEqual([])
   })
 
   it('hydrates the island on the served page and leaves the static markup alone', async () => {

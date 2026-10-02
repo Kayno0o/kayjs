@@ -1,5 +1,6 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { findKayFiles } from '../build/files'
 import { kay } from '../build/plugin'
 import { compileKay } from '../compiler'
@@ -42,6 +43,8 @@ export async function buildClient(root: string, options: { minify?: boolean } = 
     target: 'browser',
     splitting: true,
     minify: options.minify ?? false,
+    // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which shipped Solid's dev build.
+    define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') },
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
     plugins: [kay({ target: 'dom', root })],
   })
