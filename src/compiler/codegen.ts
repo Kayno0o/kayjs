@@ -5,6 +5,8 @@ import { CodeBuilder } from './mapping'
 
 export interface GenerateOptions {
   name: string
+  // Set for an interactive component: its export is wrapped so the server renders it as an island root.
+  island?: string
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
   rewrites?: ReadonlyMap<number, Rewrite & { end: number }>
 }
@@ -50,7 +52,10 @@ class Generator {
     if (helpers.length > 0)
       b.add(`import { ${helpers.map(helper => `${helper} as ${helperAlias(helper)}`).join(', ')} } from 'solid-js'\n`)
 
-    b.add(`\nexport default function ${this.options.name}(`)
+    if (this.options.island)
+      b.add(`import { island as KayIsland } from 'kay/island'\n`)
+
+    b.add(`\n${this.options.island ? '' : 'export default '}function ${this.options.name}(`)
 
     if (script.props) {
       b.add('__props: ')
@@ -66,6 +71,9 @@ class Generator {
     b.add('\nreturn ')
     this.emitRoot(this.file.template)
     b.add('\n}\n')
+
+    if (this.options.island)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name})\n`)
 
     return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
   }
@@ -473,6 +481,33 @@ class Generator {
     if (!this.options.rewrites)
       this.diagnostics.push({ start: span.start, end: span.end, message })
   }
+}
+
+const INTERACTIVE_ATTRIBUTE = /^(?:on[A-Z]|bind:|ref$)/
+
+// A component needs the browser when it handles events, binds inputs, takes refs or holds reactive state.
+export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
+  if (script.reactive)
+    return true
+
+  const visit = (nodes: Node[]): boolean => nodes.some((node) => {
+    switch (node.kind) {
+      case 'element':
+        return node.attributes.some(attribute => attribute.kind !== 'spread' && INTERACTIVE_ATTRIBUTE.test(file.source.slice(attribute.name.start, attribute.name.end))) || visit(node.children)
+      case 'text':
+        return visit(node.parts.filter(part => part.kind === 'element'))
+      case 'if':
+        return node.branches.some(branch => visit(branch.children))
+      case 'for':
+        return visit(node.children) || visit(node.fallback ?? [])
+      case 'slot':
+        return visit(node.children)
+    }
+
+    return false
+  })
+
+  return visit(file.template)
 }
 
 type Helper = 'For' | 'Show' | 'omit'

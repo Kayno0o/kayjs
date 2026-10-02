@@ -22,11 +22,22 @@ function jsx(source: string): string {
 
 describe('component shell', () => {
   it('hoists imports and types above the component and keeps the rest in its body', () => {
-    const code = tsx('---\nimport { signal } from \'kay\'\ntype Size = \'sm\' | \'md\'\nconst count = signal(0)\n---\np {count()}')
+    const code = tsx('---\nimport { format } from \'./format\'\ntype Size = \'sm\' | \'md\'\nconst label = format(1)\n---\np {label}')
 
-    expect(code).toStartWith('import { signal } from \'kay\'\ntype Size = \'sm\' | \'md\'\n')
+    expect(code).toStartWith('import { format } from \'./format\'\ntype Size = \'sm\' | \'md\'\n')
     expect(code).toContain('export default function Test() {')
-    expect(code).toContain('const count = signal(0)')
+    expect(code).toContain('const label = format(1)')
+  })
+
+  it('wraps an interactive component as an island', () => {
+    const reactive = tsx('---\nimport { signal } from \'kay\'\nconst count = signal(0)\n---\np {count()}')
+
+    expect(reactive).toContain('import { island as KayIsland } from \'kay/island\'')
+    expect(reactive).toContain('\nfunction Test() {')
+    expect(reactive).toEndWith('export default KayIsland("test.kay", Test)\n')
+    expect(tsx('button(onClick={go}) Go')).toContain('export default KayIsland(')
+    expect(tsx('input(bind:value={name})')).toContain('export default KayIsland(')
+    expect(tsx('---\nimport type { Accessor } from \'solid-js\'\n---\np x')).toContain('export default function Test()')
   })
 
   it('names the component after its file', () => {

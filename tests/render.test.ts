@@ -11,6 +11,9 @@ interface TodoListModule {
   default: (props: { todos: Todo[], title?: string }) => unknown
 }
 
+// Hydratable markup separates dynamic text with comment markers; the assertions read the text alone.
+const MARKERS = /<!--[$/]-->/g
+
 const { default: TodoList } = await import(join(import.meta.dir, 'fixtures/app/src/todo-list.kay')) as TodoListModule
 
 const todos: Todo[] = [
@@ -20,7 +23,7 @@ const todos: Todo[] = [
 
 describe('server rendering through the Bun plugin', () => {
   it('renders a .kay tree with props, defaults, loops and child components', () => {
-    const html = renderToString(() => TodoList({ todos }))
+    const html = renderToString(() => TodoList({ todos })).replace(MARKERS, '')
 
     expect(html).toContain('<h1>Todos</h1>')
     expect(html).toContain('placeholder="Filter"')
@@ -31,7 +34,7 @@ describe('server rendering through the Bun plugin', () => {
   })
 
   it('renders the for fallback and an overridden default', () => {
-    const html = renderToString(() => TodoList({ todos: [], title: 'Empty' }))
+    const html = renderToString(() => TodoList({ todos: [], title: 'Empty' })).replace(MARKERS, '')
 
     expect(html).toContain('<h1>Empty</h1>')
     expect(html).toContain('Nothing matches')

@@ -1,0 +1,7 @@
+---
+import Counter from './counter.kay'
+---
+main
+  h1 Static title
+  Counter(start={2})
+  p after

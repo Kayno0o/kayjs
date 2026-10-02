@@ -8,6 +8,11 @@
   "license": "MIT",
   "exports": {
     ".": "./src/runtime/index.ts",
+    "./island": {
+      "browser": "./src/runtime/island.client.ts",
+      "default": "./src/runtime/island.server.ts"
+    },
+    "./client": "./src/runtime/client.ts",
     "./compiler": "./src/compiler/index.ts"
   },
   "bin": {

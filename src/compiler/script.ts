@@ -3,6 +3,8 @@ import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import { parse } from '@babel/parser'
 
+const REACTIVE_MODULES = new Set(['kay', 'solid-js'])
+
 export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.
   local: Span
@@ -21,6 +23,8 @@ export interface PropsDeclaration {
 
 export interface ScriptAnalysis {
   hoisted: Span[]
+  // True when the script imports a value from `kay` or `solid-js`: it holds client state, so the component becomes an island.
+  reactive: boolean
   body: Span[]
   props?: PropsDeclaration
   diagnostics: Diagnostic[]
@@ -28,7 +32,7 @@ export interface ScriptAnalysis {
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 export function analyzeScript(source: string, script: Span | undefined): ScriptAnalysis {
-  const analysis: ScriptAnalysis = { hoisted: [], body: [], diagnostics: [] }
+  const analysis: ScriptAnalysis = { hoisted: [], body: [], reactive: false, diagnostics: [] }
 
   if (!script)
     return analysis
@@ -59,6 +63,7 @@ export function analyzeScript(source: string, script: Span | undefined): ScriptA
 
     if (isHoisted(statement)) {
       analysis.hoisted.push(span)
+      analysis.reactive ||= importsReactiveValue(statement)
     }
     else {
       if (span.start > cursor)
@@ -89,6 +94,13 @@ export function analyzeScript(source: string, script: Span | undefined): ScriptA
   reportMisplacedProps(ast, analysis, shift)
 
   return analysis
+}
+
+function importsReactiveValue(statement: t.Statement): boolean {
+  if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || !REACTIVE_MODULES.has(statement.source.value))
+    return false
+
+  return statement.specifiers.some(specifier => specifier.type !== 'ImportSpecifier' || specifier.importKind !== 'type')
 }
 
 function isHoisted(statement: t.Statement): boolean {
