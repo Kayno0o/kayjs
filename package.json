@@ -6,6 +6,13 @@
   "description": "Pug-like, fully typed web framework on Bun, Elysia, pg-orm and Solid's runtime",
   "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
   "license": "MIT",
+  "exports": {
+    ".": "./src/runtime/index.ts",
+    "./compiler": "./src/compiler/index.ts"
+  },
+  "bin": {
+    "kay": "./src/cli.ts"
+  },
   "scripts": {
     "check": "tsgo --noEmit",
     "lint": "keslint --cache",
@@ -19,6 +26,7 @@
     "@babel/traverse": "^7.29.7",
     "@babel/types": "^7.29.7",
     "@solidjs/web": "^2.0.0-rc.13",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "babel-preset-solid": "^2.0.0-rc.2",
     "solid-js": "^2.0.0-rc.13"
   },
@@ -27,7 +35,6 @@
     "@types/babel__core": "^7.20.5",
     "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.2",
-    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "typescript": "^6.0.3"
   }
 }

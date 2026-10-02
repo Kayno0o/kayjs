@@ -1,0 +1,20 @@
+---
+import type { Todo } from './todo'
+import { signal } from 'kay'
+import TodoItem from './todo-item.kay'
+
+const { todos, title = 'Todos' } = props<{ todos: Todo[], title?: string }>()
+const filter = signal('')
+const shown = () => todos.filter(todo => todo.title.includes(filter()))
+const selected = signal<Todo>()
+---
+section.todo-list
+  h1 {title}
+  input(type="search" bind:value={filter} placeholder="Filter")
+  ul
+    for todo, i of shown() key={todo.id}
+      TodoItem(todo={todo} index={i} onToggle={id => selected.set(todos.find(t => t.id === id))})
+    else
+      li.empty Nothing matches
+  if selected() as todo
+    p Selected #[strong {todo.title}]

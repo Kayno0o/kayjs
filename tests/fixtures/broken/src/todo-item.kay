@@ -1,0 +1,8 @@
+---
+import type { Todo } from './todo'
+
+const { todo } = props<{ todo: Todo }>()
+---
+li
+  span {todo.titel}
+  a(hreff="/x") link

@@ -97,10 +97,8 @@ describe('elements', () => {
   })
 
   it('skips braces inside strings and template literals of an expression', () => {
-    // eslint-disable-next-line no-template-curly-in-string -- the template source holds a JS template literal
     const file = parse('a(href={`/t/${id()}?q={x}`} title={"}"})')
 
-    // eslint-disable-next-line no-template-curly-in-string -- same template literal, as the parser reads it back
     expect(outline(file)).toEqual([{ tag: 'a', attributes: ['href:{`/t/${id()}?q={x}`}', 'title:{"}"}'] }])
     expect(file.diagnostics).toEqual([])
   })

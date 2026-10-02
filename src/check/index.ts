@@ -1,0 +1,107 @@
+import type { SourceMap } from '../compiler'
+import { mkdir, rm } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+import { compileKay } from '../compiler'
+import { offsetAt, positionAt } from '../compiler/mapping'
+
+export const SHADOW_DIR = join('.kay', 'types')
+
+export interface CheckDiagnostic {
+  file: string
+  line: number
+  column: number
+  message: string
+  code?: string
+}
+
+interface ShadowFile {
+  source: string
+  file: string
+  tsx: string
+  map: SourceMap
+}
+
+const IGNORED_DIRS = new Set(['node_modules', '.kay', '.git', 'dist'])
+const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
+const tsgo = join(dirname(fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))), 'bin', 'tsgo')
+
+// Compiles every .kay file under `root` to `.kay/types/<path>.kay.tsx`, the tree tsconfig `rootDirs` merges with the sources.
+export async function writeShadowTypes(root: string): Promise<{ files: Map<string, ShadowFile>, diagnostics: CheckDiagnostic[] }> {
+  const files = new Map<string, ShadowFile>()
+  const diagnostics: CheckDiagnostic[] = []
+
+  await rm(join(root, SHADOW_DIR), { recursive: true, force: true })
+  for await (const path of new Bun.Glob('**/*.kay').scan({ cwd: root, onlyFiles: true, dot: true })) {
+    if (path.split(sep).some(segment => IGNORED_DIRS.has(segment)))
+      continue
+
+    const file = join(root, path)
+    const source = await Bun.file(file).text()
+    const { tsx, map, diagnostics: compileDiagnostics } = compileKay(source, file)
+    const shadow = join(root, SHADOW_DIR, `${path}.tsx`)
+
+    await mkdir(dirname(shadow), { recursive: true })
+    await Bun.write(shadow, tsx)
+    files.set(resolve(shadow), { source, file, tsx, map })
+    for (const diagnostic of compileDiagnostics)
+      diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message })
+  }
+
+  return { files, diagnostics }
+}
+
+// Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
+export async function check(root: string, tsconfig = 'tsconfig.json'): Promise<CheckDiagnostic[]> {
+  const { files, diagnostics } = await writeShadowTypes(root)
+  const child = Bun.spawn([process.execPath, tsgo, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const [output, errors] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  if (errors.trim() !== '')
+    diagnostics.push({ file: join(root, tsconfig), line: 1, column: 1, message: errors.trim() })
+
+  for (const diagnostic of parseTscOutput(output, root))
+    diagnostics.push(remap(diagnostic, files))
+
+  return diagnostics
+}
+
+function parseTscOutput(output: string, root: string): CheckDiagnostic[] {
+  const diagnostics: CheckDiagnostic[] = []
+
+  for (const line of output.split('\n')) {
+    const match = TSC_LINE.exec(line)
+
+    if (match) {
+      diagnostics.push({ file: resolve(root, match[1]!), line: Number(match[2]), column: Number(match[3]), code: match[4], message: match[5]! })
+
+      continue
+    }
+
+    const last = diagnostics.at(-1)
+
+    if (last && line.trim() !== '')
+      last.message += `\n${line}`
+  }
+
+  return diagnostics
+}
+
+function remap(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): CheckDiagnostic {
+  const shadow = files.get(diagnostic.file)
+
+  if (!shadow)
+    return diagnostic
+
+  const generated = offsetAt(shadow.tsx, diagnostic)
+  const source = shadow.map.toSource(generated) ?? 0
+
+  return { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, source) }
+}
+
+export function formatCheckDiagnostic(diagnostic: CheckDiagnostic, cwd = process.cwd()): string {
+  const code = diagnostic.code ? ` ${diagnostic.code}` : ''
+
+  return `${relative(cwd, diagnostic.file)}:${diagnostic.line}:${diagnostic.column} - error${code}: ${diagnostic.message}`
+}
