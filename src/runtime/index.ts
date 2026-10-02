@@ -1,5 +1,6 @@
 import type { CookieMap } from 'bun'
 import type { Setter, SignalOptions } from 'solid-js'
+import type { Action, FailureOf } from './action'
 import type { Locals } from './checks'
 import { createSignal } from 'solid-js'
 
@@ -35,6 +36,8 @@ export interface PageContext<Params extends Record<string, string> = Record<stri
   headers: Headers
   redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => never
   notFound: () => never
+  // Why the last plain form post to `action` failed, when it did; read once, on the page the browser went back to.
+  failed: <Target extends Action<never, unknown>>(action: Target) => FailureOf<Target> | undefined
 }
 
 export interface PageError {
@@ -53,6 +56,6 @@ export interface ErrorPageContext<Params extends Record<string, string> = Record
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
-export type { Action, ActionContext, FieldName, ServerAction } from './action'
+export type { Action, ActionContext, Failure, FailureOf, FieldName, FormFailure, ServerAction } from './action'
 export { action, ActionError, actionStub, formAction, isAction, registerActions } from './action'
 export type { CheckedHref, IslandComponent, IslandProp, Locals, LocalsOf, Register } from './checks'

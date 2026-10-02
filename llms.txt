@@ -227,7 +227,7 @@ p.status {todo.done ? 'Done' : 'Open'}
 
 ## Actions
 
-A page's server fence exports actions: an Elysia schema and a handler. Each one becomes `POST /_kay/action/<file>/<name>`, with its input validated (422 when invalid).
+A page's server fence exports actions: an Elysia schema and a handler. Each one becomes `POST /_kay/action/<file>/<name>`, with its input validated.
 
 ```kay
 --- server
@@ -235,22 +235,33 @@ import { t } from 'elysia'
 import { action } from 'kay'
 import { addTodo, listTodos } from '../data'
 
-export const add = action(t.Object({ title: t.String({ minLength: 1 }) }), async ({ title }) => (await addTodo(title)).id)
+export const add = action(t.Object({ title: t.String({ minLength: 1, error: 'Write a title' }) }), async ({ title }, ctx) => {
+  if ((await listTodos()).some(todo => todo.title === title))
+    return ctx.fail(409, { message: 'Already on the list' })
+
+  return (await addTodo(title)).id
+})
 
 const todos = await listTodos()
+const failure = ctx.failed(add)
 ---
 ul
   for todo of todos key={todo.id}
     li: a(href={`/todos/${todo.id}`}) {todo.title}
 form(action={add})
-  input(name="title" placeholder="New todo")
+  input(name="title" placeholder="New todo" value={failure?.values.title})
+  if failure?.errors.title as message
+    p.error {message}
+  if failure?.data as data
+    p.error {data.message}
   button Add
 ```
 
 - `form(action={add})` posts without JavaScript; `kay check` verifies every field `name` against the schema. After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
-- An island imports the action from the page and calls it: `import { add } from '../routes/index.kay'`, then `const id = await add({ title })`. The call is typed and throws `ActionError` with the status and body when it fails.
+- A post the schema refuses, or whose handler returns `ctx.fail(status, data)`, goes back to the page too. There `ctx.failed(add)` returns `{ status, values, errors, data }`, typed from the action, or `undefined`: `values` is what the form posted (fields named like a password left out), `errors` a message per refused field, the schema's `error` option when set, and `data` what `ctx.fail` received. It is read on that one render only.
+- An island imports the action from the page and calls it: `import { add } from '../routes/index.kay'`, then `const id = await add({ title })`. The call is typed, `ctx.fail` results excluded, and throws `ActionError` with `status`, `errors` and `data` when it fails.
 - A handler that throws answers 500 with a generic message and logs the error.
-- The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers` and `redirect(location)`.
+- The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers`, `redirect(location)` and `fail(status, data)`.
 
 ## Locals and guards
 

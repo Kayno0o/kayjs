@@ -1,12 +1,14 @@
 import type { JSX } from '@solidjs/web'
-import type { ErrorPageContext, Locals, PageContext, PageError } from '../runtime'
+import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError } from '../runtime'
 import type { ClientBuild } from './client'
+import type { Flash } from './flash'
 import type { Route, SpecialPage, SpecialPages } from './routes'
 import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
 import { logError, mapStack } from '../build/sourcemap'
 import { collectIslands } from '../runtime/island.server'
 import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
+import { FLASH_COOKIE, readFlash } from './flash'
 import { errorPage } from './overlay'
 import { decodePath } from './routes'
 import { NotFound, Redirect } from './signals'
@@ -84,11 +86,18 @@ export async function renderUnmatched(special: SpecialPages, context: RequestCon
 function createRendering(context: RequestContext, params: Record<string, string>): Rendering {
   const { request } = context
   const jar = cookieJar(request)
+  let flash: Flash | null | undefined
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
   const rendering: Rendering = {
     headers,
     status: 200,
-    writeCookies: () => jar.writeTo(headers),
+    // The failure of a form post is for the one page the browser went back to.
+    writeCookies: () => {
+      if (hasFlash(request))
+        jar.cookies.delete(FLASH_COOKIE)
+
+      jar.writeTo(headers)
+    },
     ctx: {
       request,
       url: new URL(request.url),
@@ -108,10 +117,19 @@ function createRendering(context: RequestContext, params: Record<string, string>
       notFound: () => {
         throw new NotFound()
       },
+      failed: (action) => {
+        flash ??= hasFlash(request) ? readFlash(jar.cookies) ?? null : null
+
+        return flash?.action === action.url ? { status: flash.status, values: flash.values, errors: flash.errors, data: flash.data } as FailureOf<typeof action> : undefined
+      },
     },
   }
 
   return rendering
+}
+
+function hasFlash(request: Request): boolean {
+  return request.headers.get('cookie')?.includes(FLASH_COOKIE) ?? false
 }
 
 function respond(rendering: Rendering, html: string): Response {

@@ -3,10 +3,16 @@ import { t } from 'elysia'
 import { action } from 'kay'
 import { addTodo, listTodos } from '../data'
 
-export const add = action(t.Object({ title: t.String({ minLength: 1 }) }), async ({ title }) => (await addTodo(title)).id)
+export const add = action(t.Object({ title: t.String({ minLength: 1, error: 'Write a title' }) }), async ({ title }, ctx) => {
+  if ((await listTodos()).some(todo => todo.title === title))
+    return ctx.fail(409, { message: 'Already on the list' })
+
+  return (await addTodo(title)).id
+})
 
 const todos = await listTodos()
 const open = todos.filter(todo => !todo.done).length
+const failure = ctx.failed(add)
 ---
 ---
 import Card from '../components/card.kay'
@@ -18,6 +24,10 @@ Card(title="Todos")
     for todo of todos key={todo.id}
       li: a(href={`/todos/${todo.id}`}) {todo.title}
   form.add(action={add})
-    input(name="title" placeholder="New todo")
+    input(name="title" placeholder="New todo" value={failure?.values.title})
+    if failure?.errors.title as message
+      p.error {message}
+    if failure?.data as data
+      p.error {data.message}
     button Add
 Counter(start={open})

@@ -116,14 +116,14 @@ describe('kay lsp', () => {
   it('shows hover types for template expressions and server data', async () => {
     await site.open('src/routes/index.kay')
 
-    const hover = await site.request<Hover>('textDocument/hover', 'src/routes/index.kay', 15, 6)
+    const hover = await site.request<Hover>('textDocument/hover', 'src/routes/index.kay', 21, 6)
 
     expect(JSON.stringify(hover.contents)).toContain('open: number')
-    expect(hover.range).toEqual({ start: { line: 15, character: 5 }, end: { line: 15, character: 9 } })
+    expect(hover.range).toEqual({ start: { line: 21, character: 5 }, end: { line: 21, character: 9 } })
   })
 
   it('completes members inside template expressions, without the generated helpers', async () => {
-    const list = await site.request<CompletionList>('textDocument/completion', 'src/routes/index.kay', 18, 46)
+    const list = await site.request<CompletionList>('textDocument/completion', 'src/routes/index.kay', 24, 46)
     const labels = list.items.map(item => item.label)
 
     expect(labels).toContain('title')
@@ -144,7 +144,7 @@ describe('kay lsp', () => {
 
     expect(action).toMatchObject({ targetUri: site.uri('src/routes/index.kay'), targetSelectionRange: { start: { line: 5, character: 13 }, end: { line: 5, character: 16 } } })
 
-    const [component] = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 22, 2)
+    const [component] = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 32, 2)
 
     expect(component?.targetUri).toBe(site.uri('src/components/counter.kay'))
   })

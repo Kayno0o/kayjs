@@ -3,6 +3,9 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 export const rename = action(t.Object({ title: t.String() }), async ({ title }) => title)
+
+const failure = ctx.failed(rename)
 ---
 form(action={rename})
   input(name="titel")
+  p {failure?.errors.titel}

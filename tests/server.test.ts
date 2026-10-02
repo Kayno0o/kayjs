@@ -6,6 +6,7 @@ import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
+import { ActionError } from '../src/runtime'
 import { pages } from '../src/server'
 import { auth } from './fixtures/site/src/auth'
 
@@ -30,6 +31,13 @@ async function hydrateFrom(html: string): Promise<void> {
 
   await (hydrated ? entry.hydrate() : entry.ready)
   hydrated = true
+}
+
+// `name=value` of the cookie a response sets, without its attributes.
+function cookiePair(response: Response): string {
+  const header = response.headers.get('set-cookie')!
+
+  return header.slice(0, header.indexOf(';'))
 }
 
 async function get(path: string): Promise<{ status: number, html: string, headers: Headers }> {
@@ -301,6 +309,84 @@ describe('request context', () => {
 
     expect(away.status).toBe(302)
     expect(away.headers.get('location')).toBe('/about')
+  })
+})
+
+describe('failed actions', () => {
+  const ADD = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add'
+  const postForm = (title: string) => app.handle(new Request(ADD, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/' },
+    body: new URLSearchParams({ title, password: 'hunter2' }),
+  }))
+  // What the browser does with the redirect: back to the page, sending the cookie it was just given.
+  const followed = async (response: Response) => {
+    const cookie = cookiePair(response)
+
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe('http://localhost/')
+
+    return app.handle(new Request('http://localhost/', { headers: { cookie } }))
+  }
+
+  it('shows a plain form what the schema refused, with the values it posted, once', async () => {
+    const page = await followed(await postForm(''))
+    const html = await page.text()
+
+    expect(html).toContain('<input name="title" placeholder="New todo" value="">')
+    expect(html).toContain('<p class="error">Write a title</p>')
+    expect(page.headers.get('set-cookie')).toStartWith('kay_failed=;')
+    expect((await get('/')).html).not.toContain('class="error"')
+  })
+
+  it('shows a plain form what the handler passed to ctx.fail, never echoing a secret field', async () => {
+    const response = await postForm('Serve pages')
+    const pair = cookiePair(response)
+    const flash = pair.slice(pair.indexOf('=') + 1)
+    const html = await (await followed(response)).text()
+
+    expect(html).toContain('value="Serve pages"')
+    expect(html).toContain('<p class="error">Already on the list</p>')
+    expect(Buffer.from(flash, 'base64url').toString()).not.toContain('hunter2')
+  })
+
+  it('answers a call with the failure as JSON', async () => {
+    const call = (title: string) => app.handle(new Request(ADD, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: JSON.stringify({ title }) }))
+    const refused = await call('')
+    const duplicate = await call('Serve pages')
+
+    expect(refused.status).toBe(422)
+    expect(await refused.json()).toEqual({ errors: { title: 'Write a title' }, data: null })
+    expect(duplicate.status).toBe(409)
+    expect(await duplicate.json()).toEqual({ errors: {}, data: { message: 'Already on the list' } })
+  })
+
+  it('rejects a call from the browser with an ActionError carrying the failure', async () => {
+    const { add } = await import(join(import.meta.dir, 'fixtures/site/src/routes/index.kay')) as { add: (input: { title: string }) => Promise<number> }
+    const realFetch = globalThis.fetch
+    let error: unknown
+
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => app.handle(new Request(new URL(String(input), 'http://localhost'), init))) as typeof fetch
+
+    try {
+      await add({ title: 'Serve pages' })
+    }
+    catch (caught) {
+      error = caught
+    }
+    finally {
+      globalThis.fetch = realFetch
+    }
+
+    expect(error).toBeInstanceOf(ActionError)
+    expect(error).toMatchObject({ status: 409, errors: {}, data: { message: 'Already on the list' } })
+  })
+
+  it('ignores a forged failure cookie', async () => {
+    const page = await app.handle(new Request('http://localhost/', { headers: { cookie: 'kay_failed=not-json' } }))
+
+    expect(page.status).toBe(200)
+    expect(await page.text()).not.toContain('class="error"')
   })
 })
 
