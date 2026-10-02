@@ -23,6 +23,8 @@ export interface PropsDeclaration {
 
 export interface ScriptAnalysis {
   hoisted: Span[]
+  // The quoted module names of hoisted imports and re-exports.
+  specifiers: Span[]
   // True when the script imports a value from `kay` or `solid-js`: it holds client state, so the component becomes an island.
   reactive: boolean
   body: Span[]
@@ -32,7 +34,7 @@ export interface ScriptAnalysis {
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 export function analyzeScript(source: string, script: Span | undefined): ScriptAnalysis {
-  const analysis: ScriptAnalysis = { hoisted: [], body: [], reactive: false, diagnostics: [] }
+  const analysis: ScriptAnalysis = { hoisted: [], specifiers: [], body: [], reactive: false, diagnostics: [] }
 
   if (!script)
     return analysis
@@ -50,6 +52,7 @@ export function analyzeScript(source: string, script: Span | undefined): ScriptA
 
     if (isHoisted(statement)) {
       analysis.hoisted.push(span)
+      analysis.specifiers.push(...moduleSpecifier(statement, shift))
       analysis.reactive ||= importsReactiveValue(statement)
     }
     else {
@@ -91,6 +94,7 @@ export interface ServerData {
 export interface ServerAnalysis {
   // Imports and types, plus exported values such as actions: module level, outside `load`.
   hoisted: Span[]
+  specifiers: Span[]
   exports: Span[]
   // Names the exports declare: actions the server registers and browser builds replace with fetch stubs.
   exportNames: string[]
@@ -106,7 +110,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], exports: [], exportNames: [], body: [], data: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], specifiers: [], exports: [], exportNames: [], body: [], data: [], diagnostics: [] }
   const parsed = parseFence(source, server, analysis.diagnostics)
 
   if (!parsed)
@@ -120,6 +124,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
 
     if (isHoisted(statement)) {
       analysis.hoisted.push(span)
+      analysis.specifiers.push(...moduleSpecifier(statement, shift))
     }
     else if (statement.type === 'ExportNamedDeclaration' && statement.declaration) {
       analysis.exports.push(span)
@@ -207,6 +212,12 @@ function importsReactiveValue(statement: t.Statement): boolean {
     return false
 
   return statement.specifiers.some(specifier => specifier.type !== 'ImportSpecifier' || specifier.importKind !== 'type')
+}
+
+function moduleSpecifier(statement: t.Statement, shift: (node: t.Node) => Span): Span[] {
+  const source = statement.type === 'ImportDeclaration' || statement.type === 'ExportNamedDeclaration' ? statement.source : undefined
+
+  return source ? [shift(source)] : []
 }
 
 function isHoisted(statement: t.Statement): boolean {

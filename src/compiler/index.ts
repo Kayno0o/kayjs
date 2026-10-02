@@ -21,6 +21,7 @@ export interface CompileOptions {
   params?: string[]
   // Output for type checking: adds the link, form field and island prop assertions.
   check?: boolean
+  relocateImport?: (specifier: string) => string | undefined
 }
 
 export interface CompileResult {
@@ -45,7 +46,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   const name = freeName(componentName(filename), fences)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
-  const generateOptions = { name, island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check }
+  const generateOptions = { name, island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport }
   const analysis = generate(file, script, server, generateOptions)
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   const { rewrites, diagnostics } = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings)

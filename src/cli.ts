@@ -28,7 +28,7 @@ async function main(args: string[]): Promise<number> {
 
   const projectFlag = rest.indexOf('-p')
   const tsconfig = projectFlag === -1 ? 'tsconfig.json' : rest[projectFlag + 1]
-  const dir = rest.find((arg, index) => !arg.startsWith('-') && index !== projectFlag + 1) ?? '.'
+  const dir = rest.find((arg, index) => !arg.startsWith('-') && (projectFlag === -1 || index !== projectFlag + 1)) ?? '.'
 
   if (!tsconfig) {
     console.error(USAGE)

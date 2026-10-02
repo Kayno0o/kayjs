@@ -86,7 +86,17 @@ export function shadowPath(root: string, file: string): string {
 // Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`.
 export function compileShadow(root: string, routesDir: string, file: string, source: string): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
   const params = file.startsWith(routesDir + sep) ? routeOf(routesDir, file)?.params : undefined
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params, check: true })
+  const shadowDir = dirname(shadowPath(root, file))
+  // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
+  const relocateImport = (specifier: string) => {
+    if (!specifier.startsWith('.'))
+      return undefined
+
+    const target = resolve(dirname(file), specifier)
+
+    return target.startsWith(root + sep) ? undefined : relative(shadowDir, target)
+  }
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params, check: true, relocateImport })
 
   return { shadow: { source, file, tsx, map }, diagnostics }
 }

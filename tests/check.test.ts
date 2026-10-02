@@ -1,6 +1,7 @@
 import { join } from 'node:path'
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { check } from '../src/check'
+import { check, compileShadow } from '../src/check'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 
@@ -40,6 +41,24 @@ describe('kay check', () => {
       { file: 'broken/src/todo-list.kay', line: 5, column: 3, code: 'TS2322', message: expect.stringContaining('IntrinsicAttributes & { todo: Todo; }') },
       { file: 'broken/src/main.ts', line: 3, column: 38, code: 'TS2741', message: expect.stringContaining('\'done\' is missing') },
     ])
+  })
+
+  it('points imports reaching outside the project at their target from the shadow file', () => {
+    const root = join(fixtures, 'app')
+    const source = '---\nimport type { Row } from "../../shared/data"\nimport type { Todo } from "./todo"\n---\np\n'
+    const { shadow } = compileShadow(root, join(root, 'src/routes'), join(root, 'src/row.kay'), source)
+
+    expect(shadow.tsx).toContain('import type { Row } from "../../../../shared/data"')
+    expect(shadow.tsx).toContain('import type { Todo } from "./todo"')
+  })
+
+  it('checks the directory given on the command line', async () => {
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', join(fixtures, 'broken')], { stdout: 'pipe', stderr: 'pipe' })
+    const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    expect(code).toBe(1)
+    expect(errors).toContain('10 errors')
+    expect(errors).toContain('2 | const id = Number(ctx.params.slug)\n  |                              ^')
   })
 })
 

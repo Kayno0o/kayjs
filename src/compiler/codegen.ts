@@ -16,6 +16,8 @@ export interface GenerateOptions {
   includeServer?: boolean
   // Route parameters, typing `ctx.params` in `load`.
   params?: string[]
+  // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
+  relocateImport?: (specifier: string) => string | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
   rewrites?: ReadonlyMap<number, Rewrite & { end: number }>
 }
@@ -61,11 +63,11 @@ class Generator {
     const includeServer = server !== undefined && this.options.includeServer !== false
 
     for (const span of script.hoisted)
-      b.addSource(span).add('\n')
+      this.emitHoisted(span, script.specifiers)
 
     if (includeServer) {
       for (const span of server.hoisted)
-        b.addSource(span).add('\n')
+        this.emitHoisted(span, server.specifiers)
     }
 
     if (server)
@@ -134,6 +136,22 @@ class Generator {
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name})\n`)
 
     return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
+  }
+
+  private emitHoisted(span: Span, specifiers: Span[]) {
+    let cursor = span.start
+
+    for (const specifier of specifiers) {
+      const target = specifier.start >= span.start && specifier.end <= span.end ? this.options.relocateImport?.(this.src.slice(specifier.start + 1, specifier.end - 1)) : undefined
+
+      if (target === undefined)
+        continue
+
+      this.b.addSource({ start: cursor, end: specifier.start }).add(JSON.stringify(target))
+      cursor = specifier.end
+    }
+
+    this.b.addSource({ start: cursor, end: span.end }).add('\n')
   }
 
   // Server exports stay at module level; the rest of the fence becomes `load(ctx)`, returning every name it declares.
