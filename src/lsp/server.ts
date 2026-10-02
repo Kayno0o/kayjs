@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { compileShadow, SHADOW_DIR, shadowPath, TSGO, writeShadowTypes } from '../check'
+import { formatKay } from '../compiler/format'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { Connection } from './rpc'
 
@@ -45,6 +46,7 @@ export class KayLanguageServer {
     client.onRequest<TextDocumentPositionParams>('textDocument/completion', async params => this.completion(params))
     client.onRequest<CompletionItem>('completionItem/resolve', async item => this.resolveCompletion(item))
     client.onRequest<TextDocumentPositionParams>('textDocument/definition', async params => this.definition(params))
+    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', ({ textDocument }) => this.format(textDocument.uri))
     client.onRequest('shutdown', async () => this.server.request('shutdown'))
     client.onNotification('exit', () => this.exit())
   }
@@ -87,6 +89,7 @@ export class KayLanguageServer {
         hoverProvider: true,
         completionProvider: { triggerCharacters: result.capabilities.completionProvider?.triggerCharacters ?? ['.'], resolveProvider: true },
         definitionProvider: true,
+        documentFormattingProvider: true,
       },
       serverInfo: { name: 'kay' },
     }
@@ -216,6 +219,16 @@ export class KayLanguageServer {
     const resolved = await this.server.request<CompletionItem>('completionItem/resolve', item)
 
     return document ? mapCompletionItem(document, resolved) : resolved
+  }
+
+  private format(uri: string): TextEdit[] {
+    const document = this.documents.get(uri)
+    const formatted = document && formatKay(document.source)
+
+    if (!document || !formatted || formatted.diagnostics.length > 0 || formatted.code === document.source)
+      return []
+
+    return [{ range: { start: { line: 0, character: 0 }, end: toPosition(document.source, document.source.length) }, newText: formatted.code }]
   }
 
   private async definition(params: TextDocumentPositionParams): Promise<LocationLink[] | null> {

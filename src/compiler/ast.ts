@@ -22,6 +22,8 @@ export interface ElementNode extends Span {
   classes: Span[]
   id?: Span
   attributes: Attribute[]
+  // The `(...)` holding the attributes, brackets included.
+  parens?: Span
   children: Node[]
 }
 
@@ -73,6 +75,8 @@ export interface KayFile {
   source: string
   script?: Span
   server?: Span
+  // Where the template begins, past the fences.
+  templateStart: number
   template: Node[]
   diagnostics: Diagnostic[]
 }

@@ -52,7 +52,7 @@ export function parseKay(source: string): KayFile {
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, template: parser.parseTemplate(), diagnostics }
+  return { source, script: fences.script, server: fences.server, templateStart, template: parser.parseTemplate(), diagnostics }
 }
 
 class TemplateParser {
@@ -442,6 +442,7 @@ class TemplateParser {
 
       if (char === ')') {
         this.pos++
+        element.parens = { start: open, end: this.pos }
 
         return
       }

@@ -1,4 +1,4 @@
-import type { CompletionList, Diagnostic, Hover, LocationLink } from '../src/lsp/protocol'
+import type { CompletionList, Diagnostic, Hover, LocationLink, TextEdit } from '../src/lsp/protocol'
 import { join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
@@ -134,5 +134,14 @@ describe('kay lsp', () => {
     const [component] = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 22, 2)
 
     expect(component?.targetUri).toBe(site.uri('src/components/counter.kay'))
+  })
+
+  it('formats a .kay document as one whole-document edit', async () => {
+    await site.open('src/routes/about.kay')
+    await site.change('src/routes/about.kay', 'div\n    p( class = \'x\' ) Hi   \n', 2)
+
+    const edits = await site.connection.request<TextEdit[]>('textDocument/formatting', { textDocument: { uri: site.uri('src/routes/about.kay') }, options: { tabSize: 2, insertSpaces: true } })
+
+    expect(edits).toEqual([{ range: { start: { line: 0, character: 0 }, end: { line: 2, character: 0 } }, newText: 'div\n  p(class="x") Hi\n' }])
   })
 })
