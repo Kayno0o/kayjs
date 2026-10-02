@@ -1,0 +1,37 @@
+---
+import type { Row } from '../../../shared/data'
+import { signal } from 'kay'
+import { rowBuilder } from '../../../shared/data'
+
+const build = rowBuilder()
+const rows = signal<Row[]>([])
+const selected = signal<number>()
+
+function swap() {
+  rows.set((list) => {
+    if (list.length < 999)
+      return list
+
+    const swapped = list.slice()
+
+    swapped[1] = list[998]!
+    swapped[998] = list[1]!
+
+    return swapped
+  })
+}
+---
+div.jumbotron
+  button#run(onClick={() => rows.set(build(1000))}) Create 1,000 rows
+  button#runlots(onClick={() => rows.set(build(10000))}) Create 10,000 rows
+  button#add(onClick={() => rows.set(list => [...list, ...build(1000)])}) Append 1,000 rows
+  button#update(onClick={() => rows.set(list => list.map((row, i) => i % 10 === 0 ? { ...row, label: `${row.label} !!!` } : row))}) Update every 10th row
+  button#clear(onClick={() => rows.set([])}) Clear
+  button#swaprows(onClick={swap}) Swap rows
+table.table
+  tbody
+    for row of rows() key={row.id}
+      tr(class={selected() === row.id ? 'danger' : ''})
+        td.id {row.id}
+        td.label: a(onClick={() => selected.set(row.id)}) {row.label}
+        td.remove: a(onClick={() => rows.set(list => list.filter(item => item.id !== row.id))}) x

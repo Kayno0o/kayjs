@@ -1,0 +1,21 @@
+--- server
+import { PRODUCTS } from '../../../shared/data'
+
+const products = PRODUCTS
+---
+---
+import { formatPrice } from '../../../shared/data'
+import Counter from '../components/counter.kay'
+---
+h1 Products
+p.summary {products.length} products
+Counter(start={0})
+ul.products
+  for product of products key={product.id}
+    li.product
+      h2 {product.name}
+      p.price {formatPrice(product.price)}
+      p.stock(class={product.stock === 0 ? 'out' : 'in'}) {product.stock} in stock
+      ul.tags
+        for tag of product.tags key={tag}
+          li {tag}

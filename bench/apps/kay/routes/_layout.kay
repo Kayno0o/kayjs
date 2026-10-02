@@ -1,0 +1,9 @@
+header.site
+  a.brand(href="/") Bench shop
+  nav
+    a(href="/") Products
+    a(href="/table") Table
+main
+  slot
+footer
+  p Rendered for the benchmark

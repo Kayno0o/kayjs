@@ -23,7 +23,10 @@
     "check": "tsgo --noEmit",
     "lint": "keslint --cache",
     "lint:fix": "keslint --fix --cache",
-    "test": "bun test"
+    "test": "bun test",
+    "bench": "bun bench/run.ts",
+    "bench:test": "bun test ./bench",
+    "bench:check": "bun src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte"
   },
   "dependencies": {
     "@babel/parser": "^7.29.7",
@@ -40,6 +43,8 @@
     "@kaynooo/eslint": "^6.0.1",
     "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.2",
+    "mitata": "1.0.34",
+    "playwright-core": "1.62.0",
     "typescript": "^6.0.3"
   }
 }

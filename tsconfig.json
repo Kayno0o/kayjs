@@ -3,11 +3,17 @@
     "target": "ESNext",
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ESNext",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "moduleDetection": "force",
     "module": "Preserve",
     "moduleResolution": "bundler",
-    "types": ["bun"],
+    "types": [
+      "bun"
+    ],
     "allowImportingTsExtensions": true,
     "strict": true,
     "noFallthroughCasesInSwitch": true,
@@ -17,6 +23,14 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests"],
-  "exclude": ["tests/fixtures"]
+  "include": [
+    "src",
+    "tests",
+    "bench/*.ts",
+    "bench/shared",
+    "bench/apps/kay/*.ts"
+  ],
+  "exclude": [
+    "tests/fixtures"
+  ]
 }

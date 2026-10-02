@@ -1,0 +1,15 @@
+{
+  "name": "bench-solid",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "elysia": "1.4.30",
+    "solid-js": "1.9.15"
+  },
+  "devDependencies": {
+    "@babel/core": "7.29.7",
+    "@babel/preset-typescript": "7.29.7",
+    "@types/babel__core": "7.20.5",
+    "babel-preset-solid": "1.9.15"
+  }
+}
