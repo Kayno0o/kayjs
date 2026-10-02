@@ -1,4 +1,4 @@
-import type { SourceMap } from '../compiler'
+import type { Diagnostic, SourceMap } from '../compiler'
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -24,7 +24,7 @@ export interface CheckDiagnostic {
   code?: string
 }
 
-interface ShadowFile {
+export interface ShadowFile {
   source: string
   file: string
   tsx: string
@@ -32,7 +32,8 @@ interface ShadowFile {
 }
 
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
-const tsgo = join(dirname(fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))), 'bin', 'tsgo')
+
+export const TSGO = join(dirname(fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))), 'bin', 'tsgo')
 
 // Compiles every .kay file under `root` to `.kay/types/<path>.kay.tsx`, the tree tsconfig `rootDirs` merges with the sources.
 export async function writeShadowTypes(projectRoot: string, options: CheckOptions = {}): Promise<{ files: Map<string, ShadowFile>, diagnostics: CheckDiagnostic[] }> {
@@ -44,13 +45,12 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await rm(join(root, SHADOW_DIR), { recursive: true, force: true })
   for (const file of await findKayFiles(root)) {
     const source = await Bun.file(file).text()
-    const params = file.startsWith(routesDir) ? routeOf(routesDir, file)?.params : undefined
-    const { tsx, map, diagnostics: compileDiagnostics } = compileKay(source, file, { root, params, check: true })
-    const shadow = join(root, SHADOW_DIR, `${relative(root, file)}.tsx`)
+    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source)
+    const path = shadowPath(root, file)
 
-    await mkdir(dirname(shadow), { recursive: true })
-    await Bun.write(shadow, tsx)
-    files.set(resolve(shadow), { source, file, tsx, map })
+    await mkdir(dirname(path), { recursive: true })
+    await Bun.write(path, shadow.tsx)
+    files.set(path, shadow)
     for (const diagnostic of compileDiagnostics)
       diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message })
   }
@@ -58,6 +58,18 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await Bun.write(join(root, SHADOW_DIR, 'kay-env.d.ts'), environment((await scanRoutes(routesDir)).map(route => route.pattern)))
 
   return { files, diagnostics }
+}
+
+export function shadowPath(root: string, file: string): string {
+  return join(root, SHADOW_DIR, `${relative(root, file)}.tsx`)
+}
+
+// Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`.
+export function compileShadow(root: string, routesDir: string, file: string, source: string): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
+  const params = file.startsWith(routesDir) ? routeOf(routesDir, file)?.params : undefined
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params, check: true })
+
+  return { shadow: { source, file, tsx, map }, diagnostics }
 }
 
 // Declares the check-only helpers generated code calls, and the routes links are checked against.
@@ -91,7 +103,7 @@ function routeTuple(pattern: string): string {
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const { files, diagnostics } = await writeShadowTypes(root, options)
-  const child = Bun.spawn([process.execPath, tsgo, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   if (errors.trim() !== '')

@@ -1,0 +1,6 @@
+**
+!dist/extension.js
+!language-configuration.json
+!syntaxes/**
+!package.json
+!README.md

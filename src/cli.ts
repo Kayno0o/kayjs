@@ -2,11 +2,18 @@
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { check, formatCheckDiagnostic } from './check'
+import { startServer } from './lsp/server'
 
-const USAGE = 'Usage: kay check [dir] [-p tsconfig.json]'
+const USAGE = 'Usage: kay check [dir] [-p tsconfig.json]\n       kay lsp --stdio'
 
 async function main(args: string[]): Promise<number> {
   const [command, ...rest] = args
+
+  if (command === 'lsp') {
+    await startServer(Bun.stdin.stream(), data => void process.stdout.write(data))
+
+    return 0
+  }
 
   if (command !== 'check') {
     console.error(USAGE)
