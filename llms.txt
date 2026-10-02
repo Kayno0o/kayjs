@@ -170,6 +170,10 @@ export default defineConfig({ plugins: [tailwind] })
 @source '../.kay/classes.txt';
 ```
 
+## Public files
+
+Files in `public/` (the `publicDir` option) are served at their path as they are: `public/robots.txt` at `/robots.txt`. A file sharing its path with a page stops the server at boot.
+
 ## Islands
 
 A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script imports a value from `kay` or `solid-js`, such as `signal`. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript. Interactive components rendered inside an island are part of it.

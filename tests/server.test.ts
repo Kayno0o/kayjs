@@ -1,5 +1,6 @@
 import type { ClientManifest } from '../src/server/client'
-import { readdir } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
@@ -8,7 +9,7 @@ import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 import { auth } from './fixtures/site/src/auth'
 
-const app = await pages({ routes: 'tests/fixtures/site/src/routes' })
+const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
 const MARKERS = /<!--[$/]-->/g
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
 const ENTRY = /<script type="module" src="\/_kay\/([^"]+)"><\/script>/
@@ -300,6 +301,37 @@ describe('request context', () => {
 
     expect(away.status).toBe(302)
     expect(away.headers.get('location')).toBe('/about')
+  })
+})
+
+describe('public files', () => {
+  it('serves them at their path, revalidated through their etag', async () => {
+    const robots = await app.handle(new Request('http://localhost/robots.txt'))
+    const etag = robots.headers.get('etag')!
+
+    expect(robots.status).toBe(200)
+    expect(await robots.text()).toStartWith('User-agent: *')
+    expect(robots.headers.get('content-type')).toStartWith('text/plain')
+    expect(robots.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+    expect((await app.handle(new Request('http://localhost/robots.txt', { headers: { 'if-none-match': etag } }))).status).toBe(304)
+    expect((await app.handle(new Request('http://localhost/.well-known/security.txt'))).status).toBe(200)
+  })
+
+  it('serves nothing outside the directory', async () => {
+    expect((await app.handle(new Request('http://localhost/..%2Fsrc%2Fdata.ts'))).status).toBe(404)
+    expect((await app.handle(new Request('http://localhost/.well-known/..%2F..%2Fsrc%2Fdata.ts'))).status).toBe(404)
+  })
+
+  it('refuses to boot when a file and a page share a path', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-public-'))
+
+    try {
+      await Bun.write(join(dir, 'about'), 'shadowed')
+      await expect(pages({ routes: 'tests/fixtures/site/src/routes', publicDir: dir, prebuilt: true })).rejects.toThrow('and a page both serve /about')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
 

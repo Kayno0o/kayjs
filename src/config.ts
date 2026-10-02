@@ -6,6 +6,8 @@ import { join } from 'node:path'
 export interface KayConfig {
   // Page directory, relative to the root. Defaults to `src/routes`.
   routes?: string
+  // Files served as they are at their path, relative to the root. Defaults to `public`.
+  publicDir?: string
   minify?: boolean
   lang?: string
   // Bun plugins the browser build runs, such as Tailwind's.

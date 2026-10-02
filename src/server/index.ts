@@ -10,6 +10,7 @@ import { loadConfig } from '../config'
 import { registerActionRoutes } from './actions'
 import { ASSET_PREFIX, buildClient, readClient } from './client'
 import { bootFailure, DEV_EVENTS, devEvents } from './dev'
+import { servePublic } from './public'
 import { renderPage, renderUnmatched } from './render'
 import { decodePath, scanRoutes, specialPagesOf } from './routes'
 
@@ -76,7 +77,7 @@ async function servePages(root: string, options: PagesOptions) {
     return new Response(Bun.file(path), { headers: { 'cache-control': 'public, max-age=31536000, immutable' } })
   })
 
-  await registerActionRoutes(app, routes, options.dev)
+  await Promise.all([registerActionRoutes(app, routes, options.dev), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
   for (const route of routes)
     app.get(route.pattern, async context => renderPage(route, context, client, renderOptions))
 
