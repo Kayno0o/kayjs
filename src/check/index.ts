@@ -1,6 +1,6 @@
 import type { Diagnostic, SourceMap } from '../compiler'
-import { mkdir, rm } from 'node:fs/promises'
-import { dirname, join, relative, resolve } from 'node:path'
+import { mkdir, readdir, rm } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { findKayFiles } from '../build/files'
@@ -42,22 +42,40 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const diagnostics: CheckDiagnostic[] = []
   const routesDir = resolve(root, options.routes ?? 'src/routes')
 
-  await rm(join(root, SHADOW_DIR), { recursive: true, force: true })
+  const environmentPath = join(root, SHADOW_DIR, 'kay-env.d.ts')
+
   for (const file of await findKayFiles(root)) {
     const source = await Bun.file(file).text()
     const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source)
     const path = shadowPath(root, file)
 
-    await mkdir(dirname(path), { recursive: true })
-    await Bun.write(path, shadow.tsx)
+    await writeIfChanged(path, shadow.tsx)
     files.set(path, shadow)
     for (const diagnostic of compileDiagnostics)
       diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message })
   }
 
-  await Bun.write(join(root, SHADOW_DIR, 'kay-env.d.ts'), environment((await scanRoutes(routesDir)).map(route => route.pattern)))
+  await writeIfChanged(environmentPath, environment((await scanRoutes(routesDir)).map(route => route.pattern)))
+
+  // Rewriting in place keeps every shadow file present for editors reading the tree meanwhile; only stale ones go.
+  const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))
+    .filter(entry => entry.isFile())
+    .map(entry => join(entry.parentPath, entry.name))
+    .filter(path => path !== environmentPath && !files.has(path))
+
+  await Promise.all(stale.map(async path => rm(path)))
 
   return { files, diagnostics }
+}
+
+async function writeIfChanged(path: string, content: string) {
+  const file = Bun.file(path)
+
+  if (await file.exists() && await file.text() === content)
+    return
+
+  await mkdir(dirname(path), { recursive: true })
+  await Bun.write(path, content)
 }
 
 export function shadowPath(root: string, file: string): string {
@@ -66,7 +84,7 @@ export function shadowPath(root: string, file: string): string {
 
 // Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`.
 export function compileShadow(root: string, routesDir: string, file: string, source: string): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
-  const params = file.startsWith(routesDir) ? routeOf(routesDir, file)?.params : undefined
+  const params = file.startsWith(routesDir + sep) ? routeOf(routesDir, file)?.params : undefined
   const { tsx, map, diagnostics } = compileKay(source, file, { root, params, check: true })
 
   return { shadow: { source, file, tsx, map }, diagnostics }

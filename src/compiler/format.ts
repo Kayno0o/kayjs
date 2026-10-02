@@ -68,6 +68,8 @@ function formatFences(text: string): string[] {
 
 function formatTemplate(file: KayFile): string[] {
   const spans = multiLineSpans(file.template)
+  // A span holding a template literal may carry significant whitespace across its lines, so they are kept byte for byte.
+  const literals = spans.filter(span => file.source.slice(span.start, span.end).includes('`'))
   const edits = attributeEdits(file)
   const levels: number[] = []
   const out: string[] = []
@@ -80,7 +82,15 @@ function formatTemplate(file: KayFile): string[] {
       continue
 
     const indent = LEADING_SPACES.exec(line.text)![0].length
-    const content = line.text.slice(indent).trimEnd()
+    const end = line.start + line.text.length
+    const verbatimEnd = literals.some(span => span.start < end && span.end > end)
+    const content = verbatimEnd ? line.text.slice(indent) : line.text.slice(indent).trimEnd()
+
+    if (literals.some(span => line.start > span.start && line.start < span.end)) {
+      out.push(line.text)
+
+      continue
+    }
 
     // Lines inside a multi-line `(...)` or `{...}` keep their layout, shifted along with the line that opened it.
     if (spans.some(span => line.start > span.start && line.start < span.end)) {

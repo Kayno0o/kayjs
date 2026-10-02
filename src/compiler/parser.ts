@@ -12,6 +12,9 @@ const FOR_HEAD = /for\s+([A-Z_$][\w$]*)(?:\s*,\s*([A-Z_$][\w$]*))?\s+of\s+/diy
 const KEYWORD = /(if|else\s+if|else|for)(?=[ \t]|\r?\n|$)/y
 const ALIAS = /\s+as\s+([a-z_$][\w$]*)\s*$/d
 const KEY_ATTRIBUTE = /\s+key=\{/y
+const CAPITALIZED = /^[A-Z]/
+const WHITESPACE = /\s/
+const ATTRIBUTE_SEPARATOR = /[\s,]/
 const CLOSERS = { '{': '}', '(': ')', '[': ']' } as const
 const TYPE_KEYWORDS = new Set(['any', 'unknown', 'never', 'string', 'number', 'boolean', 'bigint', 'symbol', 'object', 'const'])
 
@@ -329,7 +332,7 @@ class TemplateParser {
       end: tag.end,
       tag,
       name,
-      component: (/^[A-Z]/).test(name),
+      component: CAPITALIZED.test(name),
       classes: [],
       attributes: [],
       children: [],
@@ -735,14 +738,14 @@ class TemplateParser {
     this.pos = i
     let end = i
 
-    while (end > start && (/\s/).test(this.src[end - 1]!))
+    while (end > start && WHITESPACE.test(this.src[end - 1]!))
       end--
 
     return { start, end }
   }
 
   private skipAttributeSeparators() {
-    while (this.pos < this.src.length && (/[\s,]/).test(this.src[this.pos]!))
+    while (this.pos < this.src.length && ATTRIBUTE_SEPARATOR.test(this.src[this.pos]!))
       this.pos++
   }
 
@@ -833,7 +836,7 @@ class TemplateParser {
   private lastContentEnd(): number {
     let end = this.pos
 
-    while (end > 0 && (/\s/).test(this.src[end - 1]!))
+    while (end > 0 && WHITESPACE.test(this.src[end - 1]!))
       end--
 
     return end

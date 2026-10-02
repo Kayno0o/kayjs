@@ -11,9 +11,21 @@ export async function registerActionRoutes(app: Elysia, routes: Route[]): Promis
 
     for (const value of Object.values(module)) {
       if (isAction(value))
-        app.post(value.url, ({ body, request }) => runAction(value, body, request), { body: value.schema })
+        app.post(value.url, ({ body, request }) => runAction(value, body, request), { body: value.schema, beforeHandle: ({ request }) => crossSite(request) })
     }
   }
+}
+
+// Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused.
+function crossSite(request: Request): Response | undefined {
+  const origin = request.headers.get('origin')
+
+  return origin === null || sameHost(request, origin) ? undefined : new Response('Cross-site action refused', { status: 403 })
+}
+
+// Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http.
+function sameHost(request: Request, url: string | null): url is string {
+  return url !== null && URL.canParse(url) && new URL(url).host === new URL(request.url).host
 }
 
 async function runAction(action: ServerAction<TSchema, unknown>, input: unknown, request: Request): Promise<Response> {
@@ -37,7 +49,9 @@ async function runAction(action: ServerAction<TSchema, unknown>, input: unknown,
     if (request.headers.get('x-kay-action') === '1')
       return Response.json(result ?? null, { status, headers })
 
-    headers.set('location', request.headers.get('referer') ?? '/')
+    const referer = request.headers.get('referer')
+
+    headers.set('location', sameHost(request, referer) ? referer : '/')
 
     return new Response(null, { status: 303, headers })
   }

@@ -17,10 +17,10 @@ interface Document extends ShadowFile {
   diagnostics: KayDiagnostic[]
 }
 
-const KAY_FILE = /\.kay$/
+const KAY_FILE = /^file:.*\.kay$/
 const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
-const GENERATED_NAME = /^(?:__|Kay(?:For|Show|Omit|Island|Href|Field|Prop|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub)$)/
+const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:For|Show|Omit|Island|Href|Field|Prop|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub))$/
 const FULL_SYNC = 1
 const ERROR = 1
 const CHANGED = 2
@@ -32,7 +32,6 @@ export class KayLanguageServer {
   private routesDir = ''
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
-  private lastCompletion?: Document
   private diagnosticsTimer?: Timer
 
   constructor(private readonly client: Connection) {
@@ -41,7 +40,7 @@ export class KayLanguageServer {
     client.onNotification<{ textDocument: TextDocumentItem }>('textDocument/didOpen', ({ textDocument }) => this.open(textDocument))
     client.onNotification<DidChangeTextDocumentParams>('textDocument/didChange', params => this.change(params))
     client.onNotification<{ textDocument: TextDocumentIdentifier }>('textDocument/didClose', ({ textDocument }) => this.close(textDocument.uri))
-    client.onNotification('textDocument/didSave', () => void this.saved())
+    client.onNotification('textDocument/didSave', () => void guard(this.saved()))
     client.onRequest<TextDocumentPositionParams>('textDocument/hover', async params => this.hover(params))
     client.onRequest<TextDocumentPositionParams>('textDocument/completion', async params => this.completion(params))
     client.onRequest<CompletionItem>('completionItem/resolve', async item => this.resolveCompletion(item))
@@ -150,7 +149,7 @@ export class KayLanguageServer {
 
   private scheduleDiagnostics() {
     clearTimeout(this.diagnosticsTimer)
-    this.diagnosticsTimer = setTimeout(() => void this.publishAllDiagnostics(), DIAGNOSTICS_DELAY)
+    this.diagnosticsTimer = setTimeout(() => void guard(this.publishAllDiagnostics()), DIAGNOSTICS_DELAY)
   }
 
   // Every open file is checked again on any change, since editing one component can break the files using it.
@@ -171,7 +170,8 @@ export class KayLanguageServer {
     if (this.documents.get(document.uri) !== document)
       return
 
-    const typeErrors = (report?.items ?? []).map(diagnostic => ({ ...diagnostic, range: toSourceRange(document, diagnostic.range, true) ?? zeroRange() }))
+    // Related information points into the shadow TSX, a file the user never sees.
+    const typeErrors = (report?.items ?? []).map(({ relatedInformation: _related, ...diagnostic }) => ({ ...diagnostic, range: toSourceRange(document, diagnostic.range, true) ?? zeroRange() }))
 
     this.client.notify('textDocument/publishDiagnostics', { uri: document.uri, version: document.version, diagnostics: [...compileErrors, ...typeErrors] })
   }
@@ -205,20 +205,20 @@ export class KayLanguageServer {
     const editRange = list.itemDefaults?.editRange
     const itemDefaults = list.itemDefaults && { ...list.itemDefaults, editRange: editRange && ('start' in editRange ? toSourceRange(target.document, editRange) : mapInsertReplace(target.document, editRange)) }
 
-    this.lastCompletion = target.document
-
     return {
       ...list,
       itemDefaults,
-      items: list.items.filter(item => !GENERATED_NAME.test(item.label)).map(item => mapCompletionItem(target.document, item)),
+      items: list.items.filter(item => !GENERATED_NAME.test(item.label)).map(item => ({ ...mapCompletionItem(target.document, item), data: { uri: target.document.uri, data: item.data } })),
     }
   }
 
+  // Items carry the document they were listed for, since the editor may resolve one after another file asked for completions.
   private async resolveCompletion(item: CompletionItem): Promise<CompletionItem> {
-    const document = this.lastCompletion
-    const resolved = await this.server.request<CompletionItem>('completionItem/resolve', item)
+    const { uri, data } = item.data as { uri: string, data: unknown }
+    const document = this.documents.get(uri)
+    const resolved = await this.server.request<CompletionItem>('completionItem/resolve', { ...item, data })
 
-    return document ? mapCompletionItem(document, resolved) : resolved
+    return { ...(document ? mapCompletionItem(document, resolved) : resolved), data: item.data }
   }
 
   private format(uri: string): TextEdit[] {
@@ -298,6 +298,16 @@ export class KayLanguageServer {
 // Runs until the editor closes the stream.
 export async function startServer(input: ReadableStream<Uint8Array>, write: (data: string) => void): Promise<void> {
   await new KayLanguageServer(new Connection(input, write)).listening
+}
+
+// Background work reports its failure instead of ending the process with an unhandled rejection.
+async function guard(task: Promise<void>): Promise<void> {
+  try {
+    await task
+  }
+  catch (error) {
+    console.error('kay lsp:', error)
+  }
 }
 
 function mapCompletionItem(document: ShadowFile, item: CompletionItem): CompletionItem {

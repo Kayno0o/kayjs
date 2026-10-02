@@ -6,7 +6,7 @@ import { kay } from '../build/plugin'
 import { registerActionRoutes } from './actions'
 import { ASSET_PREFIX, buildClient } from './client'
 import { renderPage } from './render'
-import { scanRoutes } from './routes'
+import { decodePath, scanRoutes } from './routes'
 
 export type { Route } from './routes'
 
@@ -39,13 +39,13 @@ export async function pages(options: PagesOptions = {}) {
 
   if (client) {
     app.get(`${ASSET_PREFIX}*`, async ({ params, status }) => {
-      const path = normalize(resolve(client.dir, decodeURIComponent(params['*'])))
-      const file = Bun.file(path)
+      const name = decodePath(params['*'])
+      const path = name === undefined ? '' : normalize(resolve(client.dir, name))
 
-      if (!path.startsWith(client.dir + sep) || !await file.exists())
+      if (!path.startsWith(client.dir + sep) || !await Bun.file(path).exists())
         return status(404)
 
-      return new Response(file, { headers: { 'cache-control': 'public, max-age=31536000, immutable' } })
+      return new Response(Bun.file(path), { headers: { 'cache-control': 'public, max-age=31536000, immutable' } })
     })
   }
 

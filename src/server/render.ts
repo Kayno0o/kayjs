@@ -3,6 +3,7 @@ import type { PageContext } from '../runtime'
 import type { ClientBuild } from './client'
 import type { Route } from './routes'
 import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
+import { decodePath } from './routes'
 import { NotFound, Redirect } from './signals'
 
 interface PageModule {
@@ -15,12 +16,17 @@ export interface RenderOptions {
 }
 
 export async function renderPage(route: Route, request: Request, rawParams: Record<string, string>, client: ClientBuild | undefined, options: RenderOptions = {}): Promise<Response> {
+  const params = routeParams(route, rawParams)
+
+  if (!params)
+    return new Response('Bad request', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
   let status = 200
   const ctx: PageContext = {
     request,
     url: new URL(request.url),
-    params: routeParams(route, rawParams),
+    params,
     status: (code) => {
       status = code
     },
@@ -68,11 +74,18 @@ export async function renderPage(route: Route, request: Request, rawParams: Reco
   }
 }
 
-function routeParams(route: Route, raw: Record<string, string>): Record<string, string> {
+// Elysia decodes named params already; only the catch-all arrives encoded. Undefined when it is malformed.
+function routeParams(route: Route, raw: Record<string, string>): Record<string, string> | undefined {
   const params: Record<string, string> = {}
 
-  for (const name of route.params)
-    params[name] = decodeURIComponent((name === route.catchAll ? raw['*'] : raw[name]) ?? '')
+  for (const name of route.params) {
+    const value = name === route.catchAll ? decodePath(raw['*'] ?? '') : raw[name] ?? ''
+
+    if (value === undefined)
+      return undefined
+
+    params[name] = value
+  }
 
   return params
 }

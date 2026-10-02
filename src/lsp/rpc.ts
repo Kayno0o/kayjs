@@ -79,13 +79,23 @@ export class Connection {
 
       for (let message = takeMessage(buffer); message; message = takeMessage(buffer)) {
         buffer = message.rest
-        this.dispatch(JSON.parse(message.body) as Message)
+        this.receive(message.body)
       }
     }
 
     for (const { reject } of this.pending.values())
       reject(new Error('Connection closed'))
     this.pending.clear()
+  }
+
+  // One bad message or failing handler is logged and skipped, never allowed to end the connection.
+  private receive(body: string) {
+    try {
+      this.dispatch(JSON.parse(body) as Message)
+    }
+    catch (error) {
+      console.error('kay lsp:', error)
+    }
   }
 
   private dispatch(message: Message) {

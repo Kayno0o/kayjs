@@ -11,7 +11,7 @@ const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
 // Drives `kay lsp` over stdio the way an editor does.
 class Editor {
   readonly connection: Connection
-  private readonly process = Bun.spawn([process.execPath, cli, 'lsp', '--stdio'], { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
+  private readonly process = Bun.spawn([process.execPath, cli, 'lsp', '--stdio'], { stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
   private readonly waiting = new Map<string, (diagnostics: Diagnostic[]) => void>()
 
   constructor(readonly root: string) {
@@ -51,6 +51,11 @@ class Editor {
 
   async request<Result>(method: string, path: string, line: number, character: number): Promise<Result> {
     return this.connection.request<Result>(method, { textDocument: { uri: this.uri(path) }, position: { line, character } })
+  }
+
+  write(data: string) {
+    this.process.stdin.write(data)
+    void this.process.stdin.flush()
   }
 
   async stop() {
@@ -95,6 +100,13 @@ describe('kay lsp', () => {
     expect(fixed).toEqual([])
   })
 
+  it('survives malformed frames and documents it cannot serve', async () => {
+    broken.write('Content-Length: 5\r\n\r\n{nope')
+    broken.connection.notify('textDocument/didOpen', { textDocument: { uri: 'vscode-vfs://github/x/page.kay', languageId: 'kay', version: 1, text: 'p Hi' } })
+
+    expect(await broken.request('textDocument/hover', 'src/routes/[id].kay', 4, 3)).not.toBeNull()
+  })
+
   it('reports compile errors from the .kay compiler itself', async () => {
     const diagnostics = await broken.change('src/routes/[id].kay', 'ul\n  for item of [1, 2]\n    li {item}\n', 3)
 
@@ -123,7 +135,8 @@ describe('kay lsp', () => {
     const names = scope.items.map(item => item.label)
 
     expect(names).toEqual(expect.arrayContaining(['id', 'saved', 'submit', 'title']))
-    expect(names.filter(name => name.startsWith('__') || name.startsWith('Kay'))).toEqual([])
+    expect(names).toContain('__dirname')
+    expect(names.filter(name => name === '__props' || name.startsWith('Kay'))).toEqual([])
   })
 
   it('goes to definitions across .kay files', async () => {

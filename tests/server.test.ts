@@ -77,8 +77,15 @@ describe('pages', () => {
     expect((await get('/docs/guide/intro')).html).toContain('<p class="path">Docs at guide/intro</p>')
   })
 
-  it('refuses asset paths outside the client build', async () => {
+  it('decodes each param once and answers malformed encodings with 400', async () => {
+    expect((await get('/todos/100%25')).status).toBe(302)
+    expect((await get('/docs/a%20b/%2541')).html).toContain('<p class="path">Docs at a b/%41</p>')
+    expect((await get('/docs/100%')).status).toBe(400)
+  })
+
+  it('refuses asset paths outside the client build or malformed', async () => {
     expect((await app.handle(new Request('http://localhost/_kay/..%2F..%2Fpackage.json'))).status).toBe(404)
+    expect((await app.handle(new Request('http://localhost/_kay/%E0'))).status).toBe(404)
   })
 
   it('hydrates the island on the served page and leaves the static markup alone', async () => {
@@ -121,6 +128,18 @@ describe('pages', () => {
     expect(response.status).toBe(303)
     expect(response.headers.get('location')).toBe('http://localhost/')
     expect((await get('/')).html).toContain('From a form</a></li>')
+  })
+
+  it('refuses actions posted from another site and never redirects to one', async () => {
+    const post = (headers: Record<string, string>) => app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+      body: new URLSearchParams({ title: 'Elsewhere' }),
+    }))
+
+    expect((await post({ origin: 'https://evil.example' })).status).toBe(403)
+    expect((await post({ origin: 'https://localhost' })).status).toBe(303)
+    expect((await post({ referer: 'https://evil.example/' })).headers.get('location')).toBe('/')
   })
 
   it('answers a fetch call with the result and rejects input the schema refuses', async () => {

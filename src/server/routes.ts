@@ -79,3 +79,13 @@ function layoutsOf(routesDir: string, file: string): string[] {
 
   return layouts
 }
+
+// A percent-encoded URL path, or undefined when the encoding is malformed (`/100%`).
+export function decodePath(value: string): string | undefined {
+  try {
+    return decodeURIComponent(value)
+  }
+  catch {
+    return undefined
+  }
+}

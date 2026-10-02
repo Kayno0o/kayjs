@@ -70,6 +70,12 @@ describe('formatKay', () => {
     expect(format(source)).toBe(['div', '  button(onClick={() => {', '    go()', '  }}) Go', ''].join('\n'))
   })
 
+  it('keeps the lines of a multi-line template literal byte for byte', () => {
+    const source = ['div', '    p {`  ', '    x  ', '  y`}', ''].join('\n')
+
+    expect(format(source)).toBe(['div', '  p {`  ', '    x  ', '  y`}', ''].join('\n'))
+  })
+
   it('keeps fence code as written, template literals and blank lines included', () => {
     const source = ['---', '', 'const text = `a  ', '', '', 'b`', '', '---', 'p {text}', ''].join('\n')
 

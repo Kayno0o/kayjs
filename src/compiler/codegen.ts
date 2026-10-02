@@ -231,10 +231,6 @@ class Generator {
   }
 
   // Branch and loop bodies as one expression: a lone element stays bare, several get a fragment.
-  private emitExpression(nodes: Node[]) {
-    this.emitRoot(nodes)
-  }
-
   private emitChildren(nodes: Node[]) {
     for (const node of nodes) {
       switch (node.kind) {
@@ -272,7 +268,7 @@ class Generator {
 
     b.wrap(branch, () => {
       if (!branch.test) {
-        this.emitExpression(branch.children)
+        this.emitRoot(branch.children)
 
         return
       }
@@ -291,14 +287,14 @@ class Generator {
         b.add('>{(')
         this.accessorSites.add(b.code.length)
         b.addSource(branch.alias).add(') => ')
-        this.emitExpression(branch.children)
+        this.emitRoot(branch.children)
         b.add(`}</${helperAlias('Show')}>`)
 
         return
       }
 
       b.add('(').addSource(branch.test).add(') ? ')
-      this.emitExpression(branch.children)
+      this.emitRoot(branch.children)
       b.add(' : ')
 
       if (hasRest)
@@ -326,7 +322,7 @@ class Generator {
 
       if (node.fallback) {
         b.add(' fallback={')
-        this.emitExpression(node.fallback)
+        this.emitRoot(node.fallback)
         b.add('}')
       }
 
@@ -344,7 +340,7 @@ class Generator {
       }
 
       b.add(') => ')
-      this.emitExpression(node.children)
+      this.emitRoot(node.children)
       b.add(`}</${tag}>`)
     })
   }
@@ -380,7 +376,7 @@ class Generator {
         }
 
         b.add(' ').addSource(slot.name).add('={')
-        this.emitExpression(slot.children)
+        this.emitRoot(slot.children)
         b.add('}')
       }
       const children = element.children.filter(child => child.kind !== 'slot')

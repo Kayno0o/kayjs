@@ -2,7 +2,7 @@ import type { ExtensionContext } from 'vscode'
 import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node'
 import { existsSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
-import { workspace } from 'vscode'
+import { window, workspace } from 'vscode'
 import { LanguageClient } from 'vscode-languageclient/node'
 
 let client: LanguageClient | undefined
@@ -16,6 +16,13 @@ export async function activate(context: ExtensionContext): Promise<void> {
   const root = folder.uri.fsPath
   const config = workspace.getConfiguration('kay')
   const cli = serverPath(root, config.get<string>('server.path', ''))
+
+  if (!existsSync(cli)) {
+    void window.showErrorMessage(`Kay: no language server at ${cli}. Install kay in this workspace or set kay.server.path.`)
+
+    return
+  }
+
   const run = { command: config.get<string>('bun.path', 'bun'), args: [cli, 'lsp', '--stdio'], options: { cwd: root } }
   const server: ServerOptions = { run, debug: run }
   const options: LanguageClientOptions = {

@@ -9,6 +9,17 @@ describe('kay check', () => {
     expect(await check(join(fixtures, 'app'))).toEqual([])
   })
 
+  it('rewrites the shadow tree in place, removing only files no .kay source produces any more', async () => {
+    const stale = join(fixtures, 'app', '.kay', 'types', 'src', 'gone.kay.tsx')
+    const kept = join(fixtures, 'app', '.kay', 'types', 'src', 'todo-item.kay.tsx')
+
+    await Bun.write(stale, 'export {}')
+    await check(join(fixtures, 'app'))
+
+    expect(await Bun.file(stale).exists()).toBe(false)
+    expect(await Bun.file(kept).exists()).toBe(true)
+  })
+
   it('passes a site of pages, layouts and islands, with route params and server data typed', async () => {
     expect(await check(join(fixtures, 'site'))).toEqual([])
   })
