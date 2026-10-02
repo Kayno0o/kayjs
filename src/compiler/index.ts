@@ -3,6 +3,7 @@ import type { SourceMap } from './mapping'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { generate, isInteractive } from './codegen'
+import { codeFrame } from './frame'
 import { positionAt } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
@@ -78,5 +79,5 @@ function freeName(name: string, code: string): string {
 export function formatDiagnostic(source: string, filename: string, diagnostic: Diagnostic): string {
   const { line, column } = positionAt(source, diagnostic.start)
 
-  return `${filename}:${line}:${column} - ${diagnostic.message}`
+  return `${filename}:${line}:${column} - ${diagnostic.message}\n${codeFrame(source, diagnostic.start, diagnostic.end)}`
 }

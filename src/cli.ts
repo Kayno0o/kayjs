@@ -38,13 +38,29 @@ async function main(args: string[]): Promise<number> {
 
   const diagnostics = await check(resolve(dir), { tsconfig })
 
-  for (const diagnostic of diagnostics)
-    console.error(formatCheckDiagnostic(diagnostic))
+  const sources = new Map<string, string | undefined>()
+
+  for (const diagnostic of diagnostics) {
+    if (!sources.has(diagnostic.file))
+      sources.set(diagnostic.file, await readSource(diagnostic.file))
+
+    console.error(`${formatCheckDiagnostic(diagnostic, sources.get(diagnostic.file))}\n`)
+  }
 
   if (diagnostics.length > 0)
-    console.error(`\n${diagnostics.length} error${diagnostics.length === 1 ? '' : 's'}`)
+    console.error(`${diagnostics.length} error${diagnostics.length === 1 ? '' : 's'}`)
 
   return diagnostics.length > 0 ? 1 : 0
+}
+
+// A diagnostic can point at a file that is gone by now, such as a tsconfig tsgo could not read.
+async function readSource(file: string): Promise<string | undefined> {
+  try {
+    return await Bun.file(file).text()
+  }
+  catch {
+    return undefined
+  }
 }
 
 // Formats in place, or with `--check` lists the files that are not formatted and fails.
@@ -55,7 +71,7 @@ async function fmt(args: string[]): Promise<number> {
 
   for (const { file, source, diagnostics } of errors) {
     for (const diagnostic of diagnostics)
-      console.error(formatDiagnostic(source, relative(process.cwd(), file), diagnostic))
+      console.error(`${formatDiagnostic(source, relative(process.cwd(), file), diagnostic)}\n`)
   }
 
   for (const file of changed)

@@ -1,8 +1,10 @@
+import type { FileDiagnostic } from '../build/transform'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { findKayFiles } from '../build/files'
 import { kay } from '../build/plugin'
+import { KayCompileError } from '../build/transform'
 import { compileKay } from '../compiler'
 
 export interface ClientBuild {
@@ -14,15 +16,26 @@ export interface ClientBuild {
 export const ASSET_PREFIX = '/_kay/'
 
 // Bundles the browser code: one entry hydrating islands, each island in its own chunk. Without islands there is nothing to ship.
+// Every component is compiled first, so all of the project's syntax errors come out together instead of one per bundler run.
 export async function buildClient(root: string, options: { minify?: boolean } = {}): Promise<ClientBuild | undefined> {
   const islands = new Map<string, string>()
+  const diagnostics: FileDiagnostic[] = []
+  const files = await findKayFiles(root)
+  const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
-  for (const file of await findKayFiles(root)) {
-    const { island } = compileKay(await Bun.file(file).text(), file, { root })
+  for (const [index, file] of files.entries()) {
+    const source = sources[index]!
+    const compiled = compileKay(source, file, { root })
 
-    if (island)
-      islands.set(island, file)
+    for (const diagnostic of compiled.diagnostics)
+      diagnostics.push({ ...diagnostic, file, source })
+
+    if (compiled.island)
+      islands.set(compiled.island, file)
   }
+
+  if (diagnostics.length > 0)
+    throw new KayCompileError(diagnostics)
 
   if (islands.size === 0)
     return undefined

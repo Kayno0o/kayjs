@@ -1,3 +1,6 @@
+import type { Diagnostic } from '../compiler'
+import { relative } from 'node:path'
+import process from 'node:process'
 import { transform } from '@solidjs/compiler'
 import { compileKay, formatDiagnostic } from '../compiler'
 
@@ -11,10 +14,16 @@ export interface TransformOptions {
   root?: string
 }
 
+export interface FileDiagnostic extends Diagnostic {
+  file: string
+  source: string
+}
+
 export class KayCompileError extends Error {
-  constructor(readonly diagnostics: string[]) {
-    super(`\n${diagnostics.join('\n')}`)
-    this.name = 'KayCompileError'
+  override name = 'KayCompileError'
+
+  constructor(readonly diagnostics: FileDiagnostic[]) {
+    super(`\n${diagnostics.map(diagnostic => formatDiagnostic(diagnostic.source, relative(process.cwd(), diagnostic.file), diagnostic)).join('\n\n')}`)
   }
 }
 
@@ -23,7 +32,7 @@ export function transformKay(source: string, filename: string, options: Transfor
   const { tsx, diagnostics } = compileKay(source, filename, { root: options.root, includeServer: options.target === 'ssr' })
 
   if (diagnostics.length > 0)
-    throw new KayCompileError(diagnostics.map(diagnostic => formatDiagnostic(source, filename, diagnostic)))
+    throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file: filename, source })))
 
   return transform(tsx, { filename: `${filename}.tsx`, generate: options.target, hydratable: options.hydratable ?? false }).code
 }

@@ -5,6 +5,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { findKayFiles } from '../build/files'
 import { compileKay } from '../compiler'
+import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { routeOf, scanRoutes } from '../server/routes'
 
@@ -166,8 +167,10 @@ function remap(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): Che
   return { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, source) }
 }
 
-export function formatCheckDiagnostic(diagnostic: CheckDiagnostic, cwd = process.cwd()): string {
+// Followed by a code frame when the file's source is given.
+export function formatCheckDiagnostic(diagnostic: CheckDiagnostic, source?: string): string {
   const code = diagnostic.code ? ` ${diagnostic.code}` : ''
+  const heading = `${relative(process.cwd(), diagnostic.file)}:${diagnostic.line}:${diagnostic.column} - error${code}: ${diagnostic.message}`
 
-  return `${relative(cwd, diagnostic.file)}:${diagnostic.line}:${diagnostic.column} - error${code}: ${diagnostic.message}`
+  return source === undefined ? heading : `${heading}\n${codeFrame(source, offsetAt(source, diagnostic))}`
 }
