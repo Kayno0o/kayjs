@@ -167,6 +167,13 @@ describe('elements', () => {
   })
 })
 
+describe('islands', () => {
+  it('rejects hydrate inside an island, which hydrates as a whole', () => {
+    expect(errors('---\nimport { signal } from "kay"\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="visible")')).toEqual([expect.stringContaining('`hydrate` has no effect inside an island')])
+    expect(errors('---\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="visible")')).toEqual([])
+  })
+})
+
 describe('head', () => {
   it('registers the head tags before rendering and leaves them out of the template', () => {
     const code = tsx('---\nconst { name } = props<{ name: string }>()\n---\nhead\n  title {name} | Docs\n  meta(name="description" content={name} data-x)\nh1 {name}')

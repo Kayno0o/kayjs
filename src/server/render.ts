@@ -216,7 +216,7 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
   } }), { noScripts: true, onHead: (html) => {
     head = html
   } }))
-  const scripts = client.entry !== undefined && islands.size > 0 ? islandScripts(client, islands) : ''
+  const scripts = client.entry !== undefined && islands.count > 0 ? islandScripts(client, islands.eager) : ''
 
   return `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${stylesheets(client, files)}${scripts}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
 }
@@ -242,7 +242,7 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   return html
 }
 
-// Preloads every chunk the page's islands need, so the browser fetches them alongside the entry instead of one round trip after another.
+// Preloads every chunk the page's eager islands need, so the browser fetches them alongside the entry instead of one round trip after another.
 function islandScripts(client: ClientBuild, islands: Set<string>): string {
   const key = [...islands].sort().join('\n')
   let cached = scriptsCache.get(client)

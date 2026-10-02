@@ -570,6 +570,9 @@ class Generator {
       if (element.classes.length > 0 && attribute === classAttributes[0])
         continue
 
+      if (element.component && this.options.island && attribute.kind !== 'spread' && this.text(attribute.name) === 'hydrate')
+        this.error(attribute.name, '`hydrate` has no effect inside an island, which hydrates as a whole')
+
       b.add(' ')
 
       if (!this.emitFormAttribute(element, attribute))

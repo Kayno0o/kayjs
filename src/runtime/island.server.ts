@@ -1,17 +1,23 @@
 import type { JSX } from '@solidjs/web'
-import type { IslandComponent } from './checks'
+import type { HydrateWhen, IslandComponent } from './checks'
 import { createComponent, escape, Hydration, renderToString, ssr } from '@solidjs/web'
+import { omit } from 'solid-js'
 import { sharedConfig } from 'solid-js/internal'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
 let depth = 0
 let nextRenderId = 0
-// The ids of the islands the page being rendered holds, so it preloads their chunks and nothing else.
-let rendered: Set<string> | undefined
+// The islands of the page being rendered: it ships the entry when it holds any, and preloads the chunks of those hydrating right away.
+let rendered: RenderedIslands | undefined
+
+export interface RenderedIslands {
+  eager: Set<string>
+  count: number
+}
 
 // Runs a synchronous page render and lists the islands it rendered.
-export function collectIslands<T>(render: () => T): { result: T, islands: Set<string> } {
-  const islands = new Set<string>()
+export function collectIslands<T>(render: () => T): { result: T, islands: RenderedIslands } {
+  const islands: RenderedIslands = { eager: new Set(), count: 0 }
 
   rendered = islands
 
@@ -29,25 +35,36 @@ export class IslandPropsError extends Error {
 
 // On the server an interactive component renders as its own hydration root inside `<kay-island>`, its props serialized for the client.
 export function island<P extends object>(id: string, component: (props: P) => JSX.Element): IslandComponent<P> {
-  const render = (props: P) => {
-    if (depth > 0)
-      return component(props)
+  const render = (props: P & { hydrate?: HydrateWhen }) => {
+    const when = props.hydrate
+    const own = 'hydrate' in props ? omit(props, 'hydrate') as P : props
 
-    const serialized = serializeProps(id, props)
+    if (depth > 0)
+      return component(own)
+
+    const serialized = serializeProps(id, own)
     const renderId = `k${(nextRenderId++).toString(36)}-`
     // renderToString replaces the render context and never puts it back, which would drop the page's later `useHead` calls.
     const context = sharedConfig.context
 
     depth++
-    rendered?.add(id)
+
+    if (rendered) {
+      rendered.count++
+
+      if (when === undefined || when === 'load')
+        rendered.eager.add(id)
+    }
 
     try {
       // Pages render under NoHydration; an island re-enters hydration so its markup carries the keys the client claims.
       const html = renderToString(() => createComponent(Hydration, { id: renderId, get children() {
-        return component(props)
+        return component(own)
       } }), { renderId, noScripts: true })
 
-      return ssr([`<kay-island data-component="${escape(id, true)}" data-render-id="${renderId}" data-props="${escape(serialized, true)}">`, '</kay-island>'], html) as unknown as JSX.Element
+      const lazy = when === undefined || when === 'load' ? '' : ` data-hydrate="${escape(when, true)}"`
+
+      return ssr([`<kay-island data-component="${escape(id, true)}" data-render-id="${renderId}" data-props="${escape(serialized, true)}"${lazy}>`, '</kay-island>'], html) as unknown as JSX.Element
     }
     finally {
       sharedConfig.context = context

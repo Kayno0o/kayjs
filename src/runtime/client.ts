@@ -3,23 +3,77 @@ import { hydrate } from '@solidjs/web'
 
 export type IslandRegistry = Record<string, () => Promise<{ default: (props: object) => JSX.Element }>>
 
-// Hydrates every `<kay-island>` the server rendered, loading each component's chunk on demand.
+// Starts loading a `visible` island this far before it scrolls into view.
+const VISIBLE_MARGIN = '200px'
+const IDLE_FALLBACK_MS = 200
+const started = new WeakSet<HTMLElement>()
+
+// Hydrates every `<kay-island>` the server rendered, loading each component's chunk on demand; resolves once the eager ones are done.
+// Running it again over the same root leaves the islands it already took alone.
 export async function hydrateIslands(registry: IslandRegistry, root: ParentNode = document): Promise<void> {
-  const islands = [...root.querySelectorAll<HTMLElement>('kay-island')]
+  const eager: Promise<void>[] = []
 
-  await Promise.all(islands.map(async (element) => {
-    const id = element.dataset.component ?? ''
-    const load = registry[id]
+  for (const element of root.querySelectorAll<HTMLElement>('kay-island')) {
+    if (started.has(element))
+      continue
 
-    if (!load) {
-      console.error(`[kay] no client chunk for island ${id}`)
+    started.add(element)
+    const run = async () => hydrateIsland(registry, element)
 
+    if (element.dataset.hydrate === 'visible')
+      whenVisible(element, run)
+    else if (element.dataset.hydrate === 'idle')
+      whenIdle(run)
+    else
+      eager.push(run())
+  }
+
+  await Promise.all(eager)
+}
+
+async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Promise<void> {
+  const id = element.dataset.component ?? ''
+  const load = registry[id]
+
+  if (!load) {
+    console.error(`[kay] no client chunk for island ${id}`)
+
+    return
+  }
+
+  const { default: component } = await load()
+  const props = JSON.parse(element.dataset.props ?? '{}') as object
+
+  // Solid hydrates a page once and renders anything after from scratch; an island hydrating later still claims its server markup.
+  const hydration = (globalThis as { _$HY?: { done?: boolean } })._$HY
+
+  if (hydration)
+    hydration.done = false
+
+  hydrate(() => component(props), element, { renderId: element.dataset.renderId })
+}
+
+function whenVisible(element: HTMLElement, run: () => Promise<void>) {
+  if (typeof IntersectionObserver === 'undefined') {
+    void run()
+
+    return
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    if (!entries.some(entry => entry.isIntersecting))
       return
-    }
 
-    const { default: component } = await load()
-    const props = JSON.parse(element.dataset.props ?? '{}') as object
+    observer.disconnect()
+    void run()
+  }, { rootMargin: VISIBLE_MARGIN })
 
-    hydrate(() => component(props), element, { renderId: element.dataset.renderId })
-  }))
+  observer.observe(element)
+}
+
+function whenIdle(run: () => Promise<void>) {
+  if (typeof requestIdleCallback === 'function')
+    requestIdleCallback(() => void run())
+  else
+    setTimeout(() => void run(), IDLE_FALLBACK_MS)
 }

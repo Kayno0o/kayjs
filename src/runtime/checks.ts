@@ -5,8 +5,11 @@ import type { Elysia } from 'elysia'
 
 declare const ISLAND: unique symbol
 
-// What an interactive component's default export is: the brand lets the checker tell islands from plain components.
-export type IslandComponent<Props> = ((props: Props) => JSX.Element) & { readonly [ISLAND]: true }
+// When an island hydrates: right away, once the browser is idle, or once it scrolls near the viewport.
+export type HydrateWhen = 'load' | 'idle' | 'visible'
+
+// What an interactive component's default export is: the brand lets the checker tell islands from plain components, and only islands take `hydrate`.
+export type IslandComponent<Props> = ((props: Props & { hydrate?: HydrateWhen }) => JSX.Element) & { readonly [ISLAND]: true }
 
 // Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every route the pages directory serves, and by the app with `locals: LocalsOf<typeof auth>`.
 export interface Register {}

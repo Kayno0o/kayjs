@@ -127,6 +127,15 @@ describe('pages', () => {
     expect((await Bun.file(join(process.cwd(), '.kay/classes.txt')).text()).split('\n')).toEqual(expect.arrayContaining(['card', 'counter']))
   })
 
+  it('ships the entry to a page whose islands all wait, without preloading their chunks', async () => {
+    const manifest = await Bun.file(join(process.cwd(), '.kay/client/manifest.json')).json() as ClientManifest
+    const { html } = await get('/lazy')
+
+    expect(html).toContain('data-hydrate="idle"')
+    expect(html).toContain(`<script type="module" src="${manifest.entry}"></script>`)
+    expect(html).not.toContain(manifest.islands['tests/fixtures/site/src/components/counter.kay']![0])
+  })
+
   it('passes route params and honours notFound and redirect', async () => {
     expect((await get('/todos/1')).html).toContain('<h1>Write the compiler</h1><p class="status">Done</p>')
     expect((await get('/todos/9')).status).toBe(404)

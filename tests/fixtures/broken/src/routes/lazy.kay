@@ -1,0 +1,4 @@
+---
+import TodoItem from '../todo-item.kay'
+---
+TodoItem(todo={{ id: 1, title: 'Static', done: false }} hydrate="visible")

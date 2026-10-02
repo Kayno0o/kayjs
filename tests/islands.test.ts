@@ -52,7 +52,25 @@ describe('islands', () => {
     expect(head).toContain('After the island</title>')
   })
 
-  it('hydrates the island in place and keeps it reactive', async () => {
+  it('marks an island hydrating once visible and keeps its hydrate prop out of its props', () => {
+    expect(pageHtml).toContain('data-props="{&quot;start&quot;:5}" data-hydrate="visible">')
+  })
+
+  it('hydrates the island in place and keeps it reactive, a visible one once it scrolls into view', async () => {
+    const observed: { callback: IntersectionObserverCallback, target: Element }[] = []
+    let disconnected = 0
+
+    globalThis.IntersectionObserver = class {
+      constructor(private readonly callback: IntersectionObserverCallback) {}
+      observe(target: Element) {
+        observed.push({ callback: this.callback, target })
+      }
+
+      disconnect() {
+        disconnected++
+      }
+    } as unknown as typeof IntersectionObserver
+
     // The inline hydration script sets up the global the client runtime expects before any island hydrates.
     // Solid's bootstrap assigns `_$HY` on globalThis, which outlives happy-dom's window between test files.
     delete (globalThis as { _$HY?: unknown })._$HY
@@ -68,5 +86,25 @@ describe('islands', () => {
     button.dispatchEvent(new Event('click', { bubbles: true }))
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(button.textContent).toBe('Count 3')
+
+    const [lazy] = observed
+    const lazyButton = lazy!.target.querySelector('button')!
+
+    expect(observed).toHaveLength(1)
+    lazy!.callback([{ isIntersecting: true, target: lazy!.target } as IntersectionObserverEntry], {} as IntersectionObserver)
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(disconnected).toBe(1)
+    expect(lazy!.target.querySelector('button')).toBe(lazyButton)
+    lazyButton.dispatchEvent(new Event('click', { bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(lazyButton.textContent).toBe('Count 6')
+
+    // happy-dom has no requestIdleCallback, so an idle island waits for the timer standing in for it.
+    const idleButton = document.querySelector('kay-island[data-hydrate="idle"] button')!
+
+    await new Promise(resolve => setTimeout(resolve, 250))
+    idleButton.dispatchEvent(new Event('click', { bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(idleButton.textContent).toBe('Count 8')
   })
 })

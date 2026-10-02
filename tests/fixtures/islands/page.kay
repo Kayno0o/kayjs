@@ -5,3 +5,5 @@ main
   h1 Static title
   Counter(start={2})
   p after
+  Counter(start={5} hydrate="visible")
+  Counter(start={7} hydrate="idle")
