@@ -7,8 +7,10 @@ import { logError } from '../build/sourcemap'
 import { collectDeferred } from '../runtime/await.server'
 import { collectIslands } from '../runtime/island.server'
 
-// Swaps a streamed block in for the pending one between its markers, then hydrates the islands it brought; an outer block that settled first may have taken the markers away already.
-const SWAP = '<script>function $kayAwait(i){var t=document.getElementById("kay-await-"+i),w=document.createTreeWalker(document.body,128),s,n;while(n=w.nextNode())if(n.data=="kay-await:"+i){s=n;break}if(s){while((n=s.nextSibling)&&!(n.nodeType==8&&n.data=="/kay-await:"+i))n.remove();n&&n.remove();s.replaceWith(t.content)}t.remove();self.$kayHydrate&&$kayHydrate()}</script>'
+// Swaps every streamed block that arrived in for the pending one between its markers, then hydrates the islands they brought; an outer block that settled first may have taken the markers away already.
+// Both scripts are the same on every page, so a Content-Security-Policy allows them by hash.
+export const SWAP_SCRIPT = 'function $kayAwait(){for(var t of document.querySelectorAll("template[data-kay-await]")){var i=t.dataset.kayAwait,w=document.createTreeWalker(document.body,128),s,n;while(n=w.nextNode())if(n.data=="kay-await:"+i){s=n;break}if(s){while((n=s.nextSibling)&&!(n.nodeType==8&&n.data=="/kay-await:"+i))n.remove();n&&n.remove();s.replaceWith(t.content)}t.remove()}self.$kayHydrate&&$kayHydrate()}'
+export const SWAP_CALL = '$kayAwait()'
 const encoder = new TextEncoder()
 const EMPTY: Rendered = { html: '', islands: { eager: new Set(), count: 0 }, deferred: [] }
 
@@ -44,7 +46,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
         if (cancelled)
           return
 
-        let scripts = swapShipped ? '' : SWAP
+        let scripts = swapShipped ? '' : `<script>${SWAP_SCRIPT}</script>`
 
         swapShipped = true
 
@@ -53,7 +55,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           shipped = true
         }
 
-        controller.enqueue(encoder.encode(`<template id="kay-await-${block.id}">${rendered.html}</template>${scripts}<script>$kayAwait("${block.id}")</script>`))
+        controller.enqueue(encoder.encode(`<template data-kay-await="${block.id}">${rendered.html}</template>${scripts}<script>${SWAP_CALL}</script>`))
         await Promise.all(rendered.deferred.map(send))
       }
 

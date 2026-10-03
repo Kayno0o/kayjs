@@ -7,7 +7,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
-import { pages } from '../src/server'
+import { inlineScriptHashes, pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { renderPage } from '../src/server/render'
@@ -23,6 +23,7 @@ const BODY = /<body>([\s\S]*)<\/body>/
 // Any script but the speculation rules, which hold no code.
 const SCRIPT = /<script(?! type="speculationrules")/
 const INLINE_SCRIPTS = /<script>([\s\S]*?)<\/script>/g
+const EVERY_INLINE_SCRIPT = /<script(?: type="speculationrules")?>([\s\S]*?)<\/script>/g
 const SPECULATION = /<script type="speculationrules">(.*?)<\/script>/
 // happy-dom swaps in its own Request, which Elysia cannot read headers from.
 const NativeRequest = Request
@@ -508,6 +509,18 @@ describe('prerendering', () => {
     finally {
       logged.mockRestore()
     }
+  })
+})
+
+describe('content security policy', () => {
+  it('lists a hash for every inline script a page carries, streamed ones included', async () => {
+    const hashes = new Set(inlineScriptHashes())
+    const pagesHtml = await Promise.all(['/', '/about', '/feed', '/live'].map(async path => (await app.handle(new Request(`http://localhost${path}`))).text()))
+    const inline = pagesHtml.flatMap(html => [...html.matchAll(EVERY_INLINE_SCRIPT)].map(match => match[1]!))
+
+    expect(new Set(inline).size).toBe(4)
+    for (const script of inline)
+      expect(hashes).toContain(`'sha256-${new Bun.CryptoHasher('sha256').update(script).digest('base64')}'`)
   })
 })
 

@@ -407,6 +407,26 @@ Every page carries speculation rules: Chromium prefetches the page a link points
 }
 ```
 
+## Content-Security-Policy
+
+Every inline script kay writes is the same on every page: Solid's hydration bootstrap, the speculation rules and the swap of streamed blocks. A policy allows them by hash, with no `'unsafe-inline'` and no nonce:
+
+```ts
+import { Elysia } from 'elysia'
+import { inlineScriptHashes, pages } from 'kay/server'
+
+const policy = `default-src 'self'; script-src 'self' ${inlineScriptHashes().join(' ')}`
+
+new Elysia()
+  .onRequest(({ set }) => {
+    set.headers['content-security-policy'] = policy
+  })
+  .use(await pages())
+  .listen(3000)
+```
+
+`inlineScriptHashes({ prefetch, dev })` takes the project's `prefetch` setting when it is not the default, and `dev: true` adds the live-reload script `kay dev` pages carry.
+
 ## Commands
 
 - `kay new <dir> [--kay <dependency>]`: scaffold a project in an empty directory; `--kay` sets the `kay` dependency, a packed copy of this checkout by default.
