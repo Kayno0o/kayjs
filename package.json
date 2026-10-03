@@ -7,14 +7,27 @@
   "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
   "license": "MIT",
   "exports": {
-    ".": "./src/runtime/index.ts",
+    ".": {
+      "types": "./types/runtime/index.d.ts",
+      "default": "./src/runtime/index.ts"
+    },
     "./island": {
+      "types": "./types/runtime/island.server.d.ts",
       "browser": "./src/runtime/island.client.ts",
       "default": "./src/runtime/island.server.ts"
     },
-    "./client": "./src/runtime/client.ts",
-    "./compiler": "./src/compiler/index.ts",
-    "./server": "./src/server/index.ts"
+    "./client": {
+      "types": "./types/runtime/client.d.ts",
+      "default": "./src/runtime/client.ts"
+    },
+    "./compiler": {
+      "types": "./types/compiler/index.d.ts",
+      "default": "./src/compiler/index.ts"
+    },
+    "./server": {
+      "types": "./types/server/index.d.ts",
+      "default": "./src/server/index.ts"
+    }
   },
   "bin": {
     "kay": "./src/cli.ts"
@@ -22,10 +35,14 @@
   "files": [
     "README.md",
     "llms.txt",
-    "src"
+    "src",
+    "types"
   ],
   "scripts": {
     "check": "tsgo --noEmit",
+    "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
+    "prepack": "bun run build:types",
+    "postpack": "rm -rf types",
     "lint": "keslint --cache",
     "lint:fix": "keslint --fix --cache",
     "test": "bun test",
@@ -39,7 +56,6 @@
     "@babel/types": "^7.29.7",
     "@solidjs/compiler": "2.0.0-rc.13",
     "@solidjs/web": "2.0.0-rc.13",
-    "@types/babel__traverse": "^7.28.0",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "elysia": "^1.4.30",
     "solid-js": "2.0.0-rc.13"
@@ -47,6 +63,7 @@
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
     "@kaynooo/eslint": "^6.0.1",
+    "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.2",
     "bun-plugin-tailwind": "^0.1.2",
     "mitata": "1.0.34",

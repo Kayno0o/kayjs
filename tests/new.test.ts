@@ -9,17 +9,24 @@ import { buildClient } from '../src/server/client'
 
 const repo = join(import.meta.dir, '..')
 
-// Stands in for `bun install`: the project sees this checkout as `kay` and its dependencies as its own.
-async function linkDependencies(dir: string) {
+// Stands in for `bun install` of a packed kay: its source and the declarations `prepack` emits, beside this checkout's dependencies.
+async function installKay(dir: string) {
   const modules = join(dir, 'node_modules')
+  const kay = join(modules, 'kay')
 
-  await mkdir(modules)
-  await Promise.all((await readdir(join(repo, 'node_modules'))).map(async name => symlink(join(repo, 'node_modules', name), join(modules, name))))
-  await symlink(repo, join(modules, 'kay'))
+  await mkdir(kay, { recursive: true })
+  await Promise.all([
+    ...(await readdir(join(repo, 'node_modules'))).map(async name => symlink(join(repo, 'node_modules', name), join(modules, name))),
+    ...['package.json', 'src'].map(async name => symlink(join(repo, name), join(kay, name))),
+  ])
+
+  const emit = Bun.spawn([join(repo, 'node_modules/.bin/tsgo'), '-p', join(repo, 'tsconfig.build.json'), '--outDir', join(kay, 'types')], { stdout: 'pipe', stderr: 'pipe' })
+
+  expect(await emit.exited).toBe(0)
 }
 
 describe('kay new', () => {
-  it('scaffolds a project that type-checks, is formatted and builds as it is', async () => {
+  it('scaffolds a project that type-checks against the declarations of kay, is formatted and builds as it is', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
@@ -30,7 +37,12 @@ describe('kay new', () => {
       expect(manifest.dependencies.kay).toBe('^1.0.0')
       expect(await Bun.file(join(dir, 'src/routes/_layout.kay')).text()).toContain('title my-app')
 
-      await linkDependencies(dir)
+      await installKay(dir)
+
+      // Stricter than kay itself: its source fails this flag, its declarations must not.
+      const tsconfig = await Bun.file(join(dir, 'tsconfig.json')).json() as { compilerOptions: Record<string, unknown> }
+
+      await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, exactOptionalPropertyTypes: true } }))
       expect(await check(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
 
