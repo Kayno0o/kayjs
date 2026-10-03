@@ -389,7 +389,7 @@ it('shows why a todo was refused', async () => {
 
 ## Project setup
 
-kay is published as `@kaynooo/kay` to the registry at `https://git.kaynooo.fr/api/packages/kaynooo/npm/` and installed under the name its imports use: `"kay": "npm:@kaynooo/kay@^0.1.0"` in `package.json`, with `@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/` in the project's `.npmrc`. `bunx -p @kaynooo/kay kay new my-app` writes a project that already checks, builds and runs, both of those included: this setup, a layout, a page, a `_404.kay` and an island. The server compiles its `.kay` files when it starts with Solid's compiler, which has no musl build, so it runs on a glibc Linux (the Debian-based `oven/bun` image, not an alpine one). By hand, the server entry is:
+kay is published as `@kaynooo/kay` to the registry at `https://git.kaynooo.fr/api/packages/kaynooo/npm/` and installed under the name its imports use: `"kay": "npm:@kaynooo/kay@^0.1.0"` in `package.json`, with `@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/` in the project's `.npmrc`. `bunx -p @kaynooo/kay kay new my-app` writes a project that already checks, builds and runs, both of those included: this setup, a layout, a page, a `_404.kay` and an island. By hand, the server entry is:
 
 ```ts
 import { Elysia } from 'elysia'

@@ -1,8 +1,8 @@
 import type { Diagnostic } from '../compiler'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { transform } from '@solidjs/compiler'
 import { compileKay, formatDiagnostic } from '../compiler'
+import { transform } from './solid-compiler'
 import { registerSourceMap } from './sourcemap'
 
 export type Target = 'dom' | 'ssr'
