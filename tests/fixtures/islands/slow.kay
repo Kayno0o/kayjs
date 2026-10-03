@@ -1,0 +1,11 @@
+---
+import { defer, signal } from 'kay'
+
+const slow = defer(new Promise<string>(resolve => setTimeout(resolve, 100, 'done')))
+const n = signal(0)
+---
+section.slow
+  await slow
+    button.cancel(onClick={() => n.set(c => c + 1)}) Cancel {n()}
+  then value
+    p.text {value}

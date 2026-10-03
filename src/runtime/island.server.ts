@@ -10,6 +10,9 @@ let nextRenderId = 0
 // The islands of the page being rendered: it ships the entry when it holds any, and preloads the chunks of those hydrating right away.
 let rendered: RenderedIslands | undefined
 
+const TRAILING_SCRIPT = /<script>\(self\.\$R=[\s\S]*?<\/script>$/
+const HYDRATION_ENTRY = /_\$HY\.r\[("(?:[^"\\]|\\.)*")\]=("(?:[^"\\]|\\.)*");/g
+
 export interface RenderedIslands {
   eager: Set<string>
   count: number
@@ -63,13 +66,15 @@ export function island<P extends object>(id: string, component: (props: P) => JS
 
     try {
       // Pages render under NoHydration; an island re-enters hydration so its markup carries the keys the client claims.
-      const html = renderToString(() => createComponent(Hydration, { id: renderId, get children() {
+      const output = renderToString(() => createComponent(Hydration, { id: renderId, get children() {
         return component(own)
-      } }), { renderId, noScripts: true })
+      } }), { renderId, noScripts: false })
+      const html = output.replace(TRAILING_SCRIPT, '')
+      const data = hydrationData(output)
 
       const lazy = when === undefined || when === 'load' ? '' : ` data-hydrate="${escape(when, true)}"`
 
-      return ssr([`<kay-island data-component="${escape(id, true)}" data-render-id="${renderId}" data-props="${escape(serialized, true)}"${lazy}>`, '</kay-island>'], html) as unknown as JSX.Element
+      return ssr([`<kay-island data-component="${escape(id, true)}" data-render-id="${renderId}" data-props="${escape(serialized, true)}"${lazy}${data}>`, '</kay-island>'], html) as unknown as JSX.Element
     }
     finally {
       sharedConfig.context = context
@@ -78,6 +83,21 @@ export function island<P extends object>(id: string, component: (props: P) => JS
   }
 
   return render as IslandComponent<P>
+}
+
+// Solid serializes what the server decided, like a boundary still pending, in an inline script, and an island only hydrates the same tree when it gets it back; kay keeps it in an attribute so every inline script stays identical on every page.
+function hydrationData(html: string): string {
+  const script = TRAILING_SCRIPT.exec(html)?.[0]
+
+  if (script === undefined)
+    return ''
+
+  const entries: Record<string, string> = {}
+
+  for (const [, key, value] of script.matchAll(HYDRATION_ENTRY))
+    entries[JSON.parse(key!) as string] = JSON.parse(value!) as string
+
+  return Object.keys(entries).length === 0 ? '' : ` data-hydration="${escape(JSON.stringify(entries), true)}"`
 }
 
 function serializeProps(id: string, props: object): string {

@@ -45,10 +45,13 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   const props = JSON.parse(element.dataset.props ?? '{}') as object
 
   // Solid hydrates a page once and renders anything after from scratch; an island hydrating later still claims its server markup.
-  const hydration = (globalThis as { _$HY?: { done?: boolean } })._$HY
+  const hydration = (globalThis as { _$HY?: { done?: boolean, r?: Record<string, unknown> } })._$HY
 
-  if (hydration)
+  if (hydration) {
     hydration.done = false
+    // What the server decided for this island, like a boundary still pending, which the client must take the same way.
+    hydration.r = Object.assign(hydration.r ?? {}, JSON.parse(element.dataset.hydration ?? '{}'))
+  }
 
   hydrate(() => component(props), element, { renderId: element.dataset.renderId })
 }

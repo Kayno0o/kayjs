@@ -1,0 +1,12 @@
+---
+import { signal } from 'kay'
+
+const { name } = props<{ name: string }>()
+const n = signal(0)
+---
+section.plain
+  await name
+    p.wait pending
+  then value
+    button.hi(onClick={() => n.set(c => c + 1)}) hi {value} {n()}
+  p.after after

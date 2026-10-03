@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { generateHydrationScript, renderToString, useHead } from '@solidjs/web'
 import { plugin } from 'bun'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 
 plugin(kay())
@@ -120,5 +120,34 @@ describe('islands', () => {
     button.dispatchEvent(new Event('click', { bubbles: true }))
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(button.textContent).toBe('Clicked 1')
+  })
+
+  it.each([
+    ['a pending await block', 'slowpage.kay', 'button.cancel', 'Cancel 1'],
+    ['an await on a plain value', 'plainpage.kay', 'button.hi', 'hi Ada 1'],
+  ])('hydrates %s in an island without a key miss, its handler working at once', async (_name, file, selector, expected) => {
+    const issues: string[] = []
+    const warn = spyOn(console, 'warn').mockImplementation((...args) => void issues.push(args.join(' ')))
+    const error = spyOn(console, 'error').mockImplementation((...args) => void issues.push(args.join(' ')))
+    const { default: Fixture } = await import(join(fixtures, file)) as { default: () => unknown }
+
+    delete (globalThis as { _$HY?: unknown })._$HY
+    // eslint-disable-next-line no-new-func -- runs Solid's own bootstrap script, which happy-dom does not execute from markup
+    new Function(HYDRATION_SCRIPT.exec(generateHydrationScript())![1]!)()
+    document.body.innerHTML = renderToString(() => Fixture())
+    expect(document.querySelector('script')).toBeNull()
+
+    const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+
+    await hydrateAgain()
+    const button = document.querySelector(selector)!
+
+    button.dispatchEvent(new Event('click', { bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    warn.mockRestore()
+    error.mockRestore()
+    expect(document.querySelector(selector)).toBe(button)
+    expect(button.textContent).toBe(expected)
+    expect(issues).toEqual([])
   })
 })

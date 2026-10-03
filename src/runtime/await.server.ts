@@ -35,10 +35,14 @@ export function collectDeferred<T>(render: () => T): { result: T, deferred: Pend
 export function Await<T>(props: AwaitProps<T>): JSX.Element {
   const value = props.value
 
+  // An island builds the same tree as in the browser, which wraps any value in a memo and a boundary.
+  if (insideIsland())
+    return SolidAwait(props)
+
   if (!(value instanceof Promise))
     return props.ready(value as Awaited<T>)
 
-  if (deferred === undefined || insideIsland())
+  if (deferred === undefined)
     return SolidAwait(props)
 
   const id = (nextId++).toString(36)

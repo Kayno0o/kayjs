@@ -1,0 +1,5 @@
+---
+import Slow from './slow.kay'
+---
+main
+  Slow
