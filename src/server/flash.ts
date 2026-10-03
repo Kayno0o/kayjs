@@ -13,15 +13,24 @@ export interface Flash {
 
 // Under the 4 KB browsers keep per cookie, the other cookies of the response included.
 const MAX_LENGTH = 3800
-const SECRET_FIELD = /pass|secret|token|cvc|cvv/i
+// A field name holding one of these anywhere is a secret: `newPassword`, `accessToken`.
+const SECRET_PART = /password|passwd|passphrase|passcode|secret|token|apikey/i
+// These only as a whole word of the name, so `passenger` and `shipping` are echoed: `pin`, `card_number`, `apiKey`.
+const SECRET_WORDS = new Set(['pass', 'pwd', 'pin', 'otp', 'ssn', 'cvc', 'cvv', 'csc', 'key', 'card', 'iban'])
+// The words of a camelCase, snake_case or kebab-case name, an acronym such as `API` counting as one.
+const WORD = /[A-Z]?[a-z\d]+|[A-Z]+(?![a-z])/g
 
 export function writeFlash(cookies: CookieMap, flash: Flash): void {
   // The submitted values go first when it would not fit, then the handler's data: the field errors always make it.
   const candidates = [flash, { ...flash, values: {} }, { ...flash, values: {}, data: undefined }]
-  const value = candidates.map(candidate => Buffer.from(JSON.stringify(candidate)).toString('base64url')).find(encoded => encoded.length <= MAX_LENGTH)
+  const encoded = candidates.map(candidate => Buffer.from(JSON.stringify(candidate)).toString('base64url'))
+  const fits = encoded.findIndex(value => value.length <= MAX_LENGTH)
 
-  if (value)
-    cookies.set(FLASH_COOKIE, value, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: '/' })
+  if (fits === candidates.length - 1 && flash.data !== undefined)
+    console.warn(`kay: what ${flash.action} passed to ctx.fail is too big for the cookie carrying it back to the page, which reads no data`)
+
+  if (fits !== -1)
+    cookies.set(FLASH_COOKIE, encoded[fits]!, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: '/' })
 }
 
 // Anyone can send this cookie, so its shape is checked before a page reads it; a forged one only changes what its own sender sees.
@@ -49,11 +58,15 @@ export function submittedValues(body: unknown): Record<string, string> {
     return values
 
   for (const [name, value] of Object.entries(body)) {
-    if (!SECRET_FIELD.test(name) && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'))
+    if (!isSecret(name) && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'))
       values[name] = String(value)
   }
 
   return values
+}
+
+function isSecret(name: string): boolean {
+  return SECRET_PART.test(name) || (name.match(WORD) ?? []).some(word => SECRET_WORDS.has(word.toLowerCase()))
 }
 
 function isTextRecord(value: unknown): value is Record<string, string> {

@@ -6,12 +6,22 @@ import type { ActionContext, ServerAction } from '../runtime/action'
 import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
+import { dirname, sep } from 'node:path'
 import { decodeCall, failure, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash } from './flash'
 import { runGuards } from './guards'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
+
+// What a top-level field's JSON schema says about the text a form posts for it.
+interface FieldSchema {
+  type?: unknown
+  items?: FieldSchema
+  format?: unknown
+  pattern?: unknown
+  minLength?: unknown
+}
 
 interface ActionRequest {
   jar: CookieJar
@@ -27,6 +37,9 @@ class Refusal {
 const guarded = new WeakMap<Request, ActionRequest>()
 const TEXT = 'text/plain; charset=utf-8'
 
+// A checkbox posts `on` unless it has a value of its own.
+const BOOLEAN_TEXT = new Map([['true', true], ['on', true], ['false', false]])
+
 // The top-level field of a validation path such as `/address/street`.
 const FIELD = /^\/([^/]*)/
 // Elysia names a file it refuses `body.<field>`.
@@ -38,24 +51,36 @@ export interface ActionOptions {
   onError?: KayConfig['onError']
 }
 
-// Registers every action the pages export as a POST route whose body Elysia validates against the action's schema.
+// Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema.
 export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], options: ActionOptions = {}): Promise<void> {
-  for (const route of routes) {
-    const module = await import(route.file) as Record<string, unknown>
+  const served = new Map<string, { file: string, action: ServerAction<TSchema, unknown> }>()
+
+  for (const [file, guards] of actionFiles(routes)) {
+    const module = await import(file) as Record<string, unknown>
 
     for (const value of Object.values(module)) {
       if (!isAction(value))
         continue
 
+      const taken = served.get(value.url)
+
+      // One action exported under two names is served once.
+      if (taken?.action === value)
+        continue
+
+      if (taken)
+        throw new Error(`kay: ${taken.file} and ${file} both export an action served at ${value.url}; rename one of the files`)
+
+      served.set(value.url, { file, action: value })
       app.post(value.url, async context => runAction(value, context, options), {
         body: value.schema,
         transform: (context) => {
           refuseCrossSite(context.request)
 
-          context.body = isCall(context.request) ? callInput(context.request, context.body) : withoutEmptyFiles(context.body)
+          context.body = isCall(context.request) ? callInput(context.request, context.body) : formInput(value.schema, withoutEmptyFiles(context.body))
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
-        ...(route.guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(route.guards, context, options) }),
+        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(guards, context, options) }),
         error: ({ code, error, request, body }) => {
           if (code === 'VALIDATION')
             return refused(value, error, request)
@@ -72,6 +97,68 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
       })
     }
   }
+}
+
+// Every page and layout once, with the guards of its own directory and above: a layout's actions are not behind the guards of the pages below it.
+function actionFiles(routes: ServedRoute[]): Map<string, LoadedGuard[]> {
+  const files = new Map<string, LoadedGuard[]>()
+
+  for (const route of routes) {
+    for (const file of [...route.layouts, route.file]) {
+      if (!files.has(file))
+        files.set(file, route.guards.filter(guard => file.startsWith(dirname(guard.file) + sep)))
+    }
+  }
+
+  return files
+}
+
+// A form posts text, and each field once per value or not at all: a top-level field is read the way its schema expects before Elysia validates it.
+function formInput(schema: TSchema, body: unknown): unknown {
+  const { properties, required = [] } = schema as { properties?: Record<string, FieldSchema>, required?: string[] }
+
+  if (!properties || typeof body !== 'object' || body === null)
+    return body
+
+  const fields: Record<string, unknown> = { ...body }
+
+  for (const [name, field] of Object.entries(properties)) {
+    const optional = !required.includes(name)
+    const value = fields[name]
+
+    if (value === undefined) {
+      // A required list may well be empty, and an unticked checkbox posts nothing.
+      if (!optional && (field.type === 'array' || field.type === 'boolean'))
+        fields[name] = field.type === 'array' ? [] : false
+
+      continue
+    }
+
+    if (optional && value === '' && !acceptsBlank(field))
+      delete fields[name]
+    else if (field.type === 'array')
+      fields[name] = (Array.isArray(value) ? value : [value]).map(item => fromText(field.items, item))
+    else
+      fields[name] = fromText(field, value)
+  }
+
+  return fields
+}
+
+// A blank input fills a plain string field; any other optional field reads it as left out.
+function acceptsBlank(field: FieldSchema): boolean {
+  return field.type === 'string' && field.format === undefined && field.pattern === undefined && !(typeof field.minLength === 'number' && field.minLength > 0)
+}
+
+// The number or boolean a field asks for, when the text reads as one; anything else is left for Elysia to refuse.
+function fromText(field: FieldSchema | undefined, value: unknown): unknown {
+  if (typeof value !== 'string')
+    return value
+
+  if ((field?.type === 'number' || field?.type === 'integer') && value.trim() !== '' && Number.isFinite(Number(value)))
+    return Number(value)
+
+  return field?.type === 'boolean' ? BOOLEAN_TEXT.get(value) ?? value : value
 }
 
 // A call that carried files comes as multipart, rebuilt into its input; one whose input part is not JSON is answered 400.
@@ -208,8 +295,9 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     jar.writeTo(headers)
 
+    // `undefined` has no JSON; an empty body reads back as it.
     if (isCall(request))
-      return Response.json(result ?? null, { status, headers })
+      return result === undefined ? new Response(null, { status, headers }) : Response.json(result, { status, headers })
 
     headers.set('location', backTo(request))
 

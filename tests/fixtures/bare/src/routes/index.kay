@@ -8,6 +8,9 @@ if (ctx.url.searchParams.has('fail'))
 if (ctx.url.searchParams.has('missing'))
   ctx.notFound()
 
+if (ctx.url.searchParams.has('next'))
+  ctx.redirect(ctx.url.searchParams.get('next')!)
+
 if (ctx.url.searchParams.has('deny'))
   ctx.deny(403, 'Members only')
 

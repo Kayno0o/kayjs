@@ -9,6 +9,7 @@ import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { submittedValues, writeFlash } from '../src/server/flash'
 import { prerenderPages } from '../src/server/prerender'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
@@ -979,6 +980,120 @@ describe('special pages', () => {
     }
     finally {
       logged.mockRestore()
+    }
+  })
+})
+
+describe('action input', () => {
+  const SURVEY = 'http://localhost/_kay/action/tests/fixtures/bare/src/routes/survey.kay'
+  const post = (name: string, body: URLSearchParams | FormData | string, headers: Record<string, string> = {}) => bare.handle(new Request(`${SURVEY}/${name}`, { method: 'POST', headers: { referer: 'http://localhost/survey', ...headers }, body }))
+  const answered = async (body: URLSearchParams | FormData) => {
+    const response = await post('answer', body)
+
+    return { status: response.status, answer: JSON.parse(response.headers.get('x-answer') ?? 'null') as unknown }
+  }
+
+  it('reads a plain form against the schema: arrays, numbers, booleans and blank optional fields', async () => {
+    expect(await answered(new URLSearchParams('tags=a&count=3&agree=on&age=&email=&note='))).toEqual({ status: 303, answer: { tags: ['a'], count: 3, agree: true, note: '' } })
+    expect(await answered(new URLSearchParams('tags=a&tags=b&scores=1&scores=2.5&count=0&age=41'))).toEqual({ status: 303, answer: { tags: ['a', 'b'], scores: [1, 2.5], count: 0, agree: false, age: 41 } })
+    expect(await answered(new URLSearchParams('count=1&agree=false'))).toEqual({ status: 303, answer: { tags: [], count: 1, agree: false } })
+
+    const form = new FormData()
+
+    form.append('tags', 'only')
+    form.append('count', '7')
+    form.append('agree', 'true')
+    expect(await answered(form)).toEqual({ status: 303, answer: { tags: ['only'], count: 7, agree: true } })
+
+    const refused = await post('answer', new URLSearchParams('tags=a&count=1.5&agree=on&age=old'))
+
+    expect(refused.status).toBe(303)
+    expect(refused.headers.get('x-answer')).toBeNull()
+    expect(JSON.parse(Buffer.from(cookiePair(refused).slice('kay_failed='.length), 'base64url').toString())).toMatchObject({ status: 422, errors: { count: expect.any(String), age: expect.any(String) } })
+  })
+
+  it('answers a call returning nothing with an empty body, and a redirect holding a line break with a generic 500', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const call = await post('nothing', '{}', { 'content-type': 'application/json', 'x-kay-action': '1' })
+
+      expect(call.status).toBe(200)
+      expect(await call.text()).toBe('')
+
+      const away = await post('away', JSON.stringify({ to: '/x\r\nset-cookie: a=b' }), { 'content-type': 'application/json', 'x-kay-action': '1' })
+
+      expect(away.status).toBe(500)
+      expect(await away.text()).toBe('Internal Server Error')
+      expect((await bare.handle(new Request(`http://localhost/?next=${encodeURIComponent('/x\r\nset-cookie: a=b')}`))).status).toBe(500)
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('holds a line break'))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('serves the actions layouts export, behind the guards of their directory', async () => {
+    const root = process.cwd()
+    const dir = await mkdtemp(join(root, '.kay/routes-'))
+    const id = dir.slice(root.length + 1)
+    const action = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const leave = action(t.Object({}), () => \'left\')\n---\nslot\n'
+
+    try {
+      await Bun.write(join(dir, '_layout.kay'), action)
+      await Bun.write(join(dir, 'index.kay'), 'p Home\n')
+      await Bun.write(join(dir, 'inner/_layout.kay'), action)
+      await Bun.write(join(dir, 'inner/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Inner only\'))\n')
+      await Bun.write(join(dir, 'inner/index.kay'), 'p Inner\n')
+
+      const served = await pages({ routes: dir, prebuilt: true })
+      const call = async (file: string) => {
+        const response = await served.handle(new Request(`http://localhost/_kay/action/${id}/${file}/leave`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: '{}' }))
+
+        return `${response.status} ${await response.text()}`
+      }
+
+      expect(await call('_layout.kay')).toBe('200 "left"')
+      expect(await call('inner/_layout.kay')).toBe('403 Inner only')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses to boot when two files would serve one action URL', async () => {
+    const root = process.cwd()
+    const dir = await mkdtemp(join(root, '.kay/routes-'))
+    const action = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const go = action(t.Object({}), () => 1)\n---\np Go\n'
+
+    try {
+      await Bun.write(join(dir, 'a b.kay'), action)
+      await Bun.write(join(dir, 'a_b.kay'), action)
+      await expect(pages({ routes: dir, prebuilt: true })).rejects.toThrow(`kay: ${join(dir, 'a b.kay')} and ${join(dir, 'a_b.kay')} both export an action served at /_kay/action/${dir.slice(root.length + 1)}/a_b.kay/go; rename one of the files`)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('never echoes a field named like a secret, matching words rather than letters', () => {
+    const fields = { password: 'x', newPassword: 'x', user_passcode: 'x', apiKey: 'x', APIKey: 'x', pin: 'x', cardNumber: 'x', otp: 'x', csrfToken: 'x', passenger: 'Ada', spinner: 's', shipping: 'post', email: 'a@b.c' }
+
+    expect(submittedValues(fields)).toEqual({ passenger: 'Ada', spinner: 's', shipping: 'post', email: 'a@b.c' })
+  })
+
+  it('warns when the failure data is too big for the cookie carrying it back', () => {
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cookies = new Bun.CookieMap()
+
+    try {
+      writeFlash(cookies, { action: '/_kay/action/x/go', status: 409, values: {}, errors: {}, data: { message: 'x'.repeat(4000) } })
+
+      expect(cookies.has('kay_failed')).toBe(true)
+      expect(warned).toHaveBeenCalledWith(expect.stringContaining('/_kay/action/x/go'))
+    }
+    finally {
+      warned.mockRestore()
     }
   })
 })
