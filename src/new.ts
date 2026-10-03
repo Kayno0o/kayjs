@@ -37,6 +37,13 @@ import { pages } from 'kay/server'
 const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 3000))
 
 console.log(\`Listening on http://localhost:\${app.server?.port}\`)
+
+// Links and redirects in pages are checked against the routes the app serves besides them too.
+declare module 'kay' {
+  interface Register {
+    app: typeof app
+  }
+}
 `,
   'src/app.css': `@view-transition {
   navigation: auto;

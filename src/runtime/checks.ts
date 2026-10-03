@@ -11,7 +11,7 @@ export type HydrateWhen = 'load' | 'idle' | 'visible'
 // What an interactive component's default export is: the brand lets the checker tell islands from plain components, and only islands take `hydrate`.
 export type IslandComponent<Props> = ((props: Props & { hydrate?: HydrateWhen }) => JSX.Element) & { readonly [ISLAND]: true }
 
-// Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every route the pages directory serves, and by the app with `locals: LocalsOf<typeof auth>`.
+// Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every page route and public file, and by the app with `locals: LocalsOf<typeof auth>` and `app: typeof app`.
 export interface Register {}
 
 // Nothing is readable off `ctx.locals` until the app registers its type.
@@ -34,7 +34,20 @@ type Matches<Segments extends readonly string[], Pattern extends readonly string
     : Segments extends readonly [] ? true : false
 type AnyMatch<Segments extends readonly string[], Pattern> = Pattern extends readonly string[] ? Matches<Segments, Pattern> : never
 type PathOf<Href extends string> = Href extends `${infer Path}?${string}` ? Path : Href extends `${infer Path}#${string}` ? Path : Href
-type IsRoute<Path extends string> = [RoutePatterns] extends [never] ? true : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns> ? true : false
+// The files in `public/`, by the path they are served at.
+type PublicFiles = Register extends { files: infer Files extends string } ? Files : never
+// The app registered as `app` keeps its routes as a tree of path segments down to their methods: `/` is the root's own `get`, `:name` a parameter, `*` the rest of the path.
+type AppRoutes = Register extends { app: { '~Routes': infer Routes } } ? Routes : never
+type ServesGet<Tree> = 'get' extends keyof Tree ? true : false
+type TreeMatches<Segments extends readonly string[], Tree> = Segments extends readonly [infer Segment extends string, ...infer Rest extends readonly string[]]
+  ? (Segment extends keyof Tree ? TreeMatches<Rest, Tree[Segment]> : false)
+  | (Segment extends '' ? false : { [Key in keyof Tree & `:${string}`]: TreeMatches<Rest, Tree[Key]> }[keyof Tree & `:${string}`])
+  | ('*' extends keyof Tree ? ServesGet<Tree['*']> : false)
+  : ServesGet<Tree>
+type ServedByApp<Path extends string> = [AppRoutes] extends [never] ? false : TreeMatches<SegmentsOf<Path>, AppRoutes>
+type IsRoute<Path extends string> = [RoutePatterns] extends [never]
+  ? true
+  : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns> | (Path extends PublicFiles ? true : false) | ServedByApp<Path> ? true : false
 
 // A site-relative literal must match a page; opaque strings, relative paths and other schemes are not checked.
 export type CheckedHref<Href extends string> = string extends Href
@@ -42,7 +55,7 @@ export type CheckedHref<Href extends string> = string extends Href
   : Href extends `//${string}`
     ? unknown
     : Href extends `/${string}`
-      ? IsRoute<PathOf<Href>> extends true ? unknown : { kayError: `No page serves ${PathOf<Href>}` }
+      ? IsRoute<PathOf<Href>> extends true ? unknown : { kayError: `No page, public file or app route serves ${PathOf<Href>}` }
       : unknown
 
 // `ctx.redirect`: a site path is checked like a link, so a redirect cannot point at a page that does not exist.

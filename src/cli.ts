@@ -52,7 +52,8 @@ async function main(args: string[]): Promise<number> {
   }
 
   const root = resolve(dir)
-  const diagnostics = await check(root, { tsconfig, routes: (await loadConfig(root)).routes })
+  const { routes, publicDir } = await loadConfig(root)
+  const diagnostics = await check(root, { tsconfig, routes, publicDir })
 
   const sources = new Map<string, string | undefined>()
 
@@ -120,7 +121,8 @@ async function scaffold(args: string[]): Promise<number> {
 
 // Restarts the server on every change until interrupted.
 async function runDev(entry: string | undefined): Promise<number> {
-  const stop = await dev(process.cwd(), { entry, routes: (await loadConfig(process.cwd())).routes })
+  const { routes, publicDir } = await loadConfig(process.cwd())
+  const stop = await dev(process.cwd(), { entry, routes, publicDir })
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)

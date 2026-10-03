@@ -6,3 +6,10 @@ a(href="/form/extra?tab=1") No such page
 a(href={`/${1}`}) A param
 a(href="https://example.com/x/y") External
 Clicker(since={new Date()} format={count => `${count} clicks`})
+a(href="/api/feed.xml") Feed
+a(href="/auth/github") Sign in
+a(href="/files/a/b.txt") A file
+a(href="/docs/guide.pdf") Guide
+a(href="/api/feed.json") No such route
+a(href="/api/import") Posts only
+a(href="/docs/guide.txt") No such file

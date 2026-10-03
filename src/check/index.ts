@@ -8,6 +8,7 @@ import { findKayFiles, writeIfChanged } from '../build/files'
 import { compileKay } from '../compiler'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { publicFiles } from '../server/public'
 import { routeOf, scanRoutes } from '../server/routes'
 
 export const SHADOW_DIR = join('.kay', 'types')
@@ -16,6 +17,8 @@ export interface CheckOptions {
   tsconfig?: string
   // Page directory relative to the root, so `ctx.params` is typed per route.
   routes?: string
+  // Public file directory relative to the root, whose files links may point at.
+  publicDir?: string
 }
 
 export interface CheckDiagnostic {
@@ -60,7 +63,9 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message })
   }
 
-  await writeIfChanged(environmentPath, environment((await scanRoutes(routesDir)).map(route => route.pattern)))
+  const [routes, publicPaths] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public'))])
+
+  await writeIfChanged(environmentPath, environment(routes.map(route => route.pattern), publicPaths.map(file => file.url)))
   // A script rather than a module, which is what lets it declare a wildcard module.
   await writeIfChanged(assetsPath, ASSET_TYPES)
 
@@ -97,15 +102,16 @@ export function compileShadow(root: string, routesDir: string, file: string, sou
   return { shadow: { source, file, tsx, map }, diagnostics }
 }
 
-// Declares the check-only helpers generated code calls, and the routes links are checked against.
-function environment(patterns: string[]): string {
+// Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
+function environment(patterns: string[], files: string[]): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
+  const paths = files.length > 0 ? files.map(file => JSON.stringify(file)).join(' | ') : 'never'
 
   return [
     'import type { Action, CheckedHref, FieldName, IslandProp } from \'kay\'',
     '',
     'declare module \'kay\' {',
-    `  interface Register { routes: ${routes} }`,
+    `  interface Register { routes: ${routes}, files: ${paths} }`,
     '}',
     '',
     'declare global {',

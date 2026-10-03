@@ -8,22 +8,26 @@ import process from 'node:process'
 const CACHE_CONTROL = 'public, max-age=0, must-revalidate'
 const WILDCARD = /\*/g
 
+// Every file under the directory with the URL path it is served at, encoded the way a browser sends it: a `:` or `*` in a name never reads as a route parameter.
+export async function publicFiles(dir: string): Promise<{ path: string, url: string }[]> {
+  if (!existsSync(dir))
+    return []
+
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true })
+
+  return entries.filter(entry => entry.isFile()).map((entry) => {
+    const path = join(entry.parentPath, entry.name)
+
+    return { path, url: `/${relative(dir, path).split(sep).map(segment => encodeURIComponent(segment).replace(WILDCARD, '%2A')).join('/')}` }
+  })
+}
+
 // One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.
 // Files keep their names, so browsers revalidate them every time and get a 304 while they are unchanged.
 export async function servePublic(app: Elysia, dir: string, routes: Route[]): Promise<void> {
-  if (!existsSync(dir))
-    return
-
   const pages = new Set(routes.map(route => route.pattern))
 
-  for (const entry of await readdir(dir, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile())
-      continue
-
-    const path = join(entry.parentPath, entry.name)
-    // Encoded the way a browser sends it, a `:` or `*` in a name never reads as a route parameter.
-    const url = `/${relative(dir, path).split(sep).map(segment => encodeURIComponent(segment).replace(WILDCARD, '%2A')).join('/')}`
-
+  for (const { path, url } of await publicFiles(dir)) {
     if (pages.has(url))
       throw new Error(`kay: ${relative(process.cwd(), path)} and a page both serve ${url}`)
 

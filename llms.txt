@@ -400,7 +400,7 @@ it('shows why a todo was refused', async () => {
 ## What `kay check` verifies
 
 - Every expression, prop and server name, as TypeScript does.
-- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the routes, as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a plain `string`, relative paths, `//host` and other schemes are not checked, so a path served by something other than a page, such as a public file, goes through a `string` variable.
+- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/` and the GET routes of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
 - Island props passed from static components are JSON-serializable.
 
@@ -412,8 +412,16 @@ kay is published as `@kaynooo/kay` to the registry at `https://git.kaynooo.fr/ap
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-new Elysia().use(await pages()).listen(3000)
+const app = new Elysia().get('/feed.xml', feed).use(await pages()).listen(3000)
+
+declare module 'kay' {
+  interface Register {
+    app: typeof app
+  }
+}
 ```
+
+Registering `app` lets links and redirects point at the app's own GET routes, such as `/feed.xml`, which `kay check` otherwise reports as served by no page.
 
 Project settings live in an optional `kay.config.ts` at the root, read by `pages()` and every command; options passed to `pages()` win over it.
 

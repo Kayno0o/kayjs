@@ -27,7 +27,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   const server: ServerOptions = { run, debug: run }
   const options: LanguageClientOptions = {
     documentSelector: [{ scheme: 'file', language: 'kay' }],
-    initializationOptions: { routes: config.get<string>('routes', 'src/routes') },
+    initializationOptions: { routes: config.get<string>('routes') || undefined },
   }
 
   client = new LanguageClient('kay', 'Kay', server, options)

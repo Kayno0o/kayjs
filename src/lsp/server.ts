@@ -1,5 +1,5 @@
 import type { Subprocess } from 'bun'
-import type { ShadowFile } from '../check'
+import type { CheckOptions, ShadowFile } from '../check'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import { resolve } from 'node:path'
@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { compileShadow, SHADOW_DIR, shadowPath, TSGO, writeShadowTypes } from '../check'
 import { formatKay } from '../compiler/format'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { loadConfig } from '../config'
 import { Connection } from './rpc'
 
 // Where a file tsgo names is for the editor: its .kay source for a shadow file, the file itself outside the shadow tree.
@@ -38,6 +39,7 @@ const MAX_HOPS = 16
 export class KayLanguageServer {
   private root = ''
   private routesDir = ''
+  private shadowOptions: CheckOptions = {}
   private shadowTree = ''
   private rootUri = ''
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
@@ -80,10 +82,16 @@ export class KayLanguageServer {
     const rootUri = params.rootUri ?? params.workspaceFolders?.[0]?.uri
 
     this.root = rootUri ? fileURLToPath(rootUri) : resolve(params.rootPath ?? process.cwd())
-    this.routesDir = resolve(this.root, params.initializationOptions?.routes ?? 'src/routes')
+
+    // The editor's settings win over the project's `kay.config.ts`, as `pages()` options do.
+    const config = await loadConfig(this.root)
+
+    this.shadowOptions = { routes: params.initializationOptions?.routes ?? config.routes, publicDir: params.initializationOptions?.publicDir ?? config.publicDir }
+    this.routesDir = resolve(this.root, this.shadowOptions.routes ?? 'src/routes')
     this.shadowTree = `${pathToFileURL(resolve(this.root, SHADOW_DIR)).href}/`
     this.rootUri = `${pathToFileURL(this.root).href}/`
-    await writeShadowTypes(this.root, { routes: params.initializationOptions?.routes })
+
+    await writeShadowTypes(this.root, this.shadowOptions)
 
     const child = Bun.spawn([process.execPath, TSGO, '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
     const connection = new Connection(child.stdout, (data) => {
@@ -151,7 +159,7 @@ export class KayLanguageServer {
 
   // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code.
   private async saved() {
-    const { files } = await writeShadowTypes(this.root, { routes: this.routesDir })
+    const { files } = await writeShadowTypes(this.root, this.shadowOptions)
     const changes = [...files.keys(), resolve(this.root, SHADOW_DIR, 'kay-env.d.ts')].map(path => ({ uri: pathToFileURL(path).href, type: CHANGED }))
 
     this.server.notify('workspace/didChangeWatchedFiles', { changes })

@@ -46,8 +46,8 @@
         },
         "kay.routes": {
           "type": "string",
-          "default": "src/routes",
-          "description": "Directory of the pages, relative to the workspace, so route params and links are typed."
+          "default": "",
+          "description": "Directory of the pages, relative to the workspace, so route params and links are typed. Empty takes the project's kay.config.ts, else src/routes."
         }
       }
     },
