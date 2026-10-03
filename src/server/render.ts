@@ -5,6 +5,8 @@ import type { Flash } from './flash'
 import type { ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
 import type { Prefetch } from './speculation'
+import { relative } from 'node:path'
+import process from 'node:process'
 import { createComponent, generateHydrationScript } from '@solidjs/web'
 import { logError, mapStack } from '../build/sourcemap'
 import { cookieJar } from './cookies'
@@ -71,7 +73,8 @@ export async function renderPage(route: ServedRoute, context: RequestContext, cl
   try {
     // Layouts outermost first, then the page: when several loads fail, the outermost one decides the response.
     const modules = await importAll(files)
-    const loads = await Promise.allSettled(modules.map(async module => await module.load?.(rendering.ctx) ?? {}))
+    const timings = options.dev ? Array.from<number>({ length: files.length }) : undefined
+    const loads = await Promise.allSettled(modules.map(async (module, index) => runLoad(module, rendering.ctx, timings, index)))
 
     for (const [index, load] of loads.entries())
       loaded.set(files[index]!, load)
@@ -83,11 +86,37 @@ export async function renderPage(route: ServedRoute, context: RequestContext, cl
       return load.value
     })
 
-    return respond(rendering, renderDocument(files, modules, data, client, options))
+    const started = performance.now()
+    const body = renderDocument(files, modules, data, client, options)
+
+    if (timings)
+      rendering.headers.set('server-timing', serverTiming(files, timings, performance.now() - started))
+
+    return respond(rendering, body)
   }
   catch (error) {
     return renderFailure(error, route.special, rendering, loaded, client, options)
   }
+}
+
+// Development times each load, for the browser's network panel.
+async function runLoad(module: PageModule, ctx: PageContext, timings: number[] | undefined, index: number): Promise<Record<string, unknown>> {
+  if (!timings)
+    return await module.load?.(ctx) ?? {}
+
+  const started = performance.now()
+
+  try {
+    return await module.load?.(ctx) ?? {}
+  }
+  finally {
+    timings[index] = performance.now() - started
+  }
+}
+
+// One entry per load, layouts first, then the render; a streamed page's render covers what it sends first.
+function serverTiming(files: string[], timings: number[], render: number): string {
+  return [...files.map((file, index) => `load-${index};desc="${relative(process.cwd(), file)}";dur=${timings[index]!.toFixed(1)}`), `render;dur=${render.toFixed(1)}`].join(', ')
 }
 
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.

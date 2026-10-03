@@ -681,7 +681,7 @@ describe('special pages', () => {
     }
   })
 
-  it('shows the message and the stack in development', async () => {
+  it('shows the message and the stack in development, and times each load', async () => {
     const dev = await pages({ routes: 'tests/fixtures/site/src/routes', dev: true })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -692,6 +692,11 @@ describe('special pages', () => {
       expect(html).toMatch(/<pre class="stack">Error: Kaboom\n\s+at load \(\S+\/boom\.kay:10:13\)/)
       expect(html).toContain('new EventSource("/_kay/dev/events")')
       expect((await dev.handle(new Request('http://localhost/_kay/dev/events'))).headers.get('content-type')).toBe('text/event-stream')
+
+      const timing = (await dev.handle(new Request('http://localhost/'))).headers.get('server-timing')
+
+      expect(timing).toMatch(/^load-0;desc="tests\/fixtures\/site\/src\/routes\/_layout\.kay";dur=\d+\.\d, load-1;desc="tests\/fixtures\/site\/src\/routes\/index\.kay";dur=\d+\.\d, render;dur=\d+\.\d$/)
+      expect((await get('/')).headers.get('server-timing')).toBeNull()
     }
     finally {
       logged.mockRestore()
