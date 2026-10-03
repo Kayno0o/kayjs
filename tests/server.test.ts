@@ -211,7 +211,7 @@ describe('pages', () => {
 
   it('posts a plain form to its action and returns to the page', async () => {
     const home = await get('/')
-    const form = (/<form class="add" action="([^"]+)" method="post"><input name="title"/).exec(home.html)
+    const form = (/<form class="add" action="([^"]+)" method="post" enctype="multipart\/form-data"><input name="title"/).exec(home.html)
 
     expect(form?.[1]).toBe('/_kay/action/tests/fixtures/site/src/routes/index.kay/add')
     const response = await app.handle(new Request(`http://localhost${form![1]}`, {

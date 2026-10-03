@@ -30,3 +30,6 @@ export async function addTodo(title: string): Promise<Todo> {
 
   return todo
 }
+
+// What the upload page received, newest last.
+export const uploads: string[] = []

@@ -677,8 +677,16 @@ class Generator {
         this.emitAttribute(element, attribute)
     }
 
-    if (actionOf(element, this.src) && !element.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'method'))
-      b.add(' method="post"')
+    if (actionOf(element, this.src)) {
+      const named = (name: string) => element.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === name)
+
+      if (!named('method'))
+        b.add(' method="post"')
+
+      // Multipart whatever the schema, so file inputs post too; Elysia parses either encoding alike.
+      if (!named('enctype'))
+        b.add(' enctype="multipart/form-data"')
+    }
   }
 
   // `form(action={add})` posts to the action's URL, and each field `name` inside it must be a key of the action's input.

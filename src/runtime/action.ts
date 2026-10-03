@@ -11,6 +11,14 @@ const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 
 // Where a called action sends the browser, in place of `location`.
 export const REDIRECT_HEADER = 'x-kay-redirect'
+// A call whose input holds files goes as multipart: the input as JSON in one part, each file swapped for `{ [FILE_MARK]: n }` and sent as part `FILE_MARK + n`.
+export const INPUT_PART = '$kay'
+export const FILE_MARK = '$kayFile'
+
+export interface EncodedCall {
+  headers: Record<string, string>
+  body: string | FormData
+}
 
 export interface ActionContext {
   request: Request
@@ -129,11 +137,50 @@ export function formAction(target: string | Action<never, unknown>): string {
 export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> : string
 
 async function post<Output>(url: string, input: unknown): Promise<Output> {
-  return readActionResponse(await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-kay-action': '1' },
-    body: JSON.stringify(input),
-  }))
+  return readActionResponse(await fetch(url, { method: 'POST', ...encodeCall(input) }))
+}
+
+// JSON keeps numbers and booleans typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
+export function encodeCall(input: unknown): EncodedCall {
+  const files: Blob[] = []
+  const json = JSON.stringify(input, (_key, value: unknown) => value instanceof Blob ? { [FILE_MARK]: files.push(value) - 1 } : value)
+
+  if (files.length === 0)
+    return { headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: json }
+
+  const form = new FormData()
+
+  form.set(INPUT_PART, json)
+
+  // A browser names a bare Blob `blob`; naming it here does the same everywhere, so the handler always gets a File.
+  for (const [index, file] of files.entries())
+    form.set(`${FILE_MARK}${index}`, file, file instanceof File ? file.name : 'blob')
+
+  return { headers: { 'x-kay-action': '1' }, body: form }
+}
+
+// The input `encodeCall` sent, its files back in place; any other body is returned as it is.
+export function decodeCall(body: unknown): unknown {
+  if (typeof body !== 'object' || body === null || !(INPUT_PART in body))
+    return body
+
+  const parts = body as Record<string, unknown>
+  const restore = (value: unknown): unknown => {
+    if (Array.isArray(value))
+      return value.map(restore)
+
+    if (typeof value !== 'object' || value === null)
+      return value
+
+    if (FILE_MARK in value)
+      return parts[`${FILE_MARK}${String((value as Record<string, unknown>)[FILE_MARK])}`]
+
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, restore(item)]))
+  }
+  const input = parts[INPUT_PART]
+
+  // Elysia may already have parsed the JSON part.
+  return restore(typeof input === 'string' ? JSON.parse(input) as unknown : input)
 }
 
 // What a call got back: the handler's result, or an `ActionError` with the refused fields and the failure data.

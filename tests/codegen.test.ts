@@ -225,7 +225,7 @@ describe('check-only assertions', () => {
     expect(built).toContain('<a href="/docs">')
     expect(built).toContain('<input name="title" />')
     expect(built).toContain('<Island when={today} />')
-    expect(built).toContain('<form action={KayFormAction((save))} method="post">')
+    expect(built).toContain('<form action={KayFormAction((save))} method="post" enctype="multipart/form-data">')
   })
 })
 

@@ -1,0 +1,30 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { uploads } from '../data'
+
+export const upload = action(t.Object({
+  note: t.String(),
+  file: t.File({ type: 'image/png' }),
+  attachment: t.Optional(t.File()),
+  extra: t.Optional(t.Object({ copies: t.Number(), files: t.Files() })),
+}), async ({ note, file, attachment, extra }) => {
+  const text = `${note}: ${file.size} bytes (${file.name})${attachment ? `, attached ${attachment.name}` : ''}${extra ? `, ${extra.copies} copies of ${extra.files.length} more` : ''}`
+
+  uploads.push(text)
+
+  return text
+})
+
+const last = uploads.at(-1)
+const failure = ctx.failed(upload)
+---
+form(action={upload})
+  input(name="note" value={failure?.values.note})
+  input(type="file" name="file")
+  input(type="file" name="attachment")
+  if failure?.errors.file as message
+    p.error {message}
+  button Upload
+if last as text
+  p.received {text}

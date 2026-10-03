@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { loadConfig } from '../config'
-import { readActionResponse } from '../runtime/action'
+import { encodeCall, readActionResponse } from '../runtime/action'
 import { servePages } from '../server/app'
 
 export interface TestOptions extends PagesOptions {
@@ -25,11 +25,14 @@ export interface VisitInit {
   headers?: Record<string, string>
 }
 
+// A text field, or a file input's `File`.
+export type FormValue = string | Blob
+
 export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
-  // A plain form post from the page at `from`, followed back to wherever the action sends the browser.
-  submit: <Input>(action: Action<Input, unknown>, fields: Partial<Record<Extract<keyof Input, string>, string>>, init?: VisitInit & { from?: string }) => Promise<Visit>
+  // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser.
+  submit: <Input>(action: Action<Input, unknown>, fields: Partial<Record<Extract<keyof Input, string>, FormValue | FormValue[]>>, init?: VisitInit & { from?: string }) => Promise<Visit>
   // The call an island makes: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
   call: <Input, Output>(action: Action<Input, Output>, input: Input, init?: VisitInit) => Promise<Success<Output>>
   cookies: Bun.CookieMap
@@ -93,18 +96,25 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     visit: async (path, init = {}) => follow(await send(path, { headers: init.headers }), path, init.headers),
     submit: async (action, fields, init = {}) => {
       const from = init.from ?? '/'
+      const form = new FormData()
+
+      for (const [name, value] of Object.entries(fields as Record<string, FormValue | FormValue[]>)) {
+        for (const item of Array.isArray(value) ? value : [value])
+          form.append(name, item)
+      }
+
       const response = await send(action.url, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded', 'origin': ORIGIN, 'referer': new URL(from, ORIGIN).href, ...init.headers },
-        body: new URLSearchParams(fields as Record<string, string>),
+        headers: { origin: ORIGIN, referer: new URL(from, ORIGIN).href, ...init.headers },
+        body: form,
       })
 
       return follow(response, from, init.headers)
     },
-    call: async (action, input, init = {}) => readActionResponse(await send(action.url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'origin': ORIGIN, ...init.headers },
-      body: JSON.stringify(input),
-    })),
+    call: async (action, input, init = {}) => {
+      const { headers, body } = encodeCall(input)
+
+      return readActionResponse(await send(action.url, { method: 'POST', headers: { ...headers, origin: ORIGIN, ...init.headers }, body }))
+    },
   }
 }

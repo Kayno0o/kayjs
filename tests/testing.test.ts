@@ -8,6 +8,8 @@ import { testSite } from '../src/test'
 import { resetTodos } from './fixtures/site/src/data'
 
 const routes = 'tests/fixtures/site/src/routes'
+// A 1x1 PNG, which Elysia's `t.File({ type: 'image/png' })` recognises from its bytes.
+const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
 const site = await testSite({ routes, publicDir: 'tests/fixtures/site/public', locals: request => ({ user: request.headers.get('x-user') ?? undefined }) })
 // Imported once the site is up, which registers the `.kay` loader this process needs.
 const { add } = await import(join(import.meta.dir, 'fixtures/site/src/routes/index.kay')) as { add: Action<{ title: string }, number> }
@@ -44,6 +46,26 @@ describe('kay/test', () => {
     await expect(site.call(add, { title: '' })).rejects.toThrow(ActionError)
     expect(await site.call(promote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).toBe('bob is an admin')
     await expect(site.call(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirect', status: 303, location: '/about' })
+  })
+
+  it('uploads files from a form and from a call, nested ones included', async () => {
+    const { upload } = await import(join(import.meta.dir, 'fixtures/site/src/routes/upload.kay')) as { upload: Action<{ note: string, file: File, attachment?: File, extra?: { copies: number, files: File[] } }, string> }
+    const image = (name: string) => new File([PNG], name, { type: 'image/png' })
+    // A browser posts a file input left empty as a nameless, empty file.
+    const page = await site.submit(upload, { note: 'form', file: image('a.png'), attachment: new File([], '') }, { from: '/upload' })
+
+    expect(page.url).toBe('/upload')
+    expect(page.html).toContain(`form: ${PNG.length} bytes (a.png)</p>`)
+    expect((await site.submit(upload, { note: 'attached', file: image('a.png'), attachment: new File(['x'], 'x.txt') }, { from: '/upload' })).html).toContain('attached x.txt</p>')
+    expect(await site.call(upload, { note: 'call', file: image('b.png'), extra: { copies: 2, files: [image('c.png'), new File(['notes'], 'd.txt')] } })).toBe(`call: ${PNG.length} bytes (b.png), 2 copies of 2 more`)
+    expect(await site.call(upload, { note: 'blob', file: new Blob([PNG], { type: 'image/png' }) as File })).toBe(`blob: ${PNG.length} bytes (blob)`)
+    await expect(site.call(upload, { note: 'not an image', file: new File(['{}'], 'e.png', { type: 'image/png' }) })).rejects.toMatchObject({ status: 422, errors: { file: '"body.file" has invalid file type' } })
+
+    const refused = await site.submit(upload, { note: 'not an image', file: new File(['{}'], 'e.png', { type: 'image/png' }) }, { from: '/upload' })
+
+    expect(refused.url).toBe('/upload')
+    expect(refused.html).toContain('<p class="error">"body.file" has invalid file type</p>')
+    expect(refused.html).toContain('value="not an image"')
   })
 
   it('sends the browser where a called action redirects', async () => {

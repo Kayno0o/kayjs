@@ -317,6 +317,7 @@ form(action={add})
 - `form(action={add})` posts without JavaScript; `kay check` verifies every field `name` against the schema. After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
 - A post the schema refuses, or whose handler returns `ctx.fail(status, data)`, goes back to the page too. There `ctx.failed(add)` returns `{ status, values, errors, data }`, typed from the action, or `undefined`: `values` is what the form posted (fields named like a password left out), `errors` a message per refused field, the schema's `error` option when set, and `data` what `ctx.fail` received. It is read on that one render only.
 - An island imports the action from the page and calls it: `import { add } from '../routes/index.kay'`, then `const id = await add({ title })`. The call is typed, `ctx.fail` results excluded, and throws `ActionError` with `status`, `errors` and `data` when it fails. When the handler or a guard redirects, the browser goes there and the call never resolves; outside a browser, as in a test, it throws `ActionRedirect` with `location`.
+- Files: `t.File()` or `t.Files()` in the schema, `input(type="file" name="avatar")` in the form, and the handler gets a `File`. Forms posting to an action are sent as `multipart/form-data` unless they set `enctype`, and a file input left empty counts as no file, so `t.Optional(t.File())` works. An island passes a `File` or `Blob` anywhere in its input, nested ones included: `await upload({ avatar: input.files[0] })`. `t.File({ type: 'image/png' })` checks the file's bytes, not its name or declared type, and a file it refuses fails like any field, under its name in `errors`. Bun caps a request body at 128 MB, changed with `new Elysia({ serve: { maxRequestBodySize } })`.
 - A handler that throws answers 500 with a generic message and logs the error.
 - The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers`, `redirect(location)` and `fail(status, data)`.
 
@@ -377,7 +378,7 @@ it('shows why a todo was refused', async () => {
 })
 ```
 
-- `site.visit(path)` GETs a page and follows redirects. `site.submit(action, fields, { from })` posts a form without JavaScript and follows it back to its page. Both resolve with `{ url, status, headers, html }`. `site.call(action, input)` calls an action as an island does, resolving with its result, throwing `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
+- `site.visit(path)` GETs a page and follows redirects. `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page. Both resolve with `{ url, status, headers, html }`. `site.call(action, input)` calls an action as an island does, resolving with its result, throwing `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
 - Cookies a response sets go with the next request and read as `site.cookies`. `locals` stands in for the app's Elysia `derive`, called with each request.
 - Pages render their islands' markup without scripts. Test files import `.kay` files through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test.
 

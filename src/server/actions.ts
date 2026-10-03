@@ -6,7 +6,7 @@ import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import { logError } from '../build/sourcemap'
-import { failure, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
+import { decodeCall, failure, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash } from './flash'
 import { runGuards } from './guards'
@@ -28,6 +28,8 @@ const TEXT = 'text/plain; charset=utf-8'
 
 // The top-level field of a validation path such as `/address/street`.
 const FIELD = /^\/([^/]*)/
+// Elysia names a file it refuses `body.<field>`.
+const BODY_PREFIX = /^body\./
 
 // Registers every action the pages export as a POST route whose body Elysia validates against the action's schema.
 export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], dev = false): Promise<void> {
@@ -40,18 +42,48 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], d
 
       app.post(value.url, async context => runAction(value, context, dev), {
         body: value.schema,
-        transform: ({ request }) => refuseCrossSite(request),
+        transform: (context) => {
+          refuseCrossSite(context.request)
+
+          context.body = isCall(context.request) ? decodeCall(context.body) : withoutEmptyFiles(context.body)
+        },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
         ...(route.guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(route.guards, context, dev) }),
-        error: ({ code, error, request }) => {
+        error: ({ code, error, request, body }) => {
           if (code === 'VALIDATION')
             return refused(value, error, request)
+
+          // Elysia checks a `t.File({ type })` against the file's bytes once the schema passed.
+          if (code === 'INVALID_FILE_TYPE')
+            return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [error.property.replace(BODY_PREFIX, '')]: error.message } })
 
           return error instanceof CrossSite ? error.response : undefined
         },
       })
     }
   }
+}
+
+// A file input left empty still posts a nameless, empty file; dropping it lets `t.Optional(t.File())` see no file at all.
+function withoutEmptyFiles(body: unknown): unknown {
+  if (typeof body !== 'object' || body === null)
+    return body
+
+  const fields: Record<string, unknown> = {}
+
+  for (const [name, value] of Object.entries(body)) {
+    const kept = Array.isArray(value) ? value.filter(item => !isEmptyFile(item)) : value
+
+    if (!isEmptyFile(kept) && !(Array.isArray(kept) && kept.length === 0 && Array.isArray(value) && value.length > 0))
+      fields[name] = kept
+  }
+
+  return fields
+}
+
+// Bun parses such a part as a Blob with no name.
+function isEmptyFile(value: unknown): boolean {
+  return value instanceof Blob && value.size === 0 && !(value instanceof File && value.name)
 }
 
 // Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused before anything else runs.
