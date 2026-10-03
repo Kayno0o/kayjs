@@ -1,4 +1,5 @@
 import type { BunPlugin } from 'bun'
+import type { KayConfig } from '../src/config'
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -8,7 +9,7 @@ import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, writeAsset } from '../src/build/assets'
 import { mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
-import { loadConfig } from '../src/config'
+import { loadConfig, withConfig } from '../src/config'
 import { buildClient } from '../src/server/client'
 
 const root = join(import.meta.dir, 'fixtures/islands')
@@ -116,6 +117,19 @@ describe('kay.config.ts', () => {
 
     try {
       await expect(loadConfig(root)).rejects.toThrow('kay.config.ts must export its config by default')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('lets options given in code win over the config, except those given as undefined', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'export default { routes: \'pages\', lang: \'en\' }\n' })
+
+    try {
+      const config: KayConfig = await withConfig(root, { routes: undefined, lang: 'fr' })
+
+      expect(config).toEqual({ routes: 'pages', lang: 'fr' })
     }
     finally {
       await rm(root, { recursive: true, force: true })

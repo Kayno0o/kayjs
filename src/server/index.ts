@@ -3,7 +3,7 @@ import type { ClientBuild } from './client'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { logError } from '../build/sourcemap'
-import { loadConfig } from '../config'
+import { withConfig } from '../config'
 import { servePages } from './app'
 import { buildClient, readClient } from './client'
 import { bootFailure } from './dev'
@@ -21,8 +21,7 @@ export async function pages(options: PagesOptions = {}) {
   const root = resolve(options.root ?? process.cwd())
   const dev = options.dev ?? process.env.NODE_ENV === 'development'
 
-  // An option passed as `undefined` leaves the config's value alone rather than wiping it.
-  const config = { ...await loadConfig(root), ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)), dev }
+  const config = { ...await withConfig(root, options), dev }
   const loadClient = async () => clientFor(root, config)
 
   if (!dev)
