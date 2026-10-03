@@ -31,7 +31,7 @@ bun run build   # kay build: islands, stylesheets and prerendered pages into .ka
 bun run start   # NODE_ENV=production bun src/server.ts
 ```
 
-In production the server serves what `kay build` wrote and bundles nothing at boot.
+In production the server serves what `kay build` wrote and bundles nothing at boot. It still compiles its `.kay` files when it starts, with Solid's compiler, which has no build for musl: run it on a glibc Linux such as the Debian-based `oven/bun` image, not an alpine one.
 
 ## Commands
 

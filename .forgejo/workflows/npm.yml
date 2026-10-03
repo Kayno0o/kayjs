@@ -14,14 +14,23 @@ env:
 
 jobs:
   publish:
-    runs-on: alpine
+    # Solid 2's compiler ships no musl binary and its WASI fallback fails under Bun, so not alpine.
+    runs-on: debian
     timeout-minutes: 15
 
     steps:
+      - name: Install checkout and setup-bun tools
+        run: apt-get update && apt-get install -y unzip git
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
 
       # A lockfile change still restores the closest older cache, so bun only fetches the packages that moved.
       - name: Cache bun packages
