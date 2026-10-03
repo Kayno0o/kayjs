@@ -4,10 +4,16 @@ export interface Todo {
   done: boolean
 }
 
-const todos: Todo[] = [
+const seeded: Todo[] = [
   { id: 1, title: 'Write the compiler', done: true },
   { id: 2, title: 'Serve pages', done: false },
 ]
+const todos = structuredClone(seeded)
+
+// Test files share one process, so each one that adds todos puts the seeded ones back for the next.
+export function resetTodos(): void {
+  todos.splice(0, todos.length, ...structuredClone(seeded))
+}
 
 export async function listTodos(): Promise<Todo[]> {
   return todos

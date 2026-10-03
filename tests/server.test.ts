@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
@@ -14,6 +14,7 @@ import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
 import { speculationRules } from '../src/server/speculation'
 import { auth } from './fixtures/site/src/auth'
+import { resetTodos } from './fixtures/site/src/data'
 
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
 const MARKERS = /<!--[$/]-->/g
@@ -55,6 +56,8 @@ async function get(path: string): Promise<{ status: number, html: string, header
 
   return { status: response.status, html: (await response.text()).replace(MARKERS, ''), headers: response.headers }
 }
+
+afterAll(resetTodos)
 
 describe('pages', () => {
   it('renders a page inside its layout with server data typed into the template', async () => {

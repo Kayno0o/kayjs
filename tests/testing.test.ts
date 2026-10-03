@@ -1,10 +1,11 @@
 import type { Action } from '../src/runtime'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { ActionError } from '../src/runtime'
 import { readActionResponse } from '../src/runtime/action'
 import { testSite } from '../src/test'
+import { resetTodos } from './fixtures/site/src/data'
 
 const routes = 'tests/fixtures/site/src/routes'
 const site = await testSite({ routes, publicDir: 'tests/fixtures/site/public', locals: request => ({ user: request.headers.get('x-user') ?? undefined }) })
@@ -12,6 +13,8 @@ const site = await testSite({ routes, publicDir: 'tests/fixtures/site/public', l
 const { add } = await import(join(import.meta.dir, 'fixtures/site/src/routes/index.kay')) as { add: Action<{ title: string }, number> }
 
 describe('kay/test', () => {
+  afterAll(resetTodos)
+
   it('visits a page with the locals the test gives, following redirects', async () => {
     const home = await site.visit('/')
     const account = await site.visit('/account', { headers: { 'x-user': 'ada' } })

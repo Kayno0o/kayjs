@@ -42,5 +42,9 @@ jobs:
       - name: Tests
         run: bun test
 
+      # The Solid and Svelte apps the benchmark compares against are packages of their own.
       - name: Check the benchmark apps
-        run: bun run bench:check
+        run: |
+          bun install --silent --frozen-lockfile --cwd bench/apps/solid
+          bun install --silent --frozen-lockfile --cwd bench/apps/svelte
+          bun run bench:check
