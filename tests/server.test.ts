@@ -475,7 +475,7 @@ describe('prerendering', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(1)
+      expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(3)
       const file = await Bun.file(join(root, '.kay/client/pages/admin/report.html')).text()
       const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const visit = (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
@@ -492,6 +492,50 @@ describe('prerendering', () => {
     }
     finally {
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('renders a dynamic route for each params its prerender export lists, and the others per request', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+
+    try {
+      await prerenderPages(root, { routes }, (await readClient(root))!)
+      const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+      const visit = async (path: string) => {
+        const response = await served.handle(new NativeRequest(`http://localhost${path}`))
+
+        return { html: (await response.text()).replace(MARKERS, ''), etag: response.headers.get('etag') }
+      }
+
+      expect(await Bun.file(join(root, '.kay/client/pages/docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html.replace('guide/intro', '<!--$-->guide/intro<!--/-->'))
+      expect(await Bun.file(join(root, '.kay/client/pages/docs/a%20b.html')).exists()).toBe(true)
+      expect(await visit('/docs/guide/intro')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at guide/intro</p>'), etag: expect.any(String) })
+      expect(await visit('/docs/a%20b')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a b</p>'), etag: expect.any(String) })
+      expect(await visit('/docs/other')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at other</p>'), etag: null })
+    }
+    finally {
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('asks a dynamic route marked prerender = true for the params to render', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const dir = await mkdtemp(join(root, '.kay/routes-'))
+
+    try {
+      await Bun.write(join(dir, 'posts/[slug].kay'), '--- server\nexport const prerender = true\n---\np {ctx.params.slug}\n')
+      expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('so `prerender` lists them: export const prerender = [{ slug: \'...\' }]')
+      await rm(join(dir, 'posts'), { recursive: true })
+      // Another file, since the first one stays in the module cache.
+      await Bun.write(join(dir, 'tags/[slug].kay'), '--- server\nexport const prerender = [{ slug: 1 }]\n---\np {ctx.params.slug}\n')
+      expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('prerenders {"slug":1}, which needs a string for each of slug')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })

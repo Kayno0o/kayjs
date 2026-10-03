@@ -1,5 +1,6 @@
 import type { KayConfig } from '../config'
 import type { ClientBuild } from './client'
+import type { ServedPage } from './render'
 import { join, normalize, resolve, sep } from 'node:path'
 import { Elysia } from 'elysia'
 import { registerActionRoutes } from './actions'
@@ -19,6 +20,22 @@ export interface PagesOptions extends KayConfig {
   dev?: boolean
   // Serves the bundle `kay build` wrote instead of bundling at boot. Defaults to on when NODE_ENV is production.
   prebuilt?: boolean
+}
+
+// The prerendered pages by route pattern, then by path, read once at boot.
+async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<string, ServedPage>>> {
+  const byRoute = new Map<string, Map<string, ServedPage>>()
+
+  for (const [path, page] of client.pages) {
+    let paths = byRoute.get(page.pattern)
+
+    if (!paths)
+      byRoute.set(page.pattern, paths = new Map())
+
+    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), html: await Bun.file(join(client.dir, '..', PRERENDERED_DIR, page.file)).text() })
+  }
+
+  return byRoute
 }
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
@@ -46,14 +63,22 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   })
 
   await Promise.all([registerActionRoutes(app, routes, options.dev), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
-  for (const route of routes) {
-    const prerendered = client.pages.get(route.pattern)
-    const page = prerendered && { status: prerendered.status, etag: prerendered.etag, headers: Object.entries(prerendered.headers), html: await Bun.file(join(client.dir, '..', PRERENDERED_DIR, prerendered.file)).text() }
+  const prerendered = await loadPrerendered(client)
 
-    if (page)
-      app.get(route.pattern, async context => servePrerendered(route, page, context, client, renderOptions))
-    else
+  for (const route of routes) {
+    const served = prerendered.get(route.pattern)
+
+    // A path `kay build` rendered is served from its file; any other path of the route renders per request.
+    if (served) {
+      app.get(route.pattern, async (context) => {
+        const page = served.get(new URL(context.request.url).pathname)
+
+        return page ? servePrerendered(route, page, context, client, renderOptions) : renderPage(route, context, client, renderOptions)
+      })
+    }
+    else {
       app.get(route.pattern, async context => renderPage(route, context, client, renderOptions))
+    }
   }
 
   const fallback = specialPagesOf(routesDir, routesDir)

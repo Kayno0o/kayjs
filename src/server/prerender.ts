@@ -1,5 +1,6 @@
 import type { KayConfig } from '../config'
 import type { ClientBuild, PrerenderedPage } from './client'
+import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { parseKay } from '../compiler/parser'
@@ -23,32 +24,32 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   for (const route of await scanRoutes(resolve(root, config.routes ?? 'src/routes'))) {
     // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
-    if (!await exportsPrerender(route.file) || (await import(route.file) as { prerender?: unknown }).prerender !== true)
+    if (!await exportsPrerender(route.file))
       continue
 
     const file = relative(root, route.file)
 
-    if (route.params.length > 0)
-      throw new Error(`kay: ${file} takes params, so it has no single page to prerender`)
+    for (const params of await paramsToPrerender(route, file, (await import(route.file) as { prerender?: unknown }).prerender)) {
+      const path = pathOf(route, params)
+      // Guards run when the page is served, for whoever asks; the build renders what they let through.
+      const response = await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${path}`), params: elysiaParams(route, params) }, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true })
 
-    // Guards run when the page is served, for whoever asks; the build renders what they let through.
-    const response = await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${route.pattern}`), params: {} }, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true })
+      if (response.status >= 500)
+        throw new Error(`kay: prerendering ${path} from ${file} failed with ${response.status}; the error is logged above`)
 
-    if (response.status >= 500)
-      throw new Error(`kay: prerendering ${file} failed with ${response.status}; the error is logged above`)
+      const html = await response.text()
+      const name = `${path === '/' ? 'index' : path.slice(1)}.html`
+      const headers: Record<string, string> = {}
 
-    const html = await response.text()
-    const name = `${route.pattern === '/' ? 'index' : route.pattern.slice(1)}.html`
-    const headers: Record<string, string> = {}
+      for (const [header, value] of response.headers) {
+        if (header !== 'set-cookie')
+          headers[header] = value
+      }
 
-    for (const [header, value] of response.headers) {
-      if (header !== 'set-cookie')
-        headers[header] = value
+      await mkdir(join(dir, name, '..'), { recursive: true })
+      await Bun.write(join(dir, name), html)
+      pages[path] = { pattern: route.pattern, file: name, status: response.status, headers, etag: `"${Bun.hash(html).toString(36)}"` }
     }
-
-    await mkdir(join(dir, name, '..'), { recursive: true })
-    await Bun.write(join(dir, name), html)
-    pages[route.pattern] = { file: name, status: response.status, headers, etag: `"${Bun.hash(html).toString(36)}"` }
   }
 
   await writeManifest(root, { ...manifest, pages })
@@ -61,4 +62,46 @@ async function exportsPrerender(file: string): Promise<boolean> {
   const source = await Bun.file(file).text()
 
   return analyzeServer(source, parseKay(source).server)?.exportNames.includes('prerender') ?? false
+}
+
+// `true` for a route without params; a list of params, or a function returning one, for the paths of a route with some.
+async function paramsToPrerender(route: Route, file: string, prerender: unknown): Promise<Record<string, string>[]> {
+  if (prerender === true) {
+    if (route.params.length > 0)
+      throw new Error(`kay: ${file} takes params, so \`prerender\` lists them: export const prerender = [{ ${route.params.map(name => `${name}: '...'`).join(', ')} }]`)
+
+    return [{}]
+  }
+
+  const list: unknown = typeof prerender === 'function' ? await (prerender as () => unknown)() : prerender
+
+  if (!Array.isArray(list))
+    return []
+
+  for (const params of list) {
+    if (typeof params !== 'object' || params === null || route.params.some(name => typeof (params as Record<string, unknown>)[name] !== 'string'))
+      throw new Error(`kay: ${file} prerenders ${JSON.stringify(params)}, which needs a string for each of ${route.params.join(', ')}`)
+  }
+
+  return list as Record<string, string>[]
+}
+
+// The URL path the params fill in, each segment encoded; a catch-all keeps its slashes.
+function pathOf(route: Route, params: Record<string, string>): string {
+  return route.pattern.split('/').map((segment) => {
+    if (segment === '*')
+      return params[route.catchAll!]!.split('/').map(encodeURIComponent).join('/')
+
+    return segment.startsWith(':') ? encodeURIComponent(params[segment.slice(1)]!) : segment
+  }).join('/')
+}
+
+// What Elysia hands the page for that path: named params decoded, the catch-all still encoded.
+function elysiaParams(route: Route, params: Record<string, string>): Record<string, string> {
+  const raw: Record<string, string> = {}
+
+  for (const name of route.params)
+    raw[name === route.catchAll ? '*' : name] = name === route.catchAll ? params[name]!.split('/').map(encodeURIComponent).join('/') : params[name]!
+
+  return raw
 }

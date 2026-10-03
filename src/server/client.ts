@@ -20,11 +20,13 @@ export interface ClientManifest {
   islands: Record<string, string[]>
   // The stylesheet of each page, layout and special page that imports any, by path relative to the root.
   styles: Record<string, string>
-  // The pages `kay build` rendered, by route pattern.
+  // The pages `kay build` rendered, by URL path.
   pages?: Record<string, PrerenderedPage>
 }
 
 export interface PrerenderedPage {
+  // The route the path belongs to.
+  pattern: string
   // Under `.kay/client/pages`.
   file: string
   status: number

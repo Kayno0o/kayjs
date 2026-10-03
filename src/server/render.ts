@@ -27,7 +27,7 @@ interface PageModule {
 type Loaded = PromiseSettledResult<Record<string, unknown>>
 
 // A prerendered page as the server holds it from boot.
-export interface ServedPage extends Omit<PrerenderedPage, 'file' | 'headers'> {
+export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | 'headers'> {
   html: string
   headers: [string, string][]
 }

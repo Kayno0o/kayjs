@@ -232,7 +232,24 @@ p.status {todo.done ? 'Done' : 'Open'}
 
 ## Prerendering
 
-A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.locals` or `ctx.failed` fails the build, as does a page taking params; `ctx.url` is `http://localhost` plus its path. Development renders it per request like any other.
+A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.locals` or `ctx.failed` fails the build; `ctx.url` is `http://localhost` plus its path. Development renders it per request like any other.
+
+A route taking params lists the ones to render instead, as an array or a function returning one; any other path renders per request:
+
+```kay
+--- server
+import { findPost, listPosts } from '../../data'
+
+export async function prerender() {
+  return (await listPosts()).map(post => ({ slug: post.slug }))
+}
+
+const post = await findPost(ctx.params.slug) ?? ctx.notFound()
+---
+h1 {post.title}
+```
+
+Each value is a string, a catch-all's included with its slashes.
 
 ## Streaming
 
