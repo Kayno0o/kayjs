@@ -65,7 +65,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   app.get(`${ASSET_PREFIX}*`, async ({ params, status }) => {
     const name = decodePath(params['*'])
-    const path = name === undefined ? '' : normalize(resolve(client.dir, name))
+    // A NUL byte makes Bun.file throw, with the server path in its message.
+    const path = name === undefined || name.includes('\0') ? '' : normalize(resolve(client.dir, name))
 
     if (!path.startsWith(client.dir + sep) || !await Bun.file(path).exists())
       return status(404)

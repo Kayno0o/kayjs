@@ -98,9 +98,11 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       const from = init.from ?? '/'
       const form = new FormData()
 
-      for (const [name, value] of Object.entries(fields as Record<string, FormValue | FormValue[]>)) {
-        for (const item of Array.isArray(value) ? value : [value])
-          form.append(name, item)
+      for (const [name, value] of Object.entries(fields as Record<string, FormValue | FormValue[] | undefined>)) {
+        for (const item of Array.isArray(value) ? value : [value]) {
+          if (item !== undefined)
+            form.append(name, item)
+        }
       }
 
       const response = await send(action.url, {

@@ -17,6 +17,8 @@ import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
 
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
+// No _404.kay nor _error.kay: failures answer in plain text.
+const bare = await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true })
 const MARKERS = /<!--[$/]-->/g
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
 const ENTRY = /<script type="module" (?:async )?src="\/_kay\/([^"]+)"><\/script>/
@@ -183,11 +185,13 @@ describe('pages', () => {
     expect((await get('/todos/100%25')).status).toBe(302)
     expect((await get('/docs/a%20b/%2541')).html).toContain('<p class="path">Docs at a b/%41</p>')
     expect((await get('/docs/100%')).status).toBe(400)
+    expect((await get('/todos/100%')).status).toBe(400)
   })
 
   it('refuses asset paths outside the client build or malformed', async () => {
     expect((await app.handle(new Request('http://localhost/_kay/..%2F..%2Fpackage.json'))).status).toBe(404)
     expect((await app.handle(new Request('http://localhost/_kay/%E0'))).status).toBe(404)
+    expect((await app.handle(new Request('http://localhost/_kay/%00'))).status).toBe(404)
   })
 
   it('ships Solid\'s production build, not its development one', async () => {
@@ -594,6 +598,23 @@ describe('prerendering', () => {
     }
   })
 
+  it('refuses to prerender two paths into one file', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const dir = await mkdtemp(join(root, '.kay/routes-'))
+
+    try {
+      await Bun.write(join(dir, 'index.kay'), '--- server\nexport const prerender = true\n---\np Home\n')
+      await Bun.write(join(dir, '[slug].kay'), '--- server\nexport const prerender = [{ slug: \'index\' }]\nconst slug = ctx.params.slug\n---\np {slug}\n')
+      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('kay: /index and / would both be prerendered to index.html')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
   it('refuses to prerender a page that reads what only a request carries', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -640,7 +661,71 @@ describe('prefetch', () => {
   })
 })
 
+describe('without special pages', () => {
+  const visit = async (path: string, served = bare) => {
+    const response = await served.handle(new Request(`http://localhost${path}`))
+
+    return { status: response.status, text: await response.text(), cookie: response.headers.get('set-cookie'), type: response.headers.get('content-type'), headers: response.headers }
+  }
+
+  it('answers in plain text, keeping the cookies and headers the guard or the page set', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect(await visit('/locked')).toMatchObject({ status: 403, text: 'Locked', cookie: expect.stringMatching(/^seen=locked;/), type: 'text/plain; charset=utf-8' })
+      expect((await visit('/locked')).headers.get('x-guard')).toBe('locked')
+      expect(await visit('/?fail')).toMatchObject({ status: 500, text: 'Internal Server Error', cookie: expect.stringMatching(/^visited=yes;/) })
+      expect((await visit('/?fail')).headers.get('x-page')).toBe('index')
+      expect(await visit('/?missing')).toMatchObject({ status: 404, text: 'Not found', cookie: expect.stringMatching(/^visited=yes;/) })
+      expect(await visit('/?deny')).toMatchObject({ status: 403, text: 'Members only', cookie: expect.stringMatching(/^visited=yes;/) })
+
+      const dev = await visit('/?fail', await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true, dev: true }))
+
+      expect(dev).toMatchObject({ status: 500, text: expect.stringContaining('Kaboom'), cookie: expect.stringMatching(/^visited=yes;/), type: 'text/html; charset=utf-8' })
+      expect(dev.headers.get('x-page')).toBe('index')
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('keeps the default charset and viewport whatever a title holds', async () => {
+    const { text } = await visit(`/?title=${encodeURIComponent('data-dh="charset" data-dh="meta:name:viewport"')}`)
+
+    expect(text).toContain('<meta charset="utf-8">')
+    expect(text).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">')
+  })
+})
+
 describe('route scan', () => {
+  it('refuses routes that clash or that a router would misread', async () => {
+    const clash = async (files: string[]) => {
+      const dir = await mkdtemp(join(tmpdir(), 'kay-routes-'))
+
+      try {
+        for (const file of files)
+          await Bun.write(join(dir, file), '')
+
+        await scanRoutes(dir)
+
+        return 'scanned'
+      }
+      catch (error) {
+        return (error as Error).message.replaceAll(dir, '<routes>')
+      }
+      finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    }
+
+    expect(await clash(['about.kay', 'about/index.kay'])).toBe('kay: <routes>/about.kay and <routes>/about/index.kay both serve /about')
+    expect(await clash(['todos/[id].kay', 'todos/[slug].kay'])).toBe('kay: <routes>/todos/[id].kay and <routes>/todos/[slug].kay both serve /todos/:id')
+    expect(await clash(['u/[id]/a.kay', 'u/[slug]/b.kay'])).toBe('kay: <routes>/u/[id]/a.kay and <routes>/u/[slug]/b.kay name the same segment :id and :slug; give it one name')
+    expect(await clash(['x:y.kay'])).toBe('kay: <routes>/x:y.kay has a :, * or \' in its name, which the router cannot serve; rename it')
+    expect(await clash(['it\'s.kay'])).toBe('kay: <routes>/it\'s.kay has a :, * or \' in its name, which the router cannot serve; rename it')
+    expect(await clash(['todos/[id].kay', 'todos/new.kay', 'docs/[...path].kay', 'docs/index.kay', 'a b.kay'])).toBe('scanned')
+  })
+
   it('gives a guard the special pages outside its directory, bare for the routes root', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-guards-'))
 
@@ -756,6 +841,35 @@ describe('public files', () => {
   it('serves nothing outside the directory', async () => {
     expect((await app.handle(new Request('http://localhost/..%2Fsrc%2Fdata.ts'))).status).toBe(404)
     expect((await app.handle(new Request('http://localhost/.well-known/..%2F..%2Fsrc%2Fdata.ts'))).status).toBe(404)
+  })
+
+  it('serves a file at the URL a browser sends for its name', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-public-'))
+
+    try {
+      for (const name of ['logo@2x.png', 'a+b,c;d=e&f$[1]|.txt', 'it\'s.txt', 'c:d.txt', 'star*.txt', 'sp ace é%.txt'])
+        await Bun.write(join(dir, name), name)
+
+      const served = await pages({ routes: 'tests/fixtures/bare/src/routes', publicDir: dir, prebuilt: true })
+      const visit = async (path: string) => {
+        const response = await served.handle(new Request(`http://localhost${path}`))
+
+        return response.status === 200 ? response.text() : response.status
+      }
+
+      expect(await visit('/logo@2x.png')).toBe('logo@2x.png')
+      expect(await visit('/logo%402x.png')).toBe('logo@2x.png')
+      expect(await visit('/a+b,c;d=e&f$[1]|.txt')).toBe('a+b,c;d=e&f$[1]|.txt')
+      expect(await visit('/sp%20ace%20%C3%A9%25.txt')).toBe('sp ace é%.txt')
+      // Elysia would read these characters as a parameter, a wildcard or code, so only their encoded form serves them.
+      expect(await visit('/it%27s.txt')).toBe('it\'s.txt')
+      expect(await visit('/c%3Ad.txt')).toBe('c:d.txt')
+      expect(await visit('/star%2A.txt')).toBe('star*.txt')
+      expect(await visit('/cZZ')).toBe(404)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('refuses to boot when a file and a page share a path', async () => {

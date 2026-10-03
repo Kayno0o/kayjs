@@ -175,7 +175,7 @@ export default defineConfig({ plugins: [tailwind] })
 
 ## Public files
 
-Files in `public/` (the `publicDir` option) are served at their path as they are: `public/robots.txt` at `/robots.txt`. A file sharing its path with a page stops the server at boot.
+Files in `public/` (the `publicDir` option) are served at their path as they are: `public/robots.txt` at `/robots.txt`, `public/logo@2x.png` at `/logo@2x.png`. A `:`, `*` or `'` in a name is served percent-encoded only, as `%3A`, `%2A` or `%27`. A file sharing its path with a page stops the server at boot, as do two pages serving one path.
 
 ## Imported files
 

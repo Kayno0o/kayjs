@@ -21,6 +21,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   const dir = join(root, '.kay', 'client', PRERENDERED_DIR)
   const pages: Record<string, PrerenderedPage> = {}
+  const paths = new Map<string, string>()
 
   for (const route of await scanRoutes(resolve(root, config.routes ?? 'src/routes'))) {
     // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
@@ -39,6 +40,12 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
       const html = await response.text()
       const name = `${path === '/' ? 'index' : path.slice(1)}.html`
+      const taken = paths.get(name)
+
+      if (taken !== undefined)
+        throw new Error(`kay: ${taken} and ${path} would both be prerendered to ${name}; leave one out of prerender`)
+
+      paths.set(name, path)
       const headers: Record<string, string> = {}
 
       for (const [header, value] of response.headers) {

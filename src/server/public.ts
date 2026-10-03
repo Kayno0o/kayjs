@@ -6,9 +6,12 @@ import { join, relative, sep } from 'node:path'
 import process from 'node:process'
 
 const CACHE_CONTROL = 'public, max-age=0, must-revalidate'
-const WILDCARD = /\*/g
+// What `encodeURIComponent` escapes but a browser sends as is in a path; `:` stays escaped, since Elysia would read it as a parameter.
+const SENT_AS_IS = /%(?:40|2B|2C|3B|3D|26|24|5B|5D|7C)/g
+// What `encodeURIComponent` keeps but Elysia reads as a wildcard or breaks the code it generates on.
+const ROUTER_SYNTAX = /['*]/g
 
-// Every file under the directory with the URL path it is served at, encoded the way a browser sends it: a `:` or `*` in a name never reads as a route parameter.
+// Every file under the directory with the URL path it is served at, written the way a browser sends it: `/logo@2x.png`, `/c%3Ad.txt`.
 export async function publicFiles(dir: string): Promise<{ path: string, url: string }[]> {
   if (!existsSync(dir))
     return []
@@ -18,8 +21,12 @@ export async function publicFiles(dir: string): Promise<{ path: string, url: str
   return entries.filter(entry => entry.isFile()).map((entry) => {
     const path = join(entry.parentPath, entry.name)
 
-    return { path, url: `/${relative(dir, path).split(sep).map(segment => encodeURIComponent(segment).replace(WILDCARD, '%2A')).join('/')}` }
+    return { path, url: `/${relative(dir, path).split(sep).map(urlSegment).join('/')}` }
   })
+}
+
+function urlSegment(name: string): string {
+  return encodeURIComponent(name).replace(SENT_AS_IS, decodeURIComponent).replace(ROUTER_SYNTAX, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
 }
 
 // One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.

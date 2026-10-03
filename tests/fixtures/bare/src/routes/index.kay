@@ -1,0 +1,18 @@
+--- server
+ctx.cookies.set('visited', 'yes')
+ctx.headers.set('x-page', 'index')
+
+if (ctx.url.searchParams.has('fail'))
+  throw new Error('Kaboom')
+
+if (ctx.url.searchParams.has('missing'))
+  ctx.notFound()
+
+if (ctx.url.searchParams.has('deny'))
+  ctx.deny(403, 'Members only')
+
+const title = ctx.url.searchParams.get('title') ?? 'Home'
+---
+head
+  title {title}
+p Home

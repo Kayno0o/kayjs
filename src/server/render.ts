@@ -59,6 +59,9 @@ interface Rendering {
 
 const CHARSET = '<meta charset="utf-8">'
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
+// The head tags a page set itself, which Solid marks with their identity; text holds no `<`, so a title cannot pass for one.
+const CHARSET_TAG = /<meta\s[^>]*\bdata-dh="charset"/
+const VIEWPORT_TAG = /<meta\s[^>]*\bdata-dh="meta:name:viewport"/
 // Per set of islands and per chain of layouts: few exist, and they never change for a build.
 const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()
 const stylesCache = new WeakMap<ClientBuild, Map<string, string>>()
@@ -274,10 +277,15 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   if (html !== undefined)
     return respond(rendering, html)
 
-  if (options.dev && !notFound && !denied)
-    return new Response(errorPage(pageError) + LIVE_RELOAD, { status: pageError.status, headers: { 'content-type': 'text/html; charset=utf-8' } })
+  if (options.dev && !notFound && !denied) {
+    rendering.headers.set('content-type', 'text/html; charset=utf-8')
 
-  return new Response(notFound ? 'Not found' : pageError.message, { status: pageError.status, headers: TEXT })
+    return respond(rendering, errorPage(pageError) + LIVE_RELOAD)
+  }
+
+  rendering.headers.set('content-type', TEXT['content-type'])
+
+  return respond(rendering, notFound ? 'Not found' : pageError.message)
 }
 
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.
@@ -387,7 +395,7 @@ function defaultHead(head: string): string {
   if (head === '')
     return CHARSET + VIEWPORT
 
-  return (head.includes('data-dh="charset"') ? '' : CHARSET) + (head.includes('data-dh="meta:name:viewport"') ? '' : VIEWPORT)
+  return (CHARSET_TAG.test(head) ? '' : CHARSET) + (VIEWPORT_TAG.test(head) ? '' : VIEWPORT)
 }
 
 function describeError(error: unknown, dev = false): PageError {
@@ -397,14 +405,14 @@ function describeError(error: unknown, dev = false): PageError {
   return error instanceof Error ? { status: 500, message: error.message, stack: error.stack && mapStack(error.stack) } : { status: 500, message: String(error) }
 }
 
-// Elysia decodes named params already; only the catch-all arrives encoded. Undefined when it is malformed.
+// Elysia decodes named params already, null when malformed; only the catch-all arrives encoded. Undefined when one is malformed.
 function routeParams(route: ServedRoute, raw: Record<string, string>): Record<string, string> | undefined {
   const params: Record<string, string> = {}
 
   for (const name of route.params) {
-    const value = name === route.catchAll ? decodePath(raw['*'] ?? '') : raw[name] ?? ''
+    const value = name === route.catchAll ? decodePath(raw['*'] ?? '') : raw[name]
 
-    if (value === undefined)
+    if (typeof value !== 'string')
       return undefined
 
     params[name] = value

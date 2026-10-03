@@ -57,6 +57,7 @@ describe('kay/test', () => {
     expect(page.url).toBe('/upload')
     expect(page.html).toContain(`form: ${PNG.length} bytes (a.png)</p>`)
     expect((await site.submit(upload, { note: 'attached', file: image('a.png'), attachment: new File(['x'], 'x.txt') }, { from: '/upload' })).html).toContain('attached x.txt</p>')
+    expect((await site.submit(upload, { note: 'left out', file: image('a.png'), attachment: undefined }, { from: '/upload' })).html).toContain(`left out: ${PNG.length} bytes (a.png)</p>`)
     expect(await site.call(upload, { note: 'call', file: image('b.png'), extra: { copies: 2, files: [image('c.png'), new File(['notes'], 'd.txt')] } })).toBe(`call: ${PNG.length} bytes (b.png), 2 copies of 2 more`)
     expect(await site.call(upload, { note: 'blob', file: new Blob([PNG], { type: 'image/png' }) as File })).toBe(`blob: ${PNG.length} bytes (blob)`)
     await expect(site.call(upload, { note: 'not an image', file: new File(['{}'], 'e.png', { type: 'image/png' }) })).rejects.toMatchObject({ status: 422, errors: { file: 'Upload a PNG image' } })

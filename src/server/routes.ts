@@ -40,6 +40,9 @@ const LAYOUT = '_layout.kay'
 const NOT_FOUND = '_404.kay'
 const ERROR = '_error.kay'
 const GUARD = '_guard.ts'
+// What Elysia reads as a parameter, a wildcard or breaks the code it generates on, in a static segment.
+const ROUTER_SYNTAX = /[:*']/
+const PARAM_NAME = /:[^/]+/g
 
 // The route a file under the routes directory serves; files starting with `_` (layouts, partials) serve none.
 export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts' | 'special' | 'guards'> | undefined {
@@ -85,7 +88,43 @@ export async function scanRoutes(routesDir: string): Promise<Route[]> {
       routes.push({ ...route, layouts: layoutsOf(routesDir, file), special: specialPagesOf(routesDir, dirname(file)), guards: guardsOf(routesDir, file) })
   }
 
+  refuseClashes(routesDir, routes)
+
   return routes
+}
+
+// Elysia serves one page per path, takes one param name per segment and misreads some characters in a file name: each stops the boot with its own message, rather than a page shadowing another or a raw router error.
+function refuseClashes(routesDir: string, routes: Route[]): void {
+  const byPath = new Map<string, Route>()
+  const paramAt = new Map<string, { name: string, route: Route }>()
+
+  for (const route of routes) {
+    if (relative(routesDir, route.file).replace(KAY_EXTENSION, '').split(sep).some(segment => !DYNAMIC_SEGMENT.test(segment) && ROUTER_SYNTAX.test(segment)))
+      throw new Error(`kay: ${route.file} has a :, * or ' in its name, which the router cannot serve; rename it`)
+
+    const path = route.pattern.replace(PARAM_NAME, ':')
+    const same = byPath.get(path)
+
+    if (same)
+      throw new Error(`kay: ${same.file} and ${route.file} both serve ${same.pattern}`)
+
+    byPath.set(path, route)
+
+    const segments = route.pattern.split('/')
+
+    for (const [index, segment] of segments.entries()) {
+      if (!segment.startsWith(':'))
+        continue
+
+      const prefix = segments.slice(0, index + 1).join('/').replace(PARAM_NAME, ':')
+      const named = paramAt.get(prefix)
+
+      if (named && named.name !== segment)
+        throw new Error(`kay: ${named.route.file} and ${route.file} name the same segment ${named.name} and ${segment}; give it one name`)
+
+      paramAt.set(prefix, { name: segment, route })
+    }
+  }
 }
 
 function layoutsOf(routesDir: string, file: string): string[] {
