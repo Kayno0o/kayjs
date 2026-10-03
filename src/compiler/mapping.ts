@@ -128,9 +128,9 @@ export class SourceMap {
     return exact && exact.generated + source - exact.source
   }
 
-  // Generated code may copy a name more than once, as a loop's item into its key function and its row.
+  // Generated code may copy a name more than once, as a loop's item into its key function and its row; a run ending where the name starts is no copy of it.
   toGeneratedAll(source: number): number[] {
-    return this.bySource.filter(mapping => mapping.source <= source && source <= mapping.source + mapping.length).map(mapping => mapping.generated + source - mapping.source)
+    return this.bySource.filter(mapping => mapping.source <= source && source < mapping.source + mapping.length).map(mapping => mapping.generated + source - mapping.source)
   }
 
   // True when the generated offset was copied from the source, so a diagnostic there is the user's own code.

@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
+import { clientDir, writeAsset } from '../src/build/assets'
 import { mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { buildClient } from '../src/server/client'
@@ -42,7 +43,7 @@ describe('kay build', () => {
     }
   })
 
-  it('writes the files pages import, server fences included, for a production server that never writes', async () => {
+  it('writes the files pages import, through a server fence\'s modules too, for a production server that never writes', async () => {
     const site = join(import.meta.dir, 'fixtures/site')
 
     try {
@@ -52,6 +53,23 @@ describe('kay build', () => {
     }
     finally {
       await rm(join(site, '.kay/client'), { recursive: true, force: true })
+    }
+  })
+
+  it('names an asset in its URL the way a browser reads it back', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-asset-'))
+
+    try {
+      await Bun.write(join(dir, 'my logo#1.png'), 'png')
+
+      const url = await writeAsset(join(dir, 'my logo#1.png'), dir)
+      const name = decodeURIComponent(url.slice('/_kay/assets/'.length))
+
+      expect(url).toMatch(/^\/_kay\/assets\/my%20logo%231-\w+\.png$/)
+      expect(await Bun.file(join(clientDir(dir), 'assets', name)).text()).toBe('png')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
     }
   })
 

@@ -32,14 +32,32 @@ export function styleImports(root: string): BunPlugin {
       return undefined
     }
   }
-  const followed = (path: string) => CSS_FILE.test(path) || (path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
-  // With `assetsOnly`, the code is server code: its assets are written, nothing is followed.
-  const imports = async (code: string, importer: string, loader: Bun.JavaScriptLoader, assetsOnly = false) => {
-    const paths = transpiler(loader).scanImports(code).map(({ path }) => resolve(path, importer)).filter(path => path !== undefined)
+  const inProject = (path: string) => path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)
+  const followed = (path: string) => CSS_FILE.test(path) || (inProject(path) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
+  const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => transpiler(loader).scanImports(code).map(({ path }) => resolve(path, importer)).filter(path => path !== undefined)
+  const imports = async (code: string, importer: string, loader: Bun.JavaScriptLoader) => {
+    const paths = scan(code, importer, loader)
 
     await Promise.all(paths.filter(path => ASSET_FILE.test(path)).map(async path => writeAsset(path, root)))
 
-    return assetsOnly ? '' : paths.filter(followed).map(path => `import ${JSON.stringify(path)}\n`).join('')
+    return paths.filter(followed).map(path => `import ${JSON.stringify(path)}\n`).join('')
+  }
+  // Server code never reaches the bundler, but the assets it imports, through the project's modules too, are written all the same.
+  const walked = new Set<string>()
+  const serverAssets = async (code: string, importer: string, loader: Bun.JavaScriptLoader): Promise<void> => {
+    await Promise.all(scan(code, importer, loader).map(async (path) => {
+      if (ASSET_FILE.test(path)) {
+        await writeAsset(path, root)
+
+        return
+      }
+
+      if (!inProject(path) || !SCRIPT_FILE.test(path) || walked.has(path))
+        return
+
+      walked.add(path)
+      await serverAssets(await Bun.file(path).text(), path, scriptLoader(path))
+    }))
   }
 
   return {
@@ -50,7 +68,7 @@ export function styleImports(root: string): BunPlugin {
         const { script, server } = parseKay(source)
         const [contents] = await Promise.all([
           script ? imports(source.slice(script.start, script.end), path, 'ts') : '',
-          server && imports(source.slice(server.start, server.end), path, 'ts', true),
+          server ? serverAssets(source.slice(server.start, server.end), path, 'ts') : undefined,
         ])
 
         return { contents, loader: 'js' }

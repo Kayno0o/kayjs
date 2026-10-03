@@ -1,11 +1,11 @@
 --- server
-import og from '../og.svg'
+import { meta } from '../meta'
 ---
 ---
 import Brand from '../components/brand.kay'
 import logo from '../logo.png'
 ---
 head
-  meta(property="og:image" content={og})
+  meta(property="og:image" content={meta.og})
 img.static(src={logo} alt="Logo")
 Brand

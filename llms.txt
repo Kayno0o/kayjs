@@ -188,7 +188,7 @@ import logo from '../logo.png'
 img(src={logo} alt="Logo")
 ```
 
-The URL, such as `/_kay/assets/logo-2k1v9.png`, is named after the file's content and served with a year of immutable caching, so a changed file gets a new URL; the server and islands render the same one, and `kay build` writes every file the pages import. A file to serve at a fixed path, such as `robots.txt`, goes in `public/` instead.
+The URL, such as `/_kay/assets/logo-2k1v9.png`, is named after the file's content and served with a year of immutable caching, so a changed file gets a new URL; the server and islands render the same one, and `kay build` writes every file the pages import, through their modules and server fences too. A file to serve at a fixed path, such as `robots.txt`, goes in `public/` instead. These imports are kay's own: a build plugin of the project for the same extensions, such as one inlining SVG, does not apply to them.
 
 ## Islands
 
@@ -400,7 +400,7 @@ it('shows why a todo was refused', async () => {
 ## What `kay check` verifies
 
 - Every expression, prop and server name, as TypeScript does.
-- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the routes, as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a plain `string`, relative paths, `//host` and other schemes are not checked.
+- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the routes, as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a plain `string`, relative paths, `//host` and other schemes are not checked, so a path served by something other than a page, such as a public file, goes through a `string` variable.
 - Form field names against the action schema.
 - Island props passed from static components are JSON-serializable.
 

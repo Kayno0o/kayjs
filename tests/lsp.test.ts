@@ -173,7 +173,7 @@ describe('kay lsp', () => {
     expect(spots(add.filter(location => location.uri === site.uri('src/routes/index.kay')).map(location => location.range))).toEqual([[5, 13, 16], [14, 27, 30], [25, 19, 22]])
     expect(spots(add.filter(location => location.uri === site.uri('src/components/quick-add.kay')).map(location => location.range))).toEqual([[2, 9, 12], [9, 18, 21]])
     expect(spots(open.map(location => location.range))).toEqual([[13, 6, 10], [21, 5, 9], [32, 15, 19]])
-    expect(await site.request<DocumentHighlight[]>('textDocument/documentHighlight', 'src/routes/index.kay', 21, 6)).toHaveLength(3)
+    expect(spots((await site.request<DocumentHighlight[]>('textDocument/documentHighlight', 'src/routes/index.kay', 21, 6)).map(highlight => highlight.range))).toEqual([[13, 6, 10], [21, 5, 9], [32, 15, 19]])
   })
 
   it('renames a name everywhere the user wrote it, from either end, and nothing generated', async () => {

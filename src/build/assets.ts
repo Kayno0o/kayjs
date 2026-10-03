@@ -21,5 +21,5 @@ export async function writeAsset(path: string, root: string): Promise<string> {
   if (!await target.exists())
     await Bun.write(target, bytes)
 
-  return `${ASSET_PREFIX}${ASSETS_DIR}/${name}`
+  return `${ASSET_PREFIX}${ASSETS_DIR}/${encodeURIComponent(name)}`
 }

@@ -238,4 +238,16 @@ describe('source mapping', () => {
     expect(map.toSource(generated)).toBe(source.lastIndexOf('title'))
     expect(map.toGenerated(source.lastIndexOf('title'))).toBe(generated)
   })
+
+  it('finds every copy of a name, and no run that merely ends where it starts', () => {
+    const source = '---\nconst { title } = props<{ title: string }>()\n---\nul\n  for row of [title] key={row}\n    li {row && title}\n'
+    const { tsx, map } = compileKay(source, 'test.kay', { check: true })
+    const copies = (offset: number) => map.toGeneratedAll(offset).map(generated => tsx.slice(generated, generated + 3))
+
+    // A loop's item goes into its key function and its row.
+    expect(copies(source.indexOf('row of'))).toEqual(['row', 'row'])
+    // `title` becomes `__props.title`, right after the run copying `row && `.
+    expect(copies(source.lastIndexOf('title'))).toEqual(['tit'])
+    expect(copies(source.indexOf('title'))).toEqual(['tit'])
+  })
 })

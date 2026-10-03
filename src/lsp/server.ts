@@ -39,6 +39,7 @@ export class KayLanguageServer {
   private root = ''
   private routesDir = ''
   private shadowTree = ''
+  private rootUri = ''
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
   private diagnosticsTimer?: Timer
@@ -81,6 +82,7 @@ export class KayLanguageServer {
     this.root = rootUri ? fileURLToPath(rootUri) : resolve(params.rootPath ?? process.cwd())
     this.routesDir = resolve(this.root, params.initializationOptions?.routes ?? 'src/routes')
     this.shadowTree = `${pathToFileURL(resolve(this.root, SHADOW_DIR)).href}/`
+    this.rootUri = `${pathToFileURL(this.root).href}/`
     await writeShadowTypes(this.root, { routes: params.initializationOptions?.routes })
 
     const child = Bun.spawn([process.execPath, TSGO, '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
@@ -269,7 +271,7 @@ export class KayLanguageServer {
     if (!target)
       return null
 
-    const found = await this.across(target.params, async at => await this.server.request<Location[] | null>('textDocument/references', { ...at, context: params.context }) ?? [])
+    const { found } = await this.across(target.params, async at => await this.server.request<Location[] | null>('textDocument/references', { ...at, context: params.context }) ?? [])
 
     return uniqueBy(found.map(({ file, range }) => ({ uri: file.uri, range })), location => `${location.uri} ${rangeKey(location.range)}`)
   }
@@ -280,7 +282,7 @@ export class KayLanguageServer {
     if (!target)
       return null
 
-    const found = await this.across(target.params, async (at) => {
+    const { found } = await this.across(target.params, async (at) => {
       const highlights = await this.server.request<DocumentHighlight[] | null>('textDocument/documentHighlight', at) ?? []
 
       return highlights.map(highlight => ({ ...highlight, uri: at.textDocument.uri }))
@@ -325,22 +327,33 @@ export class KayLanguageServer {
       return null
 
     // References follow a name through generated code where a rename stops, and editing each of them renames it whole, a server value's reads in the template included.
-    const found = await this.across(target.params, async at => await this.server.request<Location[] | null>('textDocument/references', { ...at, context: { includeDeclaration: true } }) ?? [])
-    const changes: Record<string, TextEdit[]> = {}
+    const { found, complete } = await this.across(target.params, async at => await this.server.request<Location[] | null>('textDocument/references', { ...at, context: { includeDeclaration: true } }) ?? [])
+
+    // A rename that stopped short would leave the code broken, so none is better.
+    if (!complete)
+      throw new Error('kay: this name runs through too much generated code to rename it safely')
+
+    const byFile = new Map<string, Map<string, TextEdit>>()
 
     for (const { spot, file, range } of found) {
       // Generated code repeats some of the user's names, each mapped back to where it came from: an edit is kept only where the source holds the text it replaces.
-      if (file.shadow && textAt(file.shadow.source, range) !== textAt(file.shadow.tsx, spot.range))
+      if (file.shadow ? textAt(file.shadow.source, range) !== textAt(file.shadow.tsx, spot.range) : !this.editable(file.uri))
         continue
 
-      changes[file.uri] = uniqueBy([...changes[file.uri] ?? [], { range, newText: params.newName }], change => rangeKey(change.range))
+      let edits = byFile.get(file.uri)
+
+      if (!edits)
+        byFile.set(file.uri, edits = new Map())
+
+      edits.set(rangeKey(range), { range, newText: params.newName })
     }
 
-    return { changes }
+    return { changes: Object.fromEntries([...byFile].map(([uri, edits]) => [uri, [...edits.values()]])) }
   }
 
   // Generated code joins names TypeScript sees apart, such as a server value and the template's reads of it through `__props`: wherever an answer lands in generated code, the question is asked again from there.
-  private async across<Spot extends { uri: string, range: Range }>(start: TextDocumentPositionParams, ask: (at: TextDocumentPositionParams) => Promise<Spot[]>): Promise<{ spot: Spot, file: Target, range: Range }[]> {
+  // Not `complete` once it gave up following them, past `MAX_HOPS`.
+  private async across<Spot extends { uri: string, range: Range }>(start: TextDocumentPositionParams, ask: (at: TextDocumentPositionParams) => Promise<Spot[]>): Promise<{ found: { spot: Spot, file: Target, range: Range }[], complete: boolean }> {
     const files = new Map<string, Promise<Target | undefined>>()
     const known = new Set<string>([positionKey(start.textDocument.uri, start.position)])
     const queue = [start]
@@ -349,10 +362,13 @@ export class KayLanguageServer {
     const visit = (uri: string, position: Position) => {
       const key = positionKey(uri, position)
 
-      if (!known.has(key) && hops++ < MAX_HOPS)
-        queue.push({ textDocument: { uri }, position })
+      if (known.has(key))
+        return
 
       known.add(key)
+
+      if (++hops <= MAX_HOPS)
+        queue.push({ textDocument: { uri }, position })
     }
 
     for (let at = queue.pop(); at; at = queue.pop()) {
@@ -383,7 +399,12 @@ export class KayLanguageServer {
       }
     }
 
-    return found
+    return { found, complete: hops <= MAX_HOPS }
+  }
+
+  // A file a rename may change besides .kay files: one of the project's own.
+  private editable(uri: string): boolean {
+    return uri.startsWith(this.rootUri) && !uri.includes('/node_modules/')
   }
 
   // Undefined for the declarations kay generates beside the shadow files.
@@ -501,13 +522,16 @@ function rangeKey({ start, end }: Range): string {
 }
 
 function uniqueBy<Item>(items: Item[], key: (item: Item) => string): Item[] {
-  const seen = new Set<string>()
+  const byKey = new Map<string, Item>()
 
-  return items.filter((item) => {
+  for (const item of items) {
     const found = key(item)
 
-    return !seen.has(found) && Boolean(seen.add(found))
-  })
+    if (!byKey.has(found))
+      byKey.set(found, item)
+  }
+
+  return [...byKey.values()]
 }
 
 function mapInsertReplace(document: ShadowFile, edit: { insert: Range, replace: Range }): { insert: Range, replace: Range } | undefined {
