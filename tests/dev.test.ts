@@ -1,4 +1,5 @@
 import type { Subprocess } from 'bun'
+import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -41,7 +42,8 @@ describe('kay dev', () => {
       await until(() => children.length === 2)
 
       expect(children[0]!.killed).toBe(true)
-      expect(await Bun.file(join(root, '.kay/types/src/routes/about.kay.tsx')).exists()).toBe(true)
+      // The new server starts first; the types follow it.
+      await until(() => existsSync(join(root, '.kay/types/src/routes/about.kay.tsx')))
     }
     finally {
       await stop()

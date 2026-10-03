@@ -1,9 +1,12 @@
 import type { BunPlugin } from 'bun'
-import { rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
+import { mapStack } from '../src/build/sourcemap'
+import { transformKayCached } from '../src/build/transform'
 import { buildClient } from '../src/server/client'
 
 const root = join(import.meta.dir, 'fixtures/islands')
@@ -54,6 +57,32 @@ describe('kay build', () => {
     }
     finally {
       await rm(join(root, '.kay'), { recursive: true, force: true })
+    }
+  })
+})
+
+describe('compile cache', () => {
+  it('serves an unchanged file from the cache, recompiles a changed one, and still maps its stacks', async () => {
+    const cacheDir = await mkdtemp(join(tmpdir(), 'kay-cache-'))
+    const file = join(cacheDir, 'boom.kay')
+    const source = '--- server\nconst kaboom = () => {\n  throw new Error(\'boom\')\n}\nkaboom()\n---\np never\n'
+    const options = { target: 'ssr', cacheDir } as const
+
+    try {
+      const compiled = await transformKayCached(source, file, options)
+      const line = compiled.split('\n').findIndex(text => text.includes('throw new Error'))
+      const frame = `at kaboom (${file}:${line + 1}:${compiled.split('\n')[line]!.indexOf('throw') + 1})`
+      const mapped = mapStack(frame)
+
+      expect(mapped).toBe(`at kaboom (${file}:3:3)`)
+      expect(await transformKayCached(source, file, options)).toBe(compiled)
+      // A cache hit registers maps that only compile when a stack needs them.
+      expect(mapStack(frame)).toBe(mapped)
+      expect(await transformKayCached(source.replace('never', 'changed'), file, options)).toContain('changed')
+      expect(await readdir(cacheDir)).toEqual([expect.stringMatching(/-ssr\.json$/)])
+    }
+    finally {
+      await rm(cacheDir, { recursive: true, force: true })
     }
   })
 })

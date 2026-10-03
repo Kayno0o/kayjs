@@ -7,8 +7,7 @@ import process from 'node:process'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { kay } from '../build/plugin'
 import { styleImports, withoutStyles } from '../build/styles'
-import { KayCompileError } from '../build/transform'
-import { compileKay } from '../compiler'
+import { analyzeKayCached, KayCompileError } from '../build/transform'
 
 // Written beside the bundle as `manifest.json`, so a production server reads it instead of bundling at boot.
 export interface ClientManifest {
@@ -72,9 +71,12 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   const files = await findKayFiles(root)
   const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
+  const cacheDir = join(root, '.kay', 'cache')
+  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir)))
+
   for (const [index, file] of files.entries()) {
     const source = sources[index]!
-    const compiled = compileKay(source, file, { root })
+    const compiled = analyses[index]!
 
     for (const diagnostic of compiled.diagnostics)
       diagnostics.push({ ...diagnostic, file, source })
@@ -156,7 +158,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which shipped Solid's dev build.
     define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') },
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
-    plugins: [withoutStyles(), kay({ target: 'dom', root }), ...options.plugins ?? []],
+    plugins: [withoutStyles(), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache') }), ...options.plugins ?? []],
   })
 
   if (!build.success)

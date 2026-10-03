@@ -1,6 +1,6 @@
 import type { BunPlugin } from 'bun'
 import { dirname, sep } from 'node:path'
-import { compileKay } from '../compiler'
+import { parseKay } from '../compiler/parser'
 
 const KAY_FILE = /\.kay$/
 const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
@@ -44,9 +44,11 @@ export function styleImports(root: string): BunPlugin {
     name: 'kay-styles',
     setup(build) {
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => {
-        const { tsx } = compileKay(await Bun.file(path).text(), path, { root, includeServer: false })
+        // A component's imports all sit in its script; the server fence is left out.
+        const source = await Bun.file(path).text()
+        const script = parseKay(source).script
 
-        return { contents: imports(tsx, path, 'tsx'), loader: 'js' }
+        return { contents: script ? imports(source.slice(script.start, script.end), path, 'ts') : '', loader: 'js' }
       })
       build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => ({ contents: imports(await Bun.file(path).text(), path, scriptLoader(path)), loader: 'js' }))
       // `url(/logo.png)` points at a public file the server serves as is.

@@ -1,14 +1,27 @@
+import type traverseModule from '@babel/traverse'
 import type { NodePath, Scope } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic } from './ast'
 import type { Rewrite, SourceMap } from './mapping'
 import type { PropsBinding } from './script'
+import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
-import traverseModule from '@babel/traverse'
 import { defaultName } from './codegen'
 
-const traverse = (traverseModule as unknown as { default?: typeof traverseModule }).default ?? traverseModule
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
+const require = createRequire(import.meta.url)
+let loadedTraverse: typeof traverseModule | undefined
+
+// Loading it takes longer than most compiles, so a server whose `.kay` files all come from the compile cache never does; `kay dev` loads it ahead of time.
+export function loadTraverse(): typeof traverseModule {
+  loadedTraverse ??= (require('@babel/traverse') as { default: typeof traverseModule }).default
+
+  return loadedTraverse
+}
+
+function traverse(...args: Parameters<typeof traverseModule>): void {
+  loadTraverse()(...args)
+}
 
 export type Rewrites = Map<number, Rewrite & { end: number }>
 

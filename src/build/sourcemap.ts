@@ -19,16 +19,28 @@ const VLQ_CONTINUATION = 32
 const VLQ_VALUE = 31
 
 // Bun reports positions in the JavaScript a plugin returns and ignores any source map with it, so kay maps `.kay` frames itself.
-const compiled = new Map<string, Compiled>()
+// A file the compile cache served compiles again for its maps only when a stack needs them.
+const compiled = new Map<string, Compiled | (() => Compiled)>()
 
-export function registerSourceMap(file: string, entry: Omit<Compiled, 'lines'>): void {
+export function registerSourceMap(file: string, entry: Omit<Compiled, 'lines'> | (() => Omit<Compiled, 'lines'>)): void {
   compiled.set(file, entry)
+}
+
+function compiledFor(file: string): Compiled | undefined {
+  let entry = compiled.get(file)
+
+  if (typeof entry === 'function') {
+    entry = entry()
+    compiled.set(file, entry)
+  }
+
+  return entry
 }
 
 // Points every `.kay` frame of a stack at the line and column of the `.kay` source; other frames are left as they are.
 export function mapStack(stack: string): string {
   return stack.replace(KAY_FRAME, (frame, file: string, line: string, column: string) => {
-    const module = compiled.get(file)
+    const module = compiledFor(file)
     const position = module && toKay(module, Number(line), Number(column))
 
     return position ? `${file}:${position.line}:${position.column}` : frame
