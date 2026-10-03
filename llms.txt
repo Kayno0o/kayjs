@@ -188,7 +188,7 @@ import logo from '../logo.png'
 img(src={logo} alt="Logo")
 ```
 
-The URL, such as `/_kay/assets/logo-2k1v9.png`, is named after the file's content and served with a year of immutable caching, so a changed file gets a new URL; the server and islands render the same one, and `kay build` writes every file the pages import, through their modules and server fences too. A file to serve at a fixed path, such as `robots.txt`, goes in `public/` instead. These imports are kay's own: a build plugin of the project for the same extensions, such as one inlining SVG, does not apply to them.
+The URL, such as `/_kay/assets/logo-2k1v9.png`, is named after the file's content and served with a year of immutable caching, so a changed file gets a new URL; the server and islands render the same one, and `kay build` writes every file the pages import, through their modules and server fences too. A file to serve at a fixed path, such as `robots.txt`, goes in `public/` instead. The extension may be upper case, `logo.PNG`; `kay check` types the lower and upper case spellings only. These imports are kay's own: a build plugin of the project for the same extensions, such as one inlining SVG, does not apply to them.
 
 ## Islands
 
@@ -411,7 +411,7 @@ it('shows why a todo was refused', async () => {
 ## What `kay check` verifies
 
 - Every expression, prop and server name, as TypeScript does.
-- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/` and the GET routes of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a plain `string`, relative paths, `//host` and other schemes are not checked.
+- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/` and the GET routes of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a catch-all such as `docs/[...path]` is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
 - Island props passed from static components are JSON-serializable.
 
@@ -434,7 +434,7 @@ declare module 'kay' {
 
 Registering `app` lets links and redirects point at the app's own GET routes, such as `/feed.xml`, which `kay check` otherwise reports as served by no page.
 
-Project settings live in an optional `kay.config.ts` at the root, read by `pages()` and every command; options passed to `pages()` win over it.
+Project settings live in an optional `kay.config.ts` at the root, read by `pages()` and every command; options passed to `pages()` win over it, unless `undefined`. It must `export default` its config, or the command fails with a message saying so.
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -482,9 +482,11 @@ new Elysia()
 
 ## Commands
 
-- `kay new <dir> [--kay <dependency>]`: scaffold a project in an empty directory; `--kay` sets the `kay` dependency, by default `npm:@kaynooo/kay@^<its version>`, or a packed copy when run from a checkout of kay.
-- `kay dev [entry]`: run the server entry (default `src/server.ts`) with `NODE_ENV=development`, restarting it on every change; open pages reload by themselves, and a project that fails to compile shows its errors in the browser. The next server process waits with kay already loaded, and compiled files are kept in `.kay/cache`, so a restart compiles only the file that changed. A change to a file at the project root, such as `.env` or `package.json`, starts a fresh process.
+- `kay new <dir> [--kay <dependency>]`: scaffold a project in an empty directory; `--kay` sets the `kay` dependency, by default `npm:@kaynooo/kay@^<its version>`, or a packed copy when run from a checkout of kay. The package is named after the directory, lower case with other characters turned into `-`.
+- `kay dev [entry]`: run the server entry (default `src/server.ts`) with `NODE_ENV=development`, restarting it on every change; open pages reload by themselves, and a project that fails to compile shows its errors in the browser. The next server process waits with kay already loaded, and compiled files are kept in `.kay/cache`, so a restart compiles only the file that changed. A change to a file at the project root, such as `.env` or `package.json`, starts a fresh process, which reads the new `.env` values (variables set in the shell still win, unless they equal the file's value).
 - `kay build [dir]`: bundle the islands and stylesheets for production, minified, into `.kay/client`, and render the pages marked `prerender`; then start the server with `NODE_ENV=production`. Each page preloads the chunks of the islands it renders.
-- `kay check [dir] [-p tsconfig.json]`: type-check the project, `.kay` files included.
+- `kay check [dir] [-p tsconfig.json]`: type-check the project, `.kay` files included; `-p` is relative to `dir`, and a tsconfig that is missing or matches no files fails the check.
 - `kay fmt [paths...] [--check]`: format `.kay` files; `--check` lists unformatted files and fails.
 - `kay lsp --stdio`: the language server behind the editor extension in `editors/vscode`: errors, hover, completion with auto-import, signatures, definitions, references, rename, quick fixes and formatting in `.kay` files. An import it adds goes in the fence the name is used from, the server fence for server code and the component script otherwise, made if missing. Renaming a server value renames its reads in the template, and renaming a destructured prop renames it in every parent passing it.
+
+Every command prints its usage for `--help` or `-h`, and refuses an option or argument it does not take. `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.

@@ -27,6 +27,94 @@ async function installKay(dir: string) {
   expect(await emit.exited).toBe(0)
 }
 
+async function kay(args: string[], cwd?: string): Promise<{ stdout: string, stderr: string, code: number }> {
+  const child = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), ...args], { cwd, stdout: 'pipe', stderr: 'pipe' })
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  return { stdout, stderr, code }
+}
+
+describe('kay command line', () => {
+  it('prints the usage for --help and -h on every command, without running it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+
+    try {
+      for (const args of [['--help'], ['-h'], ['build', '--help'], ['check', '-h'], ['new', '--help'], ['fmt', '--help'], ['dev', '--help'], ['lsp', '--help']]) {
+        const { stdout, stderr, code } = await kay(args, dir)
+
+        expect({ args, stdout: stdout.startsWith('Usage: kay new'), stderr, code }).toEqual({ args, stdout: true, stderr: '', code: 0 })
+      }
+
+      expect(await readdir(dir)).toEqual([])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses an option or an argument a command does not take, with the usage', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+
+    try {
+      for (const args of [['new', '--bogus', 'app'], ['fmt', '--bogus'], ['build', '--bogus'], ['check', '--bogus'], ['dev', '--bogus'], ['build', 'a', 'b'], ['check', '-p'], ['new', 'a', 'b']]) {
+        const { stdout, stderr, code } = await kay(args, dir)
+
+        expect({ args, stdout, usage: stderr.includes('Usage: kay new'), code }).toEqual({ args, stdout: '', usage: true, code: 1 })
+      }
+
+      expect(await readdir(dir)).toEqual([])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a missing or non-.kay path of kay fmt, without a stack and without touching the file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+
+    try {
+      await Bun.write(join(dir, 'notes.txt'), 'ul\n    li One\n')
+
+      expect(await kay(['fmt', 'notes.txt'], dir)).toEqual({ stdout: '', stderr: 'kay fmt: notes.txt is not a .kay file\n', code: 1 })
+      expect(await kay(['fmt', 'nope.kay'], dir)).toEqual({ stdout: '', stderr: 'kay fmt: nope.kay does not exist\n', code: 1 })
+      expect(await Bun.file(join(dir, 'notes.txt')).text()).toBe('ul\n    li One\n')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('scaffolds a directory name holding spaces and braces as a valid package, a literal title and a quoted cd line', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+
+    try {
+      const { stderr, code } = await kay(['new', 'my app {x}', '--kay', '^1.0.0'], dir)
+      const manifest = await Bun.file(join(dir, 'my app {x}/package.json')).json() as { name: string }
+
+      expect(code).toBe(0)
+      expect(manifest.name).toBe('my-app-x')
+      expect(await Bun.file(join(dir, 'my app {x}/src/routes/_layout.kay')).text()).toContain('title my-app-x\n')
+      expect(stderr).toContain('cd \'my app {x}\' && bun install')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses to scaffold over a file with a message', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+
+    try {
+      await Bun.write(join(dir, 'afile'), 'x')
+
+      expect(await kay(['new', 'afile'], dir)).toEqual({ stdout: '', stderr: 'kay: afile is not a directory\n', code: 1 })
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('kay new', () => {
   it('scaffolds a project that type-checks against the declarations of kay, is formatted and builds as it is', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')

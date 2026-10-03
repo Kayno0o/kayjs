@@ -1,10 +1,12 @@
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 
 // The kay this command runs from: a git checkout, which a new project depends on a packed copy of, or the published package.
 const KAY_ROOT = resolve(import.meta.dir, '..')
+const INVALID_NAME_CHARS = /[^a-z0-9._~-]+/g
+const NAME_EDGES = /^[-._~]+|[-._~]+$/g
 const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
 
 // Written as strings rather than template files, which the repository's own `.kay` scans would pick up.
@@ -99,10 +101,13 @@ export interface NewOptions {
 export async function createProject(target: string, options: NewOptions = {}): Promise<string[]> {
   const dir = resolve(target)
 
+  if (existsSync(dir) && !statSync(dir).isDirectory())
+    throw new Error(`kay: ${target} is not a directory`)
+
   if (existsSync(dir) && (await readdir(dir)).length > 0)
     throw new Error(`kay: ${target} is not empty`)
 
-  const name = basename(dir)
+  const name = packageName(basename(dir))
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
   const dependency = options.kay ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@^${kay.version}`)
   const files: Record<string, string> = {
@@ -136,6 +141,11 @@ export async function createProject(target: string, options: NewOptions = {}): P
   await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content.replaceAll('__NAME__', name))))
 
   return Object.keys(files).sort()
+}
+
+// What a directory name becomes as a package name, which is also safe to write into a template: lower case letters, digits and `-._~`.
+function packageName(directory: string): string {
+  return directory.toLowerCase().replace(INVALID_NAME_CHARS, '-').replace(NAME_EDGES, '') || 'app'
 }
 
 // A packed copy installs like a published package, its dependencies only; a `file:` folder would drag in its devDependencies too.

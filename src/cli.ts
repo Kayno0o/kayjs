@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
+import type { ParseArgsOptionsConfig } from 'node:util'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
+import { parseArgs } from 'node:util'
 import { KayCompileError } from './build/transform'
 import { check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
@@ -12,12 +14,52 @@ import { createProject } from './new'
 import { buildClient } from './server/client'
 import { prerenderPages } from './server/prerender'
 
+const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 const USAGE = 'Usage: kay new <dir> [--kay <dependency>]\n       kay dev [entry]\n       kay build [dir]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+
+interface Parsed {
+  values: Record<string, string | boolean | undefined>
+  positionals: string[]
+}
+
+// What a command's arguments hold, or the exit code once the usage was printed: to stdout for `--help`, to stderr for an option or argument the command does not take.
+function parseCommand(args: string[], options: ParseArgsOptionsConfig, maxPositionals: number): Parsed | number {
+  try {
+    const { values, positionals } = parseArgs({ args, options: { ...options, help: { type: 'boolean', short: 'h' } }, allowPositionals: true })
+
+    if (values.help) {
+      console.log(USAGE)
+
+      return 0
+    }
+
+    if (positionals.length > maxPositionals)
+      throw new Error(`unexpected argument ${positionals[maxPositionals]}`)
+
+    return { values, positionals }
+  }
+  catch (error) {
+    console.error(`kay: ${error instanceof Error ? error.message : error}\n${USAGE}`)
+
+    return 1
+  }
+}
 
 async function main(args: string[]): Promise<number> {
   const [command, ...rest] = args
 
+  if (command === '--help' || command === '-h') {
+    console.log(USAGE)
+
+    return 0
+  }
+
   if (command === 'lsp') {
+    const parsed = parseCommand(rest, { stdio: { type: 'boolean' } }, 0)
+
+    if (typeof parsed === 'number')
+      return parsed
+
     await startServer(Bun.stdin.stream(), data => void process.stdout.write(data))
 
     return 0
@@ -27,10 +69,10 @@ async function main(args: string[]): Promise<number> {
     return fmt(rest)
 
   if (command === 'dev')
-    return runDev(rest[0])
+    return runDev(rest)
 
   if (command === 'build')
-    return build(rest[0] ?? '.')
+    return build(rest)
 
   if (command === 'new')
     return scaffold(rest)
@@ -41,17 +83,17 @@ async function main(args: string[]): Promise<number> {
     return 1
   }
 
-  const projectFlag = rest.indexOf('-p')
-  const tsconfig = projectFlag === -1 ? 'tsconfig.json' : rest[projectFlag + 1]
-  const dir = rest.find((arg, index) => !arg.startsWith('-') && (projectFlag === -1 || index !== projectFlag + 1)) ?? '.'
+  return runCheck(rest)
+}
 
-  if (!tsconfig) {
-    console.error(USAGE)
+async function runCheck(args: string[]): Promise<number> {
+  const parsed = parseCommand(args, { project: { type: 'string', short: 'p' } }, 1)
 
-    return 1
-  }
+  if (typeof parsed === 'number')
+    return parsed
 
-  const root = resolve(dir)
+  const tsconfig = typeof parsed.values.project === 'string' ? parsed.values.project : 'tsconfig.json'
+  const root = resolve(parsed.positionals[0] ?? '.')
   const { routes, publicDir } = await loadConfig(root)
   const diagnostics = await check(root, { tsconfig, routes, publicDir })
 
@@ -71,8 +113,13 @@ async function main(args: string[]): Promise<number> {
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
-async function build(dir: string): Promise<number> {
-  const root = resolve(dir)
+async function build(args: string[]): Promise<number> {
+  const parsed = parseCommand(args, {}, 1)
+
+  if (typeof parsed === 'number')
+    return parsed
+
+  const root = resolve(parsed.positionals[0] ?? '.')
   const config = await loadConfig(root)
   const started = performance.now()
 
@@ -96,19 +143,23 @@ function count(amount: number, noun: string): string {
 }
 
 async function scaffold(args: string[]): Promise<number> {
-  const kayFlag = args.indexOf('--kay')
-  const dir = args.find((arg, index) => !arg.startsWith('-') && (kayFlag === -1 || index !== kayFlag + 1))
+  const parsed = parseCommand(args, { kay: { type: 'string' } }, 1)
 
-  if (!dir || (kayFlag !== -1 && !args[kayFlag + 1])) {
+  if (typeof parsed === 'number')
+    return parsed
+
+  const dir = parsed.positionals[0]
+
+  if (!dir) {
     console.error(USAGE)
 
     return 1
   }
 
   try {
-    const files = await createProject(dir, { kay: kayFlag === -1 ? undefined : args[kayFlag + 1] })
+    const files = await createProject(dir, { kay: typeof parsed.values.kay === 'string' ? parsed.values.kay : undefined })
 
-    console.error(`${files.map(file => `created ${join(dir, file)}`).join('\n')}\n\ncd ${dir} && bun install && bun run dev`)
+    console.error(`${files.map(file => `created ${join(dir, file)}`).join('\n')}\n\ncd ${shellQuote(dir)} && bun install && bun run dev`)
 
     return 0
   }
@@ -119,10 +170,20 @@ async function scaffold(args: string[]): Promise<number> {
   }
 }
 
+// A path pasted into a shell line, quoted when it holds anything the shell would read.
+function shellQuote(path: string): string {
+  return SHELL_SAFE.test(path) ? path : `'${path.replaceAll('\'', '\'\\\'\'')}'`
+}
+
 // Restarts the server on every change until interrupted.
-async function runDev(entry: string | undefined): Promise<number> {
+async function runDev(args: string[]): Promise<number> {
+  const parsed = parseCommand(args, {}, 1)
+
+  if (typeof parsed === 'number')
+    return parsed
+
   const { routes, publicDir } = await loadConfig(process.cwd())
-  const stop = await dev(process.cwd(), { entry, routes, publicDir })
+  const stop = await dev(process.cwd(), { entry: parsed.positionals[0], routes, publicDir })
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)
@@ -145,9 +206,25 @@ async function readSource(file: string): Promise<string | undefined> {
 
 // Formats in place, or with `--check` lists the files that are not formatted and fails.
 async function fmt(args: string[]): Promise<number> {
-  const write = !args.includes('--check')
-  const paths = args.filter(arg => !arg.startsWith('-'))
-  const { changed, errors } = await formatFiles(paths.length > 0 ? paths : ['.'], { write })
+  const parsed = parseCommand(args, { check: { type: 'boolean' } }, Infinity)
+
+  if (typeof parsed === 'number')
+    return parsed
+
+  const write = !parsed.values.check
+  const { positionals: paths } = parsed
+  let result: Awaited<ReturnType<typeof formatFiles>>
+
+  try {
+    result = await formatFiles(paths.length > 0 ? paths : ['.'], { write })
+  }
+  catch (error) {
+    console.error(error instanceof Error ? error.message : error)
+
+    return 1
+  }
+
+  const { changed, errors } = result
 
   for (const { file, source, diagnostics } of errors) {
     for (const diagnostic of diagnostics)

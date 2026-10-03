@@ -142,3 +142,25 @@ describe('formatFiles', () => {
     }
   })
 })
+
+describe('formatFiles, explicit paths', () => {
+  it('throws before writing when a path is missing or not a .kay file, and searches a directory named dist below its root', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-fmt-'))
+
+    try {
+      await Bun.write(join(dir, 'notes.txt'), 'ul\n    li One\n')
+      await Bun.write(join(dir, 'page.kay'), 'ul\n    li One\n')
+      await Bun.write(join(dir, 'src/dist/inner.kay'), 'ul\n    li One\n')
+      await Bun.write(join(dir, 'dist/out.kay'), 'ul\n    li One\n')
+
+      await expect(formatFiles([join(dir, 'page.kay'), join(dir, 'notes.txt')], { write: true })).rejects.toThrow('notes.txt is not a .kay file')
+      await expect(formatFiles([join(dir, 'nope.kay')], { write: true })).rejects.toThrow('nope.kay does not exist')
+      expect(await Bun.file(join(dir, 'notes.txt')).text()).toBe('ul\n    li One\n')
+      expect(await Bun.file(join(dir, 'page.kay')).text()).toBe('ul\n    li One\n')
+      expect((await formatFiles([dir], { write: false })).changed).toEqual([join(dir, 'page.kay'), join(dir, 'src/dist/inner.kay')])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
