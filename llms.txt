@@ -389,7 +389,7 @@ it('shows why a todo was refused', async () => {
 
 ## Project setup
 
-`kay new my-app` writes a project that already checks, builds and runs: this setup, a layout, a page, a `_404.kay` and an island. By hand, the server entry is:
+kay is published as `@kaynooo/kay` to the registry at `https://git.kaynooo.fr/api/packages/kaynooo/npm/` and installed under the name its imports use: `"kay": "npm:@kaynooo/kay@^0.1.0"` in `package.json`, with `@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/` in the project's `.npmrc`. `bunx -p @kaynooo/kay kay new my-app` writes a project that already checks, builds and runs, both of those included: this setup, a layout, a page, a `_404.kay` and an island. By hand, the server entry is:
 
 ```ts
 import { Elysia } from 'elysia'
@@ -446,7 +446,7 @@ new Elysia()
 
 ## Commands
 
-- `kay new <dir> [--kay <dependency>]`: scaffold a project in an empty directory; `--kay` sets the `kay` dependency, a packed copy of this checkout by default.
+- `kay new <dir> [--kay <dependency>]`: scaffold a project in an empty directory; `--kay` sets the `kay` dependency, by default `npm:@kaynooo/kay@^<its version>`, or a packed copy when run from a checkout of kay.
 - `kay dev [entry]`: run the server entry (default `src/server.ts`) with `NODE_ENV=development`, restarting it on every change; open pages reload by themselves, and a project that fails to compile shows its errors in the browser.
 - `kay build [dir]`: bundle the islands and stylesheets for production, minified, into `.kay/client`, and render the pages marked `prerender`; then start the server with `NODE_ENV=production`. Each page preloads the chunks of the islands it renders.
 - `kay check [dir] [-p tsconfig.json]`: type-check the project, `.kay` files included.

@@ -17,7 +17,8 @@ async function installKay(dir: string) {
 
   await mkdir(kay, { recursive: true })
   await Promise.all([
-    ...(await readdir(join(repo, 'node_modules'))).map(async name => symlink(join(repo, 'node_modules', name), join(modules, name))),
+    // The checkout's own `kay` is a link back to it, which the packed copy below replaces.
+    ...(await readdir(join(repo, 'node_modules'))).filter(name => name !== 'kay').map(async name => symlink(join(repo, 'node_modules', name), join(modules, name))),
     ...['package.json', 'src'].map(async name => symlink(join(repo, name), join(kay, name))),
   ])
 
@@ -35,6 +36,7 @@ describe('kay new', () => {
       const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
 
       expect(files).toContain('src/routes/index.kay')
+      expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.dependencies.kay).toBe('^1.0.0')
       expect(await Bun.file(join(dir, 'src/routes/_layout.kay')).text()).toContain('title my-app')
 

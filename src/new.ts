@@ -3,12 +3,15 @@ import { readdir } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 
-// The checkout this command runs from, which a new project depends on until kay is published.
+// The kay this command runs from: a git checkout, which a new project depends on a packed copy of, or the published package.
 const KAY_ROOT = resolve(import.meta.dir, '..')
+const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
 
 // Written as strings rather than template files, which the repository's own `.kay` scans would pick up.
 const FILES: Record<string, string> = {
   '.gitignore': 'node_modules\n.kay\n',
+  // kay is published to this registry as `@kaynooo/kay`, installed under the name `kay` its imports use.
+  '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
   // Lets test files import pages and their actions.
   'bunfig.toml': '[test]\npreload = ["kay/test/preload"]\n',
   'tests/home.test.ts': `import { expect, it } from 'bun:test'
@@ -81,7 +84,7 @@ button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times
 }
 
 export interface NewOptions {
-  // The \`kay\` dependency, \`file:\` this checkout unless given.
+  // The \`kay\` dependency: by default the published kay running this command, or a packed copy of the checkout running it.
   kay?: string
 }
 
@@ -93,8 +96,8 @@ export async function createProject(target: string, options: NewOptions = {}): P
     throw new Error(`kay: ${target} is not empty`)
 
   const name = basename(dir)
-  const dependency = options.kay ?? await packKay(join(dir, 'vendor'))
-  const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string> }
+  const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
+  const dependency = options.kay ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@^${kay.version}`)
   const files: Record<string, string> = {
     ...FILES,
     'package.json': `${JSON.stringify({

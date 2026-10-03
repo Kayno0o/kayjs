@@ -1,8 +1,7 @@
 {
-  "name": "kay",
+  "name": "@kaynooo/kay",
   "type": "module",
   "version": "0.0.0",
-  "private": true,
   "description": "Pug-like, fully typed web framework on Bun, Elysia, pg-orm and Solid's runtime",
   "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
   "license": "MIT",
@@ -97,6 +96,7 @@
     "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.2",
     "bun-plugin-tailwind": "^0.1.2",
+    "kay": "link:.",
     "mitata": "1.0.34",
     "playwright-core": "1.62.0",
     "tailwindcss": "^4.3.3",
