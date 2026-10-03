@@ -1,7 +1,6 @@
 import type { Subprocess } from 'bun'
 import type { FSWatcher } from 'node:fs'
-import { watch } from 'node:fs'
-import { readdir } from 'node:fs/promises'
+import { readdirSync, statSync, watch } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { IGNORED_DIRS } from '../build/files'
@@ -36,7 +35,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let startupChanged = false
   let restarting: Promise<void> | undefined
 
-  const spawn = () => Bun.spawn([process.execPath, '--preload', SPARE, entry], { cwd: root, env: { ...process.env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
+  const env = await environmentWithoutDotenv()
+  const spawn = () => Bun.spawn([process.execPath, '--preload', SPARE, entry], { cwd: root, env: { ...env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
   // Each restart takes the process waiting with kay loaded, and readies the next one.
   const start = () => {
     if (startupChanged || spare === undefined || spare.exitCode !== null) {
@@ -67,7 +67,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     restarting = undefined
   }
-  const watchers = await watchProject(root, (file) => {
+  const stopWatching = watchProject(root, (file) => {
     startupChanged ||= STARTUP_FILE.test(file)
     clearTimeout(timer)
     timer = setTimeout(() => {
@@ -81,8 +81,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
   return async () => {
     clearTimeout(timer)
-    for (const watcher of watchers)
-      watcher.close()
+    stopWatching()
     await restarting
     child?.kill()
     spare?.kill()
@@ -100,12 +99,68 @@ async function regenerateTypes(root: string, { routes, publicDir }: DevOptions) 
   }
 }
 
-// One recursive watcher per top-level directory, so dependencies and generated output are never walked.
-// `onChange` gets the changed path relative to the root.
-async function watchProject(root: string, onChange: (file: string) => void): Promise<FSWatcher[]> {
-  const entries = await readdir(root, { withFileTypes: true })
+// What Bun loaded from the `.env` files of the directory this process started in, as it read them then: the child loads them again, but never over a variable already set.
+// A variable the shell set to the very value its `.env` holds cannot be told from one the file set, and follows the file.
+async function environmentWithoutDotenv(): Promise<Record<string, string | undefined>> {
+  const probe = Bun.spawn([process.execPath, '-e', 'console.log(JSON.stringify(process.env))'], { cwd: process.cwd(), env: process.env.NODE_ENV === undefined ? {} : { NODE_ENV: process.env.NODE_ENV }, stdout: 'pipe', stderr: 'ignore' })
+  const [output, code] = await Promise.all([new Response(probe.stdout).text(), probe.exited])
 
-  return entries
-    .filter(entry => entry.isDirectory() ? !IGNORED_DIRS.has(entry.name) && !entry.name.startsWith('.') : !entry.name.startsWith('.') || entry.name.startsWith('.env'))
-    .map(entry => watch(join(root, entry.name), { recursive: entry.isDirectory() }, (_event, file) => onChange(entry.isDirectory() ? `${entry.name}/${file ?? ''}` : entry.name)))
+  if (code !== 0)
+    return process.env
+
+  const loaded = JSON.parse(output) as Record<string, string>
+
+  return Object.fromEntries(Object.entries(process.env).filter(([key, value]) => loaded[key] !== value))
+}
+
+// A directory or file at the project root worth reacting to; dependencies, build output and hidden entries, `.env` files apart, are not.
+function watchedName(name: string): boolean {
+  return !IGNORED_DIRS.has(name) && (!name.startsWith('.') || name.startsWith('.env'))
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false
+  }
+  catch {
+    return false
+  }
+}
+
+// The root itself is watched, not recursively, for the entries it gains and loses, and each top-level directory recursively, so dependencies and generated output are never walked.
+// A directory removed and created again gets a new watcher, as the old one stays on the inode that is gone.
+// `onChange` gets the changed path relative to the root; the returned function stops watching.
+export function watchProject(root: string, onChange: (file: string) => void): () => void {
+  const directories = new Map<string, FSWatcher>()
+  const watchDirectory = (name: string) => {
+    directories.get(name)?.close()
+    directories.delete(name)
+
+    if (!isDirectory(join(root, name)))
+      return
+
+    const watcher = watch(join(root, name), { recursive: true }, (_event, file) => onChange(`${name}/${file ?? ''}`))
+
+    // Removing the directory ends the watcher with an error; the root watcher re-arms it once the directory is back.
+    watcher.on('error', () => undefined)
+    directories.set(name, watcher)
+  }
+  const rootWatcher = watch(root, (_event, name) => {
+    if (name === null || !watchedName(name))
+      return
+
+    watchDirectory(name)
+    onChange(name)
+  })
+
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (entry.isDirectory() && watchedName(entry.name))
+      watchDirectory(entry.name)
+  }
+
+  return () => {
+    rootWatcher.close()
+    for (const watcher of directories.values())
+      watcher.close()
+  }
 }
