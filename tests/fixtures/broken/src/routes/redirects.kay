@@ -1,0 +1,16 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const move = action(t.Object({}), async (_input, ctx) => ctx.redirect('/form/extra'))
+
+if (ctx.url.searchParams.has('old'))
+  ctx.redirect('/moved/away')
+
+if (ctx.url.searchParams.has('id'))
+  ctx.redirect(`/${ctx.url.searchParams.get('id')}?tab=1`, 301)
+
+if (ctx.url.searchParams.has('away'))
+  ctx.redirect('https://example.com/elsewhere')
+---
+p Moved

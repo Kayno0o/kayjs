@@ -1,6 +1,6 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
-import type { Locals } from './checks'
+import type { Locals, Redirect } from './checks'
 
 const ACTION = Symbol.for('kay.action')
 const FAILURE = Symbol.for('kay.failure')
@@ -27,7 +27,7 @@ export interface ActionContext {
   // Response status and headers, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void
   headers: Headers
-  redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => never
+  redirect: Redirect
   // `return ctx.fail(409, { message: 'Taken' })`: a plain form post goes back to its page, which reads it through `ctx.failed(action)`; a call throws an `ActionError` carrying `data`.
   fail: <const Data = undefined>(status: number, data?: Data) => Failure<Data>
 }

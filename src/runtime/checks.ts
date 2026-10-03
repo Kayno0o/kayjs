@@ -45,6 +45,9 @@ export type CheckedHref<Href extends string> = string extends Href
       ? IsRoute<PathOf<Href>> extends true ? unknown : { kayError: `No page serves ${PathOf<Href>}` }
       : unknown
 
+// `ctx.redirect`: a site path is checked like a link, so a redirect cannot point at a page that does not exist.
+export type Redirect = <const Location extends string>(location: Location & CheckedHref<Location>, status?: 301 | 302 | 303 | 307 | 308) => never
+
 type IsSerializable<T> = T extends string | number | boolean | null | undefined
   ? true
   : T extends ((...args: never[]) => unknown) | Date | Map<unknown, unknown> | Set<unknown> | RegExp | bigint | symbol

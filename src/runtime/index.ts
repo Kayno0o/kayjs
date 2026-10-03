@@ -1,7 +1,7 @@
 import type { CookieMap } from 'bun'
 import type { Setter, SignalOptions } from 'solid-js'
 import type { Action, FailureOf } from './action'
-import type { Deferred, Locals } from './checks'
+import type { Deferred, Locals, Redirect } from './checks'
 import { createSignal, getOwner, onCleanup } from 'solid-js'
 
 export interface Signal<T> {
@@ -97,7 +97,7 @@ export interface PageContext<Params extends Record<string, string> = Record<stri
   // Response status and headers of the page being rendered.
   status: (code: number) => void
   headers: Headers
-  redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => never
+  redirect: Redirect
   notFound: () => never
   // Ends with that status, 403 unless given, rendering the nearest `_error.kay` with `message`.
   deny: (status?: number, message?: string) => never
@@ -142,5 +142,5 @@ export type PageData<Load extends (...args: never[]) => unknown> = Awaited<Retur
 
 export type { Action, ActionContext, Failure, FailureOf, FieldName, FormFailure, ServerAction } from './action'
 export { action, ActionError, ActionRedirect, actionStub, formAction, isAction, registerActions } from './action'
-export type { AwaitProps, CheckedHref, Deferred, HydrateWhen, IslandComponent, IslandProp, Locals, LocalsOf, Register } from './checks'
+export type { AwaitProps, CheckedHref, Deferred, HydrateWhen, IslandComponent, IslandProp, Locals, LocalsOf, Redirect, Register } from './checks'
 export { staticFor } from './static'

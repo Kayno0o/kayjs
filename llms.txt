@@ -387,7 +387,7 @@ it('shows why a todo was refused', async () => {
 ## What `kay check` verifies
 
 - Every expression, prop and server name, as TypeScript does.
-- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the routes; a plain `string`, relative paths, `//host` and other schemes are not checked.
+- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the routes, as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
 - Island props passed from static components are JSON-serializable.
 
