@@ -28,5 +28,13 @@ export function defineConfig(config: KayConfig): KayConfig {
 export async function loadConfig(root: string): Promise<KayConfig> {
   const file = join(root, CONFIG_FILE)
 
-  return existsSync(file) ? (await import(file) as { default: KayConfig }).default : {}
+  if (!existsSync(file))
+    return {}
+
+  const { default: config } = await import(file) as { default?: KayConfig }
+
+  if (typeof config !== 'object' || config === null)
+    throw new Error(`kay: ${CONFIG_FILE} must export its config by default: export default defineConfig({ ... })`)
+
+  return config
 }

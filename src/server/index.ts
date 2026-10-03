@@ -21,7 +21,8 @@ export async function pages(options: PagesOptions = {}) {
   const root = resolve(options.root ?? process.cwd())
   const dev = options.dev ?? process.env.NODE_ENV === 'development'
 
-  const config = { ...await loadConfig(root), ...options, dev }
+  // An option passed as `undefined` leaves the config's value alone rather than wiping it.
+  const config = { ...await loadConfig(root), ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)), dev }
   const loadClient = async () => clientFor(root, config)
 
   if (!dev)

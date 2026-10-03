@@ -1,10 +1,20 @@
 import { mkdir, readdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
-export const IGNORED_DIRS = new Set(['node_modules', '.kay', '.git', 'dist'])
+// Never source at any depth: dependencies, kay's own output and version control.
+const ALWAYS_IGNORED = new Set(['node_modules', '.kay', '.git'])
+// The output a build leaves at the project root; anywhere deeper `dist` is an ordinary directory, `src/routes/dist` a page directory.
+const ROOT_IGNORED = new Set(['dist'])
+
+export const IGNORED_DIRS = new Set([...ALWAYS_IGNORED, ...ROOT_IGNORED])
+
+export interface FindOptions {
+  // Whether `root` is a project's, whose build output `dist` is then skipped rather than searched.
+  project?: boolean
+}
 
 // Every .kay file under `root`, skipping dependencies and generated output without walking into them.
-export async function findKayFiles(root: string): Promise<string[]> {
+export async function findKayFiles(root: string, { project = false }: FindOptions = {}): Promise<string[]> {
   const files: string[] = []
   const walk = async (dir: string) => {
     const entries = await readdir(dir, { withFileTypes: true })
@@ -13,7 +23,7 @@ export async function findKayFiles(root: string): Promise<string[]> {
       const path = join(dir, entry.name)
 
       if (entry.isDirectory()) {
-        if (!IGNORED_DIRS.has(entry.name))
+        if (!ALWAYS_IGNORED.has(entry.name) && !(project && dir === root && ROOT_IGNORED.has(entry.name)))
           await walk(path)
       }
       else if (entry.name.endsWith('.kay')) {

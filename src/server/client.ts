@@ -68,7 +68,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   const islands = new Map<string, string>()
   const classes = new Set<string>()
   const diagnostics: FileDiagnostic[] = []
-  const files = await findKayFiles(root)
+  const files = await findKayFiles(root, { project: true })
   const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
   const cacheDir = join(root, '.kay', 'cache')

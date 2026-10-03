@@ -37,8 +37,10 @@ export interface ShadowFile {
 }
 
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
-// Stylesheets import for their effect, other assets for their URL.
-const ASSET_TYPES = ['declare module \'*.css\' {}\n', ...ASSET_EXTENSIONS.map(extension => `declare module '*.${extension}' {\n  const url: string\n  export default url\n}\n`)].join('\n')
+// An error about the whole run, such as a tsconfig that does not exist.
+const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
+// Stylesheets import for their effect, other assets for their URL. TypeScript matches a wildcard module case-sensitively, so both `.png` and `.PNG` are declared; a mixed case such as `.Png` is not.
+const ASSET_TYPES = ['declare module \'*.css\' {}\n', ...ASSET_EXTENSIONS.flatMap(extension => [extension, extension.toUpperCase()]).map(extension => `declare module '*.${extension}' {\n  const url: string\n  export default url\n}\n`)].join('\n')
 
 export const TSGO = join(dirname(fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))), 'bin', 'tsgo')
 
@@ -52,7 +54,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const environmentPath = join(root, SHADOW_DIR, 'kay-env.d.ts')
   const assetsPath = join(root, SHADOW_DIR, 'kay-assets.d.ts')
 
-  for (const file of await findKayFiles(root)) {
+  for (const file of await findKayFiles(root, { project: true })) {
     const source = await Bun.file(file).text()
     const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source)
     const path = shadowPath(root, file)
@@ -135,18 +137,24 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const { files, diagnostics } = await writeShadowTypes(root, options)
   const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-  const [output, errors] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const config = resolve(root, tsconfig)
+  const reported = parseTscOutput(output, config, root)
 
   if (errors.trim() !== '')
-    diagnostics.push({ file: join(root, tsconfig), line: 1, column: 1, message: errors.trim() })
+    diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })
 
-  for (const diagnostic of parseTscOutput(output, root))
+  for (const diagnostic of reported)
     diagnostics.push(remap(diagnostic, files))
+
+  // A failing run that reported nothing must not pass for a clean one.
+  if (code !== 0 && reported.length === 0 && errors.trim() === '')
+    diagnostics.push({ file: config, line: 1, column: 1, message: `tsgo exited with code ${code} and no diagnostics` })
 
   return diagnostics
 }
 
-function parseTscOutput(output: string, root: string): CheckDiagnostic[] {
+function parseTscOutput(output: string, config: string, root: string): CheckDiagnostic[] {
   const diagnostics: CheckDiagnostic[] = []
 
   for (const line of output.split('\n')) {
@@ -154,6 +162,14 @@ function parseTscOutput(output: string, root: string): CheckDiagnostic[] {
 
     if (match) {
       diagnostics.push({ file: resolve(root, match[1]!), line: Number(match[2]), column: Number(match[3]), code: match[4], message: match[5]! })
+
+      continue
+    }
+
+    const global = TSC_GLOBAL_LINE.exec(line)
+
+    if (global) {
+      diagnostics.push({ file: config, line: 1, column: 1, code: global[1], message: global[2]! })
 
       continue
     }

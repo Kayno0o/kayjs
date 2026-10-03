@@ -25,15 +25,18 @@ export type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Vo
 type RoutePatterns = Register extends { routes: infer Routes extends readonly string[] } ? Routes : never
 type Split<Path extends string> = Path extends `${infer Head}/${infer Rest}` ? [Head, ...Split<Rest>] : [Path]
 type SegmentsOf<Path extends string> = Path extends '/' ? [] : Path extends `/${infer Rest}` ? Rest extends `${infer Trimmed}/` ? Split<Trimmed> : Split<Rest> : never
-type Matches<Segments extends readonly string[], Pattern extends readonly string[]> = Pattern extends readonly ['*']
-  ? Segments extends readonly [] ? false : true
+// A catch-all serves its own directory only with a trailing slash: `/docs/` for `docs/[...path]`, never `/docs`.
+type Matches<Segments extends readonly string[], Pattern extends readonly string[], Slash extends boolean> = Pattern extends readonly ['*']
+  ? Segments extends readonly [] ? Slash : true
   : Pattern extends readonly [infer Head extends string, ...infer Rest extends readonly string[]]
     ? Segments extends readonly [infer Segment extends string, ...infer Others extends readonly string[]]
-      ? Head extends ':' ? Segment extends '' ? false : Matches<Others, Rest> : Segment extends Head ? Matches<Others, Rest> : false
+      ? Head extends ':' ? Segment extends '' ? false : Matches<Others, Rest, Slash> : Segment extends Head ? Matches<Others, Rest, Slash> : Head extends Segment ? Matches<Others, Rest, Slash> : false
       : false
     : Segments extends readonly [] ? true : false
-type AnyMatch<Segments extends readonly string[], Pattern> = Pattern extends readonly string[] ? Matches<Segments, Pattern> : never
-type PathOf<Href extends string> = Href extends `${infer Path}?${string}` ? Path : Href extends `${infer Path}#${string}` ? Path : Href
+type AnyMatch<Segments extends readonly string[], Pattern, Slash extends boolean> = Pattern extends readonly string[] ? Matches<Segments, Pattern, Slash> : never
+type WithoutHash<Href extends string> = Href extends `${infer Path}#${string}` ? Path : Href
+type PathOf<Href extends string> = WithoutHash<Href> extends `${infer Path}?${string}` ? Path : WithoutHash<Href>
+type EndsWithSlash<Path extends string> = Path extends `${string}/` ? true : false
 // The files in `public/`, by the path they are served at.
 type PublicFiles = Register extends { files: infer Files extends string } ? Files : never
 // The app registered as `app` keeps its routes, under Elysia 1.4's `~Routes`, as a tree of path segments down to their methods: `/` is the root's own `get`, `:name` a parameter, `*` the rest of the path.
@@ -47,7 +50,7 @@ type TreeMatches<Segments extends readonly string[], Tree> = Segments extends re
 type ServedByApp<Path extends string> = [AppRoutes] extends [never] ? false : TreeMatches<SegmentsOf<Path>, AppRoutes>
 type IsRoute<Path extends string> = [RoutePatterns] extends [never]
   ? true
-  : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns> | (Path extends PublicFiles ? true : false) | ServedByApp<Path> ? true : false
+  : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns, EndsWithSlash<Path>> | (Path extends PublicFiles ? true : false) | ServedByApp<Path> ? true : false
 
 // A site-relative literal must match a page; opaque strings, relative paths and other schemes are not checked.
 export type CheckedHref<Href extends string> = string extends Href

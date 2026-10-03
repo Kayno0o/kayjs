@@ -1,13 +1,14 @@
 import type { BunPlugin } from 'bun'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
-import { clientDir, writeAsset } from '../src/build/assets'
+import { ASSET_FILE, clientDir, writeAsset } from '../src/build/assets'
 import { mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
+import { loadConfig } from '../src/config'
 import { buildClient } from '../src/server/client'
 
 const root = join(import.meta.dir, 'fixtures/islands')
@@ -73,6 +74,11 @@ describe('kay build', () => {
     }
   })
 
+  it('takes an import as an asset whatever the case of its extension', () => {
+    expect(['logo.png', 'UP.PNG', 'photo.Jpg'].map(file => ASSET_FILE.test(file))).toEqual([true, true, true])
+    expect(ASSET_FILE.test('notes.png.txt')).toBe(false)
+  })
+
   it('bundles the islands for production and writes the manifest a server boots from', async () => {
     try {
       const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root], { stdout: 'pipe', stderr: 'pipe' })
@@ -88,6 +94,48 @@ describe('kay build', () => {
     }
     finally {
       await rm(join(root, '.kay'), { recursive: true, force: true })
+    }
+  })
+})
+
+describe('kay.config.ts', () => {
+  // Under the checkout's node_modules, so the pages it serves resolve their dependencies.
+  async function scratchProject(files: Record<string, string>): Promise<string> {
+    const base = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(base, { recursive: true })
+    const root = await mkdtemp(join(base, 'config-'))
+
+    await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+    return root
+  }
+
+  it('refuses a config without a default export with a message naming the fix', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'export const routes = \'pages\'\n' })
+
+    try {
+      await expect(loadConfig(root)).rejects.toThrow('kay.config.ts must export its config by default')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the config\'s value for an option pages() is given as undefined', async () => {
+    // A process serves one project, so the server runs in its own.
+    const serve = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ root: import.meta.dir, dev: true, routes: undefined }))\nconst response = await app.handle(new Request(\'http://localhost/\'))\n\nconsole.log(response.status, (await response.text()).includes(\'Home\'))\nprocess.exit(0)\n'
+    const root = await scratchProject({ 'kay.config.ts': 'export default { routes: \'pages\' }\n', 'pages/index.kay': 'p Home\n', 'serve.ts': serve })
+
+    try {
+      const child = Bun.spawn([process.execPath, 'serve.ts'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+      const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+
+      expect(output).toBe('200 true\n')
+      expect(code).toBe(0)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
     }
   })
 })
