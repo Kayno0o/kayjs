@@ -1,18 +1,17 @@
 import type { KayConfig } from '../config'
 import type { ClientBuild } from './client'
-import { normalize, resolve, sep } from 'node:path'
+import { join, normalize, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { plugin } from 'bun'
 import { Elysia } from 'elysia'
-import { kay } from '../build/plugin'
 import { logError } from '../build/sourcemap'
 import { loadConfig } from '../config'
 import { registerActionRoutes } from './actions'
-import { ASSET_PREFIX, buildClient, readClient } from './client'
+import { ASSET_PREFIX, buildClient, PRERENDERED_DIR, readClient } from './client'
 import { bootFailure, DEV_EVENTS, devEvents } from './dev'
 import { loadGuards } from './guards'
+import { registerLoader } from './loader'
 import { servePublic } from './public'
-import { renderPage, renderUnmatched } from './render'
+import { renderPage, renderUnmatched, servePrerendered } from './render'
 import { decodePath, scanRoutes, specialPagesOf } from './routes'
 
 export type { KayConfig } from '../config'
@@ -28,8 +27,6 @@ export interface PagesOptions extends KayConfig {
   // Serves the bundle `kay build` wrote instead of bundling at boot. Defaults to on when NODE_ENV is production.
   prebuilt?: boolean
 }
-
-let runtimePluginRoot: string | undefined
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
@@ -54,13 +51,7 @@ async function servePages(root: string, options: PagesOptions) {
   const routesDir = resolve(root, options.routes ?? 'src/routes')
   const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch }
 
-  if (runtimePluginRoot === undefined) {
-    plugin(kay({ target: 'ssr', root }))
-    runtimePluginRoot = root
-  }
-  else if (runtimePluginRoot !== root) {
-    throw new Error(`kay: the .kay loader is registered for ${runtimePluginRoot}; one process serves one project`)
-  }
+  registerLoader(root)
 
   const [scanned, client] = await Promise.all([scanRoutes(routesDir), clientFor(root, options)])
   const routes = await Promise.all(scanned.map(loadGuards))
@@ -80,8 +71,15 @@ async function servePages(root: string, options: PagesOptions) {
   })
 
   await Promise.all([registerActionRoutes(app, routes, options.dev), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
-  for (const route of routes)
-    app.get(route.pattern, async context => renderPage(route, context, client, renderOptions))
+  for (const route of routes) {
+    const prerendered = client.pages.get(route.pattern)
+    const page = prerendered && { ...prerendered, html: await Bun.file(join(client.dir, '..', PRERENDERED_DIR, prerendered.file)).text() }
+
+    if (page)
+      app.get(route.pattern, async context => servePrerendered(route, page, context, client, renderOptions))
+    else
+      app.get(route.pattern, async context => renderPage(route, context, client, renderOptions))
+  }
 
   const fallback = specialPagesOf(routesDir, routesDir)
 

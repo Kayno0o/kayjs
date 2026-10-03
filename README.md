@@ -17,7 +17,7 @@ bun run dev                    # http://localhost:3000, reloads on every change
 
 ```sh
 bun run check   # kay check: types, templates included
-bun run build   # kay build: islands and stylesheets into .kay/client
+bun run build   # kay build: islands, stylesheets and prerendered pages into .kay/client
 bun run start   # NODE_ENV=production bun src/server.ts
 ```
 

@@ -40,6 +40,8 @@ const LINK_ELEMENTS = new Set(['a', 'area'])
 const CTX_REFERENCE = /\bctx\b/
 const DEFAULT_PREFIX = '__default_'
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
+// The one server export that is no action: `kay build` renders the page once when it is `true`.
+const PRERENDER = 'prerender'
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script` and `base` elements only'
 
 export function defaultName(index: number): string {
@@ -79,15 +81,16 @@ class Generator {
       b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData } from 'kay'\n`)
 
     const kayHelpers = formHelpers(this.file)
+    const actions = server?.exportNames.filter(name => name !== PRERENDER) ?? []
 
-    if (server && server.exportNames.length > 0)
+    if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
 
     if (kayHelpers.length > 0)
       b.add(`import { ${kayHelpers.map(helper => `${helper} as ${kayAlias(helper)}`).join(', ')} } from 'kay'\n`)
 
     if (server && !includeServer) {
-      for (const name of server.exportNames)
+      for (const name of actions)
         b.add(`export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`)
     }
 

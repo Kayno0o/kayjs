@@ -1,6 +1,6 @@
 import type { JSX } from '@solidjs/web'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError } from '../runtime'
-import type { ClientBuild } from './client'
+import type { ClientBuild, PrerenderedPage } from './client'
 import type { Flash } from './flash'
 import type { ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
@@ -29,6 +29,8 @@ export interface RenderOptions {
   prefetch?: Prefetch
   // Shows thrown errors with their stack instead of a generic message.
   dev?: boolean
+  // Renders once at build time: what only a request carries throws instead of reading as empty.
+  prerendering?: boolean
 }
 
 // What Elysia hands a route handler, derived and resolved values included; pages see it whole as `ctx.locals`.
@@ -57,7 +59,7 @@ export async function renderPage(route: ServedRoute, context: RequestContext, cl
   if (!params)
     return new Response('Bad request', { status: 400, headers: TEXT })
 
-  const rendering = createRendering(context, params)
+  const rendering = createRendering(context, params, options.prerendering)
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
 
   if (refusal)
@@ -88,12 +90,40 @@ export async function renderPage(route: ServedRoute, context: RequestContext, cl
   }
 }
 
+// What `kay build` rendered, behind the page's guards, revalidated by its ETag.
+export async function servePrerendered(route: ServedRoute, page: PrerenderedPage & { html: string }, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
+  const rendering = createRendering(context, {})
+  const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
+
+  if (refusal)
+    return renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
+
+  const { headers } = rendering
+
+  headers.set('etag', page.etag)
+  // Behind a guard the page is for whoever passed it, so no shared cache may keep it.
+  headers.set('cache-control', route.guards.length > 0 ? 'private, no-cache' : 'public, max-age=0, must-revalidate')
+  for (const [name, value] of Object.entries(page.headers))
+    headers.set(name, value)
+
+  if (context.request.headers.get('if-none-match') === page.etag) {
+    headers.delete('content-type')
+    rendering.status = 304
+
+    return respond(rendering, '')
+  }
+
+  rendering.status = page.status
+
+  return respond(rendering, page.html)
+}
+
 // A URL no page serves, answered by the routes directory's own `_404.kay` or `_error.kay`.
 export async function renderUnmatched(special: SpecialPages, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   return renderFailure(new NotFound(), special, createRendering(context, {}), new Map(), client, options)
 }
 
-function createRendering(context: RequestContext, params: Record<string, string>): Rendering {
+function createRendering(context: RequestContext, params: Record<string, string>, prerendering = false): Rendering {
   const { request } = context
   const jar = cookieJar(request)
   let flash: Flash | null | undefined
@@ -138,7 +168,21 @@ function createRendering(context: RequestContext, params: Record<string, string>
     },
   }
 
+  if (prerendering) {
+    Object.defineProperties(rendering.ctx, {
+      cookies: { get: needsRequest('ctx.cookies') },
+      locals: { get: needsRequest('ctx.locals') },
+      failed: { get: needsRequest('ctx.failed') },
+    })
+  }
+
   return rendering
+}
+
+function needsRequest(name: string): () => never {
+  return () => {
+    throw new Error(`kay: a prerendered page renders once, at build time, so it has no ${name}; drop \`export const prerender\` to render it per request`)
+  }
 }
 
 function hasFlash(request: Request): boolean {

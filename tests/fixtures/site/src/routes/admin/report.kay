@@ -1,0 +1,7 @@
+--- server
+export const prerender = true
+
+const renderedAt = performance.now()
+---
+h1 Report
+p.at {renderedAt}

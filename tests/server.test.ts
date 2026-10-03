@@ -8,6 +8,9 @@ import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { pages } from '../src/server'
+import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { prerenderPages } from '../src/server/prerender'
+import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
 import { speculationRules } from '../src/server/speculation'
 import { auth } from './fixtures/site/src/auth'
@@ -432,6 +435,51 @@ describe('await blocks', () => {
     }
     finally {
       await GlobalRegistrator.unregister()
+    }
+  })
+})
+
+describe('prerendering', () => {
+  const routes = 'tests/fixtures/site/src/routes'
+
+  it('renders the pages marked prerender once at build time and serves them behind their guards', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+
+    try {
+      expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(1)
+      const file = await Bun.file(join(root, '.kay/client/pages/admin/report.html')).text()
+      const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+      const visit = (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
+      const served = await visit('ada')
+      const etag = served.headers.get('etag')!
+
+      expect(file).toContain('<nav class="admin">Admin tools</nav><h1>Report</h1>')
+      expect(served.status).toBe(200)
+      expect(await served.text()).toBe(file)
+      expect(served.headers.get('cache-control')).toBe('private, no-cache')
+      expect(served.headers.get('set-cookie')).toStartWith('seen=admin;')
+      expect((await visit('ada', { 'if-none-match': etag })).status).toBe(304)
+      expect((await visit('bob')).status).toBe(403)
+    }
+    finally {
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('refuses to prerender a page that reads what only a request carries', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const account = (await scanRoutes(join(process.cwd(), routes))).find(route => route.pattern === '/account')!
+      const response = await renderPage({ ...account, guards: [] }, { request: new Request('http://localhost/account'), params: {} }, (await readClient(process.cwd()))!, { prerendering: true })
+
+      expect(response.status).toBe(500)
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('a prerendered page renders once, at build time, so it has no ctx.locals'))
+    }
+    finally {
+      logged.mockRestore()
     }
   })
 })

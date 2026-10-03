@@ -20,12 +20,23 @@ export interface ClientManifest {
   islands: Record<string, string[]>
   // The stylesheet of each page, layout and special page that imports any, by path relative to the root.
   styles: Record<string, string>
+  // The pages `kay build` rendered, by route pattern.
+  pages?: Record<string, PrerenderedPage>
 }
 
-export interface ClientBuild extends Omit<ClientManifest, 'styles'> {
+export interface PrerenderedPage {
+  // Under `.kay/client/pages`.
+  file: string
+  status: number
+  headers: Record<string, string>
+  etag: string
+}
+
+export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {
   dir: string
   // By absolute path.
   styles: Map<string, string>
+  pages: Map<string, PrerenderedPage>
 }
 
 export interface ClientOptions {
@@ -45,6 +56,8 @@ type Outputs = Record<string, MetafileOutput>
 
 export const ASSET_PREFIX = '/_kay/'
 const MANIFEST = 'manifest.json'
+
+export const PRERENDERED_DIR = 'pages'
 const LEADING_DOT_SLASH = /^\.\//
 const JS_OUTPUT = /\.js$/
 
@@ -79,7 +92,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   const routesDir = resolve(root, options.routes ?? 'src/routes')
 
   // A failed build must not leave the previous manifest pointing at files that are gone.
-  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true })])
+  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true })])
   await mkdir(dir, { recursive: true })
   // Tailwind reads class names from here: `@source "../.kay/classes.txt"` in the stylesheet importing it.
   await writeIfChanged(join(root, '.kay', 'classes.txt'), [...classes].sort().join('\n'))
@@ -90,20 +103,35 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   ])
   const manifest: ClientManifest = { ...scripts, styles }
 
-  await Bun.write(join(base, MANIFEST), JSON.stringify(manifest))
+  await writeManifest(root, manifest)
 
   return fromManifest(root, manifest)
 }
 
-// What `kay build` left, or undefined when it never ran.
-export async function readClient(root: string): Promise<ClientBuild | undefined> {
+export async function writeManifest(root: string, manifest: ClientManifest): Promise<void> {
+  await Bun.write(join(root, '.kay', 'client', MANIFEST), JSON.stringify(manifest))
+}
+
+export async function readManifest(root: string): Promise<ClientManifest | undefined> {
   const file = Bun.file(join(root, '.kay', 'client', MANIFEST))
 
-  return await file.exists() ? fromManifest(root, await file.json() as ClientManifest) : undefined
+  return await file.exists() ? await file.json() as ClientManifest : undefined
+}
+
+// What `kay build` left, or undefined when it never ran.
+export async function readClient(root: string): Promise<ClientBuild | undefined> {
+  const manifest = await readManifest(root)
+
+  return manifest && fromManifest(root, manifest)
 }
 
 function fromManifest(root: string, manifest: ClientManifest): ClientBuild {
-  return { ...manifest, dir: join(root, '.kay', 'client', 'dist'), styles: new Map(Object.entries(manifest.styles).map(([file, url]) => [resolve(root, file), url])) }
+  return {
+    ...manifest,
+    dir: join(root, '.kay', 'client', 'dist'),
+    styles: new Map(Object.entries(manifest.styles).map(([file, url]) => [resolve(root, file), url])),
+    pages: new Map(Object.entries(manifest.pages ?? {})),
+  }
 }
 
 async function buildIslands(root: string, base: string, islands: Map<string, string>, options: ClientOptions): Promise<Omit<ClientManifest, 'styles'>> {

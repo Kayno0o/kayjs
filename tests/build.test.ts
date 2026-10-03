@@ -47,7 +47,7 @@ describe('kay build', () => {
       const entry = await Bun.file(join(root, '.kay/client/dist', manifest.entry.slice('/_kay/'.length))).text()
 
       expect(code).toBe(0)
-      expect(errors).toStartWith('built 2 islands and 0 stylesheets in ')
+      expect(errors).toStartWith('built 2 islands, 0 stylesheets and 0 prerendered pages in ')
       expect(Object.keys(manifest.islands).sort()).toEqual(['counter.kay', 'greeting.kay'])
       // Minified: no line of the bundle is indented.
       expect(entry).not.toContain('\n  ')

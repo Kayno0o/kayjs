@@ -10,6 +10,7 @@ import { formatFiles } from './format'
 import { startServer } from './lsp/server'
 import { createProject } from './new'
 import { buildClient } from './server/client'
+import { prerenderPages } from './server/prerender'
 
 const USAGE = 'Usage: kay new <dir> [--kay <dependency>]\n       kay dev [entry]\n       kay build [dir]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
@@ -68,7 +69,7 @@ async function main(args: string[]): Promise<number> {
   return diagnostics.length > 0 ? 1 : 0
 }
 
-// Bundles the browser code for production, minified unless kay.config.ts says otherwise; the server then boots without bundling.
+// Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
 async function build(dir: string): Promise<number> {
   const root = resolve(dir)
   const config = await loadConfig(root)
@@ -76,8 +77,9 @@ async function build(dir: string): Promise<number> {
 
   try {
     const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes })
+    const prerendered = await prerenderPages(root, config, client)
 
-    console.error(`built ${count(Object.keys(client.islands).length, 'island')} and ${count(client.styles.size, 'stylesheet')} in ${Math.round(performance.now() - started)} ms`)
+    console.error(`built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')} in ${Math.round(performance.now() - started)} ms`)
 
     return 0
   }
