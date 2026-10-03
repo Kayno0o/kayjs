@@ -128,7 +128,7 @@ function report(apps: AppResult[], environment: string[]): string {
     '',
     '## Table operations',
     '',
-    'The js-framework-benchmark keyed operations, median ms over fresh pages: from the click until the DOM holds the result and is laid out, paint excluded. Every framework waits the same one task after the click before the result is checked.',
+    'The js-framework-benchmark keyed operations, median ms over fresh pages: from the click until the DOM holds the result and is laid out, paint excluded. The result is checked after every microtask, then every task, so a frame Chromium renders in between is never counted.',
     '',
     table(['operation', ...APPS], apps[0]!.operations.map((operation, index) => [operation.name, ...relative(apps.map(app => app.operations[index]!.median), milliseconds)])),
     '',

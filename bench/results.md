@@ -18,10 +18,10 @@ The products page (layout, 500 products, one counter) rendered in-process throug
 
 |  | kay | solid | svelte |
 | --- | --- | --- | --- |
-| renders/s | 1899 (2.01x) | 1749 (2.18x) | **3815** |
-| mean (ms) | 0.5 (2.01x) | 0.6 (2.18x) | **0.3** |
-| p50 (ms) | 0.5 (1.91x) | 0.5 (2.13x) | **0.2** |
-| p99 (ms) | 1.2 (1.68x) | 1.6 (2.11x) | **0.7** |
+| renders/s | 1973 (1.96x) | 1689 (2.29x) | **3872** |
+| mean (ms) | 0.5 (1.96x) | 0.6 (2.29x) | **0.3** |
+| p50 (ms) | 0.4 (1.83x) | 0.5 (2.21x) | **0.2** |
+| p99 (ms) | 1.1 (1.55x) | 1.7 (2.31x) | **0.7** |
 
 ## Products page in Chromium
 
@@ -34,37 +34,37 @@ Medians of fresh loads with an empty cache: Chromium's main-thread time up to ne
 | JS files | 4 | 1 | 1 |
 | HTML (gzip) | **8.4 KB** | 21.6 KB (2.56x) | 15.6 KB (1.86x) |
 | HTML (raw) | **93.4 KB** | 171.8 KB (1.84x) | 138.6 KB (1.48x) |
-| script (ms) | **1.4** | 12.5 (8.85x) | 15.9 (11.26x) |
-| style (ms) | 6.8 (1.09x) | 6.5 (1.04x) | **6.2** |
-| layout (ms) | 31.9 (1.03x) | 32.0 (1.03x) | **31.1** |
-| JS heap | **1369.0 KB** | 2974.1 KB (2.17x) | 3130.8 KB (2.29x) |
+| script (ms) | **1.4** | 13.3 (9.73x) | 16.1 (11.83x) |
+| style (ms) | 6.9 (1.07x) | 6.5 (1.01x) | **6.4** |
+| layout (ms) | 31.9 (1.02x) | 31.9 (1.03x) | **31.1** |
+| JS heap | **1369.0 KB** | 2980.6 KB (2.18x) | 3129.4 KB (2.29x) |
 
 ## Table page in Chromium
 
 |  | kay | solid | svelte |
 | --- | --- | --- | --- |
-| JS shipped (gzip) | 27.5 KB (3.43x) | **8.0 KB** | 21.8 KB (2.73x) |
+| JS shipped (gzip) | 27.5 KB (3.44x) | **8.0 KB** | 21.8 KB (2.73x) |
 | JS shipped (raw) | 71.5 KB (3.52x) | **20.3 KB** | 57.6 KB (2.84x) |
 | JS files | 4 | 1 | 1 |
 | HTML (gzip) | 0.9 KB (1.91x) | 0.7 KB (1.58x) | **0.4 KB** |
 | HTML (raw) | 1.6 KB (1.88x) | 1.3 KB (1.49x) | **0.9 KB** |
-| script (ms) | **2.0** | 2.8 (1.40x) | 4.8 (2.39x) |
-| style (ms) | 0.4 (2.10x) | **0.2** | 0.2 (1.01x) |
-| layout (ms) | 3.2 (1.16x) | **2.8** | 2.9 (1.04x) |
-| JS heap | 1782.1 KB (1.16x) | **1539.3 KB** | 1588.3 KB (1.03x) |
+| script (ms) | **2.0** | 2.8 (1.37x) | 4.7 (2.34x) |
+| style (ms) | 0.4 (2.24x) | 0.2 (1.15x) | **0.2** |
+| layout (ms) | 3.2 (1.13x) | **2.9** | 2.9 (1.00x) |
+| JS heap | 1775.3 KB (1.14x) | **1564.1 KB** | 1591.3 KB (1.02x) |
 
 ## Table operations
 
-The js-framework-benchmark keyed operations, median ms over fresh pages: from the click until the DOM holds the result and is laid out, paint excluded. Every framework waits the same one task after the click before the result is checked.
+The js-framework-benchmark keyed operations, median ms over fresh pages: from the click until the DOM holds the result and is laid out, paint excluded. The result is checked after every microtask, then every task, so a frame Chromium renders in between is never counted.
 
 | operation | kay | solid | svelte |
 | --- | --- | --- | --- |
-| create 1,000 rows | 38.7 (1.11x) | **34.8** | 36.3 (1.04x) |
-| replace 1,000 rows | 36.4 (1.21x) | 33.7 (1.12x) | **30.0** |
-| update every 10th row | 5.2 (1.55x) | **3.3** | 4.3 (1.30x) |
-| select row | **0.4** | 0.5 (1.13x) | 1.3 (3.25x) |
-| swap rows | 3.9 (1.54x) | **2.5** | 2.5 (1.02x) |
-| remove row | 5.7 (2.28x) | **2.5** | 5.6 (2.24x) |
-| create 10,000 rows | 283 (1.07x) | 277 (1.04x) | **266** |
-| append 1,000 rows | 34.4 (1.06x) | **32.4** | 32.9 (1.02x) |
-| clear 1,000 rows | 4.4 (1.27x) | **3.5** | 4.1 (1.19x) |
+| create 1,000 rows | 33.8 (1.08x) | **31.1** | 32.8 (1.05x) |
+| replace 1,000 rows | 32.3 (1.07x) | **30.1** | 31.2 (1.03x) |
+| update every 10th row | 4.0 (1.23x) | 3.3 (1.02x) | **3.2** |
+| select row | **0.3** | 0.3 (1.00x) | 1.2 (4.00x) |
+| swap rows | 2.5 (1.06x) | **2.4** | 2.6 (1.06x) |
+| remove row | 2.8 (1.20x) | **2.3** | 2.6 (1.13x) |
+| create 10,000 rows | 267 (1.12x) | 251 (1.05x) | **238** |
+| append 1,000 rows | 30.6 (1.06x) | **28.8** | 29.6 (1.03x) |
+| clear 1,000 rows | 3.6 (1.16x) | **3.1** | 3.6 (1.18x) |

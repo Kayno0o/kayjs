@@ -32,6 +32,8 @@ const LOADS = 10
 const WARMUPS = 2
 const SAMPLES = 10
 const OPERATION_TIMEOUT_MS = 10_000
+// More than any framework chains before its update lands.
+const MICROTASK_CHECKS = 100
 // A live collection, so each completion check costs the same however the framework updates the table.
 const ROWS = 'document.querySelector("tbody").rows'
 
@@ -163,9 +165,9 @@ export async function assertHydrated(browser: Browser, url: string): Promise<voi
 }
 
 // Times one click until its result is in the DOM and laid out: scripting, style and layout, not paint.
-// Every framework waits one task after the click before the first check, so synchronous and batched updates pay the same overhead.
+// The result is checked after each microtask first: Chromium may render a frame before the next task, and whether it does depends on where the click falls in the frame, not on the framework.
 async function timeClick(page: Page, operation: Operation): Promise<number> {
-  return page.evaluate(async ({ click, done, timeout }) => {
+  return page.evaluate(async ({ click, done, timeout, microtasks }) => {
     // eslint-disable-next-line no-new-func -- the completion check is data, written as an expression over the document
     const finished = new Function(`return ${done}`) as () => boolean
     const tick = async () => new Promise<void>((resolve) => {
@@ -179,17 +181,20 @@ async function timeClick(page: Page, operation: Operation): Promise<number> {
 
     target.click()
 
-    do {
+    for (let check = 0; check < microtasks && !finished(); check++)
+      await Promise.resolve()
+
+    while (!finished()) {
       await tick()
 
       if (performance.now() - start > timeout)
         throw new Error(`${click} never reached ${done}`)
-    } while (!finished())
+    }
 
     void document.body.offsetHeight
 
     return performance.now() - start
-  }, { ...operation, timeout: OPERATION_TIMEOUT_MS })
+  }, { ...operation, timeout: OPERATION_TIMEOUT_MS, microtasks: MICROTASK_CHECKS })
 }
 
 // Each sample runs on a freshly loaded page after its preparation clicks, as the js-framework-benchmark does.
