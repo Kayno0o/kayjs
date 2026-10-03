@@ -1,11 +1,11 @@
 ---
 import type { Row } from '../../../shared/data'
-import { signal } from 'kay'
+import { selection, signal } from 'kay'
 import { rowBuilder } from '../../../shared/data'
 
 const build = rowBuilder()
 const rows = signal<Row[]>([])
-const selected = signal<number>()
+const selected = selection<number>()
 
 function swap() {
   rows.set((list) => {
@@ -31,7 +31,7 @@ div.jumbotron
 table.table
   tbody
     for row of rows() key={row.id}
-      tr(class={selected() === row.id ? 'danger' : undefined})
+      tr(class={selected.is(row.id) ? 'danger' : undefined})
         td.id {row.id}
         td.label: a(onClick={() => selected.set(row.id)}) {row.label}
         td.remove: a(onClick={() => rows.set(list => list.filter(item => item.id !== row.id))}) x

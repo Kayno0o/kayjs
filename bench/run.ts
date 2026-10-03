@@ -103,7 +103,7 @@ function report(apps: AppResult[], environment: string[]): string {
     'What differs by design:',
     '',
     '- Solid and Svelte hydrate the whole page, so their HTML carries the page data as JSON and their one bundle holds both pages\' components. kay hydrates its islands only and ships one chunk per island, fetched after its entry and shared chunk.',
-    '- Each table is written the way its framework\'s js-framework-benchmark entry is: Solid keeps a signal per label and selects rows with `createSelector`, Svelte keeps a `$state` label per row, kay replaces rows immutably under a keyed `for` and has no selector primitive, so selecting re-checks every row.',
+    '- Each table is written the way its framework\'s js-framework-benchmark entry is: Solid keeps a signal per label and selects rows with `createSelector`, Svelte keeps a `$state` label per row, kay replaces rows immutably under a keyed `for` and selects rows with `selection`.',
     '',
     '## Server rendering',
     '',

@@ -2,7 +2,7 @@ import type { CookieMap } from 'bun'
 import type { Setter, SignalOptions } from 'solid-js'
 import type { Action, FailureOf } from './action'
 import type { Deferred, Locals } from './checks'
-import { createSignal } from 'solid-js'
+import { createSignal, getOwner, onCleanup } from 'solid-js'
 
 export interface Signal<T> {
   (): T
@@ -21,6 +21,69 @@ export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | und
   const [read, set] = createValueSignal<T | undefined>(value, options)
 
   return Object.assign(read, { set })
+}
+
+export interface Selection<Key> {
+  (): Key | undefined
+  set: (key: Key | undefined | ((current: Key | undefined) => Key | undefined)) => void
+  // Whether `key` is the selected one, tracked per key.
+  is: (key: Key) => boolean
+}
+
+interface Flag {
+  read: () => boolean
+  write: (selected: boolean) => void
+  readers: number
+}
+
+// One selected key among many rows: `is(key)` reads a flag of that key's own, so a change re-runs what read the old key and the new one, not every row.
+// Flags are made on first read and dropped once nothing reads them.
+export function selection<Key extends string | number>(initial?: Key): Selection<Key> {
+  const [read, write] = createValueSignal<Key | undefined>(initial)
+  const flags = new Map<Key, Flag>()
+  let current = initial
+
+  const set: Selection<Key>['set'] = (next) => {
+    const key = typeof next === 'function' ? next(current) : next
+
+    if (key === current)
+      return
+
+    if (current !== undefined)
+      flags.get(current)?.write(false)
+
+    if (key !== undefined)
+      flags.get(key)?.write(true)
+
+    current = key
+    write(() => key)
+  }
+
+  const is = (key: Key): boolean => {
+    if (!getOwner())
+      return key === current
+
+    let flag = flags.get(key)
+
+    if (!flag) {
+      const [readFlag, writeFlag] = createValueSignal(key === current)
+
+      flag = { read: readFlag, write: writeFlag, readers: 0 }
+      flags.set(key, flag)
+    }
+
+    const held = flag
+
+    held.readers++
+    onCleanup(() => {
+      if (--held.readers === 0 && flags.get(key) === held)
+        flags.delete(key)
+    })
+
+    return held.read()
+  }
+
+  return Object.assign(read, { set, is })
 }
 
 export interface PageContext<Params extends Record<string, string> = Record<string, string>> {
