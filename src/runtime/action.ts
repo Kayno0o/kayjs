@@ -63,8 +63,8 @@ export class ActionError extends Error {
   override name = 'ActionError'
 
   // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.fail`.
-  constructor(readonly status: number, readonly body: string, readonly errors: Record<string, string> = {}, readonly data?: unknown) {
-    super(`Action failed with ${status}: ${body}`)
+  constructor(readonly status: number, readonly body: string, readonly errors: Record<string, string> = {}, readonly data?: unknown, message = `Action failed with ${status}: ${body}`) {
+    super(message)
   }
 }
 
@@ -73,7 +73,7 @@ export class ActionRedirect extends ActionError {
   override name = 'ActionRedirect'
 
   constructor(status: number, readonly location: string) {
-    super(status, `Redirected to ${location}`)
+    super(status, `Redirected to ${location}`, {}, undefined, `Action redirected with ${status} to ${location}`)
   }
 }
 

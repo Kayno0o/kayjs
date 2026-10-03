@@ -26,13 +26,15 @@ export interface PagesOptions extends KayConfig {
 async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<string, ServedPage>>> {
   const byRoute = new Map<string, Map<string, ServedPage>>()
 
-  for (const [path, page] of client.pages) {
+  const htmls = await Promise.all([...client.pages.values()].map(async page => Bun.file(join(client.dir, '..', PRERENDERED_DIR, page.file)).text()))
+
+  for (const [index, [path, page]] of [...client.pages].entries()) {
     let paths = byRoute.get(page.pattern)
 
     if (!paths)
       byRoute.set(page.pattern, paths = new Map())
 
-    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), html: await Bun.file(join(client.dir, '..', PRERENDERED_DIR, page.file)).text() })
+    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), html: htmls[index]! })
   }
 
   return byRoute

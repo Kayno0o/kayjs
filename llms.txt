@@ -249,7 +249,7 @@ const post = await findPost(ctx.params.slug) ?? ctx.notFound()
 h1 {post.title}
 ```
 
-Each value is a string, a catch-all's included with its slashes.
+Each value is a string with no empty, `.` or `..` segment, a catch-all's included with its slashes. `export const prerender = false` prerenders nothing.
 
 ## Streaming
 
@@ -376,7 +376,7 @@ it('shows why a todo was refused', async () => {
 })
 ```
 
-- `site.visit(path)` GETs a page and follows redirects. `site.submit(action, fields, { from })` posts a form without JavaScript and follows it back to its page. Both resolve with `{ url, status, headers, html }`. `site.call(action, input)` calls an action as an island does, resolving with its result or throwing `ActionError`.
+- `site.visit(path)` GETs a page and follows redirects. `site.submit(action, fields, { from })` posts a form without JavaScript and follows it back to its page. Both resolve with `{ url, status, headers, html }`. `site.call(action, input)` calls an action as an island does, resolving with its result, throwing `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
 - Cookies a response sets go with the next request and read as `site.cookies`. `locals` stands in for the app's Elysia `derive`, called with each request.
 - Pages render their islands' markup without scripts. Test files import `.kay` files through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test.
 

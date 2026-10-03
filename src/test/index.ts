@@ -30,7 +30,7 @@ export interface TestSite {
   visit: (path: string, init?: VisitInit) => Promise<Visit>
   // A plain form post from the page at `from`, followed back to wherever the action sends the browser.
   submit: <Input>(action: Action<Input, unknown>, fields: Partial<Record<Extract<keyof Input, string>, string>>, init?: VisitInit & { from?: string }) => Promise<Visit>
-  // The call an island makes: the result, or an `ActionError` thrown.
+  // The call an island makes: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
   call: <Input, Output>(action: Action<Input, Output>, input: Input, init?: VisitInit) => Promise<Success<Output>>
   cookies: Bun.CookieMap
   handle: (request: Request) => Promise<Response>

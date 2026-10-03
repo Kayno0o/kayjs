@@ -4,6 +4,7 @@ import { renderToString } from '@solidjs/web'
 import { plugin } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
+import { staticFor } from '../src/runtime/static'
 
 plugin(kay())
 
@@ -38,5 +39,17 @@ describe('server rendering through the Bun plugin', () => {
 
     expect(html).toContain('<h1>Empty</h1>')
     expect(html).toContain('Nothing matches')
+  })
+})
+
+describe('staticFor', () => {
+  it('renders each row once with the index for loops keyed by position, an accessor otherwise, and the fallback when empty', () => {
+    const row = (item: () => string, index: unknown) => typeof index === 'function' ? `${item()}@${(index as () => number)()}()` : `${item()}@${String(index)}`
+
+    expect(staticFor(['a', 'b'], row, true)).toEqual(['a@0', 'b@1'])
+    expect(staticFor(['a', 'b'], row, false)).toEqual(['a@0()', 'b@1()'])
+    expect(staticFor(null, row, false, () => 'none')).toBe('none')
+    expect(staticFor(false, row, false)).toBeNull()
+    expect(staticFor([], row, true, () => 'none')).toBe('none')
   })
 })

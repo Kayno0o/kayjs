@@ -531,11 +531,17 @@ describe('prerendering', () => {
 
     try {
       await Bun.write(join(dir, 'posts/[slug].kay'), '--- server\nexport const prerender = true\n---\np {ctx.params.slug}\n')
-      expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('so `prerender` lists them: export const prerender = [{ slug: \'...\' }]')
+      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('so `prerender` lists them: export const prerender = [{ slug: \'...\' }]')
       await rm(join(dir, 'posts'), { recursive: true })
       // Another file, since the first one stays in the module cache.
       await Bun.write(join(dir, 'tags/[slug].kay'), '--- server\nexport const prerender = [{ slug: 1 }]\n---\np {ctx.params.slug}\n')
-      expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('prerenders {"slug":1}, which needs a string for each of slug')
+      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('prerenders {"slug":1}, which needs a string for each of slug')
+      await rm(join(dir, 'tags'), { recursive: true })
+      await Bun.write(join(dir, 'files/[...path].kay'), '--- server\nexport const prerender = [{ path: \'a/../../x\' }]\n---\np {ctx.params.path}\n')
+      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('with no empty, . or .. segment')
+      await rm(join(dir, 'files'), { recursive: true })
+      await Bun.write(join(dir, 'notes/[slug].kay'), '--- server\nexport const prerender = \'yes\'\n---\np {ctx.params.slug}\n')
+      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('exports a prerender that is neither true, false')
     }
     finally {
       await rm(dir, { recursive: true, force: true })

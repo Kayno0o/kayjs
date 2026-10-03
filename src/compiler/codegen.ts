@@ -82,12 +82,14 @@ class Generator {
 
     const kayHelpers = formHelpers(this.file)
     const actions = server?.exportNames.filter(name => name !== PRERENDER) ?? []
-    const helpers = usedHelpers(this.file.template, script).filter(helper => helper !== 'For' || !this.staticLoops)
+    const staticLoops = this.staticLoops
+    const used = usedHelpers(this.file.template, script)
+    const helpers = used.filter(helper => helper !== 'For' || !staticLoops)
 
     if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
 
-    if (this.staticLoops && usedHelpers(this.file.template, script).includes('For'))
+    if (staticLoops && used.includes('For'))
       kayHelpers.push('staticFor')
 
     if (kayHelpers.length > 0)

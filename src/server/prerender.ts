@@ -73,17 +73,25 @@ async function paramsToPrerender(route: Route, file: string, prerender: unknown)
     return [{}]
   }
 
+  if (prerender === false)
+    return []
+
   const list: unknown = typeof prerender === 'function' ? await (prerender as () => unknown)() : prerender
 
   if (!Array.isArray(list))
-    return []
+    throw new Error(`kay: ${file} exports a prerender that is neither true, false, a list of params nor a function returning one`)
 
   for (const params of list) {
-    if (typeof params !== 'object' || params === null || route.params.some(name => typeof (params as Record<string, unknown>)[name] !== 'string'))
-      throw new Error(`kay: ${file} prerenders ${JSON.stringify(params)}, which needs a string for each of ${route.params.join(', ')}`)
+    if (typeof params !== 'object' || params === null || route.params.some(name => !isPathPart(name === route.catchAll, (params as Record<string, unknown>)[name])))
+      throw new Error(`kay: ${file} prerenders ${JSON.stringify(params)}, which needs a string for each of ${route.params.join(', ')}, with no empty, . or .. segment`)
   }
 
   return list as Record<string, string>[]
+}
+
+// A segment, or for a catch-all a slash-separated run of them, that names a file inside the prerendered pages.
+function isPathPart(catchAll: boolean, value: unknown): boolean {
+  return typeof value === 'string' && (catchAll ? value.split('/') : [value]).every(segment => segment !== '' && segment !== '.' && segment !== '..')
 }
 
 // The URL path the params fill in, each segment encoded; a catch-all keeps its slashes.
