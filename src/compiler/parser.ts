@@ -1,6 +1,6 @@
 import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 
-const FENCE = /---(?:[ \t]+([a-z]+))?[ \t]*\r?\n/y
+const FENCE = /---(?:([ \t]*)([a-z]+))?[ \t]*\r?\n/iy
 const CLOSING_FENCE = /^---[ \t]*$/gm
 const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
 const TAG_NAME = /[A-Z][\w-]*/iy
@@ -8,16 +8,21 @@ const CLASS_NAME = /[\w\-:/@!]+/y
 const ID_NAME = /[\w-]+/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
-const FOR_HEAD = /for\s+([A-Z_$][\w$]*)(?:\s*,\s*([A-Z_$][\w$]*))?\s+of\s+/diy
-const KEYWORD = /(if|else\s+if|else|for|await|then|catch)(?=[ \t]|\r?\n|$)/y
+const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
+const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch)(?=[ \t]|\r?\n|$)/y
 // `then list` closing the `await` line, or a bare `then`.
 const INLINE_THEN = /\s+then(?:\s+([a-z_$][\w$]*))?\s*$/d
 const BRANCH_NAME = /[a-z_$][\w$]*/iy
 const ALIAS = /\s+as\s+([a-z_$][\w$]*)\s*$/d
-const KEY_ATTRIBUTE = /\s+key=\{/y
+const KEY_ATTRIBUTE = /[ \t]+key=\{/y
 const CAPITALIZED = /^[A-Z]/
 const WHITESPACE = /\s/
 const ATTRIBUTE_SEPARATOR = /[\s,]/
+// What a `/` after one of these characters starts: a regex literal, since an operand is expected there.
+const REGEX_PRECEDERS = new Set('(,=:[!&|?{};+-*%<>~^')
+const REGEX_KEYWORDS = new Set(['return', 'typeof', 'void', 'delete', 'in', 'of', 'instanceof', 'new', 'throw', 'case', 'yield', 'await', 'else', 'do'])
+const WORD_BEFORE = /[\w$]+$/
+const REGEX_FLAGS = /[a-z]*/iy
 const CLOSERS = { '{': '}', '(': ')', '[': ']' } as const
 const TYPE_KEYWORDS = new Set(['any', 'unknown', 'never', 'string', 'number', 'boolean', 'bigint', 'symbol', 'object', 'const'])
 
@@ -36,7 +41,8 @@ export function parseKay(source: string): KayFile {
     if (!fence)
       break
 
-    const kind = fence[1] === undefined ? 'script' : fence[1]
+    const kind = fence[2] === undefined ? 'script' : fence[2]
+    const spaced = fence[1] !== ''
     const bodyStart = fence.index + fence[0].length
 
     CLOSING_FENCE.lastIndex = bodyStart
@@ -48,8 +54,8 @@ export function parseKay(source: string): KayFile {
     if (!closing)
       diagnostics.push({ start: fence.index, end: fence.index + 3, message: 'This fence is never closed with a `---` line' })
 
-    if (kind !== 'script' && kind !== 'server')
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`--- ${kind}\`; use \`---\` for the component script or \`--- server\` for server code` })
+    if (!spaced || (kind !== 'script' && kind !== 'server'))
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`${fence[0].trim()}\`; use \`---\` for the component script or \`--- server\` for server code` })
     else if (fences[kind])
       diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `A file has one ${kind === 'server' ? '`--- server`' : 'script'} fence` })
     else
@@ -578,7 +584,7 @@ class TemplateParser {
     if (quote === '"' || quote === '\'') {
       const end = this.src.indexOf(quote, this.pos + 1)
 
-      if (end === -1) {
+      if (end === -1 || end > this.lineEnd(this.pos)) {
         this.error(this.pos, this.pos + 1, 'Unclosed string')
         this.pos = this.src.length
 
@@ -710,6 +716,16 @@ class TemplateParser {
         continue
       }
 
+      if (char === '/' && this.src[i + 1] !== '*') {
+        const end = this.skipRegex(open, i)
+
+        if (end !== -1) {
+          i = end
+
+          continue
+        }
+      }
+
       if (char === '/' && this.src[i + 1] === '*') {
         const close = this.src.indexOf('*/', i + 2)
 
@@ -763,6 +779,12 @@ class TemplateParser {
       i++
     }
 
+    if (i >= this.src.length) {
+      this.error(open, open + 1, 'Unclosed template literal')
+
+      return this.src.length
+    }
+
     return i + 1
   }
 
@@ -773,6 +795,45 @@ class TemplateParser {
       i += this.src[i] === '\\' ? 2 : 1
 
     return this.src[i] === quote ? i + 1 : i
+  }
+
+  // Returns the position just past the regex literal starting at `at`, or -1 when a `/` there divides or the literal does not close on its line; `from` bounds the look back at the previous token.
+  private skipRegex(from: number, at: number): number {
+    let before = at - 1
+
+    while (before >= from && WHITESPACE.test(this.src[before]!))
+      before--
+
+    const previous = before < from ? '{' : this.src[before]!
+    const word = WORD_BEFORE.exec(this.src.slice(from, before + 1))?.[0]
+    const doubled = (previous === '+' || previous === '-') && this.src[before - 1] === previous
+
+    if (doubled || !(REGEX_PRECEDERS.has(previous) || (word !== undefined && REGEX_KEYWORDS.has(word))))
+      return -1
+
+    let inClass = false
+
+    for (let i = at + 1; i < this.src.length && this.src[i] !== '\n'; i++) {
+      const char = this.src[i]
+
+      if (char === '\\') {
+        i++
+      }
+      else if (char === '[') {
+        inClass = true
+      }
+      else if (char === ']') {
+        inClass = false
+      }
+      else if (char === '/' && !inClass) {
+        REGEX_FLAGS.lastIndex = i + 1
+        REGEX_FLAGS.test(this.src)
+
+        return REGEX_FLAGS.lastIndex
+      }
+    }
+
+    return -1
   }
 
   // Scans an expression running to the end of the line; brackets may span lines. With `stopAtKey`, a top-level ` key={` ends it.
@@ -803,6 +864,16 @@ class TemplateParser {
         i = this.skipTemplate(i)
 
         continue
+      }
+
+      if (char === '/') {
+        const end = this.skipRegex(start, i)
+
+        if (end !== -1) {
+          i = end
+
+          continue
+        }
       }
 
       if (char === '{' || char === '(' || char === '[') {
@@ -851,8 +922,12 @@ class TemplateParser {
     while (lineStart < this.src.length) {
       const end = this.lineEnd(lineStart)
 
-      if (this.src.slice(lineStart, end).trim() !== '' && this.indentAt(lineStart) <= indent)
-        break
+      if (this.src.slice(lineStart, end).trim() !== '') {
+        if (this.indentAt(lineStart) <= indent)
+          break
+
+        this.rejectTabs(lineStart, this.indentAt(lineStart))
+      }
 
       lineStart = end + 1
     }
@@ -882,12 +957,17 @@ class TemplateParser {
 
   private measureIndent(): number {
     const indent = this.indentAt(this.pos)
-    const tab = this.src.slice(this.pos, this.pos + indent).indexOf('\t')
 
-    if (tab !== -1)
-      this.error(this.pos + tab, this.pos + tab + 1, 'Indent with spaces, not tabs')
+    this.rejectTabs(this.pos, indent)
 
     return indent
+  }
+
+  private rejectTabs(lineStart: number, indent: number) {
+    const tab = this.src.slice(lineStart, lineStart + indent).indexOf('\t')
+
+    if (tab !== -1)
+      this.error(lineStart + tab, lineStart + tab + 1, 'Indent with spaces, not tabs')
   }
 
   private indentAt(lineStart: number): number {

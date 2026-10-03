@@ -23,6 +23,7 @@ const INDENT = '  '
 const FENCE_OPEN = /^---(?:[ \t]+([a-z]+))?[ \t]*$/
 const LEADING_SPACES = /^ */
 const CRLF = /\r\n/g
+const WHITESPACE_END = /\s$/
 
 // Formats a .kay file: template lines re-indented two spaces a level with trailing spaces and extra blank lines dropped, attribute lists on one line written `(a="x" b={y})`; fence code is kept as written.
 export function formatKay(source: string): FormatResult {
@@ -72,6 +73,7 @@ function formatTemplate(file: KayFile): string[] {
   // A span holding a template literal may carry significant whitespace across its lines, so they are kept byte for byte.
   const literals = spans.filter(span => file.source.slice(span.start, span.end).includes('`'))
   const edits = attributeEdits(file)
+  const textEnds = trailingTextEnds(file.template)
   const levels: number[] = []
   const out: string[] = []
   let owner = { from: 0, to: 0 }
@@ -84,7 +86,7 @@ function formatTemplate(file: KayFile): string[] {
 
     const indent = LEADING_SPACES.exec(line.text)![0].length
     const end = line.start + line.text.length
-    const verbatimEnd = literals.some(span => span.start < end && span.end > end)
+    const verbatimEnd = textEnds.has(end) || literals.some(span => span.start < end && span.end > end)
     const content = verbatimEnd ? line.text.slice(indent) : line.text.slice(indent).trimEnd()
 
     if (literals.some(span => line.start > span.start && line.start < span.end)) {
@@ -131,7 +133,7 @@ function formatTemplate(file: KayFile): string[] {
 
     out.push(`${' '.repeat(owner.to)}${applyEdits(content.slice(0, spread.start - offset), offset, edits)}(`)
     out.push(...spread.lines.map(attribute => ' '.repeat(owner.to + INDENT.length) + attribute))
-    out.push(`${' '.repeat(owner.to)})${applyEdits(file.source.slice(spread.end, closingLineEnd).trimEnd(), spread.end, edits)}`)
+    out.push(`${' '.repeat(owner.to)})${applyEdits(textEnds.has(closingLineEnd) ? file.source.slice(spread.end, closingLineEnd) : file.source.slice(spread.end, closingLineEnd).trimEnd(), spread.end, edits)}`)
     skipUntil = closingLineEnd
   }
 
@@ -164,13 +166,61 @@ function multiLineSpans(nodes: Node[]): Span[] {
       case 'if':
         return node.branches.flatMap(branch => [...(branch.test ? [branch.test] : []), ...multiLineSpans(branch.children)])
       case 'for':
-        return [node.each, node.key, ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]
+        return [node.each, { start: node.key.start - 1, end: node.key.end + 1 }, ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]
       case 'await':
         return [node.value, ...multiLineSpans(awaitBlocks(node).flat())]
       default:
         return multiLineSpans(node.children)
     }
   })
+}
+
+// Where text ends in whitespace, which renders: such a line keeps its trailing spaces, only a blank line is trimmed.
+function trailingTextEnds(nodes: Node[]): Set<number> {
+  const ends = new Set<number>()
+
+  for (const node of nodes) {
+    switch (node.kind) {
+      case 'element':
+        for (const end of trailingTextEnds(node.children))
+          ends.add(end)
+
+        break
+      case 'text': {
+        const last = node.parts.at(-1)
+
+        if (last?.kind === 'chunk' && WHITESPACE_END.test(last.text))
+          ends.add(last.end)
+
+        for (const end of trailingTextEnds(node.parts.filter(part => part.kind === 'element')))
+          ends.add(end)
+
+        break
+      }
+      case 'if':
+        for (const branch of node.branches) {
+          for (const end of trailingTextEnds(branch.children))
+            ends.add(end)
+        }
+
+        break
+      case 'for':
+        for (const end of [...trailingTextEnds(node.children), ...trailingTextEnds(node.fallback ?? [])])
+          ends.add(end)
+
+        break
+      case 'await':
+        for (const end of trailingTextEnds(awaitBlocks(node).flat()))
+          ends.add(end)
+
+        break
+      default:
+        for (const end of trailingTextEnds(node.children))
+          ends.add(end)
+    }
+  }
+
+  return ends
 }
 
 // Attribute lists keep the line layout the author chose, written canonically; one whose values themselves span lines is left alone.

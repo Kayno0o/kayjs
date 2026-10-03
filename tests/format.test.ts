@@ -17,20 +17,20 @@ function format(source: string): string {
 }
 
 describe('formatKay', () => {
-  it('re-indents the template two spaces a level, keeping comments and dropping trailing spaces and extra blank lines', () => {
+  it('re-indents the template two spaces a level, keeping comments and dropping the spaces of blank lines and extra blank lines', () => {
     const source = [
       '',
       '---   server',
       'const open = 1',
       '---',
       '',
-      'ul    ',
+      'ul',
       '    // rows',
       '    for todo of todos key={todo.id}',
-      '        li {todo.title}  ',
+      '        li {todo.title}',
       '    else',
       '        li Nothing',
-      '',
+      '   ',
       '',
       '',
       'p {open} open',
@@ -80,6 +80,22 @@ describe('formatKay', () => {
     const source = ['---', '', 'const text = `a  ', '', '', 'b`', '', '---', 'p {text}', ''].join('\n')
 
     expect(format(source)).toBe(['---', 'const text = `a  ', '', '', 'b`', '---', 'p {text}', ''].join('\n'))
+  })
+
+  it('keeps the trailing whitespace of text, which renders, and trims only blank lines', () => {
+    expect(format('p Hello \n  b world\n  \n| tail  \n')).toBe('p Hello \n  b world\n\n| tail  \n')
+    expect(format('p {\n  a\n} x  \n')).toBe('p {\n  a\n} x  \n')
+  })
+
+  it('keeps the braces of a multi-line key with the for, so children stay under it', () => {
+    expect(format('ul\n  for todo of todos key={todo.id\n\n}\n    li x\n')).toBe('ul\n  for todo of todos key={todo.id\n\n}\n    li x\n')
+  })
+
+  it('leaves a file whose attribute string spans lines as an error rather than mangling it', () => {
+    const { code, diagnostics } = formatKay('div\n    a(title="a   \n  b" c="1") x\n')
+
+    expect(code).toBe('div\n    a(title="a   \n  b" c="1") x\n')
+    expect(diagnostics.map(d => d.message)).toContain('Unclosed string')
   })
 
   it('normalizes CRLF line endings', () => {

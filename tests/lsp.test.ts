@@ -217,7 +217,7 @@ describe('kay lsp', () => {
 
   it('formats a .kay document as one whole-document edit', async () => {
     await site.open('src/routes/about.kay')
-    await site.change('src/routes/about.kay', 'div\n    p( class = \'x\' ) Hi   \n', 2)
+    await site.change('src/routes/about.kay', 'div\n    p( class = \'x\' ) Hi\n', 2)
 
     const edits = await site.connection.request<TextEdit[]>('textDocument/formatting', { textDocument: { uri: site.uri('src/routes/about.kay') }, options: { tabSize: 2, insertSpaces: true } })
 

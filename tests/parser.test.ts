@@ -64,6 +64,11 @@ describe('fence', () => {
   it('reports an unclosed fence', () => {
     expect(parse('---\nconst a = 1\n').diagnostics[0]?.message).toContain('never closed')
   })
+
+  it('names a fence kind spelled with capitals or without a space as unknown', () => {
+    expect(parse('--- Server\nconst a = 1\n---\np hi').diagnostics[0]?.message).toContain('Unknown fence `--- Server`')
+    expect(parse('---server\nconst a = 1\n---\np hi').diagnostics[0]?.message).toContain('Unknown fence `---server`')
+  })
 })
 
 describe('elements', () => {
@@ -188,6 +193,37 @@ describe('control flow', () => {
     expect(parse('p a\nelse\n  p b').diagnostics[0]?.message).toContain('must directly follow')
   })
 
+  it('reads an if on the line after else as a child of the else, not as else if', () => {
+    const file = parse('if a\n  p x\nelse\n  if b\n    p y\n  p z\n')
+    const node = file.template[0] as IfNode
+
+    expect(node.branches).toHaveLength(2)
+    expect(text(file, node.branches[1]?.test)).toBeUndefined()
+    expect(node.branches[1]?.children.map(child => child.kind)).toEqual(['if', 'element'])
+
+    const loop = parse('for x of xs key={x}\n  p x\nelse\n  if b\n    p y\n').template[0] as ForNode
+
+    expect(loop.fallback?.map(child => child.kind)).toEqual(['if'])
+    expect(parse('if a\n  p x\nelse\t if b\n  p y').diagnostics).toEqual([])
+  })
+
+  it('keeps a regex literal with brackets and quotes inside an expression whole', () => {
+    expect(outline(parse('a(x={/\\)/.test(y)} z="1") hi'))).toEqual([{ tag: 'a', attributes: ['x:{/\\)/.test(y)}', 'z:1'], children: [['hi']] }])
+    expect(outline(parse('p {s.replace(/\\//g, "-")} after'))).toEqual([{ tag: 'p', children: [[`{s.replace(/\\//g, "-")}`, ' after']] }])
+    expect(outline(parse('p {/}/.test(s)} after'))).toEqual([{ tag: 'p', children: [['{/}/.test(s)}', ' after']] }])
+    expect(outline(parse('p {s.split(/[(/]/).length} after'))).toEqual([{ tag: 'p', children: [['{s.split(/[(/]/).length}', ' after']] }])
+    expect(outline(parse('a(x={a / b} y={c / d}) t'))).toEqual([{ tag: 'a', attributes: ['x:{a / b}', 'y:{c / d}'], children: [['t']] }])
+    expect(outline(parse('if /[(]/.test(x)\n  p'))).toMatchObject([{ if: [{ test: '/[(]/.test(x)' }] }])
+    expect(outline(parse('for a of s.split(/\\//) key={a}\n  p'))).toMatchObject([{ for: 'a', of: 's.split(/\\//)', key: 'a' }])
+    expect(parse('for a of s.split(/\'/) key={a}\n  p').diagnostics).toEqual([])
+  })
+
+  it('requires the head of a for on one line', () => {
+    expect(parse('ul\n  for todo of todos\n\nkey={todo.id}\n    li x\n').diagnostics.length).toBeGreaterThan(0)
+    expect(parse('for todo of\n  todos key={todo.id}\n  p').diagnostics.length).toBeGreaterThan(0)
+    expect(parse('for todo of todos\n  key={todo.id}\n  p').diagnostics[0]?.message).toContain('needs a key')
+  })
+
   it('reads await with its pending, then and catch blocks', () => {
     const file = parse('await comments(post.id)\n  p wait\nthen list\n  p {list.length}\ncatch error\n  p oops\nawait user then\n  p ready\np after')
 
@@ -236,5 +272,23 @@ describe('diagnostics', () => {
     const text = element(section.children[0]).children[0] as TextNode
 
     expect(text.parts[0]?.kind).toBe('expression')
+  })
+
+  it('closes a static attribute string on the line it opens, reporting an unclosed one at its opening quote', () => {
+    const source = 'div\n  a(href="/x) hi\n  p(title="t") z\n'
+    const diagnostic = parse(source).diagnostics.find(d => d.message === 'Unclosed string')!
+
+    expect(source.slice(diagnostic.start, diagnostic.end)).toBe('"')
+    expect(diagnostic.start).toBe(source.indexOf('"'))
+    expect(parse('a(title="a\n  b" c="1") x').diagnostics.map(d => d.message)).toContain('Unclosed string')
+  })
+
+  it('reports tabs in the lines under a comment', () => {
+    expect(parse('a\n  // c\n\t\t\tp\n  e').diagnostics.map(d => d.message)).toContain('Indent with spaces, not tabs')
+  })
+
+  it('reports an unterminated template literal in an if, for or await expression', () => {
+    for (const source of ['if `\n  p x\n', 'for a of `x key={a}\n  p', 'await `x\n  p\nthen\n  p'])
+      expect(parse(source).diagnostics.map(d => d.message)).toContain('Unclosed template literal')
   })
 })
