@@ -1,0 +1,7 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const promote = action(t.Object({ name: t.String({ minLength: 1 }) }), ({ name }) => `${name} is an admin`)
+---
+h1 Admin

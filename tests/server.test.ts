@@ -8,6 +8,7 @@ import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { pages } from '../src/server'
+import { scanRoutes } from '../src/server/routes'
 import { auth } from './fixtures/site/src/auth'
 
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
@@ -271,7 +272,7 @@ describe('pages', () => {
 
 describe('request context', () => {
   const ACCOUNT_ACTION = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/account.kay/remember'
-  // A guard registered before the pages covers their actions too, which a layout's load never runs for.
+  // An Elysia guard covers an action only when it matches the action's own path, here holding the page's name.
   const guarded = new Elysia()
     .use(auth)
     .onBeforeHandle(({ user, path, status }) => user === undefined && path.includes('account') ? status(401, 'Sign in first') : undefined)
@@ -318,6 +319,81 @@ describe('request context', () => {
 
     expect(away.status).toBe(302)
     expect(away.headers.get('location')).toBe('/about')
+  })
+})
+
+describe('guards', () => {
+  const PROMOTE = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/admin/index.kay/promote'
+  const signedIn = new Elysia().use(auth).use(app)
+  const visit = (user?: string) => signedIn.handle(new NativeRequest('http://localhost/admin', { headers: user === undefined ? {} : { 'x-user': user } }))
+  const promote = (body: unknown, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest(PROMOTE, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...headers },
+    body: JSON.stringify(body),
+  }))
+
+  it('runs before the page, sending its redirect and cookies', async () => {
+    const away = await visit()
+
+    expect(away.status).toBe(302)
+    expect(away.headers.get('location')).toBe('/about')
+    expect(away.headers.get('set-cookie')).toStartWith('seen=admin;')
+    expect(await (await visit('ada')).text()).toContain('<nav class="admin">Admin tools</nav><h1>Admin</h1>')
+  })
+
+  it('renders a denial with the error page outside the guarded directory', async () => {
+    const denied = await visit('bob')
+    const html = await denied.text()
+
+    expect(denied.status).toBe(403)
+    expect(html).toContain('<header><a href="/">Kay demo</a></header>')
+    expect(html).toContain('<p class="message">Admins only</p>')
+    expect(html).not.toContain('Admin tools')
+  })
+
+  it('guards the actions of its pages before their input is validated', async () => {
+    const away = await promote({ name: '' })
+    const denied = await promote({ name: 'bob' }, { 'x-user': 'bob' })
+
+    expect(away.status).toBe(303)
+    expect(away.headers.get('location')).toBe('/about')
+    expect(denied.status).toBe(403)
+    expect(await denied.text()).toBe('Admins only')
+    expect((await promote({ name: '' }, { 'x-user': 'ada' })).status).toBe(422)
+
+    const done = await promote({ name: 'bob' }, { 'x-user': 'ada' })
+
+    expect(await done.json()).toBe('bob is an admin')
+    expect(done.headers.get('set-cookie')).toStartWith('seen=admin;')
+  })
+
+  it('refuses a cross-site post before any guard runs', async () => {
+    const response = await promote({ name: 'bob' }, { 'x-user': 'ada', 'origin': 'https://evil.example' })
+
+    expect(response.status).toBe(403)
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
+})
+
+describe('route scan', () => {
+  it('gives a guard the special pages outside its directory, bare for the routes root', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-guards-'))
+
+    try {
+      for (const file of ['_guard.ts', '_layout.kay', '_error.kay', 'admin/_guard.ts', 'admin/_layout.kay', 'admin/_error.kay', 'admin/index.kay'])
+        await Bun.write(join(dir, file), '')
+
+      const [route] = await scanRoutes(dir)
+
+      expect(route!.guards).toEqual([
+        { file: join(dir, '_guard.ts'), special: { notFound: undefined, error: { file: join(dir, '_error.kay'), layouts: [] } } },
+        { file: join(dir, 'admin/_guard.ts'), special: { notFound: undefined, error: { file: join(dir, '_error.kay'), layouts: [join(dir, '_layout.kay')] } } },
+      ])
+      expect(route!.special.error!.file).toBe(join(dir, 'admin/_error.kay'))
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
 

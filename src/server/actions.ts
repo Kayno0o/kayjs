@@ -1,20 +1,36 @@
 import type { CookieMap } from 'bun'
 import type { Elysia, TSchema, ValidationError } from 'elysia'
-import type { Locals } from '../runtime'
+import type { GuardContext, Locals } from '../runtime'
 import type { ActionContext, ServerAction } from '../runtime/action'
+import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
-import type { Route } from './routes'
+import type { LoadedGuard, ServedRoute } from './guards'
 import { logError } from '../build/sourcemap'
 import { failure, isAction, isFailure } from '../runtime/action'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash } from './flash'
-import { Redirect } from './signals'
+import { runGuards } from './guards'
+import { Denied, Redirect } from './signals'
+
+interface ActionRequest {
+  jar: CookieJar
+  headers: Headers
+}
+
+// Thrown before the input is validated, to answer with `response` through the route's error hook.
+class Refused {
+  constructor(readonly response: Response) {}
+}
+
+// What the guards set on the response, carried to the handler they let through.
+const guarded = new WeakMap<Request, ActionRequest>()
+const TEXT = 'text/plain; charset=utf-8'
 
 // The top-level field of a validation path such as `/address/street`.
 const FIELD = /^\/([^/]*)/
 
 // Registers every action the pages export as a POST route whose body Elysia validates against the action's schema.
-export async function registerActionRoutes(app: Elysia, routes: Route[], dev = false): Promise<void> {
+export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], dev = false): Promise<void> {
   for (const route of routes) {
     const module = await import(route.file) as Record<string, unknown>
 
@@ -24,18 +40,52 @@ export async function registerActionRoutes(app: Elysia, routes: Route[], dev = f
 
       app.post(value.url, async context => runAction(value, context, dev), {
         body: value.schema,
-        beforeHandle: ({ request }) => crossSite(request),
-        error: ({ code, error, request }) => code === 'VALIDATION' ? refused(value, error, request) : undefined,
+        // Before validation, so a visitor the action refuses learns nothing about its input.
+        transform: async context => admit(route.guards, context, dev),
+        error: ({ code, error, request }) => {
+          if (code === 'VALIDATION')
+            return refused(value, error, request)
+
+          return error instanceof Refused ? error.response : undefined
+        },
       })
     }
   }
 }
 
-// Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused.
-function crossSite(request: Request): Response | undefined {
+// Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused; then the guards of the action's page decide.
+async function admit(guards: LoadedGuard[], context: { request: Request }, dev: boolean): Promise<void> {
+  const { request } = context
   const origin = request.headers.get('origin')
 
-  return origin === null || sameHost(request, origin) ? undefined : new Response('Cross-site action refused', { status: 403 })
+  if (origin !== null && !sameHost(request, origin))
+    throw new Refused(new Response('Cross-site action refused', { status: 403 }))
+
+  if (guards.length === 0)
+    return
+
+  const state: ActionRequest = { jar: cookieJar(request), headers: new Headers() }
+  const ctx: GuardContext = {
+    request,
+    url: new URL(request.url),
+    get cookies() {
+      return state.jar.cookies
+    },
+    locals: context as unknown as Locals,
+    headers: state.headers,
+    redirect: (location, code = 303) => {
+      throw new Redirect(location, code)
+    },
+    deny: (code = 403, message) => {
+      throw new Denied(code, message)
+    },
+  }
+  const refusal = await runGuards(guards, ctx)
+
+  if (refusal)
+    throw new Refused(stopped(refusal.error, state, dev))
+
+  guarded.set(request, state)
 }
 
 // Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http.
@@ -57,8 +107,8 @@ function backTo(request: Request): string {
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
 async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request }, dev: boolean): Promise<Response> {
   const { request } = context
-  const headers = new Headers()
-  const jar = cookieJar(request)
+  const state = guarded.get(request) ?? { jar: cookieJar(request), headers: new Headers() }
+  const { jar, headers } = state
   let status = 200
   const ctx: ActionContext = {
     request,
@@ -93,18 +143,29 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     return new Response(null, { status: 303, headers })
   }
   catch (error) {
-    // Elysia would answer with the error's message, which may say more than a visitor should read.
-    if (!(error instanceof Redirect)) {
-      logError(error)
+    return stopped(error, state, dev)
+  }
+}
 
-      return new Response(dev && error instanceof Error ? error.message : 'Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
-    }
-
+// A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.
+function stopped(error: unknown, { jar, headers }: ActionRequest, dev: boolean): Response {
+  if (error instanceof Redirect) {
     headers.set('location', error.location)
     jar.writeTo(headers)
 
     return new Response(null, { status: error.status, headers })
   }
+
+  if (error instanceof Denied) {
+    headers.set('content-type', TEXT)
+    jar.writeTo(headers)
+
+    return new Response(error.message, { status: error.status, headers })
+  }
+
+  logError(error)
+
+  return new Response(dev && error instanceof Error ? error.message : 'Internal Server Error', { status: 500, headers: { 'content-type': TEXT } })
 }
 
 // Input the schema refused: a message per field, the schema's own `error` when it has one.
@@ -118,7 +179,9 @@ function refused(action: ServerAction<TSchema, unknown>, error: Readonly<Validat
     errors[field] ??= typeof custom === 'string' ? custom : issue.summary ?? 'Invalid value'
   }
 
-  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors })
+  const state = guarded.get(request) ?? { jar: cookieJar(request), headers: new Headers() }
+
+  return failed(request, state.headers, state.jar.cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors })
 }
 
 // A call gets the failure as JSON; a plain form post goes back to its page with the failure in a cookie.

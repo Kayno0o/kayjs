@@ -12,6 +12,14 @@ export interface Route {
   // `_layout.kay` files wrapping the page, outermost first.
   layouts: string[]
   special: SpecialPages
+  // `_guard.ts` files covering the page and its actions, outermost first.
+  guards: GuardFile[]
+}
+
+// A request a guard refuses gets the nearest special pages outside the guard's directory, wrapped by the layouts outside it, so nothing it protects renders.
+export interface GuardFile {
+  file: string
+  special: SpecialPages
 }
 
 // A page rendered in place of another, wrapped by the layouts of its own directory.
@@ -31,9 +39,10 @@ const KAY_EXTENSION = /\.kay$/
 const LAYOUT = '_layout.kay'
 const NOT_FOUND = '_404.kay'
 const ERROR = '_error.kay'
+const GUARD = '_guard.ts'
 
 // The route a file under the routes directory serves; files starting with `_` (layouts, partials) serve none.
-export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts' | 'special'> | undefined {
+export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts' | 'special' | 'guards'> | undefined {
   if (basename(file).startsWith('_'))
     return undefined
 
@@ -73,7 +82,7 @@ export async function scanRoutes(routesDir: string): Promise<Route[]> {
     const route = routeOf(routesDir, file)
 
     if (route)
-      routes.push({ ...route, layouts: layoutsOf(routesDir, file), special: specialPagesOf(routesDir, dirname(file)) })
+      routes.push({ ...route, layouts: layoutsOf(routesDir, file), special: specialPagesOf(routesDir, dirname(file)), guards: guardsOf(routesDir, file) })
   }
 
   return routes
@@ -81,6 +90,21 @@ export async function scanRoutes(routesDir: string): Promise<Route[]> {
 
 function layoutsOf(routesDir: string, file: string): string[] {
   return directoriesUp(routesDir, dirname(file)).map(dir => join(dir, LAYOUT)).filter(layout => existsSync(layout)).reverse()
+}
+
+function guardsOf(routesDir: string, file: string): GuardFile[] {
+  return directoriesUp(routesDir, dirname(file)).filter(dir => existsSync(join(dir, GUARD))).reverse().map(dir => ({
+    file: join(dir, GUARD),
+    // A guard on the routes directory covers every layout, so its special pages render bare.
+    special: dir === routesDir ? withoutLayouts(specialPagesOf(routesDir, dir)) : specialPagesOf(routesDir, dirname(dir)),
+  }))
+}
+
+function withoutLayouts(special: SpecialPages): SpecialPages {
+  return {
+    notFound: special.notFound && { file: special.notFound.file, layouts: [] },
+    error: special.error && { file: special.error.file, layouts: [] },
+  }
 }
 
 export function specialPagesOf(routesDir: string, dir: string): SpecialPages {

@@ -36,6 +36,8 @@ export interface PageContext<Params extends Record<string, string> = Record<stri
   headers: Headers
   redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => never
   notFound: () => never
+  // Ends with that status, 403 unless given, rendering the nearest `_error.kay` with `message`.
+  deny: (status?: number, message?: string) => never
   // Why the last plain form post to `action` failed, when it did; read once, on the page the browser went back to.
   failed: <Target extends Action<never, unknown>>(action: Target) => FailureOf<Target> | undefined
 }
@@ -51,6 +53,16 @@ export interface PageError {
 // The context of `_error.kay`, rendered when a page's load or render throws.
 export interface ErrorPageContext<Params extends Record<string, string> = Record<string, string>> extends PageContext<Params> {
   error: PageError
+}
+
+// What a `_guard.ts` decides from: who is asking, never a page's params, which an action has none of. For an action, `url` is the action's.
+export type GuardContext = Pick<PageContext, 'request' | 'url' | 'cookies' | 'locals' | 'headers' | 'redirect' | 'deny'>
+
+export type Guard = (ctx: GuardContext) => void | Promise<void>
+
+// The default export of a `_guard.ts`: runs before every page and every action in its directory and below, and lets the request through unless it redirects or denies.
+export function guard(check: Guard): Guard {
+  return check
 }
 
 // What a page's template reads: every name its `--- server` fence declares.

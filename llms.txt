@@ -195,6 +195,7 @@ Pages live in `src/routes/`:
 | `_layout.kay` | Wraps every page in its directory and below, outermost first, rendering the page at its `slot`. |
 | `_404.kay` | Rendered with status 404 for `ctx.notFound()` in its directory and below; the root one also answers URLs no page serves. |
 | `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
+| `_guard.ts` | Runs before every page and every action in its directory and below; see Guards. |
 
 Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence may use top-level `await` and the `ctx` object:
 
@@ -202,7 +203,7 @@ Other files starting with `_` are not routes. Every top-level name the server fe
 - `ctx.cookies`, a `Bun.CookieMap`: `ctx.cookies.get('theme')`; what `set` and `delete` change is sent back, redirects included
 - `ctx.locals`, what the app's Elysia `derive`, `resolve` and `decorate` add, such as the signed-in user
 - `ctx.status(404)` and `ctx.headers` set the response
-- `ctx.redirect('/login')` and `ctx.notFound()` stop rendering
+- `ctx.redirect('/login')`, `ctx.notFound()` and `ctx.deny(403, 'Members only')` stop rendering; `deny` renders `_error.kay` with that status and message
 
 Layout and page loads run in parallel; when several fail, the outermost one decides the response.
 
@@ -265,7 +266,7 @@ form(action={add})
 - A handler that throws answers 500 with a generic message and logs the error.
 - The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers`, `redirect(location)` and `fail(status, data)`.
 
-## Locals and guards
+## Locals
 
 `ctx.locals` is the Elysia context of the request. Declare what the app adds once, in a `.ts` module, and register its type:
 
@@ -282,15 +283,27 @@ declare module 'kay' {
 }
 ```
 
-A guard is an Elysia `onBeforeHandle` registered before `.use(await pages())`: it covers pages and actions alike. A layout's `ctx.redirect` is no guard, since actions never run layout loads.
+## Guards
+
+A `_guard.ts` in a routes directory runs before every page and every action in that directory and below, outermost first. It lets the request through unless it redirects or denies:
 
 ```ts
-new Elysia()
-  .use(auth)
-  .onBeforeHandle(({ user, path, redirect }) => user === undefined && path.startsWith('/account') ? redirect('/login') : undefined)
-  .use(await pages())
-  .listen(3000)
+import { guard } from 'kay'
+
+export default guard(({ locals, redirect, deny }) => {
+  if (locals.user === undefined)
+    redirect('/login')
+
+  if (!locals.user.admin)
+    deny(403, 'Admins only')
+})
 ```
+
+- Its `ctx` has `request`, `url`, `cookies`, `locals`, `headers`, `redirect` and `deny`; cookies and headers it sets reach the response either way.
+- It decides from who is asking, never from the page's params: actions have none, and their `url` is the action's own. Checks on one record belong in the load and the action.
+- An action's guards run before its input is validated. A refused form post gets the redirect, or the denial as plain text.
+- A denied page renders the nearest `_error.kay` outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
+- A layout's `ctx.redirect` is no guard: actions never run layout loads. Neither is an Elysia `onBeforeHandle` testing the page's path: actions are served under `/_kay/action/`.
 
 ## What `kay check` verifies
 

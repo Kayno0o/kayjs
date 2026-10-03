@@ -10,6 +10,7 @@ import { loadConfig } from '../config'
 import { registerActionRoutes } from './actions'
 import { ASSET_PREFIX, buildClient, readClient } from './client'
 import { bootFailure, DEV_EVENTS, devEvents } from './dev'
+import { loadGuards } from './guards'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched } from './render'
 import { decodePath, scanRoutes, specialPagesOf } from './routes'
@@ -61,7 +62,8 @@ async function servePages(root: string, options: PagesOptions) {
     throw new Error(`kay: the .kay loader is registered for ${runtimePluginRoot}; one process serves one project`)
   }
 
-  const [routes, client] = await Promise.all([scanRoutes(routesDir), clientFor(root, options)])
+  const [scanned, client] = await Promise.all([scanRoutes(routesDir), clientFor(root, options)])
+  const routes = await Promise.all(scanned.map(loadGuards))
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
   if (options.dev)

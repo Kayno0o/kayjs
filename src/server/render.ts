@@ -2,16 +2,18 @@ import type { JSX } from '@solidjs/web'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError } from '../runtime'
 import type { ClientBuild } from './client'
 import type { Flash } from './flash'
-import type { Route, SpecialPage, SpecialPages } from './routes'
+import type { ServedRoute } from './guards'
+import type { SpecialPage, SpecialPages } from './routes'
 import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
 import { logError, mapStack } from '../build/sourcemap'
 import { collectIslands } from '../runtime/island.server'
 import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
 import { FLASH_COOKIE, readFlash } from './flash'
+import { runGuards } from './guards'
 import { errorPage } from './overlay'
 import { decodePath } from './routes'
-import { NotFound, Redirect } from './signals'
+import { Denied, NotFound, Redirect } from './signals'
 
 interface PageModule {
   default: (props: Record<string, unknown>) => JSX.Element
@@ -46,13 +48,18 @@ const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()
 const stylesCache = new WeakMap<ClientBuild, Map<string, string>>()
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 
-export async function renderPage(route: Route, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
+export async function renderPage(route: ServedRoute, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const params = routeParams(route, context.params)
 
   if (!params)
     return new Response('Bad request', { status: 400, headers: TEXT })
 
   const rendering = createRendering(context, params)
+  const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
+
+  if (refusal)
+    return renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
+
   const files = [...route.layouts, route.file]
   const loaded = new Map<string, Loaded>()
 
@@ -117,6 +124,9 @@ function createRendering(context: RequestContext, params: Record<string, string>
       notFound: () => {
         throw new NotFound()
       },
+      deny: (code = 403, message) => {
+        throw new Denied(code, message)
+      },
       failed: (action) => {
         flash ??= hasFlash(request) ? readFlash(jar.cookies) ?? null : null
 
@@ -149,11 +159,12 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   }
 
   const notFound = error instanceof NotFound
+  const denied = error instanceof Denied
 
-  if (!notFound)
+  if (!notFound && !denied)
     logError(error)
 
-  const pageError = notFound ? { status: 404, message: 'Not Found' } : describeError(error, options.dev)
+  const pageError = notFound ? { status: 404, message: 'Not Found' } : denied ? { status: error.status, message: error.message } : describeError(error, options.dev)
   const page = (notFound ? special.notFound : undefined) ?? special.error
 
   rendering.status = pageError.status
@@ -164,10 +175,10 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   if (html !== undefined)
     return respond(rendering, html)
 
-  if (options.dev && !notFound)
+  if (options.dev && !notFound && !denied)
     return new Response(errorPage(pageError) + LIVE_RELOAD, { status: pageError.status, headers: { 'content-type': 'text/html; charset=utf-8' } })
 
-  return new Response(notFound ? 'Not found' : 'Internal Server Error', { status: pageError.status, headers: TEXT })
+  return new Response(pageError.message, { status: pageError.status, headers: TEXT })
 }
 
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.
@@ -283,7 +294,7 @@ function describeError(error: unknown, dev = false): PageError {
 }
 
 // Elysia decodes named params already; only the catch-all arrives encoded. Undefined when it is malformed.
-function routeParams(route: Route, raw: Record<string, string>): Record<string, string> | undefined {
+function routeParams(route: ServedRoute, raw: Record<string, string>): Record<string, string> | undefined {
   const params: Record<string, string> = {}
 
   for (const name of route.params) {
