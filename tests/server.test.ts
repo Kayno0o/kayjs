@@ -9,6 +9,7 @@ import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { pages } from '../src/server'
 import { scanRoutes } from '../src/server/routes'
+import { speculationRules } from '../src/server/speculation'
 import { auth } from './fixtures/site/src/auth'
 
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
@@ -16,6 +17,9 @@ const MARKERS = /<!--[$/]-->/g
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
 const ENTRY = /<script type="module" src="\/_kay\/([^"]+)"><\/script>/
 const BODY = /<body>([\s\S]*)<\/body>/
+// Any script but the speculation rules, which hold no code.
+const SCRIPT = /<script(?! type="speculationrules")/
+const SPECULATION = /<script type="speculationrules">(.*?)<\/script>/
 // happy-dom swaps in its own Request, which Elysia cannot read headers from.
 const NativeRequest = Request
 
@@ -77,7 +81,7 @@ describe('pages', () => {
     const about = await get('/about')
 
     expect(about.html).toContain('<h1>About</h1>')
-    expect(about.html).not.toContain('<script')
+    expect(about.html).not.toMatch(SCRIPT)
   })
 
   it('merges the head blocks of layouts and page, the page winning per title and meta name', async () => {
@@ -124,7 +128,7 @@ describe('pages', () => {
     expect(layout).toContain('background: url("/paper.png")')
     expect(page).toContain('.card {')
     expect(page).toContain('.counter {')
-    expect((await get('/about')).html).toContain(`<link rel="stylesheet" href="${links[0]}"></head>`)
+    expect((await get('/about')).html).toContain(`<link rel="stylesheet" href="${links[0]}"><script type="speculationrules">`)
     expect((await Bun.file(join(process.cwd(), '.kay/classes.txt')).text()).split('\n')).toEqual(expect.arrayContaining(['card', 'counter']))
   })
 
@@ -372,6 +376,20 @@ describe('guards', () => {
 
     expect(response.status).toBe(403)
     expect(response.headers.get('set-cookie')).toBeNull()
+  })
+})
+
+describe('prefetch', () => {
+  it('prefetches the pages links point at on hover, leaving out the urls kay serves itself and opted-out links', async () => {
+    const rules = JSON.parse(SPECULATION.exec((await get('/about')).html)![1]!) as unknown
+
+    expect(rules).toEqual({ prefetch: [{
+      source: 'document',
+      where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/_kay/*' } }, { not: { selector_matches: '[data-no-prefetch]' } }] },
+      eagerness: 'moderate',
+    }] })
+    expect(speculationRules('eager')).toContain('"eagerness":"eager"')
+    expect(speculationRules(false)).toBe('')
   })
 })
 

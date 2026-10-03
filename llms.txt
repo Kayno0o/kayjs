@@ -328,8 +328,10 @@ Project settings live in an optional `kay.config.ts` at the root, read by `pages
 ```ts
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ routes: 'src/routes', lang: 'en', minify: true, plugins: [] })
+export default defineConfig({ routes: 'src/routes', lang: 'en', minify: true, prefetch: 'moderate', plugins: [] })
 ```
+
+Every page carries speculation rules: Chromium prefetches the page a link points at once it is hovered (`prefetch: 'moderate'`), on press with `'conservative'`, as soon as it can with `'eager'`, never with `false`. A link that changes something on GET, such as a logout, takes `data-no-prefetch`. A stylesheet holding `@view-transition { navigation: auto; }` animates from page to page where the browser supports it; `kay new` writes one.
 
 `pages()` also takes `root`, `dev` (default: `NODE_ENV` is `development`) and `prebuilt` (default: `NODE_ENV` is `production`), which serves what `kay build` wrote instead of bundling at boot. A `.ts` file imports a component as `import Card from './card.kay'`, typed through the generated `.kay/types` tree. List `.kay/` in `.gitignore` and merge the tree in `tsconfig.json`:
 

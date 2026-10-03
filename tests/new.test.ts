@@ -37,7 +37,9 @@ describe('kay new', () => {
       const client = await buildClient(dir)
 
       expect(Object.keys(client.islands)).toEqual(['src/components/counter.kay'])
-      expect(client.styles.get(join(dir, 'src/routes/_layout.kay'))).toStartWith('/_kay/')
+      const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
+
+      expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toContain('@view-transition')
     }
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })

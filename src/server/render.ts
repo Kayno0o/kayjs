@@ -4,6 +4,7 @@ import type { ClientBuild } from './client'
 import type { Flash } from './flash'
 import type { ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
+import type { Prefetch } from './speculation'
 import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
 import { logError, mapStack } from '../build/sourcemap'
 import { collectIslands } from '../runtime/island.server'
@@ -14,6 +15,7 @@ import { runGuards } from './guards'
 import { errorPage } from './overlay'
 import { decodePath } from './routes'
 import { Denied, NotFound, Redirect } from './signals'
+import { speculationRules } from './speculation'
 
 interface PageModule {
   default: (props: Record<string, unknown>) => JSX.Element
@@ -24,6 +26,7 @@ type Loaded = PromiseSettledResult<Record<string, unknown>>
 
 export interface RenderOptions {
   lang?: string
+  prefetch?: Prefetch
   // Shows thrown errors with their stack instead of a generic message.
   dev?: boolean
 }
@@ -229,7 +232,7 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
   } }))
   const scripts = client.entry !== undefined && islands.count > 0 ? islandScripts(client, islands.eager) : ''
 
-  return `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${stylesheets(client, files)}${scripts}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
+  return `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${stylesheets(client, files)}${scripts}${speculationRules(options.prefetch)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
 }
 
 // The stylesheets of the layouts, outermost first, then the page's.

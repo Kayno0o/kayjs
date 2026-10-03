@@ -21,7 +21,11 @@ const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 30
 
 console.log(\`Listening on http://localhost:\${app.server?.port}\`)
 `,
-  'src/app.css': `body {
+  'src/app.css': `@view-transition {
+  navigation: auto;
+}
+
+body {
   margin: 0;
   font-family: system-ui, sans-serif;
 }

@@ -52,7 +52,7 @@ export async function pages(options: PagesOptions = {}) {
 
 async function servePages(root: string, options: PagesOptions) {
   const routesDir = resolve(root, options.routes ?? 'src/routes')
-  const renderOptions = { lang: options.lang, dev: options.dev }
+  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch }
 
   if (runtimePluginRoot === undefined) {
     plugin(kay({ target: 'ssr', root }))

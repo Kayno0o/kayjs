@@ -1,4 +1,5 @@
 import type { BunPlugin } from 'bun'
+import type { Prefetch } from './server/speculation'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -10,6 +11,8 @@ export interface KayConfig {
   publicDir?: string
   minify?: boolean
   lang?: string
+  // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
+  prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[]
 }
