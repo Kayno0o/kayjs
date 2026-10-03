@@ -6,7 +6,7 @@ import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import { logError } from '../build/sourcemap'
-import { failure, isAction, isFailure } from '../runtime/action'
+import { failure, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash } from './flash'
 import { runGuards } from './guards'
@@ -84,7 +84,7 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, dev: 
   const refusal = await runGuards(guards, ctx)
 
   if (refusal)
-    return stopped(refusal.error, state, dev)
+    return stopped(refusal.error, request, state, dev)
 
   guarded.set(request, state)
 
@@ -146,14 +146,15 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     return new Response(null, { status: 303, headers })
   }
   catch (error) {
-    return stopped(error, state, dev)
+    return stopped(error, request, state, dev)
   }
 }
 
 // A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.
-function stopped(error: unknown, { jar, headers }: ActionRequest, dev: boolean): Response {
+function stopped(error: unknown, request: Request, { jar, headers }: ActionRequest, dev: boolean): Response {
   if (error instanceof Redirect) {
-    headers.set('location', error.location)
+    // `fetch` would follow a `location` and hand the island the next page's HTML; a call reads where to go instead.
+    headers.set(isCall(request) ? REDIRECT_HEADER : 'location', error.location)
     jar.writeTo(headers)
 
     return new Response(null, { status: error.status, headers })

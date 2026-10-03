@@ -9,6 +9,9 @@ const FAILURE = Symbol.for('kay.failure')
 declare const RESULT: unique symbol
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 
+// Where a called action sends the browser, in place of `location`.
+export const REDIRECT_HEADER = 'x-kay-redirect'
+
 export interface ActionContext {
   request: Request
   cookies: CookieMap
@@ -62,6 +65,15 @@ export class ActionError extends Error {
   // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.fail`.
   constructor(readonly status: number, readonly body: string, readonly errors: Record<string, string> = {}, readonly data?: unknown) {
     super(`Action failed with ${status}: ${body}`)
+  }
+}
+
+// Thrown by a call whose action redirected, where there is no browser to send: a test, a script.
+export class ActionRedirect extends ActionError {
+  override name = 'ActionRedirect'
+
+  constructor(status: number, readonly location: string) {
+    super(status, `Redirected to ${location}`)
   }
 }
 
@@ -126,6 +138,18 @@ async function post<Output>(url: string, input: unknown): Promise<Output> {
 
 // What a call got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
 export async function readActionResponse<Output>(response: Response): Promise<Output> {
+  const target = response.headers.get(REDIRECT_HEADER)
+
+  if (target !== null) {
+    if (typeof window === 'undefined')
+      throw new ActionRedirect(response.status, target)
+
+    // The page goes away, so whatever awaited the call never resumes.
+    window.location.assign(target)
+
+    return new Promise<never>(() => undefined)
+  }
+
   const body = await response.text()
 
   if (!response.ok) {

@@ -363,8 +363,10 @@ describe('guards', () => {
     const away = await promote({ name: 'bob' })
     const denied = await promote({ name: 'bob' }, { 'x-user': 'bob' })
 
+    // A call reads where to go off a header: `fetch` would follow `location` and parse the next page.
     expect(away.status).toBe(303)
-    expect(away.headers.get('location')).toBe('/about')
+    expect(away.headers.get('location')).toBeNull()
+    expect(away.headers.get('x-kay-redirect')).toBe('/about')
     expect((await promote({ name: '' })).status).toBe(422)
     expect(denied.status).toBe(403)
     expect(await denied.text()).toBe('Admins only')

@@ -78,6 +78,6 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
 export type { Action, ActionContext, Failure, FailureOf, FieldName, FormFailure, ServerAction } from './action'
-export { action, ActionError, actionStub, formAction, isAction, registerActions } from './action'
+export { action, ActionError, ActionRedirect, actionStub, formAction, isAction, registerActions } from './action'
 export type { AwaitProps, CheckedHref, Deferred, HydrateWhen, IslandComponent, IslandProp, Locals, LocalsOf, Register } from './checks'
 export { staticFor } from './static'

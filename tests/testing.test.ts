@@ -1,7 +1,9 @@
 import type { Action } from '../src/runtime'
 import { join } from 'node:path'
+import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { describe, expect, it } from 'bun:test'
 import { ActionError } from '../src/runtime'
+import { readActionResponse } from '../src/runtime/action'
 import { testSite } from '../src/test'
 
 const routes = 'tests/fixtures/site/src/routes'
@@ -33,7 +35,23 @@ describe('kay/test', () => {
   })
 
   it('calls an action as an island does', async () => {
+    const { promote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as { promote: Action<{ name: string }, string> }
+
     expect(await site.call(add, { title: 'Called from a test' })).toBeNumber()
     await expect(site.call(add, { title: '' })).rejects.toThrow(ActionError)
+    expect(await site.call(promote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).toBe('bob is an admin')
+    await expect(site.call(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirect', status: 303, location: '/about' })
+  })
+
+  it('sends the browser where a called action redirects', async () => {
+    GlobalRegistrator.register({ url: 'http://localhost/admin' })
+
+    try {
+      void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }))
+      expect(window.location.href).toBe('http://localhost/about')
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+    }
   })
 })
