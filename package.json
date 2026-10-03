@@ -1,7 +1,7 @@
 {
   "name": "@kaynooo/kay",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Pug-like, fully typed web framework on Bun, Elysia, pg-orm and Solid's runtime",
   "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
   "license": "MIT",
