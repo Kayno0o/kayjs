@@ -16,7 +16,7 @@ class Editor {
   private readonly process = Bun.spawn([process.execPath, cli, 'lsp', '--stdio'], { stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
   private readonly waiting = new Map<string, (diagnostics: Diagnostic[]) => void>()
 
-  constructor(readonly root: string) {
+  constructor(readonly root: string, private readonly vscode = false) {
     this.connection = new Connection(this.process.stdout, (data) => {
       this.process.stdin.write(data)
       void this.process.stdin.flush()
@@ -25,12 +25,17 @@ class Editor {
   }
 
   async start() {
-    await this.connection.request('initialize', { processId: process.pid, rootUri: pathToFileURL(this.root).href, capabilities: {} })
+    await this.connection.request('initialize', { processId: process.pid, rootUri: this.fileUri(this.root), capabilities: {} })
     this.connection.notify('initialized', {})
   }
 
   uri(path: string): string {
-    return pathToFileURL(join(this.root, path)).href
+    return this.fileUri(join(this.root, path))
+  }
+
+  // VS Code percent-encodes every character of a path but the unreserved ones, more than Node's `pathToFileURL` does.
+  private fileUri(path: string): string {
+    return this.vscode ? `file://${path.split('/').map(segment => encodeURIComponent(segment).replaceAll(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)).join('/')}` : pathToFileURL(path).href
   }
 
   async open(path: string): Promise<Diagnostic[]> {
@@ -58,7 +63,7 @@ class Editor {
   async rename(path: string, line: number, character: number, newName: string): Promise<Record<string, Range[]>> {
     const { changes = {} } = await this.connection.request<WorkspaceEdit>('textDocument/rename', { textDocument: { uri: this.uri(path) }, position: { line, character }, newName })
 
-    return Object.fromEntries(Object.entries(changes).map(([uri, edits]) => [uri.slice(pathToFileURL(this.root).href.length + 1), sortRanges(edits.map(edit => edit.range))]))
+    return Object.fromEntries(Object.entries(changes).map(([uri, edits]) => [uri.slice(this.fileUri(this.root).length + 1), sortRanges(edits.map(edit => edit.range))]))
   }
 
   write(data: string) {
@@ -164,6 +169,12 @@ describe('kay lsp', () => {
     const [component] = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 32, 2)
 
     expect(component?.targetUri).toBe(site.uri('src/components/counter.kay'))
+  })
+
+  it('goes from a server value in the template to its declaration in the server fence, and to nothing else', async () => {
+    const open = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 21, 6)
+
+    expect(open.map(link => [link.targetUri, ...spots([link.targetSelectionRange])[0]!])).toEqual([[site.uri('src/routes/index.kay'), 13, 6, 10]])
   })
 
   it('finds references across .kay files, a server value\'s reads in the template included', async () => {
@@ -282,5 +293,52 @@ describe('kay lsp imports', () => {
 
     expect(await fixes('Badge\n', 3)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
     expect(await fixes('---\nimport { signal } from \'kay\'\n---\nBadge\n', 4)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport { signal } from \'kay\'\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
+  })
+})
+
+// VS Code writes a project's path with more percent-escapes than Node does, and tsgo echoes URIs the VS Code way.
+describe('kay lsp in a path VS Code percent-encodes', () => {
+  let editor: Editor
+  let dir: string
+  const page = 'src/routes/a.kay'
+  const source = '--- server\nconst s = 1\nfunction helper() { return s }\n---\np {s} {helper()}\n'
+
+  beforeAll(async () => {
+    dir = join(await mkdtemp(join(tmpdir(), 'kay-')), 'app (v1)@x+y')
+    await mkdir(join(dir, 'node_modules'), { recursive: true })
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, page), source),
+      ...(await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))),
+    ])
+    editor = new Editor(dir, true)
+    await editor.start()
+    await editor.open(page)
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  })
+
+  it('goes to definitions in the .kay file', async () => {
+    const links = await editor.request<LocationLink[]>('textDocument/definition', page, 4, 3)
+
+    expect(links.map(link => [link.targetUri, ...spots([link.targetSelectionRange])[0]!])).toEqual([[editor.uri(page), 1, 6, 7]])
+
+    const helper = await editor.request<LocationLink[]>('textDocument/definition', page, 4, 9)
+
+    expect(helper.map(link => [link.targetUri, ...spots([link.targetSelectionRange])[0]!])).toEqual([[editor.uri(page), 2, 9, 15]])
+  })
+
+  it('finds references in the .kay file', async () => {
+    const found = await editor.connection.request<Location[]>('textDocument/references', { textDocument: { uri: editor.uri(page) }, position: { line: 4, character: 3 }, context: { includeDeclaration: true } })
+
+    expect(found.map(location => location.uri)).toEqual(found.map(() => editor.uri(page)))
+    expect(spots(found.map(location => location.range))).toEqual([[1, 6, 7], [2, 27, 28], [4, 3, 4]])
+  })
+
+  it('renames a name in the .kay file', async () => {
+    expect(spots((await editor.rename(page, 4, 3, 'value'))[page]!)).toEqual([[1, 6, 7], [2, 27, 28], [4, 3, 4]])
   })
 })

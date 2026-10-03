@@ -32,6 +32,7 @@ const IMPORT_DECLARATION = /^\s*import\s/
 const TRAILING_SEMICOLON = /;$/
 // A one-line named import, as generated code writes them: its names, then its quoted module.
 const NAMED_IMPORT = /^import \{([^}]*)\} from (['"][^'"]+['"])/
+const RESERVED_CHARACTER = /[!'()*]/g
 const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
 const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:For|Show|Omit|Island|Href|Field|Prop|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
@@ -52,7 +53,7 @@ export class KayLanguageServer {
   private routesDir = ''
   private shadowOptions: CheckOptions = {}
   private shadowTree = ''
-  private rootUri = ''
+  private nodeUris = false
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
   private diagnosticsTimer?: Timer
@@ -93,15 +94,16 @@ export class KayLanguageServer {
   private async initialize(params: InitializeParams) {
     const rootUri = params.rootUri ?? params.workspaceFolders?.[0]?.uri
 
-    this.root = rootUri ? fileURLToPath(rootUri) : resolve(params.rootPath ?? process.cwd())
+    this.root = rootUri ? resolve(fileURLToPath(rootUri)) : resolve(params.rootPath ?? process.cwd())
 
     const config = await projectConfig(this.root)
 
     // The editor's setting wins over the project's `kay.config.ts`, as `pages()` options do.
     this.shadowOptions = { routes: params.initializationOptions?.routes ?? config.routes, publicDir: config.publicDir }
     this.routesDir = resolve(this.root, this.shadowOptions.routes ?? 'src/routes')
-    this.shadowTree = `${pathToFileURL(resolve(this.root, SHADOW_DIR)).href}/`
-    this.rootUri = `${pathToFileURL(this.root).href}/`
+    this.shadowTree = `${resolve(this.root, SHADOW_DIR)}/`
+    // A client that writes URIs the way Node does keeps getting them that way, any other the way VS Code does.
+    this.nodeUris = rootUri !== undefined && rootUri !== vscodeUri(this.root) && rootUri === pathToFileURL(this.root).href
 
     await writeShadowTypes(this.root, this.shadowOptions)
 
@@ -305,11 +307,49 @@ export class KayLanguageServer {
     if (!target)
       return null
 
-    const result = await this.server.request<Location | Location[] | LocationLink[] | null>('textDocument/definition', target.params)
-    const locations = result === null ? [] : Array.isArray(result) ? result : [result]
-    const links = await Promise.all(locations.map(async location => this.toSourceLink(target.document, location)))
+    const links = await this.sourceLinks(target.document, await this.definitionsAt(target.params), new Set([positionKey(target.params.textDocument.uri, target.params.position)]))
 
-    return links
+    return uniqueBy(links, link => `${link.targetUri} ${rangeKey(link.targetSelectionRange)}`)
+  }
+
+  private async definitionsAt(at: TextDocumentPositionParams): Promise<(Location | LocationLink)[]> {
+    const result = await this.server.request<Location | Location[] | LocationLink[] | null>('textDocument/definition', at)
+
+    return result === null ? [] : Array.isArray(result) ? result : [result]
+  }
+
+  // Definitions inside another component land in its shadow TSX; this points them back at the .kay file.
+  // One that lands in generated glue, such as the `return { srv }` handing a server value to the template, is asked again from there, to reach the declaration it stands for.
+  private async sourceLinks(origin: Document, locations: (Location | LocationLink)[], asked: Set<string>): Promise<LocationLink[]> {
+    const links = await Promise.all(locations.map(async (location) => {
+      const link = 'targetUri' in location ? location : { targetUri: location.uri, targetRange: location.range, targetSelectionRange: location.range }
+      const shadow = await this.shadowOf(link.targetUri)
+      const originSelectionRange = link.originSelectionRange && toSourceRange(origin, link.originSelectionRange)
+
+      if (!shadow)
+        return [{ ...link, targetUri: this.clientUri(filePath(link.targetUri)), originSelectionRange }]
+
+      const targetUri = this.clientUri(shadow.file)
+      const selection = toSourceRange(shadow, link.targetSelectionRange)
+
+      if (selection)
+        return [{ originSelectionRange, targetUri, targetRange: toSourceRange(shadow, link.targetRange, true) ?? selection, targetSelectionRange: selection }]
+
+      const key = positionKey(link.targetUri, link.targetSelectionRange.start)
+
+      if (!asked.has(key) && asked.size <= MAX_HOPS) {
+        asked.add(key)
+
+        const followed = await this.sourceLinks(origin, await this.definitionsAt({ textDocument: { uri: link.targetUri }, position: link.targetSelectionRange.start }), asked)
+
+        if (followed.length > 0)
+          return followed.map(found => ({ ...found, originSelectionRange }))
+      }
+
+      return [{ originSelectionRange, targetUri, targetRange: toSourceRange(shadow, link.targetRange, true) ?? zeroRange(), targetSelectionRange: toSourceRange(shadow, link.targetSelectionRange, true) ?? zeroRange() }]
+    }))
+
+    return links.flat()
   }
 
   private async references(params: TextDocumentPositionParams & { context: unknown }): Promise<Location[] | null> {
@@ -451,7 +491,14 @@ export class KayLanguageServer {
 
   // A file a rename may change besides .kay files: one of the project's own.
   private editable(uri: string): boolean {
-    return uri.startsWith(this.rootUri) && !uri.includes('/node_modules/')
+    const path = filePath(uri)
+
+    return path.startsWith(`${this.root}/`) && !path.includes('/node_modules/')
+  }
+
+  // The URI the editor knows a file by: the one of its open document, else written like the editor writes them.
+  private clientUri(path: string): string {
+    return [...this.documents.values()].find(document => document.file === path)?.uri ?? (this.nodeUris ? pathToFileURL(path).href : vscodeUri(path))
   }
 
   // Undefined for the declarations kay generates beside the shadow files.
@@ -459,36 +506,19 @@ export class KayLanguageServer {
     const shadow = await this.shadowOf(uri)
 
     if (shadow)
-      return { uri: pathToFileURL(shadow.file).href, shadow }
+      return { uri: this.clientUri(shadow.file), shadow }
 
-    return uri.startsWith(this.shadowTree) ? undefined : { uri }
-  }
-
-  // Definitions inside another component land in its shadow TSX; this points them back at the .kay file.
-  private async toSourceLink(origin: Document, location: Location | LocationLink): Promise<LocationLink> {
-    const link = 'targetUri' in location ? location : { targetUri: location.uri, targetRange: location.range, targetSelectionRange: location.range }
-    const shadow = await this.shadowOf(link.targetUri)
-    const originSelectionRange = link.originSelectionRange && toSourceRange(origin, link.originSelectionRange)
-
-    if (!shadow)
-      return { ...link, originSelectionRange }
-
-    return {
-      originSelectionRange,
-      targetUri: pathToFileURL(shadow.file).href,
-      targetRange: toSourceRange(shadow, link.targetRange, true) ?? zeroRange(),
-      targetSelectionRange: toSourceRange(shadow, link.targetSelectionRange, true) ?? zeroRange(),
-    }
+    return filePath(uri).startsWith(this.shadowTree) ? undefined : { uri: this.clientUri(filePath(uri)) }
   }
 
   private async shadowOf(uri: string): Promise<ShadowFile | undefined> {
-    const open = [...this.documents.values()].find(document => document.shadowUri === uri)
+    const path = filePath(uri)
+    const open = [...this.documents.values()].find(document => filePath(document.shadowUri) === path)
 
     if (open)
       return open
 
-    const path = fileURLToPath(uri)
-    const prefix = `${resolve(this.root, SHADOW_DIR)}/`
+    const prefix = this.shadowTree
 
     if (!path.startsWith(prefix) || !path.endsWith('.kay.tsx'))
       return undefined
@@ -643,7 +673,17 @@ function textAt(text: string, range: Range): string {
 }
 
 function positionKey(uri: string, { line, character }: Position): string {
-  return `${uri} ${line}:${character}`
+  return `${filePath(uri)} ${line}:${character}`
+}
+
+// URIs of one file differ by how they are percent-encoded, so files are compared by path.
+function filePath(uri: string): string {
+  return uri.startsWith('file:') ? fileURLToPath(uri) : uri
+}
+
+// Every character but the unreserved ones is percent-encoded, as VS Code writes a file URI.
+function vscodeUri(path: string): string {
+  return `file://${path.split('/').map(segment => encodeURIComponent(segment).replaceAll(RESERVED_CHARACTER, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)).join('/')}`
 }
 
 function rangeKey({ start, end }: Range): string {
