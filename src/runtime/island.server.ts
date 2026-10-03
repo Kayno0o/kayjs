@@ -29,6 +29,11 @@ export function collectIslands<T>(render: () => T): { result: T, islands: Render
   }
 }
 
+// An island renders in the browser as well, so what it holds follows Solid's own rules there.
+export function insideIsland(): boolean {
+  return depth > 0
+}
+
 export class IslandPropsError extends Error {
   override name = 'IslandPropsError'
 }

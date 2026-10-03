@@ -28,6 +28,12 @@
       "include": "#else"
     },
     {
+      "include": "#await"
+    },
+    {
+      "include": "#await-branch"
+    },
+    {
       "include": "#element"
     }
   ],
@@ -156,6 +162,39 @@
       "captures": {
         "1": {
           "name": "keyword.control.conditional.kay"
+        }
+      }
+    },
+    "await": {
+      "match": "^[ \\t]*(await)[ \\t]+(.*?)(?:[ \\t]+(then)(?:[ \\t]+([a-z_$][\\w$]*))?)?[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.flow.kay"
+        },
+        "2": {
+          "name": "meta.embedded.expression.kay",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        },
+        "3": {
+          "name": "keyword.control.flow.kay"
+        },
+        "4": {
+          "name": "variable.other.readwrite.alias.kay"
+        }
+      }
+    },
+    "await-branch": {
+      "match": "^[ \\t]*(then|catch)(?:[ \\t]+([a-z_$][\\w$]*))?[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.flow.kay"
+        },
+        "2": {
+          "name": "variable.other.readwrite.alias.kay"
         }
       }
     },

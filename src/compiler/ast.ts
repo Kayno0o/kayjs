@@ -69,7 +69,26 @@ export interface SlotNode extends Span {
   children: Node[]
 }
 
-export type Node = ElementNode | TextNode | IfNode | ForNode | SlotNode
+export interface AwaitBranch extends Span {
+  alias?: Span
+  children: Node[]
+}
+
+// `await value`, its pending block, then `then name` and `catch error` at the same indentation; `await value then name` has no pending block.
+export interface AwaitNode extends Span {
+  kind: 'await'
+  value: Span
+  pending: Node[]
+  resolved?: AwaitBranch
+  rejected?: AwaitBranch
+}
+
+export type Node = ElementNode | TextNode | IfNode | ForNode | AwaitNode | SlotNode
+
+// The pending, resolved and failed blocks, in source order.
+export function awaitBlocks(node: AwaitNode): Node[][] {
+  return [node.pending, node.resolved?.children ?? [], node.rejected?.children ?? []]
+}
 
 export interface KayFile {
   source: string

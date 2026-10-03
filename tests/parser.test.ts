@@ -35,6 +35,8 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
         return { if: node.branches.map(branch => ({ test: text(file, branch.test), alias: text(file, branch.alias), children: outline(file, branch.children) })) }
       case 'for':
         return { for: text(file, node.item), index: text(file, node.index), of: text(file, node.each), key: text(file, node.key), children: outline(file, node.children), fallback: node.fallback && outline(file, node.fallback) }
+      case 'await':
+        return { await: text(file, node.value), pending: outline(file, node.pending), resolved: node.resolved && { alias: text(file, node.resolved.alias), children: outline(file, node.resolved.children) }, rejected: node.rejected && { alias: text(file, node.rejected.alias), children: outline(file, node.rejected.children) } }
       case 'slot':
         return { slot: text(file, node.name), children: outline(file, node.children) }
     }
@@ -184,6 +186,24 @@ describe('control flow', () => {
 
   it('rejects a stray else', () => {
     expect(parse('p a\nelse\n  p b').diagnostics[0]?.message).toContain('must directly follow')
+  })
+
+  it('reads await with its pending, then and catch blocks', () => {
+    const file = parse('await comments(post.id)\n  p wait\nthen list\n  p {list.length}\ncatch error\n  p oops\nawait user then\n  p ready\np after')
+
+    expect(outline(file)).toEqual([
+      { await: 'comments(post.id)', pending: [{ tag: 'p', children: [['wait']] }], resolved: { alias: 'list', children: [{ tag: 'p', children: [['{list.length}']] }] }, rejected: { alias: 'error', children: [{ tag: 'p', children: [['oops']] }] } },
+      { await: 'user', pending: [], resolved: { alias: undefined, children: [{ tag: 'p', children: [['ready']] }] }, rejected: undefined },
+      { tag: 'p', children: [['after']] },
+    ])
+    expect(file.diagnostics).toEqual([])
+  })
+
+  it('requires then after await and rejects a stray then or catch', () => {
+    expect(parse('await x\n  p wait\np after').diagnostics[0]?.message).toContain('needs a `then` block')
+    expect(parse('p a\nthen x').diagnostics[0]?.message).toContain('`then` must directly follow an `await`')
+    expect(parse('await x\n  p\ncatch e\n  p').diagnostics.map(d => d.message)).toContain('`catch` must directly follow the `then` of an `await` at the same indentation')
+    expect(parse('await x then a\n  p\nthen b\n  p').diagnostics[0]?.message).toContain('`then` must directly follow')
   })
 
   it('reads slots under a component', () => {

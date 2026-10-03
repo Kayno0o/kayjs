@@ -1,4 +1,5 @@
 import type { Attribute, Diagnostic, ElementNode, KayFile, Node, Span } from './ast'
+import { awaitBlocks } from './ast'
 import { parseKay } from './parser'
 
 export interface FormatResult {
@@ -164,6 +165,8 @@ function multiLineSpans(nodes: Node[]): Span[] {
         return node.branches.flatMap(branch => [...(branch.test ? [branch.test] : []), ...multiLineSpans(branch.children)])
       case 'for':
         return [node.each, node.key, ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]
+      case 'await':
+        return [node.value, ...multiLineSpans(awaitBlocks(node).flat())]
       default:
         return multiLineSpans(node.children)
     }
@@ -214,6 +217,8 @@ function elementsOf(nodes: Node[]): ElementNode[] {
         return node.branches.flatMap(branch => elementsOf(branch.children))
       case 'for':
         return [...elementsOf(node.children), ...elementsOf(node.fallback ?? [])]
+      case 'await':
+        return elementsOf(awaitBlocks(node).flat())
       default:
         return elementsOf(node.children)
     }

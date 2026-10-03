@@ -1,7 +1,7 @@
 import type { CookieMap } from 'bun'
 import type { Setter, SignalOptions } from 'solid-js'
 import type { Action, FailureOf } from './action'
-import type { Locals } from './checks'
+import type { Deferred, Locals } from './checks'
 import { createSignal } from 'solid-js'
 
 export interface Signal<T> {
@@ -65,9 +65,18 @@ export function guard(check: Guard): Guard {
   return check
 }
 
+// Marks a promise for an `await` block and handles its rejection at once: the block renders the failure, and nothing crashes the process before it does.
+export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
+  const promise = Promise.resolve(value)
+
+  void Promise.allSettled([promise])
+
+  return promise as Deferred<T>
+}
+
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
 export type { Action, ActionContext, Failure, FailureOf, FieldName, FormFailure, ServerAction } from './action'
 export { action, ActionError, actionStub, formAction, isAction, registerActions } from './action'
-export type { CheckedHref, HydrateWhen, IslandComponent, IslandProp, Locals, LocalsOf, Register } from './checks'
+export type { AwaitProps, CheckedHref, Deferred, HydrateWhen, IslandComponent, IslandProp, Locals, LocalsOf, Register } from './checks'

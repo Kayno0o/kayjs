@@ -5,9 +5,8 @@ import type { Flash } from './flash'
 import type { ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
 import type { Prefetch } from './speculation'
-import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
+import { createComponent, generateHydrationScript } from '@solidjs/web'
 import { logError, mapStack } from '../build/sourcemap'
-import { collectIslands } from '../runtime/island.server'
 import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
 import { FLASH_COOKIE, readFlash } from './flash'
@@ -16,6 +15,7 @@ import { errorPage } from './overlay'
 import { decodePath } from './routes'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
+import { renderStatic, streamDocument } from './stream'
 
 interface PageModule {
   default: (props: Record<string, unknown>) => JSX.Element
@@ -145,10 +145,10 @@ function hasFlash(request: Request): boolean {
   return request.headers.get('cookie')?.includes(FLASH_COOKIE) ?? false
 }
 
-function respond(rendering: Rendering, html: string): Response {
+function respond(rendering: Rendering, body: string | ReadableStream<Uint8Array>): Response {
   rendering.writeCookies()
 
-  return new Response(html, { status: rendering.status, headers: rendering.headers })
+  return new Response(body, { status: rendering.status, headers: rendering.headers })
 }
 
 // A redirect goes out as is; anything else renders the nearest special page, falling back to plain text.
@@ -185,7 +185,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
 }
 
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.
-async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<string | undefined> {
+async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<string | ReadableStream<Uint8Array> | undefined> {
   const layoutsFailed = page.layouts.some(file => loaded.get(file)?.status === 'rejected')
 
   for (const files of layoutsFailed ? [[page.file]] : [[...page.layouts, page.file], [page.file]]) {
@@ -211,8 +211,8 @@ async function importAll(files: string[]): Promise<PageModule[]> {
   return Promise.all(files.map(async file => await import(file) as PageModule))
 }
 
-// The last module is the page, the others its layouts, outermost first.
-function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, options: RenderOptions): string {
+// The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
+function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, options: RenderOptions): string | ReadableStream<Uint8Array> {
   const page = modules.length - 1
   let view = () => createComponent(modules[page]!.default, data[page]!)
 
@@ -224,15 +224,20 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
     } })
   }
   let head = ''
-  // Pages and layouts are static: only islands, rendered as their own roots, carry hydration keys. Without scripts, a `head` title renders as a `<title>`.
-  const { result: body, islands } = collectIslands(() => renderToString(() => createComponent(NoHydration, { get children() {
-    return view()
-  } }), { noScripts: true, onHead: (html) => {
+  // Without scripts, a `head` title renders as a `<title>`.
+  const { html: body, islands, deferred } = renderStatic(view, (html) => {
     head = html
-  } }))
-  const scripts = client.entry !== undefined && islands.count > 0 ? islandScripts(client, islands.eager) : ''
+  })
+  const streamed = deferred.length > 0
+  const hasIslands = client.entry !== undefined && islands.count > 0
+  const scripts = hasIslands ? islandScripts(client, islands.eager, streamed) : ''
+  const start = `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${stylesheets(client, files)}${scripts}${speculationRules(options.prefetch)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}`
 
-  return `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${stylesheets(client, files)}${scripts}${speculationRules(options.prefetch)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}</body></html>`
+  if (!streamed)
+    return `${start}</body></html>`
+
+  // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
+  return streamDocument(hasIslands ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, hasIslands)
 }
 
 // The stylesheets of the layouts, outermost first, then the page's.
@@ -256,9 +261,9 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   return html
 }
 
-// Preloads every chunk the page's eager islands need, so the browser fetches them alongside the entry instead of one round trip after another.
-function islandScripts(client: ClientBuild, islands: Set<string>): string {
-  const key = [...islands].sort().join('\n')
+// Preloads every chunk the page's eager islands need, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
+function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean): string {
+  const key = `${streamed}\n${[...islands].sort().join('\n')}`
   let cached = scriptsCache.get(client)
 
   if (!cached)
@@ -274,7 +279,7 @@ function islandScripts(client: ClientBuild, islands: Set<string>): string {
         chunks.add(chunk)
     }
 
-    html = `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${generateHydrationScript()}<script type="module" src="${client.entry}"></script>`
+    html = `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${generateHydrationScript()}${streamed ? '' : `<script type="module" src="${client.entry}"></script>`}`
     cached.set(key, html)
   }
 

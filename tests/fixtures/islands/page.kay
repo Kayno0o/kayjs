@@ -1,5 +1,6 @@
 ---
 import Counter from './counter.kay'
+import Greeting from './greeting.kay'
 ---
 main
   h1 Static title
@@ -7,3 +8,4 @@ main
   p after
   Counter(start={5} hydrate="visible")
   Counter(start={7} hydrate="idle")
+  Greeting(name="Ada")

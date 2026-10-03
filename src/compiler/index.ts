@@ -2,6 +2,7 @@ import type { Diagnostic, Node } from './ast'
 import type { SourceMap } from './mapping'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
+import { awaitBlocks } from './ast'
 import { generate, isInteractive } from './codegen'
 import { codeFrame } from './frame'
 import { positionAt } from './mapping'
@@ -77,6 +78,9 @@ function shorthandClasses(nodes: Node[], source: string, found: string[] = []): 
     else if (node.kind === 'if') {
       for (const branch of node.branches)
         shorthandClasses(branch.children, source, found)
+    }
+    else if (node.kind === 'await') {
+      shorthandClasses(awaitBlocks(node).flat(), source, found)
     }
     else {
       shorthandClasses([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], source, found)

@@ -107,4 +107,18 @@ describe('islands', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(idleButton.textContent).toBe('Count 8')
   })
+
+  it('renders an await block in an island pending on the server, then resolves it in the hydrated island', async () => {
+    expect(pageHtml).toMatch(/<p _hk=\S+ class="wait">Waiting<\/p>/)
+    const section = document.querySelector('section.greeting')!
+    const button = section.querySelector('button')!
+
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(document.querySelector('section.greeting')).toBe(section)
+    expect(section.querySelector('p.text')?.textContent).toBe('Hello Ada')
+    expect(section.querySelector('p.wait')).toBeNull()
+    button.dispatchEvent(new Event('click', { bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(button.textContent).toBe('Clicked 1')
+  })
 })

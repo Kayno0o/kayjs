@@ -7,6 +7,7 @@
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
 - Signals are explicit. Read `count()`, write `count.set(1)` or `count.set(c => c + 1)`. Props and server data are plain names, never called: `{title}`, not `{title()}`.
 - Every `for` has a `key={...}`.
+- A promise an `await` block renders is made with `defer()`, never left bare.
 - The component script exports types only. Shared values live in `.ts` modules.
 - A page has no props: its data comes from its `--- server` fence.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
@@ -70,6 +71,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `slot` | Where a layout or wrapper renders its children. |
 | `@name` | Directly under a component: passes the indented block as its `name` prop. |
 | `head` | At the top level: its `title`, `meta`, `link`, `style`, `script` and `base` children go in the document head. |
+| `await value` / `then name` / `catch error` | Renders the indented block under `await` until `value` settles; see Streaming. |
 
 ```kay
 ---
@@ -227,6 +229,35 @@ const todo = await findTodo(id) ?? ctx.notFound()
 h1 {todo.title}
 p.status {todo.done ? 'Done' : 'Open'}
 ```
+
+## Streaming
+
+A load waits for every `await` in its server fence before the page renders. A value the page can show later is made with `defer()` instead, left unawaited, and rendered by an `await` block:
+
+```kay
+--- server
+import { defer } from 'kay'
+import { findPost, listComments } from '../../data'
+
+const post = await findPost(Number(ctx.params.id)) ?? ctx.notFound()
+const comments = defer(listComments(post.id))
+---
+h1 {post.title}
+await comments
+  p Loading comments
+then list
+  ul
+    for comment of list key={comment.id}
+      li {comment.body}
+catch
+  p Comments are unavailable
+```
+
+- The page goes out at once with the block under `await`. Each `then` block streams in as its value resolves, in whatever order they do, swapped in by a few bytes of inline script; islands inside it hydrate when it lands.
+- `await value then name` on one line has no pending block. `catch error` binds the rejection; without `catch`, a rejection removes the pending block and is logged.
+- `defer()` handles a rejection where the promise is made. Without it, a promise rejecting before the page renders it would crash the server, so `kay check` refuses a bare promise in `await`.
+- Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them, and a `head` block inside one is ignored.
+- In an island, `await` renders through Solid's async rendering: the server sends the pending block and the browser renders the rest.
 
 ## Actions
 

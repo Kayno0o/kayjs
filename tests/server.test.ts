@@ -15,10 +15,11 @@ import { auth } from './fixtures/site/src/auth'
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
 const MARKERS = /<!--[$/]-->/g
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
-const ENTRY = /<script type="module" src="\/_kay\/([^"]+)"><\/script>/
+const ENTRY = /<script type="module" (?:async )?src="\/_kay\/([^"]+)"><\/script>/
 const BODY = /<body>([\s\S]*)<\/body>/
 // Any script but the speculation rules, which hold no code.
 const SCRIPT = /<script(?! type="speculationrules")/
+const INLINE_SCRIPTS = /<script>([\s\S]*?)<\/script>/g
 const SPECULATION = /<script type="speculationrules">(.*?)<\/script>/
 // happy-dom swaps in its own Request, which Elysia cannot read headers from.
 const NativeRequest = Request
@@ -376,6 +377,62 @@ describe('guards', () => {
 
     expect(response.status).toBe(403)
     expect(response.headers.get('set-cookie')).toBeNull()
+  })
+})
+
+describe('await blocks', () => {
+  async function chunksOf(path: string): Promise<string[]> {
+    const response = await app.handle(new Request(`http://localhost${path}`))
+    const decoder = new TextDecoder()
+    const chunks: string[] = []
+
+    expect(response.status).toBe(200)
+    for await (const chunk of response.body!)
+      chunks.push(decoder.decode(chunk))
+
+    return chunks
+  }
+
+  it('sends the page at once, then each pending block as it settles', async () => {
+    const [page, failed, ready, end] = await chunksOf('/feed?delay=30')
+
+    expect(page).toContain('<h1>Feed</h1><!--kay-await:')
+    expect(page).toContain('<p class="pending">Loading the feed</p>')
+    expect(page).toContain('<p class="now">right away</p></main>')
+    expect(page).not.toContain('Feed down')
+    expect(failed).toContain('<p class="error">Feed down</p></template>')
+    expect(ready).toContain('<ul><li>first</li><li>second</li></ul><kay-island')
+    expect(ready).toContain('<script type="module" async src="/_kay/')
+    expect(end).toBe('</body></html>')
+  })
+
+  it('swaps each block in for its pending one and hydrates the islands it brings', async () => {
+    const html = (await chunksOf('/feed')).join('')
+
+    GlobalRegistrator.register()
+
+    try {
+      delete (globalThis as { _$HY?: unknown })._$HY
+      document.body.innerHTML = BODY.exec(html)![1]!
+      // Runs the inline scripts in page order, as the browser does while the stream arrives; declarations must land on the global scope.
+      for (const [, script] of html.matchAll(INLINE_SCRIPTS))
+        // eslint-disable-next-line no-eval -- happy-dom does not execute scripts from markup
+        (0, eval)(script!)
+      await hydrateFrom(html)
+
+      expect(document.querySelector('.pending')).toBeNull()
+      expect(document.querySelector('template')).toBeNull()
+      expect([...document.querySelectorAll('main > *')].map(element => element.tagName.toLowerCase())).toEqual(['h1', 'ul', 'kay-island', 'p', 'p'])
+      expect(document.querySelector('p.error')?.textContent).toBe('Feed down')
+      const button = document.querySelector('kay-island button')!
+
+      button.dispatchEvent(new Event('click', { bubbles: true }))
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(button.textContent).toBe('Clicked 3')
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+    }
   })
 })
 

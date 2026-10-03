@@ -20,7 +20,7 @@ interface Document extends ShadowFile {
 const KAY_FILE = /^file:.*\.kay$/
 const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
-const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:For|Show|Omit|Island|Href|Field|Prop|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead))$/
+const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:For|Show|Omit|Island|Href|Field|Prop|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
 const FULL_SYNC = 1
 const ERROR = 1
 const CHANGED = 2

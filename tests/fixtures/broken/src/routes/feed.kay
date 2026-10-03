@@ -1,0 +1,10 @@
+--- server
+import { defer } from 'kay'
+
+const items = Promise.resolve(['a'])
+const later = defer(Promise.resolve(['a']))
+---
+await items then list
+  p {list.length}
+await later then list
+  p {list.lengt}

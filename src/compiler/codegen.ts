@@ -1,7 +1,8 @@
-import type { Attribute, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 import type { Rewrite } from './mapping'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
+import { awaitBlocks } from './ast'
 import { CodeBuilder } from './mapping'
 
 export interface GenerateOptions {
@@ -103,6 +104,9 @@ class Generator {
 
     if (this.options.island)
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
+
+    if (usesAwait(this.file.template))
+      b.add(`import { Await as KayAwait } from 'kay/await'\n`)
 
     const { head, template } = this.splitHead(this.file.template)
 
@@ -399,6 +403,10 @@ class Generator {
           this.emitFor(node)
 
           break
+        case 'await':
+          this.emitAwait(node)
+
+          break
         case 'slot':
           this.reportSlot(node)
 
@@ -446,6 +454,47 @@ class Generator {
         this.emitIf(node, index + 1)
       else
         b.add('null')
+    })
+  }
+
+  // A component taking each block as a function, so the browser and the server each decide when to render which.
+  private emitAwait(node: AwaitNode) {
+    const { b } = this
+
+    b.wrap(node, () => {
+      // An error about the value, such as a promise `defer()` never took, lands on the value itself.
+      b.add('<KayAwait ')
+      b.wrap(node.value, () => b.add('value'))
+      b.add('={').addSource(node.value).add('}')
+
+      if (node.pending.length > 0) {
+        b.add(' pending={() => ')
+        this.emitRoot(node.pending)
+        b.add('}')
+      }
+
+      if (node.resolved)
+        this.emitAwaitBranch('ready', node.resolved)
+
+      if (node.rejected)
+        this.emitAwaitBranch('failed', node.rejected)
+
+      b.add(' />')
+    })
+  }
+
+  private emitAwaitBranch(prop: 'ready' | 'failed', branch: AwaitBranch) {
+    const { b } = this
+
+    b.wrap(branch, () => {
+      b.add(` ${prop}={(`)
+
+      if (branch.alias)
+        b.addSource(branch.alias)
+
+      b.add(') => ')
+      this.emitRoot(branch.children)
+      b.add('}')
     })
   }
 
@@ -809,6 +858,8 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
         return node.branches.some(branch => visit(branch.children))
       case 'for':
         return visit(node.children) || visit(node.fallback ?? [])
+      case 'await':
+        return awaitBlocks(node).some(visit)
       case 'slot':
         return visit(node.children)
     }
@@ -846,6 +897,8 @@ function formHelpers(file: KayFile): KayHelper[] {
         return node.branches.some(branch => hasActionForm(branch.children))
       case 'for':
         return hasActionForm(node.children) || hasActionForm(node.fallback ?? [])
+      case 'await':
+        return awaitBlocks(node).some(hasActionForm)
       case 'slot':
         return hasActionForm(node.children)
     }
@@ -886,6 +939,28 @@ function usesChildrenSlot(nodes: Node[]): boolean {
         return node.branches.some(branch => usesChildrenSlot(branch.children))
       case 'for':
         return usesChildrenSlot(node.children) || usesChildrenSlot(node.fallback ?? [])
+      case 'await':
+        return awaitBlocks(node).some(usesChildrenSlot)
+    }
+
+    return false
+  })
+}
+
+function usesAwait(nodes: Node[]): boolean {
+  return nodes.some((node) => {
+    switch (node.kind) {
+      case 'await':
+        return true
+      case 'element':
+      case 'slot':
+        return usesAwait(node.children)
+      case 'text':
+        return usesAwait(node.parts.filter(part => part.kind === 'element'))
+      case 'if':
+        return node.branches.some(branch => usesAwait(branch.children))
+      case 'for':
+        return usesAwait(node.children) || usesAwait(node.fallback ?? [])
     }
 
     return false
@@ -915,6 +990,10 @@ function usedHelpers(nodes: Node[], script: ScriptAnalysis): Helper[] {
       }
       else if (node.kind === 'element' || node.kind === 'slot') {
         visit(node.children)
+      }
+      else if (node.kind === 'await') {
+        for (const block of awaitBlocks(node))
+          visit(block)
       }
       else {
         visit(node.parts.filter(part => part.kind === 'element'))

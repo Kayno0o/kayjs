@@ -1,4 +1,4 @@
-import type { Attribute, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 
 const FENCE = /---(?:[ \t]+([a-z]+))?[ \t]*\r?\n/y
 const CLOSING_FENCE = /^---[ \t]*$/gm
@@ -9,7 +9,10 @@ const ID_NAME = /[\w-]+/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 const FOR_HEAD = /for\s+([A-Z_$][\w$]*)(?:\s*,\s*([A-Z_$][\w$]*))?\s+of\s+/diy
-const KEYWORD = /(if|else\s+if|else|for)(?=[ \t]|\r?\n|$)/y
+const KEYWORD = /(if|else\s+if|else|for|await|then|catch)(?=[ \t]|\r?\n|$)/y
+// `then list` closing the `await` line, or a bare `then`.
+const INLINE_THEN = /\s+then(?:\s+([a-z_$][\w$]*))?\s*$/d
+const BRANCH_NAME = /[a-z_$][\w$]*/iy
 const ALIAS = /\s+as\s+([a-z_$][\w$]*)\s*$/d
 const KEY_ATTRIBUTE = /\s+key=\{/y
 const CAPITALIZED = /^[A-Z]/
@@ -100,6 +103,11 @@ class TemplateParser {
       this.parseLine(indent, nodes)
     }
 
+    for (const node of nodes) {
+      if (node.kind === 'await' && !node.resolved)
+        this.error(node.start, node.value.end, '`await` needs a `then` block at the same indentation, or `await <value> then <name>` on one line')
+    }
+
     return nodes
   }
 
@@ -142,6 +150,18 @@ class TemplateParser {
 
     if (keyword === 'for') {
       siblings.push(this.parseFor(indent))
+
+      return
+    }
+
+    if (keyword === 'await') {
+      siblings.push(this.parseAwait(indent))
+
+      return
+    }
+
+    if (keyword === 'then' || keyword === 'catch') {
+      this.attachAwaitBranch(indent, siblings.at(-1), keyword)
 
       return
     }
@@ -261,6 +281,65 @@ class TemplateParser {
     this.error(start, this.lineEnd(start), '`else` must directly follow an `if`, an `else if` or a `for` at the same indentation')
     this.pos = this.lineEnd(start)
     this.skipChildren(indent)
+  }
+
+  private parseAwait(indent: number): AwaitNode {
+    const start = this.pos
+
+    this.pos = start + 'await'.length
+    this.skipSpaces()
+    const value = this.scanToLineEnd()
+    const lineEnd = value.end
+    const inline = INLINE_THEN.exec(this.src.slice(value.start, value.end))
+
+    if (inline)
+      value.end = value.start + inline.index
+
+    if (value.start === value.end)
+      this.error(start, lineEnd, 'Expected the value to await: `await comments`')
+
+    if (!inline) {
+      const pending = this.parseBlock(indent)
+
+      return { kind: 'await', start, end: this.lastContentEnd(), value, pending }
+    }
+
+    const group = inline.indices?.[1]
+    const alias = group && { start: value.start + group[0], end: value.start + group[1] }
+    const children = this.parseBlock(indent)
+    const end = this.lastContentEnd()
+
+    return { kind: 'await', start, end, value, pending: [], resolved: { start: value.end, end, alias, children } }
+  }
+
+  // `then name` directly follows an `await`, and `catch error` its `then`; both names are optional.
+  private attachAwaitBranch(indent: number, previous: Node | undefined, keyword: 'then' | 'catch') {
+    const start = this.pos
+    const valid = previous?.kind === 'await' && (keyword === 'then' ? !previous.resolved : previous.resolved !== undefined && !previous.rejected)
+
+    if (!valid) {
+      this.error(start, this.lineEnd(start), keyword === 'then' ? '`then` must directly follow an `await` at the same indentation' : '`catch` must directly follow the `then` of an `await` at the same indentation')
+      this.pos = this.lineEnd(start)
+      this.skipChildren(indent)
+
+      return
+    }
+
+    this.pos = start + keyword.length
+    this.skipSpaces()
+    BRANCH_NAME.lastIndex = this.pos
+    const name = this.atLineEnd() ? null : BRANCH_NAME.exec(this.src)
+    const alias = name ? { start: this.pos, end: this.pos + name[0].length } : undefined
+
+    if (alias)
+      this.pos = alias.end
+
+    this.expectLineEnd(`\`${keyword}\` takes one name at most: \`${keyword} ${keyword === 'then' ? 'value' : 'error'}\``)
+    const children = this.parseBlock(indent)
+    const branch: AwaitBranch = { start, end: this.lastContentEnd(), alias, children }
+
+    previous[keyword === 'then' ? 'resolved' : 'rejected'] = branch
+    previous.end = branch.end
   }
 
   private parseFor(indent: number): ForNode {

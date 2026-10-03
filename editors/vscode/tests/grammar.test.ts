@@ -144,6 +144,16 @@ describe('kay grammar', () => {
     expect(lines[8]).toEqual(['|: punctuation.definition.text.kay', 'plain: source.kay', '{: punctuation.section.embedded.begin.kay', 'x: variable.other.ts', '}: punctuation.section.embedded.end.kay'])
   })
 
+  it('reads await blocks with their then and catch branches', () => {
+    const lines = tokenize(['await comments', '  p Loading', 'then list', 'catch error', 'await user then found', 'then'].join('\n'))
+
+    expect(lines[0]).toEqual(['await: keyword.control.flow.kay', 'comments: variable.other.ts'])
+    expect(lines[2]).toEqual(['then: keyword.control.flow.kay', 'list: variable.other.readwrite.alias.kay'])
+    expect(lines[3]).toEqual(['catch: keyword.control.flow.kay', 'error: variable.other.readwrite.alias.kay'])
+    expect(lines[4]).toEqual(['await: keyword.control.flow.kay', 'user: variable.other.ts', 'then: keyword.control.flow.kay', 'found: variable.other.readwrite.alias.kay'])
+    expect(lines[5]).toEqual(['then: keyword.control.flow.kay'])
+  })
+
   it('handles block expansion, inline elements, escapes and nested braces', () => {
     const [expansion, inline] = tokenize('li: a(href={`/t/${id}`}) {todo.title}\np Hi \\{ #[b.x(y=\'1\') bold] {({ a: 1 }).a}')
 

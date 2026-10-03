@@ -1,0 +1,13 @@
+---
+import { defer, signal } from 'kay'
+
+const { name } = props<{ name: string }>()
+const greeting = defer(new Promise<string>(resolve => setTimeout(resolve, 5, `Hello ${name}`)))
+const clicks = signal(0)
+---
+section.greeting
+  await greeting
+    p.wait Waiting
+  then text
+    p.text {text}
+  button(onClick={() => clicks.set(c => c + 1)}) Clicked {clicks()}

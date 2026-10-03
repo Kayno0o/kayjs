@@ -59,3 +59,19 @@ type IsSerializable<T> = T extends string | number | boolean | null | undefined
 export type IslandProp<Component, Value> = Component extends { readonly [ISLAND]: true }
   ? [IsSerializable<Value>] extends [true] ? unknown : { kayError: 'An island receives its props as JSON: no functions, Dates, Maps, Sets or class instances' }
   : unknown
+
+declare const DEFERRED: unique symbol
+
+// A promise `defer()` marked for an `await` block.
+export type Deferred<T> = Promise<T> & { readonly [DEFERRED]: true }
+
+// A promise rejecting before its block renders would crash the process, unless `defer()` took it when it was made.
+export type AwaitValue<T> = T extends PromiseLike<unknown> ? T extends { readonly [DEFERRED]: true } ? unknown : { kayError: 'Wrap the promise in defer() where it is made: a rejection before the page renders it would crash the server' } : unknown
+
+// What a template's `await` block compiles to: the value, then a function per block.
+export interface AwaitProps<T> {
+  value: T & AwaitValue<T>
+  pending?: () => JSX.Element
+  ready: (value: Awaited<T>) => JSX.Element
+  failed?: (error: unknown) => JSX.Element
+}

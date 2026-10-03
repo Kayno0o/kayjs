@@ -113,8 +113,8 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   const entryFile = join(base, 'entry.ts')
   const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
 
-  // `hydrate` re-runs over a root whose markup was swapped in after load.
-  await Bun.write(entryFile, `import { hydrateIslands } from 'kay/client'\n\nconst islands = {\n${registry}\n}\n\nexport const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)\nexport const ready = hydrate()\n`)
+  // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`.
+  await Bun.write(entryFile, `import { hydrateIslands } from 'kay/client'\n\nconst islands = {\n${registry}\n}\n\nexport const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)\nexport const ready = hydrate()\n\n;(globalThis as { $kayHydrate?: () => unknown }).$kayHydrate = hydrate\n`)
 
   const build = await Bun.build({
     entrypoints: [entryFile],

@@ -1,0 +1,25 @@
+--- server
+import { defer } from 'kay'
+
+const delay = Number(ctx.url.searchParams.get('delay') ?? 20)
+const items = defer(new Promise<string[]>(resolve => setTimeout(resolve, delay, ['first', 'second'])))
+const broken = defer(Promise.reject(new Error('Feed down')))
+const now = 'right away'
+---
+---
+import Counter from '../components/counter.kay'
+---
+h1 Feed
+await items
+  p.pending Loading the feed
+then list
+  ul
+    for item of list key={item}
+      li {item}
+  Counter(start={list.length})
+await broken then value
+  p {value}
+catch error
+  p.error {error instanceof Error ? error.message : 'Failed'}
+await now then value
+  p.now {value}

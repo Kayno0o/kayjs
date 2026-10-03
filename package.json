@@ -16,6 +16,11 @@
       "browser": "./src/runtime/island.client.ts",
       "default": "./src/runtime/island.server.ts"
     },
+    "./await": {
+      "types": "./types/runtime/await.d.ts",
+      "browser": "./src/runtime/await.ts",
+      "default": "./src/runtime/await.server.ts"
+    },
     "./client": {
       "types": "./types/runtime/client.d.ts",
       "default": "./src/runtime/client.ts"
