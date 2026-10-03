@@ -1,0 +1,23 @@
+--- server
+import type { Row } from '../fmt'
+import { fmt } from '../fmt'
+const title: string = 'Typed'
+let count: number = 3
+enum Color { Red = 'red' }
+declare const ambient: number
+const rows: Row[] = [{ id: 1 }]
+type First = typeof rows[number]
+const first: First = rows[0]!
+---
+---
+import type { Row } from '../fmt'
+import { fmt } from '../fmt'
+const label: string = fmt(first.id)
+const row: Row = first
+type Local = typeof label
+const same: Local = label
+const extra: { class?: string, title: string } = { title: 'x' }
+---
+h1 {title} {count} {Color.Red} {label} {row.id} {same} {ambient}
+p.note(class="x") {new Date(0).getFullYear()}
+p.note({...extra} class="y")

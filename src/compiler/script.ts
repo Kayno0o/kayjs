@@ -21,8 +21,21 @@ export interface PropsDeclaration {
   rest?: Span
 }
 
+// One name an import brings in, with the specifier's own span so a duplicate of it can be left out.
+export interface ImportBinding {
+  local: string
+  // `default` and `*` stand for default and namespace imports.
+  imported: string
+  source: string
+  typeOnly: boolean
+  span: Span
+  // The whole `import ... from '...'` statement.
+  declaration: Span
+}
+
 export interface ScriptAnalysis {
   hoisted: Span[]
+  imports: ImportBinding[]
   // The quoted module names of hoisted imports and re-exports.
   specifiers: Span[]
   // True when the script imports a value from `kay` or `solid-js`: it holds client state, so the component becomes an island.
@@ -33,8 +46,9 @@ export interface ScriptAnalysis {
 }
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
-export function analyzeScript(source: string, script: Span | undefined): ScriptAnalysis {
-  const analysis: ScriptAnalysis = { hoisted: [], specifiers: [], body: [], reactive: false, diagnostics: [] }
+// `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of.
+export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = []): ScriptAnalysis {
+  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], reactive: false, diagnostics: [] }
 
   if (!script)
     return analysis
@@ -45,13 +59,15 @@ export function analyzeScript(source: string, script: Span | undefined): ScriptA
     return analysis
 
   const { ast, shift } = parsed
+  const local = bodyTypes(ast.program.body, serverNames, shift, analysis.diagnostics)
   let cursor = script.start
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
 
-    if (isHoisted(statement)) {
+    if (isHoisted(statement, local)) {
       analysis.hoisted.push(span)
+      analysis.imports.push(...importBindings(statement, shift))
       analysis.specifiers.push(...moduleSpecifier(statement, shift))
       analysis.reactive ||= importsReactiveValue(statement)
     }
@@ -94,6 +110,7 @@ export interface ServerData {
 export interface ServerAnalysis {
   // Imports and types, plus exported values such as actions: module level, outside `load`.
   hoisted: Span[]
+  imports: ImportBinding[]
   specifiers: Span[]
   exports: Span[]
   // Names the exports declare: actions the server registers and browser builds replace with fetch stubs.
@@ -110,20 +127,22 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], specifiers: [], exports: [], exportNames: [], body: [], data: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], body: [], data: [], diagnostics: [] }
   const parsed = parseFence(source, server, analysis.diagnostics)
 
   if (!parsed)
     return analysis
 
   const { ast, shift } = parsed
+  const local = bodyTypes(ast.program.body, [], shift, analysis.diagnostics)
   let cursor = server.start
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
 
-    if (isHoisted(statement)) {
+    if (isHoisted(statement, local)) {
       analysis.hoisted.push(span)
+      analysis.imports.push(...importBindings(statement, shift))
       analysis.specifiers.push(...moduleSpecifier(statement, shift))
     }
     else if (statement.type === 'ExportNamedDeclaration' && statement.declaration) {
@@ -139,8 +158,10 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
         analysis.body.push({ start: cursor, end: span.start })
 
       analysis.body.push(span)
-      for (const identifier of declaredIdentifiers(statement))
-        analysis.data.push({ name: identifier.name, local: shift(identifier) })
+      for (const identifier of declaredIdentifiers(statement)) {
+        if (!analysis.data.some(data => data.name === identifier.name))
+          analysis.data.push({ name: identifier.name, local: nameSpan(identifier, shift) })
+      }
     }
 
     cursor = span.end
@@ -149,9 +170,23 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   return analysis
 }
 
+// The name alone: an annotated identifier's range runs on through `: string`.
+function nameSpan(identifier: t.Identifier, shift: (node: t.Node) => Span): Span {
+  const { start } = shift(identifier)
+
+  return { start, end: start + identifier.name.length }
+}
+
+// A `const enum` is no value to hand on, and an ambient declaration only describes something that exists elsewhere.
 function declaredIdentifiers(statement: t.Statement): t.Identifier[] {
+  if (isAmbient(statement))
+    return []
+
   if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration')
     return statement.id ? [statement.id] : []
+
+  if (statement.type === 'TSEnumDeclaration')
+    return statement.const ? [] : [statement.id]
 
   if (statement.type !== 'VariableDeclaration')
     return []
@@ -220,17 +255,138 @@ function moduleSpecifier(statement: t.Statement, shift: (node: t.Node) => Span):
   return source ? [shift(source)] : []
 }
 
-function isHoisted(statement: t.Statement): boolean {
-  if (statement.type === 'ImportDeclaration' || statement.type === 'TSTypeAliasDeclaration' || statement.type === 'TSInterfaceDeclaration')
+function importBindings(statement: t.Statement, shift: (node: t.Node) => Span): ImportBinding[] {
+  if (statement.type !== 'ImportDeclaration')
+    return []
+
+  const declaration = shift(statement)
+  const source = statement.source.value
+
+  return statement.specifiers.map((specifier) => {
+    const typeOnly = statement.importKind === 'type' || (specifier.type === 'ImportSpecifier' && specifier.importKind === 'type')
+    let imported = '*'
+
+    if (specifier.type === 'ImportDefaultSpecifier')
+      imported = 'default'
+    else if (specifier.type === 'ImportSpecifier')
+      imported = specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
+
+    return { local: specifier.local.name, imported, source, typeOnly, span: shift(specifier), declaration }
+  })
+}
+
+// A `declare` statement describes a global, so it belongs at module level: a function body cannot hold one.
+function isAmbient(statement: t.Statement): boolean {
+  const declaration = statement.type === 'ExportNamedDeclaration' && statement.declaration ? statement.declaration : statement
+
+  return 'declare' in declaration && declaration.declare === true
+}
+
+function typeDeclaration(statement: t.Statement): t.TSTypeAliasDeclaration | t.TSInterfaceDeclaration | undefined {
+  const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+
+  return declaration?.type === 'TSTypeAliasDeclaration' || declaration?.type === 'TSInterfaceDeclaration' ? declaration : undefined
+}
+
+function isHoisted(statement: t.Statement, local: ReadonlySet<t.Statement>): boolean {
+  if (local.has(statement))
+    return false
+
+  // A namespace cannot sit inside a function either.
+  if (statement.type === 'ImportDeclaration' || statement.type === 'TSModuleDeclaration' || isAmbient(statement) || typeDeclaration(statement))
     return true
 
   if (statement.type !== 'ExportNamedDeclaration')
     return false
 
-  if (statement.exportKind === 'type')
-    return true
+  return statement.exportKind === 'type'
+}
 
-  return statement.declaration?.type === 'TSTypeAliasDeclaration' || statement.declaration?.type === 'TSInterfaceDeclaration'
+function leftmost(name: t.Node): string | undefined {
+  if (name.type === 'TSQualifiedName')
+    return leftmost(name.left)
+
+  return name.type === 'Identifier' ? name.name : undefined
+}
+
+function eachNode(node: t.Node | null | undefined, visit: (node: t.Node) => void) {
+  if (!node || typeof node.type !== 'string')
+    return
+
+  visit(node)
+
+  for (const key of Object.keys(node) as (keyof t.Node)[]) {
+    if (key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments' || key === 'loc')
+      continue
+
+    const value = node[key] as unknown
+
+    if (Array.isArray(value)) {
+      for (const child of value)
+        eachNode(child as t.Node, visit)
+    }
+    else if (value && typeof value === 'object') {
+      eachNode(value as t.Node, visit)
+    }
+  }
+}
+
+// A type is hoisted above the function so it is visible everywhere, but one taking the `typeof` a name the body declares has to stay in the body, and so does one built from such a type.
+function bodyTypes(statements: t.Statement[], extraNames: string[], shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): Set<t.Statement> {
+  const values = new Set(extraNames)
+  const types: { statement: t.Statement, name: string, values: Set<string>, types: Set<string> }[] = []
+
+  for (const statement of statements) {
+    const declaration = typeDeclaration(statement)
+
+    if (!declaration) {
+      if (statement.type !== 'ImportDeclaration' && statement.type !== 'TSModuleDeclaration') {
+        for (const identifier of declaredIdentifiers(statement))
+          values.add(identifier.name)
+      }
+
+      continue
+    }
+
+    const found = { statement, name: declaration.id.name, values: new Set<string>(), types: new Set<string>() }
+
+    eachNode(declaration, (node) => {
+      const reference = node.type === 'TSTypeQuery' ? leftmost(node.exprName) : node.type === 'TSTypeReference' ? leftmost(node.typeName) : undefined
+
+      if (reference !== undefined)
+        (node.type === 'TSTypeQuery' ? found.values : found.types).add(reference)
+    })
+    types.push(found)
+  }
+
+  const local = new Set<t.Statement>()
+  const exported = new Set<t.Statement>()
+  const names = new Set<string>()
+
+  for (let changed = true; changed;) {
+    changed = false
+
+    for (const type of types) {
+      if (local.has(type.statement) || (![...type.values].some(name => values.has(name)) && ![...type.types].some(name => names.has(name))))
+        continue
+
+      // An export belongs at module level, where the body's names are out of reach.
+      if (type.statement.type === 'ExportNamedDeclaration') {
+        if (!exported.has(type.statement))
+          diagnostics.push({ ...shift(type.statement), message: `\`${type.name}\` is exported, so it sits at module level, where it cannot refer to the script's own names; drop the \`export\`` })
+
+        exported.add(type.statement)
+
+        continue
+      }
+
+      local.add(type.statement)
+      names.add(type.name)
+      changed = true
+    }
+  }
+
+  return local
 }
 
 function withLeadingComments(statement: t.Statement, shift: (node: t.Node | t.Comment) => Span): Span {

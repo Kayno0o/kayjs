@@ -18,7 +18,11 @@ export interface Rewrite {
   before?: string
   replace?: string
   after?: string
+  // The name is a component tag the rewrite cannot spell as one: it opens as `KayDynamic component={...}`.
+  dynamic?: boolean
 }
+
+export const DYNAMIC_TAG = 'KayDynamic'
 
 export class CodeBuilder {
   code = ''
@@ -57,6 +61,21 @@ export class CodeBuilder {
     this.copy(cursor, span.end)
 
     return this
+  }
+
+  // A component tag's name, which `KayDynamic` takes as a value when it is read through a call or a default; returns whether it did, so the closing tag matches.
+  addTag(span: Span): boolean {
+    const dynamic = this.rewritesIn(span).some(([, rewrite]) => rewrite.dynamic)
+
+    if (dynamic)
+      this.code += `${DYNAMIC_TAG} component={`
+
+    this.addSource(span)
+
+    if (dynamic)
+      this.code += '}'
+
+    return dynamic
   }
 
   // Maps everything `emit` generates back to `source` as one range.

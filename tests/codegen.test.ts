@@ -71,10 +71,10 @@ describe('props', () => {
   it('applies defaults on every read and handles renames, quoted keys and the rest', () => {
     const code = tsx('---\nconst { size = \'md\', label: text, \'aria-label\': aria, ...rest } = props<{ size?: string, label: string, \'aria-label\'?: string, id?: string }>()\n---\nbutton(aria-label={aria} {...rest}) {size} {text}')
 
-    expect(code).toContain('const __default_0 = (\'md\');')
+    expect(code).toContain('const __default_0 = (): Exclude<(typeof __props)["size"], undefined> => (\'md\');')
     expect(code).toContain('const rest = KayOmit(__props, "size", "label", "aria-label");')
     expect(code).toContain('aria-label={__props["aria-label"]}')
-    expect(code).toContain('{(__props.size ?? __default_0)} {__props.label}')
+    expect(code).toContain('{(__props.size !== undefined ? __props.size : __default_0())} {__props.label}')
   })
 
   it('leaves shadowing names alone', () => {
@@ -156,7 +156,7 @@ describe('elements', () => {
 
   it('binds inputs both ways, with the right event and value type', () => {
     expect(jsx('input(bind:value={name})')).toBe('<input value={(name)()} onInput={(kayEvent) => (name).set(kayEvent.currentTarget.value)} />')
-    expect(jsx('input(type="number" bind:value={n})')).toContain('kayEvent.currentTarget.valueAsNumber')
+    expect(jsx('input(type="number" bind:value={n})')).toContain('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (n).set(kayValue) }')
     expect(jsx('input(type="checkbox" bind:checked={on})')).toContain('checked={(on)()} onChange=')
     expect(jsx('select(bind:value={v})')).toContain('onChange=')
     expect(errors('Field(bind:value={v})')).toEqual([expect.stringContaining('`bind:` works on')])
@@ -249,5 +249,194 @@ describe('source mapping', () => {
     // `title` becomes `__props.title`, right after the run copying `row && `.
     expect(copies(source.lastIndexOf('title'))).toEqual(['tit'])
     expect(copies(source.indexOf('title'))).toEqual(['tit'])
+  })
+})
+
+describe('server fence names', () => {
+  const rewritten = (source: string) => compileKay(source, 'test.kay', { includeServer: true })
+
+  it('keeps every rewrite when a declaration carries a type annotation', () => {
+    const result = rewritten('--- server\nconst title: string = \'T\'\nlet count: number\nconst { a }: { a: number } = { a: 1 }\n---\nh1 {title} {count} {a}')
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.tsx).toContain('return { title, count, a }')
+    expect(result.tsx).toContain('<h1>{__props.title} {__props.count} {__props.a}</h1>')
+  })
+
+  it('hands on enums, once each name, and leaves ambient declarations and namespaces at module level', () => {
+    const result = rewritten('--- server\nenum Color { Red = \'red\' }\nvar x = 1\nvar x = 2\ndeclare const dd: number\nnamespace Util { export const one = 1 }\ndeclare function ambient(): void\n---\np {Color.Red} {x} {Util.one}')
+    const [module, load] = result.tsx.split('export async function load')
+
+    expect(result.diagnostics).toEqual([])
+    expect(load).toContain('return { Color, x }')
+    expect(load).toContain('enum Color')
+    expect(module).toContain('declare const dd: number')
+    expect(module).toContain('namespace Util')
+    expect(module).toContain('declare function ambient(): void')
+    expect(load).not.toContain('namespace')
+    expect(load).not.toContain('declare')
+  })
+})
+
+describe('imports in both fences', () => {
+  const both = (server: string, script: string) => compileKay(`--- server\n${server}\n---\n---\n${script}\n---\np x`, 'test.kay', { includeServer: true })
+
+  it('declares an import both fences make once', () => {
+    const result = both('import { fmt } from \'./fmt\'\nconst a = fmt(1)', 'import { fmt } from \'./fmt\'\nconst b = fmt(2)')
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.tsx.match(/import \{ fmt \}/g)).toHaveLength(1)
+    expect(both('import type { Row } from \'./fmt\'', 'import type { Row } from \'./fmt\'').tsx.match(/import type \{ Row \}/g)).toHaveLength(1)
+  })
+
+  it('leaves out only the names already imported, and the commas around them', () => {
+    const result = both('import def, { a, b, c } from \'./m\'', 'import def, { b } from \'./m\'')
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.tsx).toContain('import def, { b } from \'./m\'\nimport { a, c } from \'./m\'')
+    expect(both('import { a, b } from \'./m\'', 'import { a } from \'./m\'').tsx).toContain('import { b } from \'./m\'')
+  })
+
+  it('reports a name imported two different ways', () => {
+    expect(both('import { fmt } from \'./other\'', 'import { fmt } from \'./fmt\'').diagnostics.map(d => d.message)).toEqual([expect.stringContaining('`fmt` is imported twice')])
+    expect(both('import { fmt as other } from \'./fmt\'', 'import { other } from \'./fmt\'').diagnostics).toHaveLength(1)
+    expect(both('import { Row } from \'./fmt\'', 'import type { Row } from \'./fmt\'').diagnostics).toHaveLength(1)
+  })
+})
+
+describe('component names', () => {
+  it('takes a prop, a server value or a loop item as the component tag, opening and closing alike', () => {
+    const code = tsx('---\nconst { Icon, Wrap, items } = props<{ Icon: unknown, Wrap: unknown, items: unknown[] }>()\n---\nIcon(n="x")\nWrap\n  p a\nfor Item of items key={Item}\n  Item(x="1")\n    p b')
+
+    expect(code).toContain('<__props.Icon n="x" />')
+    expect(code).toContain('<__props.Wrap><p>a</p></__props.Wrap>')
+    expect(code).toContain('{(Item) => <KayDynamic component={Item()} x="1"><p>b</p></KayDynamic>}')
+    expect(code).toContain('import { Dynamic as KayDynamic } from \'@solidjs/web\'')
+  })
+
+  it('reads a component prop with a default through Dynamic as well', () => {
+    const code = tsx('---\nconst { Icon = Fallback } = props<{ Icon?: unknown }>()\nconst Fallback = () => null\n---\nIcon\n  p a')
+
+    expect(code).toContain('<KayDynamic component={(__props.Icon !== undefined ? __props.Icon : __default_0())}><p>a</p></KayDynamic>')
+  })
+
+  it('renames the function when the template reads a global of its name', () => {
+    expect(compileKay('---\nconst { ts } = props<{ ts: number }>()\n---\np {new Date(ts).getFullYear()}', 'date.kay').tsx).toContain('export default function DatePage(')
+    expect(compileKay('p {Date.now()}', 'date.kay').tsx).toContain('export default function DatePage(')
+    expect(compileKay('p {Date.now()}', 'other.kay').tsx).toContain('export default function Other(')
+  })
+
+  it('keeps the name for a template that renders the component itself', () => {
+    expect(compileKay('---\nconst { n } = props<{ n: number }>()\n---\nif n > 0\n  Tree(n={n - 1})', 'tree.kay').tsx).toContain('export default function Tree(')
+    expect(compileKay('---\nimport { signal } from \'kay\'\n---\np {Counter}', 'counter.kay').tsx).toContain('\nfunction CounterPage(')
+  })
+})
+
+describe('prop defaults', () => {
+  it('reads a default only for an undefined prop and runs it only then', () => {
+    const code = tsx('---\nconst { opts = {}, fmt = (v: number) => String(v) } = props<{ opts?: { a?: number }, fmt?: (v: number) => string }>()\n---\np {opts.a} {fmt(1)}')
+
+    expect(code).toContain('const __default_0 = (): Exclude<(typeof __props)["opts"], undefined> => ({});')
+    expect(code).toContain('(__props.opts !== undefined ? __props.opts : __default_0()).a')
+    expect(code).not.toContain('??')
+  })
+
+  it('applies a default to a renamed and a quoted key too', () => {
+    const code = tsx('---\nconst { label: text = \'x\', \'aria-label\': aria = \'y\' } = props<{ label?: string, \'aria-label\'?: string }>()\n---\np {text} {aria}')
+
+    expect(code).toContain('(__props.label !== undefined ? __props.label : __default_0())')
+    expect(code).toContain('(__props["aria-label"] !== undefined ? __props["aria-label"] : __default_1())')
+  })
+})
+
+describe('types in the component script', () => {
+  it('keeps a type of a script name in the body, and the types built from it', () => {
+    const code = tsx('---\nimport type { Foo } from \'./foo\'\nconst { a } = props<{ a: string }>()\nconst rows = [{ id: 1 }]\ntype Row = typeof rows[number]\ntype Rows = Row[]\ntype A = typeof a\ntype Plain = { id: number }\ninterface Shape { row: Row }\n---\np x')
+    const [module, body] = code.split('export default function')
+
+    expect(module).toContain('import type { Foo }')
+    expect(module).toContain('type Plain = { id: number }')
+    for (const text of ['type Row = typeof rows[number]', 'type Rows = Row[]', 'type A = typeof __props.a', 'interface Shape'])
+      expect(body).toContain(text)
+
+    expect(module).not.toContain('type Row')
+  })
+
+  it('keeps a type of a name the server fence hands on in the body', () => {
+    const code = compileKay('--- server\nconst rows = [1]\ntype Row = typeof rows[number]\n---\n---\ntype Same = typeof rows\ntype Plain = string\n---\np x', 'test.kay', { includeServer: true }).tsx
+    const load = code.slice(code.indexOf('export async function load'), code.indexOf('export default function'))
+
+    expect(load).toContain('type Row = typeof rows[number]')
+    expect(code.slice(code.indexOf('export default function'))).toContain('type Same = typeof __props.rows')
+    expect(code.slice(0, code.indexOf('export async function load'))).toContain('type Plain = string')
+  })
+
+  it('reports an exported type that needs a script name', () => {
+    expect(errors('---\nconst rows = [1]\nexport type Row = typeof rows[number]\n---\np x')).toEqual([expect.stringContaining('`Row` is exported')])
+  })
+})
+
+describe('invalid code', () => {
+  const at = (source: string) => compileKay(source, 'test.kay').diagnostics.map(d => ({ message: d.message, text: source.slice(d.start, d.start + 5) }))
+
+  it('reports template expressions that do not parse at their position in the source', () => {
+    expect(at('p {x +}')).toEqual([{ message: expect.stringContaining('Unexpected token'), text: '}' }])
+    expect(at('---\nconst p = 1\n---\np {await p}')).toEqual([{ message: expect.stringContaining('read async data in the `--- server` fence'), text: 'await' }])
+  })
+
+  it('flags an await in the component script', () => {
+    expect(at('---\nconst x = await Promise.resolve(1)\n---\np {x}')).toEqual([{ message: expect.stringContaining('\'await\''), text: 'await' }])
+  })
+
+  it('reports a duplicate declaration, which the generated code cannot hold', () => {
+    expect(compileKay('--- server\nconst x = 1\n---\n---\nconst x = 2\n---\np {x}', 'test.kay').diagnostics.map(d => d.message)).toEqual([expect.stringContaining('already been declared')])
+  })
+
+  it('leaves the fence diagnostics alone when the code does not parse for their reason', () => {
+    expect(compileKay('---\nconst x = (\n---\np x', 'test.kay').diagnostics).toHaveLength(1)
+  })
+})
+
+describe('read-only diagnostics', () => {
+  it('point at the name a statement writes, not at the start of the statement', () => {
+    const source = '---\nconst { a, b, c, d } = props<{ a: number, b: number, c: number[], d: number }>()\nfunction f() {\n  a = 1\n  ++b\n  ;[d] = [2]\n  for (c of [[1]]) {}\n  ;({ x: a } = { x: 1 })\n}\n---\np x'
+    const found = compileKay(source, 'test.kay').diagnostics.map(d => source.slice(d.start, d.end))
+
+    expect(found).toEqual(['a', 'b', 'd', 'c', 'a'])
+  })
+})
+
+describe('class shorthand', () => {
+  it('merges with the class attribute and the class of every spread', () => {
+    expect(jsx('p.a({...sp})')).toBe('<p {...sp} class={["a", ((sp) as unknown as { class?: string }).class]} />')
+    expect(jsx('p.a({...sp} class="z")')).toBe('<p {...sp} class={["a", ((sp) as unknown as { class?: string }).class, "z"]} />')
+    expect(jsx('p.a(class={c} {...sp})')).toBe('<p {...sp} class={["a", (c), ((sp) as unknown as { class?: string }).class]} />')
+    expect(jsx('p.a(title="t" {...sp} id="i")')).toBe('<p title="t" {...sp} id="i" class={["a", ((sp) as unknown as { class?: string }).class]} />')
+  })
+
+  it('stays where it is without a spread', () => {
+    expect(jsx('p.a(title="t" class="b")')).toBe('<p class="a b" title="t" />')
+  })
+})
+
+describe('text lines', () => {
+  it('separates consecutive lines with a line break, and nothing else', () => {
+    expect(jsx('p\n  | one\n  | two {x}\n  | three')).toBe('<p>one{"\\n"}two {x}{"\\n"}three</p>')
+    expect(jsx('p one\n  | two')).toBe('<p>one{"\\n"}two</p>')
+    expect(jsx('p\n  | one\n  b two\n  | three')).toBe('<p>one<b>two</b>three</p>')
+  })
+})
+
+describe('lowercase events', () => {
+  it('suggests the camelCase name', () => {
+    expect(errors('button(onclick={go}) x')).toEqual(['`onclick` does not attach a handler: events are written in camelCase, as `onClick`'])
+    expect(errors('button(on:click={go}) x')).toEqual(['`on:click` does not attach a handler: events are written in camelCase, as `onClick`'])
+    expect(errors('input(onkeydown={go} ondblclick={go})')).toEqual([expect.stringContaining('`onKeyDown`'), expect.stringContaining('`onDblClick`')])
+  })
+
+  it('leaves components, strings and the camelCase form alone', () => {
+    expect(errors('Card(onclick={go})')).toEqual([])
+    expect(errors('button(onclick="go()") x')).toEqual([])
+    expect(errors('button(onClick={go}) x')).toEqual([])
   })
 })

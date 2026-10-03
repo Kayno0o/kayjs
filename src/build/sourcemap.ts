@@ -14,7 +14,12 @@ interface Compiled {
 }
 
 const BASE64_DIGITS = new Map([...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'].map((char, index) => [char, index]))
-const KAY_FRAME = /([^\s()]+\.kay):(\d+):(\d+)/g
+// A stack line is `at fn (path:line:column)` or `at path:line:column`, and the path may hold spaces and parentheses.
+const FRAME_START = /^\s*at\s+/
+const PATH_IN_PARENTHESES = /\s\((?=\/|[A-Z]:[\\/])/i
+const FRAME_POSITION = /\.kay:(\d+):(\d+)/
+// Anything else mentioning a position, such as an error message.
+const KAY_POSITION = /([^\s()]+\.kay):(\d+):(\d+)/g
 const VLQ_CONTINUATION = 32
 const VLQ_VALUE = 31
 
@@ -39,12 +44,27 @@ function compiledFor(file: string): Compiled | undefined {
 
 // Points every `.kay` frame of a stack at the line and column of the `.kay` source; other frames are left as they are.
 export function mapStack(stack: string): string {
-  return stack.replace(KAY_FRAME, (frame, file: string, line: string, column: string) => {
-    const module = compiledFor(file)
-    const position = module && toKay(module, Number(line), Number(column))
+  return stack.split('\n').map((text) => {
+    const position = FRAME_POSITION.exec(text)
+    const start = FRAME_START.exec(text)
 
-    return position ? `${file}:${position.line}:${position.column}` : frame
-  })
+    if (!position || !start)
+      return text.replace(KAY_POSITION, (found, file: string, line: string, column: string) => mapPosition(file, line, column) ?? found)
+
+    const parenthesised = text.search(PATH_IN_PARENTHESES)
+    const from = parenthesised !== -1 && parenthesised < position.index ? parenthesised + 2 : start[0].length
+    const file = text.slice(from, position.index + 4)
+    const end = position.index + position[0].length
+
+    return `${text.slice(0, from)}${mapPosition(file, position[1]!, position[2]!) ?? text.slice(from, end)}${text.slice(end)}`
+  }).join('\n')
+}
+
+function mapPosition(file: string, line: string, column: string): string | undefined {
+  const module = compiledFor(file)
+  const position = module && toKay(module, Number(line), Number(column))
+
+  return position ? `${file}:${position.line}:${position.column}` : undefined
 }
 
 // Bun would print the compiled code around the throw, so an error goes out as its stack mapped to `.kay` lines.

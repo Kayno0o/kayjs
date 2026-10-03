@@ -114,3 +114,44 @@ describe('client bundle', () => {
     dispose()
   })
 })
+
+describe('bind:value on a number input', () => {
+  it('keeps the signal\'s last number while the input is empty', async () => {
+    const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+
+    try {
+      await Bun.write(join(dir, 'number.kay'), '---\nimport { signal } from \'kay\'\nconst n = signal<number>(5)\n---\ninput#num(type="number" bind:value={n})\ninput#range(type="range" min="0" max="10" bind:value={n})\np#out {n()}\n')
+      await Bun.write(join(dir, 'entry.ts'), 'import { render } from \'@solidjs/web\'\nimport Number from \'./number.kay\'\n\nexport function mount(element: HTMLElement) {\n  return render(() => Number({}), element)\n}\n')
+
+      const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: join(dir, 'out'), target: 'browser', plugins: [kay()] })
+
+      if (!build.success)
+        throw new AggregateError(build.logs, 'client build failed')
+
+      const { mount } = await import(build.outputs[0]!.path) as Pick<ClientModule, 'mount'>
+      const root = document.createElement('div')
+
+      document.body.append(root)
+      const dispose = mount(root)
+      const input = root.querySelector<HTMLInputElement>('#num')!
+      const output = root.querySelector('#out')!
+      const type = async (value: string) => {
+        input.value = value
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        await settle()
+      }
+
+      expect(input.value).toBe('5')
+      await type('7')
+      expect(output.textContent).toBe('7')
+      await type('')
+      expect(output.textContent).toBe('7')
+      await type('8.5')
+      expect(output.textContent).toBe('8.5')
+      dispose()
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})

@@ -190,3 +190,9 @@ function firstLine(text: string): string {
 
   return end === -1 ? text : text.slice(0, end)
 }
+
+describe('kay check on compiler output', () => {
+  it('types annotated server declarations, duplicate imports, prop defaults, script types, component tags and merged classes', async () => {
+    expect(await check(join(fixtures, 'compiler'))).toEqual([])
+  })
+})

@@ -1,0 +1,24 @@
+---
+import type { JSX } from '@solidjs/web'
+import type { Component } from 'solid-js'
+const { opts = {}, fmt = v => String(v), size = 'md', list = [], Icon, Wrap, items } = props<{
+  opts?: { a?: number }
+  fmt?: (v: number) => string
+  size?: 'sm' | 'md'
+  list?: string[]
+  Icon: Component<{ n?: string }>
+  Wrap: Component<{ children?: JSX.Element }>
+  items: Component<{ n?: string }>[]
+}>()
+const n: number = opts.a ?? 0
+const s: 'sm' | 'md' = size
+const l: string[] = list
+type Row = typeof l[number]
+const first: Row | undefined = l[0]
+---
+p {opts.a} {fmt(1)} {size} {n} {s} {l.length} {first}
+Icon(n={size})
+Wrap
+  p {size}
+for Item of items key={Item}
+  Item(n={size})

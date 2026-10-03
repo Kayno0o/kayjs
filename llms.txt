@@ -48,8 +48,9 @@ li(class={size})
   span {todo.title}
 ```
 
-- Destructure one level deep and read nested fields as `todo.title`; give defaults in the destructuring. `const all = props<T>()` also works and reads as `all.todo`.
+- Destructure one level deep and read nested fields as `todo.title`; give defaults in the destructuring. A default applies only to an `undefined` prop (`null` stays `null`) and runs only then, each time the prop is read. `const all = props<T>()` also works and reads as `all.todo`.
 - Props stay reactive: the compiler turns each destructured name into a live read. They are read-only.
+- Imports, `type` and `interface` declarations are module level, except a type taking the `typeof` a name the script declares, which stays inside the component. Both fences may import the same name; the server fence's copy is dropped.
 - `signal(value)` from `kay` makes state; `signal<T>()` starts as `undefined`. Derived values are plain functions: `const shown = () => todos.filter(t => !t.done)`.
 - `selection<Key>(initial?)` from `kay` holds one selected string or number key among many rows, or none. It reads as `selected()` and writes as `selected.set(id)`, and `selected.is(row.id)` re-runs only for the rows a change selects or unselects, not every row: `tr(class={{ danger: selected.is(row.id) }})`.
 - Other Solid primitives come from `solid-js`.
@@ -62,8 +63,8 @@ Each line is one of the following; deeper indentation nests children under the l
 | --- | --- |
 | `tag.class#id(attributes) text` | An element. Each part is optional, but the line starts with a tag, `.` or `#`. |
 | `.card` | A `div`: a line starting with `.` or `#` has an implied `div`. |
-| `Card(title="x")` | A component: a capitalised tag, imported in the script. |
-| `\| text {expr}` | A text line, also the way to put a lone `{expr}` on its own line. |
+| `Card(title="x")` | A component: a capitalised tag, imported in the script. A prop, a server value or a loop item holding a component works as the tag too. |
+| `\| text {expr}` | A text line, also the way to put a lone `{expr}` on its own line. Consecutive text lines are joined with a line break. |
 | `// note` | A comment. Lines indented under it are commented out too. |
 | `if cond` / `else if cond` / `else` | Conditional rendering. |
 | `if user() as u` | Binds the truthy value to `u` for the children. |
@@ -99,10 +100,10 @@ section.todo-list
 ### Elements
 
 - Classes: `.class` takes Tailwind names, `:`, `/`, `@` and `!` included: `div.md:flex.w-1/2.hover:underline`. A class holding `.` or `[` goes in `class="..."`.
-- `class={...}` takes a string, an array or a `{ name: boolean }` object, and merges with the `.class` shorthand. An element has one `class` attribute and one id.
+- `class={...}` takes a string, an array or a `{ name: boolean }` object, and merges with the `.class` shorthand and with the `class` of a `{...spread}`. An element has one `class` attribute and one id.
 - Attributes are separated by spaces, inside one pair of parentheses that may span lines: `a(href="/x" target="_blank")`. A value is a quoted string or `{expression}`. A name alone is a boolean attribute. `{...obj}` spreads.
-- Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`.
-- `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways.
+- Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`. A lowercase `onclick` or `on:click` attaches nothing, and kay reports it.
+- `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways. On `type="number"` and `type="range"` the signal holds a `number`, and keeps its last one while the input is empty.
 - `ref={el => ...}` receives the DOM element.
 - Inline text follows the tag after one space. `\{` and `\#` are a literal brace and hash.
 - `#[tag inline]` puts an element inside text: `p Read #[a(href="/docs") the docs] first`.

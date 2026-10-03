@@ -1,9 +1,9 @@
 import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 import type { Rewrite } from './mapping'
-import type { ScriptAnalysis, ServerAnalysis } from './script'
+import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
 import { awaitBlocks } from './ast'
-import { CodeBuilder } from './mapping'
+import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 
 export interface GenerateOptions {
   name: string
@@ -38,6 +38,10 @@ const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 const LINK_ELEMENTS = new Set(['a', 'area'])
 const CTX_REFERENCE = /\bctx\b/
+const LOWERCASE_EVENT = /^on:?([a-z]+)$/
+const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
+const IMPORT_COMMA_AFTER = /^\s*,\s*/
+const IMPORT_COMMA_BEFORE = /,\s*$/
 const DEFAULT_PREFIX = '__default_'
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
 // The one server export that is no action: `kay build` renders the page once when it is `true`.
@@ -70,11 +74,13 @@ class Generator {
     const includeServer = server !== undefined && this.options.includeServer !== false
 
     for (const span of script.hoisted)
-      this.emitHoisted(span, script.specifiers)
+      this.emitHoisted(span, script.specifiers, script.imports, [])
 
     if (includeServer) {
+      const duplicates = this.duplicateImports(script, server)
+
       for (const span of server.hoisted)
-        this.emitHoisted(span, server.specifiers)
+        this.emitHoisted(span, server.specifiers, server.imports, duplicates)
     }
 
     if (server)
@@ -114,6 +120,9 @@ class Generator {
 
     if (usesAwait(this.file.template))
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
+
+    if (this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
+      b.add(`import { Dynamic as ${DYNAMIC_TAG} } from '@solidjs/web'\n`)
 
     const { head, template } = this.splitHead(this.file.template)
 
@@ -162,20 +171,69 @@ class Generator {
     return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
   }
 
-  private emitHoisted(span: Span, specifiers: Span[]) {
-    let cursor = span.start
+  // Both fences land in one module, so a name they both import is declared once; the server fence's copy is the one left out, and a name imported two different ways is reported.
+  private duplicateImports(script: ScriptAnalysis, server: ServerAnalysis): ImportBinding[] {
+    const seen = new Map(script.imports.map(binding => [binding.local, binding]))
+    const duplicates: ImportBinding[] = []
+
+    for (const binding of server.imports) {
+      const first = seen.get(binding.local)
+
+      if (!first) {
+        seen.set(binding.local, binding)
+
+        continue
+      }
+
+      if (first.imported === binding.imported && first.source === binding.source && (binding.typeOnly || !first.typeOnly))
+        duplicates.push(binding)
+      else
+        this.error(binding.span, `\`${binding.local}\` is imported twice, once in each fence, and not the same way; import it once`)
+    }
+
+    return duplicates
+  }
+
+  private emitHoisted(span: Span, specifiers: Span[], imports: ImportBinding[], duplicates: ImportBinding[]) {
+    const inside = (binding: ImportBinding) => binding.declaration.end === span.end
+    const left = duplicates.filter(inside)
+
+    if (left.length > 0 && left.length === imports.filter(inside).length)
+      return
+
+    const edits: { start: number, end: number, text?: string }[] = left.map(binding => this.withoutComma(binding.span, binding.declaration))
 
     for (const specifier of specifiers) {
       const target = specifier.start >= span.start && specifier.end <= span.end ? this.options.relocateImport?.(this.src.slice(specifier.start + 1, specifier.end - 1)) : undefined
 
-      if (target === undefined)
-        continue
+      if (target !== undefined)
+        edits.push({ ...specifier, text: JSON.stringify(target) })
+    }
 
-      this.b.addSource({ start: cursor, end: specifier.start }).add(JSON.stringify(target))
-      cursor = specifier.end
+    let cursor = span.start
+
+    for (const edit of edits.sort((a, b) => a.start - b.start)) {
+      this.b.addSource({ start: cursor, end: edit.start })
+
+      if (edit.text !== undefined)
+        this.b.add(edit.text)
+
+      cursor = edit.end
     }
 
     this.b.addSource({ start: cursor, end: span.end }).add('\n')
+  }
+
+  // An import specifier with the comma that separates it from its neighbour.
+  private withoutComma(specifier: Span, declaration: Span): Span {
+    const after = IMPORT_COMMA_AFTER.exec(this.src.slice(specifier.end, declaration.end))
+
+    if (after)
+      return { start: specifier.start, end: specifier.end + after[0].length }
+
+    const before = IMPORT_COMMA_BEFORE.exec(this.src.slice(declaration.start, specifier.start))
+
+    return { start: specifier.start - (before?.[0].length ?? 0), end: specifier.end }
   }
 
   // Server exports stay at module level; the rest of the fence becomes `load(ctx)`, returning every name it declares.
@@ -235,9 +293,13 @@ class Generator {
     if (props.name)
       b.add('const ').addSource(props.name).add(' = __props;\n')
 
+    // A default runs where the prop is read and is typed as the prop, so a function or an object literal in it gets its type from the props type.
     for (const [index, binding] of props.bindings.entries()) {
-      if (binding.fallback)
-        b.add(`const ${defaultName(index)} = (`).addSource(binding.fallback).add(');\n')
+      if (!binding.fallback)
+        continue
+
+      b.wrap(binding.local, () => b.add(`const ${defaultName(index)} = (): Exclude<(typeof __props)[${JSON.stringify(binding.key)}], undefined> => (`))
+      b.addSource(binding.fallback).add(');\n')
     }
 
     if (props.rest)
@@ -395,6 +457,8 @@ class Generator {
 
   // Branch and loop bodies as one expression: a lone element stays bare, several get a fragment.
   private emitChildren(nodes: Node[]) {
+    let previous: Node | undefined
+
     for (const node of nodes) {
       switch (node.kind) {
         case 'element':
@@ -402,6 +466,10 @@ class Generator {
 
           break
         case 'text':
+          // JSX folds a line break into a space, so the line break between two text lines is an expression.
+          if (previous?.kind === 'text')
+            this.b.add('{"\\n"}')
+
           this.emitText(node)
 
           break
@@ -426,6 +494,8 @@ class Generator {
 
           break
       }
+
+      previous = node
     }
   }
 
@@ -613,9 +683,10 @@ class Generator {
     b.wrap(element, () => {
       b.add('<')
 
-      if (element.tag.end > element.tag.start)
-        b.addSource(element.tag)
-      else
+      const named = element.tag.end > element.tag.start
+      const dynamic = named ? b.addTag(element.tag) : false
+
+      if (!named)
         b.add(element.name)
 
       this.emitAttributes(element)
@@ -649,7 +720,17 @@ class Generator {
 
       this.emitChildren(children)
       this.formTarget = outerForm
-      b.add(`</${element.name}>`)
+      b.add('</')
+
+      // The closing tag reads the name the way the opening one did: a prop, a loop item or a server value may be the component.
+      if (dynamic)
+        b.add(DYNAMIC_TAG)
+      else if (named)
+        b.addSource(element.tag)
+      else
+        b.add(element.name)
+
+      b.add('>')
     })
   }
 
@@ -668,7 +749,10 @@ class Generator {
     if (classAttributes.length > 1)
       this.error(classAttributes[1]!.kind === 'spread' ? element : classAttributes[1]!.name, 'An element takes one `class` attribute; put several classes in it')
 
-    if (element.classes.length > 0)
+    // A spread may carry a `class` of its own, which merges in too, so the class goes after every attribute and spread.
+    const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
+
+    if (element.classes.length > 0 && !spreads)
       this.emitShorthandClass(element, classAttributes[0])
 
     for (const attribute of element.attributes) {
@@ -683,6 +767,9 @@ class Generator {
       if (!this.emitFormAttribute(element, attribute))
         this.emitAttribute(element, attribute)
     }
+
+    if (element.classes.length > 0 && spreads)
+      this.emitMergedClass(element, classAttributes[0])
 
     if (actionOf(element, this.src)) {
       const named = (name: string) => element.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === name)
@@ -744,11 +831,44 @@ class Generator {
     this.error(attribute.kind === 'spread' ? element : attribute.name, '`class` needs a value')
   }
 
+  // The shorthand, the `class` attribute and the `class` each spread brings, in the order they were written.
+  private emitMergedClass(element: ElementNode, classAttribute: Attribute | undefined) {
+    const { b } = this
+    const source = { start: element.classes[0]!.start, end: element.classes.at(-1)!.end }
+
+    b.add(' ')
+    b.wrap(classAttribute?.kind === 'expression' ? classAttribute.name : source, () => b.add('class'))
+    b.add(`={[${JSON.stringify(element.classes.map(span => this.text(span)).join(' '))}`)
+
+    for (const attribute of element.attributes) {
+      if (attribute.kind === 'spread') {
+        b.add(', ((').addSource(attribute.expression).add(') as unknown as { class?: string }).class')
+
+        continue
+      }
+
+      if (attribute !== classAttribute)
+        continue
+
+      if (attribute.kind === 'static')
+        b.add(`, ${JSON.stringify(attribute.text)}`)
+      else if (attribute.kind === 'expression')
+        b.add(', (').addSource(attribute.expression).add(')')
+      else
+        this.error(attribute.name, '`class` needs a value')
+    }
+
+    b.add(']}')
+  }
+
   private emitAttribute(element: ElementNode, attribute: Attribute) {
     const { b } = this
 
     if (this.options.check && this.emitCheckedAttribute(element, attribute))
       return
+
+    if (!element.component && attribute.kind === 'expression')
+      this.reportLowercaseEvent(attribute)
 
     switch (attribute.kind) {
       case 'spread':
@@ -788,6 +908,18 @@ class Generator {
         b.addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
       }
     }
+  }
+
+  // `onclick` and `on:click` attach nothing in Solid, and the component would not become an island either.
+  private reportLowercaseEvent(attribute: Extract<Attribute, { kind: 'expression' }>) {
+    const name = LOWERCASE_EVENT.exec(this.text(attribute.name))?.[1]
+
+    if (name === undefined)
+      return
+
+    const camel = name.replace(COMPOUND_EVENT, (_, first: string, second: string) => capitalize(first) + capitalize(second))
+
+    this.error(attribute.name, `\`${this.text(attribute.name)}\` does not attach a handler: events are written in camelCase, as \`on${capitalize(camel)}\``)
   }
 
   // Check-only wrappers: a site link must match a page, and a static parent passes an island JSON-safe props only.
@@ -846,7 +978,13 @@ class Generator {
     const read = property === 'checked' ? 'checked' : NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
 
     b.wrap(attribute.name, () => b.add(property))
-    b.add('={(').addSource(attribute.expression).add(`)()} ${event}={(kayEvent) => (`).addSource(attribute.expression).add(`).set(kayEvent.currentTarget.${read})}`)
+    b.add('={(').addSource(attribute.expression).add(`)()} ${event}={(kayEvent) => `)
+
+    // An emptied number input has no number: the signal keeps its last one rather than take a NaN, or an undefined its type does not allow.
+    if (read === 'valueAsNumber')
+      b.add('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (').addSource(attribute.expression).add(').set(kayValue) }}')
+    else
+      b.add('(').addSource(attribute.expression).add(`).set(kayEvent.currentTarget.${read})}`)
   }
 
   private emitText(node: TextNode) {
@@ -1068,6 +1206,10 @@ function usedHelpers(nodes: Node[], script: ScriptAnalysis): Helper[] {
   visit(nodes)
 
   return [...used]
+}
+
+function capitalize(word: string): string {
+  return `${word[0]!.toUpperCase()}${word.slice(1)}`
 }
 
 // JSX attribute strings have no escapes, so pick a quote the value does not contain, or fall back to an expression.
