@@ -1,15 +1,16 @@
 import type { CookieMap } from 'bun'
 import type { Elysia, TSchema, ValidationError } from 'elysia'
+import type { KayConfig } from '../config'
 import type { GuardContext, Locals } from '../runtime'
 import type { ActionContext, ServerAction } from '../runtime/action'
 import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
-import { logError } from '../build/sourcemap'
 import { decodeCall, failure, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash } from './flash'
 import { runGuards } from './guards'
+import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
 
 interface ActionRequest {
@@ -32,7 +33,13 @@ const FIELD = /^\/([^/]*)/
 const BODY_PREFIX = /^body\./
 
 // Registers every action the pages export as a POST route whose body Elysia validates against the action's schema.
-export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], dev = false): Promise<void> {
+// `dev` shows a failed action's message instead of a generic one.
+export interface ActionOptions {
+  dev?: boolean
+  onError?: KayConfig['onError']
+}
+
+export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], options: ActionOptions = {}): Promise<void> {
   for (const route of routes) {
     const module = await import(route.file) as Record<string, unknown>
 
@@ -40,7 +47,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], d
       if (!isAction(value))
         continue
 
-      app.post(value.url, async context => runAction(value, context, dev), {
+      app.post(value.url, async context => runAction(value, context, options), {
         body: value.schema,
         transform: (context) => {
           refuseCrossSite(context.request)
@@ -48,7 +55,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], d
           context.body = isCall(context.request) ? callInput(context.request, context.body) : withoutEmptyFiles(context.body)
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
-        ...(route.guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(route.guards, context, dev) }),
+        ...(route.guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(route.guards, context, options) }),
         error: ({ code, error, request, body }) => {
           if (code === 'VALIDATION')
             return refused(value, error, request)
@@ -126,7 +133,7 @@ function refuseCrossSite(request: Request) {
 }
 
 // The guards of the action's page, answering for it when one stops the request.
-async function admit(guards: LoadedGuard[], context: { request: Request }, dev: boolean): Promise<Response | undefined> {
+async function admit(guards: LoadedGuard[], context: { request: Request }, options: ActionOptions): Promise<Response | undefined> {
   const { request } = context
   const state: ActionRequest = { jar: cookieJar(request), headers: new Headers() }
   const ctx: GuardContext = {
@@ -147,7 +154,7 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, dev: 
   const refusal = await runGuards(guards, ctx)
 
   if (refusal)
-    return stopped(refusal.error, request, state, dev)
+    return stopped(refusal.error, request, state, options)
 
   guarded.set(request, state)
 
@@ -171,7 +178,7 @@ function backTo(request: Request): string {
 }
 
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
-async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request }, dev: boolean): Promise<Response> {
+async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request }, options: ActionOptions): Promise<Response> {
   const { request } = context
   const state = guarded.get(request) ?? { jar: cookieJar(request), headers: new Headers() }
   const { jar, headers } = state
@@ -209,12 +216,12 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     return new Response(null, { status: 303, headers })
   }
   catch (error) {
-    return stopped(error, request, state, dev)
+    return stopped(error, request, state, options)
   }
 }
 
 // A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.
-function stopped(error: unknown, request: Request, { jar, headers }: ActionRequest, dev: boolean): Response {
+function stopped(error: unknown, request: Request, { jar, headers }: ActionRequest, { dev, onError }: ActionOptions): Response {
   if (error instanceof Redirect) {
     // `fetch` would follow a `location` and hand the island the next page's HTML; a call reads where to go instead.
     headers.set(isCall(request) ? REDIRECT_HEADER : 'location', error.location)
@@ -230,7 +237,7 @@ function stopped(error: unknown, request: Request, { jar, headers }: ActionReque
     return new Response(error.message, { status: error.status, headers })
   }
 
-  logError(error)
+  reportServerError(error, request, onError)
 
   return new Response(dev && error instanceof Error ? error.message : 'Internal Server Error', { status: 500, headers: { 'content-type': TEXT } })
 }

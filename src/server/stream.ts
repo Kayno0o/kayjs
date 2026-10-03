@@ -3,7 +3,6 @@ import type { PendingBlock } from '../runtime/await.server'
 import type { RenderedIslands } from '../runtime/island.server'
 import type { ClientBuild } from './client'
 import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
-import { logError } from '../build/sourcemap'
 import { collectDeferred } from '../runtime/await.server'
 import { collectIslands } from '../runtime/island.server'
 
@@ -30,7 +29,7 @@ export function renderStatic(view: () => JSX.Element, onHead?: (html: string) =>
 }
 
 // Sends the page up to its last pending block at once, then each block as it settles, in whatever order they do.
-export function streamDocument(shell: string, deferred: PendingBlock[], client: ClientBuild, entryShipped: boolean): ReadableStream<Uint8Array> {
+export function streamDocument(shell: string, deferred: PendingBlock[], client: ClientBuild, entryShipped: boolean, report: (error: unknown) => void): ReadableStream<Uint8Array> {
   let shipped = entryShipped
   let swapShipped = false
   // Once the browser goes away, blocks still settling render nothing.
@@ -41,7 +40,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
       controller.enqueue(encoder.encode(shell))
 
       const send = async (block: PendingBlock): Promise<void> => {
-        const rendered = await settle(block, () => cancelled)
+        const rendered = await settle(block, () => cancelled, report)
 
         if (cancelled)
           return
@@ -73,8 +72,8 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
   })
 }
 
-// The `then` block once the value resolves, or the `catch` block once it rejects; without one, the pending block just goes away and the error is logged.
-async function settle(block: PendingBlock, cancelled: () => boolean): Promise<Rendered> {
+// The `then` block once the value resolves, or the `catch` block once it rejects; without one, the pending block just goes away and the error is reported.
+async function settle(block: PendingBlock, cancelled: () => boolean, report: (error: unknown) => void): Promise<Rendered> {
   try {
     const value = await block.value
 
@@ -91,11 +90,11 @@ async function settle(block: PendingBlock, cancelled: () => boolean): Promise<Re
         return renderStatic(() => failed(error))
       }
       catch (renderError) {
-        logError(renderError)
+        report(renderError)
       }
     }
     else {
-      logError(error)
+      report(error)
     }
 
     return EMPTY

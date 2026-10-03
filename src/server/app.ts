@@ -52,7 +52,7 @@ function withoutTrailingSlash(url: URL): Response {
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(root: string, options: PagesOptions, loadClient: () => Promise<ClientBuild>) {
   const routesDir = resolve(root, options.routes ?? 'src/routes')
-  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch }
+  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError }
 
   registerLoader(root)
 
@@ -73,7 +73,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     return new Response(Bun.file(path), { headers: { 'cache-control': 'public, max-age=31536000, immutable' } })
   })
 
-  await Promise.all([registerActionRoutes(app, routes, options.dev), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
+  await Promise.all([registerActionRoutes(app, routes, { dev: options.dev, onError: options.onError }), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
   const prerendered = await loadPrerendered(client)
 
   for (const route of routes) {

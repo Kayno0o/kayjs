@@ -246,6 +246,16 @@ h1 {todo.title}
 p.status {todo.done ? 'Done' : 'Open'}
 ```
 
+Each error kay logs while answering a request, from a load, a render, a guard, an action or a streamed block without `catch`, also goes to the `onError` option of `kay.config.ts` or `pages()`, the place to send it to an error tracker. It runs beside the response, never holding it, and an error it throws is logged:
+
+```ts
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  onError: (error, request) => tracker.capture(error, { url: request.url }),
+})
+```
+
 ## Prerendering
 
 A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.locals` or `ctx.failed` fails the build; `ctx.url` is `http://localhost` plus its path. Development renders it per request like any other.

@@ -1,6 +1,6 @@
 --- server
 import { t } from 'elysia'
-import { action } from 'kay'
+import { action, defer } from 'kay'
 
 export const explode = action(t.Object({}), () => {
   throw new Error('Kaboom in an action')
@@ -8,5 +8,8 @@ export const explode = action(t.Object({}), () => {
 
 if (ctx.url.searchParams.has('fail'))
   throw new Error('Kaboom')
+
+const later = defer(ctx.url.searchParams.has('later') ? Promise.reject(new Error('Kaboom later')) : Promise.resolve('Fine'))
 ---
-p Fine
+await later then value
+  p {value}

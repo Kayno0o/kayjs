@@ -791,6 +791,29 @@ describe('special pages', () => {
     }
   })
 
+  it('hands every error it logs to onError with its request, and logs a reporter that throws', async () => {
+    const reported: string[] = []
+    const watched = await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: true, onError: (error, request) => {
+      reported.push(`${new URL(request.url).pathname}${new URL(request.url).search}: ${(error as Error).message}`)
+
+      if (reported.length === 1)
+        throw new Error('Tracker down')
+    } })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect((await watched.handle(new Request('http://localhost/boom?fail'))).status).toBe(500)
+      expect((await watched.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/boom.kay/explode', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: '{}' }))).status).toBe(500)
+      expect(await (await watched.handle(new Request('http://localhost/boom?later'))).text()).not.toContain('Kaboom')
+      expect(await (await watched.handle(new Request('http://localhost/boom'))).text()).toContain('<p>Fine</p>')
+      expect(reported).toEqual(['/boom?fail: Kaboom', '/_kay/action/tests/fixtures/site/src/routes/boom.kay/explode: Kaboom in an action', '/boom?later: Kaboom later'])
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^Error: Tracker down/))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('renders the nearest _404.kay inside its layouts, for notFound and for URLs no page serves', async () => {
     const missingTodo = await get('/todos/9')
     const unmatched = await get('/no/such/page')

@@ -1,4 +1,5 @@
 import type { JSX } from '@solidjs/web'
+import type { KayConfig } from '../config'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Flash } from './flash'
@@ -8,12 +9,13 @@ import type { Prefetch } from './speculation'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { createComponent, generateHydrationScript } from '@solidjs/web'
-import { logError, mapStack } from '../build/sourcemap'
+import { mapStack } from '../build/sourcemap'
 import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
 import { FLASH_COOKIE, readFlash } from './flash'
 import { runGuards } from './guards'
 import { errorPage } from './overlay'
+import { reportServerError } from './report'
 import { decodePath } from './routes'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
@@ -39,6 +41,7 @@ export interface RenderOptions {
   dev?: boolean
   // Renders once at build time: what only a request carries throws instead of reading as empty.
   prerendering?: boolean
+  onError?: KayConfig['onError']
 }
 
 // What Elysia hands a route handler, derived and resolved values included; pages see it whole as `ctx.locals`.
@@ -96,7 +99,7 @@ export async function renderPage(route: ServedRoute, context: RequestContext, cl
     })
 
     const started = performance.now()
-    const body = renderDocument(files, modules, data, client, options)
+    const body = renderDocument(files, modules, data, client, rendering, options)
 
     if (timings)
       rendering.headers.set('server-timing', serverTiming(files, modules, timings, performance.now() - started))
@@ -258,7 +261,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   const denied = error instanceof Denied
 
   if (!notFound && !denied)
-    logError(error)
+    reportServerError(error, rendering.ctx.request, options.onError)
 
   const pageError = notFound ? { status: 404, message: 'Not Found' } : denied ? { status: error.status, message: error.message } : describeError(error, options.dev)
   const page = (notFound || (denied && error.status === 404) ? special.notFound : undefined) ?? special.error
@@ -290,10 +293,10 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
         return prior?.status === 'fulfilled' ? prior.value : await module.load?.(rendering.ctx) ?? {}
       }))
 
-      return renderDocument(files, modules, data, client, options)
+      return renderDocument(files, modules, data, client, rendering, options)
     }
     catch (error) {
-      logError(error)
+      reportServerError(error, rendering.ctx.request, options.onError)
     }
   }
 
@@ -305,7 +308,7 @@ async function importAll(files: string[]): Promise<PageModule[]> {
 }
 
 // The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
-function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, options: RenderOptions): string | ReadableStream<Uint8Array> {
+function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
   const page = modules.length - 1
   let view = () => createComponent(modules[page]!.default, data[page]!)
 
@@ -330,7 +333,7 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
     return `${start}</body></html>`
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
-  return streamDocument(hasIslands ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, hasIslands)
+  return streamDocument(hasIslands ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, hasIslands, error => reportServerError(error, rendering.ctx.request, options.onError))
 }
 
 // The stylesheets of the layouts, outermost first, then the page's.

@@ -15,6 +15,8 @@ export interface KayConfig {
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[]
+  // Receives every error a load, a render, a guard or an action throws, as it is logged: the place to send them to an error tracker.
+  onError?: (error: unknown, request: Request) => void | Promise<void>
 }
 
 export const CONFIG_FILE = 'kay.config.ts'
