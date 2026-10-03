@@ -127,8 +127,7 @@ function isDirectory(path: string): boolean {
   }
 }
 
-// The root itself is watched, not recursively, for the entries it gains and loses, and each top-level directory recursively, so dependencies and generated output are never walked.
-// A directory removed and created again gets a new watcher, as the old one stays on the inode that is gone.
+// The root is watched for the entries it gains and loses, each top-level directory recursively, and a directory created again gets a new watcher, the old one staying on the inode that is gone.
 // `onChange` gets the changed path relative to the root; the returned function stops watching.
 export function watchProject(root: string, onChange: (file: string) => void): () => void {
   const directories = new Map<string, FSWatcher>()
@@ -139,11 +138,16 @@ export function watchProject(root: string, onChange: (file: string) => void): ()
     if (!isDirectory(join(root, name)))
       return
 
-    const watcher = watch(join(root, name), { recursive: true }, (_event, file) => onChange(`${name}/${file ?? ''}`))
+    // The directory may go between the check and the watch, or the system run out of watchers: `kay dev` keeps going without it.
+    try {
+      const watcher = watch(join(root, name), { recursive: true }, (_event, file) => onChange(`${name}/${file ?? ''}`))
 
-    // Removing the directory ends the watcher with an error; the root watcher re-arms it once the directory is back.
-    watcher.on('error', () => undefined)
-    directories.set(name, watcher)
+      watcher.on('error', () => undefined)
+      directories.set(name, watcher)
+    }
+    catch (error) {
+      console.error(error)
+    }
   }
   const rootWatcher = watch(root, (_event, name) => {
     if (name === null || !watchedName(name))
@@ -152,6 +156,8 @@ export function watchProject(root: string, onChange: (file: string) => void): ()
     watchDirectory(name)
     onChange(name)
   })
+
+  rootWatcher.on('error', error => console.error(error))
 
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (entry.isDirectory() && watchedName(entry.name))

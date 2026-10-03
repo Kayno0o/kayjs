@@ -154,6 +154,14 @@ describe('prop defaults', () => {
     expect(calls).toEqual([])
   })
 
+  it('run once per component, however often the prop is read, keeping one value', async () => {
+    Object.assign(globalThis, { calls })
+    calls.length = 0
+
+    expect(await renderKay('---\nconst { opts = make() } = props<{ opts?: { n: number } }>()\nfunction make() {\n  calls.push(1)\n\n  return { n: 7 }\n}\n---\np {opts.n} {String(opts === opts)}', {})).toBe('<p _hk=0>7 true</p>')
+    expect(calls).toEqual([1])
+  })
+
   it('are read where the prop is read, not once up front', async () => {
     let reads = 0
     const props = { get size() {

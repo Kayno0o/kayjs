@@ -127,8 +127,8 @@ function formInput(schema: TSchema, body: unknown): unknown {
     const value = fields[name]
 
     if (value === undefined) {
-      // A required list may well be empty, and an unticked checkbox posts nothing.
-      if (!optional && (field.type === 'array' || field.type === 'boolean'))
+      // A required list may well be empty, and an unticked checkbox posts nothing; a required file list is no file chosen, refused as missing.
+      if (!optional && ((field.type === 'array' && field.items?.format !== 'binary') || field.type === 'boolean'))
         fields[name] = field.type === 'array' ? [] : false
 
       continue

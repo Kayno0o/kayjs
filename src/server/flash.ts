@@ -14,11 +14,13 @@ export interface Flash {
 // Under the 4 KB browsers keep per cookie, the other cookies of the response included.
 const MAX_LENGTH = 3800
 // A field name holding one of these anywhere is a secret: `newPassword`, `accessToken`.
-const SECRET_PART = /password|passwd|passphrase|passcode|secret|token|apikey/i
+const SECRET_PART = /password|passwd|passphrase|passcode|secret|token|apikey|cvc|cvv|pass(?![a-z])/i
 // These only as a whole word of the name, so `passenger` and `shipping` are echoed: `pin`, `card_number`, `apiKey`.
 const SECRET_WORDS = new Set(['pass', 'pwd', 'pin', 'otp', 'ssn', 'cvc', 'cvv', 'csc', 'key', 'card', 'iban'])
 // The words of a camelCase, snake_case or kebab-case name, an acronym such as `API` counting as one.
 const WORD = /[A-Z]?[a-z\d]+|[A-Z]+(?![a-z])/g
+// `pin2` is a pin.
+const TRAILING_DIGITS = /\d+$/
 
 export function writeFlash(cookies: CookieMap, flash: Flash): void {
   // The submitted values go first when it would not fit, then the handler's data: the field errors always make it.
@@ -66,7 +68,7 @@ export function submittedValues(body: unknown): Record<string, string> {
 }
 
 function isSecret(name: string): boolean {
-  return SECRET_PART.test(name) || (name.match(WORD) ?? []).some(word => SECRET_WORDS.has(word.toLowerCase()))
+  return SECRET_PART.test(name) || (name.match(WORD) ?? []).some(word => SECRET_WORDS.has(word.toLowerCase().replace(TRAILING_DIGITS, '')))
 }
 
 function isTextRecord(value: unknown): value is Record<string, string> {

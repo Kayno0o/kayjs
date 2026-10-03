@@ -1,6 +1,7 @@
 import type { Diagnostic } from '../compiler'
+import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { findKayFiles } from '../build/files'
 import { formatKay } from '../compiler/format'
 
@@ -30,7 +31,7 @@ export async function formatFiles(paths: string[], options: { write: boolean }):
       throw new Error(`kay fmt: ${path} does not exist`)
 
     if (info.isDirectory())
-      return findKayFiles(resolve(path), { project: true })
+      return findKayFiles(resolve(path), { project: existsSync(join(path, 'package.json')) })
 
     if (!path.endsWith('.kay'))
       throw new Error(`kay fmt: ${path} is not a .kay file`)

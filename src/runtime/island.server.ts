@@ -85,7 +85,8 @@ export function island<P extends object>(id: string, component: (props: P) => JS
   return render as IslandComponent<P>
 }
 
-// Solid serializes what the server decided, like a boundary still pending, in an inline script, and an island only hydrates the same tree when it gets it back; kay keeps it in an attribute so every inline script stays identical on every page.
+// What Solid decided on the server, such as a boundary still pending, which the island needs back to hydrate the same tree.
+// Solid writes it as an inline script; an attribute keeps every inline script identical on every page.
 function hydrationData(html: string): string {
   const script = TRAILING_SCRIPT.exec(html)?.[0]
 
@@ -94,8 +95,13 @@ function hydrationData(html: string): string {
 
   const entries: Record<string, string> = {}
 
-  for (const [, key, value] of script.matchAll(HYDRATION_ENTRY))
-    entries[JSON.parse(key!) as string] = JSON.parse(value!) as string
+  for (const [, key, value] of script.matchAll(HYDRATION_ENTRY)) {
+    // Seroval escapes some characters the JSON way does not; such an entry is left out, and the island renders its part afresh.
+    try {
+      entries[JSON.parse(key!) as string] = JSON.parse(value!) as string
+    }
+    catch {}
+  }
 
   return Object.keys(entries).length === 0 ? '' : ` data-hydration="${escape(JSON.stringify(entries), true)}"`
 }

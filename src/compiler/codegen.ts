@@ -293,13 +293,17 @@ class Generator {
     if (props.name)
       b.add('const ').addSource(props.name).add(' = __props;\n')
 
-    // A default runs where the prop is read and is typed as the prop, so a function or an object literal in it gets its type from the props type.
+    // A default runs the first time an `undefined` prop is read, then keeps its value like a destructuring default; it is typed as the prop, so a function or an object literal in it gets its type from the props type.
     for (const [index, binding] of props.bindings.entries()) {
       if (!binding.fallback)
         continue
 
-      b.wrap(binding.local, () => b.add(`const ${defaultName(index)} = (): Exclude<(typeof __props)[${JSON.stringify(binding.key)}], undefined> => (`))
-      b.addSource(binding.fallback).add(');\n')
+      const name = defaultName(index)
+      const type = `Exclude<(typeof __props)[${JSON.stringify(binding.key)}], undefined>`
+
+      b.add(`let ${name}_made: { value: ${type} } | undefined;\n`)
+      b.wrap(binding.local, () => b.add(`const ${name} = (): ${type} => (${name}_made ??= { value: (`))
+      b.addSource(binding.fallback).add(') }).value;\n')
     }
 
     if (props.rest)

@@ -11,7 +11,7 @@ import { loadGuards } from './guards'
 import { registerLoader } from './loader'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
-import { decodePath, scanRoutes, specialPagesOf } from './routes'
+import { decodePath, refuseClashes, scanRoutes, specialPagesOf } from './routes'
 
 // Every slash at either end of a path.
 const EDGE_SLASHES = /^\/+|\/+$/g
@@ -57,6 +57,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   registerLoader(root)
 
   const [scanned, client] = await Promise.all([scanRoutes(routesDir), loadClient()])
+
+  refuseClashes(routesDir, scanned)
   const routes = await Promise.all(scanned.map(loadGuards))
   const app = new Elysia({ name: 'kay/pages', seed: root })
 

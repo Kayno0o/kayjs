@@ -144,10 +144,11 @@ describe('formatFiles', () => {
 })
 
 describe('formatFiles, explicit paths', () => {
-  it('throws before writing when a path is missing or not a .kay file, and searches a directory named dist below its root', async () => {
+  it('throws before writing when a path is missing or not a .kay file, and skips a directory named dist only at a project root', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-fmt-'))
 
     try {
+      await Bun.write(join(dir, 'package.json'), '{}')
       await Bun.write(join(dir, 'notes.txt'), 'ul\n    li One\n')
       await Bun.write(join(dir, 'page.kay'), 'ul\n    li One\n')
       await Bun.write(join(dir, 'src/dist/inner.kay'), 'ul\n    li One\n')
@@ -158,6 +159,7 @@ describe('formatFiles, explicit paths', () => {
       expect(await Bun.file(join(dir, 'notes.txt')).text()).toBe('ul\n    li One\n')
       expect(await Bun.file(join(dir, 'page.kay')).text()).toBe('ul\n    li One\n')
       expect((await formatFiles([dir], { write: false })).changed).toEqual([join(dir, 'page.kay'), join(dir, 'src/dist/inner.kay')])
+      expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([join(dir, 'src/dist/inner.kay')])
     }
     finally {
       await rm(dir, { recursive: true, force: true })

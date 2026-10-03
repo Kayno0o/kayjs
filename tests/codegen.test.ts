@@ -68,10 +68,10 @@ describe('props', () => {
     expect(code).not.toContain('} = __props')
   })
 
-  it('applies defaults on every read and handles renames, quoted keys and the rest', () => {
+  it('applies defaults where the prop is read and handles renames, quoted keys and the rest', () => {
     const code = tsx('---\nconst { size = \'md\', label: text, \'aria-label\': aria, ...rest } = props<{ size?: string, label: string, \'aria-label\'?: string, id?: string }>()\n---\nbutton(aria-label={aria} {...rest}) {size} {text}')
 
-    expect(code).toContain('const __default_0 = (): Exclude<(typeof __props)["size"], undefined> => (\'md\');')
+    expect(code).toContain('const __default_0 = (): Exclude<(typeof __props)["size"], undefined> => (__default_0_made ??= { value: (\'md\') }).value;')
     expect(code).toContain('const rest = KayOmit(__props, "size", "label", "aria-label");')
     expect(code).toContain('aria-label={__props["aria-label"]}')
     expect(code).toContain('{(__props.size !== undefined ? __props.size : __default_0())} {__props.label}')
@@ -336,9 +336,9 @@ describe('prop defaults', () => {
   it('reads a default only for an undefined prop and runs it only then', () => {
     const code = tsx('---\nconst { opts = {}, fmt = (v: number) => String(v) } = props<{ opts?: { a?: number }, fmt?: (v: number) => string }>()\n---\np {opts.a} {fmt(1)}')
 
-    expect(code).toContain('const __default_0 = (): Exclude<(typeof __props)["opts"], undefined> => ({});')
+    expect(code).toContain('const __default_0 = (): Exclude<(typeof __props)["opts"], undefined> => (__default_0_made ??= { value: ({}) }).value;')
     expect(code).toContain('(__props.opts !== undefined ? __props.opts : __default_0()).a')
-    expect(code).not.toContain('??')
+    expect(code).not.toContain('?? __default')
   })
 
   it('applies a default to a renamed and a quoted key too', () => {

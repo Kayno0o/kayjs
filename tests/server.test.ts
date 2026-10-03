@@ -12,7 +12,7 @@ import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { submittedValues, writeFlash } from '../src/server/flash'
 import { prerenderPages } from '../src/server/prerender'
 import { renderPage } from '../src/server/render'
-import { scanRoutes } from '../src/server/routes'
+import { refuseClashes, scanRoutes } from '../src/server/routes'
 import { speculationRules } from '../src/server/speculation'
 import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
@@ -707,7 +707,7 @@ describe('route scan', () => {
         for (const file of files)
           await Bun.write(join(dir, file), '')
 
-        await scanRoutes(dir)
+        refuseClashes(dir, await scanRoutes(dir))
 
         return 'scanned'
       }
@@ -725,6 +725,18 @@ describe('route scan', () => {
     expect(await clash(['x:y.kay'])).toBe('kay: <routes>/x:y.kay has a :, * or \' in its name, which the router cannot serve; rename it')
     expect(await clash(['it\'s.kay'])).toBe('kay: <routes>/it\'s.kay has a :, * or \' in its name, which the router cannot serve; rename it')
     expect(await clash(['todos/[id].kay', 'todos/new.kay', 'docs/[...path].kay', 'docs/index.kay', 'a b.kay'])).toBe('scanned')
+
+    const dir = await mkdtemp(join(tmpdir(), 'kay-routes-'))
+
+    try {
+      await Bun.write(join(dir, 'about.kay'), '')
+      await Bun.write(join(dir, 'about/index.kay'), '')
+      expect(await scanRoutes(dir)).toHaveLength(2)
+      await expect(pages({ routes: dir, prebuilt: true })).rejects.toThrow('both serve /about')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('gives a guard the special pages outside its directory, bare for the routes root', async () => {
@@ -1005,6 +1017,11 @@ describe('action input', () => {
     form.append('agree', 'true')
     expect(await answered(form)).toEqual({ status: 303, answer: { tags: ['only'], count: 7, agree: true } })
 
+    const noPhoto = new FormData()
+
+    noPhoto.append('photos', new File([], ''))
+    expect(cookiePair(await post('gallery', noPhoto))).toStartWith('kay_failed=')
+
     const refused = await post('answer', new URLSearchParams('tags=a&count=1.5&agree=on&age=old'))
 
     expect(refused.status).toBe(303)
@@ -1077,7 +1094,7 @@ describe('action input', () => {
   })
 
   it('never echoes a field named like a secret, matching words rather than letters', () => {
-    const fields = { password: 'x', newPassword: 'x', user_passcode: 'x', apiKey: 'x', APIKey: 'x', pin: 'x', cardNumber: 'x', otp: 'x', csrfToken: 'x', passenger: 'Ada', spinner: 's', shipping: 'post', email: 'a@b.c' }
+    const fields = { cvv2: 'x', cardcvc: 'x', userpass: 'x', pin2: 'x', password: 'x', newPassword: 'x', user_passcode: 'x', apiKey: 'x', APIKey: 'x', pin: 'x', cardNumber: 'x', otp: 'x', csrfToken: 'x', passenger: 'Ada', spinner: 's', shipping: 'post', email: 'a@b.c' }
 
     expect(submittedValues(fields)).toEqual({ passenger: 'Ada', spinner: 's', shipping: 'post', email: 'a@b.c' })
   })

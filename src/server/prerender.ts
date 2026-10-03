@@ -8,7 +8,7 @@ import { analyzeServer } from '../compiler/script'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { registerLoader } from './loader'
 import { renderPage } from './render'
-import { scanRoutes } from './routes'
+import { refuseClashes, scanRoutes } from './routes'
 
 // Renders every page whose server fence exports `prerender = true` into `.kay/client/pages`, listing them in the manifest the server boots from.
 export async function prerenderPages(root: string, config: KayConfig, client: ClientBuild): Promise<number> {
@@ -23,7 +23,12 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
 
-  for (const route of await scanRoutes(resolve(root, config.routes ?? 'src/routes'))) {
+  const routesDir = resolve(root, config.routes ?? 'src/routes')
+  const routes = await scanRoutes(routesDir)
+
+  refuseClashes(routesDir, routes)
+
+  for (const route of routes) {
     // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
     if (!await exportsPrerender(route.file))
       continue

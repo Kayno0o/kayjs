@@ -88,13 +88,12 @@ export async function scanRoutes(routesDir: string): Promise<Route[]> {
       routes.push({ ...route, layouts: layoutsOf(routesDir, file), special: specialPagesOf(routesDir, dirname(file)), guards: guardsOf(routesDir, file) })
   }
 
-  refuseClashes(routesDir, routes)
-
   return routes
 }
 
-// Elysia serves one page per path, takes one param name per segment and misreads some characters in a file name: each stops the boot with its own message, rather than a page shadowing another or a raw router error.
-function refuseClashes(routesDir: string, routes: Route[]): void {
+// Elysia serves one page per path, takes one param name per segment and misreads some characters in a file name: each stops the server with its own message, rather than a page shadowing another or a raw router error.
+// The server and the build call it; `kay check` and the editor read routes mid-edit and leave it out.
+export function refuseClashes(routesDir: string, routes: Route[]): void {
   const byPath = new Map<string, Route>()
   const paramAt = new Map<string, { name: string, route: Route }>()
 
