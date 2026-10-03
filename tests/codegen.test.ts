@@ -115,6 +115,16 @@ describe('control flow', () => {
     expect(jsx('for row, i of rows key={i}\n  p {i}: {row}')).toBe('<><KayFor each={rows} keyed={false}>{(row, i) => <p>{i}: {row()}</p>}</KayFor></>')
   })
 
+  it('renders the loops of a page on the server without Solid\'s For, which only islands and browsers need', () => {
+    const page = '--- server\nconst rows = [1]\n---\nul\n  for row, i of rows key={row}\n    li {i}: {row}\n  else\n    li none'
+    const server = compileKay(page, 'src/routes/index.kay', { includeServer: true }).tsx
+
+    expect(server).toContain('{KayStaticFor(__props.rows, (row, i) => <li>{i()}: {row()}</li>, false, () => <li>none</li>)}')
+    expect(server).not.toContain('KayFor ')
+    expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).toContain('<KayFor each={__props.rows}')
+    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('<KayFor each={__props.rows}')
+  })
+
   it('renders a for fallback', () => {
     expect(jsx('for t of list key={t}\n  p {t}\nelse\n  p none')).toContain('fallback={<p>none</p>}')
   })

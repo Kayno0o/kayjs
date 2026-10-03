@@ -80,3 +80,4 @@ export type PageData<Load extends (...args: never[]) => unknown> = Awaited<Retur
 export type { Action, ActionContext, Failure, FailureOf, FieldName, FormFailure, ServerAction } from './action'
 export { action, ActionError, actionStub, formAction, isAction, registerActions } from './action'
 export type { AwaitProps, CheckedHref, Deferred, HydrateWhen, IslandComponent, IslandProp, Locals, LocalsOf, Register } from './checks'
+export { staticFor } from './static'

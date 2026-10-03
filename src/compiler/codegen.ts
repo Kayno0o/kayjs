@@ -82,9 +82,13 @@ class Generator {
 
     const kayHelpers = formHelpers(this.file)
     const actions = server?.exportNames.filter(name => name !== PRERENDER) ?? []
+    const helpers = usedHelpers(this.file.template, script).filter(helper => helper !== 'For' || !this.staticLoops)
 
     if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
+
+    if (this.staticLoops && usedHelpers(this.file.template, script).includes('For'))
+      kayHelpers.push('staticFor')
 
     if (kayHelpers.length > 0)
       b.add(`import { ${kayHelpers.map(helper => `${helper} as ${kayAlias(helper)}`).join(', ')} } from 'kay'\n`)
@@ -99,8 +103,6 @@ class Generator {
 
     if (childrenSlot)
       b.add(`import type { JSX as KayJSX } from '@solidjs/web'\n`)
-
-    const helpers = usedHelpers(this.file.template, script)
 
     if (helpers.length > 0)
       b.add(`import { ${helpers.map(helper => `${helper} as ${helperAlias(helper)}`).join(', ')} } from 'solid-js'\n`)
@@ -501,11 +503,22 @@ class Generator {
     })
   }
 
+  // Pages and layouts render once on the server and never hydrate, so their loops skip the owner Solid's `For` makes for every row.
+  private get staticLoops(): boolean {
+    return this.server !== undefined && this.options.includeServer !== false && !this.options.check && !this.options.island
+  }
+
   private emitFor(node: ForNode) {
     const { b } = this
     const tag = helperAlias('For')
     // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
     const positional = node.index !== undefined && this.text(node.key).trim() === this.text(node.index)
+
+    if (this.staticLoops) {
+      this.emitStaticFor(node, positional)
+
+      return
+    }
 
     b.wrap(node, () => {
       b.add(`<${tag} each={`).addSource(node.each).add('} keyed={')
@@ -539,6 +552,37 @@ class Generator {
       b.add(') => ')
       this.emitRoot(node.children)
       b.add(`}</${tag}>`)
+    })
+  }
+
+  // The loop's callback takes the same parameters as `For`'s, so the reads the analysis pass rewrote stay right.
+  private emitStaticFor(node: ForNode, positional: boolean) {
+    const { b } = this
+
+    b.wrap(node, () => {
+      b.add(`{${kayAlias('staticFor')}(`).addSource(node.each).add(', (')
+      this.accessorSites.add(b.code.length)
+      b.addSource(node.item)
+
+      if (node.index) {
+        b.add(', ')
+
+        if (!positional)
+          this.accessorSites.add(b.code.length)
+
+        b.addSource(node.index)
+      }
+
+      b.add(`) => `)
+      this.emitRoot(node.children)
+      b.add(`, ${positional}`)
+
+      if (node.fallback) {
+        b.add(', () => ')
+        this.emitRoot(node.fallback)
+      }
+
+      b.add(')}')
     })
   }
 
@@ -873,7 +917,7 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return visit(file.template)
 }
 
-type KayHelper = 'formAction' | 'registerActions' | 'actionStub'
+type KayHelper = 'formAction' | 'registerActions' | 'actionStub' | 'staticFor'
 
 function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
