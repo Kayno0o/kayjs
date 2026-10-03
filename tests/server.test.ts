@@ -209,6 +209,22 @@ describe('pages', () => {
     }
   })
 
+  it('redirects a page path ending in a slash to the one without, query kept, never off the site', async () => {
+    const redirect = async (path: string) => {
+      const response = await app.handle(new Request(`http://localhost${path}`))
+
+      return [response.status, response.headers.get('location')]
+    }
+
+    expect(await redirect('/about/')).toEqual([308, '/about'])
+    expect(await redirect('/about/?q=2')).toEqual([308, '/about?q=2'])
+    expect(await redirect('/docs/guide/intro/')).toEqual([308, '/docs/guide/intro'])
+    expect(await redirect('/admin/')).toEqual([308, '/admin'])
+    expect((await redirect('//evil.example/'))[1] ?? '/').toStartWith('/')
+    expect((await redirect('//evil.example/'))[1] ?? '/').not.toStartWith('//')
+    expect((await get('/')).status).toBe(200)
+  })
+
   it('posts a plain form to its action and returns to the page', async () => {
     const home = await get('/')
     const form = (/<form class="add" action="([^"]+)" method="post" enctype="multipart\/form-data"><input name="title"/).exec(home.html)

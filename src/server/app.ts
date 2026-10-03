@@ -12,6 +12,9 @@ import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
 import { decodePath, scanRoutes, specialPagesOf } from './routes'
 
+// Every slash at either end of a path.
+const EDGE_SLASHES = /^\/+|\/+$/g
+
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
   // Project root: island ids and `.kay/` output are relative to it. Defaults to the working directory.
@@ -38,6 +41,11 @@ async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<str
   }
 
   return byRoute
+}
+
+// `/about/` redirects to `/about`, so a page has one URL and its relative links resolve one way; leading slashes collapse too, so `//host/` never becomes a redirect off the site.
+function withoutTrailingSlash(url: URL): Response {
+  return new Response(null, { status: 308, headers: { location: `/${url.pathname.replace(EDGE_SLASHES, '')}${url.search}` } })
 }
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
@@ -70,17 +78,17 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   for (const route of routes) {
     const served = prerendered.get(route.pattern)
 
-    // A path `kay build` rendered is served from its file; any other path of the route renders per request.
-    if (served) {
-      app.get(route.pattern, async (context) => {
-        const page = served.get(new URL(context.request.url).pathname)
+    app.get(route.pattern, async (context) => {
+      const url = new URL(context.request.url)
 
-        return page ? servePrerendered(route, page, context, client, renderOptions) : renderPage(route, context, client, renderOptions)
-      })
-    }
-    else {
-      app.get(route.pattern, async context => renderPage(route, context, client, renderOptions))
-    }
+      if (url.pathname.length > 1 && url.pathname.endsWith('/'))
+        return withoutTrailingSlash(url)
+
+      // A path `kay build` rendered is served from its file; any other path of the route renders per request.
+      const page = served?.get(url.pathname)
+
+      return page ? servePrerendered(route, page, context, client, renderOptions) : renderPage(route, context, client, renderOptions)
+    })
   }
 
   const fallback = specialPagesOf(routesDir, routesDir)

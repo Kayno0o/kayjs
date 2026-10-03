@@ -200,6 +200,8 @@ Pages live in `src/routes/`:
 | `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
 | `_guard.ts` | Runs before every page and every action in its directory and below; see Guards. |
 
+A page URL ending in a slash redirects with 308 to the one without, query kept: `/about/` to `/about`.
+
 Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence may use top-level `await` and the `ctx` object:
 
 - `ctx.params`, typed from the file name, `ctx.url`, `ctx.request`
