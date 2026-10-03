@@ -86,6 +86,15 @@ export interface LocationLink {
   targetSelectionRange: Range
 }
 
+export interface DocumentHighlight {
+  range: Range
+  kind?: number
+}
+
+export interface WorkspaceEdit {
+  changes: Record<string, TextEdit[]>
+}
+
 export interface InitializeParams {
   rootUri?: string | null
   rootPath?: string | null

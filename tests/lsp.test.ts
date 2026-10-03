@@ -1,4 +1,4 @@
-import type { CompletionList, Diagnostic, Hover, LocationLink, TextEdit } from '../src/lsp/protocol'
+import type { CompletionList, Diagnostic, DocumentHighlight, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
 import { join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
@@ -53,6 +53,12 @@ class Editor {
     return this.connection.request<Result>(method, { textDocument: { uri: this.uri(path) }, position: { line, character } })
   }
 
+  async rename(path: string, line: number, character: number, newName: string): Promise<Record<string, Range[]>> {
+    const { changes } = await this.connection.request<WorkspaceEdit>('textDocument/rename', { textDocument: { uri: this.uri(path) }, position: { line, character }, newName })
+
+    return Object.fromEntries(Object.entries(changes).map(([uri, edits]) => [uri.slice(pathToFileURL(this.root).href.length + 1), sortRanges(edits.map(edit => edit.range))]))
+  }
+
   write(data: string) {
     this.process.stdin.write(data)
     void this.process.stdin.flush()
@@ -69,6 +75,15 @@ class Editor {
       this.waiting.set(uri, resolve)
     })
   }
+}
+
+// `[line, start, end]` for a one-line range, in source order.
+function spots(ranges: Range[]): number[][] {
+  return sortRanges(ranges).map(range => [range.start.line, range.start.character, range.end.character])
+}
+
+function sortRanges(ranges: Range[]): Range[] {
+  return ranges.toSorted((a, b) => a.start.line - b.start.line || a.start.character - b.start.character)
 }
 
 function brief(diagnostics: Diagnostic[]) {
@@ -147,6 +162,44 @@ describe('kay lsp', () => {
     const [component] = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 32, 2)
 
     expect(component?.targetUri).toBe(site.uri('src/components/counter.kay'))
+  })
+
+  it('finds references across .kay files, a server value\'s reads in the template included', async () => {
+    await site.open('src/components/quick-add.kay')
+
+    const add = await site.connection.request<Location[]>('textDocument/references', { textDocument: { uri: site.uri('src/routes/index.kay') }, position: { line: 5, character: 14 }, context: { includeDeclaration: true } })
+    const open = await site.connection.request<Location[]>('textDocument/references', { textDocument: { uri: site.uri('src/routes/index.kay') }, position: { line: 13, character: 7 }, context: { includeDeclaration: true } })
+
+    expect(spots(add.filter(location => location.uri === site.uri('src/routes/index.kay')).map(location => location.range))).toEqual([[5, 13, 16], [14, 27, 30], [25, 19, 22]])
+    expect(spots(add.filter(location => location.uri === site.uri('src/components/quick-add.kay')).map(location => location.range))).toEqual([[2, 9, 12], [9, 18, 21]])
+    expect(spots(open.map(location => location.range))).toEqual([[13, 6, 10], [21, 5, 9], [32, 15, 19]])
+    expect(await site.request<DocumentHighlight[]>('textDocument/documentHighlight', 'src/routes/index.kay', 21, 6)).toHaveLength(3)
+  })
+
+  it('renames a name everywhere the user wrote it, from either end, and nothing generated', async () => {
+    const open = [[13, 6, 10], [21, 5, 9], [32, 15, 19]]
+
+    const fromDeclaration = await site.rename('src/routes/index.kay', 13, 7, 'pending')
+
+    expect(Object.keys(fromDeclaration)).toEqual(['src/routes/index.kay'])
+    expect(spots(fromDeclaration['src/routes/index.kay']!)).toEqual(open)
+    expect(spots((await site.rename('src/routes/index.kay', 21, 6, 'pending'))['src/routes/index.kay']!)).toEqual(open)
+    // A loop's item is generated into both its key function and its row.
+    expect(spots((await site.rename('src/routes/index.kay', 23, 9, 'item'))['src/routes/index.kay']!)).toEqual([[23, 8, 12], [23, 27, 31], [24, 28, 32], [24, 41, 45]])
+
+    await site.open('src/components/card.kay')
+
+    const title = await site.rename('src/components/card.kay', 3, 9, 'heading')
+
+    expect(spots(title['src/components/card.kay']!)).toEqual([[3, 8, 13], [3, 26, 31], [6, 6, 11]])
+    expect(spots(title['src/routes/index.kay']!)).toEqual([[20, 5, 10]])
+    expect(await site.request('textDocument/prepareRename', 'src/routes/index.kay', 23, 5)).toBeNull()
+  })
+
+  it('shows the signature of the call under the cursor', async () => {
+    const help = await site.request<{ signatures: { label: string }[] }>('textDocument/signatureHelp', 'src/components/quick-add.kay', 9, 28)
+
+    expect(help.signatures[0]!.label).toBe('add(input: { title: string; }): Promise<number>')
   })
 
   it('formats a .kay document as one whole-document edit', async () => {

@@ -1,7 +1,7 @@
 import type { Subprocess } from 'bun'
 import type { ShadowFile } from '../check'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
-import type { CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit } from './protocol'
+import type { CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -9,6 +9,12 @@ import { compileShadow, SHADOW_DIR, shadowPath, TSGO, writeShadowTypes } from '.
 import { formatKay } from '../compiler/format'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { Connection } from './rpc'
+
+// Where a file tsgo names is for the editor: its .kay source for a shadow file, the file itself outside the shadow tree.
+interface Target {
+  uri: string
+  shadow?: ShadowFile
+}
 
 interface Document extends ShadowFile {
   uri: string
@@ -25,11 +31,14 @@ const FULL_SYNC = 1
 const ERROR = 1
 const CHANGED = 2
 const DIAGNOSTICS_DELAY = 150
+// How far a question follows names through generated code.
+const MAX_HOPS = 16
 
 // Serves .kay files by compiling each to its shadow TSX, forwarding requests to tsgo's language server and mapping positions both ways.
 export class KayLanguageServer {
   private root = ''
   private routesDir = ''
+  private shadowTree = ''
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
   private diagnosticsTimer?: Timer
@@ -45,6 +54,11 @@ export class KayLanguageServer {
     client.onRequest<TextDocumentPositionParams>('textDocument/completion', async params => this.completion(params))
     client.onRequest<CompletionItem>('completionItem/resolve', async item => this.resolveCompletion(item))
     client.onRequest<TextDocumentPositionParams>('textDocument/definition', async params => this.definition(params))
+    client.onRequest<TextDocumentPositionParams & { context: unknown }>('textDocument/references', async params => this.references(params))
+    client.onRequest<TextDocumentPositionParams>('textDocument/documentHighlight', async params => this.highlights(params))
+    client.onRequest<TextDocumentPositionParams & { context?: unknown }>('textDocument/signatureHelp', async params => this.signatureHelp(params))
+    client.onRequest<TextDocumentPositionParams>('textDocument/prepareRename', async params => this.prepareRename(params))
+    client.onRequest<TextDocumentPositionParams & { newName: string }>('textDocument/rename', async params => this.rename(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', ({ textDocument }) => this.format(textDocument.uri))
     client.onRequest('shutdown', async () => this.server.request('shutdown'))
     client.onNotification('exit', () => this.exit())
@@ -66,6 +80,7 @@ export class KayLanguageServer {
 
     this.root = rootUri ? fileURLToPath(rootUri) : resolve(params.rootPath ?? process.cwd())
     this.routesDir = resolve(this.root, params.initializationOptions?.routes ?? 'src/routes')
+    this.shadowTree = `${pathToFileURL(resolve(this.root, SHADOW_DIR)).href}/`
     await writeShadowTypes(this.root, { routes: params.initializationOptions?.routes })
 
     const child = Bun.spawn([process.execPath, TSGO, '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
@@ -80,7 +95,7 @@ export class KayLanguageServer {
     connection.onRequest('workspace/diagnostic/refresh', () => this.scheduleDiagnostics())
 
     const capabilities = { ...params.capabilities, textDocument: { ...params.capabilities.textDocument, diagnostic: { dynamicRegistration: false } } }
-    const result = await connection.request<{ capabilities: { completionProvider?: { triggerCharacters?: string[] } } }>('initialize', { ...params, rootUri: pathToFileURL(this.root).href, capabilities, initializationOptions: undefined })
+    const result = await connection.request<{ capabilities: { completionProvider?: { triggerCharacters?: string[] }, signatureHelpProvider?: unknown } }>('initialize', { ...params, rootUri: pathToFileURL(this.root).href, capabilities, initializationOptions: undefined })
 
     return {
       capabilities: {
@@ -88,6 +103,10 @@ export class KayLanguageServer {
         hoverProvider: true,
         completionProvider: { triggerCharacters: result.capabilities.completionProvider?.triggerCharacters ?? ['.'], resolveProvider: true },
         definitionProvider: true,
+        referencesProvider: true,
+        documentHighlightProvider: true,
+        signatureHelpProvider: result.capabilities.signatureHelpProvider ?? { triggerCharacters: ['(', ','] },
+        renameProvider: { prepareProvider: true },
         documentFormattingProvider: true,
       },
       serverInfo: { name: 'kay' },
@@ -244,6 +263,139 @@ export class KayLanguageServer {
     return links
   }
 
+  private async references(params: TextDocumentPositionParams & { context: unknown }): Promise<Location[] | null> {
+    const target = this.toShadow(params)
+
+    if (!target)
+      return null
+
+    const found = await this.across(target.params, async at => await this.server.request<Location[] | null>('textDocument/references', { ...at, context: params.context }) ?? [])
+
+    return uniqueBy(found.map(({ file, range }) => ({ uri: file.uri, range })), location => `${location.uri} ${rangeKey(location.range)}`)
+  }
+
+  private async highlights(params: TextDocumentPositionParams): Promise<DocumentHighlight[] | null> {
+    const target = this.toShadow(params)
+
+    if (!target)
+      return null
+
+    const found = await this.across(target.params, async (at) => {
+      const highlights = await this.server.request<DocumentHighlight[] | null>('textDocument/documentHighlight', at) ?? []
+
+      return highlights.map(highlight => ({ ...highlight, uri: at.textDocument.uri }))
+    })
+
+    return uniqueBy(found.map(({ spot, range }) => ({ range, kind: spot.kind })), highlight => rangeKey(highlight.range))
+  }
+
+  // Signatures carry no positions, so they pass through as they are.
+  private async signatureHelp(params: TextDocumentPositionParams & { context?: unknown }): Promise<unknown> {
+    const target = this.toShadow(params)
+
+    return target ? this.server.request('textDocument/signatureHelp', { ...target.params, context: params.context }) : null
+  }
+
+  // A name only generated code holds cannot be renamed: the editor says so instead of renaming part of it.
+  private async prepareRename(params: TextDocumentPositionParams): Promise<unknown> {
+    const target = this.toShadow(params)
+
+    if (!target)
+      return null
+
+    const result = await this.server.request<Range | { range: Range, placeholder: string } | { defaultBehavior: boolean } | null>('textDocument/prepareRename', target.params)
+
+    if (!result || 'defaultBehavior' in result)
+      return result
+
+    const range = toSourceRange(target.document, 'range' in result ? result.range : result)
+
+    if (!range)
+      return null
+
+    return 'range' in result ? { ...result, range } : range
+  }
+
+  // Only what the user wrote is edited; generated code follows by itself once the source changes.
+  private async rename(params: TextDocumentPositionParams & { newName: string }): Promise<WorkspaceEdit | null> {
+    const target = this.toShadow(params)
+
+    // TypeScript refuses a name it cannot rename, such as a library's.
+    if (!target || !await this.server.request<WorkspaceEdit | null>('textDocument/rename', { ...target.params, newName: params.newName }))
+      return null
+
+    // References follow a name through generated code where a rename stops, and editing each of them renames it whole, a server value's reads in the template included.
+    const found = await this.across(target.params, async at => await this.server.request<Location[] | null>('textDocument/references', { ...at, context: { includeDeclaration: true } }) ?? [])
+    const changes: Record<string, TextEdit[]> = {}
+
+    for (const { spot, file, range } of found) {
+      // Generated code repeats some of the user's names, each mapped back to where it came from: an edit is kept only where the source holds the text it replaces.
+      if (file.shadow && textAt(file.shadow.source, range) !== textAt(file.shadow.tsx, spot.range))
+        continue
+
+      changes[file.uri] = uniqueBy([...changes[file.uri] ?? [], { range, newText: params.newName }], change => rangeKey(change.range))
+    }
+
+    return { changes }
+  }
+
+  // Generated code joins names TypeScript sees apart, such as a server value and the template's reads of it through `__props`: wherever an answer lands in generated code, the question is asked again from there.
+  private async across<Spot extends { uri: string, range: Range }>(start: TextDocumentPositionParams, ask: (at: TextDocumentPositionParams) => Promise<Spot[]>): Promise<{ spot: Spot, file: Target, range: Range }[]> {
+    const files = new Map<string, Promise<Target | undefined>>()
+    const known = new Set<string>([positionKey(start.textDocument.uri, start.position)])
+    const queue = [start]
+    const found: { spot: Spot, file: Target, range: Range }[] = []
+    let hops = 0
+    const visit = (uri: string, position: Position) => {
+      const key = positionKey(uri, position)
+
+      if (!known.has(key) && hops++ < MAX_HOPS)
+        queue.push({ textDocument: { uri }, position })
+
+      known.add(key)
+    }
+
+    for (let at = queue.pop(); at; at = queue.pop()) {
+      for (const spot of await ask(at)) {
+        let pending = files.get(spot.uri)
+
+        if (!pending)
+          files.set(spot.uri, pending = this.targetOf(spot.uri))
+
+        const file = await pending
+
+        if (!file)
+          continue
+
+        const range = file.shadow ? toSourceRange(file.shadow, spot.range) : spot.range
+
+        if (!range) {
+          visit(spot.uri, spot.range.start)
+
+          continue
+        }
+
+        found.push({ spot, file, range })
+        known.add(positionKey(spot.uri, spot.range.start))
+        // Every other copy of the name in generated code is asked about too.
+        for (const generated of file.shadow?.map.toGeneratedAll(toOffset(file.shadow.source, range.start)) ?? [])
+          visit(spot.uri, toPosition(file.shadow!.tsx, generated))
+      }
+    }
+
+    return found
+  }
+
+  // Undefined for the declarations kay generates beside the shadow files.
+  private async targetOf(uri: string): Promise<Target | undefined> {
+    const shadow = await this.shadowOf(uri)
+
+    if (shadow)
+      return { uri: pathToFileURL(shadow.file).href, shadow }
+
+    return uri.startsWith(this.shadowTree) ? undefined : { uri }
+  }
+
   // Definitions inside another component land in its shadow TSX; this points them back at the .kay file.
   private async toSourceLink(origin: Document, location: Location | LocationLink): Promise<LocationLink> {
     const link = 'targetUri' in location ? location : { targetUri: location.uri, targetRange: location.range, targetSelectionRange: location.range }
@@ -334,6 +486,28 @@ function mapCompletionItem(document: ShadowFile, item: CompletionItem): Completi
     mapped.additionalTextEdits = edits
 
   return mapped
+}
+
+function textAt(text: string, range: Range): string {
+  return text.slice(toOffset(text, range.start), toOffset(text, range.end))
+}
+
+function positionKey(uri: string, { line, character }: Position): string {
+  return `${uri} ${line}:${character}`
+}
+
+function rangeKey({ start, end }: Range): string {
+  return `${start.line}:${start.character}-${end.line}:${end.character}`
+}
+
+function uniqueBy<Item>(items: Item[], key: (item: Item) => string): Item[] {
+  const seen = new Set<string>()
+
+  return items.filter((item) => {
+    const found = key(item)
+
+    return !seen.has(found) && Boolean(seen.add(found))
+  })
 }
 
 function mapInsertReplace(document: ShadowFile, edit: { insert: Range, replace: Range }): { insert: Range, replace: Range } | undefined {

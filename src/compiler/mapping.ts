@@ -128,6 +128,11 @@ export class SourceMap {
     return exact && exact.generated + source - exact.source
   }
 
+  // Generated code may copy a name more than once, as a loop's item into its key function and its row.
+  toGeneratedAll(source: number): number[] {
+    return this.bySource.filter(mapping => mapping.source <= source && source <= mapping.source + mapping.length).map(mapping => mapping.generated + source - mapping.source)
+  }
+
   // True when the generated offset was copied from the source, so a diagnostic there is the user's own code.
   isExact(generated: number): boolean {
     return findContaining(this.byGenerated, generated, mapping => mapping.generated) !== undefined

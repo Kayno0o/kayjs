@@ -468,4 +468,4 @@ new Elysia()
 - `kay build [dir]`: bundle the islands and stylesheets for production, minified, into `.kay/client`, and render the pages marked `prerender`; then start the server with `NODE_ENV=production`. Each page preloads the chunks of the islands it renders.
 - `kay check [dir] [-p tsconfig.json]`: type-check the project, `.kay` files included.
 - `kay fmt [paths...] [--check]`: format `.kay` files; `--check` lists unformatted files and fails.
-- `kay lsp --stdio`: the language server behind the editor extension in `editors/vscode`.
+- `kay lsp --stdio`: the language server behind the editor extension in `editors/vscode`: errors, hover, completion, signatures, definitions, references, rename and formatting in `.kay` files. Renaming a server value renames its reads in the template, and renaming a destructured prop renames it in every parent passing it.

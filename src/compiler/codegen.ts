@@ -250,6 +250,13 @@ class Generator {
         b.add(`${JSON.stringify(binding.key)}: `).addSource(binding.local).add(', ')
       b.add('} = __props;\n')
     }
+    // Type checking keeps each `{ title }` as a read of its prop, so the editor hovers, finds and renames it with the prop.
+    else if (this.options.check) {
+      for (const binding of props.bindings) {
+        if (this.text(binding.local) === binding.key)
+          b.add('__props.').addSource(binding.local).add(';\n')
+      }
+    }
   }
 
   // The template's top-level `head` block, which renders into the document head rather than in place.
