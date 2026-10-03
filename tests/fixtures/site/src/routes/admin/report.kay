@@ -1,6 +1,9 @@
 --- server
 export const prerender = true
 
+// A guarded page asking shared caches to keep it, which they must not.
+ctx.headers.set('cache-control', 'public, max-age=3600')
+
 const renderedAt = performance.now()
 ---
 h1 Report

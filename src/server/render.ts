@@ -26,6 +26,12 @@ interface PageModule {
 
 type Loaded = PromiseSettledResult<Record<string, unknown>>
 
+// A prerendered page as the server holds it from boot.
+export interface ServedPage extends Omit<PrerenderedPage, 'file' | 'headers'> {
+  html: string
+  headers: [string, string][]
+}
+
 export interface RenderOptions {
   lang?: string
   prefetch?: Prefetch
@@ -54,6 +60,9 @@ const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-sca
 const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()
 const stylesCache = new WeakMap<ClientBuild, Map<string, string>>()
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
+const WEAK_PREFIX = /^W\//
+// Header values are bytes, so a file name outside ASCII is escaped.
+const NOT_ASCII = /[^\x20-\x7E]/g
 
 export async function renderPage(route: ServedRoute, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const params = routeParams(route, context.params)
@@ -90,7 +99,7 @@ export async function renderPage(route: ServedRoute, context: RequestContext, cl
     const body = renderDocument(files, modules, data, client, options)
 
     if (timings)
-      rendering.headers.set('server-timing', serverTiming(files, timings, performance.now() - started))
+      rendering.headers.set('server-timing', serverTiming(files, modules, timings, performance.now() - started))
 
     return respond(rendering, body)
   }
@@ -115,12 +124,14 @@ async function runLoad(module: PageModule, ctx: PageContext, timings: number[] |
 }
 
 // One entry per load, layouts first, then the render; a streamed page's render covers what it sends first.
-function serverTiming(files: string[], timings: number[], render: number): string {
-  return [...files.map((file, index) => `load-${index};desc="${relative(process.cwd(), file)}";dur=${timings[index]!.toFixed(1)}`), `render;dur=${render.toFixed(1)}`].join(', ')
+function serverTiming(files: string[], modules: PageModule[], timings: number[], render: number): string {
+  const loads = files.flatMap((file, index) => modules[index]!.load ? [`load-${index};desc=${JSON.stringify(relative(process.cwd(), file)).replace(NOT_ASCII, encodeURIComponent)};dur=${timings[index]!.toFixed(1)}`] : [])
+
+  return [...loads, `render;dur=${render.toFixed(1)}`].join(', ')
 }
 
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
-export async function servePrerendered(route: ServedRoute, page: PrerenderedPage & { html: string }, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
+export async function servePrerendered(route: ServedRoute, page: ServedPage, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const rendering = createRendering(context, {})
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
 
@@ -129,13 +140,17 @@ export async function servePrerendered(route: ServedRoute, page: PrerenderedPage
 
   const { headers } = rendering
 
-  headers.set('etag', page.etag)
-  // Behind a guard the page is for whoever passed it, so no shared cache may keep it.
-  headers.set('cache-control', route.guards.length > 0 ? 'private, no-cache' : 'public, max-age=0, must-revalidate')
-  for (const [name, value] of Object.entries(page.headers))
+  headers.set('cache-control', 'public, max-age=0, must-revalidate')
+  for (const [name, value] of page.headers)
     headers.set(name, value)
 
-  if (context.request.headers.get('if-none-match') === page.etag) {
+  headers.set('etag', page.etag)
+
+  // Behind a guard the page is for whoever passed it, so no shared cache may keep it, whatever the page set.
+  if (route.guards.length > 0)
+    headers.set('cache-control', 'private, no-cache')
+
+  if (matchesEtag(context.request.headers.get('if-none-match'), page.etag)) {
     headers.delete('content-type')
     rendering.status = 304
 
@@ -145,6 +160,11 @@ export async function servePrerendered(route: ServedRoute, page: PrerenderedPage
   rendering.status = page.status
 
   return respond(rendering, page.html)
+}
+
+// Caches and proxies may send several tags, or a weak one.
+function matchesEtag(header: string | null, etag: string): boolean {
+  return header !== null && header.split(',').some(tag => tag.trim().replace(WEAK_PREFIX, '') === etag)
 }
 
 // A URL no page serves, answered by the routes directory's own `_404.kay` or `_error.kay`.
@@ -241,7 +261,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
     logError(error)
 
   const pageError = notFound ? { status: 404, message: 'Not Found' } : denied ? { status: error.status, message: error.message } : describeError(error, options.dev)
-  const page = (notFound ? special.notFound : undefined) ?? special.error
+  const page = (notFound || (denied && error.status === 404) ? special.notFound : undefined) ?? special.error
 
   rendering.status = pageError.status
   ;(rendering.ctx as ErrorPageContext).error = pageError
@@ -254,7 +274,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   if (options.dev && !notFound && !denied)
     return new Response(errorPage(pageError) + LIVE_RELOAD, { status: pageError.status, headers: { 'content-type': 'text/html; charset=utf-8' } })
 
-  return new Response(pageError.message, { status: pageError.status, headers: TEXT })
+  return new Response(notFound ? 'Not found' : pageError.message, { status: pageError.status, headers: TEXT })
 }
 
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.

@@ -65,8 +65,8 @@ declare const DEFERRED: unique symbol
 // A promise `defer()` marked for an `await` block.
 export type Deferred<T> = Promise<T> & { readonly [DEFERRED]: true }
 
-// A promise rejecting before its block renders would crash the process, unless `defer()` took it when it was made.
-export type AwaitValue<T> = T extends PromiseLike<unknown> ? T extends { readonly [DEFERRED]: true } ? unknown : { kayError: 'Wrap the promise in defer() where it is made: a rejection before the page renders it would crash the server' } : unknown
+// A promise rejecting before its block renders would crash the process, unless `defer()` took it when it was made; checked across a union too.
+export type AwaitValue<T> = [Exclude<Extract<T, PromiseLike<unknown>>, { readonly [DEFERRED]: true }>] extends [never] ? unknown : { kayError: 'Wrap the promise in defer() where it is made: a rejection before the page renders it would crash the server' }
 
 // What a template's `await` block compiles to: the value, then a function per block.
 export interface AwaitProps<T> {

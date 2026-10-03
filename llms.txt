@@ -232,7 +232,7 @@ p.status {todo.done ? 'Done' : 'Open'}
 
 ## Prerendering
 
-A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.locals` or `ctx.failed` fails the build, as does a page taking params. Development renders it per request like any other.
+A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.locals` or `ctx.failed` fails the build, as does a page taking params; `ctx.url` is `http://localhost` plus its path. Development renders it per request like any other.
 
 ## Streaming
 
@@ -260,7 +260,8 @@ catch
 - The page goes out at once with the block under `await`. Each `then` block streams in as its value resolves, in whatever order they do, swapped in by a few bytes of inline script; islands inside it hydrate when it lands.
 - `await value then name` on one line has no pending block. `catch error` binds the rejection; without `catch`, a rejection removes the pending block and is logged.
 - `defer()` handles a rejection where the promise is made. Without it, a promise rejecting before the page renders it would crash the server, so `kay check` refuses a bare promise in `await`.
-- Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them, and a `head` block inside one is ignored.
+- Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them, and a `head` block inside one is ignored. A block renders on its own, outside the layouts' Solid context, and an `await` inside a pending block renders its own pending block only.
+- The response stays open until the last value settles. Bun closes a connection idle for `idleTimeout` seconds, 10 by default, so a value slower than that needs `Bun.serve({ idleTimeout })` raised.
 - In an island, `await` renders through Solid's async rendering: the server sends the pending block and the browser renders the rest.
 
 ## Actions

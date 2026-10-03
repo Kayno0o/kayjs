@@ -1,0 +1,16 @@
+--- server
+import { defer } from 'kay'
+
+const score = defer(new Promise<number>(resolve => setTimeout(resolve, 10, 42)))
+const inner = defer(Promise.resolve('inner'))
+---
+---
+import Counter from '../components/counter.kay'
+---
+Counter(start={1})
+await score
+  p.pending Scoring
+  await inner then text
+    p.inner {text}
+then value
+  p.score {value}

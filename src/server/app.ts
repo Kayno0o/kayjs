@@ -48,7 +48,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   await Promise.all([registerActionRoutes(app, routes, options.dev), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
   for (const route of routes) {
     const prerendered = client.pages.get(route.pattern)
-    const page = prerendered && { ...prerendered, html: await Bun.file(join(client.dir, '..', PRERENDERED_DIR, prerendered.file)).text() }
+    const page = prerendered && { status: prerendered.status, etag: prerendered.etag, headers: Object.entries(prerendered.headers), html: await Bun.file(join(client.dir, '..', PRERENDERED_DIR, prerendered.file)).text() }
 
     if (page)
       app.get(route.pattern, async context => servePrerendered(route, page, context, client, renderOptions))

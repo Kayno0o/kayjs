@@ -5,4 +5,4 @@ dist
 *.tsbuildinfo
 .env
 *.vsix
-types
+/types

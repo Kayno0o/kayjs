@@ -2,6 +2,8 @@ import type { KayConfig } from '../config'
 import type { ClientBuild, PrerenderedPage } from './client'
 import { mkdir } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
+import { parseKay } from '../compiler/parser'
+import { analyzeServer } from '../compiler/script'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { registerLoader } from './loader'
 import { renderPage } from './render'
@@ -20,7 +22,8 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   const pages: Record<string, PrerenderedPage> = {}
 
   for (const route of await scanRoutes(resolve(root, config.routes ?? 'src/routes'))) {
-    if ((await import(route.file) as { prerender?: unknown }).prerender !== true)
+    // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
+    if (!await exportsPrerender(route.file) || (await import(route.file) as { prerender?: unknown }).prerender !== true)
       continue
 
     const file = relative(root, route.file)
@@ -52,4 +55,10 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   client.pages = new Map(Object.entries(pages))
 
   return Object.keys(pages).length
+}
+
+async function exportsPrerender(file: string): Promise<boolean> {
+  const source = await Bun.file(file).text()
+
+  return analyzeServer(source, parseKay(source).server)?.exportNames.includes('prerender') ?? false
 }

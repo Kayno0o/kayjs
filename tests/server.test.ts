@@ -359,12 +359,13 @@ describe('guards', () => {
     expect(html).not.toContain('Admin tools')
   })
 
-  it('guards the actions of its pages before their input is validated', async () => {
-    const away = await promote({ name: '' })
+  it('guards the actions of its pages once their input is valid', async () => {
+    const away = await promote({ name: 'bob' })
     const denied = await promote({ name: 'bob' }, { 'x-user': 'bob' })
 
     expect(away.status).toBe(303)
     expect(away.headers.get('location')).toBe('/about')
+    expect((await promote({ name: '' })).status).toBe(422)
     expect(denied.status).toBe(403)
     expect(await denied.text()).toBe('Admins only')
     expect((await promote({ name: '' }, { 'x-user': 'ada' })).status).toBe(422)
@@ -373,6 +374,19 @@ describe('guards', () => {
 
     expect(await done.json()).toBe('bob is an admin')
     expect(done.headers.get('set-cookie')).toStartWith('seen=admin;')
+  })
+
+  it('sees what the app resolves, on pages and actions alike', async () => {
+    const resolved = new Elysia().resolve({ as: 'global' }, ({ headers }) => ({ user: headers['x-user'] })).use(app)
+    const page = await resolved.handle(new NativeRequest('http://localhost/admin', { headers: { 'x-user': 'ada' } }))
+    const action = await resolved.handle(new NativeRequest(PROMOTE, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-user': 'ada' },
+      body: JSON.stringify({ name: 'bob' }),
+    }))
+
+    expect(page.status).toBe(200)
+    expect(await action.json()).toBe('bob is an admin')
   })
 
   it('refuses a cross-site post before any guard runs', async () => {
@@ -406,6 +420,17 @@ describe('await blocks', () => {
     expect(failed).toContain('<p class="error">Feed down</p></template>')
     expect(ready).toContain('<ul><li>first</li><li>second</li></ul><kay-island')
     expect(ready).toContain('<script type="module" async src="/_kay/')
+    expect(end).toBe('</body></html>')
+  })
+
+  it('loads the entry right after a shell holding islands, and streams nothing for an await inside a pending block', async () => {
+    const [shell, block, end] = await chunksOf('/live')
+
+    expect(shell).toContain('<script type="module" async src="/_kay/')
+    expect(shell).not.toContain('<script type="module" src=')
+    expect(shell).toContain('<p class="pending">Scoring</p>')
+    expect(block).toContain('<p class="score">42</p>')
+    expect(block).not.toContain('<script type="module"')
     expect(end).toBe('</body></html>')
   })
 
@@ -459,7 +484,7 @@ describe('prerendering', () => {
       expect(await served.text()).toBe(file)
       expect(served.headers.get('cache-control')).toBe('private, no-cache')
       expect(served.headers.get('set-cookie')).toStartWith('seen=admin;')
-      expect((await visit('ada', { 'if-none-match': etag })).status).toBe(304)
+      expect((await visit('ada', { 'if-none-match': `"other", W/${etag}` })).status).toBe(304)
       expect((await visit('bob')).status).toBe(403)
     }
     finally {
@@ -495,6 +520,10 @@ describe('prefetch', () => {
     }] })
     expect(speculationRules('eager')).toContain('"eagerness":"eager"')
     expect(speculationRules(false)).toBe('')
+
+    const quiet = await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: true, prefetch: false })
+
+    expect(await (await quiet.handle(new Request('http://localhost/about'))).text()).not.toContain('speculationrules')
   })
 })
 

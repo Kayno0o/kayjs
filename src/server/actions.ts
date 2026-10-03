@@ -18,7 +18,7 @@ interface ActionRequest {
 }
 
 // Thrown before the input is validated, to answer with `response` through the route's error hook.
-class Refused {
+class CrossSite {
   constructor(readonly response: Response) {}
 }
 
@@ -40,30 +40,31 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], d
 
       app.post(value.url, async context => runAction(value, context, dev), {
         body: value.schema,
-        // Before validation, so a visitor the action refuses learns nothing about its input.
-        transform: async context => admit(route.guards, context, dev),
+        transform: ({ request }) => refuseCrossSite(request),
+        // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
+        ...(route.guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(route.guards, context, dev) }),
         error: ({ code, error, request }) => {
           if (code === 'VALIDATION')
             return refused(value, error, request)
 
-          return error instanceof Refused ? error.response : undefined
+          return error instanceof CrossSite ? error.response : undefined
         },
       })
     }
   }
 }
 
-// Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused; then the guards of the action's page decide.
-async function admit(guards: LoadedGuard[], context: { request: Request }, dev: boolean): Promise<void> {
-  const { request } = context
+// Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused before anything else runs.
+function refuseCrossSite(request: Request) {
   const origin = request.headers.get('origin')
 
   if (origin !== null && !sameHost(request, origin))
-    throw new Refused(new Response('Cross-site action refused', { status: 403 }))
+    throw new CrossSite(new Response('Cross-site action refused', { status: 403 }))
+}
 
-  if (guards.length === 0)
-    return
-
+// The guards of the action's page, answering for it when one stops the request.
+async function admit(guards: LoadedGuard[], context: { request: Request }, dev: boolean): Promise<Response | undefined> {
+  const { request } = context
   const state: ActionRequest = { jar: cookieJar(request), headers: new Headers() }
   const ctx: GuardContext = {
     request,
@@ -83,9 +84,11 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, dev: 
   const refusal = await runGuards(guards, ctx)
 
   if (refusal)
-    throw new Refused(stopped(refusal.error, state, dev))
+    return stopped(refusal.error, state, dev)
 
   guarded.set(request, state)
+
+  return undefined
 }
 
 // Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http.
@@ -179,9 +182,7 @@ function refused(action: ServerAction<TSchema, unknown>, error: Readonly<Validat
     errors[field] ??= typeof custom === 'string' ? custom : issue.summary ?? 'Invalid value'
   }
 
-  const state = guarded.get(request) ?? { jar: cookieJar(request), headers: new Headers() }
-
-  return failed(request, state.headers, state.jar.cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors })
+  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors })
 }
 
 // A call gets the failure as JSON; a plain form post goes back to its page with the failure in a cookie.

@@ -42,8 +42,16 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
     return SolidAwait(props)
 
   const id = (nextId++).toString(36)
+  const blocks = deferred
 
-  deferred.push({ id, value, ready: props.ready as PendingBlock['ready'], failed: props.failed })
+  blocks.push({ id, value, ready: props.ready as PendingBlock['ready'], failed: props.failed })
+  // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
+  deferred = undefined
 
-  return ssr([`<!--kay-await:${id}-->`, `<!--/kay-await:${id}-->`], props.pending?.()) as unknown as JSX.Element
+  try {
+    return ssr([`<!--kay-await:${id}-->`, `<!--/kay-await:${id}-->`], props.pending?.()) as unknown as JSX.Element
+  }
+  finally {
+    deferred = blocks
+  }
 }

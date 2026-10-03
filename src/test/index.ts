@@ -32,9 +32,7 @@ export interface TestSite {
   submit: <Input>(action: Action<Input, unknown>, fields: Partial<Record<Extract<keyof Input, string>, string>>, init?: VisitInit & { from?: string }) => Promise<Visit>
   // The call an island makes: the result, or an `ActionError` thrown.
   call: <Input, Output>(action: Action<Input, Output>, input: Input, init?: VisitInit) => Promise<Success<Output>>
-  // What the site set so far, sent with every request.
   cookies: Bun.CookieMap
-  // Any other request, answered by the same app.
   handle: (request: Request) => Promise<Response>
 }
 

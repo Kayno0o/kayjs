@@ -10,6 +10,7 @@ import { collectIslands } from '../runtime/island.server'
 // Swaps a streamed block in for the pending one between its markers, then hydrates the islands it brought; an outer block that settled first may have taken the markers away already.
 const SWAP = '<script>function $kayAwait(i){var t=document.getElementById("kay-await-"+i),w=document.createTreeWalker(document.body,128),s,n;while(n=w.nextNode())if(n.data=="kay-await:"+i){s=n;break}if(s){while((n=s.nextSibling)&&!(n.nodeType==8&&n.data=="/kay-await:"+i))n.remove();n&&n.remove();s.replaceWith(t.content)}t.remove();self.$kayHydrate&&$kayHydrate()}</script>'
 const encoder = new TextEncoder()
+const EMPTY: Rendered = { html: '', islands: { eager: new Set(), count: 0 }, deferred: [] }
 
 export interface Rendered {
   html: string
@@ -30,13 +31,19 @@ export function renderStatic(view: () => JSX.Element, onHead?: (html: string) =>
 export function streamDocument(shell: string, deferred: PendingBlock[], client: ClientBuild, entryShipped: boolean): ReadableStream<Uint8Array> {
   let shipped = entryShipped
   let swapShipped = false
+  // Once the browser goes away, blocks still settling render nothing.
+  let cancelled = false
 
   return new ReadableStream({
     async start(controller) {
       controller.enqueue(encoder.encode(shell))
 
       const send = async (block: PendingBlock): Promise<void> => {
-        const rendered = await settle(block)
+        const rendered = await settle(block, () => cancelled)
+
+        if (cancelled)
+          return
+
         let scripts = swapShipped ? '' : SWAP
 
         swapShipped = true
@@ -51,16 +58,26 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
       }
 
       await Promise.all(deferred.map(send))
+
+      if (cancelled)
+        return
+
       controller.enqueue(encoder.encode('</body></html>'))
       controller.close()
+    },
+    cancel() {
+      cancelled = true
     },
   })
 }
 
 // The `then` block once the value resolves, or the `catch` block once it rejects; without one, the pending block just goes away and the error is logged.
-async function settle(block: PendingBlock): Promise<Rendered> {
+async function settle(block: PendingBlock, cancelled: () => boolean): Promise<Rendered> {
   try {
     const value = await block.value
+
+    if (cancelled())
+      return EMPTY
 
     return renderStatic(() => block.ready(value as never))
   }
@@ -79,6 +96,6 @@ async function settle(block: PendingBlock): Promise<Rendered> {
       logError(error)
     }
 
-    return { html: '', islands: { eager: new Set(), count: 0 }, deferred: [] }
+    return EMPTY
   }
 }
