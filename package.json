@@ -32,6 +32,14 @@
     "./server": {
       "types": "./types/server/index.d.ts",
       "default": "./src/server/index.ts"
+    },
+    "./test": {
+      "types": "./types/test/index.d.ts",
+      "default": "./src/test/index.ts"
+    },
+    "./test/preload": {
+      "types": "./types/test/preload.d.ts",
+      "default": "./src/test/preload.ts"
     }
   },
   "bin": {

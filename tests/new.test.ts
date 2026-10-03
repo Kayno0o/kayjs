@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { check } from '../src/check'
 import { formatFiles } from '../src/format'
@@ -45,6 +46,12 @@ describe('kay new', () => {
       await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, exactOptionalPropertyTypes: true } }))
       expect(await check(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
+
+      const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+      const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+
+      expect(report).toContain('1 pass')
+      expect(code).toBe(0)
 
       const client = await buildClient(dir)
 

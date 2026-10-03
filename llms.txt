@@ -340,6 +340,28 @@ export default guard(({ locals, redirect, deny }) => {
 - A denied page renders the nearest `_error.kay` outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
 - A layout's `ctx.redirect` is no guard: actions never run layout loads. Neither is an Elysia `onBeforeHandle` testing the page's path: actions are served under `/_kay/action/`.
 
+## Testing
+
+`kay/test` serves the project's pages and actions inside the test process, with no server and no browser build:
+
+```ts
+import { expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+import { add } from '../src/routes/index.kay'
+
+const site = await testSite({ locals: () => ({ user: { id: 1, admin: true } }) })
+
+it('shows why a todo was refused', async () => {
+  const page = await site.submit(add, { title: '' }, { from: '/' })
+
+  expect(page.html).toContain('Write a title')
+})
+```
+
+- `site.visit(path)` GETs a page and follows redirects. `site.submit(action, fields, { from })` posts a form without JavaScript and follows it back to its page. Both resolve with `{ url, status, headers, html }`. `site.call(action, input)` calls an action as an island does, resolving with its result or throwing `ActionError`.
+- Cookies a response sets go with the next request and read as `site.cookies`. `locals` stands in for the app's Elysia `derive`, called with each request.
+- Pages render their islands' markup without scripts. Test files import `.kay` files through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test.
+
 ## What `kay check` verifies
 
 - Every expression, prop and server name, as TypeScript does.

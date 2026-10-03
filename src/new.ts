@@ -9,6 +9,20 @@ const KAY_ROOT = resolve(import.meta.dir, '..')
 // Written as strings rather than template files, which the repository's own `.kay` scans would pick up.
 const FILES: Record<string, string> = {
   '.gitignore': 'node_modules\n.kay\n',
+  // Lets test files import pages and their actions.
+  'bunfig.toml': '[test]\npreload = ["kay/test/preload"]\n',
+  'tests/home.test.ts': `import { expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+
+const site = await testSite()
+
+it('greets from the server', async () => {
+  const home = await site.visit('/')
+
+  expect(home.status).toBe(200)
+  expect(home.html).toContain('Hello from the server')
+})
+`,
   'kay.config.ts': `import { defineConfig } from 'kay/server'
 
 export default defineConfig({ lang: 'en' })
@@ -87,7 +101,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
       name,
       type: 'module',
       private: true,
-      scripts: { dev: 'kay dev', build: 'kay build', start: 'NODE_ENV=production bun src/server.ts', check: 'kay check', fmt: 'kay fmt' },
+      scripts: { dev: 'kay dev', build: 'kay build', start: 'NODE_ENV=production bun src/server.ts', check: 'kay check', fmt: 'kay fmt', test: 'bun test' },
       dependencies: { elysia: kay.dependencies.elysia, kay: dependency },
       devDependencies: { '@types/bun': kay.devDependencies['@types/bun'] },
     }, null, 2)}\n`,
@@ -105,7 +119,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
         noEmit: true,
         skipLibCheck: true,
       },
-      include: ['src', 'kay.config.ts', '.kay/types'],
+      include: ['src', 'tests', 'kay.config.ts', '.kay/types'],
     }, null, 2)}\n`,
   }
 

@@ -117,11 +117,15 @@ export function formAction(target: string | Action<never, unknown>): string {
 export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> : string
 
 async function post<Output>(url: string, input: unknown): Promise<Output> {
-  const response = await fetch(url, {
+  return readActionResponse(await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-kay-action': '1' },
     body: JSON.stringify(input),
-  })
+  }))
+}
+
+// What a call got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
+export async function readActionResponse<Output>(response: Response): Promise<Output> {
   const body = await response.text()
 
   if (!response.ok) {
