@@ -6,3 +6,4 @@ dist
 .env
 *.vsix
 /types
+.claude/scheduled_tasks.lock
