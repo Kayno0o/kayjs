@@ -1,4 +1,6 @@
-import type { CompletionList, Diagnostic, DocumentHighlight, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
+import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
@@ -54,7 +56,7 @@ class Editor {
   }
 
   async rename(path: string, line: number, character: number, newName: string): Promise<Record<string, Range[]>> {
-    const { changes } = await this.connection.request<WorkspaceEdit>('textDocument/rename', { textDocument: { uri: this.uri(path) }, position: { line, character }, newName })
+    const { changes = {} } = await this.connection.request<WorkspaceEdit>('textDocument/rename', { textDocument: { uri: this.uri(path) }, position: { line, character }, newName })
 
     return Object.fromEntries(Object.entries(changes).map(([uri, edits]) => [uri.slice(pathToFileURL(this.root).href.length + 1), sortRanges(edits.map(edit => edit.range))]))
   }
@@ -209,5 +211,60 @@ describe('kay lsp', () => {
     const edits = await site.connection.request<TextEdit[]>('textDocument/formatting', { textDocument: { uri: site.uri('src/routes/about.kay') }, options: { tabSize: 2, insertSpaces: true } })
 
     expect(edits).toEqual([{ range: { start: { line: 0, character: 0 }, end: { line: 2, character: 0 } }, newText: 'div\n  p(class="x") Hi\n' }])
+  })
+})
+
+// Applies an editor's edits to a text, last first so earlier offsets stay valid.
+function applyEdits(text: string, edits: TextEdit[]): string {
+  const offsetOf = ({ line, character }: { line: number, character: number }) => text.split('\n').slice(0, line).reduce((sum, lineText) => sum + lineText.length + 1, 0) + character
+
+  return edits.map(edit => ({ ...edit, start: offsetOf(edit.range.start), end: offsetOf(edit.range.end) })).sort((a, b) => b.start - a.start).reduce((result, edit) => result.slice(0, edit.start) + edit.newText + result.slice(edit.end), text)
+}
+
+// Outside this checkout, whose `node_modules/kay` links back to it: tsgo would take a fixture's modules for the `kay` package's own and offer no import of them.
+describe('kay lsp imports', () => {
+  let editor: Editor
+  let dir: string
+  const page = 'src/routes/index.kay'
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'kay-imports-'))
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, 'src/data.ts'), 'export function listTodos(): string[] {\n  return []\n}\n'),
+      Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n'),
+      Bun.write(join(dir, page), 'p Home\n'),
+    ])
+    editor = new Editor(dir)
+    await editor.start()
+    await editor.open(page)
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('adds the import a completion brings to the fence the name is used from', async () => {
+    const source = '--- server\nconst todos = listTo\n---\np {todos.length}\n'
+
+    await editor.change(page, source, 2)
+
+    const list = await editor.request<CompletionList>('textDocument/completion', page, 1, 20)
+    const item = await editor.connection.request<CompletionItem>('completionItem/resolve', list.items.find(entry => entry.label === 'listTodos'))
+
+    expect(applyEdits(source, item.additionalTextEdits ?? [])).toBe('--- server\nimport { listTodos } from \'../data\'\nconst todos = listTo\n---\np {todos.length}\n')
+  })
+
+  it('adds a missing import as a quick fix, opening a script fence when there is none', async () => {
+    const fixes = async (source: string, version: number) => {
+      const diagnostics = await editor.change(page, source, version)
+      const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range: { start: { line: source.split('\n').indexOf('Badge'), character: 0 }, end: { line: source.split('\n').indexOf('Badge'), character: 5 } }, context: { diagnostics } })
+
+      return actions.map(action => ({ title: action.title, text: applyEdits(source, action.edit!.changes![editor.uri(page)]!) }))
+    }
+
+    expect(await fixes('Badge\n', 3)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
+    expect(await fixes('---\nimport { signal } from \'kay\'\n---\nBadge\n', 4)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport { signal } from \'kay\'\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
   })
 })

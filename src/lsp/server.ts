@@ -1,13 +1,15 @@
 import type { Subprocess } from 'bun'
 import type { CheckOptions, ShadowFile } from '../check'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
-import type { CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
+import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { compileShadow, SHADOW_DIR, shadowPath, TSGO, writeShadowTypes } from '../check'
 import { formatKay } from '../compiler/format'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { parseKay } from '../compiler/parser'
+import { analyzeScript, analyzeServer } from '../compiler/script'
 import { loadConfig } from '../config'
 import { Connection } from './rpc'
 
@@ -25,6 +27,8 @@ interface Document extends ShadowFile {
 }
 
 const KAY_FILE = /^file:.*\.kay$/
+const IMPORT_DECLARATION = /^\s*import\s/
+const TRAILING_SEMICOLON = /;$/
 const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
 const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:For|Show|Omit|Island|Href|Field|Prop|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
@@ -32,6 +36,10 @@ const FULL_SYNC = 1
 const ERROR = 1
 const CHANGED = 2
 const DIAGNOSTICS_DELAY = 150
+const QUICK_FIX = 'quickfix'
+// Completions offer names from modules not imported yet, as editors do for TypeScript by default; added imports are quoted the way kay's own code is, since generated code would mislead the guess.
+const TYPESCRIPT_SETTINGS = { suggest: { autoImports: true }, preferences: { quoteStyle: 'single' } }
+const TYPESCRIPT_SECTIONS = new Set(['js/ts', 'typescript', 'javascript'])
 // How far a question follows names through generated code.
 const MAX_HOPS = 16
 
@@ -63,6 +71,7 @@ export class KayLanguageServer {
     client.onRequest<TextDocumentPositionParams>('textDocument/prepareRename', async params => this.prepareRename(params))
     client.onRequest<TextDocumentPositionParams & { newName: string }>('textDocument/rename', async params => this.rename(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', ({ textDocument }) => this.format(textDocument.uri))
+    client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
     client.onRequest('shutdown', async () => this.server.request('shutdown'))
     client.onNotification('exit', () => this.exit())
   }
@@ -101,10 +110,11 @@ export class KayLanguageServer {
 
     this.tsgo = { connection, process: child }
     connection.onUnhandledRequest(() => null)
-    connection.onRequest<{ items: unknown[] }>('workspace/configuration', ({ items }) => items.map(() => null))
+    connection.onRequest<{ items: { section?: string }[] }>('workspace/configuration', ({ items }) => items.map(item => TYPESCRIPT_SECTIONS.has(item.section ?? '') ? TYPESCRIPT_SETTINGS : null))
     connection.onRequest('workspace/diagnostic/refresh', () => this.scheduleDiagnostics())
 
-    const capabilities = { ...params.capabilities, textDocument: { ...params.capabilities.textDocument, diagnostic: { dynamicRegistration: false } } }
+    // tsgo asks this server for its settings, whatever the editor supports.
+    const capabilities = { ...params.capabilities, workspace: { ...params.capabilities.workspace as object, configuration: true }, textDocument: { ...params.capabilities.textDocument, diagnostic: { dynamicRegistration: false } } }
     const result = await connection.request<{ capabilities: { completionProvider?: { triggerCharacters?: string[] }, signatureHelpProvider?: unknown } }>('initialize', { ...params, rootUri: pathToFileURL(this.root).href, capabilities, initializationOptions: undefined })
 
     return {
@@ -117,6 +127,7 @@ export class KayLanguageServer {
         documentHighlightProvider: true,
         signatureHelpProvider: result.capabilities.signatureHelpProvider ?? { triggerCharacters: ['(', ','] },
         renameProvider: { prepareProvider: true },
+        codeActionProvider: { codeActionKinds: [QUICK_FIX] },
         documentFormattingProvider: true,
       },
       serverInfo: { name: 'kay' },
@@ -237,17 +248,41 @@ export class KayLanguageServer {
     return {
       ...list,
       itemDefaults,
-      items: list.items.filter(item => !GENERATED_NAME.test(item.label)).map(item => ({ ...mapCompletionItem(target.document, item), data: { uri: target.document.uri, data: item.data } })),
+      items: list.items.filter(item => !GENERATED_NAME.test(item.label)).map(item => ({ ...mapCompletionItem(target.document, item, target.offset), data: { uri: target.document.uri, offset: target.offset, data: item.data } })),
     }
   }
 
   // Items carry the document they were listed for, since the editor may resolve one after another file asked for completions.
   private async resolveCompletion(item: CompletionItem): Promise<CompletionItem> {
-    const { uri, data } = item.data as { uri: string, data: unknown }
+    const { uri, offset, data } = item.data as { uri: string, offset: number, data: unknown }
     const document = this.documents.get(uri)
     const resolved = await this.server.request<CompletionItem>('completionItem/resolve', { ...item, data })
 
-    return { ...(document ? mapCompletionItem(document, resolved) : resolved), data: item.data }
+    return { ...(document ? mapCompletionItem(document, resolved, offset) : resolved), data: item.data }
+  }
+
+  // Quick fixes whose every edit lands in what the user wrote, an added import moved into its fence.
+  private async codeActions(params: CodeActionParams): Promise<CodeAction[] | null> {
+    const document = this.documents.get(params.textDocument.uri)
+    const range = document && toShadowRange(document, params.range)
+
+    if (!document || !range)
+      return null
+
+    const diagnostics = params.context.diagnostics.flatMap((diagnostic) => {
+      const mapped = diagnostic.source === 'kay' ? undefined : toShadowRange(document, diagnostic.range)
+
+      return mapped ? [{ ...diagnostic, range: mapped }] : []
+    })
+    const actions = await this.server.request<CodeAction[] | null>('textDocument/codeAction', { textDocument: { uri: document.shadowUri }, range, context: { ...params.context, diagnostics, only: [QUICK_FIX] } })
+    const offset = toOffset(document.source, params.range.start)
+
+    return (actions ?? []).flatMap((action): CodeAction[] => {
+      const changes = action.edit && !action.command ? fileEdits(action.edit) : undefined
+      const edits = changes?.length === 1 && changes[0]![0] === document.shadowUri ? sourceEdits(document, changes[0]![1], offset) : undefined
+
+      return edits ? [{ title: action.title, kind: action.kind, isPreferred: action.isPreferred, edit: { changes: { [document.uri]: edits } } }] : []
+    })
   }
 
   private format(uri: string): TextEdit[] {
@@ -460,14 +495,16 @@ export class KayLanguageServer {
     return await source.exists() ? compileShadow(this.root, this.routesDir, file, await source.text()).shadow : undefined
   }
 
-  private toShadow(params: TextDocumentPositionParams): { document: Document, params: TextDocumentPositionParams } | undefined {
+  // `offset` is the position in the .kay source.
+  private toShadow(params: TextDocumentPositionParams): { document: Document, offset: number, params: TextDocumentPositionParams } | undefined {
     const document = this.documents.get(params.textDocument.uri)
-    const generated = document && document.map.toGenerated(toOffset(document.source, params.position))
+    const offset = document && toOffset(document.source, params.position)
+    const generated = offset === undefined ? undefined : document!.map.toGenerated(offset)
 
-    if (!document || generated === undefined)
+    if (!document || offset === undefined || generated === undefined)
       return undefined
 
-    return { document, params: { textDocument: { uri: document.shadowUri }, position: toPosition(document.tsx, generated) } }
+    return { document, offset, params: { textDocument: { uri: document.shadowUri }, position: toPosition(document.tsx, generated) } }
   }
 
   private exit() {
@@ -491,7 +528,7 @@ async function guard(task: Promise<void>): Promise<void> {
   }
 }
 
-function mapCompletionItem(document: ShadowFile, item: CompletionItem): CompletionItem {
+function mapCompletionItem(document: ShadowFile, item: CompletionItem, offset: number): CompletionItem {
   const { textEdit, additionalTextEdits, ...rest } = item
   const mapped: CompletionItem = { ...rest }
 
@@ -504,17 +541,59 @@ function mapCompletionItem(document: ShadowFile, item: CompletionItem): Completi
       mapped.insertText = textEdit.newText
   }
 
-  // Auto-import edits target the generated imports; only those landing in the user's own code survive.
-  const edits = (additionalTextEdits ?? []).flatMap((edit): TextEdit[] => {
-    const range = toSourceRange(document, edit.range)
+  const edits = additionalTextEdits && sourceEdits(document, additionalTextEdits, offset)
 
-    return range ? [{ range, newText: edit.newText }] : []
-  })
-
-  if (edits.length > 0)
+  if (edits && edits.length > 0)
     mapped.additionalTextEdits = edits
 
   return mapped
+}
+
+// tsgo's edits of a shadow file as edits of its source, all or none: what was copied maps back, and an import added among the generated ones goes to the fence the code at `offset` belongs to.
+function sourceEdits(document: ShadowFile, edits: TextEdit[], offset: number): TextEdit[] | undefined {
+  const mapped: TextEdit[] = []
+
+  for (const edit of edits) {
+    const range = toSourceRange(document, edit.range)
+
+    if (range)
+      mapped.push({ range, newText: edit.newText })
+    else if (IMPORT_DECLARATION.test(edit.newText))
+      mapped.push(importEdit(document.source, offset, edit.newText.trim()))
+    else
+      return undefined
+  }
+
+  return mapped
+}
+
+// After the last import of the server fence for server code, of the component script otherwise; a file without a script gets one.
+function importEdit(source: string, offset: number, declaration: string): TextEdit {
+  const { script, server } = parseKay(source)
+  const inServer = server !== undefined && offset >= server.start && offset <= server.end
+  const fence = inServer ? server : script
+
+  if (!fence)
+    return { range: { start: toPosition(source, 0), end: toPosition(source, 0) }, newText: `---\n${declaration.replace(TRAILING_SEMICOLON, '')}\n---\n` }
+
+  const last = (inServer ? analyzeServer(source, fence)?.hoisted : analyzeScript(source, fence).hoisted)?.at(-1)
+  const position = toPosition(source, last ? last.end : fence.start)
+  // tsgo reads the semicolon style off generated code; the fence's own imports, or kay's style without them, decide instead.
+  const statement = last && source.slice(last.start, last.end).trimEnd().endsWith(';') ? declaration : declaration.replace(TRAILING_SEMICOLON, '')
+
+  return { range: { start: position, end: position }, newText: last ? `\n${statement}` : `${statement}\n` }
+}
+
+// A source range in the shadow TSX, when both ends were copied there.
+function toShadowRange(document: ShadowFile, range: Range): Range | undefined {
+  const start = document.map.toGenerated(toOffset(document.source, range.start))
+  const end = document.map.toGenerated(toOffset(document.source, range.end))
+
+  return start === undefined || end === undefined ? undefined : { start: toPosition(document.tsx, start), end: toPosition(document.tsx, end) }
+}
+
+function fileEdits(edit: WorkspaceEdit): [string, TextEdit[]][] {
+  return [...Object.entries(edit.changes ?? {}), ...(edit.documentChanges ?? []).flatMap(change => 'edits' in change ? [[change.textDocument.uri, change.edits] as [string, TextEdit[]]] : [])]
 }
 
 function textAt(text: string, range: Range): string {

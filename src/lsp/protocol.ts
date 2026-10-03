@@ -92,7 +92,23 @@ export interface DocumentHighlight {
 }
 
 export interface WorkspaceEdit {
-  changes: Record<string, TextEdit[]>
+  changes?: Record<string, TextEdit[]>
+  documentChanges?: ({ textDocument: TextDocumentIdentifier, edits: TextEdit[] } | { kind: string })[]
+}
+
+export interface CodeActionParams {
+  textDocument: TextDocumentIdentifier
+  range: Range
+  context: { diagnostics: Diagnostic[], only?: string[], [key: string]: unknown }
+}
+
+export interface CodeAction {
+  title: string
+  kind?: string
+  diagnostics?: Diagnostic[]
+  edit?: WorkspaceEdit
+  command?: unknown
+  [key: string]: unknown
 }
 
 export interface InitializeParams {
