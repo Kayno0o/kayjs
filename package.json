@@ -73,6 +73,9 @@
     "elysia": "^1.4.30",
     "solid-js": "2.0.0-rc.13"
   },
+  "peerDependencies": {
+    "@types/bun": "^1.4.2"
+  },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
     "@kaynooo/eslint": "^6.0.1",
