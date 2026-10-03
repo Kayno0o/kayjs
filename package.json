@@ -6,6 +6,17 @@
   "description": "Pug-like, fully typed web framework on Bun, Elysia, pg-orm and Solid's runtime",
   "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://git.kaynooo.fr/kaynooo/poc-framework"
+  },
+  "bugs": {
+    "url": "https://git.kaynooo.fr/kaynooo/poc-framework/issues"
+  },
+  "publishConfig": {
+    "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/",
+    "access": "restricted"
+  },
   "exports": {
     ".": {
       "types": "./types/runtime/index.d.ts",
@@ -46,11 +57,15 @@
     "kay": "./src/cli.ts"
   },
   "files": [
+    "LICENSE",
     "README.md",
     "llms.txt",
     "src",
     "types"
   ],
+  "engines": {
+    "bun": ">=1.4.2"
+  },
   "scripts": {
     "check": "tsgo --noEmit",
     "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
