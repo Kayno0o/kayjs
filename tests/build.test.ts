@@ -42,6 +42,19 @@ describe('kay build', () => {
     }
   })
 
+  it('writes the files pages import, server fences included, for a production server that never writes', async () => {
+    const site = join(import.meta.dir, 'fixtures/site')
+
+    try {
+      const client = await buildClient(site)
+
+      expect((await readdir(join(client.dir, 'assets'))).sort()).toEqual([expect.stringMatching(/^logo-\w+\.png$/), expect.stringMatching(/^og-\w+\.svg$/)])
+    }
+    finally {
+      await rm(join(site, '.kay/client'), { recursive: true, force: true })
+    }
+  })
+
   it('bundles the islands for production and writes the manifest a server boots from', async () => {
     try {
       const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root], { stdout: 'pipe', stderr: 'pipe' })

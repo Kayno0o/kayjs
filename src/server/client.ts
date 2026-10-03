@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
+import { ASSET_PREFIX, clientDir } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { kay } from '../build/plugin'
 import { styleImports, withoutStyles } from '../build/styles'
@@ -55,7 +56,6 @@ interface MetafileOutput {
 
 type Outputs = Record<string, MetafileOutput>
 
-export const ASSET_PREFIX = '/_kay/'
 const MANIFEST = 'manifest.json'
 
 export const PRERENDERED_DIR = 'pages'
@@ -92,7 +92,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
     throw new KayCompileError(diagnostics)
 
   const base = join(root, '.kay', 'client')
-  const dir = join(base, 'dist')
+  const dir = clientDir(root)
   const routesDir = resolve(root, options.routes ?? 'src/routes')
 
   // A failed build must not leave the previous manifest pointing at files that are gone.
@@ -132,7 +132,7 @@ export async function readClient(root: string): Promise<ClientBuild | undefined>
 function fromManifest(root: string, manifest: ClientManifest): ClientBuild {
   return {
     ...manifest,
-    dir: join(root, '.kay', 'client', 'dist'),
+    dir: clientDir(root),
     styles: new Map(Object.entries(manifest.styles).map(([file, url]) => [resolve(root, file), url])),
     pages: new Map(Object.entries(manifest.pages ?? {})),
   }
@@ -150,7 +150,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 
   const build = await Bun.build({
     entrypoints: [entryFile],
-    outdir: join(base, 'dist'),
+    outdir: clientDir(root),
     target: 'browser',
     splitting: true,
     minify: options.minify ?? false,

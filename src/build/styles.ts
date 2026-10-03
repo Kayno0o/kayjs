@@ -1,6 +1,7 @@
 import type { BunPlugin } from 'bun'
 import { dirname, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
+import { ASSET_FILE, writeAsset } from './assets'
 
 const KAY_FILE = /\.kay$/
 const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
@@ -10,8 +11,8 @@ const TYPESCRIPT = /\.[cm]?ts$/
 const TSX = /\.tsx$/
 const JSX = /\.jsx$/
 
-// For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses.
-// A page's server code is left out, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
+// For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses, and the assets they import are written for the server to serve.
+// A page's server code is left out but for its assets, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
 export function styleImports(root: string): BunPlugin {
   const transpilers = new Map<Bun.JavaScriptLoader, Bun.Transpiler>()
   const transpiler = (loader: Bun.JavaScriptLoader) => {
@@ -23,34 +24,38 @@ export function styleImports(root: string): BunPlugin {
     return found
   }
   const project = root + sep
-  const keep = (specifier: string, importer: string): string | undefined => {
-    let resolved: string
-
+  const resolve = (specifier: string, importer: string): string | undefined => {
     try {
-      resolved = Bun.resolveSync(specifier, dirname(importer))
+      return Bun.resolveSync(specifier, dirname(importer))
     }
     catch {
       return undefined
     }
-
-    if (CSS_FILE.test(resolved))
-      return resolved
-
-    return resolved.startsWith(project) && !resolved.includes(`${sep}node_modules${sep}`) && (KAY_FILE.test(resolved) || SCRIPT_FILE.test(resolved)) ? resolved : undefined
   }
-  const imports = (code: string, importer: string, loader: Bun.JavaScriptLoader) => transpiler(loader).scanImports(code).map(({ path }) => keep(path, importer)).filter(path => path !== undefined).map(path => `import ${JSON.stringify(path)}\n`).join('')
+  const followed = (path: string) => CSS_FILE.test(path) || (path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
+  // With `assetsOnly`, the code is server code: its assets are written, nothing is followed.
+  const imports = async (code: string, importer: string, loader: Bun.JavaScriptLoader, assetsOnly = false) => {
+    const paths = transpiler(loader).scanImports(code).map(({ path }) => resolve(path, importer)).filter(path => path !== undefined)
+
+    await Promise.all(paths.filter(path => ASSET_FILE.test(path)).map(async path => writeAsset(path, root)))
+
+    return assetsOnly ? '' : paths.filter(followed).map(path => `import ${JSON.stringify(path)}\n`).join('')
+  }
 
   return {
     name: 'kay-styles',
     setup(build) {
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => {
-        // A component's imports all sit in its script; the server fence is left out.
         const source = await Bun.file(path).text()
-        const script = parseKay(source).script
+        const { script, server } = parseKay(source)
+        const [contents] = await Promise.all([
+          script ? imports(source.slice(script.start, script.end), path, 'ts') : '',
+          server && imports(source.slice(server.start, server.end), path, 'ts', true),
+        ])
 
-        return { contents: script ? imports(source.slice(script.start, script.end), path, 'ts') : '', loader: 'js' }
+        return { contents, loader: 'js' }
       })
-      build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => ({ contents: imports(await Bun.file(path).text(), path, scriptLoader(path)), loader: 'js' }))
+      build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => ({ contents: await imports(await Bun.file(path).text(), path, scriptLoader(path)), loader: 'js' }))
       // `url(/logo.png)` points at a public file the server serves as is.
       build.onResolve({ filter: ABSOLUTE_URL }, ({ path, importer }) => CSS_FILE.test(importer) ? { path, external: true } : undefined)
     },

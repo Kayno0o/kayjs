@@ -3,6 +3,7 @@ import { readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { ASSET_EXTENSIONS } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { compileKay } from '../compiler'
 import { codeFrame } from '../compiler/frame'
@@ -33,6 +34,8 @@ export interface ShadowFile {
 }
 
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
+// Stylesheets import for their effect, other assets for their URL.
+const ASSET_TYPES = ['declare module \'*.css\' {}\n', ...ASSET_EXTENSIONS.map(extension => `declare module '*.${extension}' {\n  const url: string\n  export default url\n}\n`)].join('\n')
 
 export const TSGO = join(dirname(fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))), 'bin', 'tsgo')
 
@@ -59,7 +62,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await writeIfChanged(environmentPath, environment((await scanRoutes(routesDir)).map(route => route.pattern)))
   // A script rather than a module, which is what lets it declare a wildcard module.
-  await writeIfChanged(assetsPath, 'declare module \'*.css\' {}\n')
+  await writeIfChanged(assetsPath, ASSET_TYPES)
 
   // Rewriting in place keeps every shadow file present for editors reading the tree meanwhile; only stale ones go.
   const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))

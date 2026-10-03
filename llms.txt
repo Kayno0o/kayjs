@@ -177,6 +177,19 @@ export default defineConfig({ plugins: [tailwind] })
 
 Files in `public/` (the `publicDir` option) are served at their path as they are: `public/robots.txt` at `/robots.txt`. A file sharing its path with a page stops the server at boot.
 
+## Imported files
+
+A component script, a server fence or a `.ts` module imports an image, font, video, audio file or PDF for its URL, typed as a `string`:
+
+```kay
+---
+import logo from '../logo.png'
+---
+img(src={logo} alt="Logo")
+```
+
+The URL, such as `/_kay/assets/logo-2k1v9.png`, is named after the file's content and served with a year of immutable caching, so a changed file gets a new URL; the server and islands render the same one, and `kay build` writes every file the pages import. A file to serve at a fixed path, such as `robots.txt`, goes in `public/` instead.
+
 ## Islands
 
 A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script imports a value from `kay` or `solid-js`, such as `signal`. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript. Interactive components rendered inside an island are part of it.

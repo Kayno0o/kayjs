@@ -1,5 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { Target } from './transform'
+import process from 'node:process'
+import { ASSET_FILE, writeAsset } from './assets'
 import { transformKayCached } from './transform'
 
 export interface KayPluginOptions {
@@ -7,7 +9,7 @@ export interface KayPluginOptions {
   target?: Target
   // On by default: islands hydrate the server markup instead of re-rendering it.
   hydratable?: boolean
-  // Island ids are relative to this directory; defaults to the working directory.
+  // Island ids are relative to this directory, and imported assets are written under its `.kay/client`; defaults to the working directory.
   root?: string
   // Keeps compiled files here between runs; off when unset.
   cacheDir?: string
@@ -26,6 +28,8 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
 
         return { contents: await transformKayCached(source, path, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir }), loader: 'ts' }
       })
+      // `import logo from './logo.png'` gives the URL the server serves it at, on the server and in islands alike.
+      build.onLoad({ filter: ASSET_FILE }, async ({ path }) => ({ contents: `export default ${JSON.stringify(await writeAsset(path, options.root ?? process.cwd()))}`, loader: 'js' }))
     },
   }
 }
