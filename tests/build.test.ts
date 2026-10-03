@@ -1,12 +1,12 @@
 import type { BunPlugin } from 'bun'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { mapStack } from '../src/build/sourcemap'
-import { transformKayCached } from '../src/build/transform'
+import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { buildClient } from '../src/server/client'
 
 const root = join(import.meta.dir, 'fixtures/islands')
@@ -80,6 +80,33 @@ describe('compile cache', () => {
       expect(mapStack(frame)).toBe(mapped)
       expect(await transformKayCached(source.replace('never', 'changed'), file, options)).toContain('changed')
       expect(await readdir(cacheDir)).toEqual([expect.stringMatching(/-ssr\.json$/)])
+    }
+    finally {
+      await rm(cacheDir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps one entry per target, hydration and root, and the analysis of a file only once it compiles', async () => {
+    const cacheDir = await mkdtemp(join(tmpdir(), 'kay-cache-'))
+    const file = join(cacheDir, 'counter.kay')
+    const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton.counter(onClick={() => count.set(c => c + 1)}) {count()}\n'
+
+    try {
+      const dom = await transformKayCached(source, file, { target: 'dom', cacheDir, root: cacheDir })
+      const otherRoot = await transformKayCached(source, file, { target: 'dom', cacheDir, root: dirname(cacheDir) })
+
+      expect(otherRoot).not.toBe(dom)
+      expect(await transformKayCached(source, file, { target: 'dom', cacheDir, root: cacheDir })).toBe(dom)
+      expect(await transformKayCached(source, file, { target: 'dom', hydratable: true, cacheDir, root: cacheDir })).not.toBe(dom)
+      expect(await transformKayCached(source, file, { target: 'ssr', cacheDir, root: cacheDir })).not.toBe(dom)
+
+      const analysis = await analyzeKayCached(source, file, cacheDir, cacheDir)
+
+      expect(analysis).toMatchObject({ island: 'counter.kay', classes: ['counter'], diagnostics: [] })
+      expect(await analyzeKayCached(source, file, cacheDir, cacheDir)).toEqual(analysis)
+      expect((await analyzeKayCached('for t of list\n  li x\n', file, cacheDir, cacheDir)).diagnostics).not.toHaveLength(0)
+      expect(await analyzeKayCached(source, file, cacheDir, cacheDir)).toEqual(analysis)
+      expect((await readdir(cacheDir)).sort()).toEqual([expect.stringMatching(/-analysis\.json$/), expect.stringMatching(/-dom-hydratable\.json$/), expect.stringMatching(/-dom\.json$/), expect.stringMatching(/-ssr\.json$/)])
     }
     finally {
       await rm(cacheDir, { recursive: true, force: true })

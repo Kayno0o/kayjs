@@ -7,6 +7,12 @@ import { kay } from '../src/build/plugin'
 
 interface ClientModule {
   mount: (element: HTMLElement) => () => void
+  selectionRows: (initial?: number) => {
+    selected: { (): number | undefined, set: (key: number | undefined | ((current: number | undefined) => number | undefined)) => void, is: (key: number) => boolean }
+    runs: number[]
+    dispose: () => void
+    flush: () => void
+  }
 }
 
 let outdir: string
@@ -36,6 +42,36 @@ beforeAll(async () => {
 afterAll(async () => {
   await GlobalRegistrator.unregister()
   await rm(outdir, { recursive: true, force: true })
+})
+
+describe('selection', () => {
+  it('re-runs only the rows a change selects or unselects', () => {
+    const { selected, runs, dispose, flush } = client.selectionRows(3)
+    const ranAgain = (before: number[]) => runs.flatMap((count, row) => count === before[row] ? [] : [row])
+
+    expect(runs.every(count => count === 1)).toBe(true)
+
+    let before = [...runs]
+
+    selected.set(5)
+    flush()
+    expect(ranAgain(before)).toEqual([3, 5])
+
+    before = [...runs]
+    selected.set(current => (current ?? 0) + 2)
+    flush()
+    expect(ranAgain(before)).toEqual([5, 7])
+    expect(selected()).toBe(7)
+
+    before = [...runs]
+    selected.set(7)
+    selected.set(undefined)
+    flush()
+    expect(ranAgain(before)).toEqual([7])
+    // Read outside any tracking scope, as in an event handler.
+    expect(selected.is(7)).toBe(false)
+    dispose()
+  })
 })
 
 describe('client bundle', () => {

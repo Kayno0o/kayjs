@@ -18,7 +18,7 @@ interface ActionRequest {
 }
 
 // Thrown before the input is validated, to answer with `response` through the route's error hook.
-class CrossSite {
+class Refusal {
   constructor(readonly response: Response) {}
 }
 
@@ -45,7 +45,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], d
         transform: (context) => {
           refuseCrossSite(context.request)
 
-          context.body = isCall(context.request) ? decodeCall(context.body) : withoutEmptyFiles(context.body)
+          context.body = isCall(context.request) ? callInput(context.request, context.body) : withoutEmptyFiles(context.body)
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
         ...(route.guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(route.guards, context, dev) }),
@@ -53,15 +53,38 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], d
           if (code === 'VALIDATION')
             return refused(value, error, request)
 
-          // Elysia checks a `t.File({ type })` against the file's bytes once the schema passed.
-          if (code === 'INVALID_FILE_TYPE')
-            return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [error.property.replace(BODY_PREFIX, '')]: error.message } })
+          // Elysia checks a top-level `t.File({ type })` against the file's bytes once the schema passed.
+          if (code === 'INVALID_FILE_TYPE') {
+            const field = error.property.replace(BODY_PREFIX, '')
 
-          return error instanceof CrossSite ? error.response : undefined
+            return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [field]: fieldError(value, field) ?? 'Invalid file type' } })
+          }
+
+          return error instanceof Refusal ? error.response : undefined
         },
       })
     }
   }
+}
+
+// A call that carried files comes as multipart, rebuilt into its input; one whose input part is not JSON is answered 400.
+function callInput(request: Request, body: unknown): unknown {
+  if (!request.headers.get('content-type')?.startsWith('multipart/form-data'))
+    return body
+
+  try {
+    return decodeCall(body)
+  }
+  catch {
+    throw new Refusal(new Response('Malformed action input', { status: 400, headers: { 'content-type': TEXT } }))
+  }
+}
+
+// The `error` option the schema gives a top-level field, when it is a string.
+function fieldError(action: ServerAction<TSchema, unknown>, field: string): string | undefined {
+  const error = (action.schema as { properties?: Record<string, { error?: unknown }> }).properties?.[field]?.error
+
+  return typeof error === 'string' ? error : undefined
 }
 
 // A file input left empty still posts a nameless, empty file; dropping it lets `t.Optional(t.File())` see no file at all.
@@ -72,10 +95,18 @@ function withoutEmptyFiles(body: unknown): unknown {
   const fields: Record<string, unknown> = {}
 
   for (const [name, value] of Object.entries(body)) {
-    const kept = Array.isArray(value) ? value.filter(item => !isEmptyFile(item)) : value
+    if (!Array.isArray(value)) {
+      if (!isEmptyFile(value))
+        fields[name] = value
 
-    if (!isEmptyFile(kept) && !(Array.isArray(kept) && kept.length === 0 && Array.isArray(value) && value.length > 0))
-      fields[name] = kept
+      continue
+    }
+
+    const files = value.filter(item => !isEmptyFile(item))
+
+    // A multiple file input left empty posts only empty files, which is no files at all.
+    if (files.length > 0 || value.length === 0)
+      fields[name] = files
   }
 
   return fields
@@ -91,7 +122,7 @@ function refuseCrossSite(request: Request) {
   const origin = request.headers.get('origin')
 
   if (origin !== null && !sameHost(request, origin))
-    throw new CrossSite(new Response('Cross-site action refused', { status: 403 }))
+    throw new Refusal(new Response('Cross-site action refused', { status: 403 }))
 }
 
 // The guards of the action's page, answering for it when one stops the request.

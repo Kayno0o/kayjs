@@ -38,13 +38,8 @@ export interface Analysis {
   diagnostics: Diagnostic[]
 }
 
-// What a compile depends on besides its source: kay's compiler and the version of Solid's.
-const COMPILER_SOURCES = [
-  ...readdirSync(join(import.meta.dir, '../compiler')).map(name => join(import.meta.dir, '../compiler', name)),
-  join(import.meta.dir, 'transform.ts'),
-  join(import.meta.dir, '../runtime/action.ts'),
-  join(dirname(Bun.resolveSync('@solidjs/compiler', import.meta.dir)), 'package.json'),
-]
+// The packages a compile runs through, their versions part of every cache key.
+const COMPILER_PACKAGES = ['@solidjs/compiler/package.json', '@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json']
 let fingerprint: string | undefined
 
 export interface FileDiagnostic extends Diagnostic {
@@ -145,7 +140,16 @@ function compilerFingerprint(): string {
   if (fingerprint === undefined) {
     const hasher = new Bun.CryptoHasher('sha256')
 
-    for (const file of COMPILER_SOURCES)
+    // What a compile depends on besides its source: kay's compiler, every file of it, and the packages it runs through.
+    const compilerDir = join(import.meta.dir, '../compiler')
+    const sources = [
+      ...readdirSync(compilerDir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)).sort(),
+      join(import.meta.dir, 'transform.ts'),
+      join(import.meta.dir, '../runtime/action.ts'),
+      ...COMPILER_PACKAGES.map(manifest => Bun.resolveSync(manifest, compilerDir)),
+    ]
+
+    for (const file of sources)
       hasher.update(readFileSync(file))
 
     fingerprint = hasher.digest('hex')

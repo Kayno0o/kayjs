@@ -81,7 +81,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     app.get(route.pattern, async (context) => {
       const url = new URL(context.request.url)
 
-      if (url.pathname.length > 1 && url.pathname.endsWith('/'))
+      // A catch-all's own `/docs/` stays: `/docs` is not one of its paths.
+      if (url.pathname.length > 1 && url.pathname.endsWith('/') && !(route.catchAll !== undefined && (context.params as Record<string, string>)['*'] === ''))
         return withoutTrailingSlash(url)
 
       // A path `kay build` rendered is served from its file; any other path of the route renders per request.

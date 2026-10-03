@@ -19,6 +19,8 @@ export interface DevOptions {
 // Long enough to gather the few events one save makes.
 const DEBOUNCE_MS = 30
 const SPARE = join(import.meta.dir, 'spare.ts')
+// The root files Bun reads as a process starts.
+const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
 // Resolves once watching, with a function stopping the watchers and the server.
@@ -29,17 +31,17 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let spare: Subprocess<'pipe'> | undefined
   let timer: Timer | undefined
   let changed = false
-  // Bun reads `.env`, `bunfig.toml` and `package.json` as a process starts, so a change at the root needs a process started after it.
-  let rootChanged = false
+  // Bun reads these as a process starts, so changing one needs a process started after it.
+  let startupChanged = false
   let restarting: Promise<void> | undefined
 
-  const spawn = () => Bun.spawn([process.execPath, SPARE, entry], { cwd: root, env: { ...process.env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
+  const spawn = () => Bun.spawn([process.execPath, '--preload', SPARE, entry], { cwd: root, env: { ...process.env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
   // Each restart takes the process waiting with kay loaded, and readies the next one.
   const start = () => {
-    if (rootChanged || spare === undefined || spare.exitCode !== null) {
+    if (startupChanged || spare === undefined || spare.exitCode !== null) {
       spare?.kill()
       spare = spawn()
-      rootChanged = false
+      startupChanged = false
     }
 
     child = spare
@@ -64,8 +66,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     restarting = undefined
   }
-  const watchers = await watchProject(root, (atRoot) => {
-    rootChanged ||= atRoot
+  const watchers = await watchProject(root, (file) => {
+    startupChanged ||= STARTUP_FILE.test(file)
     clearTimeout(timer)
     timer = setTimeout(() => {
       changed = true
@@ -98,11 +100,11 @@ async function regenerateTypes(root: string, routes: string | undefined) {
 }
 
 // One recursive watcher per top-level directory, so dependencies and generated output are never walked.
-// `onChange` learns whether the file changed sits at the root.
-async function watchProject(root: string, onChange: (atRoot: boolean) => void): Promise<FSWatcher[]> {
+// `onChange` gets the changed path relative to the root.
+async function watchProject(root: string, onChange: (file: string) => void): Promise<FSWatcher[]> {
   const entries = await readdir(root, { withFileTypes: true })
 
   return entries
     .filter(entry => entry.isDirectory() ? !IGNORED_DIRS.has(entry.name) && !entry.name.startsWith('.') : !entry.name.startsWith('.') || entry.name.startsWith('.env'))
-    .map(entry => watch(join(root, entry.name), { recursive: entry.isDirectory() }, () => onChange(!entry.isDirectory())))
+    .map(entry => watch(join(root, entry.name), { recursive: entry.isDirectory() }, (_event, file) => onChange(entry.isDirectory() ? `${entry.name}/${file ?? ''}` : entry.name)))
 }

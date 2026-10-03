@@ -5,7 +5,7 @@ import { uploads } from '../data'
 
 export const upload = action(t.Object({
   note: t.String(),
-  file: t.File({ type: 'image/png' }),
+  file: t.File({ type: 'image/png', error: 'Upload a PNG image' }),
   attachment: t.Optional(t.File()),
   extra: t.Optional(t.Object({ copies: t.Number(), files: t.Files() })),
 }), async ({ note, file, attachment, extra }) => {

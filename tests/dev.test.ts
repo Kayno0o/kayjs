@@ -1,5 +1,5 @@
 import type { Subprocess } from 'bun'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -50,6 +50,30 @@ describe('kay dev', () => {
       await rm(root, { recursive: true, force: true })
     }
     expect(children.at(-1)!.killed).toBe(true)
+  })
+
+  it('runs the entry as the main module, and a changed .env reaches the next server', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const seen = join(root, 'seen.txt')
+    const children: Subprocess[] = []
+
+    await Bun.write(join(root, '.env'), 'KAY_GREETING=hello\n')
+    await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(seen)}, \`\${process.env.KAY_GREETING}|\${import.meta.main}\`)\nsetInterval(() => undefined, 1000)\n`)
+    const stop = await dev(root, { onRestart: child => children.push(child) })
+
+    try {
+      await until(() => existsSync(seen))
+      expect(await Bun.file(seen).text()).toBe('hello|true')
+
+      await Bun.write(join(root, '.env'), 'KAY_GREETING=changed\n')
+      await until(() => children.length === 2)
+      await until(() => readFileSync(seen, 'utf8').startsWith('changed'))
+      expect(await Bun.file(seen).text()).toBe('changed|true')
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('serves the compile errors of a project that failed to boot, and the reload stream', async () => {

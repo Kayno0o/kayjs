@@ -59,13 +59,18 @@ describe('kay/test', () => {
     expect((await site.submit(upload, { note: 'attached', file: image('a.png'), attachment: new File(['x'], 'x.txt') }, { from: '/upload' })).html).toContain('attached x.txt</p>')
     expect(await site.call(upload, { note: 'call', file: image('b.png'), extra: { copies: 2, files: [image('c.png'), new File(['notes'], 'd.txt')] } })).toBe(`call: ${PNG.length} bytes (b.png), 2 copies of 2 more`)
     expect(await site.call(upload, { note: 'blob', file: new Blob([PNG], { type: 'image/png' }) as File })).toBe(`blob: ${PNG.length} bytes (blob)`)
-    await expect(site.call(upload, { note: 'not an image', file: new File(['{}'], 'e.png', { type: 'image/png' }) })).rejects.toMatchObject({ status: 422, errors: { file: '"body.file" has invalid file type' } })
+    await expect(site.call(upload, { note: 'not an image', file: new File(['{}'], 'e.png', { type: 'image/png' }) })).rejects.toMatchObject({ status: 422, errors: { file: 'Upload a PNG image' } })
 
     const refused = await site.submit(upload, { note: 'not an image', file: new File(['{}'], 'e.png', { type: 'image/png' }) }, { from: '/upload' })
 
     expect(refused.url).toBe('/upload')
-    expect(refused.html).toContain('<p class="error">"body.file" has invalid file type</p>')
+    expect(refused.html).toContain('<p class="error">Upload a PNG image</p>')
     expect(refused.html).toContain('value="not an image"')
+
+    const malformed = new FormData()
+
+    malformed.set('$kay', '{not json')
+    expect((await site.handle(new Request(`http://localhost${upload.url}`, { method: 'POST', headers: { 'x-kay-action': '1' }, body: malformed }))).status).toBe(400)
   })
 
   it('sends the browser where a called action redirects', async () => {

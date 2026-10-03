@@ -220,8 +220,22 @@ describe('pages', () => {
     expect(await redirect('/about/?q=2')).toEqual([308, '/about?q=2'])
     expect(await redirect('/docs/guide/intro/')).toEqual([308, '/docs/guide/intro'])
     expect(await redirect('/admin/')).toEqual([308, '/admin'])
-    expect((await redirect('//evil.example/'))[1] ?? '/').toStartWith('/')
-    expect((await redirect('//evil.example/'))[1] ?? '/').not.toStartWith('//')
+    expect(await redirect('/docs/')).toEqual([200, null])
+
+    // A catch-all at the root matches `//evil.example/`, whose redirect must stay on this site.
+    const dir = await mkdtemp(join(process.cwd(), '.kay/routes-'))
+
+    try {
+      await Bun.write(join(dir, '[...path].kay'), '--- server\nconst path = ctx.params.path\n---\np {path}\n')
+      // Prebuilt, so the shared client build the other tests read stays as it is.
+      const site = new Elysia().use(await pages({ routes: dir, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+      const response = await site.handle(new Request('http://localhost//evil.example/'))
+
+      expect([response.status, response.headers.get('location')]).toEqual([308, '/evil.example'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
     expect((await get('/')).status).toBe(200)
   })
 
