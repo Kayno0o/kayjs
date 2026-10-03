@@ -148,6 +148,12 @@ describe('text', () => {
     }])
   })
 
+  it('reads spaces left after a tag as no text, and keeps those that follow text', () => {
+    const file = parse('ul    \n  li {x}  \np Hello \n  b world')
+
+    expect(outline(file)).toEqual([{ tag: 'ul', children: [{ tag: 'li', children: [['{x}', '  ']] }] }, { tag: 'p', children: [['Hello '], { tag: 'b', children: [['world']] }] }])
+  })
+
   it('drops comments with their indented block', () => {
     const file = parse('// note\n  p hidden\np shown')
 

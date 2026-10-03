@@ -453,7 +453,8 @@ class TemplateParser {
       this.pos++
       const text = this.parseText(this.pos, terminator)
 
-      if (text.parts.length > 0)
+      // Spaces left at the end of a tag line are not text, so they render nothing.
+      if (text.parts.some(part => part.kind !== 'chunk' || part.text.trim() !== ''))
         element.children.push(text)
 
       element.end = this.pos

@@ -17,14 +17,14 @@ function format(source: string): string {
 }
 
 describe('formatKay', () => {
-  it('re-indents the template two spaces a level, keeping comments and dropping the spaces of blank lines and extra blank lines', () => {
+  it('re-indents the template two spaces a level, keeping comments and dropping the spaces after a tag, of blank lines and extra blank lines', () => {
     const source = [
       '',
       '---   server',
       'const open = 1',
       '---',
       '',
-      'ul',
+      'ul    ',
       '    // rows',
       '    for todo of todos key={todo.id}',
       '        li {todo.title}',
