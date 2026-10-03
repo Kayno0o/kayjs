@@ -1,6 +1,7 @@
 import type { Subprocess } from 'bun'
 import type { CheckOptions, ShadowFile } from '../check'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
+import type { KayConfig } from '../config'
 import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import { resolve } from 'node:path'
 import process from 'node:process'
@@ -29,6 +30,8 @@ interface Document extends ShadowFile {
 const KAY_FILE = /^file:.*\.kay$/
 const IMPORT_DECLARATION = /^\s*import\s/
 const TRAILING_SEMICOLON = /;$/
+// A one-line named import, as generated code writes them: its names, then its quoted module.
+const NAMED_IMPORT = /^import \{([^}]*)\} from (['"][^'"]+['"])/
 const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
 const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:For|Show|Omit|Island|Href|Field|Prop|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
@@ -92,10 +95,10 @@ export class KayLanguageServer {
 
     this.root = rootUri ? fileURLToPath(rootUri) : resolve(params.rootPath ?? process.cwd())
 
-    // The editor's settings win over the project's `kay.config.ts`, as `pages()` options do.
-    const config = await loadConfig(this.root)
+    const config = await projectConfig(this.root)
 
-    this.shadowOptions = { routes: params.initializationOptions?.routes ?? config.routes, publicDir: params.initializationOptions?.publicDir ?? config.publicDir }
+    // The editor's setting wins over the project's `kay.config.ts`, as `pages()` options do.
+    this.shadowOptions = { routes: params.initializationOptions?.routes ?? config.routes, publicDir: config.publicDir }
     this.routesDir = resolve(this.root, this.shadowOptions.routes ?? 'src/routes')
     this.shadowTree = `${pathToFileURL(resolve(this.root, SHADOW_DIR)).href}/`
     this.rootUri = `${pathToFileURL(this.root).href}/`
@@ -265,8 +268,9 @@ export class KayLanguageServer {
   private async codeActions(params: CodeActionParams): Promise<CodeAction[] | null> {
     const document = this.documents.get(params.textDocument.uri)
     const range = document && toShadowRange(document, params.range)
+    const wanted = params.context.only?.includes(QUICK_FIX) ?? true
 
-    if (!document || !range)
+    if (!document || !range || !wanted)
       return null
 
     const diagnostics = params.context.diagnostics.flatMap((diagnostic) => {
@@ -498,10 +502,14 @@ export class KayLanguageServer {
   // `offset` is the position in the .kay source.
   private toShadow(params: TextDocumentPositionParams): { document: Document, offset: number, params: TextDocumentPositionParams } | undefined {
     const document = this.documents.get(params.textDocument.uri)
-    const offset = document && toOffset(document.source, params.position)
-    const generated = offset === undefined ? undefined : document!.map.toGenerated(offset)
 
-    if (!document || offset === undefined || generated === undefined)
+    if (!document)
+      return undefined
+
+    const offset = toOffset(document.source, params.position)
+    const generated = document.map.toGenerated(offset)
+
+    if (generated === undefined)
       return undefined
 
     return { document, offset, params: { textDocument: { uri: document.shadowUri }, position: toPosition(document.tsx, generated) } }
@@ -510,6 +518,18 @@ export class KayLanguageServer {
   private exit() {
     this.tsgo?.process.kill()
     process.exit(0)
+  }
+}
+
+// A `kay.config.ts` that fails to load leaves the defaults rather than the editor without a language server.
+async function projectConfig(root: string): Promise<KayConfig> {
+  try {
+    return await loadConfig(root)
+  }
+  catch (error) {
+    console.error('kay lsp: kay.config.ts failed to load', error)
+
+    return {}
   }
 }
 
@@ -556,15 +576,36 @@ function sourceEdits(document: ShadowFile, edits: TextEdit[], offset: number): T
   for (const edit of edits) {
     const range = toSourceRange(document, edit.range)
 
-    if (range)
+    if (range) {
       mapped.push({ range, newText: edit.newText })
-    else if (IMPORT_DECLARATION.test(edit.newText))
-      mapped.push(importEdit(document.source, offset, edit.newText.trim()))
-    else
-      return undefined
+    }
+    else {
+      const declaration = IMPORT_DECLARATION.test(edit.newText) ? edit.newText.trim() : mergedImport(document.tsx, edit)
+
+      if (!declaration)
+        return undefined
+
+      mapped.push(importEdit(document.source, offset, declaration))
+    }
   }
 
   return mapped
+}
+
+// tsgo adds a name to an import generated code already has, such as `solid-js`'s: the names it adds become an import of their own.
+function mergedImport(tsx: string, edit: TextEdit): string | undefined {
+  const line = tsx.split('\n')[edit.range.start.line] ?? ''
+  const before = NAMED_IMPORT.exec(line)
+
+  if (!before || edit.range.end.line !== edit.range.start.line)
+    return undefined
+
+  const after = NAMED_IMPORT.exec(line.slice(0, edit.range.start.character) + edit.newText + line.slice(edit.range.end.character))
+  const names = (match: RegExpExecArray) => match[1]!.split(',').map(name => name.trim()).filter(name => name !== '')
+  const existing = new Set(names(before))
+  const added = after && after[2] === before[2] ? names(after).filter(name => !existing.has(name)) : []
+
+  return added.length > 0 ? `import { ${added.join(', ')} } from ${before[2]}` : undefined
 }
 
 // After the last import of the server fence for server code, of the component script otherwise; a file without a script gets one.
@@ -576,7 +617,8 @@ function importEdit(source: string, offset: number, declaration: string): TextEd
   if (!fence)
     return { range: { start: toPosition(source, 0), end: toPosition(source, 0) }, newText: `---\n${declaration.replace(TRAILING_SEMICOLON, '')}\n---\n` }
 
-  const last = (inServer ? analyzeServer(source, fence)?.hoisted : analyzeScript(source, fence).hoisted)?.at(-1)
+  const hoisted = (inServer ? analyzeServer(source, fence)?.hoisted : analyzeScript(source, fence).hoisted) ?? []
+  const last = hoisted.filter(span => source.startsWith('import', span.start)).at(-1)
   const position = toPosition(source, last ? last.end : fence.start)
   // tsgo reads the semicolon style off generated code; the fence's own imports, or kay's style without them, decide instead.
   const statement = last && source.slice(last.start, last.end).trimEnd().endsWith(';') ? declaration : declaration.replace(TRAILING_SEMICOLON, '')

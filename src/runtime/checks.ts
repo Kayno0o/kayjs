@@ -36,7 +36,7 @@ type AnyMatch<Segments extends readonly string[], Pattern> = Pattern extends rea
 type PathOf<Href extends string> = Href extends `${infer Path}?${string}` ? Path : Href extends `${infer Path}#${string}` ? Path : Href
 // The files in `public/`, by the path they are served at.
 type PublicFiles = Register extends { files: infer Files extends string } ? Files : never
-// The app registered as `app` keeps its routes as a tree of path segments down to their methods: `/` is the root's own `get`, `:name` a parameter, `*` the rest of the path.
+// The app registered as `app` keeps its routes, under Elysia 1.4's `~Routes`, as a tree of path segments down to their methods: `/` is the root's own `get`, `:name` a parameter, `*` the rest of the path.
 type AppRoutes = Register extends { app: { '~Routes': infer Routes } } ? Routes : never
 type ServesGet<Tree> = 'get' extends keyof Tree ? true : false
 type TreeMatches<Segments extends readonly string[], Tree> = Segments extends readonly [infer Segment extends string, ...infer Rest extends readonly string[]]

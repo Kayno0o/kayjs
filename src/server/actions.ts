@@ -32,13 +32,13 @@ const FIELD = /^\/([^/]*)/
 // Elysia names a file it refuses `body.<field>`.
 const BODY_PREFIX = /^body\./
 
-// Registers every action the pages export as a POST route whose body Elysia validates against the action's schema.
-// `dev` shows a failed action's message instead of a generic one.
 export interface ActionOptions {
+  // Shows a failed action's message instead of a generic one.
   dev?: boolean
   onError?: KayConfig['onError']
 }
 
+// Registers every action the pages export as a POST route whose body Elysia validates against the action's schema.
 export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], options: ActionOptions = {}): Promise<void> {
   for (const route of routes) {
     const module = await import(route.file) as Record<string, unknown>

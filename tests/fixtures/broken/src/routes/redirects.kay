@@ -12,5 +12,8 @@ if (ctx.url.searchParams.has('id'))
 
 if (ctx.url.searchParams.has('away'))
   ctx.redirect('https://example.com/elsewhere')
+
+if (ctx.url.searchParams.has('feed'))
+  ctx.redirect(ctx.url.searchParams.has('file') ? '/docs/guide.pdf' : '/api/feed.xml')
 ---
 p Moved

@@ -116,6 +116,6 @@ export interface InitializeParams {
   rootPath?: string | null
   workspaceFolders?: { uri: string, name: string }[] | null
   capabilities: Record<string, unknown> & { textDocument?: Record<string, unknown> }
-  initializationOptions?: { routes?: string, publicDir?: string }
+  initializationOptions?: { routes?: string }
   [key: string]: unknown
 }

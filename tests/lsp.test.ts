@@ -1,5 +1,5 @@
 import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -234,7 +234,12 @@ describe('kay lsp imports', () => {
       Bun.write(join(dir, 'src/data.ts'), 'export function listTodos(): string[] {\n  return []\n}\n'),
       Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n'),
       Bun.write(join(dir, page), 'p Home\n'),
+      // A config that fails to load leaves the defaults; every test below runs against it.
+      Bun.write(join(dir, 'kay.config.ts'), 'throw new Error(\'Broken config\')\n'),
     ])
+    // Every package of this checkout but kay itself, so generated code imports `solid-js` as a project's does.
+    await mkdir(join(dir, 'node_modules'))
+    await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== 'kay' && name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
     editor = new Editor(dir)
     await editor.start()
     await editor.open(page)
@@ -254,6 +259,17 @@ describe('kay lsp imports', () => {
     const item = await editor.connection.request<CompletionItem>('completionItem/resolve', list.items.find(entry => entry.label === 'listTodos'))
 
     expect(applyEdits(source, item.additionalTextEdits ?? [])).toBe('--- server\nimport { listTodos } from \'../data\'\nconst todos = listTo\n---\np {todos.length}\n')
+  })
+
+  it('adds a name from a module generated code imports too, as its own import', async () => {
+    const source = '---\nconst double = createMem\n---\nfor n of [1] key={n}\n  p {n}\n'
+
+    await editor.change(page, source, 5)
+
+    const list = await editor.request<CompletionList>('textDocument/completion', page, 1, 25)
+    const item = await editor.connection.request<CompletionItem>('completionItem/resolve', list.items.find(entry => entry.label === 'createMemo'))
+
+    expect(applyEdits(source, item.additionalTextEdits ?? [])).toBe('---\nimport { createMemo } from \'solid-js\'\nconst double = createMem\n---\nfor n of [1] key={n}\n  p {n}\n')
   })
 
   it('adds a missing import as a quick fix, opening a script fence when there is none', async () => {
