@@ -1,8 +1,32 @@
-import type { SeoConfig } from '../config'
+import type { KayConfig, SeoConfig } from '../config'
 import type { HeadOptions, HeadTag } from '../runtime/head'
+import { join } from 'node:path'
+import { faviconTags } from './favicon'
+import { builtFonts, fontTags, prepareFonts } from './fonts'
 
 // The head options of one response, from its URL and status.
 export type SeoHead = (url: URL, status: number) => HeadOptions
+
+// Everything kay.config.ts gives every page's head: the fonts, the favicon, then `site` and `seo`.
+// An executable reads the fonts `kay build` recorded, its project being elsewhere; anything else writes them from their files.
+export async function configHead(root: string, config: KayConfig, clientDir: string, bundled = false): Promise<SeoHead | undefined> {
+  const extra: HeadTag[] = []
+  const dir = join(clientDir, '..')
+
+  if (config.fonts !== undefined && config.fonts.length > 0) {
+    const fonts = bundled ? await builtFonts(dir) : await prepareFonts(root, config.fonts, dir)
+
+    if (!fonts)
+      throw new Error('kay: this executable holds no fonts; build it again with kay build --compile')
+
+    extra.push(...fontTags(fonts))
+  }
+
+  if (config.favicon !== undefined)
+    extra.push(...faviconTags(config.manifest))
+
+  return seoHead(config.site, config.seo, extra)
+}
 
 // What `site`, `seo` and other settings such as the favicon give every page's head, or undefined when the project sets none and pages keep only their own tags.
 export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = []): SeoHead | undefined {

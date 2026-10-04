@@ -19,6 +19,8 @@ export interface KayConfig {
   favicon?: string
   // The web manifest served with the favicon, named after `seo.name`.
   manifest?: ManifestConfig
+  // Self-hosted fonts, declared and preloaded on every page.
+  fonts?: FontConfig[]
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
@@ -42,6 +44,20 @@ export interface SeoConfig {
   locale?: string
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
   jsonLd?: Record<string, unknown>[]
+}
+
+export interface FontConfig {
+  family: string
+  // A font file relative to the root, or a file of an installed package: `@fontsource-variable/inter/files/inter-latin-wght-normal.woff2`.
+  src: string
+  // A weight, or a range for a variable font: `100 900`. Defaults to 400.
+  weight?: number | string
+  style?: 'normal' | 'italic'
+  // Defaults to `swap`.
+  display?: 'auto' | 'block' | 'swap' | 'fallback' | 'optional'
+  unicodeRange?: string
+  // Fetched with the page rather than once the stylesheet asks for it; on by default, worth turning off for a face few pages use.
+  preload?: boolean
 }
 
 export interface ManifestConfig {

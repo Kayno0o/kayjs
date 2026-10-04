@@ -13,14 +13,14 @@ import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents } from './dev'
-import { FAVICON_DIR, faviconTags, serveFavicons } from './favicon'
+import { FAVICON_DIR, serveFavicons } from './favicon'
 import { loadGuards } from './guards'
 import { serveImages } from './image'
 import { registerLoader } from './loader'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
 import { decodePath, refuseClashes, scanRoutes, specialPagesOf } from './routes'
-import { seoHead, siteOrigin } from './seo'
+import { configHead, siteOrigin } from './seo'
 import { serveSitemap } from './sitemap'
 
 // Every slash at either end of a path.
@@ -82,7 +82,6 @@ function withoutTrailingSlash(url: URL, route: Route): Response {
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(root: string, options: PagesOptions, loadClient: () => Promise<ClientBuild>) {
   const routesDir = resolve(root, options.routes ?? 'src/routes')
-  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: seoHead(options.site, options.seo, options.favicon === undefined ? [] : faviconTags(options.manifest)) }
 
   // An executable carries its routes and modules compiled; anything else finds them on disk and compiles them as they load.
   const bundle = bundled()
@@ -94,6 +93,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   refuseClashes(routesDir, scanned)
   const routes = await Promise.all(scanned.map(loadGuards))
+  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined) }
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
   if (options.dev)

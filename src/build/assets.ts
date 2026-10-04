@@ -13,9 +13,14 @@ export function clientDir(root: string): string {
 
 // Named after its content, so the server, the islands and every build agree on a file's URL without sharing anything; written once, when missing.
 export async function writeAsset(path: string, root: string): Promise<string> {
-  const bytes = await Bun.file(path).bytes()
   const extension = extname(path)
-  const name = `${basename(path, extension)}-${Bun.hash(bytes).toString(36)}${extension}`
+
+  return writeAssetBytes(basename(path, extension), extension, await Bun.file(path).bytes(), root)
+}
+
+// Content that is no file of the project, such as CSS kay writes, served the same way.
+export async function writeAssetBytes(stem: string, extension: string, bytes: Uint8Array | string, root: string): Promise<string> {
+  const name = `${stem}-${Bun.hash(bytes).toString(36)}${extension}`
   const target = Bun.file(join(clientDir(root), ASSETS_DIR, name))
 
   if (!await target.exists())
