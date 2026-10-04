@@ -269,7 +269,10 @@ describe('kay lsp imports', () => {
     dir = await mkdtemp(join(tmpdir(), 'kay-imports-'))
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'package.json'), JSON.stringify({ name: 'imports', type: 'module', dependencies: { kay: '*' } })),
+      Bun.write(join(dir, 'package.json'), JSON.stringify({ name: 'imports', type: 'module', dependencies: { 'kay': '*', 'kay-lib': '*' } })),
+      // A kay library, its components given specifiers by its exports map.
+      Bun.write(join(dir, 'node_modules/kay-lib/package.json'), JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } })),
+      Bun.write(join(dir, 'node_modules/kay-lib/src/tag-pill.kay'), '---\nconst { label } = props<{ label: string }>()\n---\nspan.pill {label}\n'),
       Bun.write(join(dir, 'src/actions.ts'), 'import { action } from \'kay\'\n\nexport const add = action(() => 1)\n'),
       Bun.write(join(dir, 'src/data.ts'), 'export function listTodos(): string[] {\n  return []\n}\n'),
       Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n'),
@@ -278,7 +281,7 @@ describe('kay lsp imports', () => {
       Bun.write(join(dir, 'kay.config.ts'), 'throw new Error(\'Broken config\')\n'),
     ])
     // Every package of this checkout, and kay as a copy installed there: tsgo offers no import from a package whose files sit outside node_modules.
-    await mkdir(join(dir, 'node_modules'))
+    await mkdir(join(dir, 'node_modules'), { recursive: true })
     await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== 'kay' && name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
     await cp(join(import.meta.dir, '../src'), join(dir, 'node_modules/kay/src'), { recursive: true })
     // Without the `types` build a packed kay carries, each export resolves to its source.
@@ -315,6 +318,21 @@ describe('kay lsp imports', () => {
     const item = await editor.connection.request<CompletionItem>('completionItem/resolve', list.items.find(entry => entry.label === 'signal'))
 
     expect(applyEdits(source, item.additionalTextEdits ?? [])).toBe('---\nimport { add } from \'../actions\'\nimport { signal } from \'kay\'\nconst count = signa\n---\nform(action={add})\n  button Add\n')
+  })
+
+  it('types a library component, goes to its .kay source and imports it as a quick fix', async () => {
+    const source = '---\nimport TagPill from \'kay-lib/tag-pill.kay\'\n---\nTagPill(label={1})\n'
+    const diagnostics = await editor.change(page, source, 7)
+    const definition = await editor.request<LocationLink[]>('textDocument/definition', page, 3, 2)
+
+    expect(brief(diagnostics)).toEqual([{ start: { line: 3, character: 8 }, end: { line: 3, character: 13 }, code: 2322 }])
+    expect(definition.map(link => [link.targetUri.slice(editor.uri('').length), link.targetSelectionRange.start.line])).toEqual([['/node_modules/kay-lib/src/tag-pill.kay', 0]])
+
+    const missing = 'TagPill(label="x")\n'
+    const found = await editor.change(page, missing, 8)
+    const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } }, context: { diagnostics: found } })
+
+    expect(actions.map(action => applyEdits(missing, action.edit!.changes![editor.uri(page)]!))).toContain('---\nimport TagPill from \'kay-lib/tag-pill.kay\'\n---\nTagPill(label="x")\n')
   })
 
   it('adds a missing import as a quick fix, opening a script fence when there is none', async () => {

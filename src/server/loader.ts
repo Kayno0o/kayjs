@@ -5,9 +5,9 @@ import { kay } from '../build/plugin'
 let loaderRoot: string | undefined
 
 // Lets this process import `.kay` files as server modules; the loader is global, so one process serves one project.
-export function registerLoader(root: string) {
+export function registerLoader(root: string, settings?: Record<string, string>) {
   if (loaderRoot === undefined) {
-    plugin(kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache') }))
+    plugin(kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings }))
     loaderRoot = root
   }
   else if (loaderRoot !== root) {

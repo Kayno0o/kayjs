@@ -33,7 +33,7 @@ export interface PrerenderOptions {
 
 // Renders every page whose server fence exports `prerender = true` into `.kay/client/pages`, listing them in the manifest the server boots from.
 export async function prerenderPages(root: string, config: KayConfig, client: ClientBuild, options: PrerenderOptions = {}): Promise<number> {
-  registerLoader(root)
+  registerLoader(root, config.settings)
 
   const manifest = await readManifest(root)
 

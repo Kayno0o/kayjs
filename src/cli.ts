@@ -109,8 +109,8 @@ async function runCheck(args: string[]): Promise<number> {
   if (root === undefined)
     return 1
 
-  const { routes, publicDir, api, content, redirects, i18n } = await loadConfig(root)
-  const diagnostics = await check(root, { tsconfig, routes, publicDir, api, content, redirects, i18n })
+  const { routes, publicDir, api, content, redirects, i18n, settings } = await loadConfig(root)
+  const diagnostics = await check(root, { tsconfig, routes, publicDir, api, content, redirects, i18n, settings })
 
   const sources = new Map<string, string | undefined>()
 
@@ -168,7 +168,7 @@ async function build(args: string[]): Promise<number> {
     if (exported)
       refuseStaticConfig(config)
 
-    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, base: basePath(config.base) })
+    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, base: basePath(config.base), settings: config.settings })
     // Before prerendering, whose pages read the collections from what it writes.
     const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
 
@@ -275,8 +275,8 @@ async function runDev(args: string[]): Promise<number> {
   if (typeof parsed === 'number')
     return parsed
 
-  const { routes, publicDir, api } = await loadConfig(process.cwd())
-  const stop = await dev(process.cwd(), { entry: parsed.positionals[0], routes, publicDir, api })
+  const { routes, publicDir, api, settings } = await loadConfig(process.cwd())
+  const stop = await dev(process.cwd(), { entry: parsed.positionals[0], routes, publicDir, api, settings })
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)

@@ -1,4 +1,5 @@
 import type { BunPlugin } from 'bun'
+import type { KayLibrary } from '../build/libraries'
 import type { FileDiagnostic } from '../build/transform'
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
@@ -6,6 +7,7 @@ import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { ASSET_PREFIX, clientDir } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
+import { findKayLibraries, reachableLibraryFiles, templateWords } from '../build/libraries'
 import { kay } from '../build/plugin'
 import { forgetBundleMaps } from '../build/sourcemap'
 import { styleImports, withoutStyles } from '../build/styles'
@@ -59,6 +61,8 @@ export interface ClientOptions {
   sourcemap?: boolean
   // The site's mount point, which the stylesheets' own paths go under, `url(/bg.png)` included.
   base?: string
+  // The app's own modules for its libraries' settings, as `kay.config.ts` gives them.
+  settings?: Record<string, string>
 }
 
 interface MetafileOutput {
@@ -82,7 +86,11 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   const islands = new Map<string, string>()
   const classes = new Set<string>()
   const diagnostics: FileDiagnostic[] = []
-  const files = await findKayFiles(root, { project: true })
+  // A library's components the app reaches compile with its own.
+  const own = await findKayFiles(root, { project: true })
+  const libraries = await findKayLibraries(root)
+  const fromLibraries = new Set(await reachableLibraryFiles(root, libraries, own))
+  const files = [...own, ...fromLibraries]
   const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
   const cacheDir = join(root, '.kay', 'cache')
@@ -100,6 +108,12 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
 
     for (const name of compiled.classes)
       classes.add(name)
+
+    // Tailwind reads the app's files itself, never a package's, so a library's template words go to it here too.
+    if (fromLibraries.has(file)) {
+      for (const name of templateWords(source))
+        classes.add(name)
+    }
   }
 
   if (diagnostics.length > 0)
@@ -118,7 +132,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
 
   const [scripts, styles] = await Promise.all([
     buildIslands(root, base, islands, options),
-    buildStyles(root, dir, existsSync(routesDir) ? await findKayFiles(routesDir) : [], options),
+    buildStyles(root, dir, existsSync(routesDir) ? await findKayFiles(routesDir) : [], libraries, options),
   ])
   const manifest: ClientManifest = { ...scripts, styles }
 
@@ -176,7 +190,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
     define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') },
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
-    plugins: [withoutStyles(), apiStubs(apiDir, await scanApi(apiDir)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache') }), ...options.plugins ?? []],
+    plugins: [withoutStyles(), apiStubs(apiDir, await scanApi(apiDir)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings }), ...options.plugins ?? []],
   })
 
   if (!build.success)
@@ -186,7 +200,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 }
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders.
-async function buildStyles(root: string, dir: string, pages: string[], options: ClientOptions): Promise<Record<string, string>> {
+async function buildStyles(root: string, dir: string, pages: string[], libraries: KayLibrary[], options: ClientOptions): Promise<Record<string, string>> {
   if (pages.length === 0)
     return {}
 
@@ -197,7 +211,7 @@ async function buildStyles(root: string, dir: string, pages: string[], options: 
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root), ...options.plugins ?? []],
+    plugins: [styleImports(root, libraries), ...options.plugins ?? []],
   })
 
   if (!build.success)

@@ -8,6 +8,31 @@ const ROOT_IGNORED = new Set(['dist'])
 
 export const TSCONFIG = 'tsconfig.json'
 
+const TYPESCRIPT = /\.[cm]?ts$/
+const TSX = /\.tsx$/
+const JSX = /\.jsx$/
+const transpilers = new Map<Bun.JavaScriptLoader, Bun.Transpiler>()
+
+// One transpiler per loader, shared by everything reading a module's imports.
+export function transpilerFor(loader: Bun.JavaScriptLoader): Bun.Transpiler {
+  let found = transpilers.get(loader)
+
+  if (!found)
+    transpilers.set(loader, found = new Bun.Transpiler({ loader }))
+
+  return found
+}
+
+export function scriptLoader(path: string): Bun.JavaScriptLoader {
+  if (TYPESCRIPT.test(path))
+    return 'ts'
+
+  if (TSX.test(path))
+    return 'tsx'
+
+  return JSX.test(path) ? 'jsx' : 'js'
+}
+
 export const IGNORED_DIRS = new Set([...ALWAYS_IGNORED, ...ROOT_IGNORED])
 
 export interface FindOptions {

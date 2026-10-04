@@ -57,6 +57,8 @@ const DELETED = 3
 const WATCHED = '**/*.{kay,ts,tsx,js,jsx,json}'
 const DIAGNOSTICS_DELAY = 150
 const QUICK_FIX = 'quickfix'
+const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
+const DEFAULT_MEMBER = '.default'
 // Completions offer names from modules not imported yet, as editors do for TypeScript by default; added imports are quoted the way kay's own code is, since generated code would mislead the guess.
 const TYPESCRIPT_SETTINGS = { suggest: { autoImports: true }, preferences: { quoteStyle: 'single' } }
 const TYPESCRIPT_SECTIONS = new Set(['js/ts', 'typescript', 'javascript'])
@@ -247,7 +249,7 @@ export class KayLanguageServer {
   private async configure(project: Project) {
     const config = await projectConfig(project.root)
 
-    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, publicDir: config.publicDir, i18n: config.i18n, api: config.api }
+    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, publicDir: config.publicDir, i18n: config.i18n, api: config.api, settings: config.settings }
     project.routesDir = resolve(project.root, project.options.routes ?? 'src/routes')
     project.configured = true
   }
@@ -415,6 +417,21 @@ export class KayLanguageServer {
       const link = 'targetUri' in location ? location : { targetUri: location.uri, targetRange: location.range, targetSelectionRange: location.range }
       const shadow = await this.shadowOf(link.targetUri)
       const originSelectionRange = link.originSelectionRange && toSourceRange(origin, link.originSelectionRange)
+      const declared = shadow ? undefined : await packageDeclaration(link.targetUri, link.targetSelectionRange.start.line)
+
+      // A library component's declaration stands for its shadow file, which leads on to its `.kay` source.
+      if (declared) {
+        const key = positionKey(declared.textDocument.uri, declared.position)
+
+        if (!asked.has(key) && asked.size <= MAX_HOPS) {
+          asked.add(key)
+
+          const followed = await this.sourceLinks(origin, await this.definitionsAt(declared), asked)
+
+          if (followed.length > 0)
+            return followed.map(found => ({ ...found, originSelectionRange }))
+        }
+      }
 
       if (!shadow)
         return [{ ...link, targetUri: this.clientUri(filePath(link.targetUri)), originSelectionRange }]
@@ -774,6 +791,17 @@ function textAt(text: string, range: Range): string {
 
 function positionKey(uri: string, { line, character }: Position): string {
   return `${filePath(uri)} ${line}:${character}`
+}
+
+// Where the `.default` a line of `kay-packages.d.ts` reads sits, which tsgo takes on to the component's shadow file.
+async function packageDeclaration(uri: string, line: number): Promise<TextDocumentPositionParams | undefined> {
+  if (!filePath(uri).endsWith(PACKAGE_TYPES))
+    return undefined
+
+  const text = (await Bun.file(filePath(uri)).text()).split('\n')[line] ?? ''
+  const at = text.lastIndexOf(DEFAULT_MEMBER)
+
+  return at === -1 ? undefined : { textDocument: { uri }, position: { line, character: at + 1 } }
 }
 
 // URIs of one file differ by how they are percent-encoded, so files are compared by path.

@@ -1,28 +1,19 @@
 import type { BunPlugin } from 'bun'
+import type { KayLibrary } from './libraries'
 import { dirname, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { ASSET_FILE, writeAsset } from './assets'
+import { scriptLoader, transpilerFor } from './files'
+import { libraryOf } from './libraries'
 
 const KAY_FILE = /\.kay$/
 const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
 const CSS_FILE = /\.css$/
 const ABSOLUTE_URL = /^\//
-const TYPESCRIPT = /\.[cm]?ts$/
-const TSX = /\.tsx$/
-const JSX = /\.jsx$/
 
 // For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses, and the assets they import are written for the server to serve.
 // A page's server code is left out but for its assets, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
-export function styleImports(root: string): BunPlugin {
-  const transpilers = new Map<Bun.JavaScriptLoader, Bun.Transpiler>()
-  const transpiler = (loader: Bun.JavaScriptLoader) => {
-    let found = transpilers.get(loader)
-
-    if (!found)
-      transpilers.set(loader, found = new Bun.Transpiler({ loader }))
-
-    return found
-  }
+export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlugin {
   const project = root + sep
   const resolve = (specifier: string, importer: string): string | undefined => {
     try {
@@ -33,8 +24,9 @@ export function styleImports(root: string): BunPlugin {
     }
   }
   const inProject = (path: string) => path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)
-  const followed = (path: string) => CSS_FILE.test(path) || (inProject(path) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
-  const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => transpiler(loader).scanImports(code).map(({ path }) => resolve(path, importer)).filter(path => path !== undefined)
+  // A kay library's components and modules are followed as the app's own are.
+  const followed = (path: string) => CSS_FILE.test(path) || ((inProject(path) || libraryOf(libraries, path) !== undefined) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
+  const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => transpilerFor(loader).scanImports(code).map(({ path }) => resolve(path, importer)).filter(path => path !== undefined)
   const imports = async (code: string, importer: string, loader: Bun.JavaScriptLoader) => {
     const paths = scan(code, importer, loader)
 
@@ -78,16 +70,6 @@ export function styleImports(root: string): BunPlugin {
       build.onResolve({ filter: ABSOLUTE_URL }, ({ path, importer }) => CSS_FILE.test(importer) ? { path, external: true } : undefined)
     },
   }
-}
-
-function scriptLoader(path: string): Bun.JavaScriptLoader {
-  if (TYPESCRIPT.test(path))
-    return 'ts'
-
-  if (TSX.test(path))
-    return 'tsx'
-
-  return JSX.test(path) ? 'jsx' : 'js'
 }
 
 // For the island build: stylesheets reach the page through the stylesheet build, so the browser code leaves them out.

@@ -1,3 +1,4 @@
+import type { KayLibrary, SettingsReplacement } from '../build/libraries'
 import type { Diagnostic, SourceMap } from '../compiler'
 import type { I18nConfig } from '../config'
 import type { ContentProblem } from '../content/validate'
@@ -13,7 +14,8 @@ import { fileURLToPath } from 'node:url'
 import { ASSET_EXTENSIONS } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
-import { compileKay } from '../compiler'
+import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacements, throughNodeModules } from '../build/libraries'
+import { compileKay, componentName } from '../compiler'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
@@ -30,6 +32,9 @@ import { patternShapes, routeOf, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 
 export const SHADOW_DIR = join('.kay', 'types')
+const SETTINGS_CHECK = 'kay-settings.ts'
+const TSX_EXTENSION = /\.tsx$/
+const SCRIPT_EXTENSION = /\.[cm]?[jt]sx?$/
 const CONTENT_PROBLEMS = fileURLToPath(new URL('../content/problems.ts', import.meta.url))
 const MESSAGE_PROBLEMS = fileURLToPath(new URL('./messages.ts', import.meta.url))
 
@@ -41,6 +46,8 @@ export interface CheckOptions {
   publicDir?: string
   // API directory relative to the root, whose modules' GET routes links may point at.
   api?: string
+  // The app's own modules for its libraries' settings, checked against the defaults they replace.
+  settings?: Record<string, string>
   // The content config relative to the root, whose collections' entries are read against their schemas.
   content?: string
   // The config's redirects, whose targets on the site must be a page or a public file.
@@ -79,7 +86,7 @@ const ASSET_TYPES = ['declare module \'*.css\' {}\n', ...ASSET_EXTENSIONS.flatMa
 export const TSGO = join(dirname(fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))), 'bin', 'tsgo')
 
 // Compiles every .kay file of the project at `root`, nested projects left to their own, to `.kay/types/<path>.kay.tsx`, the tree tsconfig `rootDirs` merges with the sources.
-export async function writeShadowTypes(projectRoot: string, options: CheckOptions = {}): Promise<{ files: Map<string, ShadowFile>, diagnostics: CheckDiagnostic[] }> {
+export async function writeShadowTypes(projectRoot: string, options: CheckOptions = {}): Promise<ShadowTypes> {
   const root = resolve(projectRoot)
   const files = new Map<string, ShadowFile>()
   const diagnostics: CheckDiagnostic[] = []
@@ -88,8 +95,11 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const environmentPath = join(root, SHADOW_DIR, 'kay-env.d.ts')
   const assetsPath = join(root, SHADOW_DIR, 'kay-assets.d.ts')
   const iconsPath = join(root, SHADOW_DIR, 'kay-icons.d.ts')
+  const packagesPath = join(root, SHADOW_DIR, 'kay-packages.d.ts')
+  const settingsPath = join(root, SHADOW_DIR, SETTINGS_CHECK)
+  const own = await findKayFiles(root, { project: true, ownOnly: true })
 
-  for (const file of await findKayFiles(root, { project: true, ownOnly: true })) {
+  for (const file of own) {
     const source = await Bun.file(file).text()
     const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source)
     const path = shadowPath(root, file)
@@ -121,15 +131,92 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await writeIfChanged(assetsPath, ASSET_TYPES)
   await writeIfChanged(iconsPath, iconTypes(root))
 
+  // A library's components compile against the app's types; their own compile errors are the library's to report.
+  const libraries = await findKayLibraries(root)
+  const reached = new Set((await reachableLibraryFiles(root, libraries, own)).map(file => throughNodeModules(libraryOf(libraries, file)!, file)))
+  const unreached = new Set<string>()
+
+  await Promise.all(libraries.flatMap(library => library.files).map(async (file) => {
+    const { shadow } = compileShadow(root, routesDir, file, await Bun.file(file).text())
+    const path = shadowPath(root, file)
+
+    await writeIfChanged(path, shadow.tsx)
+    files.set(path, shadow)
+
+    if (!reached.has(file))
+      unreached.add(file)
+  }))
+
+  await writeIfChanged(packagesPath, packageTypes(root, libraries))
+
+  const replaced = settingsCheck(root, options.settings ?? {}, diagnostics)
+
+  await writeIfChanged(settingsPath, replaced.code)
+
   // Rewriting in place keeps every shadow file present for editors reading the tree meanwhile; only stale ones go.
   const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))
     .filter(entry => entry.isFile())
     .map(entry => join(entry.parentPath, entry.name))
-    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && !files.has(path))
+    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && path !== packagesPath && path !== settingsPath && !files.has(path))
 
   await Promise.all(stale.map(async path => rm(path)))
 
-  return { files, diagnostics }
+  return { files, diagnostics, unreached, settings: replaced.lines }
+}
+
+export interface ShadowTypes {
+  files: Map<string, ShadowFile>
+  diagnostics: CheckDiagnostic[]
+  // Library components the app never imports, whose errors are not its own.
+  unreached: Set<string>
+  // The app's settings module each line of the settings check stands for, with the library it sets.
+  settings: Map<number, { file: string, library: string }>
+}
+
+// Each component a library exports, typed as the module its specifier names: rootDirs merges relative imports only, so a package's `.kay` files reach the app through these.
+function packageTypes(root: string, libraries: KayLibrary[]): string {
+  const shadowDir = join(root, SHADOW_DIR)
+
+  return libraries.flatMap(library => [...library.specifiers].map(([specifier, file]) => {
+    const shadow = relative(shadowDir, shadowPath(root, file)).replace(TSX_EXTENSION, '')
+
+    const name = componentName(file)
+
+    // Named after the component, which is what auto-import offers it as.
+    return `declare module ${JSON.stringify(specifier)} {\n  const ${name}: typeof import(${JSON.stringify(`./${shadow}`)}).default\n  export default ${name}\n}\n`
+  })).join('\n')
+}
+
+// One line per library whose settings the app replaces, assigning the app's module to the type of the defaults it stands in for.
+function settingsCheck(root: string, settings: Record<string, string>, diagnostics: CheckDiagnostic[]): { code: string, lines: Map<number, { file: string, library: string }> } {
+  const shadowDir = join(root, SHADOW_DIR)
+  const imports: string[] = []
+  const checks: string[] = []
+  const lines = new Map<number, { file: string, library: string }>()
+  let replacements: SettingsReplacement[]
+
+  try {
+    replacements = settingsReplacements(root, settings)
+  }
+  catch (error) {
+    diagnostics.push({ file: join(root, CONFIG_FILE), line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
+
+    return { code: '', lines }
+  }
+
+  if (replacements.length === 0)
+    return { code: '', lines }
+
+  const modulePath = (file: string) => JSON.stringify(relative(shadowDir, file).replace(SCRIPT_EXTENSION, ''))
+
+  for (const [index, { library, defaults, replacement }] of replacements.entries()) {
+    imports.push(`import type defaults${index} from ${modulePath(defaults)}`, `import settings${index} from ${modulePath(replacement)}`)
+    checks.push(`export const kaySettings${index}: typeof defaults${index} = settings${index}`)
+    // Lines count from 1, the checks after the imports and a blank line.
+    lines.set(replacements.length * 2 + 2 + index, { file: replacement, library })
+  }
+
+  return { code: `${imports.join('\n')}\n\n${checks.join('\n')}\n`, lines }
 }
 
 // The API modules, or none with the reason the server would refuse them reported at the directory.
@@ -286,7 +373,8 @@ function spellings(path: string): string[] {
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
-  const { files, diagnostics } = await writeShadowTypes(root, options)
+  const { files, diagnostics, unreached, settings } = await writeShadowTypes(root, options)
+  const settingsFile = join(resolve(root), SHADOW_DIR, SETTINGS_CHECK)
   const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code, content, messages] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkContent(root, options.content), checkMessages(root, options.i18n)])
   const config = resolve(root, tsconfig)
@@ -299,8 +387,11 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
   for (const diagnostic of reported) {
     const remapped = remap(diagnostic, files)
+    const setting = remapped.file === settingsFile ? settings.get(remapped.line) : undefined
 
-    if (!broken.has(remapped.file))
+    if (setting)
+      diagnostics.push({ file: setting.file, line: 1, column: 1, code: remapped.code, message: `The settings for ${setting.library} do not match what it takes: ${remapped.message}` })
+    else if (!broken.has(remapped.file) && !unreached.has(remapped.file))
       diagnostics.push(remapped)
   }
 

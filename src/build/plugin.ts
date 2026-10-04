@@ -6,6 +6,7 @@ import { ISLAND_TWIN, withoutTwin } from '../compiler'
 import { RESIZABLE } from '../runtime/image'
 import { ASSET_FILE, writeAsset } from './assets'
 import { iconModule, iconNames, installedIconSets } from './icons'
+import { settingsReplacements } from './libraries'
 import { transformKayCached } from './transform'
 
 export interface KayPluginOptions {
@@ -17,6 +18,8 @@ export interface KayPluginOptions {
   root?: string
   // Keeps compiled files here between runs; off when unset.
   cacheDir?: string
+  // The app's own module for a library's settings, by the library's name, relative to the root: `kay.config.ts`'s `settings`.
+  settings?: Record<string, string>
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
@@ -75,6 +78,12 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
           for (const name of iconNames(prefix, file))
             build.module(`~icons/${name}`, () => ({ contents: iconModule(iconSets, `~icons/${name}`), loader: 'js' }))
         }
+      }
+
+      // A library's settings module loads as the app's own, wherever the library imports it from.
+      for (const { paths, replacement } of settingsReplacements(options.root ?? process.cwd(), options.settings ?? {})) {
+        for (const path of paths)
+          build.onLoad({ filter: new RegExp(`^${RegExp.escape(path)}$`) }, () => ({ contents: `export * from ${JSON.stringify(replacement)}\nexport { default } from ${JSON.stringify(replacement)}\n`, loader: 'ts' }))
       }
 
       // `import logo from './logo.png'` gives the URL the server serves it at, on the server and in islands alike; an image also records its size for `image()`.

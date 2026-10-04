@@ -13,6 +13,8 @@ export interface DevOptions {
   routes?: string
   publicDir?: string
   api?: string
+  // The app's modules for its libraries' settings, for the settings check in `.kay/types`.
+  settings?: Record<string, string>
   // Called with each server process once it is spawned.
   onRestart?: (child: Subprocess) => void
 }
@@ -98,9 +100,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 }
 
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
-async function regenerateTypes(root: string, { routes, publicDir, api }: DevOptions) {
+async function regenerateTypes(root: string, { routes, publicDir, api, settings }: DevOptions) {
   try {
-    await writeShadowTypes(root, { routes, publicDir, api })
+    await writeShadowTypes(root, { routes, publicDir, api, settings })
   }
   catch (error) {
     console.error(error)

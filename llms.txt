@@ -373,6 +373,25 @@ Some components cannot render on the server: a package that touches `window` as 
 
 A browser-only global is one lib.dom declares and Bun lacks: `window`, `document`, `localStorage`, `sessionStorage`, `innerWidth` and the like. `fetch`, `URL`, `WebSocket`, `crypto` and `navigator` exist on the server too and are never reported. `kay check` and the editor report one read while the component renders: at the script's top level, in a `memo` or an array callback such as `.map`, in a function of the script the render calls, or in a template value. Handlers, refs, `effect`, `onMount` and other callbacks run in the browser only and report nothing. The editor offers two fixes: wrap the statement in `effect`, offered for a statement that is a plain call or assignment, since a declaration would take its name out of reach, or turn the fence into `--- client`. `typeof window` while an island renders is reported too: it is `'undefined'` on the server, so the island would render something else in the browser than the markup it hydrates. A global reached through a module of the app or a package is not seen; in development, a server render failing on one names it, the `.kay` line reading it, and the same two fixes.
 
+## Component libraries
+
+A package can ship `.kay` components, which the app installing it compiles as its own: on the server, in islands, and in `kay build --compile` and `--static`.
+
+Publishing one:
+
+- Ship the `.kay` sources, list `kay` under `peerDependencies`, and import from `kay`, so the app's one copy of kay, and its registered types, serve the library too.
+- Give each component a specifier in the exports map, `"exports": { "./*.kay": "./src/*.kay", ".": "./src/index.ts" }`, imported as `import Button from '@kaynooo/kay-ui/button.kay'`. Without an exports map a component is imported by its path in the package.
+- Settings the app may replace, such as theme classes or an icon resolver, live in one module named in package.json, `"kay": { "settings": "./src/settings.ts" }`, which default-exports the defaults and which the library's components import. Export the `Settings` type, and the defaults if apps should extend them, from another module, such as the package's index: the app's settings module takes the place of that one, so importing it from there would import itself.
+
+Using one:
+
+- Install it and import its components; `kay check`, the editor, auto-import and go-to-definition included, types them through `.kay/types/kay-packages.d.ts`, and needs no change to `tsconfig.json`.
+- Only the components the app's imports reach ship: an island of the library the app never imports adds nothing to its bundles, unless a module re-exporting every component, such as a barrel `index.ts`, is imported.
+- Their template classes reach `.kay/classes.txt` with the app's own, so Tailwind builds them with no `@source` line into `node_modules`.
+- `kay check` reports a type error inside a library component the app uses once, at the component's own line; one the app never imports reports nothing.
+- `settings` in `kay.config.ts` replaces a library's settings module with the app's, by the library's name, on the server and in the browser: `settings: { '@kaynooo/kay-ui': './src/ui-settings.ts' }`, a module default-exporting the library's `Settings`. `kay check` checks it against the defaults it replaces.
+- A library linked rather than installed, `"@kaynooo/kay-ui": "link:../kay-ui"`, works the same.
+
 ## Pages and routing
 
 Pages live in `src/routes/`:
