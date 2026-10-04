@@ -1,6 +1,7 @@
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { image, imageUrl, registerImage } from '../src/runtime/image'
 import { pages } from '../src/server'
@@ -82,6 +83,40 @@ describe('image route', () => {
 
     expect(changed.status).toBe(200)
     expect(changed.headers.get('etag')).not.toBe(etag)
+  })
+
+  it('answers several requests for a variant not written yet, each with the whole file', async () => {
+    await Bun.write(join(uploads, 'burst.png'), Bun.file(HERO))
+
+    const responses = await Promise.all(Array.from({ length: 6 }, async () => get(`/_kay/image?src=${encodeURIComponent('/uploads/burst.png')}&w=960`)))
+    const bodies = await Promise.all(responses.map(async response => response.bytes()))
+
+    expect(responses.map(response => response.status)).toEqual([200, 200, 200, 200, 200, 200])
+    expect(new Set(bodies.map(body => Bun.hash(body))).size).toBe(1)
+    expect((await new Bun.Image(bodies[0]!).metadata()).width).toBe(960)
+    expect((await readdir(join(process.cwd(), '.kay/cache/images'))).filter(name => name.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('refuses a runtime image too large to decode safely, from its header alone', async () => {
+    const chunk = (type: string, data: Uint8Array) => {
+      const bytes = new Uint8Array(12 + data.length)
+      const view = new DataView(bytes.buffer)
+
+      view.setUint32(0, data.length)
+      bytes.set(new TextEncoder().encode(type), 4)
+      bytes.set(data, 8)
+      view.setUint32(8 + data.length, Bun.hash.crc32(bytes.subarray(4, 8 + data.length)))
+
+      return bytes
+    }
+    const header = new Uint8Array(13)
+
+    new DataView(header.buffer).setUint32(0, 10_000)
+    new DataView(header.buffer).setUint32(4, 10_000)
+    header.set([8, 6, 0, 0, 0], 8)
+    await Bun.write(join(uploads, 'huge.png'), new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...chunk('IHDR', header), ...chunk('IEND', new Uint8Array())]))
+
+    expect((await get(`/_kay/image?src=${encodeURIComponent('/uploads/huge.png')}&w=320`)).status).toBe(413)
   })
 
   it('answers 415 for a file that is no image', async () => {

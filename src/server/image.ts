@@ -1,10 +1,10 @@
 import type { Elysia } from 'elysia'
 import { existsSync } from 'node:fs'
-import { readdir, stat } from 'node:fs/promises'
+import { readdir, rename, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
-import { IMAGE_ROUTE, IMAGE_WIDTHS } from '../runtime/image'
-import { matchesEtag } from './public'
+import { IMAGE_ROUTE, IMAGE_WIDTHS, RESIZABLE } from '../runtime/image'
+import { revalidated } from './public'
 import { decodePath } from './routes'
 
 export interface ImageRouteOptions {
@@ -19,19 +19,24 @@ export interface ImageRouteOptions {
 
 export const VARIANTS_DIR = 'images'
 const ASSETS_PATH = `${ASSET_PREFIX}assets/`
-const RESIZABLE = /\.(?:png|jpe?g|webp)$/i
 const IMMUTABLE = 'public, max-age=31536000, immutable'
-const REVALIDATE = 'public, max-age=0, must-revalidate'
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 const LADDER = new Set<number>(IMAGE_WIDTHS)
+// About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
+const MAX_UPLOAD_PIXELS = 50_000_000
 
 // The file name of one variant of an image the build or the route wrote.
 export function variantName(source: string, width: number): string {
   return `${basename(source, extname(source))}-${width}.webp`
 }
 
+// Written under a temporary name and moved into place, so a reader never sees a variant half written, nor one a crash cut short.
 export async function writeVariant(source: string, width: number, target: string, quality = 80): Promise<void> {
-  await new Bun.Image(source).resize(width, undefined, { withoutEnlargement: true }).webp({ quality }).write(target)
+  const partial = `${target}.${crypto.randomUUID()}.tmp`
+
+  // Read through Bun.file, which also reaches the files an executable embeds, where Bun.Image given a path does not.
+  await new Bun.Image(Bun.file(source)).resize(width, undefined, { withoutEnlargement: true }).webp({ quality }).write(partial)
+  await rename(partial, target)
 }
 
 // Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files.
@@ -86,25 +91,28 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     let own: number
 
     try {
-      own = (await new Bun.Image(source.path).metadata()).width
+      own = (await new Bun.Image(Bun.file(source.path), { maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }).metadata()).width
     }
-    catch {
+    catch (error) {
+      if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
+        return new Response(`Image over ${MAX_UPLOAD_PIXELS} pixels`, { status: 413, headers: TEXT })
+
       return new Response('Not an image kay can resize', { status: 415, headers: TEXT })
     }
 
     if (!Number.isInteger(width) || (width !== own && !(LADDER.has(width) && width < own)))
       return new Response(`Width ${url.searchParams.get('w')} is neither one of ${IMAGE_WIDTHS.join(', ')} below the image's own nor its own, ${own}`, { status: 400, headers: TEXT })
 
-    // An imported image is named after its content; a public one may change in place, so its size and time go in the name.
+    // An imported image is named after its content; a runtime one may change in place, so its size and time go in the name.
     const name = source.immutable ? variantName(source.path, width) : `${Bun.hash(`${source.path}\n${stats.size}\n${stats.mtimeMs}`).toString(36)}-${width}.webp`
     const built = join(options.clientDir, VARIANTS_DIR, name)
     const cached = join(options.cacheDir, name)
     let file = source.immutable && await Bun.file(built).exists() ? built : cached
 
-    if (file === cached && !await Bun.file(cached).exists()) {
-      let writing = pending.get(cached)
+    let writing = pending.get(cached)
 
-      // Requests for a variant being written wait for that one write.
+    // Requests for a variant being written wait for that one write.
+    if (file === cached && (writing || !await Bun.file(cached).exists())) {
       if (!writing) {
         writing = (async () => {
           try {
@@ -130,12 +138,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if (source.immutable)
       return new Response(Bun.file(file), { headers: { 'cache-control': IMMUTABLE } })
 
-    const etag = `W/"${name}"`
-
-    if (matchesEtag(request.headers.get('if-none-match'), etag))
-      return new Response(null, { status: 304, headers: { etag, 'cache-control': REVALIDATE } })
-
-    return new Response(Bun.file(file), { headers: { etag, 'cache-control': REVALIDATE } })
+    return revalidated(request, `W/"${name}"`, () => Bun.file(file))
   })
 }
 

@@ -5,7 +5,8 @@ import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
 
-const CACHE_CONTROL = 'public, max-age=0, must-revalidate'
+// For a file served under a name that stays when its content changes.
+export const REVALIDATE = 'public, max-age=0, must-revalidate'
 // What `encodeURIComponent` escapes but a browser sends as is in a path; `:` stays escaped, since Elysia would read it as a parameter.
 const SENT_AS_IS = /%(?:40|2B|2C|3B|3D|26|24|5B|5D|7C)/g
 // What `encodeURIComponent` keeps but Elysia reads as a wildcard or breaks the code it generates on.
@@ -39,6 +40,14 @@ export function matchesEtag(header: string | null, etag: string): boolean {
 
 // One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.
 // Files keep their names, so browsers revalidate them every time and get a 304 while they are unchanged.
+// The body, or a 304 when the browser already holds the version the ETag names.
+export function revalidated(request: Request, etag: string, body: () => BodyInit, headers: Record<string, string> = {}): Response {
+  if (matchesEtag(request.headers.get('if-none-match'), etag))
+    return new Response(null, { status: 304, headers: { etag, 'cache-control': REVALIDATE } })
+
+  return new Response(body(), { headers: { ...headers, etag, 'cache-control': REVALIDATE } })
+}
+
 export async function servePublic(app: Elysia, dir: string, routes: Route[]): Promise<Set<string>> {
   const pages = new Set(routes.map(route => route.pattern))
   const files = await publicFiles(dir)
@@ -50,9 +59,7 @@ export async function servePublic(app: Elysia, dir: string, routes: Route[]): Pr
     const { size, mtimeMs } = await stat(path)
     const etag = `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
 
-    app.get(url, ({ request }) => matchesEtag(request.headers.get('if-none-match'), etag)
-      ? new Response(null, { status: 304, headers: { etag, 'cache-control': CACHE_CONTROL } })
-      : new Response(Bun.file(path), { headers: { etag, 'cache-control': CACHE_CONTROL } }))
+    app.get(url, ({ request }) => revalidated(request, etag, () => Bun.file(path)))
   }
 
   return new Set(files.map(file => file.url))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
 import { jsonLd } from '../src/runtime/seo'
+import { pages } from '../src/server'
 import { siteOrigin } from '../src/server/seo'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -58,6 +58,10 @@ describe('seo head', () => {
     expect(head).toContain('<meta property="og:description" content="Who we are">')
     expect(head).toContain('<link rel="canonical" href="https://example.com/about">')
     expect(count(head, 'name="description"')).toBe(1)
+  })
+
+  it('shows the site name for a title that comes out empty, not the template around nothing', async () => {
+    expect((await headOf('/blank')).head).toContain('<title>Kay site</title>')
   })
 
   it('lets a page replace the canonical link and its card, made absolute against the site', async () => {
@@ -125,6 +129,7 @@ describe('sitemap and robots', () => {
     expect([...xml.matchAll(LOC)].map(match => match[1]).sort()).toEqual([
       'https://example.com/',
       'https://example.com/about',
+      'https://example.com/blank',
       'https://example.com/blog/a%20%26%20b',
       'https://example.com/blog/first',
       'https://example.com/custom',

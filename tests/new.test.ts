@@ -217,7 +217,16 @@ describe('kay build --compile', () => {
         'src/routes/echo.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const shout = action(t.Object({ text: t.String() }), ({ text }) => text.toUpperCase())\n---\np Echo\n',
         'src/routes/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Admins only\'))\n',
         'src/routes/admin/index.kay': 'p Secret\n',
+        'src/routes/photo.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero)} alt="Hero")\n',
+        'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }] })\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+
+      // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
+      await Promise.all([
+        Bun.write(join(dir, 'src/hero.png'), Bun.file(join(repo, 'tests/fixtures/images/src/hero.png'))),
+        Bun.write(join(dir, 'src/favicon.png'), Bun.file(join(repo, 'tests/fixtures/seo/src/favicon.png'))),
+        Bun.write(join(dir, 'src/display.woff2'), Bun.file(join(repo, 'tests/fixtures/seo/src/fonts/display.woff2'))),
+      ])
 
       const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--compile', 'server'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
       const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
@@ -252,6 +261,18 @@ describe('kay build --compile', () => {
         expect(parse(await call.text())).toBe('HI')
         expect(await get('/admin')).toEqual({ status: 403, text: 'Admins only' })
         expect((await get('/missing')).text).toContain('<h1>Nothing here</h1>')
+
+        const photo = await get('/photo')
+        const variant = (/srcset="([^ "]+) 320w/).exec(photo.text)![1]!.replaceAll('&amp;', '&')
+        const fonts = (/<link rel="stylesheet" href="(\/_kay\/assets\/fonts-[^"]+)">/).exec(home.text)![1]!
+        const image = await fetch(`${origin}${variant}`)
+
+        expect(image.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+        expect((await new Bun.Image(await image.bytes()).metadata()).width).toBe(320)
+        expect((await fetch(`${origin}/favicon.ico`)).headers.get('content-type')).toBe('image/x-icon')
+        expect((await get('/manifest.webmanifest')).status).toBe(200)
+        expect((await get(fonts)).text).toContain('@font-face{font-family:"Display"')
+        expect((await get('/sitemap.xml')).text).toContain('<loc>https://example.com/about</loc>')
       }
       finally {
         server.kill()

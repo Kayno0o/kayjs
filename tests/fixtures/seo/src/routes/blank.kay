@@ -1,0 +1,6 @@
+--- server
+const name = ''
+---
+head
+  title {name}
+h1 Blank

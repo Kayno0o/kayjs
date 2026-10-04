@@ -33,10 +33,13 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
 export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = []): SeoHead | undefined {
   const origin = site === undefined ? undefined : siteOrigin(site)
 
-  if (origin === undefined && Object.keys(seo).length === 0 && extra.length === 0)
+  // Fonts or a favicon alone give a page no social card.
+  const social = origin !== undefined || Object.keys(seo).length > 0
+
+  if (!social && extra.length === 0)
     return undefined
 
-  const tags: HeadTag[] = [...extra, meta('property', 'og:type', 'website')]
+  const tags: HeadTag[] = social ? [...extra, meta('property', 'og:type', 'website')] : [...extra]
 
   if (seo.name !== undefined)
     tags.push({ tag: 'title', props: { children: seo.name } }, meta('property', 'og:site_name', seo.name))
@@ -60,7 +63,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
   return (url, status) => ({
     defaults: origin !== undefined && status === 200 ? [...tags, { tag: 'link', props: { rel: 'canonical', href: origin + url.pathname } }] : tags,
     titleTemplate: seo.titleTemplate,
-    social: { origin },
+    social: social ? { origin } : undefined,
   })
 }
 

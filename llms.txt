@@ -220,7 +220,7 @@ export default defineConfig({
 - `site` is an origin, nothing after the host. Each page answering 200 gets `link(rel="canonical")` at `site` plus its path, query left out; an error page gets none.
 - `name` is the title of a page that sets none, unwrapped, and `og:site_name`. `titleTemplate` wraps a title a layout or the page sets: `title About` renders `About | Example`.
 - `og:title`, `og:description` and `og:url` repeat the page's own title (unwrapped), description and canonical link unless it sets them; `twitter:card` is `summary_large_image` once there is an `og:image`. A canonical link or an `og:image` and `twitter:image` written as a path, `/og.png` or an imported asset's URL, is made absolute against `site`. `og:type` is `website`.
-- JSON-LD goes in a `head` block as a `script(type="application/ld+json")` holding its text, which `jsonLd()` from `kay/seo` writes from typed data in a server fence: `const place = jsonLd({ '@type': 'LocalBusiness', 'name': shop.name })`, then `script(type="application/ld+json") {place}`. It adds the schema.org `@context` unless the data names its own, and takes a list as one `@graph`. Any `<` in a JSON script is written `\u003c`, so a value holding `</script>` cannot end it. `seo.jsonLd` takes the same data.
+- JSON-LD goes in a `head` block as a `script(type="application/ld+json")` holding its text, which `jsonLd()` from `kay/seo` writes from typed data in a server fence: `const place = jsonLd({ '@type': 'LocalBusiness', 'name': shop.name })`, then `script(type="application/ld+json") {place}`. It adds the schema.org `@context` unless the data names its own, and takes a list as one `@graph`; the type checks `@type` only, the rest being schema.org's vocabulary. Any `<` in a JSON script is written `\u003c`, so a value holding `</script>` cannot end it. `seo.jsonLd` takes the same data.
 - Without `site` and `seo`, a page's head holds only the tags it and its layouts set.
 
 ### Sitemap and robots.txt
@@ -332,7 +332,7 @@ img({...image(hero, { sizes: '(min-width: 60rem) 50vw, 100vw' })} alt="The works
 
 - An imported PNG, JPEG or WebP gets a `srcset` of WebP variants at 320, 640, 960, 1280, 1920, 2560 and 3840 pixels wide, those below its own width, plus its own; `src` is the 1280 one, or the widest below it; `width` and `height` are its own, so the page keeps its space while it loads. `sizes` is passed through. Any other file, an SVG for instance, gets its `src` alone, with its size when kay read one.
 - Variants are served by `/_kay/image?src=...&w=...`, which answers only those widths. `kay build` writes every variant of every imported image, served as files with a year of immutable caching; development makes them on request, kept in `.kay/cache/images`.
-- Images added at runtime, such as uploads, are resized too from a directory listed by the URL path the app serves it at: `images: { dirs: { '/uploads/': 'data/uploads' } }` in `kay.config.ts`, relative to the root, or to where an executable runs. Give their size, `image(post.photo, { width: post.photoWidth, height: post.photoHeight })`, for the variants; without it the image keeps its `src` alone. Each variant is made once per version of the file and revalidated by its ETag, since an upload can change in place. kay does not serve the originals: the app does.
+- Images added at runtime, such as uploads, are resized too from a directory listed by the URL path the app serves it at: `images: { dirs: { '/uploads/': 'data/uploads' } }` in `kay.config.ts`, relative to the root, or to where an executable runs. Give their size, `image(post.photo, { width: post.photoWidth, height: post.photoHeight })`, for the variants; without it the image keeps its `src` alone. Each variant is made once per version of the file and revalidated by its ETag, since an upload can change in place; one over 50 megapixels is refused with 413 from its header alone. kay does not serve the originals: the app does.
 - `images.quality` sets the WebP quality, 80 by default. Variants are WebP, which every current browser reads; AVIF encoding is not available on Linux.
 - An element with a spread is not checked for `alt`, so write it.
 
@@ -351,7 +351,7 @@ a(href="/")
 
 - The import gives the `viewBox`, the markup inlined as `innerHTML`, `aria-hidden="true"`, and a height of `1em` with the width of the icon's ratio, so it sizes to the text around it and takes its colour from `currentColor`; a class or style sizes it otherwise. An icon that means something on its own, with no text beside it, takes `role="img"` and an `aria-label`.
 - Only the icons a page or an island imports are in the build; an alias renders as the icon it points at.
-- `kay check` declares every icon of the installed sets, so a misspelt name is reported as a module it cannot find; a bundle naming one fails with the set and the name.
+- `kay check` declares every icon of the installed sets in `.kay/types/kay-icons.d.ts`, so a misspelt name is reported as a module it cannot find; a bundle naming one fails with the set and the name. kay reads `@iconify-json/<prefix>` packages, not the all-in-one `@iconify/json`: each icon of an installed set is one declaration there and one virtual module the server registers at boot (Tabler, 6,400 icons, takes about 10 ms).
 
 ## Islands
 

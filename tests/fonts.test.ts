@@ -26,6 +26,8 @@ describe('fonts', () => {
 
     expect(preloads).toEqual([[expect.stringMatching(/^\/_kay\/assets\/display-\w+\.woff2$/), 'font/woff2']])
     expect(html.indexOf(stylesheet)).toBeLessThan(html.indexOf('</head>'))
+    // Fonts alone set no social card.
+    expect(html).not.toContain('og:')
 
     const css = await (await app.handle(new Request(`http://localhost${stylesheet}`))).text()
 

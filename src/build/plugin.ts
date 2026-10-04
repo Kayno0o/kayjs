@@ -3,6 +3,7 @@ import type { Target } from './transform'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
+import { RESIZABLE } from '../runtime/image'
 import { ASSET_FILE, writeAsset } from './assets'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { transformKayCached } from './transform'
@@ -23,7 +24,6 @@ const KAY_FILE = /\.kay(?:\?island)?$/
 const TWIN_IMPORT = /\.kay\?island$/
 // Where the bundler keeps twins: unlike the runtime loader, it resolves no specifier holding a `?`.
 const TWIN_NAMESPACE = 'kay-island'
-const RESIZABLE = /\.(?:png|jpe?g|webp)$/i
 const ICON_SPECIFIER = /^~icons\//
 const ICON_NAMESPACE = 'kay-icon'
 const ANY = /.*/

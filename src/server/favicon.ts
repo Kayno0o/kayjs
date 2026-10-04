@@ -3,15 +3,16 @@ import type { ManifestConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { matchesEtag } from './public'
+import { revalidated } from './public'
 
 export const FAVICON_DIR = 'favicon'
 const MANIFEST = '/manifest.webmanifest'
 // Browsers ask for the first two at these paths on their own; the manifest points at the others.
 const PNG_FILES: Record<string, number> = { '/apple-touch-icon.png': 180, '/icon-192.png': 192, '/icon-512.png': 512 }
 const ICO_SIZES = [16, 32, 48]
+// The widest icon kay writes, which the source must reach so none is upscaled.
+const LARGEST = 512
 const ICO = '/favicon.ico'
-const REVALIDATE = 'public, max-age=0, must-revalidate'
 
 export interface FaviconOptions {
   // The square source image, absolute.
@@ -26,8 +27,8 @@ export interface FaviconOptions {
 export async function faviconFiles(source: string): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
   const { width, height } = await new Bun.Image(source).metadata()
 
-  if (width !== height)
-    throw new Error(`kay: the favicon ${source} is ${width}x${height}; it has to be square, 512x512 or more`)
+  if (width !== height || width < LARGEST)
+    throw new Error(`kay: the favicon ${source} is ${width}x${height}; it has to be square, ${LARGEST}x${LARGEST} or more`)
 
   const files = new Map<string, Uint8Array<ArrayBuffer>>()
   const png = async (size: number) => new Uint8Array(await new Bun.Image(source).resize(size, size).png().bytes())
@@ -76,7 +77,7 @@ function ico(images: Uint8Array[], sizes: number[]): Uint8Array<ArrayBuffer> {
 // The links every page carries for them, which a page's own replace.
 export function faviconTags(manifest?: ManifestConfig): HeadTag[] {
   const tags: HeadTag[] = [
-    { tag: 'link', props: { rel: 'icon', href: ICO, sizes: '48x48' } },
+    { tag: 'link', props: { rel: 'icon', href: ICO, sizes: ICO_SIZES.map(size => `${size}x${size}`).join(' ') } },
     { tag: 'link', props: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
     { tag: 'link', props: { rel: 'manifest', href: MANIFEST } },
   ]
@@ -117,14 +118,7 @@ export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconO
     return built
   }
 
-  const respond = (request: Request, body: Uint8Array<ArrayBuffer> | string, type: string) => {
-    const etag = `"${Bun.hash(body).toString(36)}"`
-
-    if (matchesEtag(request.headers.get('if-none-match'), etag))
-      return new Response(null, { status: 304, headers: { etag, 'cache-control': REVALIDATE } })
-
-    return new Response(body, { headers: { 'etag': etag, 'cache-control': REVALIDATE, 'content-type': type } })
-  }
+  const respond = (request: Request, body: Uint8Array<ArrayBuffer> | string, type: string) => revalidated(request, `"${Bun.hash(body).toString(36)}"`, () => body, { 'content-type': type })
 
   for (const path of [...Object.keys(PNG_FILES), ICO]) {
     if (taken.has(path))

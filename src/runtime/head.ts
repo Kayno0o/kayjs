@@ -103,9 +103,11 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   }
 
   const titleTag = winners.get('title')?.[0]
-  const fromDefaults = options.defaults !== undefined && titleGroup === 0
-  const ownTitle = titleTag && text(titleTag)
-  const titleText = ownTitle !== undefined && options.titleTemplate && !fromDefaults ? options.titleTemplate.replaceAll('%s', () => ownTitle) : ownTitle
+  const defaultTitle = options.defaults?.find(tag => tag.tag === 'title')
+  // A title that comes out empty, from a value the page lacked, shows the site's rather than the template around nothing.
+  const useDefault = (options.defaults !== undefined && titleGroup === 0) || (titleTag !== undefined && text(titleTag).trim() === '' && defaultTitle !== undefined)
+  const ownTitle = titleTag && text(useDefault && defaultTitle ? defaultTitle : titleTag)
+  const titleText = ownTitle !== undefined && options.titleTemplate && !useDefault ? options.titleTemplate.replaceAll('%s', () => ownTitle) : ownTitle
 
   // Social cards show the site name on their own, so they take the title without the template.
   if (options.social)

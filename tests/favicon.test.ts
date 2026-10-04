@@ -26,7 +26,7 @@ describe('favicon', () => {
   it('links the favicon, the touch icon, the manifest and the theme colour from every page', async () => {
     const html = await (await get('/about')).text()
 
-    expect(html).toContain('<link rel="icon" href="/favicon.ico" sizes="48x48">')
+    expect(html).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">')
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">')
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest">')
     expect(html).toContain('<meta name="theme-color" content="#1e1e2e">')
@@ -82,11 +82,14 @@ describe('favicon', () => {
     expect((await own.handle(new Request('http://localhost/icon-192.png'))).status).toBe(200)
   })
 
-  it('refuses a source that is not square, and writes the files for a build', async () => {
+  it('refuses a source that is not square or smaller than the largest icon, and writes the files for a build', async () => {
     const wide = join(scratch, 'wide.png')
+    const small = join(scratch, 'small.png')
 
     await Bun.write(wide, await new Bun.Image(SOURCE).resize(512, 256).png().bytes())
-    await expect(faviconFiles(wide)).rejects.toThrow('is 512x256; it has to be square')
+    await Bun.write(small, await new Bun.Image(SOURCE).resize(256, 256).png().bytes())
+    await expect(faviconFiles(wide)).rejects.toThrow('is 512x256; it has to be square, 512x512 or more')
+    await expect(faviconFiles(small)).rejects.toThrow('is 256x256; it has to be square, 512x512 or more')
 
     await writeFavicons(SOURCE, join(scratch, 'built'))
 

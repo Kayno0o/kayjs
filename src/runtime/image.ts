@@ -23,7 +23,9 @@ export interface ImageOptions {
 const sizes = new Map<string, { width: number, height: number }>()
 // The variant `src` falls back to for a browser that ignores `srcset`.
 const FALLBACK_WIDTH = 1280
-const RESIZABLE = /\.(?:png|jpe?g|webp)(?:\?.*)?$/i
+
+// What Bun.Image reads and the route resizes, a query after the name allowed.
+export const RESIZABLE = /\.(?:png|jpe?g|webp)(?:\?.*)?$/i
 
 // What an image module exports: its URL, its size recorded for `image()`.
 export function registerImage(url: string, width: number, height: number): string {
