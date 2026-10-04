@@ -25,7 +25,17 @@ export function bundled(): Bundle | undefined {
   return bundle
 }
 
+// Bun already imports a file once per process; keeping what it gave spares every request the cost of asking it again.
+const imported = new Map<string, unknown>()
+
 // A page, layout, special page or guard: the executable's own copy, or the file imported through the `.kay` loader.
 export async function importModule<Module>(file: string): Promise<Module> {
-  return (bundle?.modules[file] ?? await import(file)) as Module
+  let module = bundle?.modules[file] ?? imported.get(file)
+
+  if (module === undefined) {
+    module = await import(file)
+    imported.set(file, module)
+  }
+
+  return module as Module
 }
