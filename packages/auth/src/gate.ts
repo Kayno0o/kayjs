@@ -5,39 +5,27 @@ const READ_METHODS = new Set(['GET', 'HEAD'])
 const REQUIREMENT = Symbol('auth.requirement')
 const DECIDED = Symbol('auth.decided')
 
-/** What the auth plugin needs wired in: how to resolve a principal and how to authorize it. */
-export interface AuthPluginDeps<P, G extends string> {
-  resolvePrincipal: (
-    req: { cookie: any, headers: any },
-    opts: { allowSubstitute?: boolean },
-  ) => Promise<P | null>
-  authorize: (
-    principal: P | null,
-    requirement: Requirement<P, G>,
-    level: Level,
-    ctx: PolicyContext,
-  ) => Promise<boolean>
-  /** Requirement applied to routes with no `auth:`; secure by default (e.g. `[hasRole('ROLE_SUPER_ADMIN')]`). */
+// What the gate needs wired in: who is asking and whether they may.
+export interface GateDeps<P, G extends string> {
+  principal: (ctx: object) => Promise<P | null>
+  authorize: (principal: P | null, requirement: Requirement<P, G>, level: Level, ctx: PolicyContext) => Promise<boolean>
+  // Applied to routes with no `auth:`, so a route that forgets one stays closed.
   defaultRequirement: Requirement<P, G>
 }
 
-/** The slice of the Elysia context the gate reads, plus the stamps it leaves on it. */
+// The slice of the Elysia context the gate reads, plus the stamps it leaves on it.
 interface GateContext<P, G extends string> extends PolicyContext {
   request: Request
   set: { status?: number | string }
-  auth?: { user: P | null }
   [REQUIREMENT]?: Requirement<P, G> | false
   [DECIDED]?: true
 }
 
 // The macro only stamps the route's requirement; one local beforeHandle enforces it, so routes added through `group`, `guard`, `use`, `route`, `all` or `ws` fall back to `defaultRequirement` too.
-/** Builds the Elysia auth surface, to mount before any route: routes fall back to `defaultRequirement`, override with `auth: <Requirement>`, opt out with `auth: false`. Answers 401 to an anonymous caller and 403 to a signed-in one who is denied. */
-export function createAuthPlugin<P, G extends string>(deps: AuthPluginDeps<P, G>) {
-  return (opts: { allowSubstitute?: boolean } = {}) => (app: Elysia) =>
+// Routes of the instance it is used on take `auth: <Requirement>` to override the default and `auth: false` to opt out. Answers 401 to an anonymous caller and 403 to a signed-in one who is denied.
+export function createGate<P, G extends string>(deps: GateDeps<P, G>) {
+  return (app: Elysia) =>
     app
-      .derive({ as: 'scoped' }, async ({ cookie, headers }) => ({
-        auth: { user: await deps.resolvePrincipal({ cookie, headers }, opts) },
-      }))
       .macro({
         auth: (requirement: Requirement<P, G> | false | undefined) => ({
           transform(ctx: object) {
@@ -49,11 +37,11 @@ export function createAuthPlugin<P, G extends string>(deps: AuthPluginDeps<P, G>
         const ctx = context as unknown as GateContext<P, G>
         const requirement = ctx[REQUIREMENT] ?? deps.defaultRequirement
 
-        // A route nested in two authed instances runs this twice; the first pass already decided.
+        // A route nested in two gated instances runs this twice; the first pass already decided.
         if (requirement === false || ctx[DECIDED])
           return
 
-        const user = ctx.auth?.user ?? null
+        const user = await deps.principal(ctx)
         const level: Level = READ_METHODS.has(ctx.request.method) ? 'read' : 'write'
         const ok = await deps.authorize(user, requirement, level, { params: ctx.params, body: ctx.body, query: ctx.query })
 
