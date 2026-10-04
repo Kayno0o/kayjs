@@ -7,6 +7,7 @@ import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { registerActionRoutes } from './actions'
+import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents } from './dev'
@@ -77,9 +78,13 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const routesDir = resolve(root, options.routes ?? 'src/routes')
   const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError }
 
-  registerLoader(root)
+  // An executable carries its routes and modules compiled; anything else finds them on disk and compiles them as they load.
+  const bundle = bundled()
 
-  const [scanned, client] = await Promise.all([scanRoutes(routesDir), loadClient()])
+  if (!bundle)
+    registerLoader(root)
+
+  const [scanned, client] = await Promise.all([bundle?.routes ?? scanRoutes(routesDir), loadClient()])
 
   refuseClashes(routesDir, scanned)
   const routes = await Promise.all(scanned.map(loadGuards))
@@ -138,7 +143,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     })
   }
 
-  const fallback = specialPagesOf(routesDir, routesDir)
+  const fallback = bundle?.fallback ?? specialPagesOf(routesDir, routesDir)
 
   // Every route above wins over this one, so it only answers what no page serves.
   if (fallback.notFound ?? fallback.error)

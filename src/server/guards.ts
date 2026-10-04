@@ -1,5 +1,6 @@
 import type { Guard, GuardContext } from '../runtime'
 import type { GuardFile, Route } from './routes'
+import { importModule } from './bundle'
 
 export interface LoadedGuard extends GuardFile {
   check: Guard
@@ -18,7 +19,7 @@ export interface Refusal {
 
 export async function loadGuards(route: Route): Promise<ServedRoute> {
   const guards = await Promise.all(route.guards.map(async (guard) => {
-    const check = (await import(guard.file) as { default?: unknown }).default
+    const check = (await importModule<{ default?: unknown }>(guard.file)).default
 
     if (typeof check !== 'function')
       throw new TypeError(`kay: ${guard.file} must export a guard by default: export default guard(ctx => ...)`)

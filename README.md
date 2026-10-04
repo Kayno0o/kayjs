@@ -31,7 +31,7 @@ bun run build   # kay build: islands, stylesheets and prerendered pages into .ka
 bun run start   # NODE_ENV=production bun src/server.ts
 ```
 
-In production the server serves what `kay build` wrote and bundles nothing at boot.
+In production the server serves what `kay build` wrote and bundles nothing at boot. `kay build --compile server` goes one step further and writes `server`, one executable holding the server, its pages and the client build, which needs neither Bun nor the project installed where it runs.
 
 ## Commands
 
@@ -40,6 +40,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | `kay new <dir>` | scaffold a project that checks, builds and runs |
 | `kay dev [entry]` | run the server, restarting on change, errors shown in the browser |
 | `kay build [dir]` | bundle the browser code for production |
+| `kay build [dir] --compile <file>` | the same, plus the server and everything it serves in one executable |
 | `kay check [dir]` | type-check the project, `.kay` files included |
 | `kay fmt [paths] [--check]` | format `.kay` files |
 | `kay lsp --stdio` | language server for the editor extension in `editors/vscode` |

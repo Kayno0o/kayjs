@@ -1,14 +1,17 @@
+import type { Subprocess } from 'bun'
 import { mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
+import { parse, stringify } from 'devalue'
 import { check } from '../src/check'
 import { formatFiles } from '../src/format'
 import { createProject } from '../src/new'
 import { buildClient } from '../src/server/client'
 
 const repo = join(import.meta.dir, '..')
+const LISTENING = /localhost:(\d+)/
 
 // Stands in for `bun install` of a packed kay: its source and the declarations `prepack` emits, beside this checkout's dependencies.
 async function installKay(dir: string) {
@@ -166,4 +169,83 @@ describe('kay new', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+})
+
+// The first line a server prints with the port it listens on.
+async function listeningPort(child: Subprocess<'ignore', 'pipe', 'pipe'>): Promise<string> {
+  const reader = child.stdout.getReader()
+  let output = ''
+
+  for (let match = LISTENING.exec(output); !match; match = LISTENING.exec(output)) {
+    const { value, done } = await reader.read()
+
+    if (done)
+      throw new Error(`the executable exited without listening: ${await new Response(child.stderr).text()}`)
+
+    output += new TextDecoder().decode(value)
+  }
+
+  reader.releaseLock()
+
+  return LISTENING.exec(output)![1]!
+}
+
+describe('kay build --compile', () => {
+  it('bundles the server, its pages and the client build into one executable that serves them from anywhere', async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'kay-compile-')), 'my-app')
+
+    try {
+      await createProject(dir, { kay: '^1.0.0' })
+      await installKay(dir)
+      await Promise.all(Object.entries({
+        'public/robots.txt': 'User-agent: *\n',
+        'src/components/badge.kay': '---\nconst { labels } = props<{ labels: string[] }>()\n---\nul.badges\n  for label of labels key={label}\n    li {label}\n',
+        'src/components/tally.kay': '---\nimport { signal } from \'kay\'\nimport Badge from \'./badge.kay\'\n\nconst n = signal(0)\n---\nBadge(labels={[\'in\']})\nbutton(onClick={() => n.set(c => c + 1)}) {n()}\n',
+        'src/routes/badges.kay': '---\nimport Badge from \'../components/badge.kay\'\nimport Tally from \'../components/tally.kay\'\n---\nBadge(labels={[\'out\']})\nTally\n',
+        'src/routes/about.kay': '--- server\nexport const prerender = true\n---\np About\n',
+        'src/routes/echo.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const shout = action(t.Object({ text: t.String() }), ({ text }) => text.toUpperCase())\n---\np Echo\n',
+        'src/routes/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Admins only\'))\n',
+        'src/routes/admin/index.kay': 'p Secret\n',
+      }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+
+      const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--compile', 'server'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+      const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+
+      expect(report).toContain('compiled server in ')
+      expect(code).toBe(0)
+
+      // Run from elsewhere, with nothing of the project to read.
+      const server = Bun.spawn([join(dir, 'server')], { cwd: tmpdir(), env: { PATH: process.env.PATH, PORT: '0' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+
+      try {
+        const origin = `http://localhost:${await listeningPort(server)}`
+        const get = async (path: string) => {
+          const response = await fetch(`${origin}${path}`)
+
+          return { status: response.status, text: await response.text() }
+        }
+        const home = await get('/')
+        const entry = (/<script type="module" src="([^"]+)"/).exec(home.text)![1]!
+        const badges = await get('/badges')
+        const call = await fetch(`${origin}/_kay/action/src/routes/echo.kay/shout`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'origin': origin }, body: stringify({ text: 'hi' }) })
+
+        expect(home.text).toContain('<h1>Hello from the server</h1>')
+        expect((await get(entry)).status).toBe(200)
+        expect(await get('/robots.txt')).toEqual({ status: 200, text: 'User-agent: *\n' })
+        expect((await get('/about')).text).toContain('<p>About</p>')
+        expect(badges.text).toContain('<ul class="badges"><li>out</li></ul>')
+        expect(badges.text).toMatch(/<ul _hk=\S+ class="badges">/)
+        expect(parse(await call.text())).toBe('HI')
+        expect(await get('/admin')).toEqual({ status: 403, text: 'Admins only' })
+        expect((await get('/missing')).text).toContain('<h1>Nothing here</h1>')
+      }
+      finally {
+        server.kill()
+        await server.exited
+      }
+    }
+    finally {
+      await rm(join(dir, '..'), { recursive: true, force: true })
+    }
+  }, 120_000)
 })

@@ -1,0 +1,108 @@
+import type { KayConfig } from '../config'
+import type { Route, SpecialPages } from '../server/routes'
+import { existsSync } from 'node:fs'
+import { basename, join, resolve } from 'node:path'
+import { CONFIG_FILE } from '../config'
+import { refuseClashes, scanRoutes, specialPagesOf } from '../server/routes'
+import { kay } from './plugin'
+import { withoutStyles } from './styles'
+
+export interface CompileOptions {
+  // The server entry, relative to the root.
+  entry?: string
+  // The executable to write, relative to the root.
+  outfile: string
+}
+
+// Bun embeds an asset directory under its last path component, beside the executable's entry.
+const CLIENT_ASSETS = 'client'
+
+// Bundles the server, its pages and the client build `kay build` wrote into one executable, which runs as `NODE_ENV=production bun <entry>` would.
+// The entry it generates registers every route module before the server entry calls `pages()`, which then reads nothing from disk but the embedded files.
+export async function compileServer(root: string, config: KayConfig, options: CompileOptions): Promise<string> {
+  const routesDir = resolve(root, config.routes ?? 'src/routes')
+  const publicDir = resolve(root, config.publicDir ?? 'public')
+  const clientBase = join(root, '.kay', 'client')
+  const entry = resolve(root, options.entry ?? 'src/server.ts')
+  const outfile = resolve(root, options.outfile)
+
+  if (!existsSync(entry))
+    throw new Error(`kay: no server entry at ${entry}; pass --entry`)
+
+  if (basename(publicDir) === CLIENT_ASSETS)
+    throw new Error(`kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
+
+  const routes = await scanRoutes(routesDir)
+
+  refuseClashes(routesDir, routes)
+
+  const fallback = specialPagesOf(routesDir, routesDir)
+  const modules = [...routeModules(routes, fallback)]
+  const configFile = join(root, CONFIG_FILE)
+  const generated = join(root, '.kay', 'compile', 'entry.ts')
+  const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
+
+  await Bun.write(generated, [
+    `import { join } from 'node:path'`,
+    `import { registerBundle } from 'kay/server'`,
+    ...modules.map((file, index) => `import * as module${index} from ${JSON.stringify(file)}`),
+    existsSync(configFile) ? `import config from ${JSON.stringify(configFile)}` : 'const config = {}',
+    '',
+    'registerBundle({',
+    `  root: ${JSON.stringify(root)},`,
+    `  routes: ${JSON.stringify(routes)},`,
+    `  fallback: ${JSON.stringify(fallback)},`,
+    `  modules: { ${modules.map((file, index) => `${JSON.stringify(file)}: module${index}`).join(', ')} },`,
+    '  config,',
+    `  clientDir: ${embedded(clientBase)},`,
+    `  publicDir: ${embedded(publicDir)},`,
+    '})',
+    '',
+    `await import(${JSON.stringify(entry)})`,
+    '',
+  ].join('\n'))
+
+  const build = await Bun.build({
+    entrypoints: [generated],
+    target: 'bun',
+    compile: { outfile, assets: [clientBase, publicDir].filter(dir => existsSync(dir)) },
+    // Solid's and the app's production code, as `NODE_ENV=production` gives a server started with Bun.
+    define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+    // Stylesheets reach pages through the client build, already embedded.
+    plugins: [withoutStyles(), kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache') }), ...config.plugins ?? []],
+  } as Bun.BuildConfig)
+
+  if (!build.success)
+    throw new AggregateError(build.logs, 'kay: compiling the server failed')
+
+  return outfile
+}
+
+// Every module a route renders or runs: its page, layouts, special pages and guards.
+function routeModules(routes: Route[], fallback: SpecialPages): Set<string> {
+  const files = new Set<string>()
+  const addSpecial = (special: SpecialPages) => {
+    for (const page of [special.notFound, special.error]) {
+      if (page) {
+        for (const file of [...page.layouts, page.file])
+          files.add(file)
+      }
+    }
+  }
+
+  for (const route of routes) {
+    for (const file of [...route.layouts, route.file])
+      files.add(file)
+
+    addSpecial(route.special)
+
+    for (const guard of route.guards) {
+      files.add(guard.file)
+      addSpecial(guard.special)
+    }
+  }
+
+  addSpecial(fallback)
+
+  return files
+}

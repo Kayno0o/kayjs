@@ -11,6 +11,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { createComponent, generateHydrationScript } from '@solidjs/web'
 import { mapStack } from '../build/sourcemap'
+import { importModule } from './bundle'
 import { preferredEncoding } from './compress'
 import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
@@ -352,7 +353,7 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
 }
 
 async function importAll(files: string[]): Promise<PageModule[]> {
-  return Promise.all(files.map(async file => await import(file) as PageModule))
+  return Promise.all(files.map(async file => importModule<PageModule>(file)))
 }
 
 // The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.

@@ -4,6 +4,7 @@ import { statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
+import { compileServer } from './build/compile'
 import { KayCompileError } from './build/transform'
 import { check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
@@ -17,7 +18,7 @@ import { compressFiles } from './server/compress'
 import { prerenderPages } from './server/prerender'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>]\n       kay dev [entry]\n       kay build [dir]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>]\n       kay dev [entry]\n       kay build [dir] [--compile <executable>] [--entry <file>]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -119,11 +120,20 @@ async function runCheck(args: string[]): Promise<number> {
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
+// With `--compile`, also bundles the server and all of it into one executable.
 async function build(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, {}, 1)
+  const parsed = parseCommand(args, { compile: { type: 'string' }, entry: { type: 'string' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
+
+  const { compile, entry } = parsed.values
+
+  if (typeof entry === 'string' && typeof compile !== 'string') {
+    console.error(`kay: --entry names the server an executable runs, so it goes with --compile\n${USAGE}`)
+
+    return 1
+  }
 
   const root = projectRoot('build', parsed.positionals[0])
 
@@ -140,6 +150,13 @@ async function build(args: string[]): Promise<number> {
     await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 
     console.error(`built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')} in ${Math.round(performance.now() - started)} ms`)
+
+    if (typeof compile === 'string') {
+      const compiled = performance.now()
+      const executable = await compileServer(root, config, { outfile: compile, entry: typeof entry === 'string' ? entry : undefined })
+
+      console.error(`compiled ${relative(process.cwd(), executable)} in ${Math.round(performance.now() - compiled)} ms`)
+    }
 
     return 0
   }

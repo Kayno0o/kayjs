@@ -3,14 +3,17 @@ import type { ClientBuild } from './client'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { logError } from '../build/sourcemap'
-import { withConfig } from '../config'
+import { mergeConfig, withConfig } from '../config'
 import { servePages } from './app'
+import { bundled } from './bundle'
 import { buildClient, readClient } from './client'
 import { bootFailure } from './dev'
 
 export type { KayConfig } from '../config'
 export { defineConfig } from '../config'
 export type { PagesOptions } from './app'
+export type { Bundle } from './bundle'
+export { registerBundle } from './bundle'
 export type { ScriptHashOptions } from './csp'
 export { inlineScriptHashes } from './csp'
 export { defineEnv } from './env'
@@ -19,6 +22,22 @@ export type { Route } from './routes'
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
 export async function pages(options: PagesOptions = {}) {
+  const bundle = bundled()
+
+  // An executable serves what `kay build --compile` embedded, as production does.
+  if (bundle) {
+    const config = { ...mergeConfig(bundle.config, options), root: bundle.root, dev: false, prebuilt: true, publicDir: bundle.publicDir }
+
+    return servePages(bundle.root, config, async () => {
+      const client = await readClient(bundle.root, bundle.clientDir)
+
+      if (!client)
+        throw new Error(`kay: this executable holds no client build at ${bundle.clientDir}`)
+
+      return client
+    })
+  }
+
   const root = resolve(options.root ?? process.cwd())
   const dev = options.dev ?? process.env.NODE_ENV === 'development'
 

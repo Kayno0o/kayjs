@@ -9,6 +9,7 @@ import type { LoadedGuard, ServedRoute } from './guards'
 import { dirname, sep } from 'node:path'
 import { decodeCall, failure, FAILURE_HEADER, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
 import { encodeValue, unsendable } from '../runtime/wire'
+import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash, writeSuccess } from './flash'
 import { runGuards } from './guards'
@@ -66,7 +67,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
   const served = new Map<string, { file: string, action: ServerAction<TSchema, unknown> }>()
 
   for (const [file, guards] of actionFiles(routes)) {
-    const module = await import(file) as Record<string, unknown>
+    const module = await importModule<Record<string, unknown>>(file)
 
     for (const value of Object.values(module)) {
       if (!isAction(value))

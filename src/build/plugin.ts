@@ -1,7 +1,8 @@
 import type { BunPlugin } from 'bun'
 import type { Target } from './transform'
+import { dirname, resolve } from 'node:path'
 import process from 'node:process'
-import { withoutTwin } from '../compiler'
+import { ISLAND_TWIN, withoutTwin } from '../compiler'
 import { ASSET_FILE, writeAsset } from './assets'
 import { transformKayCached } from './transform'
 
@@ -18,6 +19,9 @@ export interface KayPluginOptions {
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
 const KAY_FILE = /\.kay(?:\?island)?$/
+const TWIN_IMPORT = /\.kay\?island$/
+// Where the bundler keeps twins: unlike the runtime loader, it resolves no specifier holding a `?`.
+const TWIN_NAMESPACE = 'kay-island'
 
 export function kay(options: KayPluginOptions = {}): BunPlugin {
   return {
@@ -25,11 +29,20 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
     setup(build) {
       const target = options.target ?? (build.config?.target === 'browser' ? 'dom' : 'ssr')
 
-      build.onLoad({ filter: KAY_FILE }, async ({ path }) => {
-        const source = await Bun.file(withoutTwin(path)).text()
+      const load = async (file: string) => {
+        const source = await Bun.file(withoutTwin(file)).text()
 
-        return { contents: await transformKayCached(source, path, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir }), loader: 'ts' }
-      })
+        return { contents: await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir }), loader: 'ts' as const }
+      }
+
+      build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))
+
+      // Only a bundle has a config; the runtime loader takes the specifier as it is.
+      if (build.config) {
+        build.onResolve({ filter: TWIN_IMPORT }, ({ path, importer }) => ({ path: `${resolve(dirname(importer), withoutTwin(path))}${ISLAND_TWIN}`, namespace: TWIN_NAMESPACE }))
+        build.onLoad({ filter: KAY_FILE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path))
+      }
+
       // `import logo from './logo.png'` gives the URL the server serves it at, on the server and in islands alike.
       build.onLoad({ filter: ASSET_FILE }, async ({ path }) => ({ contents: `export default ${JSON.stringify(await writeAsset(path, options.root ?? process.cwd()))}`, loader: 'js' }))
     },

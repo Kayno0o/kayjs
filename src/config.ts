@@ -41,5 +41,9 @@ export async function loadConfig(root: string): Promise<KayConfig> {
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
 export async function withConfig<Options extends KayConfig>(root: string, options: Options): Promise<KayConfig & Options> {
-  return { ...await loadConfig(root), ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) } as KayConfig & Options
+  return mergeConfig(await loadConfig(root), options)
+}
+
+export function mergeConfig<Options extends KayConfig>(config: KayConfig, options: Options): KayConfig & Options {
+  return { ...config, ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) } as KayConfig & Options
 }

@@ -120,23 +120,24 @@ export async function writeManifest(root: string, manifest: ClientManifest): Pro
   await Bun.write(join(root, '.kay', 'client', MANIFEST), JSON.stringify(manifest))
 }
 
-export async function readManifest(root: string): Promise<ClientManifest | undefined> {
-  const file = Bun.file(join(root, '.kay', 'client', MANIFEST))
+// `base` is where `kay build` wrote the client build, `.kay/client` unless an executable embeds it elsewhere.
+export async function readManifest(root: string, base = join(root, '.kay', 'client')): Promise<ClientManifest | undefined> {
+  const file = Bun.file(join(base, MANIFEST))
 
   return await file.exists() ? await file.json() as ClientManifest : undefined
 }
 
 // What `kay build` left, or undefined when it never ran.
-export async function readClient(root: string): Promise<ClientBuild | undefined> {
-  const manifest = await readManifest(root)
+export async function readClient(root: string, base = join(root, '.kay', 'client')): Promise<ClientBuild | undefined> {
+  const manifest = await readManifest(root, base)
 
-  return manifest && fromManifest(root, manifest)
+  return manifest && fromManifest(root, manifest, join(base, 'dist'))
 }
 
-function fromManifest(root: string, manifest: ClientManifest): ClientBuild {
+function fromManifest(root: string, manifest: ClientManifest, dir = clientDir(root)): ClientBuild {
   return {
     ...manifest,
-    dir: clientDir(root),
+    dir,
     styles: new Map(Object.entries(manifest.styles).map(([file, url]) => [resolve(root, file), url])),
     pages: new Map(Object.entries(manifest.pages ?? {})),
   }
