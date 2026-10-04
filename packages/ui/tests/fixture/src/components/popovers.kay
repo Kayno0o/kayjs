@@ -11,7 +11,7 @@ const open = signal(false)
 button#show(onClick={() => open.set(true)}) Show
 Popover(id="menu" open={open()} placement="top-end" onToggle={shown => { open.set(shown); onToggle(shown) }})
   @trigger(attributes)
-    button#trigger({...attributes}) Menu
+    IconButton#trigger({...attributes} icon="chevron" label="Menu")
   p#inside Inside
 IconButton#delete(icon="delete" label="Delete" data-tooltip-placement="bottom")
 TooltipHost

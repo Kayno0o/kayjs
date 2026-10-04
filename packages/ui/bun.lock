@@ -17,7 +17,7 @@
       },
       "peerDependencies": {
         "@iconify-json/tabler": "^1.2.41",
-        "kay": "^0.3.0",
+        "kay": "^0.4.0",
         "tailwindcss": "^4.3.3",
       },
     },

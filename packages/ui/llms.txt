@@ -6,16 +6,16 @@
 
 - Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`.
 - Components write no Tailwind utility, only the classes of `theme.css`. A rule of the app's on one of those classes restyles every instance; utilities passed through a component's `class` prop restyle one.
-- A static page cannot pass functions, `JSX.Element` props or children to an island. Render Dialog, Popover, or a Table with a `@cell` block from a component of the app that is an island itself: one with an `on*` handler, a `ref`, a `bind:` or a value import from `'kay'`.
+- A static page cannot pass functions, `JSX.Element` props or children to an island. Render Dialog, Popover, FormDialog, or a Table with a `@cell` or `@empty` block, a function `sortValue` or a function `rowKey` from a component of the app that is an island itself: one with an `on*` handler, a `ref`, a `bind:` or a value import from `'kay'`. The examples below are written as such components.
 - `toast` only shows in the browser, called from an island. The server's copy of the toast list is shared by every request, so it stays empty. Render one `Toaster` and one `TooltipHost` in the root layout.
 - An icon is either a slot name such as `'close'`, which the app's settings map to any icon set, or an icon imported from `~icons/<prefix>/<name>`. The default slots use Tabler, so the app installs `@iconify-json/tabler`.
-- Dialog and FormDialog follow `open`. The parent sets it, then sets it back to false in `onClose`, which runs however the dialog closed. Their content renders only while they are open.
+- Dialog and FormDialog follow `open`. The parent sets it, then sets it back to false in `onClose`, which runs however the dialog closed. Their content renders only while they are open. A Popover the page opens through `open` is set back the same way, in `onToggle`.
 - FormDialog calls the action with the form's `FormData`. The server reads it as a plain form post, so give each control the `name` of its field in the action's schema: numbers, booleans and lists are coerced from their text, and files and the honeypot come along.
 - Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The only text the library holds is the English wording of its own buttons and titles: `Cancel`, `Delete`, `Deleting…`, `Saving…`, `Loading…` and `Confirm Deletion`.
 
 ## Setup
 
-kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Tailwind v4 and `@iconify-json/tabler` are peer dependencies.
+kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay 0.4 or later, Tailwind v4 and `@iconify-json/tabler` are peer dependencies.
 
 ```sh
 bun add @kaynooo/kayjs-ui @iconify-json/tabler
@@ -37,8 +37,10 @@ The theme's tokens are `@theme default`, so the app's `@theme` overrides any of 
 
 - Surfaces, darkest first: `mantle`, `canvas`, `surface0`, `surface1`.
 - Hairlines: `surface2` and `overlay0`.
-- Text: `text`, `subtext0` and `muted`.
-- State: `accent`, `success`, `warning`, `info` and `error`.
+- Text: `text`, `overlay1` (the faintest), `subtext0` and `muted`.
+- State: `accent`, `accent-hi` (its hover), `on-accent` (text on it), `success`, `warning`, `info` and `error`.
+- Fills: `fill-hover`, `fill-danger` and `row-hover`.
+- Chart series: `chart-1` to `chart-6`.
 
 ```kay
 ---
@@ -75,7 +77,7 @@ export default settings
 
 ## Components
 
-Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle spreads them on its checkbox, and ConfirmDelete, FormField and FormDialog take none.
+Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle spreads them on its checkbox, Popover on its panel, and ConfirmDelete, FormField, FormDialog, Toaster and TooltipHost take none.
 
 ### Icon, Button, IconButton
 
@@ -112,12 +114,12 @@ Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
   input.field-input(name="name")
 ```
 
-- Dialog is a modal `dialog`. It closes when its parent sets `open` to false, on Escape, or on a click outside. `onClose(event)` runs however it closed, while its content is still there to read.
+- Dialog is a modal `dialog`. It closes when its parent sets `open` to false, on Escape, or on a click outside. `onClose(event)` runs however it closed. Closed by Escape or a click outside, its content is still there to read; closed by the parent, it is already gone. Its title names it for screen readers.
 - Once something has been typed inside, or while `dirty` is set (for example while a request is in flight), Escape and a click outside leave it open: only its own buttons close it.
 - `ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})` renders a trigger that opens a dialog asking before deleting:
   - While the promise `onConfirm` returns is pending, the dialog's buttons are disabled.
   - Once it resolves, the dialog closes. If it throws, `failure` is toasted and the dialog stays open.
-  - `trigger="button"` makes the trigger a labelled danger button rather than an icon. `label` renames the trigger, for "Revoke link" or "Empty trash"; `size`, `variant` and `class` go on it too.
+  - `trigger="button"` makes the trigger a labelled danger button rather than an icon. `label` renames the trigger, for "Revoke link" or "Empty trash", and `class` goes on it. `size` and `variant` style the icon trigger only.
 
 ### Table
 
@@ -141,13 +143,14 @@ Table(columns={columns} rows={posts} rowKey="id")
 
 - A column shows the row's value at `key` as text. With `cell: true`, it shows what the `@cell(row, column)` block draws instead.
 - A column with `sortValue` sorts when its header is clicked. `true` sorts by the row's value at `key`; a function sorts by what it returns.
-- The first click sorts in `defaultDirection`, `asc` unless set, and the next click flips it. `sort` gives the sort to start from.
+- The first click sorts in `defaultDirection`, `desc` unless set, and the next click flips it. `sort` gives the sort to start from.
 - `serverSort` leaves the rows in the order they came. The headers show the sort, and `onSort(sort)` lets the page fetch the rows sorted that way, from a load or an action.
+- With `sortValue: true`, dates sort by time, booleans as 0 and 1, and a missing value sorts last in either direction.
 - `rowKey` is a field of the row or a function of it, and tells rows apart across a sort.
 
 ### Segmented, TabNav, Toggle
 
-- `Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} value="day" label="Period" name="period" onChange={period.set})`: real radios, so arrow keys move between options and the group posts as `name` inside a form. A parent passing another `value` moves the choice.
+- `Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} value="day" label="Period" name="period" onChange={period.set})`: real radios, so arrow keys move between options and the group posts as `name` inside a form. A parent passing another `value` moves the choice. `name` is required for now, until kay gives components a unique id.
 - `TabNav(links={[{ href: '/settings', label: 'Profile' }, { href: '/settings/keys', label: 'Keys' }]} current={ctx.url.pathname} label="Settings")`: tabs as links, one page each. The current tab is marked `aria-current="page"`, and on a narrow screen it is scrolled into view.
 - `Toggle(label="Public" checked={post.public} name="public" onChange={setPublic})`: a checkbox drawn as a switch, with `role="switch"`, that posts like a checkbox. Without `label`, give it `aria-label`.
 
@@ -176,10 +179,10 @@ Popover(id="post-menu" placement="bottom-end")
   Button(label="Duplicate" onClick={duplicate})
 ```
 
-- Popover is the browser's popover. A click on the trigger toggles it, and a click outside or Escape closes it. `id` must be unique on the page, since it pairs the panel with its trigger.
+- Popover is the browser's popover. A click on the trigger toggles it, and a click outside or Escape closes it. `id` must be unique on the page, since it pairs the panel with its trigger, and made of letters, digits, `-` and `_`, since it also names the CSS anchor.
 - `@trigger(attributes)` renders the trigger, which spreads `attributes`: `popovertarget`, `aria-expanded` and its anchor.
 - `placement` is `bottom-start`, `bottom-end`, `top-start` or `top-end`, and the browser flips it when there is no room.
-- `open` opens or closes it from the page, and `onToggle(open)` runs however it changed.
+- `open` opens or closes it from the page, and `onToggle(open)` runs however it changed: a page driving `open` sets its own value back there, or it could not open the panel again after a click outside closed it.
 - TooltipHost shows the `data-tooltip` of whichever element the pointer or a tab lands on. `data-tooltip-placement`, a CSS `position-area`, says where it sits, `top` by default: `button(data-tooltip="Copy link" data-tooltip-placement="bottom")`. IconButton sets `data-tooltip` to its label.
 
 ## Forms
@@ -217,7 +220,7 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
 
 - FormDialog calls `action` with `new FormData(form)`, read on the server as a plain form post and answered as a call. An action that redirects takes the browser there instead.
 - When the action refuses a field, its message shows on the FormField with that `name`, and the dialog stays open.
-- Any other failure toasts `failure`. A refusal of the whole form, under the empty name, toasts its own message instead.
+- A refused message no FormField shows is toasted instead, a refusal of the whole form under the empty name included. A failure carrying no message toasts `failure`.
 - A save hands what the action returned to `onSaved`, then closes the dialog.
 - The submit button sits in the footer, paired with the form by `id`. The `id` defaults to one named after the action, so give one when two dialogs on a page call the same action.
 - Enter submits from a single-line field, and Ctrl+Enter from a textarea. While the call is under way, the buttons are disabled, and Escape or a click outside leaves the dialog open.
@@ -226,7 +229,8 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
 FormField also works outside a dialog, in a plain form posting to an action:
 
 - `issue` shows a message of the page's own, such as `ctx.failed(rename)?.errors.title`.
-- `hint` explains the control, under it. `action` sits at the end of the label's line. `required` marks the label.
+- `hint` explains the control, under it. `action` sits at the end of the label's line. `required` marks the label with a `*` hidden from screen readers, which read the control's own `required`.
+- The label holds only the label's text and the control, so the hint, the messages and the action stay out of the control's accessible name.
 - `group` makes it a `fieldset` with a `legend`, for a control made of several inputs.
 - Its messages sit in an `aria-live` region, so a screen reader reads them as they appear.
 

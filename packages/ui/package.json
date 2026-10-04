@@ -16,6 +16,7 @@
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/",
     "access": "restricted"
   },
+  "sideEffects": false,
   "kay": {
     "settings": "./src/settings.ts"
   },
@@ -34,7 +35,7 @@
     "bun": ">=1.4.2"
   },
   "scripts": {
-    "postinstall": "bun scripts/link-fixture.ts",
+    "prepare": "bun scripts/link-fixture.ts",
     "check": "tsgo --noEmit",
     "lint": "keslint --cache",
     "lint:fix": "keslint --fix --cache",
@@ -43,7 +44,7 @@
   },
   "peerDependencies": {
     "@iconify-json/tabler": "^1.2.41",
-    "kay": "^0.3.0",
+    "kay": "^0.4.0",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {

@@ -30,6 +30,7 @@ describe('Dialog', () => {
 
     expect(dialog.open).toBe(true)
     expect(dialog.querySelector('.dialog-title')?.textContent).toBe('Rename')
+    expect(dialog.getAttribute('aria-label')).toBe('Rename')
     expect(dialog.querySelector('.dialog-footer #cancel')).not.toBeNull()
 
     click(root.querySelector('#cancel'))
@@ -105,5 +106,17 @@ describe('ConfirmDelete', () => {
     expect(dialog.open).toBe(true)
     expect([...dialog.querySelectorAll('button')].map(button => button.disabled)).toEqual([false, false])
     expect(root.querySelector('.toast-message')?.textContent).toBe('Could not delete')
+  })
+
+  test('takes a labelled danger button as its trigger, for a delete known by another name', async () => {
+    const root = await dialogs()
+    const trigger = root.querySelector('.revoke')!
+
+    expect([trigger.tagName, trigger.className, trigger.textContent]).toEqual(['BUTTON', 'btn btn-danger revoke', 'Revoke link'])
+
+    click(trigger)
+    await settle()
+
+    expect(root.querySelectorAll<HTMLDialogElement>('dialog')[2]?.open).toBe(true)
   })
 })

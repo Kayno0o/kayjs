@@ -1,6 +1,7 @@
 --- <Output>
 import type { Action, Failure, JSX } from 'kay'
-import { ActionError, signal } from 'kay'
+import { ActionError, effect, signal } from 'kay'
+import Button from './button.kay'
 import Dialog from './dialog.kay'
 import { formIssues } from './forms'
 import { toast } from './toast'
@@ -33,10 +34,15 @@ let form: HTMLFormElement | undefined
 
 formIssues.provide(issues)
 
-// The dialog drops its content once closed, which empties the form; its messages are cleared too, so the next open starts afresh.
-function close() {
-  issues.set({})
-  onClose()
+// The dialog drops its content once closed, which empties the form; however it closed, its messages are cleared too, so the next open starts afresh.
+effect(() => {
+  if (!open)
+    issues.set({})
+})
+
+// Whether a FormField of the form shows the messages refused for `name`.
+function shown(name: string) {
+  return [...form?.querySelectorAll('[data-field]') ?? []].some(field => field.getAttribute('data-field') === name)
 }
 
 async function submit(event: SubmitEvent) {
@@ -51,20 +57,21 @@ async function submit(event: SubmitEvent) {
     result = await action(new FormData(form))
   }
   catch (error) {
-    const refused = error instanceof ActionError ? error.errors : {}
+    const refused: Record<string, string> = error instanceof ActionError ? error.errors : {}
+    const messages = Object.entries(refused)
 
     issues.set(refused)
 
-    // A limit or a refusal of the whole form says so under the empty name; anything else is the page's own message.
-    if (Object.keys(refused).length === 0 || refused[''] !== undefined)
-      toast.error(refused[''] ?? failure)
+    // A message no FormField shows, such as a limit or a refusal of the whole form under the empty name, is toasted rather than lost; a failure carrying none toasts the page's own message.
+    for (const message of messages.length === 0 ? [failure] : messages.filter(([name]) => !shown(name)).map(([, message]) => message))
+      toast.error(message)
 
     return
   }
 
   // Outside the `try`, so a page failing to patch the saved result in surfaces as the bug it is rather than as a refused save.
   onSaved?.(result)
-  close()
+  onClose()
 }
 
 // Enter in a single-line field submits on its own; a textarea keeps Enter for new lines and takes Ctrl+Enter.
@@ -77,12 +84,12 @@ function submitOnCtrlEnter(event: KeyboardEvent) {
 }
 ---
 // Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
-Dialog(open={open} title={title} dirty={action.pending()} class={className} onClose={() => open && close()})
+Dialog(open={open} title={title} dirty={action.pending()} class={className} onClose={() => open && onClose()})
   @footer
     .form-dialog-footer
       | {extra}
       .form-dialog-actions
-        button.btn(type="button" disabled={action.pending()} onClick={close}) Cancel
-        button.btn.btn-accent(type="submit" form={formId} disabled={action.pending()}) {action.pending() ? 'Saving…' : submitLabel}
+        Button(label="Cancel" disabled={action.pending()} onClick={() => onClose()})
+        Button(label={action.pending() ? 'Saving…' : submitLabel} type="submit" form={formId} variant="accent" busy={action.pending()} disabled={action.pending()})
   form.form-grid(id={formId} ref={element => form = element} onSubmit={submit} onKeyDown={submitOnCtrlEnter})
     slot

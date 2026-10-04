@@ -11,7 +11,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 ---
 main
   form#form(action={rename})
-    #field
+    section#field
       FormField(label="Name" hint="As it shows on the site" issue={failure?.errors.name} required)
         input(name="name" value={failure?.values.name})
     button Rename

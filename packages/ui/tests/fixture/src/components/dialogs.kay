@@ -15,4 +15,5 @@ Dialog#dialog(open={open()} title="Rename" dirty={dirty} onClose={() => { open.s
     button#cancel.btn(onClick={() => open.set(false)}) Cancel
   input#name(name="name")
 ConfirmDelete(message="Delete this?" failure="Could not delete" onConfirm={onDelete})
+ConfirmDelete(message="Revoke this link?" failure="Could not revoke" onConfirm={onDelete} trigger="button" label="Revoke link" class="revoke")
 Toaster

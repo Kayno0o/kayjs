@@ -1,5 +1,6 @@
 ---
 import { signal } from 'kay'
+import Button from './button.kay'
 import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
 import { attempt } from './toast'
@@ -14,6 +15,7 @@ const { message, onConfirm, failure, trigger = 'icon', label = 'Delete', size, v
   trigger?: 'icon' | 'button'
   // What the trigger says, for a delete the reader knows by another name: "Empty trash", "Revoke link".
   label?: string
+  // The icon trigger's size and look; the button trigger is always a danger button.
   size?: 'xs' | 'sm' | 'md' | 'lg'
   variant?: 'solid' | 'ghost' | 'inline' | 'danger'
   // Goes on the trigger.
@@ -39,11 +41,11 @@ async function confirm() {
 }
 ---
 if trigger === 'button'
-  button.btn.btn-danger(type="button" class={className} onClick={() => open.set(true)}) {label}
+  Button(label={label} variant="danger" class={className} onClick={() => open.set(true)})
 else
   IconButton(icon="delete" label={label} size={size} variant={variant} class={className} onClick={() => open.set(true)})
 Dialog(open={open()} title="Confirm Deletion" dirty={pending()} onClose={() => open.set(false)})
   @footer
-    button.btn(type="button" disabled={pending()} onClick={() => open.set(false)}) Cancel
-    button.btn.btn-danger(type="button" disabled={pending()} onClick={confirm}) {pending() ? 'Deleting…' : 'Delete'}
+    Button(label="Cancel" disabled={pending()} onClick={() => open.set(false)})
+    Button(label={pending() ? 'Deleting…' : 'Delete'} variant="danger" busy={pending()} disabled={pending()} onClick={confirm})
   p.confirm-delete-message {message}

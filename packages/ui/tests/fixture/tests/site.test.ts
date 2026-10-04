@@ -116,7 +116,7 @@ describe('FormField', () => {
   test('labels its control with what it takes, and shows the message a plain form post was refused with', async () => {
     const field = (await element('/form', 'field')).replaceAll(/<!--[^>]*-->/g, '')
 
-    expect(field).toBe('<div id="field"><label class="form-field"><span class="form-field-head"><span class="label-text">Name<span class="form-field-required">*</span></span></span><input name="name"><span class="form-field-hint">As it shows on the site</span><span class="form-field-issues" aria-live="polite"></span></label></div>')
+    expect(field).toBe('<section id="field"><div class="form-field"><label class="form-field-label"><span class="form-field-head"><span class="label-text">Name<span class="form-field-required" aria-hidden="true">*</span></span></span><input name="name"></label><span class="form-field-hint">As it shows on the site</span><span class="form-field-issues" aria-live="polite"></span></div></section>')
 
     const { rename } = await import('../src/routes/form.kay')
     const refused = await site.submit(rename, { name: 'A' }, { from: '/form' })

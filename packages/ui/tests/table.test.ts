@@ -20,6 +20,24 @@ describe('sortedRows', () => {
   })
 })
 
+test('sortValue: true sorts dates by time and booleans as numbers, and missing values last either way', () => {
+  interface Launch { name: string, at: Date | null, crewed: boolean }
+
+  const launches: Launch[] = [
+    { name: 'Gemini', at: new Date('1965-03-23'), crewed: true },
+    { name: 'Sputnik', at: null, crewed: false },
+    { name: 'Apollo', at: new Date('1968-10-11'), crewed: true },
+    { name: 'Luna', at: new Date('1959-01-02'), crewed: false },
+  ]
+  const at: Column<Launch> = { key: 'at', header: 'At', sortValue: true }
+  const crewed: Column<Launch> = { key: 'crewed', header: 'Crewed', sortValue: true }
+  const names = (sort: Parameters<typeof sortedRows>[2]) => sortedRows(launches, [at, crewed], sort).map(launch => launch.name)
+
+  expect(names({ key: 'at', direction: 'asc' })).toEqual(['Luna', 'Gemini', 'Apollo', 'Sputnik'])
+  expect(names({ key: 'at', direction: 'desc' })).toEqual(['Apollo', 'Gemini', 'Luna', 'Sputnik'])
+  expect(names({ key: 'crewed', direction: 'desc' })).toEqual(['Gemini', 'Apollo', 'Sputnik', 'Luna'])
+})
+
 test('nextSort flips a sorted column and starts another on its default direction', () => {
   expect(nextSort({ key: 'name', direction: 'desc' }, name)).toEqual({ key: 'name', direction: 'asc' })
   expect(nextSort({ key: 'name', direction: 'desc' }, moons)).toEqual({ key: 'moons', direction: 'asc' })

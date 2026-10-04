@@ -29,7 +29,9 @@ const rename = Object.assign(async (form: FormData) => {
 }, { pending, url: '/_kay/action/form/rename' }) as unknown as Action<{ name: string }, string>
 ---
 button#open(onClick={() => open.set(true)}) Open
+button#hide(onClick={() => open.set(false)}) Hide
 FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" onSaved={onSaved} onClose={() => open.set(false)})
   FormField(label="Name" name="name")
     input#name(name="name" value="Ada")
+  textarea#notes(name="notes")
 Toaster

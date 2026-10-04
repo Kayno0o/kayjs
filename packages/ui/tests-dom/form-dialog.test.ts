@@ -69,6 +69,44 @@ describe('FormDialog', () => {
     expect(root.querySelector('.form-field-issue')).toBeNull()
   })
 
+  test('toasts a message no FormField shows, the whole form\'s included, and clears every message however it closed', async () => {
+    const root = await formDialog(async () => ({ errors: { 'name': 'Taken', 'notes': 'Too long', '': 'Slow down' } }))
+
+    submit(root)
+    await settle()
+
+    expect(root.querySelector('.form-field-issue')?.textContent).toBe('Taken')
+    expect([...root.querySelectorAll('.toast-message')].map(toast => toast.textContent).slice(-2)).toEqual(['Too long', 'Slow down'])
+
+    click(root.querySelector('#hide'))
+    await settle()
+    click(root.querySelector('#open'))
+    await settle()
+
+    expect(root.querySelector('.form-field')).not.toBeNull()
+    expect(root.querySelector('.form-field-issue')).toBeNull()
+  })
+
+  test('submits on Ctrl+Enter from a textarea, which keeps a plain Enter for new lines', async () => {
+    let calls = 0
+    const root = await formDialog(async () => {
+      calls++
+
+      return 'Ada'
+    })
+    const notes = root.querySelector('#notes')!
+
+    notes.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await settle()
+
+    expect(calls).toBe(0)
+
+    notes.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }))
+    await settle()
+
+    expect(calls).toBe(1)
+  })
+
   test('toasts a call that failed outright and disables its buttons while one is under way', async () => {
     const { promise, reject } = Promise.withResolvers<string>()
     const root = await formDialog(async () => promise)
@@ -81,7 +119,7 @@ describe('FormDialog', () => {
     reject(new Error('offline'))
     await settle()
 
-    expect(root.querySelector('.toast-message')?.textContent).toBe('Could not rename')
+    expect([...root.querySelectorAll('.toast-message')].at(-1)?.textContent).toBe('Could not rename')
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
   })
 })

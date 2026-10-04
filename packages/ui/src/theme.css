@@ -435,7 +435,11 @@
   }
 
   .form-field {
-    @apply flex w-full flex-col gap-1;
+    @apply relative flex w-full flex-col gap-1;
+  }
+
+  .form-field-label {
+    @apply flex flex-col gap-1;
   }
 
   .form-field
@@ -456,8 +460,9 @@
     @apply flex flex-wrap items-center gap-2;
   }
 
+  /* Held on the label's line, outside the label. */
   .form-field-action {
-    @apply ml-auto flex flex-wrap items-center gap-1.5;
+    @apply absolute top-0 right-0 flex flex-wrap items-center gap-1.5;
   }
 
   .form-field-required {

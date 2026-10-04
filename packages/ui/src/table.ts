@@ -42,6 +42,20 @@ export function cellText<Row>(row: Row, column: Column<Row>): string {
   return value === undefined || value === null ? '' : String(value)
 }
 
+// The row's own value as `sortValue: true` sorts it: a date by its time, a boolean as 0 or 1, and nothing for a missing value, which sorts last either way.
+function sortable(value: unknown): string | number | undefined {
+  if (value === undefined || value === null)
+    return undefined
+
+  if (value instanceof Date)
+    return value.getTime()
+
+  if (typeof value === 'boolean')
+    return Number(value)
+
+  return typeof value === 'number' ? value : String(value)
+}
+
 export function sortedRows<Row>(rows: Row[], columns: Column<Row>[], sort: SortState | undefined): Row[] {
   const column = sort && columns.find(item => item.key === sort.key)
 
@@ -49,10 +63,18 @@ export function sortedRows<Row>(rows: Row[], columns: Column<Row>[], sort: SortS
     return rows
 
   const { sortValue } = column
-  const value = sortValue === true ? (row: Row) => valueAt(row, column.key) as string | number : sortValue
+  const value = sortValue === true ? (row: Row) => sortable(valueAt(row, column.key)) : sortValue
   const factor = sort.direction === 'asc' ? 1 : -1
 
-  return [...rows].sort((a, b) => factor * compareValues(value(a), value(b)))
+  return [...rows].sort((a, b) => {
+    const first = value(a)
+    const second = value(b)
+
+    if (first === undefined || second === undefined)
+      return Number(first === undefined) - Number(second === undefined)
+
+    return factor * compareValues(first, second)
+  })
 }
 
 // The sort a click on `column`'s header leads to: its other direction when it already sorts the table, its default one otherwise.

@@ -8,7 +8,7 @@ const { open, title, dirty = false, onClose, footer, class: className, ...rest }
   title: string
   // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own.
   dirty?: boolean
-  // Called however the dialog closes, a click outside and Escape included, while its content is still there to read.
+  // Called however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
   onClose: (event: Event) => void
   footer?: JSX.Element
   class?: string
@@ -35,7 +35,8 @@ function closed(event: Event) {
   edited.set(false)
 }
 ---
-dialog.dialog({...rest} ref={element => dialog = element} closedby={dirty || edited() ? 'none' : 'any'} onInput={() => edited.set(true)} onClose={closed} class={className})
+// Named by its title for screen readers, which announce the dialog as it opens.
+dialog.dialog(aria-label={title} {...rest} ref={element => dialog = element} closedby={dirty || edited() ? 'none' : 'any'} onInput={() => edited.set(true)} onClose={closed} class={className})
   if open
     h3.dialog-title {title}
     .dialog-body
