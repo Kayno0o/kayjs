@@ -10,6 +10,7 @@ import { check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
 import { loadConfig } from './config'
 import { writeContentManifests } from './content/server'
+import { ContentError } from './content/validate'
 import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
@@ -171,7 +172,7 @@ async function build(args: string[]): Promise<number> {
     return 0
   }
   catch (error) {
-    console.error(error instanceof KayCompileError ? error.message.trimStart() : error)
+    console.error(error instanceof KayCompileError || error instanceof ContentError ? error.message.trimStart() : error)
 
     return 1
   }

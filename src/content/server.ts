@@ -13,16 +13,23 @@ import { ContentError, decodeEntries } from './validate'
 // The module declaring a project's collections, which `kay build`, `kay check` and the server read them from.
 export const CONTENT_CONFIG = 'src/content.config.ts'
 
-// The collections the project's content config exports, or none without one; their folders are relative to it.
-export async function projectCollections(root: string, config = CONTENT_CONFIG): Promise<Collection<unknown>[]> {
-  const file = resolve(root, config)
+// Starts the line `kay check` reads the content problems from.
+export const PROBLEMS_MARKER = 'kay-content-problems:'
+
+// The collections the project's content config exports, or none without the default one; their folders are relative to it.
+export async function projectCollections(root: string, config?: string): Promise<Collection<unknown>[]> {
+  const file = resolve(root, config ?? CONTENT_CONFIG)
 
   setContentPlace(root, dirname(file))
 
   const bundle = bundled()
 
-  if (bundle ? !(file in bundle.modules) : !existsSync(file))
+  if (bundle ? !(file in bundle.modules) : !existsSync(file)) {
+    if (config !== undefined && !bundle)
+      throw new Error(`kay: kay.config.ts names ${config} as the content config, and there is no such file`)
+
     return []
+  }
 
   // Its components are `.kay` files.
   if (!bundle)

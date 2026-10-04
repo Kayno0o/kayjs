@@ -12,6 +12,14 @@ export interface ComponentSegment {
   component: string
   props: Record<string, unknown>
   children: Segment[]
+  // Where its tag sits in the file, for the error naming a component the collection lacks.
+  line: number
+}
+
+interface ExtractedComponent {
+  name: string
+  props: Record<string, unknown>
+  line: number
 }
 
 export type Segment = string | ComponentSegment
@@ -32,8 +40,11 @@ const COMPONENT_TAG = /<(\/?)([A-Z][\w.]*)((?:[\s/](?:[^>"'{}]|"[^"]*"|'[^']*'|\
 const SELF_CLOSING = /\/\s*$/
 const PLACEHOLDER = 'kay-component'
 const PLACEHOLDER_TAG = /<kay-component n="(\d+)" \/>|<kay-component n="(\d+)">|<\/kay-component>/g
-// A fenced code block's opening or closing line.
-const FENCE = /^ {0,3}(`{3,}|~{3,})/
+// A fenced code block's opening line, and its closing one, which carries no info string.
+const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/
+const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})\s*$/
+const INDENTED = /^(?: {4}|\t)/
+const BLANK = /^\s*$/
 const ATTRIBUTE_NAME = /^[A-Z_][\w:-]*/i
 const TAGS = /<[^>]*>/g
 const SPACE = /\s/
@@ -83,89 +94,149 @@ async function highlighted(html: string, highlight: Highlighter): Promise<string
 }
 
 // The body with each component tag outside code replaced by a placeholder, and the components in the order their tags open.
-function extractComponents(body: string, bodyLine: number): { text: string, components: { name: string, props: Record<string, unknown> }[] } {
-  const components: { name: string, props: Record<string, unknown> }[] = []
+// Tags are read per paragraph-like block, so one may spread its attributes over several lines; fenced and indented code blocks pass through.
+function extractComponents(body: string, bodyLine: number): { text: string, components: ExtractedComponent[] } {
+  const components: ExtractedComponent[] = []
   const open: { name: string, line: number }[] = []
+  const out: string[] = []
   let fence: string | undefined
+  let indentedCode = false
+  let afterBlank = true
+  let block: { start: number, lines: string[] } | undefined
 
-  const lines = body.split('\n').map((line, index) => {
-    const marker = FENCE.exec(line)?.[1]
+  const flush = () => {
+    if (block)
+      out.push(replaceTags(block.lines.join('\n'), bodyLine + block.start, components, open))
 
-    if (marker !== undefined && (fence === undefined || (marker[0] === fence[0] && marker.length >= fence.length))) {
-      fence = fence === undefined ? marker : undefined
+    block = undefined
+  }
 
-      return line
+  for (const [index, line] of body.split('\n').entries()) {
+    if (fence !== undefined) {
+      const closing = FENCE_CLOSE.exec(line)?.[1]
+
+      if (closing !== undefined && closing[0] === fence[0] && closing.length >= fence.length)
+        fence = undefined
+
+      out.push(line)
+
+      continue
     }
 
-    if (fence !== undefined)
-      return line
+    if (indentedCode && (INDENTED.test(line) || BLANK.test(line))) {
+      out.push(line)
 
-    const at = bodyLine + index
+      continue
+    }
 
-    return outsideCodeSpans(line, part => part.replace(COMPONENT_TAG, (_tag, closing: string, name: string, inside = '') => {
-      if (closing) {
-        const opened = open.pop()
+    indentedCode = false
 
-        if (opened?.name !== name)
-          throw new MarkdownError(`</${name}> closes ${opened === undefined ? 'no component' : `<${opened.name}>, opened on line ${opened.line}`}`, at)
+    const opening = FENCE_OPEN.exec(line)?.[1]
 
-        return `</${PLACEHOLDER}>`
-      }
+    if (opening !== undefined) {
+      flush()
+      fence = opening
+      out.push(line)
+      afterBlank = false
 
-      const selfClosing = SELF_CLOSING.test(inside)
+      continue
+    }
 
-      components.push({ name, props: readAttributes(selfClosing ? inside.replace(SELF_CLOSING, '') : inside, name, at) })
+    if (BLANK.test(line)) {
+      flush()
+      out.push(line)
+      afterBlank = true
 
-      if (selfClosing)
-        return `<${PLACEHOLDER} n="${components.length - 1}" />`
+      continue
+    }
 
-      open.push({ name, line: at })
+    // An indented code block starts after a blank line, never inside a paragraph.
+    if (afterBlank && block === undefined && INDENTED.test(line)) {
+      indentedCode = true
+      out.push(line)
 
-      return `<${PLACEHOLDER} n="${components.length - 1}">`
-    }))
-  })
+      continue
+    }
+
+    afterBlank = false
+    block ??= { start: index, lines: [] }
+    block.lines.push(line)
+  }
+
+  flush()
 
   const unclosed = open.at(-1)
 
   if (unclosed)
     throw new MarkdownError(`<${unclosed.name}> is never closed: end it with </${unclosed.name}>, or write <${unclosed.name} />`, unclosed.line)
 
-  return { text: lines.join('\n'), components }
+  return { text: out.join('\n'), components }
 }
 
-// Applies `edit` to the parts of a line between its code spans, which stay as written.
-function outsideCodeSpans(line: string, edit: (part: string) => string): string {
+// The block with its component tags, outside code spans, swapped for placeholders.
+function replaceTags(text: string, startLine: number, components: ExtractedComponent[], open: { name: string, line: number }[]): string {
+  return outsideCodeSpans(text, (part, offset) => part.replace(COMPONENT_TAG, (tag: string, closing: string, name: string, inside = '', at: number) => {
+    const line = startLine + lineOf(text, offset + at) - 1
+
+    if (closing) {
+      const opened = open.pop()
+
+      if (opened?.name !== name)
+        throw new MarkdownError(`</${name}> closes ${opened === undefined ? 'no component' : `<${opened.name}>, opened on line ${opened.line}`}`, line)
+
+      return `</${PLACEHOLDER}>`
+    }
+
+    const selfClosing = SELF_CLOSING.test(inside)
+
+    components.push({ name, props: readAttributes(selfClosing ? inside.replace(SELF_CLOSING, '') : inside, name, line), line })
+
+    if (selfClosing)
+      return `<${PLACEHOLDER} n="${components.length - 1}" />`
+
+    open.push({ name, line })
+
+    return `<${PLACEHOLDER} n="${components.length - 1}">`
+  }))
+}
+
+// Applies `edit` to the parts of the text between its code spans, which stay as written, giving each part's offset.
+function outsideCodeSpans(text: string, edit: (part: string, offset: number) => string): string {
   let result = ''
   let index = 0
 
-  while (index < line.length) {
-    const tick = line.indexOf('`', index)
+  while (index < text.length) {
+    const tick = text.indexOf('`', index)
 
     if (tick === -1)
       break
 
     let run = tick
 
-    while (line[run] === '`')
+    while (text[run] === '`')
       run++
 
-    const ticks = line.slice(tick, run)
-    const close = line.indexOf(ticks, run)
+    const ticks = text.slice(tick, run)
+    const close = text.indexOf(ticks, run)
 
     // An unmatched run is text, as Markdown reads it.
-    if (close === -1)
-      break
+    if (close === -1) {
+      result += edit(text.slice(index, run), index)
+      index = run
 
-    result += edit(line.slice(index, tick)) + line.slice(tick, close + ticks.length)
+      continue
+    }
+
+    result += edit(text.slice(index, tick), index) + text.slice(tick, close + ticks.length)
     index = close + ticks.length
   }
 
-  return result + edit(line.slice(index))
+  return result + edit(text.slice(index), index)
 }
 
 // The rendered HTML cut at each placeholder into a tree of components.
-function componentSegments(html: string, components: { name: string, props: Record<string, unknown> }[]): Segment[] {
-  const root: ComponentSegment = { component: '', props: {}, children: [] }
+function componentSegments(html: string, components: ExtractedComponent[]): Segment[] {
+  const root: ComponentSegment = { component: '', props: {}, children: [], line: 0 }
   const open: ComponentSegment[] = [root]
   let last = 0
 
@@ -184,8 +255,13 @@ function componentSegments(html: string, components: { name: string, props: Reco
       continue
     }
 
-    const { name, props } = components[Number(selfClosing ?? opening)]!
-    const segment: ComponentSegment = { component: name, props, children: [] }
+    const found = components[Number(selfClosing ?? opening)]
+
+    // Only a placeholder written into the body by hand has no component behind it.
+    if (!found)
+      throw new MarkdownError(`the body writes <${PLACEHOLDER}> itself, which kay keeps for components`, 1)
+
+    const segment: ComponentSegment = { component: found.name, props: found.props, children: [], line: found.line }
 
     parent.children.push(segment)
 

@@ -53,7 +53,9 @@ describe('Markdown entries', () => {
 
     expect(second?.data).toEqual({ title: 'Second post', date: new Date('2026-09-15'), tags: [] })
     expect(second?.file).toBe('tests/fixtures/content/src/content/posts/second.md')
-    expect((await posts.all()).map(post => post.slug)).toEqual(['draft', 'second', 'hello'])
+    // A draft only shows in `kay dev`.
+    expect((await posts.all()).map(post => post.slug)).toEqual(['second', 'hello'])
+    expect(await posts.get('draft')).toBeUndefined()
   })
 })
 
@@ -77,8 +79,9 @@ describe('feeds', () => {
     expect(xml).toContain('<entry><title>A &lt;b>bold&lt;/b> move</title><link href="https://x.example/a"/><id>https://x.example/a</id><updated>2026-01-02T00:00:00.000Z</updated></entry>')
   })
 
-  it('need the site\'s URL', async () => {
-    expect(pages({ routes, content, prebuilt: false })).rejects.toThrow('has a feed, whose links need the site\'s URL')
+  it('need the site\'s URL, and a content config kay.config.ts names must exist', async () => {
+    await expect(pages({ routes, content: 'tests/fixtures/content/src/missing.config.ts', prebuilt: false })).rejects.toThrow('names tests/fixtures/content/src/missing.config.ts as the content config, and there is no such file')
+    await expect(pages({ routes, content, prebuilt: false })).rejects.toThrow('has a feed, whose links need the site\'s URL')
   })
 })
 
@@ -89,9 +92,9 @@ describe('prerendering a collection', () => {
 
     try {
       expect(await writeContentManifests(root, join(root, '.kay/client'), content)).toBe(5)
-      expect(await prerenderPages(root, { routes, content }, (await readClient(root))!)).toBe(3)
+      expect(await prerenderPages(root, { routes, content }, (await readClient(root))!)).toBe(2)
       expect(await Bun.file(join(root, '.kay/client/pages/blog/hello.html')).text()).toContain('<h1 class="title">Hello world</h1>')
-      expect(await Bun.file(join(root, '.kay/client/pages/blog/draft.html')).exists()).toBe(true)
+      expect(await Bun.file(join(root, '.kay/client/pages/blog/draft.html')).exists()).toBe(false)
     }
     finally {
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
@@ -115,7 +118,7 @@ describe('kay check', () => {
       const diagnostics = (await check(FIXTURE)).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
 
       expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 3, message: expect.stringContaining('date: ') })
-      expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 1, message: 'uses <Missing>, which the collection\'s components do not name' })
+      expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 6, message: 'uses <Missing>, which the collection\'s components do not name' })
       expect(diagnostics.some(diagnostic => diagnostic.file === `${FIXTURE}/src/routes/typo.kay` && diagnostic.message.includes('titel'))).toBe(true)
     }
     finally {
@@ -129,7 +132,7 @@ describe('compiling Markdown', () => {
   it('reads component attributes as text, JSON or a bare true', async () => {
     const { segments } = await compileMarkdown('<Chart title="Sales &amp; costs" data={[1, {"a": "}"}]} wide />\n', 1)
 
-    expect(segments).toEqual([{ component: 'Chart', props: { title: 'Sales & costs', data: [1, { a: '}' }], wide: true }, children: [] }, '\n'])
+    expect(segments).toEqual([{ component: 'Chart', props: { title: 'Sales & costs', data: [1, { a: '}' }], wide: true }, children: [], line: 1 }, '\n'])
   })
 
   it('leaves a tag written in code alone, and refuses one never closed at its line', async () => {
@@ -139,8 +142,30 @@ describe('compiling Markdown', () => {
 
     const unclosed = compileMarkdown('Intro\n\n<Callout type="warn">\n\nBody\n', 5)
 
-    expect(unclosed).rejects.toBeInstanceOf(MarkdownError)
-    expect(unclosed).rejects.toMatchObject({ line: 7, message: '<Callout> is never closed: end it with </Callout>, or write <Callout />' })
+    await expect(unclosed).rejects.toBeInstanceOf(MarkdownError)
+    await expect(unclosed).rejects.toMatchObject({ line: 7, message: '<Callout> is never closed: end it with </Callout>, or write <Callout />' })
+  })
+
+  it('leaves tags in fenced and indented code alone, and reads one spread over several lines', async () => {
+    const { segments } = await compileMarkdown('Intro\n\n    <Callout type="x">\n\n```md\n<Callout>\n```\n\n<Callout\n  type="warn">\n\nIn\n\n</Callout>\n', 1)
+
+    expect(segments[0]).toBe('<p>Intro</p>\n<pre><code>&lt;Callout type=&quot;x&quot;&gt;\n</code></pre>\n<pre><code class="language-md">&lt;Callout&gt;\n</code></pre>\n')
+    expect(segments[1]).toEqual({ component: 'Callout', props: { type: 'warn' }, children: ['\n<p>In</p>\n'], line: 9 })
+  })
+
+  it('refuses two files with one slug, naming both', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-content-'))
+
+    try {
+      setContentPlace(dir, dir)
+      await Bun.write(join(dir, 'guides/index.md'), 'Guides\n')
+      await Bun.write(join(dir, 'guides.md'), 'Also guides\n')
+      await expect(collection('.', { schema: t.Object({}) }).all()).rejects.toThrow(/has the slug guides, as .*guides.* does; rename one/)
+    }
+    finally {
+      setContentPlace(process.cwd(), join(process.cwd(), FIXTURE, 'src'))
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('compiles each entry once, keyed by its content, so a change recompiles that entry only', async () => {

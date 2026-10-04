@@ -1,5 +1,6 @@
 import type { Heading, Highlighter, Segment } from './markdown'
-import { mkdir } from 'node:fs/promises'
+import type { ContentProblem } from './validate'
+import { mkdir, rename } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { bundled } from '../server/bundle'
@@ -19,14 +20,15 @@ export interface RawEntry {
 }
 
 // Under `.kay/client`, beside the build's other output, and embedded with it in an executable.
-export const CONTENT_DIR = 'content'
+const CONTENT_DIR = 'content'
+const READ_BATCH = 64
 const ENTRY_FILES = new Bun.Glob('**/*.{md,json,yaml,yml}')
 const EXTENSION = /\.(?:md|json|ya?ml)$/
 const INDEX = /(?:^|\/)index$/
 const BACKSLASH = /\\/g
 const TOP_LEVEL_FIELD = /^["']?([\w$-]+)["']?\s*:/
 // Bumped whenever what an entry compiles to changes shape, so no cache from before is read.
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2
 
 let place: { root: string, base: string } | undefined
 
@@ -81,40 +83,73 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
   const root = rootOf()
   const absolute = resolve(baseOf(), dir)
   const cacheDir = join(root, '.kay', 'cache', 'content')
-  // A highlighter changing its theme changes the output, so its source is part of every key.
-  const salt = `${CACHE_VERSION}:${highlight?.toString() ?? ''}`
-  const files = await Array.fromAsync(ENTRY_FILES.scan({ cwd: absolute, onlyFiles: true }))
-  const problems: ContentError['problems'] = []
+  // Bun's Markdown output and the highlighter's source are part of every key; a highlighter whose output changes with no change to its source, such as a new theme passed in, needs the cache cleared.
+  const salt = `${CACHE_VERSION}:${Bun.version}:${highlight?.toString() ?? ''}`
+  const files = (await Array.fromAsync(ENTRY_FILES.scan({ cwd: absolute, onlyFiles: true }))).sort()
+  const problems: ContentProblem[] = []
+  const entries: RawEntry[] = []
 
   await mkdir(cacheDir, { recursive: true })
 
-  const entries = await Promise.all(files.sort().map(async (name) => {
-    const path = join(absolute, name)
-    const file = relative(root, path).split(sep).join('/')
-    const source = await Bun.file(path).text()
-    const cached = Bun.file(join(cacheDir, `${Bun.hash(`${salt}:${file}:${source}`).toString(36)}.json`))
+  // A few files at a time, so a large collection never opens them all at once.
+  for (let start = 0; start < files.length; start += READ_BATCH) {
+    entries.push(...(await Promise.all(files.slice(start, start + READ_BATCH).map(async (name) => {
+      const path = join(absolute, name)
+      const file = relative(root, path).split(sep).join('/')
+      const source = await Bun.file(path).text()
+      const cacheFile = join(cacheDir, `${Bun.hash(`${salt}:${file}:${source}`).toString(36)}.json`)
+      const cached = await readCached(cacheFile)
 
-    if (await cached.exists())
-      return await cached.json() as RawEntry
+      if (cached)
+        return cached
 
-    try {
-      const entry = await compileEntry(name.split(sep).join('/'), file, source, highlight)
+      try {
+        const entry = await compileEntry(name.split(sep).join('/'), file, source, highlight)
 
-      await Bun.write(cached, JSON.stringify(entry))
+        await writeAtomically(cacheFile, JSON.stringify(entry))
 
-      return entry
-    }
-    catch (error) {
-      problems.push({ file, line: error instanceof MarkdownError ? error.line : 1, message: error instanceof Error ? error.message : String(error) })
+        return entry
+      }
+      catch (error) {
+        problems.push({ file, line: error instanceof MarkdownError ? error.line : 1, message: error instanceof Error ? error.message : String(error) })
 
-      return undefined
-    }
-  }))
+        return undefined
+      }
+    }))).filter(entry => entry !== undefined))
+  }
+
+  const bySlug = new Map<string, RawEntry>()
+
+  for (const entry of entries) {
+    const taken = bySlug.get(entry.slug)
+
+    if (taken)
+      problems.push({ file: entry.file, line: 1, message: `has the slug ${entry.slug}, as ${taken.file} does; rename one` })
+
+    bySlug.set(entry.slug, entry)
+  }
 
   if (problems.length > 0)
     throw new ContentError(problems)
 
-  return entries.filter(entry => entry !== undefined)
+  return entries
+}
+
+// A cache file that is missing or unreadable, such as one a crash left half written, is a miss.
+async function readCached(file: string): Promise<RawEntry | undefined> {
+  try {
+    return await Bun.file(file).json() as RawEntry
+  }
+  catch {
+    return undefined
+  }
+}
+
+async function writeAtomically(file: string, text: string): Promise<void> {
+  const temporary = `${file}.${crypto.randomUUID()}.tmp`
+
+  await Bun.write(temporary, text)
+  await rename(temporary, file)
 }
 
 async function compileEntry(name: string, file: string, source: string, highlight?: Highlighter): Promise<RawEntry> {
@@ -148,15 +183,16 @@ function parseYaml(text: string, line: number): unknown {
   }
 }
 
-// Where each top-level field starts: a key at the start of a line in YAML, or one indented once in a JSON object.
+// Where each top-level field starts: the keys indented least, at the start of a line in YAML, or once in a JSON object.
 function fieldLines(text: string, json = false, offset = 0): Record<string, number> {
+  const keys = text.split('\n').map((line, index) => ({ key: TOP_LEVEL_FIELD.exec(line.trimStart())?.[1], indent: line.length - line.trimStart().length, line: index + 1 + offset }))
+  const found = keys.flatMap(({ key, ...rest }) => key === undefined ? [] : [{ key, ...rest }])
+  const top = json ? Math.min(...found.map(candidate => candidate.indent)) : 0
   const lines: Record<string, number> = {}
 
-  for (const [index, line] of text.split('\n').entries()) {
-    const key = TOP_LEVEL_FIELD.exec(json ? line.trim() : line)?.[1]
-
-    if (key !== undefined && !(key in lines) && (json || !line.startsWith(' ')))
-      lines[key] = index + 1 + offset
+  for (const { key, indent, line } of found) {
+    if (indent === top && !(key in lines))
+      lines[key] = line
   }
 
   return lines

@@ -13,11 +13,12 @@ export const posts = collection('content/posts', {
   components: { Callout, Counter },
   // Stands in for Shiki: marks the block so a test sees it went through.
   highlight: (code, language) => `<pre class="highlighted" data-language="${language ?? ''}">${code.replaceAll('&', '&amp;').replaceAll('<', '&lt;')}</pre>`,
+  draft: post => post.data.draft === true,
   sort: (a, b) => b.data.date.getTime() - a.data.date.getTime(),
   feed: {
     path: '/blog/rss.xml',
     title: 'The blog',
-    item: entry => entry.data.draft ? undefined : { title: entry.data.title, path: `/blog/${entry.slug}`, date: entry.data.date },
+    item: entry => ({ title: entry.data.title, path: `/blog/${entry.slug}`, date: entry.data.date }),
   },
 })
 

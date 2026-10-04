@@ -4,6 +4,7 @@ import type { Component } from '../runtime/jsx'
 import type { FeedOptions } from './feed'
 import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
+import process from 'node:process'
 import { child } from '../runtime/html'
 import { loadEntries } from './load'
 import { decodeEntries } from './validate'
@@ -32,6 +33,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   components?: Record<string, Component<never>>
   // Highlights code blocks when the entries compile, at build time, such as with Shiki.
   highlight?: Highlighter
+  // Entries left out everywhere but `kay dev`: from `all()`, `get()`, prerendering, the sitemap and the feed.
+  draft?: (entry: Entry<Static<Schema>>) => boolean
   // The order `all()` lists entries in; by slug otherwise.
   sort?: (a: Entry<Static<Schema>>, b: Entry<Static<Schema>>) => number
   // An RSS or Atom feed of the collection, served at its path.
@@ -58,7 +61,9 @@ export function collection<Schema extends TSchema>(dir: string, options: Collect
 
   const load = async () => {
     const raw = await loadEntries(dir, options.highlight)
-    const entries = decodeEntries(raw, options.schema, components).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components))
+    const decoded = decodeEntries(raw, options.schema, components).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components))
+    const { draft } = options
+    const entries = draft && process.env.NODE_ENV !== 'development' ? decoded.filter(entry => !draft(entry)) : decoded
 
     entries.sort(options.sort ?? ((a, b) => a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0))
 

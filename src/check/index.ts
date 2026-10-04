@@ -11,7 +11,7 @@ import { iconTypes } from '../build/icons'
 import { compileKay } from '../compiler'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
-import { CONTENT_CONFIG } from '../content/server'
+import { CONTENT_CONFIG, PROBLEMS_MARKER } from '../content/server'
 import { publicFiles } from '../server/public'
 import { routeOf, scanRoutes } from '../server/routes'
 
@@ -190,7 +190,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
 // The collections' entries that fail to compile or to match their schema, read in a process of its own.
 async function checkContent(root: string, config: string | undefined): Promise<CheckDiagnostic[]> {
-  if (!existsSync(resolve(root, config ?? CONTENT_CONFIG)))
+  if (config === undefined && !existsSync(resolve(root, CONTENT_CONFIG)))
     return []
 
   const child = Bun.spawn([process.execPath, CONTENT_PROBLEMS, resolve(root), config ?? ''], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
@@ -199,7 +199,9 @@ async function checkContent(root: string, config: string | undefined): Promise<C
   if (code !== 0)
     return [{ file: resolve(root, config ?? CONTENT_CONFIG), line: 1, column: 1, message: errors.trim() || `reading the collections exited with code ${code}` }]
 
-  return (JSON.parse(output) as ContentProblem[]).map(problem => ({ file: resolve(root, problem.file), line: problem.line, column: 1, message: problem.message }))
+  const line = output.split('\n').find(text => text.startsWith(PROBLEMS_MARKER)) ?? `${PROBLEMS_MARKER}[]`
+
+  return (JSON.parse(line.slice(PROBLEMS_MARKER.length)) as ContentProblem[]).map(problem => ({ file: resolve(root, problem.file), line: problem.line, column: 1, message: problem.message }))
 }
 
 function parseTscOutput(output: string, config: string, root: string): CheckDiagnostic[] {

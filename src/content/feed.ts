@@ -1,5 +1,5 @@
 import type { Entry } from './index'
-import { escape, escapeAttribute } from '../runtime/escape'
+import { escape as escapeHtml, escapeAttribute as escapeHtmlAttribute } from '../runtime/escape'
 
 export interface FeedItem {
   title: string
@@ -15,6 +15,8 @@ export interface FeedOptions<Data> {
   path: string
   title: string
   description?: string
+  // Who writes the feed, which Atom requires; its title otherwise.
+  author?: string
   // RSS 2.0 by default.
   format?: 'rss' | 'atom'
   // The newest this many items, 20 by default.
@@ -24,10 +26,20 @@ export interface FeedOptions<Data> {
 }
 
 const DEFAULT_LIMIT = 20
+// Characters XML 1.0 refuses anywhere, which a title may still carry.
+// eslint-disable-next-line no-control-regex
+const INVALID_XML = /[\u0000-\u0008\v\f\u000E-\u001F\uFFFE\uFFFF]/g
 
 // The feed's XML: its items newest first, every link absolute on the site's origin.
 export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>, origin: string): string {
-  const items = entries.map(options.item).filter(item => item !== undefined).sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, options.limit ?? DEFAULT_LIMIT)
+  const items = entries.flatMap((entry) => {
+    const item = options.item(entry)
+
+    if (item && Number.isNaN(item.date.getTime()))
+      throw new Error(`kay: the feed at ${options.path} gives ${entry.file} an invalid date`)
+
+    return item ? [item] : []
+  }).sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, options.limit ?? DEFAULT_LIMIT)
   const self = new URL(options.path, origin).href
   const updated = items[0]?.date ?? new Date(0)
 
@@ -39,6 +51,7 @@ export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>
 <link rel="self" href="${escapeAttribute(self)}"/>
 <id>${escape(self)}</id>
 <updated>${updated.toISOString()}</updated>
+<author><name>${escape(options.author ?? options.title)}</name></author>
 ${items.map((item) => {
   const link = new URL(item.path, origin).href
 
@@ -64,4 +77,12 @@ ${items.map((item) => {
 </channel>
 </rss>
 `
+}
+
+function escape(text: string): string {
+  return escapeHtml(text.replace(INVALID_XML, ''))
+}
+
+function escapeAttribute(text: string): string {
+  return escapeHtmlAttribute(text.replace(INVALID_XML, ''))
 }

@@ -455,8 +455,9 @@ import Callout from './components/callout.kay'
 export const posts = collection('content/posts', {
   schema: t.Object({ title: t.String(), date: t.Date(), tags: t.Array(t.String(), { default: [] }), draft: t.Optional(t.Boolean()) }),
   components: { Callout },
+  draft: post => post.data.draft === true,
   sort: (a, b) => b.data.date.getTime() - a.data.date.getTime(),
-  feed: { path: '/blog/rss.xml', title: 'Blog', item: post => post.data.draft ? undefined : { title: post.data.title, path: `/blog/${post.slug}`, date: post.data.date } },
+  feed: { path: '/blog/rss.xml', title: 'Blog', item: post => ({ title: post.data.title, path: `/blog/${post.slug}`, date: post.data.date }) },
 })
 
 export const authors = collection('content/authors', { schema: t.Object({ name: t.String() }) })
@@ -481,15 +482,16 @@ article
   Content
 ```
 
-- `all()` gives every entry in the collection's `sort` order, by slug without one; filter and sort it like any array. `get(slug)` gives one entry or `undefined`.
+- `all()` gives every entry in the collection's `sort` order, by slug without one; filter and sort it like any array. `get(slug)` gives one entry or `undefined`. An entry `draft` returns true for shows in `kay dev` only: everywhere else it is left out of `all()`, `get()`, prerendering, the sitemap and the feed. Two files giving one slug, `guides.md` and `guides/index.md`, fail the collection.
 - An entry has `slug`, its path in the folder without the extension (`guides/intro`; an `index` file takes its folder's), `data`, `headings` (`{ depth, id, text }` in order, for a table of contents), `Content`, the component rendering its body, and `file`. A data file's `headings` is empty and its `Content` renders nothing.
 - A Markdown file starts with YAML frontmatter between `---` lines. Every entry's data is read against the schema: defaults filled in, a `t.Date()` decoded from its text. An entry it refuses, or one that does not parse, fails `kay check` at the field's line, and fails `kay build` and the first load.
 - Headings get ids, deduplicated, and link to themselves. Bare URLs become links.
 - `highlight: (code, language) => html` highlights code blocks as entries compile, at build time: it returns the whole `<pre>`, such as Shiki's `codeToHtml`, which the site depends on itself. Without one, a block renders as `<pre><code class="language-ts">`.
-- A Markdown entry uses the components its collection's `components` names, written with a capital as in a template: `<Callout type="warn">` on its own line, Markdown inside after a blank line, then `</Callout>` on its own line; `<Badge text="new" />` inline. Attributes are text (`type="warn"`), JSON in braces (`count={3}`, `items={["a", "b"]}`), or bare for `true`. An interactive component renders as an island and hydrates as in any page. A tag inside code stays text. A component the collection does not name, or a tag left open, fails `kay check` and the build.
+- A Markdown entry uses the components its collection's `components` names, written with a capital as in a template: `<Callout type="warn">` on its own line, Markdown inside after a blank line, then `</Callout>` on its own line; `<Badge text="new" />` inline. Attributes are text (`type="warn"`), JSON in braces (`count={3}`, `items={["a", "b"]}`), or bare for `true`, and may spread over several lines. An interactive component renders as an island and hydrates as in any page. A tag in a code span, a fenced code block or an indented one stays text. A component the collection does not name, or a tag left open, fails `kay check` and the build.
 - `export const prerender = posts` in a page with one param prerenders a page per entry, its slug as the param; `sitemap` takes a collection the same way. A slug with a slash needs a catch-all page, `[...slug].kay`.
-- `feed` serves an RSS 2.0 feed at its path, `format: 'atom'` for Atom: the newest `limit` items, 20 by default, that `item` returns, links absolute on the `site` kay.config.ts sets, which a feed needs.
-- Each entry compiles once and is cached in `.kay/cache/content` by its content, so a change, which restarts `kay dev`, recompiles that entry only. `kay build` compiles every collection into `.kay/client/content`, which production reads, an executable included, instead of the files.
+- Entries are the site's own content, trusted: their HTML, links and what a highlighter returns go out as written, unsanitised.
+- `feed` serves an RSS 2.0 feed at its path, `format: 'atom'` for Atom, its `author` the feed's title unless set: the newest `limit` items, 20 by default, that `item` returns, links absolute on the `site` kay.config.ts sets, which a feed needs.
+- Each entry compiles once and is cached in `.kay/cache/content` by its content, the highlighter's source and Bun's version, so a change, which restarts `kay dev`, recompiles that entry only. A highlighter whose output changes with no change to its source, such as a new theme passed in, needs that folder cleared. `kay build` compiles every collection into `.kay/client/content`, which production reads, an executable included, instead of the files.
 
 ## Caching
 

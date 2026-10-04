@@ -1,7 +1,7 @@
 import type { TSchema } from 'elysia'
 import type { TypeCheck } from 'elysia/type-system'
 import type { RawEntry } from './load'
-import type { Segment } from './markdown'
+import type { ComponentSegment, Segment } from './markdown'
 import { mapValueError } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 
@@ -40,10 +40,9 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
 
   for (const entry of entries) {
     const data = withDefaults(entry.data, schema)
-    const unknown = unknownComponents(entry.segments ?? [], components)
 
-    for (const name of unknown)
-      problems.push({ file: entry.file, line: 1, message: `uses <${name}>, which the collection's components do not name` })
+    for (const { component, line } of unknownComponents(entry.segments ?? [], components))
+      problems.push({ file: entry.file, line, message: `uses <${component}>, which the collection's components do not name` })
 
     if (check.Check(data)) {
       decoded.push({ entry, data: check.Decode(data) })
@@ -84,13 +83,13 @@ function withDefaults(data: unknown, schema: TSchema): unknown {
   return filled
 }
 
-function unknownComponents(segments: Segment[], components: Record<string, unknown>, found = new Set<string>()): Set<string> {
+function unknownComponents(segments: Segment[], components: Record<string, unknown>, found: ComponentSegment[] = []): ComponentSegment[] {
   for (const segment of segments) {
     if (typeof segment === 'string')
       continue
 
     if (!(segment.component in components))
-      found.add(segment.component)
+      found.push(segment)
 
     unknownComponents(segment.children, components, found)
   }
