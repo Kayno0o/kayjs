@@ -8,6 +8,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
+import { projectCollections, serveFeeds } from '../content/server'
 import { registerActionRoutes } from './actions'
 import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
@@ -175,6 +176,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(bundle ? process.cwd() : root, dir)])),
     quality: options.images?.quality,
   })
+
+  serveFeeds(app, await projectCollections(root, options.content), options.site === undefined ? undefined : siteOrigin(options.site), options.dev)
 
   if (options.site !== undefined)
     serveSitemap(app, routes, siteOrigin(options.site), publicUrls, { dev: options.dev, onError: options.onError })

@@ -5,6 +5,7 @@ import { mkdir } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
+import { isCollection } from '../content'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { registerLoader } from './loader'
 import { renderPage } from './render'
@@ -101,8 +102,22 @@ async function exportsPrerender(file: string): Promise<boolean> {
   return analyzeServer(source, parseKay(source).server)?.exportNames.includes('prerender') ?? false
 }
 
-// The paths a page export such as `prerender` lists: `true` for a route without params; a list of params, or a function returning one, for a route with some.
+// The paths a page export such as `prerender` lists: `true` for a route without params; a list of params, a function returning one, or a content collection, for a route with some.
 export async function listedParams(route: Route, file: string, name: string, value: unknown): Promise<Record<string, string>[]> {
+  if (isCollection(value)) {
+    if (route.params.length !== 1)
+      throw new Error(`kay: ${file} takes ${route.params.length === 0 ? 'no params' : route.params.join(', ')}, so a collection cannot fill them: its entries give one slug each, for a route with one param`)
+
+    const param = route.params[0]!
+    const entries = await value.all()
+    const nested = entries.find(entry => entry.slug.includes('/') && param !== route.catchAll)
+
+    if (nested)
+      throw new Error(`kay: ${file} takes one segment as ${param}, but the entry ${nested.file} has the slug ${nested.slug}; name the page [...${param}].kay for nested entries`)
+
+    return entries.map(entry => ({ [param]: entry.slug }))
+  }
+
   if (value === true) {
     if (route.params.length > 0)
       throw new Error(`kay: ${file} takes params, so \`${name}\` lists them: export const ${name} = [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }]`)
@@ -116,7 +131,7 @@ export async function listedParams(route: Route, file: string, name: string, val
   const list: unknown = typeof value === 'function' ? await (value as () => unknown)() : value
 
   if (!Array.isArray(list))
-    throw new Error(`kay: ${file} exports a ${name} that is neither true, false, a list of params nor a function returning one`)
+    throw new Error(`kay: ${file} exports a ${name} that is neither true, false, a list of params, a function returning one, nor a collection`)
 
   for (const params of list) {
     if (typeof params !== 'object' || params === null || route.params.some(param => !isPathPart(param === route.catchAll, (params as Record<string, unknown>)[param])))

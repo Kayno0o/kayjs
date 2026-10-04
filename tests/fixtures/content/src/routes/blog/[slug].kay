@@ -1,0 +1,15 @@
+--- server
+import { posts } from '../../content.config'
+
+export const prerender = posts
+
+const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
+const { Content } = post
+const toc = post.headings
+---
+h1.title {post.data.title}
+nav.toc
+  for heading of toc key={heading.id}
+    a(href={`#${heading.id}`}) {heading.text}
+article
+  Content

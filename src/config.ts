@@ -34,6 +34,8 @@ export interface KayConfig {
   log?: RequestLogger
   // Serves a request from another path, query included, such as a host's pages from a section: `url => url.hostname === 'blog.example.com' ? `/blog${url.pathname}` : undefined`. The browser keeps its URL.
   rewrite?: Rewrite
+  // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.
+  content?: string
   // Seconds a stopping server gives open requests and streams to finish before closing them; 10 by default.
   shutdownTimeout?: number
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.

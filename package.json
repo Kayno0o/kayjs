@@ -43,6 +43,10 @@
       "types": "./types/runtime/seo.d.ts",
       "default": "./src/runtime/seo.ts"
     },
+    "./content": {
+      "types": "./types/content/index.d.ts",
+      "default": "./src/content/index.ts"
+    },
     "./cache": {
       "types": "./types/runtime/cache.d.ts",
       "default": "./src/runtime/cache.ts"

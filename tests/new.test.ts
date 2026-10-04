@@ -217,6 +217,9 @@ describe('kay build --compile', () => {
         'src/routes/echo.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const shout = action(t.Object({ text: t.String() }), ({ text }) => text.toUpperCase())\n---\np Echo\n',
         'src/routes/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Admins only\'))\n',
         'src/routes/admin/index.kay': 'p Secret\n',
+        'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', {\n  schema: t.Object({ title: t.String(), date: t.Date() }),\n  feed: { path: \'/notes.xml\', title: \'Notes\', item: note => ({ title: note.data.title, path: `/notes/${note.slug}`, date: note.data.date }) },\n})\n',
+        'src/content/notes/first.md': '---\ntitle: First note\ndate: 2026-09-01\n---\n\n## Read me\n',
+        'src/routes/notes/[slug].kay': '--- server\nimport { notes } from \'../../content.config\'\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\nconst { Content } = note\n---\nh1 {note.data.title}\nContent\n',
         'src/routes/photo.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero)} alt="Hero")\n',
         'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }] })\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
@@ -272,6 +275,9 @@ describe('kay build --compile', () => {
         expect((await get('/manifest.webmanifest')).status).toBe(200)
         expect((await get(fonts)).text).toContain('@font-face{font-family:"Display"')
         expect((await get('/sitemap.xml')).text).toContain('<loc>https://example.com/about</loc>')
+        // Content entries come from what the build compiled, with nothing of src/content beside the executable.
+        expect((await get('/notes/first')).text).toContain('<h1>First note</h1><h2 id="read-me"><a href="#read-me">Read me</a></h2>')
+        expect((await get('/notes.xml')).text).toContain('<link>https://example.com/notes/first</link>')
       }
       finally {
         server.kill()

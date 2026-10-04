@@ -9,6 +9,7 @@ import { KayCompileError } from './build/transform'
 import { check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
 import { loadConfig } from './config'
+import { writeContentManifests } from './content/server'
 import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
@@ -103,8 +104,8 @@ async function runCheck(args: string[]): Promise<number> {
   if (root === undefined)
     return 1
 
-  const { routes, publicDir } = await loadConfig(root)
-  const diagnostics = await check(root, { tsconfig, routes, publicDir })
+  const { routes, publicDir, content } = await loadConfig(root)
+  const diagnostics = await check(root, { tsconfig, routes, publicDir, content })
 
   const sources = new Map<string, string | undefined>()
 
@@ -147,6 +148,8 @@ async function build(args: string[]): Promise<number> {
 
   try {
     const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes })
+    // Before prerendering, whose pages read the collections from what it writes.
+    const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
     const prerendered = await prerenderPages(root, config, client)
 
     await writeImageVariants(client.dir, config.images?.quality)
@@ -156,7 +159,7 @@ async function build(args: string[]): Promise<number> {
 
     await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 
-    console.error(`built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')} in ${Math.round(performance.now() - started)} ms`)
+    console.error(`built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''} in ${Math.round(performance.now() - started)} ms`)
 
     if (typeof compile === 'string') {
       const compiled = performance.now()

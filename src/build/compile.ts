@@ -3,6 +3,7 @@ import type { Route, SpecialPages } from '../server/routes'
 import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
+import { CONTENT_CONFIG } from '../content/server'
 import { refuseClashes, scanRoutes, specialPagesOf } from '../server/routes'
 import { kay } from './plugin'
 import { withoutStyles } from './styles'
@@ -36,7 +37,9 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   refuseClashes(routesDir, routes)
 
   const fallback = specialPagesOf(routesDir, routesDir)
-  const modules = [...routeModules(routes, fallback)]
+  const contentConfig = resolve(root, config.content ?? CONTENT_CONFIG)
+  // The content config too, which the server reads the collections and their feeds from.
+  const modules = [...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : []]
   const configFile = join(root, CONFIG_FILE)
   const generated = join(root, '.kay', 'compile', 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`

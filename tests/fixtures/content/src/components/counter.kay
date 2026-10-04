@@ -1,0 +1,7 @@
+---
+import { signal } from 'kay'
+
+const { start } = props<{ start: number }>()
+const count = signal(start)
+---
+button(onClick={() => count.set(value => value + 1)}) Count {count()}

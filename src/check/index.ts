@@ -1,4 +1,6 @@
 import type { Diagnostic, SourceMap } from '../compiler'
+import type { ContentProblem } from '../content/validate'
+import { existsSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -9,10 +11,12 @@ import { iconTypes } from '../build/icons'
 import { compileKay } from '../compiler'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { CONTENT_CONFIG } from '../content/server'
 import { publicFiles } from '../server/public'
 import { routeOf, scanRoutes } from '../server/routes'
 
 export const SHADOW_DIR = join('.kay', 'types')
+const CONTENT_PROBLEMS = fileURLToPath(new URL('../content/problems.ts', import.meta.url))
 
 export interface CheckOptions {
   tsconfig?: string
@@ -20,6 +24,8 @@ export interface CheckOptions {
   routes?: string
   // Public file directory relative to the root, whose files links may point at.
   publicDir?: string
+  // The content config relative to the root, whose collections' entries are read against their schemas.
+  content?: string
 }
 
 export interface CheckDiagnostic {
@@ -157,7 +163,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const { files, diagnostics } = await writeShadowTypes(root, options)
   const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-  const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const [output, errors, code, content] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkContent(root, options.content)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
@@ -173,11 +179,27 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
       diagnostics.push(remapped)
   }
 
+  diagnostics.push(...content)
+
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && reported.length === 0 && errors.trim() === '')
     diagnostics.push({ file: config, line: 1, column: 1, message: `tsgo exited with code ${code} and no diagnostics` })
 
   return diagnostics
+}
+
+// The collections' entries that fail to compile or to match their schema, read in a process of its own.
+async function checkContent(root: string, config: string | undefined): Promise<CheckDiagnostic[]> {
+  if (!existsSync(resolve(root, config ?? CONTENT_CONFIG)))
+    return []
+
+  const child = Bun.spawn([process.execPath, CONTENT_PROBLEMS, resolve(root), config ?? ''], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  if (code !== 0)
+    return [{ file: resolve(root, config ?? CONTENT_CONFIG), line: 1, column: 1, message: errors.trim() || `reading the collections exited with code ${code}` }]
+
+  return (JSON.parse(output) as ContentProblem[]).map(problem => ({ file: resolve(root, problem.file), line: problem.line, column: 1, message: problem.message }))
 }
 
 function parseTscOutput(output: string, config: string, root: string): CheckDiagnostic[] {

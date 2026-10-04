@@ -1,0 +1,5 @@
+---
+const { type } = props<{ type: string }>()
+---
+aside(class={`callout ${type}`})
+  slot

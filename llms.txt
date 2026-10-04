@@ -228,7 +228,7 @@ export default defineConfig({
 A project with a `site` serves `/sitemap.xml` and `/robots.txt`, which allows every crawler and points at the sitemap; a file of the same name in `public/` replaces either. The sitemap lists:
 
 - every page without params, unless its server fence has `export const sitemap = false`;
-- for a page with params, the ones its `sitemap` export lists, else the ones its `prerender` export lists, else none. `sitemap` takes what `prerender` takes: `true`, `false`, a list of params or a function returning one;
+- for a page with params, the ones its `sitemap` export lists, else the ones its `prerender` export lists, else none. `sitemap` takes what `prerender` takes: `true`, `false`, a content collection, a list of params or a function returning one;
 - a page behind a guard only when its `sitemap` export lists it.
 
 ```kay
@@ -442,6 +442,54 @@ h1 {post.title}
 Each value is a string with no empty, `.` or `..` segment, a catch-all's included with its slashes. `export const prerender = false` prerenders nothing.
 
 `export const revalidate = 3600` beside `prerender` keeps a prerendered page fresh: once it is older than that many seconds, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does; every request after that render lands gets the new page, with a new ETag and compressed copies. One render runs at a time per path. A render that fails or answers 5xx is logged and leaves the page as it was, the next attempt coming a minute later at most. The new page lives in memory, so a restart serves the built file again until it goes stale; an executable built a while ago revalidates on its first request.
+
+## Content collections
+
+A collection is a folder of Markdown files, or of JSON and YAML data files, read against a schema. The project declares its collections in `src/content.config.ts`, or the module `content` names in kay.config.ts, each folder relative to that module:
+
+```ts
+import { t } from 'elysia'
+import { collection } from 'kay/content'
+import Callout from './components/callout.kay'
+
+export const posts = collection('content/posts', {
+  schema: t.Object({ title: t.String(), date: t.Date(), tags: t.Array(t.String(), { default: [] }), draft: t.Optional(t.Boolean()) }),
+  components: { Callout },
+  sort: (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+  feed: { path: '/blog/rss.xml', title: 'Blog', item: post => post.data.draft ? undefined : { title: post.data.title, path: `/blog/${post.slug}`, date: post.data.date } },
+})
+
+export const authors = collection('content/authors', { schema: t.Object({ name: t.String() }) })
+```
+
+A page reads it in its server fence, typed from the schema:
+
+```kay
+--- server
+import { posts } from '../../content.config'
+
+export const prerender = posts
+
+const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
+const { Content } = post
+---
+h1 {post.data.title}
+nav
+  for heading of post.headings key={heading.id}
+    a(href={`#${heading.id}`}) {heading.text}
+article
+  Content
+```
+
+- `all()` gives every entry in the collection's `sort` order, by slug without one; filter and sort it like any array. `get(slug)` gives one entry or `undefined`.
+- An entry has `slug`, its path in the folder without the extension (`guides/intro`; an `index` file takes its folder's), `data`, `headings` (`{ depth, id, text }` in order, for a table of contents), `Content`, the component rendering its body, and `file`. A data file's `headings` is empty and its `Content` renders nothing.
+- A Markdown file starts with YAML frontmatter between `---` lines. Every entry's data is read against the schema: defaults filled in, a `t.Date()` decoded from its text. An entry it refuses, or one that does not parse, fails `kay check` at the field's line, and fails `kay build` and the first load.
+- Headings get ids, deduplicated, and link to themselves. Bare URLs become links.
+- `highlight: (code, language) => html` highlights code blocks as entries compile, at build time: it returns the whole `<pre>`, such as Shiki's `codeToHtml`, which the site depends on itself. Without one, a block renders as `<pre><code class="language-ts">`.
+- A Markdown entry uses the components its collection's `components` names, written with a capital as in a template: `<Callout type="warn">` on its own line, Markdown inside after a blank line, then `</Callout>` on its own line; `<Badge text="new" />` inline. Attributes are text (`type="warn"`), JSON in braces (`count={3}`, `items={["a", "b"]}`), or bare for `true`. An interactive component renders as an island and hydrates as in any page. A tag inside code stays text. A component the collection does not name, or a tag left open, fails `kay check` and the build.
+- `export const prerender = posts` in a page with one param prerenders a page per entry, its slug as the param; `sitemap` takes a collection the same way. A slug with a slash needs a catch-all page, `[...slug].kay`.
+- `feed` serves an RSS 2.0 feed at its path, `format: 'atom'` for Atom: the newest `limit` items, 20 by default, that `item` returns, links absolute on the `site` kay.config.ts sets, which a feed needs.
+- Each entry compiles once and is cached in `.kay/cache/content` by its content, so a change, which restarts `kay dev`, recompiles that entry only. `kay build` compiles every collection into `.kay/client/content`, which production reads, an executable included, instead of the files.
 
 ## Caching
 
@@ -666,6 +714,7 @@ it('shows why a todo was refused', async () => {
 - `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/` and the GET routes of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a path may be spelled as written or percent-encoded, `/café` or `/caf%C3%A9`; a catch-all such as `docs/[...path]`, or an app route such as `/files/*`, is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
 - Island props passed from static components can be serialized: no functions or class instances.
+- Every content collection entry against its schema and the components its collection names, reported at the entry's line.
 - What a page needs to be usable without seeing it: an `img` has `alt` (`alt=""` for decoration), an `iframe` a `title`, an `input(type="image")` an `alt`, and an element with `onClick` is one a keyboard reaches, such as a `button` or an `a`, or has a `role`. An element with a `{...spread}` is not checked. These are reported by `kay check` and the editor only: the page still runs meanwhile.
 
 ## Project setup

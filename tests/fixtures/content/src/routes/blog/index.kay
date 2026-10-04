@@ -1,0 +1,11 @@
+--- server
+import { authors, posts } from '../../content.config'
+
+const list = (await posts.all()).filter(post => !post.data.draft)
+const people = await authors.all()
+---
+ul.posts
+  for post of list key={post.slug}
+    li
+      a(href={`/blog/${post.slug}`}) {post.data.title}
+p.authors {people.map(author => author.data.name).join(', ')}
