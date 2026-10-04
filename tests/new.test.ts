@@ -96,7 +96,8 @@ describe('kay command line', () => {
 
       expect(code).toBe(0)
       expect(manifest.name).toBe('my-app-x')
-      expect(await Bun.file(join(dir, 'my app {x}/src/routes/_layout.kay')).text()).toContain('title my-app-x\n')
+      expect(await Bun.file(join(dir, 'my app {x}/src/components/header.kay')).text()).toContain('(href="/") my-app-x\n')
+      expect(await Bun.file(join(dir, 'my app {x}/kay.config.ts')).text()).toContain('seo: { name: \'my-app-x\', titleTemplate: \'%s | my-app-x\'')
       expect(stderr).toContain('cd \'my app {x}\' && bun install')
     }
     finally {
@@ -124,12 +125,17 @@ describe('kay new', () => {
 
     try {
       const files = await createProject(dir, { kay: '^1.0.0' })
-      const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
+      const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
 
       expect(files).toContain('src/routes/index.kay')
+      // The container runs the one executable `kay build --compile` makes.
+      expect(files).toEqual(expect.arrayContaining(['Dockerfile', 'compose.prod.yaml', 'src/components/accent-picker.kay']))
+      expect(manifest.scripts.compile).toBe('kay build --compile server')
+      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
+      expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.dependencies.kay).toBe('^1.0.0')
-      expect(await Bun.file(join(dir, 'src/routes/_layout.kay')).text()).toContain('title my-app')
+      expect(await Bun.file(join(dir, 'src/components/header.kay')).text()).toContain('(href="/") my-app\n')
 
       await installKay(dir)
 
@@ -148,7 +154,7 @@ describe('kay new', () => {
 
       const client = await buildClient(dir)
 
-      expect(Object.keys(client.islands)).toEqual(['src/components/counter.kay'])
+      expect(Object.keys(client.islands)).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
       const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
 
       expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toContain('@view-transition')
@@ -179,8 +185,45 @@ describe('kay new', () => {
 
       expect(report).toContain('exported 1 page')
       expect(code).toBe(0)
-      expect(await Bun.file(join(dir, 'dist/index.html')).text()).toContain('<link rel="canonical" href="https://pages.example/me/my-site/">')
+      const html = await Bun.file(join(dir, 'dist/index.html')).text()
+      const stylesheet = await Bun.file(join(dir, 'dist', (/href="\/me\/my-site\/(_kay\/[^"]+\.css)"/).exec(html)![1]!)).text()
+
+      expect(html).toContain('<link rel="canonical" href="https://pages.example/me/my-site/">')
+      expect(html).toContain('<title>Home | my-site</title>')
+      expect(html).toContain('<a class="skip-link" href="#main-content">')
+      expect(html).toContain('<style>:root { --accent: var(--accent-peach); }</style>')
+      // Every accent the picker offers, though only the picker reads them.
+      expect(stylesheet.match(/--accent-[a-z]+:#/g)).toHaveLength(14)
+      expect(stylesheet).toContain('.text-accent')
       expect(await Bun.file(join(dir, 'dist/404.html')).exists()).toBe(true)
+    }
+    finally {
+      await rm(join(dir, '..'), { recursive: true, force: true })
+    }
+  })
+
+  it('scaffolds an app with sessions, a guarded section and a websocket island, which checks, tests and builds as it is', async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
+
+    try {
+      const files = await createProject(dir, { kay: '^1.0.0', template: 'app' })
+
+      expect(files).toEqual(expect.arrayContaining(['.env', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts']))
+      expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\n$/)
+      expect(await Bun.file(join(dir, '.gitignore')).text()).toContain('.env')
+      expect(await Bun.file(join(dir, 'compose.prod.yaml')).text()).toContain('SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}')
+
+      await installKay(dir)
+      expect(await check(dir)).toEqual([])
+      expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
+
+      // Signs in through the action and lands in the guarded section.
+      const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+      const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+
+      expect(report).toContain('2 pass')
+      expect(code).toBe(0)
+      expect(Object.keys((await buildClient(dir)).islands)).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay', 'src/components/online.kay'])
     }
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
@@ -295,7 +338,7 @@ describe('kay build --compile', () => {
         const about = await fetch(`${origin}/about`, { headers: { 'accept-encoding': 'br' } })
         const call = await fetch(`${origin}/_kay/action/src/routes/echo.kay/shout`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'origin': origin }, body: stringify({ text: 'hi' }) })
 
-        expect(home.text).toContain('<h1>Hello from the server</h1>')
+        expect(home.text).toContain('Hello from the server</h1>')
         expect((await get(entry)).status).toBe(200)
         expect(await get('/robots.txt')).toEqual({ status: 200, text: 'User-agent: *\n' })
         // The copy `kay build` prerendered and compressed, not a render.
@@ -307,7 +350,7 @@ describe('kay build --compile', () => {
         expect(await get('/admin')).toEqual({ status: 403, text: 'Admins only' })
         expect(await get('/api/ping')).toEqual({ status: 200, text: 'pong' })
         expect(await get('/api/members')).toEqual({ status: 403, text: 'Members only' })
-        expect((await get('/missing')).text).toContain('<h1>Nothing here</h1>')
+        expect((await get('/missing')).text).toContain('Nothing here</h1>')
 
         const photo = await get('/photo')
         const variant = (/srcset="([^ "]+) 320w/).exec(photo.text)![1]!.replaceAll('&amp;', '&')

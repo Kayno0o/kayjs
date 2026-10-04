@@ -37,7 +37,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 
 | Command | Does |
 | --- | --- |
-| `kay new <dir>` | scaffold a project that checks, builds and runs |
+| `kay new <dir> [--template server\|site\|app]` | scaffold a project that checks, builds and runs: a server run as one executable, a static site, or an app with sessions |
 | `kay dev [entry]` | run the server, restarting on change, errors shown in the browser |
 | `kay build [dir]` | bundle the browser code for production |
 | `kay build [dir] --compile <file>` | the same, plus the server and everything it serves in one executable |

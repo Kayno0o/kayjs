@@ -1,191 +1,24 @@
+import type { Template } from './templates'
+import { randomBytes } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
+import { TEMPLATE_FILES } from './templates'
 
 // The kay this command runs from: a git checkout, which a new project depends on a packed copy of, or the published package.
 const KAY_ROOT = resolve(import.meta.dir, '..')
 const INVALID_NAME_CHARS = /[^a-z0-9._~-]+/g
 const NAME_EDGES = /^[-._~]+|[-._~]+$/g
-const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
 
-// Written as strings rather than template files, which the repository's own `.kay` scans would pick up.
-const FILES: Record<string, string> = {
-  '.gitignore': 'node_modules\n.kay\n',
-  // kay is published to this registry as `@kaynooo/kayjs`, installed under the name `kay` its imports use.
-  '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
-  // Lets test files import pages and their actions.
-  'bunfig.toml': '[test]\npreload = ["kay/test/preload"]\n',
-  'tests/home.test.ts': `import { expect, it } from 'bun:test'
-import { testSite } from 'kay/test'
+export type { Template }
 
-const site = await testSite()
-
-it('greets from the server', async () => {
-  const home = await site.visit('/')
-
-  expect(home.status).toBe(200)
-  expect(home.html).toContain('Hello from the server')
-})
-`,
-  'kay.config.ts': `import { defineConfig } from 'kay/server'
-
-export default defineConfig({ lang: 'en' })
-`,
-  'src/server.ts': `import process from 'node:process'
-import { Elysia } from 'elysia'
-import { pages } from 'kay/server'
-
-const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 3000))
-
-console.log(\`Listening on http://localhost:\${app.server?.port}\`)
-
-// Links and redirects in pages are checked against the routes the app serves besides them too.
-declare module 'kay' {
-  interface Register {
-    app: typeof app
-  }
-}
-`,
-  'src/app.css': `@view-transition {
-  navigation: auto;
-}
-
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-}
-
-main {
-  max-width: 40rem;
-  margin: 2rem auto;
-  padding: 0 1rem;
-}
-`,
-  'src/routes/_layout.kay': `---
-import '../app.css'
----
-head
-  title __NAME__
-main
-  slot
-`,
-  'src/routes/index.kay': `--- server
-const greeting = 'Hello from the server'
----
----
-import Counter from '../components/counter.kay'
----
-h1 {greeting}
-Counter(start={0})
-`,
-  'src/routes/_404.kay': `h1 Nothing here
-a(href="/") Back home
-`,
-  'src/components/counter.kay': `---
-import { signal } from 'kay'
-
-const { start } = props<{ start: number }>()
-const count = signal(start)
----
-button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times
-`,
-}
-
-// A site with no server: `kay build --static` writes it to `dist`, which a Forgejo Pages workflow publishes, or a container serves with nginx.
-const SITE_FILES: Record<string, string> = {
-  'kay.config.ts': `import process from 'node:process'
-import { defineConfig } from 'kay/server'
-
-// The Pages workflow sets both: the host the site is published on, and the path it is published under.
-export default defineConfig({
-  lang: 'en',
-  site: process.env.SITE_URL,
-  base: process.env.SITE_BASE,
-})
-`,
-  '.forgejo/workflows/pages.yml': `name: Publish to Pages
-
-on:
-  push:
-    branches:
-      - main
-
-permissions:
-  contents: write
-
-jobs:
-  publish:
-    runs-on: debian
-    steps:
-      - name: Install unzip and git
-        run: apt-get update && apt-get install -y unzip git
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build the site
-        env:
-          # The host your Forgejo instance publishes Pages on.
-          SITE_URL: https://pages.kaynooo.fr
-          SITE_BASE: /\${{ github.repository }}
-        run: bun run build
-
-      - name: Publish to the gitea-pages branch
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: \${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gitea-pages
-          force_orphan: true
-`,
-  // The container option: the same files, served by nginx with the compressed copies the build wrote.
-  'Dockerfile': `FROM oven/bun:1 AS build
-WORKDIR /app
-COPY . .
-RUN bun install --frozen-lockfile && bun run build
-
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-`,
-  'nginx.conf': `server {
-  listen 80;
-  root /usr/share/nginx/html;
-  gzip_static on;
-  gzip_vary on;
-
-  location /_kay/ {
-    add_header Cache-Control "public, max-age=31536000, immutable";
-  }
-
-  location / {
-    try_files $uri $uri.html $uri/index.html =404;
-  }
-
-  error_page 404 /404.html;
-}
-`,
-  '.dockerignore': 'node_modules\n.kay\ndist\n',
-  '.gitignore': 'node_modules\n.kay\ndist\n',
-}
-
-export type Template = 'server' | 'site'
-
-export const TEMPLATES: readonly Template[] = ['server', 'site']
+export const TEMPLATES: readonly Template[] = ['server', 'site', 'app']
 
 export interface NewOptions {
   // The \`kay\` dependency: by default the published kay running this command, or a packed copy of the checkout running it.
   kay?: string
-  // `server` by default, an Elysia app serving the pages; `site`, a static site built to files.
+  // `server` by default, an Elysia app serving the pages, run in production as one executable; `site`, a static site built to files; `app`, the server with sessions, a sign-in, a guarded section and a websocket.
   template?: Template
 }
 
@@ -202,17 +35,18 @@ export async function createProject(target: string, options: NewOptions = {}): P
   const name = packageName(basename(dir))
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
   const dependency = options.kay ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@^${kay.version}`)
-  const site = options.template === 'site'
+  const template = options.template ?? 'server'
+  const site = template === 'site'
+  const devDependencies = Object.fromEntries(['@iconify-json/tabler', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'].map(name => [name, kay.devDependencies[name]!]))
   const files: Record<string, string> = {
-    ...FILES,
-    ...site && SITE_FILES,
+    ...TEMPLATE_FILES[template],
     'package.json': `${JSON.stringify({
       name,
       type: 'module',
       private: true,
-      scripts: site ? { dev: 'kay dev', build: 'kay build --static', check: 'kay check', fmt: 'kay fmt', test: 'bun test' } : { dev: 'kay dev', build: 'kay build', start: 'NODE_ENV=production bun src/server.ts', check: 'kay check', fmt: 'kay fmt', test: 'bun test' },
+      scripts: site ? { dev: 'kay dev', build: 'kay build --static', check: 'kay check', fmt: 'kay fmt', test: 'bun test' } : { dev: 'kay dev', build: 'kay build', compile: 'kay build --compile server', start: 'NODE_ENV=production bun src/server.ts', check: 'kay check', fmt: 'kay fmt', test: 'bun test' },
       dependencies: { elysia: kay.dependencies.elysia, kay: dependency },
-      devDependencies: { '@types/bun': kay.devDependencies['@types/bun'] },
+      devDependencies,
     }, null, 2)}\n`,
     'tsconfig.json': `${JSON.stringify({
       compilerOptions: {
@@ -232,9 +66,9 @@ export async function createProject(target: string, options: NewOptions = {}): P
     }, null, 2)}\n`,
   }
 
-  // A static site has no server of its own.
-  if (site)
-    delete files['src/server.ts']
+  // The app's session secret, for development and its tests, never committed.
+  if (template === 'app')
+    files['.env'] = `SESSION_SECRET=${randomBytes(32).toString('hex')}\n`
 
   await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content.replaceAll('__NAME__', name))))
 

@@ -26,7 +26,7 @@ import { writeImageVariants } from './server/image'
 import { ExportError, prerenderPages } from './server/prerender'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site]\n       kay dev [entry]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [entry]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
