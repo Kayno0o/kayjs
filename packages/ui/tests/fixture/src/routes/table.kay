@@ -1,0 +1,9 @@
+---
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+const planets = [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }, { id: 3, name: 'Venus', moons: 0 }]
+const columns = [{ key: 'name', header: 'Name', sortValue: true as const }, { key: 'moons', header: 'Moons', align: 'end' as const }]
+---
+main
+  #static
+    Table(columns={columns} rows={planets} rowKey="id" sort={{ key: 'name', direction: 'asc' }})

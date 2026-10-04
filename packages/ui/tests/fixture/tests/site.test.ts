@@ -56,3 +56,13 @@ test('IconButton names its action for screen readers and as its tooltip', async 
 test('Toaster is an island rendering an empty manual popover, filled in the browser only', async () => {
   expect(await element('/buttons', 'toasts')).toMatch(/^<div id="toasts"><slot data-component="[^"]*\/toaster\.kay"[^>]*><div class="toaster" popover="manual"><\/div>/)
 })
+
+test('Table renders sorted on the server from a static page, its sortable headers buttons and the rest text', async () => {
+  // An island's hydration markers left out.
+  const table = (await element('/table', 'static')).replaceAll(/<!--[^>]*-->/g, '')
+  const cells = [...table.matchAll(/<td class="table-cell" data-align="(\w+)">([^<]*)<\/td>/g)].map(([, align, text]) => `${align}:${text}`)
+
+  expect(cells).toEqual(['start:Earth', 'end:1', 'start:Mars', 'end:2', 'start:Venus', 'end:0'])
+  expect(table).toMatch(/<th class="table-head-cell" scope="col" data-align="start" aria-sort="ascending"><button class="table-sort-btn" type="button" data-direction="asc">Name<svg/)
+  expect(table).toContain('<th class="table-head-cell" scope="col" data-align="end">Moons</th>')
+})

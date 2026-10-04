@@ -1,0 +1,72 @@
+--- <Row>
+import type { JSX } from 'kay'
+import type { Column, RowKey, SortState } from './table'
+import { effect, signal } from 'kay'
+import Icon from './icon.kay'
+import { cellText, nextSort, rowKeyOf, sortedRows } from './table'
+
+const { columns, rows, rowKey, sort, serverSort = false, onSort, cell, empty, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+  columns: Column<Row>[]
+  rows: Row[]
+  rowKey: RowKey<Row>
+  // The sort to start from; a table whose parent passes a new one follows it.
+  sort?: SortState
+  // Rows already sorted by the data source: the table reflects the sort in its headers and never reorders them itself.
+  serverSort?: boolean
+  // Called with each sort a header click asks for, to fetch the rows sorted that way when `serverSort` is set.
+  onSort?: (sort: SortState) => void
+  // Draws the cells of the columns marked `cell: true`.
+  cell?: (row: Row, column: Column<Row>) => JSX.Element
+  // Shown in place of the rows when there are none.
+  empty?: JSX.Element
+  class?: string
+}>()
+
+const current = signal(sort)
+
+effect(() => current.set(sort))
+
+const shown = () => serverSort ? rows : sortedRows(rows, columns, current())
+const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
+
+function toggle(column: Column<Row>) {
+  const next = nextSort(current(), column)
+
+  current.set(next)
+  onSort?.(next)
+}
+
+function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
+  if (!sorting(column))
+    return undefined
+
+  return current()?.direction === 'asc' ? 'ascending' : 'descending'
+}
+---
+.table-wrap({...rest} class={className})
+  table.table
+    thead
+      tr
+        for column of columns key={column.key}
+          th.table-head-cell(scope="col" data-align={column.align ?? 'start'} aria-sort={ariaSort(column)})
+            if column.sortValue
+              button.table-sort-btn(type="button" data-direction={sorting(column) ? current()?.direction : undefined} onClick={() => toggle(column)})
+                | {column.header}
+                if sorting(column)
+                  Icon(icon="chevron" class="table-sort-icon")
+            else
+              | {column.header}
+    tbody
+      for row of shown() key={rowKeyOf(row, rowKey)}
+        tr.table-row
+          for column of columns key={column.key}
+            td.table-cell(data-align={column.align ?? 'start'})
+              if column.cell && cell
+                | {cell(row, column)}
+              else
+                | {cellText(row, column)}
+      else
+        if empty
+          tr
+            td.table-empty-cell(colspan={columns.length})
+              | {empty}

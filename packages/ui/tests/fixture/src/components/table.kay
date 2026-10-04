@@ -1,0 +1,23 @@
+---
+import type { Column, SortState } from '@kaynooo/kayjs-ui'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Planet {
+  id: number
+  name: string
+  moons: number
+}
+
+const { rows, serverSort = false, onSort } = props<{ rows: Planet[], serverSort?: boolean, onSort?: (sort: SortState) => void }>()
+
+const columns: Column<Planet>[] = [
+  { key: 'name', header: 'Name', sortValue: planet => planet.name, defaultDirection: 'asc', cell: true },
+  { key: 'moons', header: 'Moons', sortValue: true, align: 'end' },
+  { key: 'id', header: 'Id' },
+]
+---
+Table(columns={columns} rows={rows} rowKey={planet => planet.id} serverSort={serverSort} onSort={onSort})
+  @cell(planet)
+    strong {planet.name}
+  @empty
+    p.nothing No planets
