@@ -1,6 +1,6 @@
 import type { ClientManifest } from '../src/server/client'
 import type { Encoding } from '../src/server/compress'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -198,22 +198,13 @@ describe('pages', () => {
     expect((await app.handle(new Request('http://localhost/_kay/%00'))).status).toBe(404)
   })
 
-  it('ships Solid\'s production build, not its development one', async () => {
-    const dist = join(process.cwd(), '.kay/client/dist')
-    const chunks = await Promise.all((await readdir(dist)).filter(file => file.endsWith('.js')).map(async file => Bun.file(join(dist, file)).text()))
-
-    // Only solid-js's dev build points at its diagnostics package.
-    expect(chunks.filter(chunk => chunk.includes('@solidjs/diagnostics'))).toEqual([])
-  })
-
   it('hydrates the island on the served page and leaves the static markup alone', async () => {
     const html = await (await app.handle(new Request('http://localhost/'))).text()
 
     GlobalRegistrator.register()
 
     try {
-      // Solid's bootstrap assigns `_$HY` on globalThis, which outlives happy-dom's window between test files.
-      // eslint-disable-next-line no-new-func -- runs Solid's inline bootstrap script, which happy-dom does not execute from markup
+      // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
       new Function(INLINE_SCRIPT.exec(html)![1]!)()
       document.body.innerHTML = BODY.exec(html)![1]!
       const button = document.querySelector('slot button')!
@@ -317,7 +308,7 @@ describe('pages', () => {
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => app.handle(new NativeRequest(new URL(String(input), 'http://localhost'), init))) as typeof fetch
 
     try {
-      // eslint-disable-next-line no-new-func -- runs Solid's inline bootstrap script, which happy-dom does not execute from markup
+      // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
       new Function(INLINE_SCRIPT.exec(html)![1]!)()
       document.body.innerHTML = BODY.exec(html)![1]!
       await hydrateFrom(html)
@@ -325,7 +316,7 @@ describe('pages', () => {
 
       input.value = 'From an island'
       input.dispatchEvent(new Event('input', { bubbles: true }))
-      // Solid 2 stages writes until a microtask; a person types and submits in separate tasks.
+      // A person types and submits in separate tasks.
       await new Promise(resolve => setTimeout(resolve, 0))
       document.querySelector('form.quick')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
       await new Promise(resolve => setTimeout(resolve, 50))

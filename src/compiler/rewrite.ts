@@ -10,9 +10,6 @@ import { defaultName } from './codegen'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 
-// Literals both of Solid's builds write into the markup alike.
-const PLAIN_LITERALS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral'])
-
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
 const require = createRequire(import.meta.url)
 let loadedTraverse: typeof traverseModule | undefined
@@ -103,20 +100,6 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
   }
 
   traverse(ast, {
-    // Solid's server build folds a constant child such as `{name}` into the markup, while the browser build inserts it between markers; among other children, hydration then finds no markers.
-    // Read through a call, it is dynamic to both.
-    JSXExpressionContainer: (path) => {
-      const parent = path.parentPath.node
-      const expression = path.get('expression')
-
-      if ((parent.type !== 'JSXElement' && parent.type !== 'JSXFragment') || parent.children.length < 2 || !expression.isExpression() || PLAIN_LITERALS.has(expression.node.type) || !expression.evaluate().confident)
-        return
-
-      const start = map.isExact(expression.node.start!) ? map.toSource(expression.node.start!) : undefined
-
-      if (start !== undefined && !rewrites.has(start))
-        rewrites.set(start, { before: '(() => (', after: '))()', end: start + expression.node.end! - expression.node.start! })
-    },
     Program: (path) => {
       // The export of the function counts as a reference to it, and a tag of that name is the component rendering itself; neither is a read of a global.
       shadowsName = path.scope.getBinding(componentName)?.referencePaths.some(reference => reference.isIdentifier() && !inIslandExport(reference) && tagPosition(reference) === undefined) ?? false

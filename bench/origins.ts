@@ -4,7 +4,7 @@ import { readdirSync } from 'node:fs'
 import { cpus } from 'node:os'
 import { basename, join } from 'node:path'
 import { buildClient } from '../src/server/client'
-import { APP, browserOrigin, bytesByOrigin, ENGINE, GC, gzipSize, INLINE, KAY, LAYOUT, readChunk, SOLID, timeByOrigin } from './attribution'
+import { APP, browserOrigin, bytesByOrigin, ENGINE, GC, gzipSize, INLINE, KAY, LAYOUT, readChunk, timeByOrigin } from './attribution'
 import { launch, openTable, OPERATIONS, serve, timeClick, WARMUPS } from './browser'
 import { kilobytes, milliseconds, table } from './format'
 
@@ -26,7 +26,7 @@ const DIST = join(ROOT, '.kay', 'client', 'dist')
 const LOADS = 10
 const SAMPLES = 10
 const SAMPLING_INTERVAL_US = 50
-const MAIN_ORIGINS = [SOLID, KAY, APP]
+const MAIN_ORIGINS = [KAY, APP]
 // The origins the operations table gives a column each; the rest are summed as "other".
 const OPERATION_ORIGINS = [...MAIN_ORIGINS, GC, ENGINE, LAYOUT]
 const JS_OUTPUT = /\.js$/
@@ -138,7 +138,7 @@ function percent(part: number, whole: number): string {
   return `${whole === 0 ? 0 : Math.round(part / whole * 100)}%`
 }
 
-// Solid, kay and the app first, then the rest by weight.
+// kay and the app first, then the rest by weight.
 function ordered(origins: Iterable<string>, weight: (origin: string) => number): string[] {
   const rest = [...new Set(origins)].filter(origin => !MAIN_ORIGINS.includes(origin)).sort((a, b) => weight(b) - weight(a))
 
@@ -192,10 +192,10 @@ function operationsSection(operations: OperationProfile[]): string {
   const otherTime = (operation: OperationProfile) => sum(others.map(origin => operation.times.get(origin) ?? 0))
 
   return table(
-    ['operation', 'measured (ms)', 'profiled (ms)', ...OPERATION_ORIGINS, 'other', `${SOLID} share`],
+    ['operation', 'measured (ms)', 'profiled (ms)', ...OPERATION_ORIGINS, 'other', `${KAY} share`],
     operations.map((operation) => {
       const profiled = sum(operation.times.values())
-      const solid = operation.times.get(SOLID) ?? 0
+      const kay = operation.times.get(KAY) ?? 0
 
       return [
         operation.name,
@@ -203,14 +203,10 @@ function operationsSection(operations: OperationProfile[]): string {
         milliseconds(profiled),
         ...OPERATION_ORIGINS.map(origin => milliseconds(operation.times.get(origin) ?? 0)),
         milliseconds(otherTime(operation)),
-        `**${percent(solid, profiled)}**`,
+        `**${percent(kay, profiled)}**`,
       ]
     }),
   )
-}
-
-async function packageVersion(name: string): Promise<string> {
-  return (await Bun.file(join(import.meta.dir, '..', 'node_modules', name, 'package.json')).json() as { version: string }).version
 }
 
 async function commit(): Promise<string> {
@@ -248,10 +244,10 @@ try {
       '',
       `- ${cpus()[0]?.model ?? 'unknown CPU'}, ${cpus().length} threads`,
       `- Bun ${Bun.version}, Chromium ${browser.version()} headless`,
-      `- kay ${await commit()}, solid-js ${await packageVersion('solid-js')}, @solidjs/web ${await packageVersion('@solidjs/web')}`,
+      `- kay ${await commit()}`,
       `- run on ${new Date().toISOString().slice(0, 10)}`,
       '',
-      `How much of what kay costs is Solid's, to weigh replacing its runtime and compiler. ${SOLID} is solid-js, @solidjs/signals, @solidjs/web and seroval; ${KAY} is kay's runtime and the entry it generates; ${APP} is the bench app's components as Solid's compiler wrote them and its shared data. Reproduce with \`bun run bench:origins\`; the cross-framework numbers are in results.md.`,
+      `What kay costs, by where it comes from. ${KAY} is kay's runtime and the entry it generates; ${APP} is the bench app's components as kay compiled them and its shared data. Reproduce with \`bun run bench:origins\`; the cross-framework numbers are in results.md.`,
       '',
       '## JS shipped',
       '',
@@ -267,7 +263,7 @@ try {
       '',
       '## Page loads in Chromium',
       '',
-      `Main-thread milliseconds per fresh load up to network idle, from Chromium's CPU profiler sampling every ${SAMPLING_INTERVAL_US} µs, means of ${LOADS} loads. A DOM call counts for the JavaScript that made it, so the time a replacement would still spend creating nodes is in Solid's share. ${ENGINE} is Chromium's own work outside any script: parsing, style, layout. ${INLINE} are the page's inline scripts.`,
+      `Main-thread milliseconds per fresh load up to network idle, from Chromium's CPU profiler sampling every ${SAMPLING_INTERVAL_US} µs, means of ${LOADS} loads. A DOM call counts for the JavaScript that made it, so creating nodes counts for the code that asked for them. ${ENGINE} is Chromium's own work outside any script: parsing, style, layout. ${INLINE} are the page's inline scripts.`,
       '',
       timesSection([{ name: 'products', times: products.times }, { name: 'table', times: tablePage.times }], milliseconds),
       '',

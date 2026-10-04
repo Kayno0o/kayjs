@@ -165,7 +165,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     minify: options.minify ?? false,
     sourcemap: options.sourcemap ? 'linked' : 'none',
     metafile: true,
-    // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which shipped Solid's dev build.
+    // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
     define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') },
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
     plugins: [withoutStyles(), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache') }), ...options.plugins ?? []],

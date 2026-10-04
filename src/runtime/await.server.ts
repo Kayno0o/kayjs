@@ -1,6 +1,6 @@
-import type { JSX } from '@solidjs/web'
 import type { AwaitProps } from './checks'
 import type { Html } from './html'
+import type { JSX } from './jsx'
 import { child } from './html'
 import { insideIsland } from './island.server'
 

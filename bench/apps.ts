@@ -10,7 +10,7 @@ export function isApp(name: string | undefined): name is AppName {
   return APPS.includes(name as AppName)
 }
 
-// Each app lives in its own package, so it is loaded in its own process: Solid 1 and kay's Solid 2 never meet.
+// Each app lives in its own package, so it is loaded in its own process, with its own dependencies.
 export async function loadApp(name: AppName): Promise<BenchApp> {
   const { createApp } = await import(`./apps/${name}/app.ts`) as { createApp: () => Promise<BenchApp> }
 

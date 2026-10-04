@@ -47,7 +47,7 @@ const NAMED_IMPORT = /^import \{([^}]*)\} from (['"][^'"]+['"])/
 const RESERVED_CHARACTER = /[!'()*]/g
 const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
-const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|Island|IslandBrand|HydrateWhen|Href|Field|Prop|FunctionProp|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
+const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Field|Prop|FunctionProp|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
 const FULL_SYNC = 1
 const ERROR = 1
 const CREATED = 1
@@ -717,7 +717,7 @@ function sourceEdits(document: ShadowFile, edits: TextEdit[], offset: number): T
   return mapped
 }
 
-// tsgo adds a name to an import generated code already has, such as `solid-js`'s: the names it adds become an import of their own.
+// tsgo adds a name to an import generated code already has, such as `kay`'s: the names it adds become an import of their own.
 function mergedImport(tsx: string, edit: TextEdit): string | undefined {
   const line = tsx.split('\n')[edit.range.start.line] ?? ''
   const before = NAMED_IMPORT.exec(line)

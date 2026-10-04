@@ -6,10 +6,6 @@ describe('child values', () => {
   it('escape text, keep numbers and rendered markup, and drop null, undefined and booleans', () => {
     expect(child(['a < b & c', 1, null, undefined, true, false, { t: '<b>x</b>' }, () => '<i>'])).toBe('a &lt; b &amp; c1<b>x</b>&lt;i>')
   })
-
-  it('refuse markup still waiting on async data', () => {
-    expect(() => child({ t: [''], h: [] })).toThrow('cannot render outside an island')
-  })
 })
 
 describe('element', () => {

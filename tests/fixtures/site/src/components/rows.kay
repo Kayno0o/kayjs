@@ -1,5 +1,5 @@
 --- <T>
-import type { JSX } from '@solidjs/web'
+import type { JSX } from 'kay'
 
 const { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()
 ---

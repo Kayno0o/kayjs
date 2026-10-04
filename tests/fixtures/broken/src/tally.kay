@@ -1,5 +1,5 @@
 ---
-import type { JSX } from '@solidjs/web'
+import type { JSX } from 'kay'
 
 const { label } = props<{ label: (count: number) => JSX.Element }>()
 ---

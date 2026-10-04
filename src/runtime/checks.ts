@@ -1,5 +1,5 @@
-import type { JSX } from '@solidjs/web'
 import type { Elysia } from 'elysia'
+import type { Component, JSX } from './jsx'
 
 // Types behind the checks `kay check` adds to generated code; nothing here runs.
 
@@ -110,4 +110,19 @@ export interface AwaitProps<T> {
   pending?: () => JSX.Element
   ready: (value: Awaited<T>) => JSX.Element
   failed?: (error: unknown) => JSX.Element
+}
+
+type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicElements[Tag] : Tag extends Component<infer Props> ? Props : Record<string, unknown>
+
+// What the template's control flow and dynamic tags read as in generated code: `for` and an aliased `if` hand their block accessors, as the browser build does.
+export interface TemplateHelpers {
+  For: {
+    <T>(props: { each: readonly T[] | null | undefined | false, keyed: (item: T) => unknown, fallback?: JSX.Element, children: (item: () => T, index: () => number) => JSX.Element }): JSX.Element
+    <T>(props: { each: readonly T[] | null | undefined | false, keyed: false, fallback?: JSX.Element, children: (item: () => T, index: number) => JSX.Element }): JSX.Element
+  }
+  Show: <T>(props: { when: T, fallback?: JSX.Element, children: (value: () => NonNullable<T>) => JSX.Element }) => JSX.Element
+  staticFor: <T>(each: readonly T[] | null | undefined | false, render: (item: T, index: number) => JSX.Element, fallback?: () => JSX.Element) => JSX.Element
+  Dynamic: <Tag>(props: { component: Tag } & PropsOf<Tag>) => JSX.Element
+  omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
+  head: (tags: { tag: string, props: Record<string, unknown> }[]) => void
 }

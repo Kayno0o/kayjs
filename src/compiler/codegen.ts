@@ -43,7 +43,7 @@ export interface Generated {
   diagnostics: Diagnostic[]
 }
 
-// Solid's compiler collapses a run of spaces in JSX text, which `pre` and `textarea` would show, so a run goes out as a string.
+// JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
 const JSX_TEXT_ESCAPES = /[{}<>]|[ \t]{2,}/g
 const BINDABLE = new Set(['input', 'textarea', 'select'])
 const NUMERIC_INPUTS = new Set(['number', 'range'])
@@ -126,9 +126,6 @@ class Generator {
     if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
 
-    if (used.includes('For') && !runnable)
-      kayHelpers.push(staticLoops ? 'staticFor' : 'loopFor')
-
     if (kayHelpers.length > 0)
       b.add(`import { ${kayHelpers.map(helper => `${helper} as ${kayAlias(helper)}`).join(', ')} } from 'kay'\n`)
 
@@ -141,7 +138,7 @@ class Generator {
     const childrenType = ' & { children?: KayJSX.Element }'
 
     if (childrenSlot)
-      b.add(`import type { JSX as KayJSX } from '@solidjs/web'\n`)
+      b.add(`import type { JSX as KayJSX } from 'kay'\n`)
 
     if (html)
       b.add(htmlHelperImport())
@@ -149,8 +146,11 @@ class Generator {
     if (dom)
       b.add(domHelperImport())
 
-    if (helpers.length > 0)
-      b.add(`import { ${helpers.map(helper => `${helper} as ${helperAlias(helper)}`).join(', ')} } from 'solid-js'\n`)
+    // Code that only gets read, by the type checker and the analysis pass, declares the helpers of its control flow rather than import a runtime of them.
+    const declared: [name: string, helper: DeclaredHelper][] = helpers.map(helper => [helperAlias(helper), helper])
+
+    if (used.includes('For') && !runnable)
+      declared.push(staticLoops ? ['KayStaticFor', 'staticFor'] : ['KayLoopFor', 'For'])
 
     if (this.options.island)
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
@@ -165,12 +165,19 @@ class Generator {
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
 
     if (!runnable && this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
-      b.add(`import { Dynamic as ${DYNAMIC_TAG} } from '@solidjs/web'\n`)
+      declared.push([DYNAMIC_TAG, 'Dynamic'])
 
     const { head, template } = this.splitHead(this.file.template)
 
     if (head && !this.options.check && !runnable)
-      b.add(`import { useHead as KayUseHead } from '@solidjs/web'\n`)
+      declared.push(['KayUseHead', 'head'])
+
+    if (declared.length > 0) {
+      b.add(`import type { TemplateHelpers as KayTemplateHelpers } from 'kay'\n`)
+
+      for (const [name, helper] of declared)
+        b.add(`declare const ${name}: KayTemplateHelpers[${JSON.stringify(helper)}]\n`)
+    }
 
     if (includeServer)
       this.emitLoad(server, query)
@@ -487,7 +494,7 @@ class Generator {
     return nested === undefined
   }
 
-  // The tag Solid's `useHead` takes: `{ tag: 'meta', props: { name: 'description', content: (description) } }`.
+  // The tag `head()` takes: `{ tag: 'meta', props: { name: 'description', content: (description) } }`.
   private emitHeadTag(element: ElementNode) {
     const { b } = this
 
@@ -687,7 +694,7 @@ class Generator {
     })
   }
 
-  // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops skip the owner Solid's `For` makes for every row.
+  // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops hand each row its item rather than an accessor to it.
   private get staticLoops(): boolean {
     if (this.options.check || this.options.island)
       return false
@@ -704,7 +711,7 @@ class Generator {
       return
     }
 
-    const tag = kayAlias('loopFor')
+    const tag = 'KayLoopFor'
     // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
     const positional = node.index !== undefined && this.text(node.key).trim() === this.text(node.index)
 
@@ -748,7 +755,7 @@ class Generator {
     const { b } = this
 
     b.wrap(node, () => {
-      b.add(`{${kayAlias('staticFor')}(`).addSource(node.each).add(', (')
+      b.add('{KayStaticFor(').addSource(node.each).add(', (')
       b.addSource(node.item)
 
       if (node.index)
@@ -1041,7 +1048,7 @@ class Generator {
           return
         }
 
-        // Solid reads a handler once, when it attaches it; read at each event instead, a handler held by a prop, a signal or a loop item stays current.
+        // Read at each event rather than once, as the browser build does, so a handler held by a prop, a signal or a loop item stays current.
         if (!element.component && !this.options.check && EVENT_HANDLER.test(name) && !isFunctionExpression(this.text(attribute.expression))) {
           b.addSource(attribute.name).add('={(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)}')
 
@@ -1083,7 +1090,7 @@ class Generator {
     return undefined
   }
 
-  // `onclick` and `on:click` attach nothing in Solid, and the component would not become an island either.
+  // `onclick` and `on:click` attach nothing, and the component would not become an island either.
   private reportLowercaseEvent(attribute: Extract<Attribute, { kind: 'expression' }>) {
     const name = LOWERCASE_EVENT.exec(this.text(attribute.name))?.[1]
 
@@ -1257,7 +1264,7 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return visit(file.template)
 }
 
-type KayHelper = 'formAction' | 'registerActions' | 'actionStub' | 'staticFor' | 'loopFor'
+type KayHelper = 'formAction' | 'registerActions' | 'actionStub'
 
 function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
@@ -1288,6 +1295,9 @@ function formHelpers(file: KayFile): KayHelper[] {
 }
 
 type Helper = 'For' | 'Show' | 'omit'
+
+// The members of `TemplateHelpers` in src/runtime/checks.ts.
+type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head'
 
 function helperAlias(helper: Helper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`

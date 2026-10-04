@@ -19,7 +19,7 @@ export interface Rendered {
   deferred: PendingBlock[]
 }
 
-// A static render, as pages and layouts are: only islands, rendered as their own Solid roots, carry hydration keys.
+// A static render, as pages and layouts are: only islands carry the markers hydration claims.
 export function renderStatic(view: () => unknown): Rendered {
   const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => child(view())))
 

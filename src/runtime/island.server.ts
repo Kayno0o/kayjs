@@ -1,6 +1,6 @@
-import type { JSX } from '@solidjs/web'
 import type { HydrateWhen, IslandComponent } from './checks'
 import type { Html } from './html'
+import type { JSX } from './jsx'
 import { omit } from './dom'
 import { escapeAttribute } from './escape'
 import { child } from './html'

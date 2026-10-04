@@ -1,5 +1,5 @@
-import type { JSX } from '@solidjs/web'
 import type { AwaitProps } from './checks'
+import type { JSX } from './jsx'
 import { awaited, fragment, markers } from './dom'
 
 // Compiled islands bind `await` blocks themselves; this is the component form, for code that builds one by hand.

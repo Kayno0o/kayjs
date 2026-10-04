@@ -37,7 +37,7 @@ describe('component shell', () => {
     expect(reactive).toEndWith('export default KayIsland("test.kay", Test)\n')
     expect(tsx('button(onClick={go}) Go')).toContain('export default KayIsland(')
     expect(tsx('input(bind:value={name})')).toContain('export default KayIsland(')
-    expect(tsx('---\nimport type { Accessor } from \'solid-js\'\n---\np x')).toContain('export default function Test()')
+    expect(tsx('---\nimport type { JSX } from \'kay\'\n---\np x')).toContain('export default function Test()')
   })
 
   it('names the component after its file', () => {
@@ -115,7 +115,7 @@ describe('control flow', () => {
     expect(jsx('for row, i of rows key={i}\n  p {i}: {row}')).toBe('<><KayLoopFor each={rows} keyed={false}>{(row, i) => <p>{i}: {row()}</p>}</KayLoopFor></>')
   })
 
-  it('renders the loops of a page on the server without Solid\'s For, which only islands and browsers need', () => {
+  it('hands the rows of a page\'s loops their items, since only islands and browsers update rows', () => {
     const page = '--- server\nconst rows = [1]\n---\nul\n  for row, i of rows key={row}\n    li {i}: {row}\n  else\n    li none'
     const server = compileKay(page, 'src/routes/index.kay', { includeServer: true }).tsx
 
@@ -209,11 +209,19 @@ describe('islands', () => {
   })
 })
 
+describe('fences', () => {
+  it('report markup as belonging in the template, a fence holding TypeScript only', () => {
+    expect(errors('---\nconst el = <p>x</p>\n---\np x')).toEqual([expect.stringContaining('a fence holds TypeScript, never JSX')])
+    expect(errors('--- server\nconst el = <><b /></>\n---\np x')).toEqual([expect.stringContaining('a fence holds TypeScript, never JSX')])
+    expect(errors('---\nconst x = 1 +\n---\np x')).toEqual(['Unexpected token'])
+  })
+})
+
 describe('head', () => {
   it('registers the head tags before rendering and leaves them out of the template', () => {
     const code = tsx('---\nconst { name } = props<{ name: string }>()\n---\nhead\n  title {name} | Docs\n  meta(name="description" content={name} data-x)\nh1 {name}')
 
-    expect(code).toContain('import { useHead as KayUseHead } from \'@solidjs/web\'')
+    expect(code).toContain('declare const KayUseHead: KayTemplateHelpers["head"]')
     expect(code).toContain('KayUseHead([{ tag: "title", props: { "children": "" + (__props.name) + " | Docs" } }, { tag: "meta", props: { "name": "description", "content": (__props.name), "data-x": true,  } }, ]);\n\nreturn <h1>{__props.name}</h1>')
   })
 
@@ -367,7 +375,7 @@ describe('component names', () => {
     expect(code).toContain('<__props.Icon n="x" />')
     expect(code).toContain('<__props.Wrap><p>a</p></__props.Wrap>')
     expect(code).toContain('{(Item) => <KayDynamic component={Item()} x="1"><p>b</p></KayDynamic>}')
-    expect(code).toContain('import { Dynamic as KayDynamic } from \'@solidjs/web\'')
+    expect(code).toContain('declare const KayDynamic: KayTemplateHelpers["Dynamic"]')
   })
 
   it('reads a component prop with a default through Dynamic as well', () => {

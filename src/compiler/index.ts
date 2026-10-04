@@ -56,7 +56,7 @@ export function withoutTwin(path: string): string {
   return path.endsWith(ISLAND_TWIN) ? path.slice(0, -ISLAND_TWIN.length) : path
 }
 
-// Compiles a .kay component to TSX that is both type-checked and handed to Solid's compiler.
+// Compiles a .kay component: to TSX the type checker reads, or with `output` to the HTML strings and DOM code that run.
 export function compileKay(source: string, filename: string, options: CompileOptions = {}): CompileResult {
   const file = parseKay(source)
   const server = analyzeServer(source, file.server)

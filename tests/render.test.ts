@@ -7,7 +7,6 @@ import { kay } from '../src/build/plugin'
 import { mapStack } from '../src/build/sourcemap'
 import { transformKay } from '../src/build/transform'
 import { child } from '../src/runtime/html'
-import { staticFor } from '../src/runtime/static'
 
 plugin(kay())
 
@@ -42,17 +41,6 @@ describe('server rendering through the Bun plugin', () => {
 
     expect(html).toContain('<h1>Empty</h1>')
     expect(html).toContain('Nothing matches')
-  })
-})
-
-describe('staticFor', () => {
-  it('renders each row once with its item and index, and the fallback when empty', () => {
-    const row = (item: string, index: number) => `${item}@${index}`
-
-    expect(staticFor(['a', 'b'], row)).toEqual(['a@0', 'b@1'])
-    expect(staticFor(null, row, () => 'none')).toBe('none')
-    expect(staticFor(false, row)).toBeNull()
-    expect(staticFor([], row, () => 'none')).toBe('none')
   })
 })
 
@@ -173,7 +161,7 @@ describe('prop defaults', () => {
 
 describe('slots with parameters', () => {
   it('render once per call the component makes, with the arguments it passes', async () => {
-    await Bun.write(join(scratch, 'rows.kay'), '--- <T>\nimport type { JSX } from \'@solidjs/web\'\n\nconst { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()\n---\nul\n  for item, i of items key={i}\n    | {row(item, i)}\n')
+    await Bun.write(join(scratch, 'rows.kay'), '--- <T>\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()\n---\nul\n  for item, i of items key={i}\n    | {row(item, i)}\n')
 
     const html = await renderKay('---\nimport Rows from \'./rows.kay\'\nconst { names } = props<{ names: string[] }>()\n---\nRows(items={names})\n  @row(name, i)\n    li {i}: {name}', { names: ['a', 'b'] })
 
@@ -246,14 +234,14 @@ describe('stack frames', () => {
 })
 
 describe('static server output', () => {
-  it('builds markup without Solid', () => {
+  it('builds markup with kay\'s HTML runtime only', () => {
     const file = join(scratch, 'plain-page.kay')
     const compiled = transformKay('--- server\nconst rows = [1, 2]\n---\nul\n  for row of rows key={row}\n    li {row}\n', file, { target: 'ssr', hydratable: true })
 
     expect(compiled).not.toContain('solid')
   })
 
-  it('writes attributes as Solid\'s server build does', async () => {
+  it('writes attributes as HTML reads them', async () => {
     const source = '---\nconst { off, on, none, cls, css } = props<{ off: boolean, on: boolean, none?: string, cls: unknown, css: Record<string, string | null> }>()\n---\np(title="a &amp; b & c" data-e="" hidden aria-a={off} aria-b={on} aria-c={none} class={cls} style={css})'
     const html = await renderKay(source, { off: false, on: true, cls: ['x', { y: true, z: false }, 0], css: { color: 'red', margin: null } })
 

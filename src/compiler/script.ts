@@ -5,7 +5,7 @@ import type { Diagnostic, Span } from './ast'
 import { parse } from '@babel/parser'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
-const REACTIVE_MODULES = new Set(['kay', 'solid-js'])
+const REACTIVE_MODULES = new Set(['kay'])
 
 export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.
@@ -40,7 +40,7 @@ export interface ScriptAnalysis {
   imports: ImportBinding[]
   // The quoted module names of hoisted imports and re-exports.
   specifiers: Span[]
-  // True when the script imports a value from `kay` or `solid-js`: it holds client state, so the component becomes an island.
+  // True when the script imports a value from `kay`: it holds client state, so the component becomes an island.
   reactive: boolean
   body: Span[]
   props?: PropsDeclaration
@@ -350,18 +350,24 @@ function declaredIdentifiers(statement: t.Statement): t.Identifier[] {
 }
 
 function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): { ast: ParseResult<t.File>, shift: (node: t.Node | t.Comment) => Span } | undefined {
+  const code = source.slice(span.start, span.end)
   let ast: ParseResult<t.File>
 
   try {
-    ast = parse(source.slice(span.start, span.end), { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+    ast = parse(code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
   }
   catch (error) {
-    const at = span.start + ((error as { pos?: number }).pos ?? 0)
+    if (!reportJsx(code, span, diagnostics)) {
+      const at = span.start + ((error as { pos?: number }).pos ?? 0)
 
-    diagnostics.push({ start: at, end: at + 1, message: (error as Error).message.replace(POSITION_SUFFIX, '') })
+      diagnostics.push({ start: at, end: at + 1, message: (error as Error).message.replace(POSITION_SUFFIX, '') })
+    }
 
     return undefined
   }
+
+  if ((ast.errors?.length ?? 0) > 0 && reportJsx(code, span, diagnostics))
+    return undefined
 
   for (const error of ast.errors ?? []) {
     const at = span.start + ((error as unknown as { pos?: number }).pos ?? 0)
@@ -370,6 +376,51 @@ function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): { as
   }
 
   return { ast, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }
+}
+
+// Markup in a fence reads as JSX, which kay never compiles: the template is the only place for it.
+function reportJsx(code: string, span: Span, diagnostics: Diagnostic[]): boolean {
+  let jsx: t.Node | undefined
+
+  try {
+    const ast = parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'] })
+
+    jsx = findJsx(ast.program)
+  }
+  catch {
+    return false
+  }
+
+  if (!jsx)
+    return false
+
+  diagnostics.push({ start: span.start + jsx.start!, end: span.start + jsx.end!, message: 'Markup belongs in the template, or in a component of its own: a fence holds TypeScript, never JSX' })
+
+  return true
+}
+
+function findJsx(node: unknown): t.Node | undefined {
+  if (typeof node !== 'object' || node === null)
+    return undefined
+
+  if (Array.isArray(node))
+    return node.reduce<t.Node | undefined>((found, child) => found ?? findJsx(child), undefined)
+
+  const { type } = node as { type?: unknown }
+
+  if (type === 'JSXElement' || type === 'JSXFragment')
+    return node as t.Node
+
+  for (const [key, value] of Object.entries(node)) {
+    if (key !== 'loc' && key !== 'leadingComments' && key !== 'trailingComments' && key !== 'innerComments') {
+      const found = findJsx(value)
+
+      if (found)
+        return found
+    }
+  }
+
+  return undefined
 }
 
 function importsReactiveValue(statement: t.Statement): boolean {

@@ -51,6 +51,10 @@
       "types": "./types/runtime/image.d.ts",
       "default": "./src/runtime/image.ts"
     },
+    "./jsx-runtime": {
+      "types": "./types/runtime/jsx-runtime.d.ts",
+      "default": "./src/runtime/jsx-runtime.ts"
+    },
     "./dom": {
       "types": "./types/runtime/dom.d.ts",
       "default": "./src/runtime/dom.ts"
@@ -109,12 +113,9 @@
     "@babel/parser": "^7.29.7",
     "@babel/traverse": "^7.29.7",
     "@babel/types": "^7.29.7",
-    "@solidjs/compiler": "2.0.0-rc.13",
-    "@solidjs/web": "2.0.0-rc.13",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "devalue": "^6.0.2",
-    "elysia": "^1.4.30",
-    "solid-js": "2.0.0-rc.13"
+    "elysia": "^1.4.30"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",

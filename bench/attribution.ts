@@ -45,7 +45,6 @@ export interface CpuProfile {
 // A frame's origin, or undefined for a native one, whose time goes to the JavaScript that called it.
 export type FrameOrigin = (frame: CallFrame) => string | undefined
 
-export const SOLID = 'Solid'
 export const KAY = 'kay'
 export const APP = 'app'
 export const BUNDLER = 'bundler'
@@ -55,8 +54,6 @@ export const ENGINE = 'engine'
 export const LAYOUT = 'style and layout'
 export const INLINE = 'inline scripts'
 
-// Solid's packages and the serializer it hydrates with.
-const SOLID_PACKAGES = new Set(['solid-js', '@solidjs/signals', '@solidjs/web', 'seroval', 'seroval-plugins'])
 // The last `node_modules` of a path names its package.
 const PACKAGE = /.*node_modules\/((?:@[^/]+\/)?[^/]+)\//
 // What a build with source maps adds to each file: a debug id and the map's URL.
@@ -65,12 +62,12 @@ const REPO = resolve(import.meta.dir, '..')
 // The profiler's own nodes: `(idle)` is left out, `(program)` and `(root)` are the engine's.
 const META_FRAMES = new Map([['(garbage collector)', GC], ['(program)', ENGINE], ['(root)', ENGINE], ['(idle)', undefined]])
 
-// Solid, kay (its sources and the entry it generates), the benchmarked app, or the package a file belongs to.
+// kay (its sources and the entry it generates), the benchmarked app, or the package a file belongs to.
 export function originOf(path: string): string {
   const name = PACKAGE.exec(path)?.[1]
 
   if (name !== undefined)
-    return SOLID_PACKAGES.has(name) ? SOLID : name === 'kay' ? KAY : name
+    return name === 'kay' ? KAY : name
 
   const file = path.startsWith('file:') ? fileURLToPath(path) : path
 

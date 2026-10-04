@@ -1,5 +1,5 @@
 import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
-import { mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -269,15 +269,22 @@ describe('kay lsp imports', () => {
     dir = await mkdtemp(join(tmpdir(), 'kay-imports-'))
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, 'package.json'), JSON.stringify({ name: 'imports', type: 'module', dependencies: { kay: '*' } })),
+      Bun.write(join(dir, 'src/actions.ts'), 'import { action } from \'kay\'\n\nexport const add = action(() => 1)\n'),
       Bun.write(join(dir, 'src/data.ts'), 'export function listTodos(): string[] {\n  return []\n}\n'),
       Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n'),
       Bun.write(join(dir, page), 'p Home\n'),
       // A config that fails to load leaves the defaults; every test below runs against it.
       Bun.write(join(dir, 'kay.config.ts'), 'throw new Error(\'Broken config\')\n'),
     ])
-    // Every package of this checkout but kay itself, so generated code imports `solid-js` as a project's does.
+    // Every package of this checkout, and kay as a copy installed there: tsgo offers no import from a package whose files sit outside node_modules.
     await mkdir(join(dir, 'node_modules'))
     await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== 'kay' && name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
+    await cp(join(import.meta.dir, '../src'), join(dir, 'node_modules/kay/src'), { recursive: true })
+    // Without the `types` build a packed kay carries, each export resolves to its source.
+    const manifest = await Bun.file(join(import.meta.dir, '../package.json')).json() as { exports: Record<string, Record<string, string>> }
+
+    await Bun.write(join(dir, 'node_modules/kay/package.json'), JSON.stringify({ ...manifest, exports: Object.fromEntries(Object.entries(manifest.exports).map(([path, { types: _types, ...conditions }]) => [path, conditions])) }))
     editor = new Editor(dir)
     await editor.start()
     await editor.open(page)
@@ -300,14 +307,14 @@ describe('kay lsp imports', () => {
   })
 
   it('adds a name from a module generated code imports too, as its own import', async () => {
-    const source = '---\nconst double = createMem\n---\nfor n of [1] key={n}\n  p {n}\n'
+    const source = '---\nimport { add } from \'../actions\'\nconst count = signa\n---\nform(action={add})\n  button Add\n'
 
     await editor.change(page, source, 5)
 
-    const list = await editor.request<CompletionList>('textDocument/completion', page, 1, 25)
-    const item = await editor.connection.request<CompletionItem>('completionItem/resolve', list.items.find(entry => entry.label === 'createMemo'))
+    const list = await editor.request<CompletionList>('textDocument/completion', page, 2, 19)
+    const item = await editor.connection.request<CompletionItem>('completionItem/resolve', list.items.find(entry => entry.label === 'signal'))
 
-    expect(applyEdits(source, item.additionalTextEdits ?? [])).toBe('---\nimport { createMemo } from \'solid-js\'\nconst double = createMem\n---\nfor n of [1] key={n}\n  p {n}\n')
+    expect(applyEdits(source, item.additionalTextEdits ?? [])).toBe('---\nimport { add } from \'../actions\'\nimport { signal } from \'kay\'\nconst count = signa\n---\nform(action={add})\n  button Add\n')
   })
 
   it('adds a missing import as a quick fix, opening a script fence when there is none', async () => {
@@ -333,6 +340,7 @@ describe('kay lsp following files on disk', () => {
     dir = await mkdtemp(join(tmpdir(), 'kay-disk-'))
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, 'src/actions.ts'), 'import { action } from \'kay\'\n\nexport const add = action(() => 1)\n'),
       Bun.write(join(dir, 'src/data.ts'), 'export const n: number = 1\n'),
       Bun.write(join(dir, page), '---\nimport { n } from \'../data\'\nimport Badge from \'../badge.kay\'\n\nconst s: string = n\n---\nBadge\np {s}\n'),
     ])

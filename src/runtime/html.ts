@@ -1,5 +1,5 @@
 // What pages, layouts and static components render to on the server: markup built as strings, with no reactive runtime.
-// A rendered value is `{ t: markup }`, the shape Solid's server build gives its own, so an island's markup and JSX written in a fence or a `.tsx` component go in as they are.
+// A rendered value is `{ t: markup }`: what a component or an island rendered goes into its parent's markup as it is.
 
 import { escape, escapeAttribute } from './escape'
 
@@ -82,16 +82,9 @@ export function raw(value: unknown): string {
 }
 
 function rendered(value: object): string {
-  const { t, h } = value as { t?: unknown, h?: unknown }
+  const { t } = value as { t?: unknown }
 
-  if (typeof t === 'string')
-    return t
-
-  // Solid's markup still waiting on a value, which only an island's own root can render.
-  if (h !== undefined)
-    throw new Error('kay: this value cannot render outside an island: it waits on async data; read it in `--- server` or render it inside an `await` block')
-
-  return ''
+  return typeof t === 'string' ? t : ''
 }
 
 // ` name="value"`, ` name` for `true`, nothing for `null`, `undefined` and `false`.

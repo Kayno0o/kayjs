@@ -125,7 +125,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
         target: 'ESNext',
         lib: ['ESNext', 'DOM', 'DOM.Iterable'],
         jsx: 'preserve',
-        jsxImportSource: '@solidjs/web',
+        jsxImportSource: 'kay',
         module: 'Preserve',
         moduleResolution: 'bundler',
         rootDirs: ['.', '.kay/types'],

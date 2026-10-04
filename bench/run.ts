@@ -168,7 +168,7 @@ try {
   const environment = [
     `${cpus()[0]?.model ?? 'unknown CPU'}, ${cpus().length} threads`,
     `Bun ${Bun.version}, Chromium ${browser.version()} headless`,
-    `kay on ${await version('kay', 'solid-js')}, ${await version('solid', 'solid-js')}, ${await version('svelte', 'svelte')}`,
+    `${await version('kay', 'kay')}, ${await version('solid', 'solid-js')}, ${await version('svelte', 'svelte')}`,
     `run on ${new Date().toISOString().slice(0, 10)}`,
   ]
   const markdown = report(results, environment)

@@ -1,6 +1,6 @@
 # Kay
 
-> Kay is a Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to plain HTML strings on the server, islands run on Solid 2, and an Elysia plugin serves it all with automatic islands. Everything is typed, templates included, and `kay check` reports errors at the `.kay` line and column.
+> Kay is a Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to plain HTML strings on the server, islands run on kay's own signals and DOM runtime, and an Elysia plugin serves it all with automatic islands. Everything is typed, templates included, and `kay check` reports errors at the `.kay` line and column.
 
 ## Rules that are easy to get wrong
 
@@ -50,10 +50,10 @@ li(class={size})
 
 - Destructure one level deep and read nested fields as `todo.title`; give defaults in the destructuring. A default applies only to an `undefined` prop (`null` stays `null`) and runs only then, once per component, the first time the prop is read. `const all = props<T>()` also works and reads as `all.todo`.
 - Props stay reactive: the compiler turns each destructured name into a live read. They are read-only.
-- Imports, `type` and `interface` declarations are module level, except a type taking the `typeof` a name the script declares, which stays inside the component. Both fences may import the same name; the server fence's copy is dropped.
+- Imports, `type` and `interface` declarations are module level, except a type taking the `typeof` a name the script declares, which stays inside the component. Both fences may import the same name; the server fence's copy is dropped. A fence holds TypeScript only: markup goes in the template, and JSX in a fence is reported.
 - `signal(value)` from `kay` makes state; `signal<T>()` starts as `undefined`. Derived values are plain functions: `const shown = () => todos.filter(t => !t.done)`.
 - `selection<Key>(initial?)` from `kay` holds one selected string or number key among many rows, or none. It reads as `selected()` and writes as `selected.set(id)`, and `selected.is(row.id)` re-runs only for the rows a change selects or unselects, not every row: `tr(class={{ danger: selected.is(row.id) }})`.
-- Other Solid primitives come from `solid-js`.
+- `memo(fn)` caches a derived value until what it read changes, `effect(fn)` runs once the render is done and again whenever what it read changes, and `onMount`, `onCleanup`, `untrack`, `batch`, `root` and `flush` come from `kay` too. A write applies at once; the effects it touches run together in a microtask, or right away through `flush()`.
 
 ### Generic components
 
@@ -129,7 +129,7 @@ section.todo-list
 
 ```kay
 ---
-import type { JSX } from '@solidjs/web'
+import type { JSX } from 'kay'
 
 const { title, actions } = props<{ title: string, actions?: JSX.Element }>()
 ---
@@ -156,7 +156,7 @@ A block taking parameters is passed as a function the component calls, once per 
 
 ```kay
 --- <T extends { id: number }>
-import type { JSX } from '@solidjs/web'
+import type { JSX } from 'kay'
 
 const { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()
 ---
@@ -355,7 +355,7 @@ a(href="/")
 
 ## Islands
 
-A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script imports a value from `kay` or `solid-js`, such as `signal`. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript. Interactive components rendered inside an island are part of it.
+A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script imports a value from `kay`, such as `signal`. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript. Interactive components rendered inside an island are part of it.
 
 Props a static component passes to an island are serialized for the browser: plain objects and arrays, strings, numbers, booleans, `null` and `undefined`, and also Dates, Maps, Sets, bigints, URLs and RegExps, which arrive as themselves, a value referenced twice arriving once. `kay check` rejects functions and class instances there, and rendering throws on a class instance it could not tell apart, naming the prop. Children cannot cross either: rendering an island with children from a static parent throws.
 
@@ -491,7 +491,7 @@ catch
 - `defer()` handles a rejection where the promise is made. Without it, a promise rejecting before the page renders it would crash the server, so `kay check` refuses a bare promise in `await`.
 - Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them, and a `head` block inside one is ignored. A block renders on its own, outside its layouts, and an `await` inside a pending block renders its own pending block only.
 - The response stays open until the last value settles. Bun closes a connection idle for `idleTimeout` seconds, 10 by default, so a value slower than that needs `Bun.serve({ idleTimeout })` raised.
-- In an island, `await` renders through Solid's async rendering: the server sends the pending block and the browser renders the rest.
+- In an island, the server sends the pending block and the browser renders the rest once the value settles.
 
 ## Actions
 
@@ -703,7 +703,7 @@ Every page carries speculation rules: Chromium prefetches the page a link points
 {
   "compilerOptions": {
     "jsx": "preserve",
-    "jsxImportSource": "@solidjs/web",
+    "jsxImportSource": "kay",
     "module": "Preserve",
     "moduleResolution": "bundler",
     "rootDirs": [".", ".kay/types"],
