@@ -105,3 +105,41 @@ describe('seo head', () => {
     expect(() => siteOrigin('example.com')).toThrow('kay: site is the origin')
   })
 })
+
+describe('sitemap and robots', () => {
+  const LOC = /<loc>(.*?)<\/loc>/g
+
+  it('lists every page a crawler reaches, params from sitemap or prerender, guarded pages only when they opt in', async () => {
+    const response = await app.handle(new Request('http://localhost/sitemap.xml'))
+    const xml = await response.text()
+
+    expect(response.headers.get('content-type')).toBe('application/xml; charset=utf-8')
+    expect(xml).toStartWith('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    expect([...xml.matchAll(LOC)].map(match => match[1]).sort()).toEqual([
+      'https://example.com/',
+      'https://example.com/about',
+      'https://example.com/blog/a%20%26%20b',
+      'https://example.com/blog/first',
+      'https://example.com/custom',
+      'https://example.com/docs/guide/start',
+      'https://example.com/members',
+      'https://example.com/missing',
+    ])
+  })
+
+  it('points crawlers at the sitemap', async () => {
+    const response = await app.handle(new Request('http://localhost/robots.txt'))
+
+    expect(await response.text()).toBe('User-agent: *\nAllow: /\n\nSitemap: https://example.com/sitemap.xml\n')
+  })
+
+  it('leaves both to a public file of the same name, and serves neither without a site', async () => {
+    const own = await pages({ routes: ROUTES, publicDir: 'tests/fixtures/seo/public', prebuilt: false, site: 'https://example.com' })
+    const plain = await pages({ routes: ROUTES, prebuilt: false })
+
+    expect(await (await own.handle(new Request('http://localhost/robots.txt'))).text()).toBe('User-agent: *\nDisallow: /private\n')
+    expect((await own.handle(new Request('http://localhost/sitemap.xml'))).status).toBe(200)
+    expect((await plain.handle(new Request('http://localhost/sitemap.xml'))).status).toBe(404)
+    expect((await plain.handle(new Request('http://localhost/robots.txt'))).status).toBe(404)
+  })
+})

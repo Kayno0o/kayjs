@@ -39,10 +39,11 @@ export function matchesEtag(header: string | null, etag: string): boolean {
 
 // One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.
 // Files keep their names, so browsers revalidate them every time and get a 304 while they are unchanged.
-export async function servePublic(app: Elysia, dir: string, routes: Route[]): Promise<void> {
+export async function servePublic(app: Elysia, dir: string, routes: Route[]): Promise<Set<string>> {
   const pages = new Set(routes.map(route => route.pattern))
+  const files = await publicFiles(dir)
 
-  for (const { path, url } of await publicFiles(dir)) {
+  for (const { path, url } of files) {
     if (pages.has(url))
       throw new Error(`kay: ${relative(process.cwd(), path)} and a page both serve ${url}`)
 
@@ -53,4 +54,6 @@ export async function servePublic(app: Elysia, dir: string, routes: Route[]): Pr
       ? new Response(null, { status: 304, headers: { etag, 'cache-control': CACHE_CONTROL } })
       : new Response(Bun.file(path), { headers: { etag, 'cache-control': CACHE_CONTROL } }))
   }
+
+  return new Set(files.map(file => file.url))
 }

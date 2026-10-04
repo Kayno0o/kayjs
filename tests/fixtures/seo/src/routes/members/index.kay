@@ -1,0 +1,4 @@
+--- server
+export const sitemap = true
+---
+h1 Members

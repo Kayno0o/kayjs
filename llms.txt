@@ -223,6 +223,29 @@ export default defineConfig({
 - JSON-LD goes in a `head` block as a `script(type="application/ld+json")` holding the JSON text, written from a server value: `script(type="application/ld+json") {JSON.stringify(place)}`. Any `<` in it is written `\u003c`, so a value holding `</script>` cannot end the script.
 - Without `site` and `seo`, a page's head holds only the tags it and its layouts set.
 
+### Sitemap and robots.txt
+
+A project with a `site` serves `/sitemap.xml` and `/robots.txt`, which allows every crawler and points at the sitemap; a file of the same name in `public/` replaces either. The sitemap lists:
+
+- every page without params, unless its server fence has `export const sitemap = false`;
+- for a page with params, the ones its `sitemap` export lists, else the ones its `prerender` export lists, else none. `sitemap` takes what `prerender` takes: `true`, `false`, a list of params or a function returning one;
+- a page behind a guard only when its `sitemap` export lists it.
+
+```kay
+--- server
+import { findPost, listPosts } from '../../data'
+
+export async function sitemap() {
+  return (await listPosts()).map(post => ({ slug: post.slug }))
+}
+
+const post = await findPost(ctx.params.slug) ?? ctx.notFound()
+---
+h1 {post.title}
+```
+
+In production the sitemap is built on the first request and kept for an hour; development builds it per request.
+
 ## Styles
 
 A component script or any `.ts` module imports its stylesheet: `import './card.css'`. Each page links one stylesheet per layout, outermost first, then its own, holding the CSS of every component it renders, islands included. Bun bundles them: `@import`, nesting and relative `url()` assets work, and `url(/logo.png)` is left for a public file.

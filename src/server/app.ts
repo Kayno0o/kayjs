@@ -16,7 +16,8 @@ import { registerLoader } from './loader'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
 import { decodePath, refuseClashes, scanRoutes, specialPagesOf } from './routes'
-import { seoHead } from './seo'
+import { seoHead, siteOrigin } from './seo'
+import { serveSitemap } from './sitemap'
 
 // Every slash at either end of a path.
 const EDGE_SLASHES = /^\/+|\/+$/g
@@ -124,7 +125,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     return new Response(Bun.file(encodedPath(path, encoding)), { headers: { ...headers, 'content-encoding': encoding, 'content-type': Bun.file(path).type } })
   })
 
-  await Promise.all([registerActionRoutes(app, routes, { dev: options.dev, onError: options.onError }), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
+  const [, publicUrls] = await Promise.all([registerActionRoutes(app, routes, { dev: options.dev, onError: options.onError }), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
+
+  if (options.site !== undefined)
+    serveSitemap(app, routes, siteOrigin(options.site), publicUrls, { dev: options.dev, onError: options.onError })
+
   const prerendered = await loadPrerendered(client)
 
   for (const route of routes) {
