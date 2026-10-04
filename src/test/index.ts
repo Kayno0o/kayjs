@@ -13,6 +13,9 @@ import { servePages } from '../server/app'
 import { shutDown } from '../server/lifecycle'
 import { testRoot } from './root'
 
+export type { Mounted } from './mount'
+export { mount, settle } from './mount'
+
 export interface TestOptions extends PagesOptions {
   // The plugins the server entry uses before the pages, in order, such as `session()`: their derives reach `ctx.locals` and their cookies the next request.
   use?: AnyElysia[]

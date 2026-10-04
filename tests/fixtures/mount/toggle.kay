@@ -1,0 +1,12 @@
+---
+import { effect, onCleanup, signal } from 'kay'
+
+const { label, onChange, onDispose } = props<{ label: string, onChange: (open: boolean) => void, onDispose: () => void }>()
+const open = signal(false)
+
+effect(() => onChange(open()))
+onCleanup(onDispose)
+---
+button.toggle(onClick={() => open.set(o => !o)}) {label}
+if open()
+  p.panel Open

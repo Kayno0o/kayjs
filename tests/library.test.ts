@@ -126,6 +126,34 @@ describe('kay libraries', () => {
     expect(code).toBe(0)
   })
 
+  it('mounts a library component built for the browser with the app\'s settings, its handlers running', async () => {
+    const project = await newProject()
+    const test = [
+      'import { GlobalRegistrator } from \'@happy-dom/global-registrator\'',
+      'import { expect, it } from \'bun:test\'',
+      `import { mount, settle } from ${JSON.stringify(resolve('src/test'))}`,
+      '',
+      'GlobalRegistrator.register()',
+      '',
+      'it(\'counts\', async () => {',
+      '  const { root } = await mount(\'node_modules/kay-lib/src/counter.kay\', { start: 2 })',
+      '',
+      '  root.querySelector(\'button\')!.click()',
+      '  await settle()',
+      '  expect(root.textContent).toBe(\'app:count 3\')',
+      '})',
+      '',
+    ].join('\n')
+
+    await Bun.write(join(project, 'mount.kay-test.ts'), test)
+
+    const child = Bun.spawn([process.execPath, 'test', './mount.kay-test.ts'], { cwd: project, stdout: 'pipe', stderr: 'pipe' })
+    const [output, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    expect(output).toContain('1 pass')
+    expect(code).toBe(0)
+  })
+
   it('renders a project nested below the working directory under kay test, named by KAY_ROOT', async () => {
     const outer = await mkdtemp(join(import.meta.dir, '.dom-'))
 
