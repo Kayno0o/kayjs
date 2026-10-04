@@ -56,6 +56,23 @@ class Editor {
     return published
   }
 
+  async save(path: string): Promise<Diagnostic[]> {
+    const published = this.diagnostics(this.uri(path))
+
+    this.connection.notify('textDocument/didSave', { textDocument: { uri: this.uri(path) } })
+
+    return published
+  }
+
+  // What the editor's file watcher reports: `path` changed on disk; the diagnostics `open` gets next.
+  async filesChanged(open: string, events: { path: string, type: 1 | 2 | 3 }[]): Promise<Diagnostic[]> {
+    const published = this.diagnostics(this.uri(open))
+
+    this.connection.notify('workspace/didChangeWatchedFiles', { changes: events.map(event => ({ uri: this.uri(event.path), type: event.type })) })
+
+    return published
+  }
+
   async request<Result>(method: string, path: string, line: number, character: number): Promise<Result> {
     return this.connection.request<Result>(method, { textDocument: { uri: this.uri(path) }, position: { line, character } })
   }
@@ -303,6 +320,50 @@ describe('kay lsp imports', () => {
 
     expect(await fixes('Badge\n', 3)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
     expect(await fixes('---\nimport { signal } from \'kay\'\n---\nBadge\n', 4)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport { signal } from \'kay\'\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
+  })
+})
+
+describe('kay lsp following files on disk', () => {
+  let editor: Editor
+  let dir: string
+  const page = 'src/routes/index.kay'
+  const codes = (diagnostics: Diagnostic[]) => diagnostics.map(diagnostic => diagnostic.code)
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'kay-disk-'))
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, 'src/data.ts'), 'export const n: number = 1\n'),
+      Bun.write(join(dir, page), '---\nimport { n } from \'../data\'\nimport Badge from \'../badge.kay\'\n\nconst s: string = n\n---\nBadge\np {s}\n'),
+    ])
+    await mkdir(join(dir, 'node_modules'))
+    await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
+    editor = new Editor(dir)
+    await editor.start()
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('sees a component created or deleted on disk, on save or from the file watcher', async () => {
+    expect(codes(await editor.open(page))).toEqual([2307, 2322])
+
+    await Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n')
+    expect(codes(await editor.save(page))).toEqual([2322])
+
+    await rm(join(dir, 'src/badge.kay'))
+    expect(codes(await editor.filesChanged(page, [{ path: 'src/badge.kay', type: 3 }]))).toEqual([2307, 2322])
+
+    await Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n')
+    expect(codes(await editor.filesChanged(page, [{ path: 'src/badge.kay', type: 1 }]))).toEqual([2322])
+  })
+
+  it('sees a module a component imports change on disk', async () => {
+    await Bun.write(join(dir, 'src/data.ts'), 'export const n: string = \'1\'\n')
+
+    expect(await editor.filesChanged(page, [{ path: 'src/data.ts', type: 2 }])).toEqual([])
   })
 })
 

@@ -111,6 +111,12 @@ export interface CodeAction {
   [key: string]: unknown
 }
 
+// A file the editor saw created (1), changed (2) or deleted (3) on disk.
+export interface FileEvent {
+  uri: string
+  type: 1 | 2 | 3
+}
+
 export interface InitializeParams {
   rootUri?: string | null
   rootPath?: string | null

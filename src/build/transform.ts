@@ -71,7 +71,7 @@ export async function transformKayCached(source: string, filename: string, optio
     return transformKay(source, filename, options)
 
   const hydratable = options.hydratable ?? false
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}`, `${options.target}\0${hydratable}\0${options.root}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}`, `${options.target}\0${hydratable}\0${options.root ?? process.cwd()}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   if (cached !== undefined) {

@@ -2,7 +2,7 @@ import type { Subprocess } from 'bun'
 import type { CheckOptions, ShadowFile } from '../check'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { KayConfig } from '../config'
-import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
+import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -38,7 +38,11 @@ const WORD_CHARACTER = /[\w$]/
 const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:For|Show|Omit|Island|IslandBrand|HydrateWhen|Href|Field|Prop|FunctionProp|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
 const FULL_SYNC = 1
 const ERROR = 1
+const CREATED = 1
 const CHANGED = 2
+const DELETED = 3
+// What the editor reports changing on disk: components, the modules they import, and the configs deciding how those resolve.
+const WATCHED = '**/*.{kay,ts,tsx,js,jsx,json}'
 const DIAGNOSTICS_DELAY = 150
 const QUICK_FIX = 'quickfix'
 // Completions offer names from modules not imported yet, as editors do for TypeScript by default; added imports are quoted the way kay's own code is, since generated code would mislead the guess.
@@ -54,13 +58,16 @@ export class KayLanguageServer {
   private shadowOptions: CheckOptions = {}
   private shadowTree = ''
   private nodeUris = false
+  private watchesFiles = false
+  private shadowFiles = new Set<string>()
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
   private diagnosticsTimer?: Timer
 
   constructor(private readonly client: Connection) {
     client.onRequest<InitializeParams>('initialize', async params => this.initialize(params))
-    client.onNotification('initialized', () => this.server.notify('initialized', {}))
+    client.onNotification('initialized', () => void guard(this.initialized()))
+    client.onNotification<{ changes: FileEvent[] }>('workspace/didChangeWatchedFiles', ({ changes }) => void guard(this.filesChanged(changes)))
     client.onNotification<{ textDocument: TextDocumentItem }>('textDocument/didOpen', ({ textDocument }) => this.open(textDocument))
     client.onNotification<DidChangeTextDocumentParams>('textDocument/didChange', params => this.change(params))
     client.onNotification<{ textDocument: TextDocumentIdentifier }>('textDocument/didClose', ({ textDocument }) => this.close(textDocument.uri))
@@ -105,7 +112,8 @@ export class KayLanguageServer {
     // A client that writes URIs the way Node does keeps getting them that way, any other the way VS Code does.
     this.nodeUris = rootUri !== undefined && rootUri !== vscodeUri(this.root) && rootUri === pathToFileURL(this.root).href
 
-    await writeShadowTypes(this.root, this.shadowOptions)
+    this.shadowFiles = new Set((await writeShadowTypes(this.root, this.shadowOptions)).files.keys())
+    this.watchesFiles = (params.capabilities.workspace as { didChangeWatchedFiles?: { dynamicRegistration?: boolean } } | undefined)?.didChangeWatchedFiles?.dynamicRegistration === true
 
     const child = Bun.spawn([process.execPath, TSGO, '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
     const connection = new Connection(child.stdout, (data) => {
@@ -137,6 +145,27 @@ export class KayLanguageServer {
       },
       serverInfo: { name: 'kay' },
     }
+  }
+
+  // Asks the editor to report file changes on disk, when it can, so a component created, deleted or changed outside it reaches tsgo.
+  private async initialized() {
+    this.server.notify('initialized', {})
+
+    if (this.watchesFiles)
+      await this.client.request('client/registerCapability', { registrations: [{ id: 'kay-files', method: 'workspace/didChangeWatchedFiles', registerOptions: { watchers: [{ globPattern: WATCHED }] } }] })
+  }
+
+  // A .kay file changing on disk rewrites the shadow tree; any other file goes to tsgo as is. The shadow tree is this server's own to report.
+  private async filesChanged(changes: FileEvent[]) {
+    const others = changes.flatMap(change => change.uri.startsWith('file:') && !KAY_FILE.test(change.uri) && !fileURLToPath(change.uri).startsWith(this.shadowTree) ? [{ uri: pathToFileURL(fileURLToPath(change.uri)).href, type: change.type }] : [])
+
+    if (others.length > 0)
+      this.server.notify('workspace/didChangeWatchedFiles', { changes: others })
+
+    if (changes.some(change => KAY_FILE.test(change.uri)))
+      await this.saved()
+    else if (others.length > 0)
+      this.scheduleDiagnostics()
   }
 
   private open(item: TextDocumentItem) {
@@ -173,10 +202,16 @@ export class KayLanguageServer {
     this.client.notify('textDocument/publishDiagnostics', { uri, diagnostics: [] })
   }
 
-  // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code.
+  // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code; tsgo hears which shadow files came and went, so imports of them resolve again.
   private async saved() {
-    const { files } = await writeShadowTypes(this.root, this.shadowOptions)
-    const changes = [...files.keys(), resolve(this.root, SHADOW_DIR, 'kay-env.d.ts')].map(path => ({ uri: pathToFileURL(path).href, type: CHANGED }))
+    const files = new Set((await writeShadowTypes(this.root, this.shadowOptions)).files.keys())
+    const changes = [
+      ...[...files].map(path => ({ uri: pathToFileURL(path).href, type: this.shadowFiles.has(path) ? CHANGED : CREATED })),
+      ...[...this.shadowFiles].filter(path => !files.has(path)).map(path => ({ uri: pathToFileURL(path).href, type: DELETED })),
+      { uri: pathToFileURL(resolve(this.root, SHADOW_DIR, 'kay-env.d.ts')).href, type: CHANGED },
+    ]
+
+    this.shadowFiles = files
 
     this.server.notify('workspace/didChangeWatchedFiles', { changes })
     this.scheduleDiagnostics()

@@ -193,6 +193,19 @@ describe('compile cache', () => {
 
       expect(otherRoot).not.toBe(dom)
       expect(await transformKayCached(source, file, { target: 'dom', cacheDir, root: cacheDir })).toBe(dom)
+
+      // Without a root, the working directory is the root, in the key too.
+      const cwd = process.cwd()
+
+      try {
+        process.chdir(cacheDir)
+        expect(await transformKayCached(source, file, { target: 'dom', cacheDir })).toBe(dom)
+        process.chdir(dirname(cacheDir))
+        expect(await transformKayCached(source, file, { target: 'dom', cacheDir })).toBe(otherRoot)
+      }
+      finally {
+        process.chdir(cwd)
+      }
       expect(await transformKayCached(source, file, { target: 'dom', hydratable: true, cacheDir, root: cacheDir })).not.toBe(dom)
       expect(await transformKayCached(source, file, { target: 'ssr', cacheDir, root: cacheDir })).not.toBe(dom)
 
