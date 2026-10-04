@@ -37,6 +37,8 @@ export interface KayConfig {
   rewrite?: Rewrite
   // Old paths sent elsewhere with a 308, or a 307 with `permanent: false`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*' }`. `kay check` reports a target no page serves.
   redirects?: Redirects
+  // The locales pages are served in, each under its prefix or on its own domain, with messages in `src/messages/<locale>.ts`.
+  i18n?: I18nConfig
   // Whether a page's URL ends with a slash: `never`, the default, redirects `/about/` to `/about`; `always` the other way; `ignore` serves both.
   trailingSlash?: TrailingSlash
   // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.
@@ -112,6 +114,18 @@ export interface ImagesConfig {
 }
 
 export type TrailingSlash = 'never' | 'always' | 'ignore'
+
+export interface I18nConfig {
+  // BCP 47 tags, `['fr', 'en']`.
+  locales: string[]
+  defaultLocale: string
+  // The default locale under its prefix too, `/fr/about`; an unprefixed path then redirects to the visitor's locale, from their cookie or their browser's languages. Off by default, the default locale's pages unprefixed.
+  prefixDefault?: boolean
+  // Each locale's host, `{ fr: 'example.fr', en: 'example.com' }`, in place of prefixes; a host not listed serves the default locale.
+  domains?: Record<string, string>
+  // The directory of the `<locale>.ts` message files, relative to the root: `src/messages` by default.
+  messages?: string
+}
 
 export const CONFIG_FILE = 'kay.config.ts'
 

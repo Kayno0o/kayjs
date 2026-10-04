@@ -15,11 +15,13 @@ let rendered: RenderedIslands | undefined
 export interface RenderedIslands {
   eager: Set<string>
   count: number
+  // The message keys the islands use, which go to the browser with them.
+  messages: Set<string>
 }
 
 // Runs a synchronous page render and lists the islands it rendered.
 export function collectIslands<T>(render: () => T): { result: T, islands: RenderedIslands } {
-  const islands: RenderedIslands = { eager: new Set(), count: 0 }
+  const islands: RenderedIslands = { eager: new Set(), count: 0, messages: new Set() }
 
   rendered = islands
 
@@ -40,12 +42,21 @@ export class IslandPropsError extends Error {
   override name = 'IslandPropsError'
 }
 
+// A message an island looked up while rendering, so the browser gets it too.
+export function noteMessage(key: string): void {
+  rendered?.messages.add(key)
+}
+
 // On the server an interactive component renders inside a `<slot>` the browser hydrates, its props serialized for the client.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
-export function island<P extends object>(id: string, component: (props: P) => JSX.Element): IslandComponent<P> {
+// `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser.
+export function island<P extends object>(id: string, component: (props: P) => JSX.Element, messages: readonly string[] = []): IslandComponent<P> {
   const render = (props: P & { hydrate?: HydrateWhen }) => {
     const when = props.hydrate
     const own = 'hydrate' in props ? omit(props, 'hydrate') as P : props
+
+    for (const key of messages)
+      noteMessage(key)
 
     if (depth > 0)
       return component(own)

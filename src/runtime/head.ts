@@ -202,6 +202,10 @@ function replaceableIdentity({ tag, props }: HeadTag, unique: () => string): str
     if (rel === 'canonical')
       return 'link:canonical'
 
+    // One URL per language, which a page may set itself in place of the one kay gives.
+    if (rel === 'alternate' && props.hreflang != null)
+      return `link:alternate:hreflang=${String(props.hreflang)}`
+
     if (rel === 'icon' || rel === 'apple-touch-icon')
       return `link:${rel}${props.sizes != null ? `:sizes=${String(props.sizes)}` : ''}${props.type != null ? `:type=${String(props.type)}` : ''}`
 

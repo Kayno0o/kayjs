@@ -247,7 +247,7 @@ export class KayLanguageServer {
   private async configure(project: Project) {
     const config = await projectConfig(project.root)
 
-    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, publicDir: config.publicDir }
+    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, publicDir: config.publicDir, i18n: config.i18n }
     project.routesDir = resolve(project.root, project.options.routes ?? 'src/routes')
     project.configured = true
   }

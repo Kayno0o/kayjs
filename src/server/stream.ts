@@ -5,13 +5,14 @@ import { collectDeferred } from '../runtime/await.server'
 import { child } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
 import { hydrationScript } from './hydration'
+import { messagesScript } from './i18n'
 
 // Swaps every streamed block that arrived in for the pending one between its markers, then hydrates the islands they brought; an outer block that settled first may have taken the markers away already.
 // Both scripts are the same on every page, so a Content-Security-Policy allows them by hash.
 export const SWAP_SCRIPT = 'function $kayAwait(){for(var t of document.querySelectorAll("template[data-kay-await]")){var i=t.dataset.kayAwait,w=document.createTreeWalker(document.body,128),s=null,n;while(n=w.nextNode())if(n.data=="kay-await:"+i){s=n;break}if(s){while((n=s.nextSibling)&&!(n.nodeType==8&&n.data=="/kay-await:"+i))n.remove();n&&n.remove();s.replaceWith(t.content)}t.remove()}self.$kayHydrate&&$kayHydrate()}'
 export const SWAP_CALL = '$kayAwait()'
 const encoder = new TextEncoder()
-const EMPTY: Rendered = { html: '', islands: { eager: new Set(), count: 0 }, deferred: [] }
+const EMPTY: Rendered = { html: '', islands: { eager: new Set(), count: 0, messages: new Set() }, deferred: [] }
 
 export interface Rendered {
   html: string
@@ -47,9 +48,14 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
 
         swapShipped = true
 
-        if (rendered.islands.count > 0 && !shipped && client.entry !== undefined) {
-          scripts += `${hydrationScript}<script type="module" async src="${client.entry}"></script>`
-          shipped = true
+        if (rendered.islands.count > 0) {
+          // The first part with islands carries the locale; later ones only the messages they bring.
+          scripts += messagesScript(rendered.islands.messages, !shipped)
+
+          if (!shipped && client.entry !== undefined) {
+            scripts += `${hydrationScript}<script type="module" async src="${client.entry}"></script>`
+            shipped = true
+          }
         }
 
         controller.enqueue(encoder.encode(`<template data-kay-await="${block.id}">${rendered.html}</template>${scripts}<script>${SWAP_CALL}</script>`))

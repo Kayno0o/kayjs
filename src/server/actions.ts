@@ -6,13 +6,16 @@ import type { ActionContext, ServerAction } from '../runtime/action'
 import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
+import type { I18n } from './i18n'
 import { dirname, sep } from 'node:path'
 import { decodeCall, failure, FAILURE_HEADER, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
+import { localeState as currentLocale, runInLocale } from '../runtime/i18n.server'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash, writeSuccess } from './flash'
 import { runGuards } from './guards'
+import { localeState, requestLocale } from './i18n'
 import { protectionRefusal } from './protection'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
@@ -61,6 +64,8 @@ export interface ActionOptions {
   // Shows a failed action's message instead of a generic one.
   dev?: boolean
   onError?: KayConfig['onError']
+  // An action runs in the locale of the page it was sent from.
+  i18n?: I18n
 }
 
 // Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema.
@@ -84,7 +89,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
         throw new Error(`kay: ${taken.file} and ${file} both export an action served at ${value.url}; rename one of the files`)
 
       served.set(value.url, { file, action: value })
-      app.post(value.url, async context => runAction(value, context, options), {
+      app.post(value.url, async context => inLocale(context.request, options, async () => runAction(value, context, options)), {
         body: value.schema,
         transform: (context) => {
           refuseCrossSite(context.request)
@@ -99,7 +104,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
           context.body = call ? callInput(context.body) : formInput(value.schema, withoutEmptyFiles(context.body))
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
-        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(guards, context, options) }),
+        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, context, options)) }),
         error: ({ code, error, request, body }) => {
           if (code === 'VALIDATION')
             return refused(value, error, request)
@@ -249,6 +254,20 @@ export function overHttps(request: Request): boolean {
   return new URL(request.url).protocol === 'https:' || FORWARDED_HTTPS.test(request.headers.get('x-forwarded-proto') ?? '')
 }
 
+function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
+  if (!options.i18n)
+    return run()
+
+  const locale = requestLocale(options.i18n.settings, request)
+
+  return runInLocale(localeState(options.i18n, locale, new URL(request.url).pathname, request), run)
+}
+
+// What `ctx.locale` reads: the request's locale, or the site's single language.
+function contextLocale(): string {
+  return currentLocale()?.locale ?? ''
+}
+
 // The guards of the action's page, answering for it when one stops the request.
 async function admit(guards: LoadedGuard[], context: { request: Request }, options: ActionOptions): Promise<Response | undefined> {
   const { request } = context
@@ -256,6 +275,7 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, optio
   const ctx: GuardContext = {
     request,
     url: new URL(request.url),
+    locale: contextLocale(),
     get cookies() {
       return state.jar.cookies
     },
@@ -302,6 +322,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
   let status = 200
   const ctx: ActionContext = {
     request,
+    locale: contextLocale(),
     get cookies() {
       return jar.cookies
     },

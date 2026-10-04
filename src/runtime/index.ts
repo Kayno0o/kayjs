@@ -2,6 +2,7 @@ import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect } from './checks'
+import type { Locale } from './i18n'
 import type { SignalOptions } from './reactive'
 import { createSignal, onCleanup, tracking, untrack } from './reactive'
 
@@ -92,6 +93,8 @@ export function selection<Key extends string | number>(initial?: Key): Selection
 export interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> {
   request: Request
   url: URL
+  // The locale the page is served in, as `i18n` in kay.config.ts gives it; the site's `lang` without.
+  locale: Locale
   params: Params
   // The search params, read against the page's `export const query = t.Object(...)`; a query it refuses answers 400. Their raw text is `url.searchParams`.
   query: Query
@@ -126,7 +129,7 @@ export interface ErrorPageContext<Params extends Record<string, unknown> = Recor
 }
 
 // What a `_guard.ts` decides from: who is asking, never a page's params, which an action has none of. For an action, `url` is the action's.
-export type GuardContext = Pick<PageContext, 'request' | 'url' | 'cookies' | 'locals' | 'headers' | 'redirect' | 'deny'>
+export type GuardContext = Pick<PageContext, 'request' | 'url' | 'locale' | 'cookies' | 'locals' | 'headers' | 'redirect' | 'deny'>
 
 export type Guard = (ctx: GuardContext) => void | Promise<void>
 

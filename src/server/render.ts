@@ -10,7 +10,9 @@ import type { Prefetch } from './speculation'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { mapStack } from '../build/sourcemap'
+import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
+import { localeState } from '../runtime/i18n.server'
 import { importModule } from './bundle'
 import { preferredEncoding } from './compress'
 import { cookieJar } from './cookies'
@@ -18,6 +20,7 @@ import { LIVE_RELOAD } from './dev'
 import { FLASH_COOKIE, readFlash } from './flash'
 import { runGuards } from './guards'
 import { hydrationScript } from './hydration'
+import { messagesScript } from './i18n'
 import { errorPage } from './overlay'
 import { matchesEtag } from './public'
 import { readQuery } from './query'
@@ -68,6 +71,7 @@ interface Rendering {
 }
 
 const CHARSET = '<meta charset="utf-8">'
+const DEFAULT_LANG = 'en'
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
 // Per set of islands and per chain of layouts: few exist, and they never change for a build.
 const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()
@@ -78,7 +82,7 @@ const NOT_ASCII = /[^\x20-\x7E]/g
 
 // The params come resolved, each matcher's value in place of its text.
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
-  const rendering = createRendering(context, params, options.prerendering)
+  const rendering = createRendering(context, params, options)
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
 
   if (refusal)
@@ -147,7 +151,7 @@ function serverTiming(files: string[], modules: PageModule[], timings: number[],
 
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
 export async function servePrerendered(route: ServedRoute, page: ServedPage, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
-  const rendering = createRendering(context, {})
+  const rendering = createRendering(context, {}, options)
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
 
   if (refusal)
@@ -193,10 +197,10 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, con
 
 // A URL no page serves, answered by the routes directory's own `_404.kay` or `_error.kay`.
 export async function renderUnmatched(special: SpecialPages, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
-  return renderFailure(new NotFound(), special, createRendering(context, {}), new Map(), client, options)
+  return renderFailure(new NotFound(), special, createRendering(context, {}, options), new Map(), client, options)
 }
 
-function createRendering(context: RequestContext, params: Record<string, unknown>, prerendering = false): Rendering {
+function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG }: RenderOptions): Rendering {
   const { request } = context
   const jar = cookieJar(request)
   let flash: Flash | SuccessFlash | null | undefined
@@ -218,6 +222,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
     ctx: {
       request,
       url,
+      locale: localeState()?.locale ?? lang,
       params,
       get query() {
         return query ??= readQuery(undefined, url)
@@ -367,7 +372,8 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   const scripts = hasIslands ? islandScripts(client, islands.eager, streamed) : ''
-  const start = `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${speculationRules(options.prefetch)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}`
+  const locale = localeState()
+  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) : ''}${speculationRules(options.prefetch)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}`
 
   if (!streamed)
     return `${start}</body></html>`

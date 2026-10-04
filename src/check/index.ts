@@ -1,4 +1,5 @@
 import type { Diagnostic, SourceMap } from '../compiler'
+import type { I18nConfig } from '../config'
 import type { ContentProblem } from '../content/validate'
 import type { Redirects } from '../server/redirects'
 import type { Route } from '../server/routes'
@@ -17,6 +18,7 @@ import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER } from '../content/server'
 import * as builtInMatchers from '../runtime/params'
 import { FAVICON_PATHS } from '../server/favicon'
+import { localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { matcherFile } from '../server/params'
 import { publicFiles } from '../server/public'
@@ -26,6 +28,7 @@ import { ROBOTS, SITEMAP } from '../server/sitemap'
 
 export const SHADOW_DIR = join('.kay', 'types')
 const CONTENT_PROBLEMS = fileURLToPath(new URL('../content/problems.ts', import.meta.url))
+const MESSAGE_PROBLEMS = fileURLToPath(new URL('./messages.ts', import.meta.url))
 
 export interface CheckOptions {
   tsconfig?: string
@@ -37,6 +40,8 @@ export interface CheckOptions {
   content?: string
   // The config's redirects, whose targets on the site must be a page or a public file.
   redirects?: Redirects
+  // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
+  i18n?: I18nConfig
 }
 
 export interface CheckDiagnostic {
@@ -90,7 +95,13 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   const [routes, publicPaths] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public'))])
 
-  await writeIfChanged(environmentPath, environment(routes.flatMap(route => patternShapes(route.pattern)), publicPaths.map(file => file.url)))
+  const shapes = routes.flatMap(route => patternShapes(route.pattern))
+  const settings = options.i18n && localeSettings(options.i18n)
+  // A page is reached in every locale, under its prefix where it has one.
+  const prefixes = settings && !settings.hosts ? settings.locales.filter(locale => locale !== settings.defaultLocale || settings.prefixDefault) : []
+  const localized = [...settings?.prefixDefault && !settings.hosts ? [] : shapes, ...prefixes.flatMap(locale => shapes.map(shape => `/${locale}${shape === '/' ? '' : shape}`))]
+
+  await writeIfChanged(environmentPath, environment(localized, publicPaths.map(file => file.url), options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
@@ -159,15 +170,16 @@ function matcherSource(routesDir: string, matcher: string): string | undefined {
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[]): string {
+function environment(patterns: string[], files: string[], i18n?: { locales: string[], messages: string }): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   const paths = files.length > 0 ? files.flatMap(spellings).map(file => JSON.stringify(file)).join(' | ') : 'never'
+  const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: typeof import(${JSON.stringify(i18n.messages.startsWith('.') ? i18n.messages : `./${i18n.messages}`)}).default` : ''
 
   return [
     'import type { Action, CheckedHref, FieldName, FunctionProp, IslandProp } from \'kay\'',
     '',
     'declare module \'kay\' {',
-    `  interface Register { routes: ${routes}, files: ${paths} }`,
+    `  interface Register { routes: ${routes}, files: ${paths}${locales} }`,
     '}',
     '',
     'declare global {',
@@ -205,7 +217,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const { files, diagnostics } = await writeShadowTypes(root, options)
   const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-  const [output, errors, code, content] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkContent(root, options.content)])
+  const [output, errors, code, content, messages] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkContent(root, options.content), checkMessages(root, options.i18n)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
@@ -221,13 +233,34 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
       diagnostics.push(remapped)
   }
 
-  diagnostics.push(...content)
+  diagnostics.push(...content, ...messages)
 
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && reported.length === 0 && errors.trim() === '')
     diagnostics.push({ file: config, line: 1, column: 1, message: `tsgo exited with code ${code} and no diagnostics` })
 
   return diagnostics
+}
+
+// Each locale's messages against the default locale's, read in a process of its own so an edited file is read afresh.
+async function checkMessages(root: string, config: I18nConfig | undefined): Promise<CheckDiagnostic[]> {
+  if (!config)
+    return []
+
+  const child = Bun.spawn([process.execPath, MESSAGE_PROBLEMS, resolve(root), JSON.stringify(config)], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  if (code !== 0)
+    return [{ file: join(root, CONFIG_FILE), line: 1, column: 1, message: errors.trim() || `reading the messages exited with code ${code}` }]
+
+  return problemsIn(root, output)
+}
+
+// The problems a checking process printed on its marked line, whatever else the project's code logged.
+function problemsIn(root: string, output: string): CheckDiagnostic[] {
+  const line = output.split('\n').find(text => text.startsWith(PROBLEMS_MARKER)) ?? `${PROBLEMS_MARKER}[]`
+
+  return (JSON.parse(line.slice(PROBLEMS_MARKER.length)) as ContentProblem[]).map(problem => ({ file: resolve(root, problem.file), line: problem.line, column: 1, message: problem.message }))
 }
 
 // The collections' entries that fail to compile or to match their schema, read in a process of its own.
@@ -241,9 +274,7 @@ async function checkContent(root: string, config: string | undefined): Promise<C
   if (code !== 0)
     return [{ file: resolve(root, config ?? CONTENT_CONFIG), line: 1, column: 1, message: errors.trim() || `reading the collections exited with code ${code}` }]
 
-  const line = output.split('\n').find(text => text.startsWith(PROBLEMS_MARKER)) ?? `${PROBLEMS_MARKER}[]`
-
-  return (JSON.parse(line.slice(PROBLEMS_MARKER.length)) as ContentProblem[]).map(problem => ({ file: resolve(root, problem.file), line: problem.line, column: 1, message: problem.message }))
+  return problemsIn(root, output)
 }
 
 function parseTscOutput(output: string, config: string, root: string): CheckDiagnostic[] {

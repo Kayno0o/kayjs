@@ -1,0 +1,15 @@
+--- server
+import { alternate, localize, t } from 'kay/i18n'
+
+const home = localize('/')
+const about = localize('/about')
+const english = alternate('en')
+const french = alternate('fr')
+---
+nav
+  a.home(href={home}) {t('nav.home')}
+  a.about(href={about}) {t('nav.about')}
+  a.en(href={english}) EN
+  a.fr(href={french}) FR
+main
+  slot

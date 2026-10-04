@@ -1,6 +1,7 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { Locals, Redirect } from './checks'
+import type { Locale } from './i18n'
 import { createSignal, untrack } from './reactive'
 import { decodeValue, encodeValue, unflattenValue } from './wire'
 
@@ -37,6 +38,8 @@ export interface ActionProtection<Honeypot extends string = never> {
 
 export interface ActionContext {
   request: Request
+  // The locale of the page the action was sent from, as `i18n` in kay.config.ts serves it; empty without.
+  locale: Locale
   cookies: CookieMap
   locals: Locals
   // Response status and headers, for a fetch call or the redirect after a plain form post.

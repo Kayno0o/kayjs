@@ -6,7 +6,9 @@ import { join, relative, resolve } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { isCollection } from '../content'
+import { runInLocale } from '../runtime/i18n.server'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
+import { loadI18n, localeCopies, localeState } from './i18n'
 import { registerLoader } from './loader'
 import { loadMatchers, matchedParams } from './params'
 import { renderPage } from './render'
@@ -32,6 +34,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   refuseClashes(routesDir, routes)
   const matchers = await loadMatchers(routesDir, routes)
+  const i18n = config.i18n ? await loadI18n(root, config.i18n) : undefined
 
   for (const route of routes) {
     // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
@@ -50,23 +53,28 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
       if (!matched)
         throw new Error(`kay: ${file} lists ${JSON.stringify(params)} in prerender, which its matchers refuse, so no request would reach it`)
 
-      // Guards run when the page is served, for whoever asks; the build renders what they let through.
-      const response = await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${path}`) }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head })
+      // One page per locale, each rendered in it.
+      for (const copy of localeCopies(i18n?.settings, path)) {
+        const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
+        // Guards run when the page is served, for whoever asks; the build renders what they let through.
+        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head })
+        const response = await (i18n && copy.locale !== undefined ? runInLocale(localeState(i18n, copy.locale, path, request), render) : render())
 
-      if (response.status >= 500)
-        throw new Error(`kay: prerendering ${path} from ${file} failed with ${response.status}; the error is logged above`)
+        if (response.status >= 500)
+          throw new Error(`kay: prerendering ${copy.path} from ${file} failed with ${response.status}; the error is logged above`)
 
-      const html = await response.text()
-      const name = `${path === '/' ? 'index' : path.slice(1)}.html`
-      const taken = paths.get(name)
+        const html = await response.text()
+        const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
+        const taken = paths.get(name)
 
-      if (taken !== undefined)
-        throw new Error(`kay: ${taken} and ${path} would both be prerendered to ${name}; leave one out of prerender`)
+        if (taken !== undefined)
+          throw new Error(`kay: ${taken} and ${copy.key} would both be prerendered to ${name}; leave one out of prerender`)
 
-      paths.set(name, path)
-      await mkdir(join(dir, name, '..'), { recursive: true })
-      await Bun.write(join(dir, name), html)
-      pages[path] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate }
+        paths.set(name, copy.key)
+        await mkdir(join(dir, name, '..'), { recursive: true })
+        await Bun.write(join(dir, name), html)
+        pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate }
+      }
     }
   }
 

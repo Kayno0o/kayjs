@@ -62,6 +62,8 @@ const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
 const PRERENDER = 'prerender'
 // The page's query schema, which types and validates `ctx.query`.
 const QUERY = 'query'
+// `t('nav.home')`: a message key an island's source names as it is written.
+const MESSAGE_KEY = /\bt\(\s*(['"`])([\w.-]+)\1/g
 // The server exports that are no actions; `sitemap` lists the page in the sitemap, `revalidate` renders a prerendered page again once stale.
 const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap', 'revalidate', 'layouts'])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
@@ -242,7 +244,7 @@ class Generator {
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${this.options.name}(props)) as typeof ${this.options.name}\n`)
 
     if (this.options.island)
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''})${this.genericIslandType()}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''}${islandMessages(this.src)})${this.genericIslandType()}\n`)
 
     return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
   }
@@ -1427,4 +1429,11 @@ function typeParameterNames(parameters: string): string[] {
   }
 
   return names
+}
+
+// The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none.
+function islandMessages(source: string): string {
+  const keys = [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]
+
+  return keys.length > 0 ? `, ${JSON.stringify(keys)}` : ''
 }

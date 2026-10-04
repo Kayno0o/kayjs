@@ -1,0 +1,20 @@
+--- server
+import { formatNumber, t } from 'kay/i18n'
+import Counter from '../components/counter.kay'
+
+export const prerender = true
+
+const greeting = t('greeting', { name: 'Ada' })
+const none = t('items', { count: 0 })
+const one = t('items', { count: 1 })
+const many = t('items', { count: 1234 })
+const price = formatNumber(1234.5, { style: 'currency', currency: 'EUR' })
+const saved = t('saved', { date: new Date(Date.UTC(2026, 9, 4, 12)) })
+const { locale } = ctx
+---
+h1 {greeting}
+p.items {none} / {one} / {many}
+p.price {price}
+p.saved {saved}
+p.locale {locale}
+Counter

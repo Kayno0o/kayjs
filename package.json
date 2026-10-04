@@ -47,6 +47,11 @@
       "types": "./types/content/index.d.ts",
       "default": "./src/content/index.ts"
     },
+    "./i18n": {
+      "types": "./types/runtime/i18n.server.d.ts",
+      "browser": "./src/runtime/i18n.client.ts",
+      "default": "./src/runtime/i18n.server.ts"
+    },
     "./params": {
       "types": "./types/runtime/params.d.ts",
       "default": "./src/runtime/params.ts"

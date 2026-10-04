@@ -1,9 +1,12 @@
 import type { KayConfig, SeoConfig, TrailingSlash } from '../config'
 import type { HeadOptions, HeadTag } from '../runtime/head'
+import type { LocaleCopy } from './i18n'
 import { join } from 'node:path'
+import { localeState } from '../runtime/i18n.server'
 import { jsonLd } from '../runtime/seo'
 import { faviconTags } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
+import { localeCopies } from './i18n'
 import { slashedPath } from './routes'
 
 // The head options of one response, from its URL and status.
@@ -62,10 +65,29 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
 
   // An error page is no URL to point search engines at.
   return (url, status) => ({
-    defaults: origin !== undefined && status === 200 ? [...tags, { tag: 'link', props: { rel: 'canonical', href: origin + slashedPath(url.pathname, trailingSlash) } }] : tags,
+    defaults: origin !== undefined && status === 200 ? [...tags, ...pageLinks(origin, url, trailingSlash)] : tags,
     titleTemplate: seo.titleTemplate,
     social: social ? { origin } : undefined,
   })
+}
+
+// The page's canonical URL, and in a site of several locales its copy in each, `x-default` the default locale's.
+function pageLinks(origin: string, url: URL, trailingSlash: TrailingSlash | undefined): HeadTag[] {
+  const state = localeState()
+
+  if (!state)
+    return [{ tag: 'link', props: { rel: 'canonical', href: origin + slashedPath(url.pathname, trailingSlash) } }]
+
+  const copies = localeCopies(state.settings, state.path)
+  const absolute = (copy: LocaleCopy) => `${copy.host === undefined ? origin : `https://${copy.host}`}${slashedPath(copy.path, trailingSlash)}`
+  const own = copies.find(copy => copy.locale === state.locale)!
+  const fallback = copies.find(copy => copy.locale === state.settings.defaultLocale)!
+
+  return [
+    { tag: 'link', props: { rel: 'canonical', href: absolute(own) } },
+    ...copies.map(copy => ({ tag: 'link', props: { rel: 'alternate', hreflang: copy.locale, href: absolute(copy) } })),
+    { tag: 'link', props: { rel: 'alternate', hreflang: 'x-default', href: absolute(fallback) } },
+  ]
 }
 
 // `https://example.com`, with nothing after the host: page paths are appended to it as they are.
