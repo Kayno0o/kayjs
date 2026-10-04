@@ -59,6 +59,13 @@ const QUERY = 'query'
 const NOT_ACTIONS = new Set([PRERENDER, QUERY])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
 const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
+// Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a `role`.
+const INTERACTIVE_TAGS = new Set(['a', 'audio', 'button', 'details', 'embed', 'iframe', 'input', 'label', 'object', 'option', 'select', 'summary', 'textarea', 'video'])
+// An attribute an element needs to be understood without seeing it, and what to write.
+const REQUIRED_TEXT = new Map<string, [attribute: string, message: string]>([
+  ['img', ['alt', 'An `img` needs `alt`: what it shows, or `alt=""` when it is only decoration']],
+  ['iframe', ['title', 'An `iframe` needs a `title` naming what it holds, which screen readers announce']],
+])
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script` and `base` elements only'
 
 export function defaultName(index: number): string {
@@ -729,6 +736,9 @@ class Generator {
   private emitElement(element: ElementNode) {
     const { b } = this
 
+    if (this.options.check && !element.component)
+      this.checkAccessibility(element)
+
     if (isHead(element))
       this.error(element, 'A `head` block sits at the top level of a template')
 
@@ -1008,6 +1018,23 @@ class Generator {
         b.addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
       }
     }
+  }
+
+  // Type checking only, so a page still runs while it is fixed. A spread may carry what is missing, so an element with one is left alone.
+  private checkAccessibility(element: ElementNode) {
+    if (element.attributes.some(attribute => attribute.kind === 'spread'))
+      return
+
+    const names = new Set(element.attributes.map(attribute => this.text((attribute as Exclude<Attribute, { kind: 'spread' }>).name)))
+    // `.card` has no tag of its own to point at.
+    const at = element.tag.end > element.tag.start ? element.tag : element
+    const required = REQUIRED_TEXT.get(element.name)
+
+    if (required && !names.has(required[0]))
+      this.error(at, required[1])
+
+    if (names.has('onClick') && !names.has('role') && !INTERACTIVE_TAGS.has(element.name))
+      this.error(at, `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers: use a \`button\`, or give it a \`role\`, a \`tabindex\` and a key handler`)
   }
 
   // `onclick` and `on:click` attach nothing in Solid, and the component would not become an island either.

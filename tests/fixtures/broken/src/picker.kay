@@ -4,6 +4,6 @@ import { signal } from 'kay'
 const { items, field } = props<{ items: T[], field: keyof T & string }>()
 const chosen = signal<number>()
 ---
-ul.picker
+ul.picker(role="listbox")
   for item of items key={item.id}
-    li(class={{ chosen: chosen() === item.id }} onClick={() => chosen.set(item.id)}) {String(item[field])}
+    li(role="option" aria-selected={chosen() === item.id ? 'true' : 'false'} class={{ chosen: chosen() === item.id }} onClick={() => chosen.set(item.id)}) {String(item[field])}

@@ -526,3 +526,30 @@ describe('lowercase events', () => {
     expect(errors('button(onClick={go}) x')).toEqual([])
   })
 })
+
+describe('accessibility checks', () => {
+  const checked = (source: string) => compileKay(source, 'test.kay', { check: true }).diagnostics.map(d => d.message)
+
+  it('ask an img for alt and an iframe for a title, alt="" marking decoration', () => {
+    expect(checked('img(src="/a.png")\niframe(src="/map")')).toEqual([
+      'An `img` needs `alt`: what it shows, or `alt=""` when it is only decoration',
+      'An `iframe` needs a `title` naming what it holds, which screen readers announce',
+    ])
+    expect(checked('img(src="/a.png" alt="")\niframe(src="/map" title="Map")')).toEqual([])
+  })
+
+  it('report a click handler on an element the keyboard never reaches, unless it has a role', () => {
+    const click = 'onClick={() => undefined}'
+
+    expect(checked(`.card(${click})\nli(${click}) x\nbutton(${click}) ok\na(href="/" ${click}) ok`)).toEqual([
+      'This `div` reacts to `onClick` but is out of reach of the keyboard and screen readers: use a `button`, or give it a `role`, a `tabindex` and a key handler',
+      'This `li` reacts to `onClick` but is out of reach of the keyboard and screen readers: use a `button`, or give it a `role`, a `tabindex` and a key handler',
+    ])
+    expect(checked(`li(role="option" ${click}) x`)).toEqual([])
+  })
+
+  it('leave an element with a spread alone, and never stop a page from running', () => {
+    expect(checked('---\nconst { attrs } = props<{ attrs: Record<string, string> }>()\n---\nimg({...attrs})')).toEqual([])
+    expect(errors('img(src="/a.png")\n.card(onClick={() => undefined})')).toEqual([])
+  })
+})

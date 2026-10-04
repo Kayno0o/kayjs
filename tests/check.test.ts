@@ -232,7 +232,7 @@ describe('kay check, edge cases', () => {
   it('types an imported asset whatever the case of its extension', async () => {
     const root = await scratchProject({
       'src/img/UP.PNG': 'png',
-      'src/routes/index.kay': '---\nimport up from \'../img/UP.PNG\'\n---\nimg(src={up})\n',
+      'src/routes/index.kay': '---\nimport up from \'../img/UP.PNG\'\n---\nimg(src={up} alt="Up")\n',
     })
 
     try {
