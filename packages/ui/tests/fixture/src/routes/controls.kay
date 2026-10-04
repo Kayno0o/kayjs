@@ -1,0 +1,14 @@
+---
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+const ranges = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }] as const
+---
+main
+  #tabs
+    TabNav(label="Sections" current="/controls" links={[{ href: '/', label: 'Home' }, { href: '/controls', label: 'Controls' }]})
+  #range
+    Segmented(label="Range" name="range" options={ranges} value="week")
+  #digest
+    Toggle(name="digest" label="Daily digest" checked)

@@ -1,0 +1,21 @@
+---
+import type { JSX } from 'kay'
+
+const { links, current, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+  links: readonly { href: string, label: string }[]
+  // The `href` of the page on screen, which the link to it marks as current.
+  current: string
+  // Names the navigation for screen readers.
+  label: string
+  class?: string
+}>()
+
+// A tab bar wider than a phone scrolls, so the current tab is brought into it rather than left off screen.
+function reveal(link: HTMLAnchorElement) {
+  link.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+---
+// Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens.
+nav.tab-nav({...rest} aria-label={label} class={className})
+  for link of links key={link.href}
+    a.tab-nav-link(href={link.href} aria-current={link.href === current ? 'page' : undefined} ref={element => link.href === current && reveal(element)}) {link.label}

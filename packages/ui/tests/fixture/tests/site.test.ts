@@ -66,3 +66,26 @@ test('Table renders sorted on the server from a static page, its sortable header
   expect(table).toMatch(/<th class="table-head-cell" scope="col" data-align="start" aria-sort="ascending"><button class="table-sort-btn" type="button" data-direction="asc">Name<svg/)
   expect(table).toContain('<th class="table-head-cell" scope="col" data-align="end">Moons</th>')
 })
+
+describe('controls', () => {
+  const page = async (id: string) => (await element('/controls', id)).replaceAll(/<!--[^>]*-->/g, '')
+
+  test('TabNav links every tab, marking the page on screen as current', async () => {
+    const tabs = await page('tabs')
+
+    expect(tabs).toMatch(/<nav aria-label="Sections" class="tab-nav">/)
+    expect(tabs).toContain('<a class="tab-nav-link" href="/">Home</a>')
+    expect(tabs).toContain('<a class="tab-nav-link" href="/controls" aria-current="page">Controls</a>')
+  })
+
+  test('Segmented is a named radio group with its value checked', async () => {
+    const range = await page('range')
+
+    expect(range).toMatch(/role="radiogroup" aria-label="Range"/)
+    expect([...range.matchAll(/<input class="segmented-input" type="radio" name="range" value="(\w+)"( checked)?/g)].map(([, value, checked]) => `${value}${checked ?? ''}`)).toEqual(['day', 'week checked'])
+  })
+
+  test('Toggle is a checkbox with the switch role, on when asked', async () => {
+    expect(await page('digest')).toContain('<input name="digest" type="checkbox" role="switch" checked class="toggle-input">')
+  })
+})

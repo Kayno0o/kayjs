@@ -1,0 +1,11 @@
+---
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+const { onRange, onDigest } = props<{ onRange: (value: string) => void, onDigest: (checked: boolean) => void }>()
+
+const ranges = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }] as const
+---
+form#form
+  Segmented(label="Range" name="range" options={ranges} value="day" onChange={onRange})
+  Toggle(name="digest" label="Daily digest" onChange={onDigest})

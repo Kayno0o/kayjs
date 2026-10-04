@@ -1,0 +1,23 @@
+---
+import type { JSX } from 'kay'
+import { effect, signal } from 'kay'
+
+const { checked = false, label, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'role' | 'checked' | 'class' | 'children' | 'onChange'> & {
+  // Whether it starts on; a switch whose parent passes another value follows it.
+  checked?: boolean
+  // Shown next to the switch; omit it and pass `aria-label` instead to keep the switch label-only for screen readers.
+  label?: string
+  onChange?: (checked: boolean) => void
+  class?: string
+}>()
+
+const on = signal(checked)
+
+effect(() => on.set(checked))
+---
+// A real checkbox, so it submits inside a form like any other.
+label.toggle(class={className})
+  input.toggle-input({...rest} type="checkbox" role="switch" checked={on()} onChange={event => { on.set(event.currentTarget.checked); onChange?.(event.currentTarget.checked) }})
+  span.toggle-track
+  if label
+    span.toggle-label {label}

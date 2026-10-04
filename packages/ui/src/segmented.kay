@@ -1,0 +1,32 @@
+--- <Value extends string>
+import type { JSX } from 'kay'
+import { effect, signal } from 'kay'
+
+const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+  options: readonly { value: Value, label: string }[]
+  // The option picked to start with; a group whose parent passes another follows it.
+  value: Value
+  // Names the group for screen readers.
+  label: string
+  // The radios' name: the group submits under it inside a form, and it keeps two groups on a page apart.
+  name: string
+  onChange?: (value: Value) => void
+  class?: string
+}>()
+
+// Held as a string: a signal cannot take a type parameter that might be a function.
+const picked = signal<string>(value)
+
+effect(() => picked.set(value))
+
+function pick(next: Value) {
+  picked.set(next)
+  onChange?.(next)
+}
+---
+// Real radios, so the arrow keys move between options and the group submits like any other field.
+.segmented({...rest} role="radiogroup" aria-label={label} class={className})
+  for option of options key={option.value}
+    label.segmented-option
+      input.segmented-input(type="radio" name={name} value={option.value} checked={picked() === option.value} onChange={() => pick(option.value)})
+      span.segmented-label {option.label}
