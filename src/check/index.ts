@@ -15,10 +15,14 @@ import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER } from '../content/server'
+import * as builtInMatchers from '../runtime/params'
+import { FAVICON_PATHS } from '../server/favicon'
+import { HEALTH_PATH } from '../server/lifecycle'
 import { matcherFile } from '../server/params'
 import { publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { patternShapes, routeOf, scanRoutes } from '../server/routes'
+import { ROBOTS, SITEMAP } from '../server/sitemap'
 
 export const SHADOW_DIR = join('.kay', 'types')
 const CONTENT_PROBLEMS = fileURLToPath(new URL('../content/problems.ts', import.meta.url))
@@ -88,7 +92,10 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await writeIfChanged(environmentPath, environment(routes.flatMap(route => patternShapes(route.pattern)), publicPaths.map(file => file.url)))
 
-  for (const message of redirectProblems(options.redirects ?? {}, routes.flatMap(route => patternShapes(route.pattern)), publicPaths.map(file => file.url)))
+  // What kay serves itself counts as served, whether or not the project turns it on.
+  const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
+
+  for (const message of redirectProblems(options.redirects ?? {}, served))
     diagnostics.push({ file: join(root, CONFIG_FILE), line: 1, column: 1, message })
   // A script rather than a module, which is what lets it declare a wildcard module.
   await writeIfChanged(assetsPath, ASSET_TYPES)
@@ -123,20 +130,32 @@ export function compileShadow(root: string, routesDir: string, file: string, sou
     return target.startsWith(root + sep) ? undefined : relative(shadowDir, target)
   }
   const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, relocateImport })
+  // Reported as the server reports it, rather than as a type error in the shadow file.
+  const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
-  return { shadow: { source, file, tsx, map }, diagnostics }
+  return { shadow: { source, file, tsx, map }, diagnostics: [...diagnostics, ...unknown.map(matcher => ({ start: 0, end: 0, message: `names the matcher ${matcher}, which is neither ${relative(root, matcherFile(routesDir, matcher))} nor one kay ships: ${Object.keys(builtInMatchers).join(', ')}` }))] }
 }
 
 // A matcher's param is what it returns, the project's own or kay's; an optional one may be missing.
 function paramTypesOf(routesDir: string, shadowDir: string, route: Pick<Route, 'params' | 'optional' | 'matchers'>): Record<string, string> {
   return Object.fromEntries(route.params.map((name) => {
     const matcher = route.matchers?.[name]
-    const file = matcher === undefined ? undefined : matcherFile(routesDir, matcher)
-    const module = file !== undefined && existsSync(file) ? `${JSON.stringify(relative(shadowDir, file).replace(TS_EXTENSION, ''))}).default` : `'kay/params').${matcher}`
-    const type = matcher === undefined ? 'string' : `Exclude<ReturnType<typeof import(${module}>, undefined>`
+    const source = matcher === undefined ? undefined : matcherSource(routesDir, matcher)
+    const module = source === 'kay' ? `'kay/params').${matcher}` : `${JSON.stringify(relative(shadowDir, source ?? '').replace(TS_EXTENSION, ''))}).default`
+    const type = matcher === undefined ? 'string' : source === undefined ? 'unknown' : `Exclude<ReturnType<typeof import(${module}>, undefined>`
 
     return [name, route.optional?.includes(name) ? `${type} | undefined` : type]
   }))
+}
+
+// Where a matcher comes from, as the server looks it up: the project's file, `kay` for one kay ships, or undefined for neither.
+function matcherSource(routesDir: string, matcher: string): string | undefined {
+  const file = matcherFile(routesDir, matcher)
+
+  if (existsSync(file))
+    return file
+
+  return Object.hasOwn(builtInMatchers, matcher) ? 'kay' : undefined
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.

@@ -11,7 +11,7 @@ import { readRedirects, redirectProblems } from '../src/server/redirects'
 
 const FIXTURE = 'tests/fixtures/routing'
 const routes = `${FIXTURE}/src/routes`
-const redirects = { '/old/:slug': '/items/:slug', '/legacy/*': '/blog/*', '/temp': { to: '/about', permanent: false } }
+const redirects = { '/old/:slug': '/items/:slug', '/legacy/*': '/blog/*', '/temp': { to: '/about', permanent: false }, '/go/*': '/*' }
 const app = new Elysia().use(await pages({ routes, prebuilt: false, security: false, redirects }))
 
 async function get(path: string, served = app): Promise<{ status: number, html: string, location: string | null }> {
@@ -28,11 +28,20 @@ describe('route groups and layouts', () => {
     expect(html).toContain('<header class="root">Root</header><main><div class="marketing"><h1>About</h1></div></main>')
   })
 
-  it('wrap no page exporting layouts = false', async () => {
+  it('run a group\'s guard on the pages inside it', async () => {
+    expect(await get('/lounge')).toMatchObject({ status: 302, location: '/about' })
+  })
+
+  it('wrap no page exporting layouts = false, and start the chain at a layout exporting it', async () => {
     const { html } = await get('/bare')
 
     expect(html).toContain('<p class="bare">Bare</p>')
     expect(html).not.toContain('Root')
+
+    const docs = await get('/docs/a')
+
+    expect(docs.html).toContain('<div class="docs"><p class="path">Docs at a</p></div>')
+    expect(docs.html).not.toContain('Root')
   })
 })
 
@@ -81,13 +90,26 @@ describe('redirects', () => {
     expect(await get('/temp')).toMatchObject({ status: 307, location: '/about' })
   })
 
+  it('never send a rest of the path off the site', async () => {
+    expect((await get('/go//evil.example')).location).toBe('/evil.example')
+  })
+
   it('refuse a target naming what the old path lacks, and a path a page serves', async () => {
     expect(() => readRedirects({ '/a': '/b/:id' })).toThrow('goes to /b/:id, whose :id its path has none of')
     await expect(pages({ routes, prebuilt: false, redirects: { '/about': '/bare' } })).rejects.toThrow('the redirect from /about takes a path a page serves')
+    await expect(pages({ routes, prebuilt: false, redirects: { '/docs/*': '/about' } })).rejects.toThrow('the redirect from /docs/* takes a path a page serves')
+    // A param and a catch-all are two router paths, the param tried first.
+    const beside = new Elysia().use(await pages({ routes, prebuilt: false, security: false, redirects: { '/docs/:page': '/about' } }))
+
+    expect((await get('/docs/a', beside)).location).toBe('/about')
+    expect((await get('/docs/a/b', beside)).html).toContain('Docs at a/b')
   })
 
   it('are checked against what the site serves', () => {
-    expect(redirectProblems({ '/a': '/items/9', '/b': '/blog', '/c': 'https://elsewhere.example/x', '/d': '/nowhere', '/e/*': '/fr/hello?x' }, ['/items/:id', '/blog', '/:lang/hello'], ['/robots.txt'])).toEqual(['the redirect from /d goes to /nowhere, which no page or public file serves'])
+    const served = ['/items/:id', '/blog', '/:lang/hello', '/docs/*', '/robots.txt']
+    const problems = redirectProblems({ '/a': '/items/9', '/b': '/blog/', '/c': 'https://elsewhere.example/x', '/d': '/nowhere', '/e/*': '/fr/hello?x', '/f': '/docs/', '/g': '/docs', '/h': '/d', '/i': '/robots.txt' }, served)
+
+    expect(problems).toEqual(['the redirect from /d goes to /nowhere, which nothing on the site serves', 'the redirect from /g goes to /docs, which nothing on the site serves'])
   })
 })
 
@@ -99,8 +121,17 @@ describe('trailing slashes', () => {
     expect(await get('/about/?x=1')).toMatchObject({ status: 308, location: '/about?x=1' })
     expect(await get('/about', always)).toMatchObject({ status: 308, location: '/about/' })
     expect((await get('/blog/2/', always)).html).toContain('<p class="page">Page 2, a number</p>')
+    expect(await get('/docs/a', always)).toMatchObject({ status: 308, location: '/docs/a/' })
+    expect((await get('/docs/a/', always)).html).toContain('Docs at a<')
     expect((await get('/about/', ignore)).status).toBe(200)
     expect((await get('/about', ignore)).status).toBe(200)
+  })
+
+  it('write sitemap and canonical URLs as the setting has them', async () => {
+    const always = new Elysia().use(await pages({ routes, prebuilt: false, security: false, trailingSlash: 'always', site: 'https://x.example' }))
+
+    expect((await get('/sitemap.xml', always)).html).toContain('<loc>https://x.example/about/</loc>')
+    expect((await get('/about/', always)).html).toContain('<link rel="canonical" href="https://x.example/about/">')
   })
 })
 
@@ -123,10 +154,23 @@ describe('prerendering', () => {
 
 describe('kay check', () => {
   it('types each param as its matcher returns, optional ones as possibly missing, and reports a redirect to nowhere', async () => {
-    expect(await check(FIXTURE)).toEqual([])
+    expect(await check(FIXTURE, { redirects: { '/x': '/sitemap.xml' } })).toEqual([])
 
     const diagnostics = await check(FIXTURE, { redirects: { '/x': '/nowhere' } })
 
-    expect(diagnostics.map(diagnostic => diagnostic.message)).toEqual(['the redirect from /x goes to /nowhere, which no page or public file serves'])
+    expect(diagnostics.map(diagnostic => diagnostic.message)).toEqual(['the redirect from /x goes to /nowhere, which nothing on the site serves'])
+  })
+
+  it('reports a matcher nobody provides at the page naming it', async () => {
+    const page = join(FIXTURE, 'src/routes/x/[id=nothing].kay')
+
+    try {
+      await Bun.write(page, 'p x\n')
+
+      expect((await check(FIXTURE)).map(({ file, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), message }))).toEqual([{ file: page, message: 'names the matcher nothing, which is neither src/params/nothing.ts nor one kay ships: integer, slug, uuid' }])
+    }
+    finally {
+      await rm(join(FIXTURE, 'src/routes/x'), { recursive: true, force: true })
+    }
   })
 })

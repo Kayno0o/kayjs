@@ -3,7 +3,6 @@ import type { ClientBuild } from './client'
 import type { ServedRoute } from './guards'
 import type { RouterShape } from './params'
 import type { RequestContext, ServedPage } from './render'
-import type { Route } from './routes'
 import { tmpdir } from 'node:os'
 import { join, normalize, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -22,14 +21,14 @@ import { serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
 import { logRequests } from './log'
-import { loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
+import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
 import { servePublic } from './public'
 import { readRedirects, redirectShape, serveRedirects } from './redirects'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
 import { reportServerError } from './report'
 import { revalidateStale } from './revalidate'
 import { rewriteRequests } from './rewrite'
-import { decodePath, refuseClashes, scanRoutes, servedPaths, specialPagesOf } from './routes'
+import { decodePath, refuseClashes, routerKey, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
 import { securityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
 import { serveSitemap } from './sitemap'
@@ -37,13 +36,6 @@ import { serveSitemap } from './sitemap'
 // Every slash at either end of a path.
 const EDGE_SLASHES = /^\/+|\/+$/g
 const SOURCE_MAP = '.js.map'
-const TRAILING_SLASH = /\/$/
-const PARAM_NAME = /:[^/]+|\*/g
-
-// A candidate checking none of its params with a matcher takes whatever reaches it.
-function isPlain({ route, shape }: { route: Route, shape: RouterShape }): boolean {
-  return shape.positions.every(([, name]) => route.matchers?.[name] === undefined)
-}
 
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
@@ -195,7 +187,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   serveFeeds(app, await projectCollections(root, options.content), options.site === undefined ? undefined : siteOrigin(options.site), options.dev)
 
   if (options.site !== undefined)
-    serveSitemap(app, routes, siteOrigin(options.site), publicUrls, { dev: options.dev, onError: options.onError })
+    serveSitemap(app, routes, siteOrigin(options.site), publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash })
 
   if (options.favicon !== undefined)
     serveFavicons(app, new Set([...publicUrls, ...servedPaths(routes)]), { source: resolve(root, options.favicon), builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, manifest: options.manifest })
@@ -204,7 +196,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const matchers = await loadMatchers(routesDir, routes)
   const trailingSlash = options.trailingSlash ?? 'never'
   const redirects = readRedirects(options.redirects ?? {})
-  const pagePaths = new Set([...servedPaths(routes)].map(path => path.replaceAll(PARAM_NAME, ':')))
+  const pagePaths = new Set([...servedPaths(routes)].map(routerKey))
 
   for (const redirect of redirects) {
     if (pagePaths.has(redirectShape(redirect)))
@@ -212,6 +204,19 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   }
 
   serveRedirects(app, redirects)
+
+  async function servePage(route: ServedRoute, params: Record<string, unknown>, context: RequestContext, url: URL): Promise<Response> {
+    // A path `kay build` rendered is served from its file; any other path of the route renders per request.
+    const page = prerendered.get(route.pattern)?.get(canonicalPath(withoutSlash(url.pathname)))
+
+    if (!page)
+      return renderPage(route, context, params, client, renderOptions)
+
+    // Rendered as `kay build` renders it: without the request, for whoever its guards let through.
+    revalidateStale(page, async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), error => reportServerError(error, context.request, renderOptions.onError))
+
+    return servePrerendered(route, page, context, client, renderOptions)
+  }
 
   // Each path the router serves, with the pages serving it: a page whose matcher refuses the URL passes it to the next, the one without a matcher last.
   const byPath = new Map<string, { route: ServedRoute, shape: RouterShape }[]>()
@@ -226,7 +231,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   }
 
   for (const [path, candidates] of byPath) {
-    candidates.sort((a, b) => Number(isPlain(a)) - Number(isPlain(b)))
+    // Several matchers on one path are tried in the order of their files' paths.
+    candidates.sort((a, b) => Number(isPlain(a)) - Number(isPlain(b)) || a.route.file.localeCompare(b.route.file))
 
     app.get(path, async (context) => {
       const url = new URL(context.request.url)
@@ -249,19 +255,6 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
       return renderUnmatched(candidates.at(-1)!.route.special, context, client, renderOptions)
     })
-  }
-
-  async function servePage(route: ServedRoute, params: Record<string, unknown>, context: RequestContext, url: URL): Promise<Response> {
-    // A path `kay build` rendered is served from its file; any other path of the route renders per request.
-    const page = prerendered.get(route.pattern)?.get(canonicalPath(url.pathname.length > 1 ? url.pathname.replace(TRAILING_SLASH, '') : url.pathname))
-
-    if (!page)
-      return renderPage(route, context, params, client, renderOptions)
-
-    // Rendered as `kay build` renders it: without the request, for whoever its guards let through.
-    revalidateStale(page, async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), error => reportServerError(error, context.request, renderOptions.onError))
-
-    return servePrerendered(route, page, context, client, renderOptions)
   }
 
   const fallback = bundle?.fallback ?? specialPagesOf(routesDir, routesDir)

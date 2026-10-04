@@ -1,9 +1,10 @@
-import type { KayConfig, SeoConfig } from '../config'
+import type { KayConfig, SeoConfig, TrailingSlash } from '../config'
 import type { HeadOptions, HeadTag } from '../runtime/head'
 import { join } from 'node:path'
 import { jsonLd } from '../runtime/seo'
 import { faviconTags } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
+import { slashedPath } from './routes'
 
 // The head options of one response, from its URL and status.
 export type SeoHead = (url: URL, status: number) => HeadOptions
@@ -26,11 +27,11 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   if (config.favicon !== undefined)
     extra.push(...faviconTags(config.manifest))
 
-  return seoHead(config.site, config.seo, extra)
+  return seoHead(config.site, config.seo, extra, config.trailingSlash)
 }
 
 // What `site`, `seo` and other settings such as the favicon give every page's head, or undefined when the project sets none and pages keep only their own tags.
-export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = []): SeoHead | undefined {
+export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = [], trailingSlash?: TrailingSlash): SeoHead | undefined {
   const origin = site === undefined ? undefined : siteOrigin(site)
 
   // Fonts or a favicon alone give a page no social card.
@@ -61,7 +62,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
 
   // An error page is no URL to point search engines at.
   return (url, status) => ({
-    defaults: origin !== undefined && status === 200 ? [...tags, { tag: 'link', props: { rel: 'canonical', href: origin + url.pathname } }] : tags,
+    defaults: origin !== undefined && status === 200 ? [...tags, { tag: 'link', props: { rel: 'canonical', href: origin + slashedPath(url.pathname, trailingSlash) } }] : tags,
     titleTemplate: seo.titleTemplate,
     social: social ? { origin } : undefined,
   })

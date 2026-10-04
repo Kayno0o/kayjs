@@ -5,6 +5,9 @@ export type Redirects = Record<string, string | { to: string, permanent?: boolea
 
 const PARAM = /^:([A-Z_$][\w$]*)$/i
 const QUERY_OR_HASH = /[?#].*$/
+const POSITIONAL = /:p\d+/g
+// A target on the site whose `*` starts with a slash would read as another host: `//evil.example`.
+const LEADING_SLASHES = /^\/{2,}/
 // What the target names from the old path: a `:name`, or the `*`.
 const TARGET_PART = /:([A-Z_$][\w$]*)|\*/gi
 
@@ -54,9 +57,9 @@ export function readRedirects(redirects: Redirects): Redirect[] {
   })
 }
 
-// A redirect target on the site that no page or public file serves, each `:param` standing for any segment and a `*` for any rest of the path.
-export function redirectProblems(redirects: Redirects, patterns: string[], files: string[]): string[] {
-  const served = [...patterns, ...files].map(path => path.split('/').slice(1))
+// A redirect target on the site that nothing serves: no page, public file, route kay adds nor other redirect. A `:param` stands for any segment, a `*` for any rest of the path, and a trailing slash is the page's as `trailingSlash` allows.
+export function redirectProblems(redirects: Redirects, served: string[]): string[] {
+  const paths = [...served, ...Object.keys(redirects)].map(path => path.split('/').slice(1))
 
   return Object.entries(redirects).flatMap(([from, target]) => {
     const to = typeof target === 'string' ? target : target.to
@@ -65,13 +68,15 @@ export function redirectProblems(redirects: Redirects, patterns: string[], files
     if (!to.startsWith('/') || to.startsWith('//'))
       return []
 
-    const segments = to.replace(QUERY_OR_HASH, '').split('/').slice(1)
+    const path = to.replace(QUERY_OR_HASH, '')
+    const slash = path.length > 1 && path.endsWith('/')
+    const segments = (slash ? path.slice(0, -1) : path).split('/').slice(1)
 
-    return served.some(path => reaches(segments, path)) ? [] : [`the redirect from ${from} goes to ${to}, which no page or public file serves`]
+    return paths.some(served => reaches(segments, slash, served)) ? [] : [`the redirect from ${from} goes to ${to}, which nothing on the site serves`]
   })
 }
 
-function reaches(target: string[], path: string[]): boolean {
+function reaches(target: string[], slash: boolean, path: string[]): boolean {
   for (const [index, segment] of target.entries()) {
     const served = path[index]
 
@@ -82,12 +87,13 @@ function reaches(target: string[], path: string[]): boolean {
       return false
   }
 
-  return target.length === path.length || (target.length === path.length - 1 && path.at(-1) === '*')
+  // A catch-all's own directory is served with its slash only: `/docs/` for `/docs/*`, never `/docs`.
+  return target.length === path.length || (slash && target.length === path.length - 1 && path.at(-1) === '*')
 }
 
 // The router path a redirect registers, its params unnamed, to compare with what the pages serve.
 export function redirectShape(redirect: Redirect): string {
-  return redirect.path.replaceAll(/:p\d+/g, ':')
+  return redirect.path.replaceAll(POSITIONAL, ':')
 }
 
 // Registered before the pages, the query carried over unless the target gives its own.
@@ -98,7 +104,8 @@ export function serveRedirects(app: Elysia, redirects: Redirect[]): void {
       // Named params arrive decoded, so they are encoded again; the `*` arrives as the browser sent it.
       const target = redirect.to.replaceAll(TARGET_PART, (part, name: string | undefined) => name === undefined ? values['*'] ?? '' : encodeURIComponent(values[redirect.names.get(name)!] ?? ''))
       const { search } = new URL(request.url)
-      const location = search !== '' && !target.includes('?') ? `${target}${search}` : target
+      const path = target.startsWith('/') ? target.replace(LEADING_SLASHES, '/') : target
+      const location = search !== '' && !path.includes('?') ? `${path}${search}` : path
 
       return new Response(null, { status: redirect.status, headers: { location } })
     })

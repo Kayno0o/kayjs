@@ -1,0 +1,5 @@
+--- server
+export const layouts = false
+---
+div.docs
+  slot

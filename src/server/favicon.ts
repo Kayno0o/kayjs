@@ -14,6 +14,9 @@ const ICO_SIZES = [16, 32, 48]
 const LARGEST = 512
 const ICO = '/favicon.ico'
 
+// Every path the favicon serves.
+export const FAVICON_PATHS = [ICO, ...Object.keys(PNG_FILES), MANIFEST]
+
 export interface FaviconOptions {
   // The square source image, absolute.
   source: string

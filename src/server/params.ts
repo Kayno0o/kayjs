@@ -3,9 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import * as builtIn from '../runtime/params'
 import { bundled, importModule } from './bundle'
-import { decodePath, patternShapes } from './routes'
-
-const TRAILING_SLASH = /\/$/
+import { decodePath, patternShapes, withoutSlash } from './routes'
 
 // Gives the param's value, or undefined to refuse the URL, which then falls through to the next page serving its path.
 export type Matcher = (value: string) => unknown
@@ -77,13 +75,18 @@ export function routerShapes(route: Route): RouterShape[] {
   })
 }
 
+// A candidate checking none of its params with a matcher takes whatever reaches it, so it is tried last.
+export function isPlain({ route, shape }: { route: Route, shape: RouterShape }): boolean {
+  return shape.positions.every(([, name]) => route.matchers?.[name] === undefined)
+}
+
 // The route's params from the router's positional ones, or `malformed` for an encoding that decodes to nothing; Elysia decodes named params, null when malformed, and leaves the catch-all encoded.
 // A catch-all served with a trailing slash, as `trailingSlash: 'always'` serves it, reads the same as without.
 export function positionalParams(shape: RouterShape, route: Route, raw: Record<string, string | null | undefined>): Record<string, string> | 'malformed' {
   const params: Record<string, string> = {}
 
   for (const [index, name] of shape.positions) {
-    const value = name === route.catchAll ? decodePath((raw['*'] ?? '').replace(TRAILING_SLASH, '')) : raw[`p${index}`]
+    const value = name === route.catchAll ? decodePath(withoutSlash(`/${raw['*'] ?? ''}`).slice(1)) : raw[`p${index}`]
 
     if (typeof value !== 'string')
       return 'malformed'

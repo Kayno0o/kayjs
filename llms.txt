@@ -388,9 +388,9 @@ A matcher checks a param, `[name=matcher]` or `[[name=matcher]]`: it returns the
 export default (value: string) => Number(value) % 2 === 0 ? Number(value) : undefined
 ```
 
-A URL a matcher refuses falls through to the page without one serving the same path, `items/[slug].kay` beside `items/[id=integer].kay`, and is a 404 when none does. Two pages serving one path, neither with a matcher, stop the server, whatever they name their params: `todos/[id].kay` and `todos/[slug].kay`, `blog/index.kay` and `blog/[[page]].kay`, `about.kay` and `(site)/about.kay`. A `prerender` list leaves an optional param out to prerender the path without it, and an entry a matcher refuses fails the build.
+A URL a matcher refuses falls through to the page without one serving the same path, `items/[slug].kay` beside `items/[id=integer].kay`, and is a 404 when none does; several pages with matchers on one path are tried in the order of their file paths. Two pages serving one path, neither with a matcher, stop the server, whatever they name their params: `todos/[id].kay` and `todos/[slug].kay`, `blog/index.kay` and `blog/[[page]].kay`, `about.kay` and `(site)/about.kay`. A `prerender` list leaves an optional param out to prerender the path without it, and an entry a matcher refuses fails the build.
 
-A page or a layout exporting `layouts = false` from its server fence is wrapped by none of the layouts above it: `export const layouts = false` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
+A page or a layout whose server fence has a line starting with `export const layouts = false` is wrapped by none of the layouts above it: `export const layouts = false` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
 
 Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence runs per request and may use top-level `await` and the `ctx` object, except what an export such as an action reads: that runs once, when the module loads, so it may neither await nor read `ctx`, which `kay check` reports. The fence's `ctx`:
 

@@ -52,6 +52,7 @@ const GUARD = '_guard.ts'
 // What Elysia reads as a parameter, a wildcard or breaks the code it generates on, in a static segment.
 const ROUTER_SYNTAX = /[:*']/
 const PARAM_NAME = /:[^/]+/g
+const TRAILING_SLASH = /\/$/
 
 // The route a file under the routes directory serves; files starting with `_` (layouts, partials) serve none.
 export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts' | 'special' | 'guards'> | undefined {
@@ -124,12 +125,13 @@ export async function scanRoutes(routesDir: string): Promise<Route[]> {
     return []
 
   const routes: Route[] = []
+  const read: LayoutsRead = new Map()
 
   for (const file of await findKayFiles(routesDir)) {
     const route = routeOf(routesDir, file)
 
     if (route)
-      routes.push({ ...route, layouts: layoutsOf(routesDir, file), special: specialPagesOf(routesDir, dirname(file)), guards: guardsOf(routesDir, file) })
+      routes.push({ ...route, layouts: layoutsOf(routesDir, file, read), special: specialPagesOf(routesDir, dirname(file), read), guards: guardsOf(routesDir, file, read) })
   }
 
   return routes
@@ -149,7 +151,7 @@ export function refuseClashes(routesDir: string, routes: Route[]): void {
       if (paramsIn(shape, route).some(name => route.matchers?.[name] !== undefined))
         continue
 
-      const path = shape.replace(PARAM_NAME, ':')
+      const path = routerKey(shape)
       const same = plainAt.get(path)
 
       if (same)
@@ -158,6 +160,21 @@ export function refuseClashes(routesDir: string, routes: Route[]): void {
       plainAt.set(path, route)
     }
   }
+}
+
+// A router path with its params unnamed, `/blog/:` for `/blog/:slug` and `/blog/:p2` alike, a catch-all's `*` kept: what two paths compare by.
+export function routerKey(path: string): string {
+  return path.replace(PARAM_NAME, ':')
+}
+
+// A page's path as the `trailingSlash` setting writes it, for canonical links and the sitemap: with a slash under `always`, as it is otherwise.
+export function slashedPath(path: string, trailingSlash: 'never' | 'always' | 'ignore' = 'never'): string {
+  return trailingSlash === 'always' && !path.endsWith('/') ? `${path}/` : path
+}
+
+// A path without its trailing slash, `/` kept.
+export function withoutSlash(path: string): string {
+  return path.length > 1 ? path.replace(TRAILING_SLASH, '') : path
 }
 
 // The params a shape of the route's pattern names, in order.
@@ -170,26 +187,34 @@ export function paramsIn(shape: string, route: Pick<Route, 'catchAll'>): string[
   })
 }
 
-function layoutsOf(routesDir: string, file: string): string[] {
-  if (exportsNoLayouts(file))
+// Whether each file read so far exports `layouts = false`, so a scan reads a layout once however many pages it wraps.
+type LayoutsRead = Map<string, boolean>
+
+function layoutsOf(routesDir: string, file: string, read: LayoutsRead): string[] {
+  if (exportsNoLayouts(file, read))
     return []
 
   const layouts = directoriesUp(routesDir, dirname(file)).map(dir => join(dir, LAYOUT)).filter(layout => existsSync(layout)).reverse()
   // The innermost layout that leaves its parents out starts the chain.
-  const reset = layouts.findLastIndex(exportsNoLayouts)
+  const reset = layouts.findLastIndex(layout => exportsNoLayouts(layout, read))
 
   return reset === -1 ? layouts : layouts.slice(reset)
 }
 
-function exportsNoLayouts(file: string): boolean {
-  return NO_LAYOUTS.test(readFileSync(file, 'utf8'))
+function exportsNoLayouts(file: string, read: LayoutsRead): boolean {
+  let found = read.get(file)
+
+  if (found === undefined)
+    read.set(file, found = NO_LAYOUTS.test(readFileSync(file, 'utf8')))
+
+  return found
 }
 
-function guardsOf(routesDir: string, file: string): GuardFile[] {
+function guardsOf(routesDir: string, file: string, read: LayoutsRead): GuardFile[] {
   return directoriesUp(routesDir, dirname(file)).filter(dir => existsSync(join(dir, GUARD))).reverse().map(dir => ({
     file: join(dir, GUARD),
     // A guard on the routes directory covers every layout, so its special pages render bare.
-    special: dir === routesDir ? withoutLayouts(specialPagesOf(routesDir, dir)) : specialPagesOf(routesDir, dirname(dir)),
+    special: dir === routesDir ? withoutLayouts(specialPagesOf(routesDir, dir, read)) : specialPagesOf(routesDir, dirname(dir), read),
   }))
 }
 
@@ -200,11 +225,11 @@ function withoutLayouts(special: SpecialPages): SpecialPages {
   }
 }
 
-export function specialPagesOf(routesDir: string, dir: string): SpecialPages {
+export function specialPagesOf(routesDir: string, dir: string, read: LayoutsRead = new Map()): SpecialPages {
   const nearest = (name: string): SpecialPage | undefined => {
     const file = directoriesUp(routesDir, dir).map(ancestor => join(ancestor, name)).find(path => existsSync(path))
 
-    return file ? { file, layouts: layoutsOf(routesDir, file) } : undefined
+    return file ? { file, layouts: layoutsOf(routesDir, file, read) } : undefined
   }
 
   return { notFound: nearest(NOT_FOUND), error: nearest(ERROR) }
