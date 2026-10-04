@@ -9,6 +9,8 @@ export interface RequestState {
   // Who is asking, as rate limits count them.
   client: string
   current: () => Promise<UserRecord | null>
+  // How the current user was read, once `current` has been.
+  via: () => 'session' | 'bearer' | null
   // Signs `record` in and answers where the browser goes next.
   complete: (record: UserRecord, redirect: string) => Promise<string>
   // Keeps this session signed in as `record` after its session version was raised, when it is that user's.

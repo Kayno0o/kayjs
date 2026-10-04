@@ -32,6 +32,16 @@ export interface IdentityRecord {
   createdAt: Date
 }
 
+// A token a device or an API client sends as `Authorization: Bearer`, stored as its digest.
+export interface BearerTokenRecord {
+  id: string
+  userId: string
+  label: string
+  digest: string
+  createdAt: Date
+  lastUsedAt: Date | null
+}
+
 // What an emailed link proves once used.
 export type TokenType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email'
 
@@ -57,7 +67,7 @@ export interface AuthStore {
     create: (user: UserRecord) => MaybePromise<void>
     // The user once changed, or undefined when there is none; throws when the change takes an email or a username another user has.
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
-    // Deletes the user with everything kay-auth keeps for them: identities, tokens and recovery codes.
+    // Deletes the user with everything kay-auth keeps for them: identities, links, bearer tokens and recovery codes.
     delete: (id: string) => MaybePromise<void>
     // Records `step` as the last one a code was accepted for, only when it is later than the one recorded: false when it is not, even when two requests try it together.
     advanceTotpStep: (id: string, step: number) => MaybePromise<boolean>
@@ -76,6 +86,15 @@ export interface AuthStore {
     consume: (digest: string, type: TokenType) => MaybePromise<TokenRecord | undefined>
     // Deletes the user's tokens of that type, or of every type.
     deleteForUser: (userId: string, type?: TokenType) => MaybePromise<void>
+  }
+  bearerTokens: {
+    create: (token: BearerTokenRecord) => MaybePromise<void>
+    findByDigest: (digest: string) => MaybePromise<BearerTokenRecord | undefined>
+    listByUser: (userId: string) => MaybePromise<BearerTokenRecord[]>
+    // Records a use, without changing anything else.
+    touch: (id: string, at: Date) => MaybePromise<void>
+    // Deletes the user's token with that id; false when they have none.
+    delete: (userId: string, id: string) => MaybePromise<boolean>
   }
   // Digests of the codes that sign in in place of a second factor.
   recoveryCodes: {

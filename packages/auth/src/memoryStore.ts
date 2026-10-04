@@ -1,4 +1,4 @@
-import type { AuthStore, IdentityRecord, TokenRecord, UserRecord } from './store'
+import type { AuthStore, BearerTokenRecord, IdentityRecord, TokenRecord, UserRecord } from './store'
 
 const SWEEP_EVERY = 1000
 
@@ -8,6 +8,7 @@ export function memoryStore(): AuthStore {
   const identities = new Map<string, IdentityRecord>()
   const tokens = new Map<string, TokenRecord>()
   const recoveryCodes = new Map<string, Set<string>>()
+  const bearerTokens = new Map<string, BearerTokenRecord>()
   const attempts = new Map<string, { count: number, resetAt: number }>()
   let hits = 0
   const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
@@ -71,6 +72,11 @@ export function memoryStore(): AuthStore {
         }
 
         recoveryCodes.delete(id)
+
+        for (const [key, token] of bearerTokens) {
+          if (token.userId === id)
+            bearerTokens.delete(key)
+        }
       },
       advanceTotpStep(id, step) {
         const user = users.get(id)
@@ -124,6 +130,25 @@ export function memoryStore(): AuthStore {
           if (token.userId === userId && (type === undefined || token.type === type))
             tokens.delete(key)
         }
+      },
+    },
+    bearerTokens: {
+      create(token) {
+        bearerTokens.set(token.id, { ...token })
+      },
+      findByDigest: digest => clone([...bearerTokens.values()].find(token => token.digest === digest)),
+      listByUser: userId => [...bearerTokens.values()].filter(token => token.userId === userId).map(token => ({ ...token })),
+      touch(id, at) {
+        const token = bearerTokens.get(id)
+
+        if (token)
+          bearerTokens.set(id, { ...token, lastUsedAt: at })
+      },
+      delete(userId, id) {
+        if (bearerTokens.get(id)?.userId !== userId)
+          return false
+
+        return bearerTokens.delete(id)
       },
     },
     recoveryCodes: {

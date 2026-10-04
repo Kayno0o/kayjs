@@ -1,6 +1,7 @@
 import type { AnyElysia } from 'elysia'
 import type { Guard } from 'kay'
 import type { Session } from 'kay/server'
+import type { BearerToken } from './bearer'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
 import type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult } from './email'
 import type { Limits } from './limits'
@@ -15,6 +16,7 @@ import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { clientAddress, rateKey } from 'kay/server'
 import { changePassword, deleteAccount, unlink } from './account'
+import { bearerUser, createToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { publicUser } from './core'
 import { changeEmail, confirmEmailChange, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithMagicLink, verifyEmail } from './email'
 import { createGate } from './gate'
@@ -77,13 +79,15 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string> 
 export class Auth {
   readonly [STATE]: RequestState
   private resolving?: Promise<UserRecord | null>
+  private source: 'session' | 'bearer' | null = null
 
-  constructor(private readonly session: Session<AuthSessionData>, private readonly core: Core, client: string) {
+  constructor(private readonly session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string) {
     this[STATE] = {
       core,
       session,
       client,
       current: () => this.record(),
+      via: () => this.source,
       complete: async (record, redirect) => completeSignIn(this[STATE], record, redirect, signedIn => this.establish(signedIn)),
       renew: async (record) => {
         // Read off the session, not through `record()`: the version it holds is the one just raised past.
@@ -98,11 +102,18 @@ export class Auth {
     }
   }
 
-  // The signed-in user, or null; read once per request, on first use.
+  // The signed-in user, or the owner of the request's `Authorization: Bearer` token, or null; read once per request, on first use.
   async user(): Promise<User | null> {
     const record = await this.record()
 
     return record && publicUser(record)
+  }
+
+  // How `user()` found the user: their session, or a bearer token; null when anonymous.
+  async via(): Promise<'session' | 'bearer' | null> {
+    await this.record()
+
+    return this.source
   }
 
   // Signs `user` in on this session, without asking for their second factor: for a way of signing in the app proves itself.
@@ -119,6 +130,7 @@ export class Auth {
   async signOut(): Promise<void> {
     await this.session.unset('auth')
     await this.session.regenerate()
+    this.source = null
     this.resolving = Promise.resolve(null)
   }
 
@@ -250,11 +262,26 @@ export class Auth {
     return deleteAccount(this[STATE], proof, () => this.signOut())
   }
 
+  // A bearer token for a device or an API client of the signed-in user, shown this once; minted from a session only, never from another token.
+  async createToken(proof: Proof, label: string): Promise<{ ok: true, token: string, id: string } | { ok: false, error: ProofFailure | 'label' }> {
+    return createToken(this[STATE], proof, label)
+  }
+
+  // The signed-in user's bearer tokens, without the tokens themselves.
+  async tokens(): Promise<BearerToken[]> {
+    return listTokens(this[STATE])
+  }
+
+  async revokeToken(id: string): Promise<boolean> {
+    return revokeToken(this[STATE], id)
+  }
+
   // Under a new session id, so one planted before is worth nothing.
   private async establish(record: UserRecord): Promise<void> {
     await this.session.unset('authChallenge')
     await this.session.regenerate()
     await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now() })
+    this.source = 'session'
     this.resolving = Promise.resolve(record)
   }
 
@@ -266,19 +293,23 @@ export class Auth {
 
   private async resolve(): Promise<UserRecord | null> {
     const signedIn = await this.session.get('auth')
+    const record = signedIn && await this.core.store.users.get(signedIn.user)
 
-    if (!signedIn)
-      return null
+    if (record && record.sessionVersion === signedIn!.version) {
+      this.source = 'session'
 
-    const record = await this.core.store.users.get(signedIn.user)
-
-    if (record && record.sessionVersion === signedIn.version)
       return record
+    }
 
     // Deleted, or signed out everywhere since.
-    await this.session.unset('auth')
+    if (signedIn)
+      await this.session.unset('auth')
 
-    return null
+    const owner = await bearerUser(this.core, this.request)
+
+    this.source = owner ? 'bearer' : null
+
+    return owner ?? null
   }
 }
 
@@ -291,7 +322,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   const plugin = new Elysia({ name: 'kay-auth' })
     .use(options.sessions as unknown as AnyElysia)
-    .derive(({ session, request, server }) => ({ auth: new Auth(session as unknown as Session<AuthSessionData>, core, rateKey(clientAddress(request, server))) }))
+    .derive(({ session, request, server }) => ({ auth: new Auth(session as unknown as Session<AuthSessionData>, core, request, rateKey(clientAddress(request, server))) }))
     // The session's derive reaches this instance only; lifting both lets them reach the app's routes.
     .as('scoped')
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
@@ -334,6 +365,13 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     plugin,
     hasRole,
     isGranted: (role: Role, user: User) => isGranted(role, user.roles as Role[]),
+
+    // The user a bearer token belongs to, for a websocket handshake sending one in its first message.
+    async userFromToken(token: string): Promise<User | null> {
+      const record = await tokenUser(core, token)
+
+      return record ? publicUser(record) : null
+    },
 
     // Closes every route of the Elysia instance it is used on unless the user meets `require`, signed in by default. A route takes `auth: <requirement>` to ask for more and `auth: false` to stay open.
     gate(gateOptions: { require?: AuthRequirement<Role> } = {}) {
