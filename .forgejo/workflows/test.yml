@@ -39,6 +39,12 @@ jobs:
       - name: Check
         run: bun run check
 
+      # For the tests driving pages through `kay/test` in a real browser, which Bun.WebView finds through BUN_CHROME_PATH.
+      - name: Install Chromium
+        run: |
+          apk add --no-cache chromium ttf-freefont
+          echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
+
       - name: Tests
         run: bun test
 

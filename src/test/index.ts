@@ -3,6 +3,7 @@ import type { Action, Success } from '../runtime/action'
 import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
+import type { BrowserOptions, TestPage } from './browser'
 import { join } from 'node:path'
 import { Elysia } from 'elysia'
 import { withConfig } from '../config'
@@ -10,9 +11,14 @@ import { encodeCall, readActionResponse } from '../runtime/action'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { servePages } from '../server/app'
+import { basePath } from '../server/base'
+import { buildClient } from '../server/client'
 import { shutDown } from '../server/lifecycle'
+import { browse } from './browser'
 import { testRoot } from './root'
 
+export type { BrowserOptions, TestPage, WaitForOptions, WaitOptions } from './browser'
+export { browse, browserPath } from './browser'
 export type { Mounted } from './mount'
 export { mount, settle } from './mount'
 
@@ -21,6 +27,8 @@ export interface TestOptions extends PagesOptions {
   use?: AnyElysia[]
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
   locals?: (request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>
+  // Builds the islands for the browser, as `kay dev` does into `.kay/client`, for `open()` to load pages in a headless Chrome.
+  browser?: boolean | BrowserOptions
 }
 
 export interface Visit {
@@ -51,9 +59,11 @@ export interface TestSite {
   socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => TestSocket<SocketOf<Module, Path>>
   // A route of a module under `src/api` answering with `events()`, read as an island reads it.
   stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
+  // A page loaded in a headless Chrome over a server the site starts on a free port, once `browser` is set; its cookies are the browser's, not `cookies`.
+  open: (path: string, options?: BrowserOptions) => Promise<TestPage>
   cookies: Bun.CookieMap
   handle: (request: Request) => Promise<Response>
-  // Stops the server `socket()` started, if any.
+  // Closes the pages `open()` opened and stops the server it or `socket()` started, if any.
   close: () => Promise<void>
 }
 
@@ -78,11 +88,14 @@ const ORIGIN = 'http://localhost'
 const BunWebSocket = WebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
 const MAX_REDIRECTS = 10
 
-// The project's pages and actions without a server or a browser build: pages render their islands' markup and no scripts.
+// The project's pages and actions without a server, and without a browser build unless `browser` is set: pages then render their islands' markup and no scripts.
 export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const root = testRoot(options.root)
   const config = await withConfig(root, options)
-  const client: ClientBuild = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(root, '.kay', 'client', 'dist') }
+  const client: ClientBuild = options.browser
+    ? await buildClient(root, { plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings })
+    : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(root, '.kay', 'client', 'dist') }
+  const browser = typeof options.browser === 'object' ? options.browser : {}
   const pages = await servePages(root, config, async () => client)
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
@@ -137,6 +150,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   }
 
   let server: Bun.Server<unknown> | undefined
+  const opened = new Set<TestPage>()
 
   const listening = (): Bun.Server<unknown> => {
     if (!server) {
@@ -182,7 +196,25 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
       return tested as never
     },
+    open: async (path, browserOptions) => {
+      if (!options.browser)
+        throw new Error('kay: open() loads pages in a browser, which needs their islands built: testSite({ browser: true })')
+
+      const page = await browse(new URL(path, `http://localhost:${listening().port}`).href, { ...browser, ...browserOptions })
+      const close = page.close
+
+      opened.add(page)
+      page.close = () => {
+        opened.delete(page)
+        close()
+      }
+
+      return page
+    },
     close: async () => {
+      for (const page of opened)
+        page.close()
+
       if (server)
         await shutDown(app)
 
