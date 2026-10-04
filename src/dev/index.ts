@@ -21,6 +21,7 @@ const DEBOUNCE_MS = 30
 const SPARE = join(import.meta.dir, 'spare.ts')
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
+const STYLESHEET = /\.css$/
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
 // Resolves once watching, with a function stopping the watchers and the server.
@@ -34,6 +35,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // Bun reads these as a process starts, so changing one needs a process started after it.
   let startupChanged = false
   let restarting: Promise<void> | undefined
+  // Counts every change but a stylesheet's: an open page whose server comes back with the same count only needs its stylesheets again.
+  let codeVersion = 0
 
   const env = await environmentWithoutDotenv()
   const spawn = () => Bun.spawn([process.execPath, '--preload', SPARE, entry], { cwd: root, env: { ...env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
@@ -46,7 +49,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     child = spare
-    void child.stdin.write('start\n')
+    void child.stdin.write(`start ${codeVersion}\n`)
     void child.stdin.flush()
     spare = spawn()
     options.onRestart?.(child)
@@ -69,6 +72,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   const stopWatching = watchProject(root, (file) => {
     startupChanged ||= STARTUP_FILE.test(file)
+
+    if (!STYLESHEET.test(file))
+      codeVersion++
+
     clearTimeout(timer)
     timer = setTimeout(() => {
       changed = true

@@ -6,11 +6,19 @@ import '../server'
 // Bun runs the entry once this resolves, as the main module, when `kay dev` writes a line.
 loadTraverse()
 
+const START_LINE = /^start (\d+)/
+
 const reader = Bun.stdin.stream().getReader()
-const { done } = await reader.read()
+const { done, value } = await reader.read()
 
 // Input closed without a line: `kay dev` is gone, so this server never starts.
 if (done)
   process.exit(0)
+
+// The line counts the changes so far other than to stylesheets, which pages compare to know whether reloading their styles is enough.
+const codeVersion = START_LINE.exec(new TextDecoder().decode(value))?.[1]
+
+if (codeVersion !== undefined)
+  process.env.KAY_DEV_CODE = codeVersion
 
 reader.releaseLock()

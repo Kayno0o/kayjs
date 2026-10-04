@@ -190,6 +190,40 @@ describe('kay dev', () => {
     }
   })
 
+  it('tells each server how many changes other than to stylesheets came before it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    // Hidden, so writing it restarts nothing.
+    const seen = join(root, '.seen')
+    const children: Subprocess[] = []
+
+    await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(seen)}, process.env.KAY_DEV_CODE ?? '')\nsetInterval(() => undefined, 1000)\n`)
+    await Bun.write(join(root, 'src/app.css'), 'p { color: red }\n')
+    const stop = await dev(root, { onRestart: child => children.push(child) })
+    const restartAfter = async (file: string, content: string) => {
+      const count = children.length
+
+      await rm(seen, { force: true })
+      await Bun.write(join(root, file), content)
+      await until(() => children.length > count && existsSync(seen))
+      // A save can come as several events, each restarting once their debounce settles.
+      await Bun.sleep(200)
+      await until(() => existsSync(seen))
+
+      return Bun.file(seen).text()
+    }
+
+    try {
+      await until(() => existsSync(seen))
+      expect(await Bun.file(seen).text()).toBe('0')
+      expect(await restartAfter('src/app.css', 'p { color: blue }\n')).toBe('0')
+      expect(Number(await restartAfter('src/routes/index.kay', 'p Home\n'))).toBeGreaterThan(0)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('serves the compile errors of a project that failed to boot, and the reload stream', async () => {
     const source = 'p ok\nelse\n  p no\n'
     const error = new KayCompileError([{ file: join(process.cwd(), 'src/broken.kay'), source, start: 5, end: 9, message: '`else` must directly follow an `if`' }])
@@ -205,6 +239,6 @@ describe('kay dev', () => {
     const events = await app.handle(new Request('http://localhost/_kay/dev/events'))
 
     expect(events.headers.get('content-type')).toBe('text/event-stream')
-    expect(await firstEvent(events)).toMatch(/^retry: 100\nevent: boot\ndata: [\w-]+\n\n$/)
+    expect(await firstEvent(events)).toMatch(/^retry: 100\nevent: boot\ndata: [\w-]+ [\w-]+\n\n$/)
   })
 })

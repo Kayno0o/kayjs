@@ -2,8 +2,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
+import { LIVE_RELOAD } from '../src/server/dev'
 
 interface ClientModule {
   mount: (element: HTMLElement) => () => void
@@ -249,6 +250,55 @@ describe('bind:value on a number input', () => {
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('the live reload script', () => {
+  it('swaps the stylesheets when the server comes back running the same code, and reloads on any other change', async () => {
+    const script = (/<script>([\s\S]*)<\/script>/).exec(LIVE_RELOAD)![1]!
+    const boot = (/let b="([^"]+)"/).exec(script)![1]!
+    let onBoot: (event: { data: string }) => Promise<void> = async () => undefined
+    const fetched: string[] = []
+    const reload = spyOn(location, 'reload').mockImplementation(() => undefined)
+    const fetchStub = spyOn(globalThis, 'fetch').mockImplementation((async (url: string) => {
+      fetched.push(url)
+
+      return new Response('<html><head><link rel="stylesheet" href="/_kay/app-2.css"><link rel="stylesheet" href="/theme.css"></head><body></body></html>')
+    }) as unknown as typeof fetch)
+    const stylesheets = () => [...document.querySelectorAll('link[rel=stylesheet]')].map(link => link.getAttribute('href'))
+
+    globalThis.EventSource = class {
+      addEventListener(_name: string, listener: typeof onBoot) {
+        onBoot = listener
+      }
+    } as unknown as typeof EventSource
+    const { happyDOM } = globalThis as unknown as { happyDOM: { settings: { disableCSSFileLoading: boolean, handleDisabledFileLoadingAsSuccess: boolean }, setURL: (url: string) => void } }
+
+    // A stylesheet link resolves against the page and fires `load` without fetching anything.
+    happyDOM.setURL('http://localhost/page')
+    Object.assign(happyDOM.settings, { disableCSSFileLoading: true, handleDisabledFileLoadingAsSuccess: true })
+    document.head.innerHTML = '<link rel="stylesheet" href="/_kay/app-1.css"><link rel="stylesheet" href="/theme.css">'
+
+    try {
+      // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
+      new Function(script)()
+      await onBoot({ data: `${boot} 3` })
+      expect(fetched).toEqual([])
+
+      await onBoot({ data: 'next 3' })
+      expect(fetched).toEqual(['http://localhost/page'])
+      expect(stylesheets()).toEqual(['/_kay/app-2.css', '/theme.css?kay-dev=next'])
+      expect(reload).not.toHaveBeenCalled()
+
+      await onBoot({ data: 'again 4' })
+      expect(reload).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      reload.mockRestore()
+      fetchStub.mockRestore()
+      document.head.innerHTML = ''
+      Object.assign(happyDOM.settings, { disableCSSFileLoading: false, handleDisabledFileLoadingAsSuccess: false })
     }
   })
 })
