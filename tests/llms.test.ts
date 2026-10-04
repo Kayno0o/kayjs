@@ -23,5 +23,6 @@ describe('llms.txt', () => {
 
   it('names an entry point the package exports', async () => {
     expect(await import('kay/server')).toHaveProperty('pages')
+    expect(await import('kay/server')).toMatchObject({ clientAddress: expect.any(Function), rateKey: expect.any(Function) })
   })
 })
