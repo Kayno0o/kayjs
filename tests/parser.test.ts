@@ -127,6 +127,23 @@ describe('elements', () => {
   it('rejects text glued to a tag', () => {
     expect(parse('p.x=oops').diagnostics.length).toBeGreaterThan(0)
   })
+
+  it('reports a control line after `tag: ` rather than reading it as an element', () => {
+    const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message.slice(0, 30)])
+
+    expect(at('li: if a\n  p x')).toEqual([['if', '`if` starts a line of its own;']])
+    expect(at('ul: for x of xs key={x}\n  li x')).toEqual([['for', '`for` starts a line of its own']])
+    expect(at('div: await p then v')).toEqual([['await', '`await` starts a line of its o']])
+  })
+
+  it('reports the pug lines kay has no counterpart for, with their indented block', () => {
+    const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message.slice(0, 40)])
+
+    expect(at('each x in xs\n  p {x}')).toEqual([['each', '`each` is pug syntax kay does not have; ']])
+    expect(at('doctype html\np')).toEqual([['doctype', '`doctype` is pug syntax kay does not hav']])
+    expect(at('div\n  include a.pug')).toEqual([['include', '`include` is pug syntax kay does not hav']])
+    expect(at('blockquote each one\np while\n')).toEqual([])
+  })
 })
 
 describe('text', () => {

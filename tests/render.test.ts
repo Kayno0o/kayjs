@@ -172,6 +172,14 @@ describe('prop defaults', () => {
   })
 })
 
+describe('typeof in a template expression', () => {
+  it('reads the type of a loop item, an alias and a prop with a default, which render as values', async () => {
+    const source = '---\nconst { rows, size = \'md\' } = props<{ rows: { id: number }[], size?: string }>()\n---\nfor row of rows key={row.id}\n  p {[row.id as typeof row.id, size as typeof size].join()}\nif rows[0] as first\n  p {(first as typeof first).id}'
+
+    expect(await renderKay(source, { rows: [{ id: 1 }] })).toBe('<p _hk=000>1,md</p><p _hk=220>1</p>')
+  })
+})
+
 describe('class shorthand with a spread', () => {
   const spread = { class: 'FROM', title: 't' }
 
@@ -182,6 +190,11 @@ describe('class shorthand with a spread', () => {
     expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp} title="own")', { sp: spread })).toBe('<p _hk=0 title="own" class="a FROM"></p>')
   })
 
+  it('merges a class attribute with the spread\'s class without the shorthand too', async () => {
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np(class="z" {...sp})', { sp: spread })).toBe('<p _hk=0 title="t" class="z FROM"></p>')
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np({...sp} class={["y", "z"]})', { sp: spread })).toBe('<p _hk=0 title="t" class="FROM y z"></p>')
+  })
+
   it('renders a spread without a class as before', async () => {
     expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp})', { sp: { title: 't' } })).toBe('<p _hk=0 title="t" class="a"></p>')
   })
@@ -190,6 +203,8 @@ describe('class shorthand with a spread', () => {
 describe('text lines', () => {
   it('keep their line breaks', async () => {
     expect(await renderKay('pre\n  | a\n  | b\n  | c')).toBe('<pre _hk=0>a\nb\nc</pre>')
+    expect(await renderKay('pre\n  | a\n  |   b {"x"}  c\n  |    d')).toBe('<pre _hk=0>a\n  b x  c\n   d</pre>')
+    expect(await renderKay('textarea a   b')).toBe('<textarea _hk=0>a   b</textarea>')
     expect(await renderKay('---\nconst { n } = props<{ n: string }>()\n---\np\n  | line one\n  | line two {n}', { n: 'N' })).toBe('<p _hk=0>line one\nline two N</p>')
   })
 })

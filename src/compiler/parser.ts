@@ -11,6 +11,20 @@ const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
 const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch)(?=[ \t]|\r?\n|$)/y
+// Pug lines kay has no counterpart for, which would otherwise read as an element named after the keyword.
+const PUG_KEYWORD = /(each|while|unless|case|when|include|extends|block|mixin|doctype)(?=[ \t]|\r?\n|$)/y
+const PUG_HINTS: Record<string, string> = {
+  each: 'kay loops with `for item of list key={item.id}`',
+  while: 'kay loops with `for item of list key={item.id}`',
+  unless: 'kay writes `unless x` as `if !x`',
+  case: 'kay writes `case` as `if`, `else if` and `else`',
+  when: 'kay writes `case` as `if`, `else if` and `else`',
+  include: 'kay reuses markup through a component: import a `.kay` file and use its tag',
+  extends: 'a `_layout.kay` wraps the pages of its directory at its `slot`',
+  block: 'a `_layout.kay` renders its page at `slot`, and a component takes markup as an `@name` block',
+  mixin: 'kay reuses markup through a component: import a `.kay` file and use its tag',
+  doctype: 'kay writes the doctype of every page itself',
+}
 // `then list` closing the `await` line, or a bare `then`.
 const INLINE_THEN = /\s+then(?:\s+([a-z_$][\w$]*))?\s*$/d
 const BRANCH_NAME = /[a-z_$][\w$]*/iy
@@ -182,6 +196,17 @@ class TemplateParser {
 
     if (keyword !== undefined) {
       this.attachElse(indent, siblings.at(-1), keyword !== 'else')
+
+      return
+    }
+
+    PUG_KEYWORD.lastIndex = start
+    const pug = PUG_KEYWORD.exec(this.src)?.[1]
+
+    if (pug !== undefined) {
+      this.error(start, start + pug.length, `\`${pug}\` is pug syntax kay does not have; ${PUG_HINTS[pug]}`)
+      this.pos = this.lineEnd(start)
+      this.skipChildren(indent)
 
       return
     }
@@ -443,6 +468,17 @@ class TemplateParser {
     if (next === ':' && (this.src[this.pos + 1] === ' ')) {
       this.pos += 2
       this.skipSpaces()
+      KEYWORD.lastIndex = this.pos
+      const keyword = KEYWORD.exec(this.src)?.[1]
+
+      if (keyword !== undefined) {
+        this.error(this.pos, this.pos + keyword.length, `\`${keyword}\` starts a line of its own; put it on the next line, indented under <${name}>`)
+        this.pos = this.lineEnd(this.pos)
+        this.target = element
+
+        return element
+      }
+
       const child = this.parseElement(this.pos, terminator)
 
       if (child) {

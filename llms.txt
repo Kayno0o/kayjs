@@ -11,7 +11,7 @@
 - The component script exports types only. Shared values live in `.ts` modules.
 - A page has no props: its data comes from its `--- server` fence.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
-- Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`.
+- Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.
 
 ## File layout
 

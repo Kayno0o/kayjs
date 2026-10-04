@@ -56,7 +56,8 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
   for (const [index, binding] of bindings.entries())
     propsByLocal.set(binding.local.start, { binding, index })
 
-  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Rewrite, readOnly: string) => {
+  // `typeOf` spells the type of the value the name stands for, when `typeof name` cannot read it through the rewritten name.
+  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Rewrite, readOnly: string, typeOf?: string) => {
     const binding = scope.getBinding(name)
 
     if (!binding)
@@ -64,6 +65,17 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
 
     for (const reference of binding.referencePaths) {
       const node = reference.node
+      const query = typeOf === undefined ? undefined : typeQueryOf(reference)
+
+      if (query) {
+        const start = map.isExact(query.start!) ? map.toSource(query.start!) : undefined
+
+        if (start !== undefined)
+          rewrites.set(start, { replace: `${typeOf}${memberTypes(query.exprName)}`, end: start + query.exprName.end! - query.start! })
+
+        continue
+      }
+
       const source = map.isExact(node.start!) ? map.toSource(node.start!) : undefined
       const tag = tagPosition(reference)
 
@@ -97,7 +109,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
         if (param.type !== 'Identifier' || !accessorSites.has(param.start!))
           continue
 
-        visitBinding(path.scope, param.name, reference => withShorthand(reference, param.name, { after: '()' }), `\`${param.name}\` is read-only here; it tracks the current value`)
+        visitBinding(path.scope, param.name, reference => withShorthand(reference, param.name, { after: '()' }), `\`${param.name}\` is read-only here; it tracks the current value`, `ReturnType<typeof ${param.name}>`)
       }
     },
     VariableDeclarator: (path) => {
@@ -118,7 +130,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
 
         const name = property.value.name
 
-        visitBinding(path.scope, name, reference => withShorthand(reference, name, propRead(prop.binding, prop.index, name)), `\`${name}\` is a prop, and props are read-only; copy it into a signal to change it locally`)
+        visitBinding(path.scope, name, reference => withShorthand(reference, name, propRead(prop.binding, prop.index, name)), `\`${name}\` is a prop, and props are read-only; copy it into a signal to change it locally`, propType(prop.binding))
       }
     },
   })
@@ -218,6 +230,26 @@ function propRead(binding: PropsBinding, index: number, local: string): Rewrite 
     return access
 
   return { before: `(${access.before}`, replace: access.replace, after: `${access.after ?? ''} !== undefined ? ${text} : ${defaultName(index)}())` }
+}
+
+// A prop with a default reads without `undefined`, which `typeof __props.size` would keep.
+function propType(binding: PropsBinding): string | undefined {
+  return binding.fallback ? `Exclude<(typeof __props)[${JSON.stringify(binding.key)}], undefined>` : undefined
+}
+
+// The `typeof` query a reference is the root of: `typeof row` or `typeof row.id`.
+function typeQueryOf(reference: NodePath): t.TSTypeQuery | undefined {
+  let path = reference
+
+  while (path.parentPath?.isTSQualifiedName() && path.parentPath.node.left === path.node)
+    path = path.parentPath
+
+  return path.parentPath?.isTSTypeQuery() && path.parentPath.node.exprName === path.node ? path.parentPath.node : undefined
+}
+
+// `.id.name` after the root of a `typeof` query, as indexed access types.
+function memberTypes(name: t.TSTypeQuery['exprName']): string {
+  return name.type === 'TSQualifiedName' ? `${memberTypes(name.left)}[${JSON.stringify(name.right.name)}]` : ''
 }
 
 // `{ todo }` cannot become `{ todo() }`, so a shorthand property spells its key out first.

@@ -163,8 +163,9 @@ describe('elements', () => {
     expect(errors('input(bind:value={v} onInput={f})')).toEqual([expect.stringContaining('already handles')])
   })
 
-  it('escapes text JSX would read as code', () => {
-    expect(jsx('p a < b > c } \\{d')).toBe('<p>a {\'<\'} b {\'>\'} c {\'}\'} {\'{\'}d</p>')
+  it('escapes text JSX would read as code, and runs of spaces it would collapse', () => {
+    expect(jsx('p a < b > c } \\{d')).toBe('<p>a {"<"} b {">"} c {"}"} {"{"}d</p>')
+    expect(jsx('p a   b')).toBe('<p>a{"   "}b</p>')
   })
 
   it('passes slots as component props and rejects them elsewhere', () => {

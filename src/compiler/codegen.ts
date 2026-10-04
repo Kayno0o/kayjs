@@ -33,7 +33,8 @@ export interface Generated {
   diagnostics: Diagnostic[]
 }
 
-const JSX_TEXT_ESCAPES = /[{}<>]/g
+// Solid's compiler collapses a run of spaces in JSX text, which `pre` and `textarea` would show, so a run goes out as a string.
+const JSX_TEXT_ESCAPES = /[{}<>]|[ \t]{2,}/g
 const BINDABLE = new Set(['input', 'textarea', 'select'])
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
@@ -778,19 +779,20 @@ class Generator {
       b.add(' id="').addSource(element.id).add('"')
     }
 
-    const classAttributes = element.attributes.filter(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'class')
+    const classAttributes = element.attributes.filter((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'class')
 
     if (classAttributes.length > 1)
-      this.error(classAttributes[1]!.kind === 'spread' ? element : classAttributes[1]!.name, 'An element takes one `class` attribute; put several classes in it')
+      this.error(classAttributes[1]!.name, 'An element takes one `class` attribute; put several classes in it')
 
     // A spread may carry a `class` of its own, which merges in too, so the class goes after every attribute and spread.
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
+    const merged = spreads && (element.classes.length > 0 || classAttributes.length > 0)
 
     if (element.classes.length > 0 && !spreads)
       this.emitShorthandClass(element, classAttributes[0])
 
     for (const attribute of element.attributes) {
-      if (element.classes.length > 0 && attribute === classAttributes[0])
+      if ((element.classes.length > 0 || merged) && attribute === classAttributes[0])
         continue
 
       if (element.component && this.options.island && attribute.kind !== 'spread' && this.text(attribute.name) === 'hydrate')
@@ -802,7 +804,7 @@ class Generator {
         this.emitAttribute(element, attribute)
     }
 
-    if (element.classes.length > 0 && spreads)
+    if (merged)
       this.emitMergedClass(element, classAttributes[0])
 
     if (actionOf(element, this.src)) {
@@ -837,7 +839,7 @@ class Generator {
     return true
   }
 
-  private emitShorthandClass(element: ElementNode, attribute: Attribute | undefined) {
+  private emitShorthandClass(element: ElementNode, attribute: NamedAttribute | undefined) {
     const { b } = this
     const shorthand = element.classes.map(span => this.text(span)).join(' ')
     const source = { start: element.classes[0]!.start, end: element.classes.at(-1)!.end }
@@ -862,21 +864,27 @@ class Generator {
       return
     }
 
-    this.error(attribute.kind === 'spread' ? element : attribute.name, '`class` needs a value')
+    this.error(attribute.name, '`class` needs a value')
   }
 
   // The shorthand, the `class` attribute and the `class` each spread brings, in the order they were written.
-  private emitMergedClass(element: ElementNode, classAttribute: Attribute | undefined) {
+  private emitMergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined) {
     const { b } = this
-    const source = { start: element.classes[0]!.start, end: element.classes.at(-1)!.end }
+    const shorthand = element.classes.length > 0 ? { start: element.classes[0]!.start, end: element.classes.at(-1)!.end } : undefined
 
     b.add(' ')
-    b.wrap(classAttribute?.kind === 'expression' ? classAttribute.name : source, () => b.add('class'))
-    b.add(`={[${JSON.stringify(element.classes.map(span => this.text(span)).join(' '))}`)
+    b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add('class'))
+    b.add('={[')
+
+    if (shorthand)
+      b.add(JSON.stringify(element.classes.map(span => this.text(span)).join(' ')))
+
+    let separator = shorthand ? ', ' : ''
 
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread') {
-        b.add(', ((').addSource(attribute.expression).add(') as unknown as { class?: string }).class')
+        b.add(`${separator}((`).addSource(attribute.expression).add(') as unknown as { class?: string }).class')
+        separator = ', '
 
         continue
       }
@@ -885,11 +893,13 @@ class Generator {
         continue
 
       if (attribute.kind === 'static')
-        b.add(`, ${JSON.stringify(attribute.text)}`)
+        b.add(`${separator}${JSON.stringify(attribute.text)}`)
       else if (attribute.kind === 'expression')
-        b.add(', (').addSource(attribute.expression).add(')')
+        b.add(`${separator}(`).addSource(attribute.expression).add(')')
       else
         this.error(attribute.name, '`class` needs a value')
+
+      separator = ', '
     }
 
     b.add(']}')
@@ -1045,7 +1055,7 @@ class Generator {
         continue
       }
 
-      const escaped = part.text.replace(JSX_TEXT_ESCAPES, char => `{'${char}'}`)
+      const escaped = part.text.replace(JSX_TEXT_ESCAPES, text => `{${JSON.stringify(text)}}`)
 
       if (escaped === this.text(part))
         b.addSource(part)
@@ -1113,6 +1123,9 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
 
   return visit(file.template)
 }
+
+// An attribute written with a name, which a spread is not.
+type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
 
 type KayHelper = 'formAction' | 'registerActions' | 'actionStub' | 'staticFor'
 

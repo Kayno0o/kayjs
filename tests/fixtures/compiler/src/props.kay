@@ -22,3 +22,7 @@ Wrap
   p {size}
 for Item of items key={Item}
   Item(n={size})
+for word of list key={word}
+  p {(word.length as typeof word.length).toFixed()} {[size] satisfies (typeof size)[]}
+if opts.a as a
+  p {[a] satisfies Array<typeof a>}
