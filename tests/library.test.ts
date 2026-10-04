@@ -85,7 +85,11 @@ describe.each(['@kaynooo/kayjs', '@kaynooo/kay'] as const)('a linked kay library
     const checked = await run('check', linked)
 
     expect(built.code).toBe(0)
-    expect(await Bun.file(join(out, 'index.html')).text()).toContain('<span class="badge lib-badge-class text-gray-500">hi default:hi</span>')
+    const html = await Bun.file(join(out, 'index.html')).text()
+
+    expect(html).toContain('<span class="badge lib-badge-class text-gray-500">hi default:hi</span>')
+    // Named as an installed copy's island is, not by where the link points.
+    expect(html).toContain('data-component="node_modules/kay-lib/src/counter.kay"')
     expect(built.output).toContain('built 1 island')
     expect(checked.output).toBe('')
     expect(checked.code).toBe(0)

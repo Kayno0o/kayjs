@@ -8,6 +8,7 @@ import { isInteractive } from '../compiler/codegen'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
 import { readCacheEntry, writeCacheEntry } from './cache'
+import { throughLinks } from './libraries'
 import { importsBrowserOnly, mayImportPackage } from './probe'
 import { registerSourceMap } from './sourcemap'
 
@@ -99,7 +100,7 @@ export async function analyzeKayCached(source: string, filename: string, root: s
   if (cached !== undefined)
     return cached
 
-  const { island, classes, diagnostics } = compileKay(source, filename, { root })
+  const { island, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root })
   const analysis = { island, classes, diagnostics }
 
   if (diagnostics.length === 0)
@@ -122,7 +123,7 @@ function compile(source: string, filename: string, options: TransformOptions): C
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, diagnostics } = compileKay(source, file, { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))
