@@ -29,6 +29,8 @@ export interface ClientManifest {
   pages?: Record<string, PrerenderedPage>
   // Whether the entry swaps pages in place, which ships it to pages posting forms to actions too.
   navigation?: boolean
+  // In development, the source files each island's chunks hold, by island id and relative to the root: an edited island swaps in everywhere its code runs.
+  islandInputs?: Record<string, string[]>
 }
 
 export interface PrerenderedPage {
@@ -67,12 +69,15 @@ export interface ClientOptions {
   settings?: Record<string, string>
   // Swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions.
   navigation?: boolean
+  // Development: an edited island swaps into the open pages rather than reloading them.
+  hot?: boolean
 }
 
 interface MetafileOutput {
   entryPoint?: string
   cssBundle?: string
   imports: { path: string, kind: string }[]
+  inputs?: Record<string, unknown>
 }
 
 type Outputs = Record<string, MetafileOutput>
@@ -184,10 +189,11 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 
   // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`.
   await Bun.write(entryFile, [
-    `import { ${navigation ? 'disposeIslands, hydrateIslands, startNavigation' : 'hydrateIslands'} } from 'kay/client'`,
+    `import { ${[...navigation ? ['disposeIslands'] : [], ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
     '',
     `const islands = {\n${registry}\n}`,
     '',
+    ...options.hot ? ['enableHotSwap(islands)', ''] : [],
     'export const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)',
     'export const ready = hydrate()',
     '',
@@ -213,7 +219,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   if (!build.success)
     throw new AggregateError(build.logs, 'kay: client build failed')
 
-  return { ...islandManifest(root, build.metafile!.outputs as Outputs, islands, entryFile), navigation }
+  return { ...islandManifest(root, build.metafile!.outputs as Outputs, islands, entryFile, options.hot === true), navigation }
 }
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders.
@@ -256,7 +262,7 @@ async function buildStyles(root: string, dir: string, pages: string[], libraries
   return styles
 }
 
-function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string): Omit<ClientManifest, 'styles'> {
+function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string, hot: boolean): Omit<ClientManifest, 'styles'> {
   const idByFile = new Map([...islands].map(([id, file]) => [file, id]))
   const files = new Set(islands.values())
   const entries = new Set([entry])
@@ -282,7 +288,14 @@ function islandManifest(root: string, outputs: Outputs, islands: Map<string, str
     const file = entryFile(root, meta.entryPoint, files)
 
     if (file) {
-      manifest.islands[idByFile.get(file)!] = [...closure(output)].map(assetUrl)
+      const chunks = [...closure(output)]
+      const id = idByFile.get(file)!
+
+      manifest.islands[id] = chunks.map(assetUrl)
+
+      // Inputs are named relative to the working directory, the root in development.
+      if (hot)
+        (manifest.islandInputs ??= {})[id] = [...new Set(chunks.flatMap(chunk => Object.keys(outputs[chunk]?.inputs ?? {})))].map(input => islandPath(root, input))
 
       continue
     }
@@ -296,6 +309,10 @@ function islandManifest(root: string, outputs: Outputs, islands: Map<string, str
   }
 
   return manifest
+}
+
+function islandPath(root: string, input: string): string {
+  return relative(root, resolve(input)).replaceAll('\\', '/')
 }
 
 // Bun names entry points relative to the working directory or to the build's root, so both are tried.

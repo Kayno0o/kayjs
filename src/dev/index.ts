@@ -40,6 +40,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let restarting: Promise<void> | undefined
   // Counts every change but a stylesheet's: an open page whose server comes back with the same count only needs its stylesheets again.
   let codeVersion = 0
+  // The count the last server started with, and the files changed since: a page on that count may swap in what changed.
+  let startedAt = 0
+  let changedFiles = new Set<string>()
 
   const env = await environmentWithoutDotenv()
   const spawn = () => Bun.spawn([process.execPath, '--preload', SPARE, entry], { cwd: root, env: { ...env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
@@ -52,7 +55,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     child = spare
-    void child.stdin.write(`start ${codeVersion}\n`)
+    void child.stdin.write(`start ${codeVersion} ${startedAt} ${JSON.stringify([...changedFiles])}\n`)
+    startedAt = codeVersion
+    changedFiles = new Set()
     void child.stdin.flush()
     spare = spawn()
     options.onRestart?.(child)
@@ -76,8 +81,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const stopWatching = watchProject(root, (file) => {
     startupChanged ||= STARTUP_FILE.test(file)
 
-    if (!STYLESHEET.test(file))
+    if (!STYLESHEET.test(file)) {
       codeVersion++
+      changedFiles.add(file)
+    }
 
     clearTimeout(timer)
     timer = setTimeout(() => {

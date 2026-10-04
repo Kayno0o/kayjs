@@ -7,7 +7,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { KayCompileError } from '../src/build/transform'
 import { dev, watchProject } from '../src/dev'
-import { bootFailure } from '../src/server/dev'
+import { bootFailure, hotSwap } from '../src/server/dev'
 
 async function until(condition: () => boolean, timeout = 5000) {
   for (const start = Date.now(); !condition(); await Bun.sleep(20)) {
@@ -241,5 +241,63 @@ describe('kay dev', () => {
     expect(events.headers.get('content-type')).toBe('text/event-stream')
     // Its code is its own id, so pages on either side of it always reload.
     expect(await firstEvent(events)).toMatch(/^retry: 100\nevent: boot\ndata: ([\w-]+) \1\n\n$/)
+  })
+})
+
+describe('hot swap', () => {
+  it('names the new chunks of the edited islands, and of each island holding their code, for pages on the code before', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-hot-'))
+    const client = { islands: { 'src/counter.kay': ['/_kay/counter.js', '/_kay/shared.js'], 'src/panel.kay': ['/_kay/panel.js', '/_kay/shared.js'], 'src/other.kay': ['/_kay/other.js'] }, islandInputs: { 'src/counter.kay': ['src/counter.kay'], 'src/panel.kay': ['src/panel.kay', 'src/counter.kay'], 'src/other.kay': ['src/other.kay'] }, entry: '/_kay/entry.js', entryImports: [], dir: root, styles: new Map(), pages: new Map() }
+    const swapAfter = (changed: string[]) => {
+      process.env.KAY_DEV_FROM = '3'
+      process.env.KAY_DEV_CHANGED = JSON.stringify(changed)
+
+      try {
+        return hotSwap(root, client)
+      }
+      finally {
+        delete process.env.KAY_DEV_FROM
+        delete process.env.KAY_DEV_CHANGED
+      }
+    }
+
+    await Promise.all(['src/counter.kay', 'src/other.kay', 'src/page.kay'].map(async file => Bun.write(join(root, file), 'p x\n')))
+
+    try {
+      expect(swapAfter(['src/counter.kay', 'src/.counter.kay.swp'])).toEqual({ from: 3, islands: { 'src/counter.kay': client.islands['src/counter.kay'], 'src/panel.kay': client.islands['src/panel.kay'] }, entry: '/_kay/entry.js' })
+      expect(swapAfter(['src/counter.kay', 'src/page.kay'])).toBeUndefined()
+      expect(swapAfter([])).toBeUndefined()
+      expect(hotSwap(root, client)).toBeUndefined()
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('passes each server the files changed since the last one, and the count it started from', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const seen = join(root, '.seen')
+    const children: Subprocess[] = []
+
+    await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(seen)}, \`\${process.env.KAY_DEV_FROM} \${process.env.KAY_DEV_CHANGED}\`)\nsetInterval(() => undefined, 1000)\n`)
+    const stop = await dev(root, { onRestart: child => children.push(child) })
+
+    try {
+      await until(() => existsSync(seen))
+      expect(await Bun.file(seen).text()).toBe('0 []')
+
+      await rm(seen)
+      await Bun.write(join(root, 'src/island.kay'), 'p x\n')
+      await until(() => existsSync(seen))
+
+      const [from, changed] = (await Bun.file(seen).text()).split(' ')
+
+      expect(from).toBe('0')
+      expect(JSON.parse(changed!)).toContain('src/island.kay')
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

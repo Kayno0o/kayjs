@@ -69,6 +69,9 @@ let serverRendering = 0
 const MAX_ROUNDS = 100_000
 let serverScope: (() => ServerScope | undefined) | undefined
 let reporter: (error: unknown, island?: string) => void = error => console.error(error)
+// While an island renders in development: the signals it creates, in order, and the values an edited version of it takes back.
+let recording: SignalNode<unknown>[] | undefined
+let restoring: unknown[] | undefined
 // Set while an island claims its server markup, with what waits for it to be done.
 let hydrating = 0
 let afterHydration: (() => void)[] = []
@@ -76,7 +79,9 @@ let afterHydration: (() => void)[] = []
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
 export function createSignal<T>(value: T, options?: SignalOptions<T>): [read: () => T, write: (next: T) => void] {
-  const node: SignalNode<T> = { value, observers: undefined, equals: options?.equals ?? defaultEquals, shared: serverRendering === 0 }
+  const node: SignalNode<T> = { value: restored(value), observers: undefined, equals: options?.equals ?? defaultEquals, shared: serverRendering === 0 }
+
+  recording?.push(node as SignalNode<unknown>)
 
   const read = () => {
     track(node)
@@ -185,6 +190,38 @@ export function reportError(error: unknown, island?: string): void {
 // Installed by the browser's entry: where errors go besides the console.
 export function setErrorReporter(report: (error: unknown, island?: string) => void): void {
   reporter = report
+}
+
+// Renders `fn` noting the signals it creates, the first ones taking `values` back in order; returns what reads their values now, for the next version of the island.
+export function recordSignals<T>(fn: () => T, values?: unknown[]): { result: T, values: () => unknown[] } {
+  const nodes: SignalNode<unknown>[] = []
+  const previous = [recording, restoring] as const
+
+  recording = nodes
+  restoring = values && [...values]
+
+  try {
+    return { result: fn(), values: () => nodes.map(node => node.value) }
+  }
+  finally {
+    [recording, restoring] = previous
+  }
+}
+
+// A value kept from the last version while its kind matches the initial one; past the first mismatch the island's signals start afresh, its code having changed shape there.
+function restored<T>(value: T): T {
+  if (!restoring || restoring.length === 0)
+    return value
+
+  const kept = restoring.shift()
+
+  // A signal made empty, as `signal<string>()`, takes whatever it held.
+  if (value === undefined || (typeof kept === typeof value && (kept === null) === (value === null) && Array.isArray(kept) === Array.isArray(value)))
+    return kept as T
+
+  restoring = undefined
+
+  return value
 }
 
 // Installed by the server: the scope of the request being rendered.

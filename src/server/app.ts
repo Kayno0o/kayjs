@@ -19,7 +19,7 @@ import { basePath, rebaseRedirects } from './base'
 import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from './compress'
-import { DEV_EVENTS, devEvents } from './dev'
+import { DEV_EVENTS, devEvents, hotSwap } from './dev'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, serveFavicons } from './favicon'
 import { loadGuards } from './guards'
@@ -200,8 +200,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (!options.dev)
     stopOnSignal(app, lifecycle, options.shutdownTimeout)
 
-  if (options.dev)
-    app.get(DEV_EVENTS, () => devEvents())
+  if (options.dev) {
+    const hot = hotSwap(root, client)
+
+    app.get(DEV_EVENTS, () => devEvents(false, hot))
+  }
 
   const assetCopies = await encodedCopies(client.dir)
 

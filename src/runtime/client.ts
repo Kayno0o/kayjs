@@ -1,6 +1,6 @@
 import { withBase } from './base'
 import { dispatch, hydrate, render } from './dom'
-import { reportError, root, setErrorReporter } from './reactive'
+import { recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { decodeValue } from './wire'
 
 export { startNavigation } from './navigate'
@@ -23,6 +23,14 @@ const ISLAND = 'slot[data-component]'
 const ERROR_URL = '/_kay/error'
 const MAX_REPORTS = 10
 const reported = new Set<string>()
+// Set in development: renders an island noting its signals, for an edited version of it to take their values back.
+let rendering: (<T>(element: HTMLElement, run: () => T, values?: unknown[]) => T) | undefined
+const signalsOf = new WeakMap<HTMLElement, () => unknown[]>()
+
+interface HotSwap {
+  islands: Record<string, string[]>
+  entry?: string
+}
 
 setErrorReporter((error, island) => {
   console.error(error)
@@ -102,7 +110,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   // A client-only island has no server markup to claim.
   if (element.dataset.client !== undefined) {
     try {
-      disposers.set(element, render(() => component(props), element))
+      disposers.set(element, noted(element, () => render(() => component(props), element)))
     }
     catch (error) {
       reportError(error, id)
@@ -113,7 +121,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
       disposers.set(element, dispose)
 
       try {
-        hydrate(() => component(props), element)
+        noted(element, () => hydrate(() => component(props), element))
       }
       catch (error) {
         // Markup the island would not build, such as one a browser extension changed, can fail anywhere along the way: rendered afresh rather than left dead.
@@ -125,7 +133,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
         element.textContent = ''
 
         try {
-          disposers.set(element, render(() => component(props), element))
+          disposers.set(element, noted(element, () => render(() => component(props), element)))
         }
         catch (failure) {
           // An error of the component itself, thrown again: the server's markup stays, lifeless, rather than nothing.
@@ -155,6 +163,67 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
       console.error(error)
     }
   }
+}
+
+function noted<T>(element: HTMLElement, run: () => T): T {
+  return rendering ? rendering(element, run) : run()
+}
+
+// Development: `kay dev`'s page script calls `$kayHot` with the islands an edit changed, which swap in, keeping their signals, rather than the page reloading.
+export function enableHotSwap(registry: IslandRegistry): void {
+  rendering = (element, run, values) => {
+    const recorded = recordSignals(run, values)
+
+    signalsOf.set(element, recorded.values)
+
+    return recorded.result
+  }
+  ;(globalThis as { $kayHot?: (swap: HotSwap) => Promise<boolean> }).$kayHot = async swap => hotSwap(registry, swap)
+}
+
+// Resolves false when the page must reload instead: a new chunk needing code the page never loaded, as a changed shared module, would run beside its old copy.
+async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean> {
+  const loaded = new Set([...document.querySelectorAll<HTMLLinkElement>('link[rel=modulepreload]')].map(link => new URL(link.href).pathname))
+
+  for (const entry of performance.getEntriesByType('resource'))
+    loaded.add(new URL(entry.name).pathname)
+
+  if (Object.values(swap.islands).some(chunks => chunks.slice(1).some(chunk => !loaded.has(chunk))))
+    return false
+
+  const modules = await Promise.all(Object.entries(swap.islands).map(async ([id, [chunk]]) => [id, chunk!, await import(chunk!) as Awaited<ReturnType<IslandRegistry[string]>>] as const))
+
+  for (const [id, chunk, module] of modules) {
+    registry[id] = async () => import(chunk)
+
+    for (const element of document.querySelectorAll<HTMLElement>(`${ISLAND}[data-component="${CSS.escape(id)}"]`)) {
+      const dispose = disposers.get(element)
+
+      // Not hydrated yet: it loads the new chunk when it does.
+      if (!dispose)
+        continue
+
+      const values = signalsOf.get(element)?.()
+      const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
+
+      dispose()
+      element.textContent = ''
+
+      try {
+        disposers.set(element, rendering!(element, () => render(() => module.default(props), element), values))
+      }
+      catch (error) {
+        reportError(error, id)
+
+        return false
+      }
+    }
+  }
+
+  if (swap.entry)
+    document.querySelector('script[type="module"][src]')?.setAttribute('src', swap.entry)
+
+  return true
 }
 
 // Ends every island under `root`, as a page swap takes them away.
