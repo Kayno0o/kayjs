@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { kay } from '../build/plugin'
 import { loadConfig } from '../config'
@@ -7,7 +7,7 @@ import { testRoot } from './root'
 export interface Mounted {
   // The element the component rendered into, last in `document.body`.
   root: HTMLElement
-  // Disposes of the component, running its cleanups, and removes the element.
+  // Disposes of the component, running its cleanups once, and removes the element.
   unmount: () => void
 }
 
@@ -15,8 +15,7 @@ interface MountModule {
   mount: (element: HTMLElement, props: Record<string, unknown>) => () => void
 }
 
-const ENTRY = 'import { render } from \'kay/dom\'\nimport Component from %FILE%\n\nexport function mount(element, props) {\n  return render(() => Component(props), element)\n}\n'
-// One bundle per component and test process.
+// One bundle per component and version of its file, for the test process.
 const bundles = new Map<string, Promise<MountModule>>()
 
 // Lets queued effects and timers due now land, as after a click, before the DOM is read.
@@ -32,20 +31,38 @@ export async function mount(file: string, props: Record<string, unknown> = {}): 
 
   const root = testRoot()
   const path = resolve(root, file)
-  let bundled = bundles.get(path)
+  const key = `${path}\0${await fileVersion(path)}`
+  let bundled = bundles.get(key)
 
   if (!bundled)
-    bundles.set(path, bundled = bundle(root, path))
+    bundles.set(key, bundled = bundle(root, path))
+
+  let module: MountModule
+
+  try {
+    module = await bundled
+  }
+  catch (error) {
+    // A failed bundle is tried again on the next mount, the file fixed or not.
+    bundles.delete(key)
+
+    throw error
+  }
 
   const element = document.createElement('div')
 
   document.body.append(element)
 
-  const dispose = (await bundled).mount(element, props)
+  const dispose = module.mount(element, props)
+  let mounted = true
 
   await settle()
 
   return { root: element, unmount: () => {
+    if (!mounted)
+      return
+
+    mounted = false
     dispose()
     element.remove()
   } }
@@ -60,7 +77,7 @@ async function bundle(root: string, file: string): Promise<MountModule> {
   const work = await mkdtemp(join(dir, 'mount-'))
 
   try {
-    await Bun.write(join(work, 'entry.ts'), ENTRY.replace('%FILE%', JSON.stringify(file)))
+    await Bun.write(join(work, 'entry.ts'), entry(file))
 
     const { settings } = await loadConfig(root)
     let output: string
@@ -70,7 +87,9 @@ async function bundle(root: string, file: string): Promise<MountModule> {
     }
     catch (error) {
       // Bun throws on a failed build, its messages in `errors`.
-      throw new AggregateError(error instanceof AggregateError ? error.errors : [error], `kay: bundling ${file} for the browser failed`)
+      const errors = error instanceof AggregateError ? error.errors : [error]
+
+      throw new AggregateError(errors, `kay: bundling ${file} for the browser failed: ${errors.map(String).join('\n')}`)
     }
 
     return await import(output) as MountModule
@@ -78,4 +97,26 @@ async function bundle(root: string, file: string): Promise<MountModule> {
   finally {
     await rm(work, { recursive: true, force: true })
   }
+}
+
+// Changes when the file is rewritten, so a test editing a component between mounts gets its new build.
+async function fileVersion(path: string): Promise<string> {
+  try {
+    const { mtimeMs, size } = await stat(path)
+
+    return `${mtimeMs}:${size}`
+  }
+  catch {
+    return 'missing'
+  }
+}
+
+function entry(file: string): string {
+  return `import { render } from 'kay/dom'
+import Component from ${JSON.stringify(file)}
+
+export function mount(element, props) {
+  return render(() => Component(props), element)
+}
+`
 }

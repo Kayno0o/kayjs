@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { mount, settle } from '../src/test'
@@ -31,7 +32,23 @@ describe('mount', () => {
     expect(root.isConnected).toBe(false)
   })
 
-  it('reports a component that does not compile', async () => {
-    await expect(mount('tests/fixtures/mount/missing.kay')).rejects.toThrow('kay: bundling')
+  it('reports a component that does not compile, and builds it again once fixed', async () => {
+    const file = 'tests/fixtures/mount/.broken.kay'
+
+    try {
+      await Bun.write(file, 'p {\n')
+      await expect(mount(file)).rejects.toThrow('kay: bundling')
+
+      await Bun.write(file, 'p.fixed Fixed\n')
+
+      const { root, unmount } = await mount(file)
+
+      expect(root.innerHTML).toBe('<p class="fixed">Fixed</p>')
+      unmount()
+      unmount()
+    }
+    finally {
+      await rm(file, { force: true })
+    }
   })
 })

@@ -5,6 +5,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { LIVE_RELOAD } from '../src/server/dev'
+import { settle } from '../src/test'
 
 interface ClientModule {
   mount: (element: HTMLElement) => () => void
@@ -12,11 +13,6 @@ interface ClientModule {
 
 let outdir: string
 let client: ClientModule
-
-// Lets queued effects land before the DOM is read.
-async function settle() {
-  await new Promise(resolve => setTimeout(resolve, 0))
-}
 
 // Bundles `main.kay` and the files beside it for the browser, and mounts it in a fresh element.
 async function mountKay(files: Record<string, string>): Promise<{ root: HTMLElement, dispose: () => Promise<void> }> {
