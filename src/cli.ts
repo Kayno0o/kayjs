@@ -168,7 +168,7 @@ async function build(args: string[]): Promise<number> {
     if (exported)
       refuseStaticConfig(config)
 
-    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, base: basePath(config.base), settings: config.settings })
+    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings })
     // Before prerendering, whose pages read the collections from what it writes.
     const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
 

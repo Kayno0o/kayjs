@@ -1,0 +1,10 @@
+---
+import { refresh } from 'kay'
+import { bump } from '../routes/index.kay'
+
+async function press() {
+  await bump({})
+  await refresh()
+}
+---
+button.bump(onClick={press}) Bump

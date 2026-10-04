@@ -8,8 +8,10 @@ import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import { dirname, sep } from 'node:path'
-import { decodeCall, failure, FAILURE_HEADER, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
+import { decodeCall, failure, FAILURE_HEADER, isAction, isFailure } from '../runtime/action'
+import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/i18n.server'
+import { NAVIGATE_HEADER, REDIRECT_HEADER } from '../runtime/navigate'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
@@ -19,16 +21,6 @@ import { requestLocale, stateFor } from './i18n'
 import { protectionRefusal } from './protection'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
-
-// What a top-level field's JSON schema says about the text a form posts for it.
-interface FieldSchema {
-  type?: unknown
-  items?: FieldSchema
-  format?: unknown
-  pattern?: unknown
-  minLength?: unknown
-  anyOf?: FieldSchema[]
-}
 
 export interface GuardedRequest {
   jar: CookieJar
@@ -47,13 +39,6 @@ const TEXT = 'text/plain; charset=utf-8'
 const SAME_SITE_FETCH = new Set(['same-origin', 'none'])
 // The first proxy's `X-Forwarded-Proto` saying the browser came over https.
 const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
-
-// A checkbox posts `on` unless it has a value of its own.
-const BOOLEAN_TEXT = new Map([['true', true], ['on', true], ['false', false]])
-// A decimal number as a number input posts it; `Number()` alone would also read `0x10` or `Infinity`.
-const DECIMAL = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i
-// The string formats Elysia gives the numeric text `t.Integer()` and `t.Numeric()` also take.
-const NUMERIC_FORMATS = new Set<unknown>(['integer', 'numeric'])
 
 // The top-level field of a validation path such as `/address/street`.
 const FIELD = /^\/([^/]*)/
@@ -135,61 +120,6 @@ function actionFiles(routes: ServedRoute[]): Map<string, LoadedGuard[]> {
   }
 
   return files
-}
-
-// A form posts text, as a query string is, and each field once per value or not at all: a top-level field is read the way its schema expects before it is validated.
-// `absentAsEmpty` reads a required list or boolean that is absent as empty or unticked, which only a form means by leaving it out.
-export function formInput(schema: TSchema, body: unknown, absentAsEmpty = true): unknown {
-  const { properties, required = [] } = schema as { properties?: Record<string, FieldSchema>, required?: string[] }
-
-  if (!properties || typeof body !== 'object' || body === null)
-    return body
-
-  const fields: Record<string, unknown> = { ...body }
-
-  for (const [name, field] of Object.entries(properties)) {
-    const optional = !required.includes(name)
-    const value = fields[name]
-
-    if (value === undefined) {
-      // A required list may well be empty, and an unticked checkbox posts nothing; a required file list is no file chosen, refused as missing.
-      if (absentAsEmpty && !optional && ((field.type === 'array' && field.items?.format !== 'binary') || field.type === 'boolean'))
-        fields[name] = field.type === 'array' ? [] : false
-
-      continue
-    }
-
-    if (optional && value === '' && !acceptsBlank(field))
-      delete fields[name]
-    else if (field.type === 'array')
-      fields[name] = (Array.isArray(value) ? value : [value]).map(item => fromText(field.items, item))
-    else
-      fields[name] = fromText(field, value)
-  }
-
-  return fields
-}
-
-// A blank input fills a plain string field; any other optional field reads it as left out.
-function acceptsBlank(field: FieldSchema): boolean {
-  return field.type === 'string' && field.format === undefined && field.pattern === undefined && !(typeof field.minLength === 'number' && field.minLength > 0)
-}
-
-// The number or boolean a field asks for, when the text reads as one; anything else is left for Elysia to refuse.
-function fromText(field: FieldSchema | undefined, value: unknown): unknown {
-  if (typeof value !== 'string')
-    return value
-
-  // Elysia would read the text with `Number()` itself, so text that is no decimal number becomes one the schema refuses.
-  if (field !== undefined && isNumeric(field))
-    return DECIMAL.test(value) ? Number(value) : Number.NaN
-
-  return field?.type === 'boolean' ? BOOLEAN_TEXT.get(value) ?? value : value
-}
-
-// `t.Number()`, or `t.Integer()` and `t.Numeric()`, which Elysia writes as a number or a numeric string; `t.Date()` takes a number too, but not only.
-function isNumeric(field: FieldSchema): boolean {
-  return field.type === 'number' || field.type === 'integer' || (field.anyOf?.every(member => isNumeric(member) || NUMERIC_FORMATS.has(member.format)) ?? false)
 }
 
 // A call's input comes encoded, multipart when it carries files; input that does not decode is answered 400.
@@ -367,7 +297,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
       return new Response(result === undefined ? null : encodeOrExplain(result, `what ${action.url} returned`), { status, headers })
     }
 
-    headers.set('location', backTo(request))
+    headers.set(redirectHeader(request), backTo(request))
 
     return new Response(null, { status: 303, headers })
   }
@@ -379,8 +309,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 // A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.
 function stopped(error: unknown, request: Request, { jar, headers }: GuardedRequest, { dev, onError }: ActionOptions): Response {
   if (error instanceof Redirect) {
-    // `fetch` would follow a `location` and hand the island the next page's HTML; a call reads where to go instead.
-    headers.set(isCall(request) ? REDIRECT_HEADER : 'location', error.location)
+    headers.set(redirectHeader(request), error.location)
     jar.writeTo(headers)
 
     return new Response(null, { status: error.status, headers })
@@ -441,7 +370,12 @@ function failed(request: Request, headers: Headers, cookies: CookieMap, flash: F
     return new Response(encodeOrExplain({ errors: flash.errors, data: flash.data }, `what ${flash.action} passed to ctx.fail`), { status: flash.status, headers })
   }
 
-  headers.set('location', backTo(request))
+  headers.set(redirectHeader(request), backTo(request))
 
   return new Response(null, { status: 303, headers })
+}
+
+// `fetch` and XMLHttpRequest would follow a `location` and hand the script the next page's HTML; a call, or a form the page swap posts, reads where to go instead.
+function redirectHeader(request: Request): string {
+  return isCall(request) || request.headers.get(NAVIGATE_HEADER) === '1' ? REDIRECT_HEADER : 'location'
 }

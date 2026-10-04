@@ -49,6 +49,8 @@ export interface KayConfig {
   content?: string
   // Seconds a stopping server gives open requests and streams to finish before closing them; 10 by default.
   shutdownTimeout?: number
+  // Swaps the next page in place when a link or a form of the site is followed from a page with islands or forms posting to actions, so islands marked `persist` live on; on by default. `false` loads every page as a plain site does.
+  navigation?: boolean
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.

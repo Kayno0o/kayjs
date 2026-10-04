@@ -1,4 +1,4 @@
-import type { HydrateWhen, IslandComponent } from './checks'
+import type { IslandComponent, IslandOptions } from './checks'
 import type { Html } from './html'
 import type { JSX } from './jsx'
 import { omit } from './dom'
@@ -52,9 +52,10 @@ export function noteMessage(key: string): void {
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
 // `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser.
 export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false): IslandComponent<P> {
-  const render = (props: P & { hydrate?: HydrateWhen }) => {
+  const render = (props: P & IslandOptions) => {
     const when = props.hydrate
-    const own = 'hydrate' in props ? omit(props, 'hydrate') as P : props
+    const persist = props.persist === true ? id : props.persist || undefined
+    const own = 'hydrate' in props || 'persist' in props ? omit(props, 'hydrate', 'persist') as P : props
     const browserOnly = client || when === 'client'
 
     for (const key of messages)
@@ -77,7 +78,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     try {
       const html = browserOnly ? '' : renderOnServer(() => child(component!(own)))
       const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
-      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props="${escapeAttribute(serialized)}"${lazy}${browserOnly ? ' data-client' : ''}>${html}</slot>` }
+      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props="${escapeAttribute(serialized)}"${lazy}${browserOnly ? ' data-client' : ''}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}>${html}</slot>` }
 
       return markup as unknown as JSX.Element
     }

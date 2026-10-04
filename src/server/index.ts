@@ -77,5 +77,5 @@ async function clientFor(root: string, options: PagesOptions): Promise<ClientBui
     console.warn('kay: no client build in .kay/client, bundling now; run `kay build` before starting in production')
   }
 
-  return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes, api: options.api, sourcemap: options.dev, base: basePath(options.base), settings: options.settings })
+  return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes, api: options.api, navigation: options.navigation, sourcemap: options.dev, base: basePath(options.base), settings: options.settings })
 }

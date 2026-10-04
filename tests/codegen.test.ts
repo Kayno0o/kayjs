@@ -205,6 +205,7 @@ describe('elements', () => {
 describe('islands', () => {
   it('rejects hydrate inside an island, which hydrates as a whole', () => {
     expect(errors('---\nimport { signal } from "kay"\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="visible")')).toEqual([expect.stringContaining('`hydrate` has no effect inside an island')])
+    expect(errors('---\nimport { signal } from "kay"\nimport Counter from "./counter.kay"\n---\nCounter(persist)')).toEqual([expect.stringContaining('`persist` has no effect inside an island')])
     expect(errors('---\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="visible")')).toEqual([])
   })
 })
@@ -424,7 +425,7 @@ describe('generic components', () => {
     const code = tsx('--- <T extends Record<string, (a: number) => void>, U>\nimport { signal } from \'kay\'\n\nconst { items } = props<{ items: T[], other: U }>()\nconst n = signal(0)\n---\nbutton(onClick={() => n.set(1)}) {items.length}')
 
     expect(code).toContain('function Test<T extends Record<string, (a: number) => void>, U>(')
-    expect(code).toContain('export default KayIsland("test.kay", Test as never) as unknown as KayIslandBrand & (<T extends Record<string, (a: number) => void>, U>(props: Parameters<typeof Test<T, U>>[0] & { hydrate?: KayHydrateWhen }) => ReturnType<typeof Test>)')
+    expect(code).toContain('export default KayIsland("test.kay", Test as never) as unknown as KayIslandBrand & (<T extends Record<string, (a: number) => void>, U>(props: Parameters<typeof Test<T, U>>[0] & KayIslandOptions) => ReturnType<typeof Test>)')
   })
 
   it('refuses type parameters on a page', () => {

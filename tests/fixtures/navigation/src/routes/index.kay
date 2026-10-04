@@ -1,0 +1,20 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { store } from '../state'
+
+export const bump = action(t.Object({}), () => {
+  store.bumps++
+})
+
+const bumps = store.bumps
+---
+---
+import Bump from '../components/bump.kay'
+---
+head
+  title Home
+h1 Home
+p.bumps Bumped {bumps}
+Bump
+div(style="height: 3000px")

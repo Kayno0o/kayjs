@@ -1,0 +1,6 @@
+---
+import { signal } from 'kay'
+
+const played = signal(0)
+---
+button.player(onClick={() => played.set(n => n + 1)}) Played {played()}

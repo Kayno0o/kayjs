@@ -1,0 +1,36 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { store } from '../state'
+
+export const add = action(t.Object({ title: t.String({ minLength: 3, error: 'Too short' }) }), async ({ title }, ctx) => {
+  await Bun.sleep(200)
+
+  if (title === 'taken')
+    return ctx.fail(409, { message: 'Already taken' })
+
+  store.titles.push(title)
+
+  return title
+})
+
+const failure = ctx.failed(add)
+const success = ctx.succeeded(add)
+const titles = store.titles
+---
+---
+import './second.css'
+---
+head
+  title Second
+h1 Second
+form(action={add})
+  input(name="title" value={failure?.values.title})
+  button Add
+if failure?.data as data
+  p.error {data.message}
+if success as done
+  p.done Added {done.data}
+ul
+  for title, i of titles key={i}
+    li {title}

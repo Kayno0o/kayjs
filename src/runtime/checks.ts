@@ -12,7 +12,13 @@ export type HydrateWhen = 'load' | 'idle' | 'visible' | 'client'
 export interface IslandBrand { readonly [ISLAND]: true }
 
 // What an interactive component's default export is; only islands take `hydrate`.
-export type IslandComponent<Props> = ((props: Props & { hydrate?: HydrateWhen }) => JSX.Element) & IslandBrand
+// What a static parent passes an island besides its props: when it hydrates, and whether it lives on across navigations, `persist` keeping it by its component, `persist="key"` by a key of its own.
+export interface IslandOptions {
+  hydrate?: HydrateWhen
+  persist?: boolean | string
+}
+
+export type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand
 
 // Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every page route, public file and API module, and by the app with `locals: LocalsOf<typeof auth>` and `app: typeof app`.
 export interface Register {}

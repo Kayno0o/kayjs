@@ -10,6 +10,7 @@ import type { Prefetch } from './speculation'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { browserOnlyHint, mapStack } from '../build/sourcemap'
+import { collectForms } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
 import { localeState } from '../runtime/i18n.server'
@@ -19,6 +20,7 @@ import { preferredEncoding } from './compress'
 import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
 import { FLASH_COOKIE, readFlash } from './flash'
+import { formsScript } from './forms'
 import { runGuards } from './guards'
 import { hydrationScript } from './hydration'
 import { messagesScript } from './i18n'
@@ -377,10 +379,13 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
     } })
   }
 
-  const { result: { html: body, islands, deferred }, head } = collectHead(() => renderStatic(view), options.head?.(rendering.ctx.url, rendering.status))
+  const { result: { result: { html: body, islands, deferred }, head }, forms } = collectForms(() => collectHead(() => renderStatic(view), options.head?.(rendering.ctx.url, rendering.status)))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
-  const scripts = hasIslands ? islandScripts(client, islands.eager, streamed) : ''
+  // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither still ships no JavaScript, and links from it load pages, losing no state.
+  const posts = client.entry !== undefined && client.navigation === true && forms.size > 0
+  const shipsEntry = hasIslands || posts
+  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') : ''
   const locale = localeState()
   const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) : ''}${options.base ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${speculationRules(options.prefetch, options.base)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}`
 
@@ -388,7 +393,7 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
     return `${start}</body></html>`
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
-  return streamDocument(hasIslands ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, hasIslands, error => reportServerError(error, rendering.ctx.request, options.onError))
+  return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError))
 }
 
 // The stylesheets of the layouts, outermost first, then the page's.
@@ -413,8 +418,9 @@ function stylesheets(client: ClientBuild, files: string[]): string {
 }
 
 // Preloads every chunk the page's eager islands need, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
-function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean): string {
-  const key = `${streamed}\n${[...islands].sort().join('\n')}`
+// A page without islands needs no hydration script, only the entry swapping pages.
+function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean): string {
+  const key = `${streamed}\n${hydration}\n${[...islands].sort().join('\n')}`
   let cached = scriptsCache.get(client)
 
   if (!cached)
@@ -430,7 +436,7 @@ function islandScripts(client: ClientBuild, islands: Set<string>, streamed: bool
         chunks.add(chunk)
     }
 
-    html = `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${hydrationScript}${streamed ? '' : `<script type="module" src="${client.entry}"></script>`}`
+    html = `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${hydration ? hydrationScript : ''}${streamed ? '' : `<script type="module" src="${client.entry}"></script>`}`
     cached.set(key, html)
   }
 

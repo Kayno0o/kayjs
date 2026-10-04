@@ -3,6 +3,7 @@ import type { Static, TSchema } from 'elysia'
 import type { Locals, Redirect } from './checks'
 import type { Locale } from './i18n'
 import { withBase } from './base'
+import { navigate, REDIRECT_HEADER } from './navigate'
 import { createSignal, untrack } from './reactive'
 import { decodeValue, encodeValue, unflattenValue } from './wire'
 
@@ -15,8 +16,6 @@ declare const RESULT: unique symbol
 declare const HONEYPOT: unique symbol
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 
-// Where a called action sends the browser, in place of `location`.
-export const REDIRECT_HEADER = 'x-kay-redirect'
 // Marks a failed call's body as the encoded `{ errors, data }`, which a denial or an error answered as text is not.
 export const FAILURE_HEADER = 'x-kay-failure'
 // A call whose input holds files goes as multipart: the encoded input in one part, each file in part `FILE_MARK + n`, where the input holds its index.
@@ -174,8 +173,30 @@ export function registerActions(moduleId: string, exports: Record<string, unknow
   }
 }
 
+// The actions the forms of the page being rendered post to, for the server to send their schemas along; set while it renders.
+let renderedForms: Set<Action<never, unknown>> | undefined
+
+export function collectForms<T>(render: () => T): { result: T, forms: Set<Action<never, unknown>> } {
+  const forms = new Set<Action<never, unknown>>()
+  const previous = renderedForms
+
+  renderedForms = forms
+
+  try {
+    return { result: render(), forms }
+  }
+  finally {
+    renderedForms = previous
+  }
+}
+
 export function formAction(target: string | Action<never, unknown>): string {
-  return typeof target === 'string' ? target : target.url
+  if (typeof target === 'string')
+    return target
+
+  renderedForms?.add(target)
+
+  return target.url
 }
 
 export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> | HoneypotOf<Target> : string
@@ -257,7 +278,7 @@ export async function readActionResponse<Output>(response: Response): Promise<Ou
       throw new TypeError(`kay: the action redirected to ${JSON.stringify(target)}, which is no page`)
 
     // The page goes away, so whatever awaited the call never resumes.
-    window.location.assign(withBase(target))
+    void navigate(target)
 
     return new Promise<never>(() => undefined)
   }

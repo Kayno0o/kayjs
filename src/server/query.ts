@@ -2,7 +2,7 @@ import type { TSchema } from 'elysia'
 import type { TypeCheck } from 'elysia/type-system'
 import { mapValueError } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
-import { formInput } from './actions'
+import { formInput } from '../runtime/form'
 import { Denied } from './signals'
 
 export type ReadFields = { value: Record<string, unknown> } | { refused: Map<string, string> }

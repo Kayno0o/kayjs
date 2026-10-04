@@ -1,0 +1,10 @@
+---
+import Player from '../components/player.kay'
+---
+nav
+  a.home(href="/") Home
+  a.second(href="/second") Second
+  a.later(href="/later") Later
+  a.reload(href="/plain" data-reload) Plain
+Player(persist)
+slot

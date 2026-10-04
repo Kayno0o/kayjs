@@ -27,6 +27,8 @@ export interface ClientManifest {
   styles: Record<string, string>
   // The pages `kay build` rendered, by URL path.
   pages?: Record<string, PrerenderedPage>
+  // Whether the entry swaps pages in place, which ships it to pages posting forms to actions too.
+  navigation?: boolean
 }
 
 export interface PrerenderedPage {
@@ -63,6 +65,8 @@ export interface ClientOptions {
   base?: string
   // The app's own modules for its libraries' settings, as `kay.config.ts` gives them.
   settings?: Record<string, string>
+  // Swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions.
+  navigation?: boolean
 }
 
 interface MetafileOutput {
@@ -169,7 +173,9 @@ function fromManifest(root: string, manifest: ClientManifest, dir = clientDir(ro
 }
 
 async function buildIslands(root: string, base: string, islands: Map<string, string>, options: ClientOptions): Promise<Omit<ClientManifest, 'styles'>> {
-  if (islands.size === 0)
+  const navigation = options.navigation ?? true
+
+  if (islands.size === 0 && !navigation)
     return { entryImports: [], islands: {} }
 
   const entryFile = join(base, 'entry.ts')
@@ -177,7 +183,18 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
 
   // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`.
-  await Bun.write(entryFile, `import { hydrateIslands } from 'kay/client'\n\nconst islands = {\n${registry}\n}\n\nexport const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)\nexport const ready = hydrate()\n\n;(globalThis as { $kayHydrate?: () => unknown }).$kayHydrate = hydrate\n`)
+  await Bun.write(entryFile, [
+    `import { ${navigation ? 'disposeIslands, hydrateIslands, startNavigation' : 'hydrateIslands'} } from 'kay/client'`,
+    '',
+    `const islands = {\n${registry}\n}`,
+    '',
+    'export const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)',
+    'export const ready = hydrate()',
+    '',
+    ';(globalThis as { $kayHydrate?: () => unknown }).$kayHydrate = hydrate',
+    ...navigation ? ['startNavigation({ hydrate, dispose: disposeIslands })'] : [],
+    '',
+  ].join('\n'))
 
   const build = await Bun.build({
     entrypoints: [entryFile],
@@ -196,7 +213,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   if (!build.success)
     throw new AggregateError(build.logs, 'kay: client build failed')
 
-  return islandManifest(root, build.metafile!.outputs as Outputs, islands)
+  return { ...islandManifest(root, build.metafile!.outputs as Outputs, islands), navigation }
 }
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders.

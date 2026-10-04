@@ -1,0 +1,12 @@
+--- server
+import { defer } from 'kay'
+
+const answer = defer(Bun.sleep(100).then(() => 42))
+---
+head
+  title Later
+h1 Later
+await answer
+  p.pending Thinking
+then value
+  p.answer The answer is {value}

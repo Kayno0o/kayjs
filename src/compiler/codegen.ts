@@ -68,6 +68,8 @@ const QUERY = 'query'
 const MESSAGE_KEY = /\bt\(\s*(['"`])([\w.-]+)\1/g
 // The server exports that are no actions; `sitemap` lists the page in the sitemap, `revalidate` renders a prerendered page again once stale.
 const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap', 'revalidate', 'layouts'])
+// What only a static parent passes an island.
+const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
 const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
 // Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a `role`.
@@ -164,7 +166,7 @@ class Generator {
       b.add(`import { insideIsland as KayInsideIsland } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
 
     if (this.options.island && this.genericComponent)
-      b.add(`import type { HydrateWhen as KayHydrateWhen, IslandBrand as KayIslandBrand } from 'kay'\n`)
+      b.add(`import type { IslandBrand as KayIslandBrand, IslandOptions as KayIslandOptions } from 'kay'\n`)
 
     if (usesAwait(this.file.template) && !dom)
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
@@ -273,7 +275,7 @@ class Generator {
     return this.file.typeParameters !== undefined && this.server === undefined
   }
 
-  // `island()` would fix the type parameters to their constraints, so a generic island keeps its own signature, instantiated per use, plus `hydrate`.
+  // `island()` would fix the type parameters to their constraints, so a generic island keeps its own signature, instantiated per use, plus `hydrate` and `persist`.
   private genericIslandType(): string {
     if (!this.genericComponent)
       return ''
@@ -281,7 +283,7 @@ class Generator {
     const parameters = this.text(this.file.typeParameters!)
     const { name } = this.options
 
-    return ` as unknown as KayIslandBrand & (<${parameters}>(props: Parameters<typeof ${name}<${typeParameterNames(parameters).join(', ')}>>[0] & { hydrate?: KayHydrateWhen }) => ReturnType<typeof ${name}>)`
+    return ` as unknown as KayIslandBrand & (<${parameters}>(props: Parameters<typeof ${name}<${typeParameterNames(parameters).join(', ')}>>[0] & KayIslandOptions) => ReturnType<typeof ${name}>)`
   }
 
   // Both fences land in one module, so a name they both import is declared once; the server fence's copy is the one left out, and a name imported two different ways is reported.
@@ -899,8 +901,8 @@ class Generator {
       if ((element.classes.length > 0 || merged) && attribute === classAttributes[0])
         continue
 
-      if (element.component && this.options.island && attribute.kind !== 'spread' && this.text(attribute.name) === 'hydrate')
-        this.error(attribute.name, '`hydrate` has no effect inside an island, which hydrates as a whole')
+      if (element.component && this.options.island && attribute.kind !== 'spread' && ISLAND_OPTIONS.has(this.text(attribute.name)))
+        this.error(attribute.name, `\`${this.text(attribute.name)}\` has no effect inside an island, which hydrates and lives on as a whole`)
 
       b.add(' ')
 
