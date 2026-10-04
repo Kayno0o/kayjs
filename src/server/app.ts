@@ -11,7 +11,7 @@ import { mapBundleToKay } from '../build/sourcemap'
 import { registerActionRoutes } from './actions'
 import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
-import { encodedCopies, encodedPath, preferredEncoding } from './compress'
+import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents } from './dev'
 import { FAVICON_DIR, serveFavicons } from './favicon'
 import { loadGuards } from './guards'
@@ -106,6 +106,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
       for (const [name, value] of Object.entries(security))
         set.headers[name] ??= value
     })
+  }
+
+  // Scoped, so the app's own routes are compressed too; what is encoded already, as the build's copies are, goes as it is.
+  if (options.compress) {
+    app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue) : undefined)
   }
 
   if (options.dev)

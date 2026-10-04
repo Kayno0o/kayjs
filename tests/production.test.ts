@@ -232,3 +232,40 @@ describe('revalidation', () => {
     }
   })
 })
+
+describe('compression', () => {
+  const routes = 'tests/fixtures/production/src/routes'
+
+  it('compresses what renders per request for a browser taking brotli or gzip, headers and cookies kept', async () => {
+    // Registered after the pages, as hooks only reach the routes that come after them.
+    const app = new Elysia()
+      .use(await pages({ routes, prebuilt: false, compress: true }))
+      .get('/api/report', () => new Response(JSON.stringify({ rows: Array.from({ length: 100 }, (_, i) => i) }), { headers: { 'content-type': 'application/json', 'set-cookie': 'seen=1' } }))
+      .get('/api/tiny', () => new Response('{}', { headers: { 'content-type': 'application/json', 'content-length': '2' } }))
+      .get('/api/raw', () => new Response('x'.repeat(1000), { headers: { 'content-type': 'text/plain', 'cache-control': 'no-transform' } }))
+    const fetch = async (path: string, encoding: string) => app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': encoding } }))
+    const page = await fetch('/contact', 'gzip, deflate, br, zstd')
+    const plain = await fetch('/contact', 'identity')
+
+    expect(page.headers.get('content-encoding')).toBe('br')
+    expect(page.headers.get('vary')).toContain('accept-encoding')
+    expect(page.headers.get('content-security-policy')).toStartWith('default-src \'self\'')
+    expect(new TextDecoder().decode(brotliDecompressSync(await page.bytes()))).toBe(await plain.text())
+    expect(plain.headers.get('content-encoding')).toBeNull()
+    expect(plain.headers.get('vary')).toContain('accept-encoding')
+
+    const report = await fetch('/api/report', 'gzip')
+
+    expect(report.headers.get('content-encoding')).toBe('gzip')
+    expect(report.headers.get('set-cookie')).toBe('seen=1')
+    expect(JSON.parse(new TextDecoder().decode(Bun.gunzipSync(await report.bytes())))).toMatchObject({ rows: expect.any(Array) })
+    expect((await fetch('/api/tiny', 'br')).headers.get('content-encoding')).toBeNull()
+    expect((await fetch('/api/raw', 'br')).headers.get('content-encoding')).toBeNull()
+  })
+
+  it('leaves responses alone unless compress is on', async () => {
+    const app = await pages({ routes, prebuilt: false })
+
+    expect((await app.handle(new Request('http://localhost/contact', { headers: { 'accept-encoding': 'br' } }))).headers.get('content-encoding')).toBeNull()
+  })
+})

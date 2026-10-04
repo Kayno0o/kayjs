@@ -2,13 +2,14 @@ import { existsSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { brotliCompress, constants } from 'node:zlib'
+import { brotliCompress, constants, createBrotliCompress, createGzip } from 'node:zlib'
 
 export type Encoding = 'br' | 'gzip'
 
 // Best first: brotli is smaller, gzip what every browser takes.
 const SUFFIXES: Record<Encoding, string> = { br: '.br', gzip: '.gz' }
 const ENCODINGS = Object.keys(SUFFIXES) as Encoding[]
+const ON_THE_FLY: ReadonlySet<Encoding> = new Set(ENCODINGS)
 // Text the build writes; images, fonts and media come compressed already.
 const COMPRESSIBLE = /\.(?:js|mjs|css|html|svg|json|txt|xml|map|wasm)$/i
 const ENCODED_COPY = /\.(?:br|gz)$/
@@ -16,6 +17,11 @@ const ENCODED_COPY = /\.(?:br|gz)$/
 const MIN_SIZE = 256
 const ACCEPTED = /^\s*([\w*-]+)\s*(?:;\s*q\s*=\s*([\d.]+))?/i
 const compressBrotli = promisify(brotliCompress)
+// Response types worth compressing: text, and the structured data and scripts sent as text.
+const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manifest\+json|ld\+json|rss\+xml|atom\+xml|wasm)|image\/svg\+xml)/i
+// Statuses with no body to compress, or a partial one.
+const BODILESS = new Set([101, 204, 205, 206, 304])
+const NO_TRANSFORM = /\bno-transform\b/i
 
 // Writes a brotli and a gzip copy beside every compressible file under the directory, at the strongest levels since it happens once, at build time; a copy saving little is not written.
 export async function compressFiles(dir: string): Promise<void> {
@@ -51,6 +57,65 @@ export async function compressText(text: string): Promise<Partial<Record<Encodin
   }
 
   return copies
+}
+
+// The response compressed on the fly for a browser that takes brotli or gzip, or undefined when it is not worth it: already encoded, not text, too small, or asked to be left alone.
+// A streamed body is flushed chunk by chunk, so what the server sends early still reaches the browser early.
+export function compressResponse(request: Request, response: Response): Response | undefined {
+  const { headers } = response
+  const length = headers.get('content-length')
+
+  if (!response.body || request.method === 'HEAD' || BODILESS.has(response.status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (length !== null && Number(length) < MIN_SIZE))
+    return undefined
+
+  // Whatever the browser takes, a shared cache keeps one copy per encoding.
+  headers.append('vary', 'accept-encoding')
+
+  const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
+
+  if (!encoding)
+    return undefined
+
+  const compressed = new Headers(headers)
+  const etag = compressed.get('etag')
+
+  compressed.set('content-encoding', encoding)
+  compressed.delete('content-length')
+
+  // The bytes differ from the uncompressed copy's, so a strong tag no longer holds.
+  if (etag?.startsWith('"'))
+    compressed.set('etag', `W/${etag}`)
+
+  return new Response(response.body.pipeThrough(compressor(encoding)), { status: response.status, statusText: response.statusText, headers: compressed })
+}
+
+// Levels quick enough for a request path: brotli 5 and gzip 6 compress a 150 KB page in a millisecond or so.
+function compressor(encoding: Encoding): TransformStream<Uint8Array, Uint8Array> {
+  const zlib = encoding === 'br' ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: 5 } }) : createGzip({ level: 6 })
+  const output: Uint8Array[] = []
+
+  zlib.on('data', (chunk: Uint8Array) => output.push(chunk))
+
+  const drain = (controller: TransformStreamDefaultController<Uint8Array>) => {
+    for (const chunk of output.splice(0))
+      controller.enqueue(chunk)
+  }
+
+  return new TransformStream({
+    async transform(chunk, controller) {
+      zlib.write(chunk)
+      await new Promise<void>(resolve => zlib.flush(() => resolve()))
+      drain(controller)
+    },
+    async flush(controller) {
+      // 'end' comes once the last bytes went out as data.
+      const ended = new Promise<void>(resolve => zlib.once('end', resolve))
+
+      zlib.end()
+      await ended
+      drain(controller)
+    },
+  })
 }
 
 // The copies `compressFiles` wrote, by the path of the file they copy.

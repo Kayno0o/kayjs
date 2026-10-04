@@ -24,6 +24,8 @@ export interface KayConfig {
   fonts?: FontConfig[]
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
   security?: SecurityConfig | false
+  // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip: for a server with no proxy in front doing it. Off by default.
+  compress?: boolean
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
