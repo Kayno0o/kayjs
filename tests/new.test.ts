@@ -191,6 +191,14 @@ async function listeningPort(child: Subprocess<'ignore', 'pipe', 'pipe'>): Promi
 }
 
 describe('kay build --compile', () => {
+  it('refuses --entry without --compile, before building anything', async () => {
+    const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', tmpdir(), '--entry', 'src/server.ts'], { stdout: 'pipe', stderr: 'pipe' })
+    const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+
+    expect(report).toContain('--entry names the server an executable runs, so it goes with --compile')
+    expect(code).toBe(1)
+  })
+
   it('bundles the server, its pages and the client build into one executable that serves them from anywhere', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-compile-')), 'my-app')
 
@@ -199,7 +207,10 @@ describe('kay build --compile', () => {
       await installKay(dir)
       await Promise.all(Object.entries({
         'public/robots.txt': 'User-agent: *\n',
-        'src/components/badge.kay': '---\nconst { labels } = props<{ labels: string[] }>()\n---\nul.badges\n  for label of labels key={label}\n    li {label}\n',
+        // A static component with relative imports of its own, so its island twin resolves them too.
+        'src/components/shout.ts': 'export const shout = (text: string) => text.toUpperCase()\n',
+        'src/components/dot.kay': 'i.dot\n',
+        'src/components/badge.kay': '---\nimport Dot from \'./dot.kay\'\nimport { shout } from \'./shout\'\n\nconst { labels } = props<{ labels: string[] }>()\n---\nul.badges\n  for label of labels key={label}\n    li\n      Dot\n      | {shout(label)}\n',
         'src/components/tally.kay': '---\nimport { signal } from \'kay\'\nimport Badge from \'./badge.kay\'\n\nconst n = signal(0)\n---\nBadge(labels={[\'in\']})\nbutton(onClick={() => n.set(c => c + 1)}) {n()}\n',
         'src/routes/badges.kay': '---\nimport Badge from \'../components/badge.kay\'\nimport Tally from \'../components/tally.kay\'\n---\nBadge(labels={[\'out\']})\nTally\n',
         'src/routes/about.kay': '--- server\nexport const prerender = true\n---\np About\n',
@@ -227,14 +238,17 @@ describe('kay build --compile', () => {
         const home = await get('/')
         const entry = (/<script type="module" src="([^"]+)"/).exec(home.text)![1]!
         const badges = await get('/badges')
+        const about = await fetch(`${origin}/about`, { headers: { 'accept-encoding': 'br' } })
         const call = await fetch(`${origin}/_kay/action/src/routes/echo.kay/shout`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'origin': origin }, body: stringify({ text: 'hi' }) })
 
         expect(home.text).toContain('<h1>Hello from the server</h1>')
         expect((await get(entry)).status).toBe(200)
         expect(await get('/robots.txt')).toEqual({ status: 200, text: 'User-agent: *\n' })
-        expect((await get('/about')).text).toContain('<p>About</p>')
-        expect(badges.text).toContain('<ul class="badges"><li>out</li></ul>')
-        expect(badges.text).toMatch(/<ul _hk=\S+ class="badges">/)
+        // The copy `kay build` prerendered and compressed, not a render.
+        expect(about.headers.get('etag')).toEndWith('-br"')
+        expect(await about.text()).toContain('<p>About</p>')
+        expect(badges.text).toContain('<ul class="badges"><li><i class="dot"></i>OUT</li></ul>')
+        expect(badges.text).toMatch(/<ul _hk=\S+ class="badges"><li _hk=\S+><!--\$--><i _hk=\S+ class="dot"><\/i><!--\/--><!--\$-->IN<!--\/--><\/li>/)
         expect(parse(await call.text())).toBe('HI')
         expect(await get('/admin')).toEqual({ status: 403, text: 'Admins only' })
         expect((await get('/missing')).text).toContain('<h1>Nothing here</h1>')

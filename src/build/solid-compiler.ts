@@ -23,7 +23,8 @@ type SolidCompiler = typeof import('@solidjs/compiler')
 
 let compiler: SolidCompiler | undefined
 
-// Required rather than imported, so the binding it loads finds `initialize` already there; and only on a first compile, so a server that never compiles, such as a `kay build --compile` executable, never loads it.
+// Required rather than imported, so the binding it loads finds `initialize` already there.
+// Only on a first compile, so a server that never compiles, such as a `kay build --compile` executable, never loads it.
 export function transform(...args: Parameters<SolidCompiler['transform']>): ReturnType<SolidCompiler['transform']> {
   compiler ??= createRequire(import.meta.url)('@solidjs/compiler') as SolidCompiler
 

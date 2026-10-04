@@ -8,9 +8,8 @@ import { kay } from './plugin'
 import { withoutStyles } from './styles'
 
 export interface CompileOptions {
-  // The server entry, relative to the root.
+  // The server entry, `src/server.ts` under the root by default.
   entry?: string
-  // The executable to write, relative to the root.
   outfile: string
 }
 
@@ -70,7 +69,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
     plugins: [withoutStyles(), kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache') }), ...config.plugins ?? []],
-  } as Bun.BuildConfig)
+  })
 
   if (!build.success)
     throw new AggregateError(build.logs, 'kay: compiling the server failed')

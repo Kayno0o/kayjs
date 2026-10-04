@@ -30,7 +30,14 @@ const imported = new Map<string, unknown>()
 
 // A page, layout, special page or guard: the executable's own copy, or the file imported through the `.kay` loader.
 export async function importModule<Module>(file: string): Promise<Module> {
-  let module = bundle?.modules[file] ?? imported.get(file)
+  if (bundle) {
+    if (!(file in bundle.modules))
+      throw new Error(`kay: this executable holds no ${file}; run \`kay build --compile\` again`)
+
+    return bundle.modules[file] as Module
+  }
+
+  let module = imported.get(file)
 
   if (module === undefined) {
     module = await import(file)

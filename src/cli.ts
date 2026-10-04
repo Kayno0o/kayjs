@@ -153,7 +153,7 @@ async function build(args: string[]): Promise<number> {
 
     if (typeof compile === 'string') {
       const compiled = performance.now()
-      const executable = await compileServer(root, config, { outfile: compile, entry: typeof entry === 'string' ? entry : undefined })
+      const executable = await compileServer(root, config, { outfile: resolve(compile), entry: typeof entry === 'string' ? resolve(entry) : undefined })
 
       console.error(`compiled ${relative(process.cwd(), executable)} in ${Math.round(performance.now() - compiled)} ms`)
     }

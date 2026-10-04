@@ -13,6 +13,7 @@ export type { KayConfig } from '../config'
 export { defineConfig } from '../config'
 export type { PagesOptions } from './app'
 export type { Bundle } from './bundle'
+// For the entry `kay build --compile` generates.
 export { registerBundle } from './bundle'
 export type { ScriptHashOptions } from './csp'
 export { inlineScriptHashes } from './csp'
@@ -24,7 +25,7 @@ export type { Route } from './routes'
 export async function pages(options: PagesOptions = {}) {
   const bundle = bundled()
 
-  // An executable serves what `kay build --compile` embedded, as production does.
+  // An executable serves what `kay build --compile` embedded, as production does: the root, routes and public files it was built with win over the options.
   if (bundle) {
     const config = { ...mergeConfig(bundle.config, options), root: bundle.root, dev: false, prebuilt: true, publicDir: bundle.publicDir }
 
