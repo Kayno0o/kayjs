@@ -1,0 +1,15 @@
+--- server
+import { t } from 'elysia'
+
+export const query = t.Object({
+  q: t.String({ minLength: 1, error: 'Type something to search' }),
+  page: t.Optional(t.Integer({ minimum: 1 })),
+  tags: t.Array(t.String()),
+  exact: t.Boolean(),
+})
+
+const { q, page = 1, tags, exact } = ctx.query
+---
+h1 Results for {q}
+p.types {typeof page} {typeof exact}
+p.values {page} {tags.join(',')} {String(exact)}

@@ -1,0 +1,8 @@
+--- server
+import { t } from 'elysia'
+
+export const query = t.Object({ n: t.Integer() })
+
+const { n } = ctx.query
+---
+p.n {n}

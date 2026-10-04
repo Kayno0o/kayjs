@@ -123,8 +123,8 @@ function actionFiles(routes: ServedRoute[]): Map<string, LoadedGuard[]> {
   return files
 }
 
-// A form posts text, and each field once per value or not at all: a top-level field is read the way its schema expects before Elysia validates it.
-function formInput(schema: TSchema, body: unknown): unknown {
+// A form posts text, as a query string is, and each field once per value or not at all: a top-level field is read the way its schema expects before it is validated.
+export function formInput(schema: TSchema, body: unknown): unknown {
   const { properties, required = [] } = schema as { properties?: Record<string, FieldSchema>, required?: string[] }
 
   if (!properties || typeof body !== 'object' || body === null)

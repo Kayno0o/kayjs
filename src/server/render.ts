@@ -18,6 +18,7 @@ import { FLASH_COOKIE, readFlash } from './flash'
 import { runGuards } from './guards'
 import { errorPage } from './overlay'
 import { matchesEtag } from './public'
+import { readQuery } from './query'
 import { reportServerError } from './report'
 import { decodePath } from './routes'
 import { Denied, NotFound, Redirect } from './signals'
@@ -27,6 +28,8 @@ import { renderStatic, streamDocument } from './stream'
 interface PageModule {
   default: (props: Record<string, unknown>) => JSX.Element
   load?: (ctx: PageContext) => Promise<Record<string, unknown>>
+  // The page's schema for its search params.
+  query?: unknown
 }
 
 type Loaded = PromiseSettledResult<Record<string, unknown>>
@@ -92,6 +95,11 @@ export async function renderPage(route: ServedRoute, context: RequestContext, cl
   try {
     // Layouts outermost first, then the page: when several loads fail, the outermost one decides the response.
     const modules = await importAll(files)
+
+    // Read once the guards let the request through, so a refused query never renders what they protect; the layouts see the page's.
+    if (!options.prerendering)
+      rendering.ctx.query = readQuery(modules.at(-1)!.query, rendering.ctx.url)
+
     const timings = options.dev ? Array.from<number>({ length: files.length }) : undefined
     const loads = await Promise.allSettled(modules.map(async (module, index) => runLoad(module, rendering.ctx, timings, index)))
 
@@ -197,6 +205,7 @@ function createRendering(context: RequestContext, params: Record<string, string>
   let flash: Flash | SuccessFlash | null | undefined
   const readOnce = () => flash ??= hasFlash(request) ? readFlash(jar.cookies) ?? null : null
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
+  const url = new URL(request.url)
   const rendering: Rendering = {
     headers,
     status: 200,
@@ -209,8 +218,9 @@ function createRendering(context: RequestContext, params: Record<string, string>
     },
     ctx: {
       request,
-      url: new URL(request.url),
+      url,
       params,
+      query: readQuery(undefined, url),
       get cookies() {
         return jar.cookies
       },
@@ -245,6 +255,7 @@ function createRendering(context: RequestContext, params: Record<string, string>
   if (prerendering) {
     Object.defineProperties(rendering.ctx, {
       cookies: { get: needsRequest('ctx.cookies') },
+      query: { get: needsRequest('ctx.query') },
       locals: { get: needsRequest('ctx.locals') },
       failed: { get: needsRequest('ctx.failed') },
       succeeded: { get: needsRequest('ctx.succeeded') },

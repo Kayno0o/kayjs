@@ -1,4 +1,5 @@
 import type { CookieMap } from 'bun'
+import type { Static, TSchema } from 'elysia'
 import type { Setter, SignalOptions } from 'solid-js'
 import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect } from './checks'
@@ -86,10 +87,12 @@ export function selection<Key extends string | number>(initial?: Key): Selection
   return Object.assign(read, { set, is })
 }
 
-export interface PageContext<Params extends Record<string, string> = Record<string, string>> {
+export interface PageContext<Params extends Record<string, string> = Record<string, string>, Query = Readonly<Record<string, unknown>>> {
   request: Request
   url: URL
   params: Params
+  // The search params, read against the page's `export const query = t.Object(...)`; a query it refuses answers 400. Their raw text is `url.searchParams`.
+  query: Query
   // Read on demand; what a page sets or deletes goes out as Set-Cookie headers, redirects included.
   cookies: CookieMap
   // What the app's Elysia `derive`, `resolve` and `decorate` add, typed through `Register`.
@@ -140,6 +143,9 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
 }
 
 // What a page's template reads: every name its `--- server` fence declares.
+// What a page's query schema gives `ctx.query`.
+export type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
+
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
 export type { Action, ActionContext, Failure, FailureOf, FieldName, FormFailure, FormSuccess, ServerAction, SuccessOf } from './action'

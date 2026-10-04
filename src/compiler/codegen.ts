@@ -20,6 +20,8 @@ export interface GenerateOptions {
   params?: string[]
   // `_error.kay`, whose `ctx` carries the error it renders.
   errorPage?: boolean
+  // A layout or special page, which reads the query its page declares rather than one of its own.
+  special?: boolean
   // Server output without hydration markers for a static component: inside an island it renders through this hydratable build of itself instead.
   twin?: string
   // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
@@ -51,6 +53,10 @@ const DEFAULT_PREFIX = '__default_'
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
 // The one server export that is no action: `kay build` renders the page once when it is `true`.
 const PRERENDER = 'prerender'
+// The page's query schema, which types and validates `ctx.query`.
+const QUERY = 'query'
+// The server exports that are no actions.
+const NOT_ACTIONS = new Set([PRERENDER, QUERY])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
 const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script` and `base` elements only'
@@ -90,11 +96,13 @@ class Generator {
         this.emitHoisted(span, server.specifiers, server.imports, duplicates)
     }
 
+    const query = this.declaresQuery()
+
     if (server)
-      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData } from 'kay'\n`)
+      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${query ? ', QueryOf as KayQueryOf' : ''} } from 'kay'\n`)
 
     const kayHelpers = formHelpers(this.file)
-    const actions = server?.exportNames.filter(name => name !== PRERENDER) ?? []
+    const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
     const staticLoops = this.staticLoops
     const used = usedHelpers(this.file.template, script)
     const helpers = used.filter(helper => helper !== 'For')
@@ -143,7 +151,7 @@ class Generator {
       b.add(`import { useHead as KayUseHead } from '@solidjs/web'\n`)
 
     if (includeServer)
-      this.emitLoad(server)
+      this.emitLoad(server, query)
 
     b.add(`\n${this.options.island || this.options.twin !== undefined ? '' : 'export default '}function ${this.options.name}`)
 
@@ -194,6 +202,19 @@ class Generator {
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''})${this.genericIslandType()}\n`)
 
     return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
+  }
+
+  // Whether the page declares its query; a layout's or special page's declaration is reported.
+  private declaresQuery(): boolean {
+    const span = this.server?.exportSpans.get(QUERY)
+
+    if (span && this.options.special) {
+      this.error(span, 'Only a page declares its query; a layout or special page reads its page\'s through `ctx.query`')
+
+      return false
+    }
+
+    return span !== undefined
   }
 
   private get genericComponent(): boolean {
@@ -277,7 +298,7 @@ class Generator {
   }
 
   // Server exports stay at module level; the rest of the fence becomes `load(ctx)`, returning every name it declares.
-  private emitLoad(server: ServerAnalysis) {
+  private emitLoad(server: ServerAnalysis, query: boolean) {
     const { b } = this
 
     for (const span of server.exports)
@@ -291,7 +312,7 @@ class Generator {
     // An unused parameter would trip `noUnusedParameters` in the user's tsconfig, so it is named `_ctx` when the fence never reads it.
     const ctx = server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'
 
-    b.add(`\nexport async function load(${ctx}: KayPageContext<${params}>) {\n`)
+    b.add(`\nexport async function load(${ctx}: KayPageContext<${params}${query ? `, KayQueryOf<typeof ${QUERY}>` : ''}>) {\n`)
     for (const span of server.body)
       b.addSource(span)
     b.add(`\nreturn { ${server.data.map(data => data.name).join(', ')} }\n}\n`)

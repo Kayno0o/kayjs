@@ -136,6 +136,23 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('types ctx.query from the page\'s query schema, and reports one a layout declares', async () => {
+    const page = '--- server\nimport { t } from \'elysia\'\n\nexport const query = t.Object({ page: t.Integer() })\n\nconst label: string = ctx.query.page\nconst other = ctx.query.pag\n---\np {label} {String(other)}\n'
+    const layout = '--- server\nimport { t } from \'elysia\'\n\nexport const query = t.Object({ q: t.String() })\n---\nslot\n'
+    const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/_layout.kay': layout })
+
+    try {
+      expect((await check(root)).map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([
+        ['_layout.kay', 4, 'Only a page declares its query; a layout or special page reads its page\'s through `ctx.query`'],
+        ['index.kay', 6, 'TS2322'],
+        ['index.kay', 7, 'TS2551'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('resolves -p against the directory being checked', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'tsconfig.app.json': tsconfig })
 

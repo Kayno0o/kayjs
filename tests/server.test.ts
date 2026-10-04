@@ -394,6 +394,35 @@ describe('request context', () => {
   })
 })
 
+describe('page query', () => {
+  it('reads the search params against the page\'s schema, as typed values', async () => {
+    const full = await get('/search?q=kay&page=3&tags=a&tags=b&exact=on')
+    const bare = await get('/search?q=kay&utm_source=feed')
+
+    expect(full.status).toBe(200)
+    expect(full.html).toContain('<h1>Results for kay</h1><p class="types">number boolean</p><p class="values">3 a,b true</p>')
+    expect(bare.html).toContain('<p class="values">1  false</p>')
+  })
+
+  it('answers a query the schema refuses with 400, through the error page', async () => {
+    const refused = await get('/search?q=&page=x')
+
+    expect(refused.status).toBe(400)
+    expect(refused.html).toContain('<h1>Error 400</h1>')
+    expect(refused.html).toContain('Invalid query: q: Type something to search; page: ')
+  })
+
+  it('checks the query only once the guards let the request through', async () => {
+    const signedIn = new Elysia().use(auth).use(app)
+    const visit = async (query: string, user?: string) => signedIn.handle(new NativeRequest(`http://localhost/admin/find?${query}`, { headers: user === undefined ? {} : { 'x-user': user } }))
+
+    expect((await visit('n=x')).status).toBe(302)
+    expect((await visit('n=x', 'bob')).status).toBe(403)
+    expect((await visit('n=x', 'ada')).status).toBe(400)
+    expect(await (await visit('n=2', 'ada')).text()).toContain('<p class="n">2</p>')
+  })
+})
+
 describe('guards', () => {
   const PROMOTE = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/admin/index.kay/promote'
   const signedIn = new Elysia().use(auth).use(app)

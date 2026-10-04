@@ -60,7 +60,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   let name = freeName(componentName(filename), fences)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const twin = options.staticRender && !island && !file.server ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const generateOptions = { island, twin, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE }
+  const generateOptions = { island, twin, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
   let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name)

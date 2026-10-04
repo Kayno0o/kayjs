@@ -260,6 +260,7 @@ A page URL ending in a slash redirects with 308 to the one without, query kept: 
 Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence runs per request and may use top-level `await` and the `ctx` object, except what an export such as an action reads: that runs once, when the module loads, so it may neither await nor read `ctx`, which `kay check` reports. The fence's `ctx`:
 
 - `ctx.params`, typed from the file name, `ctx.url`, `ctx.request`
+- `ctx.query`, the search params, read against the schema the page exports as `query`: `export const query = t.Object({ q: t.String(), page: t.Optional(t.Integer()) })` types `ctx.query.page` as a `number | undefined`. Each is read as a form field is (a number from decimal text, a list from a repeated name, `true` from `on`), and a query the schema refuses renders `_error.kay` with status 400, once the guards let the request through. Layouts read the page's, and declare none of their own. Without a schema each name reads as its text, a repeated one as a list, typed `unknown`; the raw text is `ctx.url.searchParams`.
 - `ctx.cookies`, a `Bun.CookieMap`: `ctx.cookies.get('theme')`; what `set` and `delete` change is sent back, redirects included
 - `ctx.locals`, what the app's Elysia `derive`, `resolve` and `decorate` add, such as the signed-in user
 - `ctx.status(404)` and `ctx.headers` set the response
@@ -300,7 +301,7 @@ export default defineConfig({
 
 ## Prerendering
 
-A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.locals`, `ctx.failed` or `ctx.succeeded` fails the build; `ctx.url` is `http://localhost` plus its path. Development renders it per request like any other.
+A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.query`, `ctx.locals`, `ctx.failed` or `ctx.succeeded` fails the build; `ctx.url` is `http://localhost` plus its path. Development renders it per request like any other.
 
 A route taking params lists the ones to render instead, as an array or a function returning one; any other path renders per request:
 
