@@ -1,0 +1,45 @@
+---
+import type { JSX } from 'kay'
+import { effect, signal } from 'kay'
+
+const { open, title, dirty = false, onClose, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+  // Shows the dialog as a modal; the parent sets it back to false in `onClose`.
+  open: boolean
+  title: string
+  // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own.
+  dirty?: boolean
+  // Called however the dialog closes, a click outside and Escape included, while its content is still there to read.
+  onClose: (event: Event) => void
+  footer?: JSX.Element
+  class?: string
+}>()
+
+// Set by any typing inside, and cleared however the dialog closes, since every way ends in its `close` event.
+const edited = signal(false)
+let dialog: HTMLDialogElement | undefined
+
+effect(() => {
+  const shown = open
+
+  if (!dialog)
+    return
+
+  if (shown && !dialog.open)
+    dialog.showModal()
+  else if (!shown && dialog.open)
+    dialog.close()
+})
+
+function closed(event: Event) {
+  onClose(event)
+  edited.set(false)
+}
+---
+dialog.dialog({...rest} ref={element => dialog = element} closedby={dirty || edited() ? 'none' : 'any'} onInput={() => edited.set(true)} onClose={closed} class={className})
+  if open
+    h3.dialog-title {title}
+    .dialog-body
+      slot
+    if footer
+      .dialog-footer
+        | {footer}

@@ -1,0 +1,49 @@
+---
+import { signal } from 'kay'
+import Dialog from './dialog.kay'
+import IconButton from './icon-button.kay'
+import { attempt } from './toast'
+
+const { message, onConfirm, failure, trigger = 'icon', label = 'Delete', size, variant, class: className } = props<{
+  message: string
+  // Deletes. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
+  onConfirm: () => void | Promise<void>
+  // Toasted when `onConfirm` throws, which leaves the dialog open.
+  failure: string
+  // An icon by default; `button` is a labelled danger button, for a dialog footer.
+  trigger?: 'icon' | 'button'
+  // What the trigger says, for a delete the reader knows by another name: "Empty trash", "Revoke link".
+  label?: string
+  size?: 'xs' | 'sm' | 'md' | 'lg'
+  variant?: 'solid' | 'ghost' | 'inline' | 'danger'
+  // Goes on the trigger.
+  class?: string
+}>()
+
+const open = signal(false)
+const pending = signal(false)
+
+async function confirm() {
+  pending.set(true)
+
+  const deleted = await attempt(async () => {
+    await onConfirm()
+
+    return true
+  }, failure)
+
+  pending.set(false)
+
+  if (deleted)
+    open.set(false)
+}
+---
+if trigger === 'button'
+  button.btn.btn-danger(type="button" class={className} onClick={() => open.set(true)}) {label}
+else
+  IconButton(icon="delete" label={label} size={size} variant={variant} class={className} onClick={() => open.set(true)})
+Dialog(open={open()} title="Confirm Deletion" dirty={pending()} onClose={() => open.set(false)})
+  @footer
+    button.btn(type="button" disabled={pending()} onClick={() => open.set(false)}) Cancel
+    button.btn.btn-danger(type="button" disabled={pending()} onClick={confirm}) {pending() ? 'Deleting…' : 'Delete'}
+  p.confirm-delete-message {message}

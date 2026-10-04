@@ -1,0 +1,18 @@
+---
+import { signal } from 'kay'
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+
+// What the test reads back: how often the dialog closed, and whether a delete failed or went through.
+const { onClose, onDelete, dirty = false } = props<{ onClose: () => void, onDelete: () => Promise<void>, dirty?: boolean }>()
+
+const open = signal(false)
+---
+button#open(onClick={() => open.set(true)}) Open
+Dialog#dialog(open={open()} title="Rename" dirty={dirty} onClose={() => { open.set(false); onClose() }})
+  @footer
+    button#cancel.btn(onClick={() => open.set(false)}) Cancel
+  input#name(name="name")
+ConfirmDelete(message="Delete this?" failure="Could not delete" onConfirm={onDelete})
+Toaster
