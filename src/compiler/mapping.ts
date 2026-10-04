@@ -65,7 +65,7 @@ export class CodeBuilder {
 
   // A component tag's name, which `KayDynamic` takes as a value when it is read through a call or a default; returns whether it did, so the closing tag matches.
   addTag(span: Span): boolean {
-    const dynamic = this.rewritesIn(span).some(([, rewrite]) => rewrite.dynamic)
+    const dynamic = this.isDynamicTag(span)
 
     if (dynamic)
       this.code += `${DYNAMIC_TAG} component={`
@@ -76,6 +76,11 @@ export class CodeBuilder {
       this.code += '}'
 
     return dynamic
+  }
+
+  // Whether a component tag is read through a call or a default, and so names a value rather than a component.
+  isDynamicTag(span: Span): boolean {
+    return this.rewritesIn(span).some(([, rewrite]) => rewrite.dynamic)
   }
 
   // Maps everything `emit` generates back to `source` as one range.

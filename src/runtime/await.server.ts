@@ -1,15 +1,16 @@
 import type { JSX } from '@solidjs/web'
 import type { AwaitProps } from './checks'
-import { ssr } from '@solidjs/web'
+import type { Html } from './html'
 import { Await as SolidAwait } from './await'
+import { child } from './html'
 import { insideIsland } from './island.server'
 
 // A block whose value was still pending when the page rendered, streamed in once it settles.
 export interface PendingBlock {
   id: string
   value: Promise<unknown>
-  ready: (value: never) => JSX.Element
-  failed?: (error: unknown) => JSX.Element
+  ready: (value: never) => unknown
+  failed?: (error: unknown) => unknown
 }
 
 // Renders are synchronous, so the blocks of the one in progress can live here, like the islands it renders.
@@ -32,6 +33,7 @@ export function collectDeferred<T>(render: () => T): { result: T, deferred: Pend
 }
 
 // On a page, a pending value renders its `pending` block between markers that the streamed result replaces; a settled one renders right away.
+// Typed as the browser build is, which `kay check` reads templates against.
 export function Await<T>(props: AwaitProps<T>): JSX.Element {
   const value = props.value
 
@@ -42,8 +44,9 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
   if (!(value instanceof Promise))
     return props.ready(value as Awaited<T>)
 
+  // Inside a block that is itself streamed, nothing streams: the pending block stays.
   if (deferred === undefined)
-    return SolidAwait(props)
+    return props.pending?.()
 
   const id = (nextId++).toString(36)
   const blocks = deferred
@@ -53,7 +56,9 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
   deferred = undefined
 
   try {
-    return ssr([`<!--kay-await:${id}-->`, `<!--/kay-await:${id}-->`], props.pending?.()) as unknown as JSX.Element
+    const markup: Html = { t: `<!--kay-await:${id}-->${child(props.pending?.())}<!--/kay-await:${id}-->` }
+
+    return markup as unknown as JSX.Element
   }
   finally {
     deferred = blocks

@@ -31,6 +31,10 @@
       "browser": "./src/runtime/await.ts",
       "default": "./src/runtime/await.server.ts"
     },
+    "./html": {
+      "types": "./types/runtime/html.d.ts",
+      "default": "./src/runtime/html.ts"
+    },
     "./client": {
       "types": "./types/runtime/client.d.ts",
       "default": "./src/runtime/client.ts"

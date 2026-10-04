@@ -1,9 +1,10 @@
-import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { parseExpression } from '@babel/parser'
 import { actionUrl } from '../runtime/action'
-import { awaitBlocks } from './ast'
+import { actionOf, awaitBlocks, isChildrenSlot, isHead } from './ast'
+import { htmlHelperImport, HtmlTemplate } from './html'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 
 export interface GenerateOptions {
@@ -24,6 +25,8 @@ export interface GenerateOptions {
   special?: boolean
   // Server output without hydration markers for a static component: inside an island it renders through this hydratable build of itself instead.
   twin?: string
+  // Server output outside islands that builds its markup as strings, with no Solid runtime; the analysis pass still generates JSX, which scope analysis reads.
+  html?: boolean
   // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
   relocateImport?: (specifier: string) => string | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
@@ -111,13 +114,14 @@ class Generator {
     const kayHelpers = formHelpers(this.file)
     const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
     const staticLoops = this.staticLoops
+    const html = this.htmlOutput
     const used = usedHelpers(this.file.template, script)
-    const helpers = used.filter(helper => helper !== 'For')
+    const helpers = html ? [] : used.filter(helper => helper !== 'For')
 
     if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
 
-    if (used.includes('For'))
+    if (used.includes('For') && !html)
       kayHelpers.push(staticLoops ? 'staticFor' : 'loopFor')
 
     if (kayHelpers.length > 0)
@@ -134,6 +138,9 @@ class Generator {
     if (childrenSlot)
       b.add(`import type { JSX as KayJSX } from '@solidjs/web'\n`)
 
+    if (html)
+      b.add(htmlHelperImport())
+
     if (helpers.length > 0)
       b.add(`import { ${helpers.map(helper => `${helper} as ${helperAlias(helper)}`).join(', ')} } from 'solid-js'\n`)
 
@@ -149,12 +156,12 @@ class Generator {
     if (usesAwait(this.file.template))
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
 
-    if (this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
+    if (!html && this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
       b.add(`import { Dynamic as ${DYNAMIC_TAG} } from '@solidjs/web'\n`)
 
     const { head, template } = this.splitHead(this.file.template)
 
-    if (head && !this.options.check)
+    if (head && !this.options.check && !html)
       b.add(`import { useHead as KayUseHead } from '@solidjs/web'\n`)
 
     if (includeServer)
@@ -199,7 +206,12 @@ class Generator {
       this.emitHead(head)
 
     b.add('\nreturn ')
-    this.emitRoot(template)
+
+    if (html)
+      new HtmlTemplate(b, this.src).value(this.withoutSlots(template))
+    else
+      this.emitRoot(template)
+
     b.add('\n}\n')
 
     if (this.options.twin !== undefined)
@@ -222,6 +234,10 @@ class Generator {
     }
 
     return span !== undefined
+  }
+
+  private get htmlOutput(): boolean {
+    return this.options.html === true && this.options.rewrites !== undefined
   }
 
   private get genericComponent(): boolean {
@@ -431,7 +447,7 @@ class Generator {
       return
     }
 
-    b.add('KayUseHead([')
+    b.add(this.htmlOutput ? 'KayHead([' : 'KayUseHead([')
     for (const tag of tags) {
       this.emitHeadTag(tag)
       b.add(', ')
@@ -659,7 +675,7 @@ class Generator {
     if (this.options.check || this.options.island)
       return false
 
-    return this.options.twin !== undefined || (this.server !== undefined && this.options.includeServer !== false)
+    return this.options.html === true || this.options.twin !== undefined || (this.server !== undefined && this.options.includeServer !== false)
   }
 
   private emitFor(node: ForNode) {
@@ -1224,22 +1240,10 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return visit(file.template)
 }
 
-// An attribute written with a name, which a spread is not.
-type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
-
 type KayHelper = 'formAction' | 'registerActions' | 'actionStub' | 'staticFor' | 'loopFor'
 
 function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
-}
-
-function actionOf(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
-  if (element.component || element.name !== 'form')
-    return undefined
-
-  const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'action')
-
-  return attribute?.kind === 'expression' ? attribute : undefined
 }
 
 // The `kay` helpers the template's forms need: `formAction` when a form posts to an action.
@@ -1270,15 +1274,6 @@ type Helper = 'For' | 'Show' | 'omit'
 
 function helperAlias(helper: Helper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
-}
-
-function isHead(node: Node): node is ElementNode {
-  return node.kind === 'element' && !node.component && node.name === 'head'
-}
-
-// `slot` renders the children a layout or wrapper component receives, like Astro's `<slot />`.
-function isChildrenSlot(node: Node): boolean {
-  return node.kind === 'element' && node.name === 'slot' && !node.component
 }
 
 function usesChildrenSlot(nodes: Node[]): boolean {

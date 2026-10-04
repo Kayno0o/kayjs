@@ -1,4 +1,3 @@
-import type { JSX } from '@solidjs/web'
 import type { KayConfig } from '../config'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
@@ -9,8 +8,9 @@ import type { SpecialPage, SpecialPages } from './routes'
 import type { Prefetch } from './speculation'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { createComponent, generateHydrationScript } from '@solidjs/web'
+import { generateHydrationScript } from '@solidjs/web'
 import { mapStack } from '../build/sourcemap'
+import { collectHead } from '../runtime/head'
 import { importModule } from './bundle'
 import { preferredEncoding } from './compress'
 import { cookieJar } from './cookies'
@@ -27,7 +27,7 @@ import { speculationRules } from './speculation'
 import { renderStatic, streamDocument } from './stream'
 
 interface PageModule {
-  default: (props: Record<string, unknown>) => JSX.Element
+  default: (props: Record<string, unknown>) => unknown
   load?: (ctx: PageContext) => Promise<Record<string, unknown>>
   // The page's schema for its search params.
   query?: unknown
@@ -68,9 +68,6 @@ interface Rendering {
 
 const CHARSET = '<meta charset="utf-8">'
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
-// The head tags a page set itself, which Solid marks with their identity; text holds no `<`, so a title cannot pass for one.
-const CHARSET_TAG = /<meta\s[^>]*\bdata-dh="charset"/
-const VIEWPORT_TAG = /<meta\s[^>]*\bdata-dh="meta:name:viewport"/
 // Per set of islands and per chain of layouts: few exist, and they never change for a build.
 const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()
 const stylesCache = new WeakMap<ClientBuild, Map<string, string>>()
@@ -359,24 +356,21 @@ async function importAll(files: string[]): Promise<PageModule[]> {
 // The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
 function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
   const page = modules.length - 1
-  let view = () => createComponent(modules[page]!.default, data[page]!)
+  let view = () => modules[page]!.default(data[page]!)
 
   for (let index = page - 1; index >= 0; index--) {
     const inner = view
 
-    view = () => createComponent(modules[index]!.default, { ...data[index], get children() {
+    view = () => modules[index]!.default({ ...data[index], get children() {
       return inner()
     } })
   }
-  let head = ''
-  // Without scripts, a `head` title renders as a `<title>`.
-  const { html: body, islands, deferred } = renderStatic(view, (html) => {
-    head = html
-  })
+
+  const { result: { html: body, islands, deferred }, head } = collectHead(() => renderStatic(view))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   const scripts = hasIslands ? islandScripts(client, islands.eager, streamed) : ''
-  const start = `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${defaultHead(head)}${head}${stylesheets(client, files)}${scripts}${speculationRules(options.prefetch)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}`
+  const start = `<!doctype html><html lang="${options.lang ?? 'en'}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${speculationRules(options.prefetch)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}`
 
   if (!streamed)
     return `${start}</body></html>`
@@ -429,14 +423,6 @@ function islandScripts(client: ClientBuild, islands: Set<string>, streamed: bool
   }
 
   return html
-}
-
-// A `head` block may set its own charset or viewport; registering the defaults through Solid instead would cost every render.
-function defaultHead(head: string): string {
-  if (head === '')
-    return CHARSET + VIEWPORT
-
-  return (CHARSET_TAG.test(head) ? '' : CHARSET) + (VIEWPORT_TAG.test(head) ? '' : VIEWPORT)
 }
 
 function describeError(error: unknown, dev = false): PageError {

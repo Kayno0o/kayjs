@@ -23,7 +23,7 @@ export interface CompileOptions {
   // Output for type checking: adds the link, form field and island prop assertions.
   check?: boolean
   relocateImport?: (specifier: string) => string | undefined
-  // Server output for rendering outside islands, without hydration markers: a static component renders through its hydratable `?island` twin inside one.
+  // Server output for rendering outside islands, built as strings with no Solid runtime: a static component renders through its hydratable `?island` twin inside one.
   staticRender?: boolean
 }
 
@@ -62,7 +62,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   let name = freeName(componentName(filename), fences)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const twin = options.staticRender && !island && !file.server && !ROUTE_FILES.has(basename(filename)) ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const generateOptions = { island, twin, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
+  const generateOptions = { island, twin, html: options.staticRender && !island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
   let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name)

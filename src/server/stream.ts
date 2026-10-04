@@ -1,9 +1,9 @@
-import type { JSX } from '@solidjs/web'
 import type { PendingBlock } from '../runtime/await.server'
 import type { RenderedIslands } from '../runtime/island.server'
 import type { ClientBuild } from './client'
-import { createComponent, generateHydrationScript, NoHydration, renderToString } from '@solidjs/web'
+import { generateHydrationScript } from '@solidjs/web'
 import { collectDeferred } from '../runtime/await.server'
+import { child } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
 
 // Swaps every streamed block that arrived in for the pending one between its markers, then hydrates the islands they brought; an outer block that settled first may have taken the markers away already.
@@ -19,11 +19,9 @@ export interface Rendered {
   deferred: PendingBlock[]
 }
 
-// A static render, as pages and layouts are: only islands, rendered as their own roots, carry hydration keys.
-export function renderStatic(view: () => JSX.Element, onHead?: (html: string) => void): Rendered {
-  const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => renderToString(() => createComponent(NoHydration, { get children() {
-    return view()
-  } }), { noScripts: true, onHead })))
+// A static render, as pages and layouts are: only islands, rendered as their own Solid roots, carry hydration keys.
+export function renderStatic(view: () => unknown): Rendered {
+  const { result: { result: html, islands }, deferred } = collectDeferred(() => collectIslands(() => child(view())))
 
   return { html, islands, deferred }
 }
@@ -95,7 +93,7 @@ async function settle(block: PendingBlock, cancelled: () => boolean, report: (er
   return cancelled() ? EMPTY : renderOrReport(() => block.ready(value as never), report)
 }
 
-function renderOrReport(view: () => JSX.Element, report: (error: unknown) => void): Rendered {
+function renderOrReport(view: () => unknown, report: (error: unknown) => void): Rendered {
   try {
     return renderStatic(view)
   }

@@ -1,23 +1,22 @@
 import type { Todo } from './fixtures/app/src/todo'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { renderToString } from '@solidjs/web'
 import { plugin } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { mapStack } from '../src/build/sourcemap'
 import { transformKay } from '../src/build/transform'
+import { child } from '../src/runtime/html'
 import { staticFor } from '../src/runtime/static'
 
 plugin(kay())
 
+// An island's hydratable markup separates dynamic text with comment markers; the assertions read the text alone.
+const MARKERS = /<!--[$/]-->/g
+
 interface TodoListModule {
   default: (props: { todos: Todo[], title?: string }) => unknown
 }
-
-// Hydratable markup separates dynamic text with comment markers; the assertions read the text alone.
-const MARKERS = /<!--[$/]-->/g
-const HYDRATION_KEY = / _hk=\w+/g
 
 const { default: TodoList } = await import(join(import.meta.dir, 'fixtures/app/src/todo-list.kay')) as TodoListModule
 
@@ -28,7 +27,7 @@ const todos: Todo[] = [
 
 describe('server rendering through the Bun plugin', () => {
   it('renders a .kay tree with props, defaults, loops and child components', () => {
-    const html = renderToString(() => TodoList({ todos })).replace(MARKERS, '')
+    const html = child(TodoList({ todos })).replace(MARKERS, '')
 
     expect(html).toContain('<h1>Todos</h1>')
     expect(html).toContain('placeholder="Filter"')
@@ -39,7 +38,7 @@ describe('server rendering through the Bun plugin', () => {
   })
 
   it('renders the for fallback and an overridden default', () => {
-    const html = renderToString(() => TodoList({ todos: [], title: 'Empty' })).replace(MARKERS, '')
+    const html = child(TodoList({ todos: [], title: 'Empty' })).replace(MARKERS, '')
 
     expect(html).toContain('<h1>Empty</h1>')
     expect(html).toContain('Nothing matches')
@@ -78,7 +77,7 @@ async function renderKay(source: string, props: Record<string, unknown> = {}, di
   const module = await import(file) as InlineModule
   const data = module.load ? { ...props, ...await module.load({ params: {} }) } : props
 
-  return renderToString(() => module.default(data)).replace(MARKERS, '')
+  return child(module.default(data))
 }
 
 describe('server fence declarations', () => {
@@ -131,7 +130,7 @@ describe('component function names', () => {
 
     const module = await import(join(directory, 'date.kay')) as InlineModule
 
-    expect(renderToString(() => module.default({ ts: 0 })).replace(MARKERS, '')).toBe('<p>1970</p>')
+    expect(child(module.default({ ts: 0 }))).toBe('<p>1970</p>')
   })
 })
 
@@ -178,7 +177,7 @@ describe('slots with parameters', () => {
 
     const html = await renderKay('---\nimport Rows from \'./rows.kay\'\nconst { names } = props<{ names: string[] }>()\n---\nRows(items={names})\n  @row(name, i)\n    li {i}: {name}', { names: ['a', 'b'] })
 
-    expect(html.replaceAll(HYDRATION_KEY, '')).toBe('<ul><li>0: a</li><li>1: b</li></ul>')
+    expect(html).toBe('<ul><li>0: a</li><li>1: b</li></ul>')
   })
 })
 
@@ -243,5 +242,51 @@ describe('stack frames', () => {
     expect(compiled).toContain('_$ssrHydrationKey')
     expect(mapStack(`    at kaboom (${file}?island:${line + 1}:${column})`)).toBe(`    at kaboom (${file}:3:3)`)
     expect(mapStack(`Error at ${file}?island:${line + 1}:${column}`)).toBe(`Error at ${file}:3:3`)
+  })
+})
+
+describe('static server output', () => {
+  it('builds markup without Solid', () => {
+    const file = join(scratch, 'plain-page.kay')
+    const compiled = transformKay('--- server\nconst rows = [1, 2]\n---\nul\n  for row of rows key={row}\n    li {row}\n', file, { target: 'ssr', hydratable: true })
+
+    expect(compiled).not.toContain('solid')
+  })
+
+  it('writes attributes as Solid\'s server build does', async () => {
+    const source = '---\nconst { off, on, none, cls, css } = props<{ off: boolean, on: boolean, none?: string, cls: unknown, css: Record<string, string | null> }>()\n---\np(title="a &amp; b & c" data-e="" hidden aria-a={off} aria-b={on} aria-c={none} class={cls} style={css})'
+    const html = await renderKay(source, { off: false, on: true, cls: ['x', { y: true, z: false }, 0], css: { color: 'red', margin: null } })
+
+    expect(html).toBe('<p title="a &amp; b &amp; c" data-e hidden aria-b class="0 x y" style="color:red"></p>')
+    expect(await renderKay('details(open) more')).toBe('<details open>more</details>')
+  })
+
+  it('sets content from innerHTML, textContent and a textarea value, and marks the selected option', async () => {
+    const source = '---\nconst { markup, text, choice } = props<{ markup: string, text: string, choice: string }>()\n---\ndiv(innerHTML={markup})\ndiv(textContent={text})\ntextarea(value={text})\nselect(value={choice})\n  option(value="a") A\n  option(value="b") B\n  option C'
+    const html = await renderKay(source, { markup: '<b>x</b>', text: '<i>', choice: 'C' })
+
+    expect(html).toBe('<div><b>x</b></div><div>&lt;i></div><textarea>&lt;i></textarea><select value="C"><option value="a">A</option><option value="b">B</option><option selected>C</option></select>')
+  })
+
+  it('leaves script and style text unescaped', async () => {
+    expect(await renderKay('---\nconst { code } = props<{ code: string }>()\n---\nscript {code}', { code: 'a < b && c' })).toBe('<script>a < b && c</script>')
+  })
+
+  it('passes a component its text children and quoted props as JSX would, and renders children only when read', async () => {
+    await Bun.write(join(scratch, 'echo.kay'), '---\nconst { label, children } = props<{ label: string, children?: string }>()\n---\nspan(title={children}) {label}\n')
+    await Bun.write(join(scratch, 'hidden.kay'), 'p none\n')
+
+    const reads: string[] = []
+
+    Object.assign(globalThis, { reads })
+
+    const html = await renderKay('---\nimport Echo from \'./echo.kay\'\nimport Hidden from \'./hidden.kay\'\nconst mark = () => reads.push(\'read\')\n---\nEcho(label="Tom &amp; Jerry") a &amp; b\nHidden\n  p {mark()}')
+
+    expect(html).toBe('<span title="a &amp; b">Tom &amp; Jerry</span><p>none</p>')
+    expect(reads).toEqual([])
+  })
+
+  it('renders a tag read off a default as the element it names', async () => {
+    expect(await renderKay('---\nconst { Tag = \'section\' } = props<{ Tag?: unknown }>()\n---\nTag(id="x") hi')).toBe('<section id="x">hi</section>')
   })
 })

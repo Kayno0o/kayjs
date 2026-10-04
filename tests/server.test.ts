@@ -105,12 +105,12 @@ describe('pages', () => {
 
     expect(about).toStartWith('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="description"')
     expect(about.match(/name="viewport"/g)).toHaveLength(1)
-    expect(about).toContain('<meta name="viewport" content="width=device-width" data-dh="meta:name:viewport">')
+    expect(about).toContain('<meta name="viewport" content="width=device-width">')
     expect(home).toContain('<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">')
-    expect(about).toContain('<title data-dh="title">About</title>')
+    expect(about).toContain('<title>About</title>')
     expect(about.match(/name="description"/g)).toHaveLength(1)
     expect(about).toContain('content="What this site is"')
-    expect(home).toContain('<title data-dh="title">Kay demo</title>')
+    expect(home).toContain('<title>Kay demo</title>')
     expect(home).toContain('content="Kay demo, a site of todos"')
   })
 
@@ -812,7 +812,7 @@ describe('without special pages', () => {
   })
 
   it('keeps the default charset and viewport whatever a title holds', async () => {
-    const { text } = await visit(`/?title=${encodeURIComponent('data-dh="charset" data-dh="meta:name:viewport"')}`)
+    const { text } = await visit(`/?title=${encodeURIComponent('<meta charset="latin1"><meta name="viewport" content="width=1">')}`)
 
     expect(text).toContain('<meta charset="utf-8">')
     expect(text).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">')

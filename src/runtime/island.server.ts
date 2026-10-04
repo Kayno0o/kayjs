@@ -1,8 +1,10 @@
 import type { JSX } from '@solidjs/web'
 import type { HydrateWhen, IslandComponent } from './checks'
-import { createComponent, escape, Hydration, renderToString, ssr } from '@solidjs/web'
+import type { Html } from './html'
+import { createComponent, Hydration, renderToString } from '@solidjs/web'
 import { omit } from 'solid-js'
 import { sharedConfig } from 'solid-js/internal'
+import { escapeAttribute } from './escape'
 import { encodeValue, unsendable } from './wire'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
@@ -54,7 +56,7 @@ export function island<P extends object>(id: string, component: (props: P) => JS
 
     const serialized = serializeProps(id, own)
     const renderId = `k${(nextRenderId++).toString(36)}-`
-    // renderToString replaces the render context and never puts it back, which would drop the page's later `useHead` calls.
+    // renderToString replaces Solid's render context and never puts it back, which a Solid component rendered after the island would read.
     const context = sharedConfig.context
 
     depth++
@@ -74,9 +76,10 @@ export function island<P extends object>(id: string, component: (props: P) => JS
       const html = output.replace(TRAILING_SCRIPT, '')
       const data = hydrationData(output)
 
-      const lazy = when === undefined || when === 'load' ? '' : ` data-hydrate="${escape(when, true)}"`
+      const lazy = when === undefined || when === 'load' ? '' : ` data-hydrate="${escapeAttribute(when)}"`
+      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-render-id="${renderId}" data-props="${escapeAttribute(serialized)}"${lazy}${data}>${html}</slot>` }
 
-      return ssr([`<slot data-component="${escape(id, true)}" data-render-id="${renderId}" data-props="${escape(serialized, true)}"${lazy}${data}>`, '</slot>'], html) as unknown as JSX.Element
+      return markup as unknown as JSX.Element
     }
     finally {
       sharedConfig.context = context
@@ -105,7 +108,7 @@ function hydrationData(html: string): string {
     catch {}
   }
 
-  return Object.keys(entries).length === 0 ? '' : ` data-hydration="${escape(JSON.stringify(entries), true)}"`
+  return Object.keys(entries).length === 0 ? '' : ` data-hydration="${escapeAttribute(JSON.stringify(entries))}"`
 }
 
 function serializeProps(id: string, props: object): string {

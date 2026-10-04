@@ -1,6 +1,6 @@
 # kay
 
-A Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. It compiles to TSX, runs on Solid 2 and is served by an Elysia plugin, with server rendering, islands, typed form actions and type checking down to the `.kay` line.
+A Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to plain HTML strings on the server, islands run on Solid 2, and an Elysia plugin serves it all, with typed form actions and type checking down to the `.kay` line.
 
 The full reference, written for people and coding agents alike, is [llms.txt](llms.txt).
 

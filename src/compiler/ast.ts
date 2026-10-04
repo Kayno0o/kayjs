@@ -87,6 +87,28 @@ export interface AwaitNode extends Span {
 
 export type Node = ElementNode | TextNode | IfNode | ForNode | AwaitNode | SlotNode
 
+// An attribute written with a name, which a spread is not.
+export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
+
+// `form(action={add})`: the attribute naming the action a form posts to.
+export function actionOf(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
+  if (element.component || element.name !== 'form')
+    return undefined
+
+  const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'action')
+
+  return attribute?.kind === 'expression' ? attribute : undefined
+}
+
+export function isHead(node: Node): node is ElementNode & { name: 'head' } {
+  return node.kind === 'element' && !node.component && node.name === 'head'
+}
+
+// `slot` renders the children a layout or wrapper component receives, like Astro's `<slot />`.
+export function isChildrenSlot(node: Node): boolean {
+  return node.kind === 'element' && node.name === 'slot' && !node.component
+}
+
 // The pending, resolved and failed blocks, in source order.
 export function awaitBlocks(node: AwaitNode): Node[][] {
   return [node.pending, node.resolved?.children ?? [], node.rejected?.children ?? []]
