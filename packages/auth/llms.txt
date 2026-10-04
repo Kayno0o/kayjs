@@ -1,0 +1,3 @@
+# kay-auth
+
+Auth for kay apps on kay sessions.
