@@ -1,3 +1,235 @@
 # kayjs-ui
 
-> kay components, ported from @kaynooo/svelte and @kaynooo/solidjs.
+> kay components ported from @kaynooo/svelte and @kaynooo/solidjs. They ship as `.kay` sources that the app compiles as its own, and they are styled by the classes of one `theme.css`, which the app restyles from its own stylesheet. The set: buttons and icons, toasts, dialogs and a form dialog that calls a page's action, a sortable table, switches and segmented controls, inputs and selects, cards, badges, popovers and tooltips.
+
+## Rules that are easy to get wrong
+
+- Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`.
+- Components write no Tailwind utility, only the classes of `theme.css`. A rule of the app's on one of those classes restyles every instance; utilities passed through a component's `class` prop restyle one.
+- A static page cannot pass functions, `JSX.Element` props or children to an island. Render Dialog, Popover, or a Table with a `@cell` block from a component of the app that is an island itself: one with an `on*` handler, a `ref`, a `bind:` or a value import from `'kay'`.
+- `toast` only shows in the browser, called from an island. The server's copy of the toast list is shared by every request, so it stays empty. Render one `Toaster` and one `TooltipHost` in the root layout.
+- An icon is either a slot name such as `'close'`, which the app's settings map to any icon set, or an icon imported from `~icons/<prefix>/<name>`. The default slots use Tabler, so the app installs `@iconify-json/tabler`.
+- Dialog and FormDialog follow `open`. The parent sets it, then sets it back to false in `onClose`, which runs however the dialog closed. Their content renders only while they are open.
+- FormDialog calls the action from the island as a call, not as a form post. Its input comes from `values(formData)`, where every value is a string, so an action taking numbers, booleans or lists needs a `values` that converts them.
+- Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The only text the library holds is the English wording of its own buttons and titles: `Cancel`, `Delete`, `Deleting…`, `Saving…`, `Loading…` and `Confirm Deletion`.
+
+## Setup
+
+kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Tailwind v4 and `@iconify-json/tabler` are peer dependencies.
+
+```sh
+bun add @kaynooo/kayjs-ui @iconify-json/tabler
+```
+
+`src/app.css`, imported by the root `_layout.kay`, imports the theme right after Tailwind. kay collects the classes of the library's templates along with the app's own, so no `@source` line has to point into `node_modules`:
+
+```css
+@import 'tailwindcss';
+@import '@kaynooo/kayjs-ui/theme.css';
+@source '../.kay/classes.txt';
+
+@theme {
+  --color-accent: #7aa2f7;
+}
+```
+
+The theme's tokens are `@theme default`, so the app's `@theme` overrides any of them wherever it sits:
+
+- Surfaces, darkest first: `mantle`, `canvas`, `surface0`, `surface1`.
+- Hairlines: `surface2` and `overlay0`.
+- Text: `text`, `subtext0` and `muted`.
+- State: `accent`, `success`, `warning`, `info` and `error`.
+
+```kay
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import './app.css'
+---
+slot
+Toaster
+TooltipHost
+```
+
+## Settings
+
+The icons the components draw come from slots, each named for what it means: `alert`, `back`, `chevron`, `close`, `delete`, `globe`, `info`, `play`, `plus`, `search`, `spinner`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
+
+```ts
+// kay.config.ts
+export default defineConfig({ settings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' } })
+```
+
+```ts
+// src/ui-settings.ts
+import type { Settings } from '@kaynooo/kayjs-ui'
+import { defaults } from '@kaynooo/kayjs-ui'
+import close from '~icons/lucide/x'
+
+const settings: Settings = { ...defaults, icons: { ...defaults.icons, close } }
+
+export default settings
+```
+
+`kay check` checks this module against `Settings`. The server, the browser, `kay build` and `kay test` all render with it.
+
+## Components
+
+Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle spreads them on its checkbox, and ConfirmDelete, FormField and FormDialog take none.
+
+### Icon, Button, IconButton
+
+- `Icon(icon="close")`: an `svg.icon`. It is decorative unless `label` names it for screen readers. `icon` is a slot or an imported `~icons` icon.
+- `Button(label="Save" variant="accent" icon="plus")`:
+  - `variant` is `default`, `accent` or `danger`.
+  - `busy` shows a spinner in place of the icon and sets `aria-busy`; it does not disable the button.
+  - `expanded` sets `aria-expanded`, for a button that opens a panel.
+  - `type` defaults to `button`, so a button inside a form never submits it by accident: pass `type="submit"` to submit. Children render after `label`.
+- `IconButton(icon="delete" label="Delete")`: an icon alone. `label` names it for screen readers and shows as its tooltip through TooltipHost. `size` is `xs`, `sm`, `md` or `lg`; `variant` is `solid`, `ghost`, `inline` or `danger`.
+
+### toast and Toaster
+
+```ts
+import { attempt, toast } from '@kaynooo/kayjs-ui'
+
+toast.success('Saved')
+toast.error('Could not save')
+toast.info('Copied')
+
+// Resolves to what the call returned, or to undefined once it threw and `failure` was toasted.
+const post = await attempt(() => publish({ id }), 'Could not publish')
+```
+
+A toast stays for four seconds, or until its close button is pressed. Toaster is a manual popover in the top layer, so toasts show above an open dialog.
+
+### Dialog, ConfirmDelete
+
+```kay
+Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
+  @footer
+    Button(label="Cancel" onClick={() => editing.set(false)})
+    Button(label="Rename" variant="accent" onClick={rename})
+  input.field-input(name="name")
+```
+
+- Dialog is a modal `dialog`. It closes when its parent sets `open` to false, on Escape, or on a click outside. `onClose(event)` runs however it closed, while its content is still there to read.
+- Once something has been typed inside, or while `dirty` is set (for example while a request is in flight), Escape and a click outside leave it open: only its own buttons close it.
+- `ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})` renders a trigger that opens a dialog asking before deleting:
+  - While the promise `onConfirm` returns is pending, the dialog's buttons are disabled.
+  - Once it resolves, the dialog closes. If it throws, `failure` is toasted and the dialog stays open.
+  - `trigger="button"` makes the trigger a labelled danger button rather than an icon. `label` renames the trigger, for "Revoke link" or "Empty trash"; `size`, `variant` and `class` go on it too.
+
+### Table
+
+```ts
+import type { Column } from '@kaynooo/kayjs-ui'
+
+const columns: Column<Post>[] = [
+  { key: 'title', header: 'Title', sortValue: true, cell: true },
+  { key: 'views', header: 'Views', sortValue: post => post.views, defaultDirection: 'desc', align: 'end' },
+  { key: 'author', header: 'Author' },
+]
+```
+
+```kay
+Table(columns={columns} rows={posts} rowKey="id")
+  @cell(post, column)
+    a(href={`/posts/${post.id}`}) {post.title}
+  @empty
+    EmptyState(title="No posts yet")
+```
+
+- A column shows the row's value at `key` as text. With `cell: true`, it shows what the `@cell(row, column)` block draws instead.
+- A column with `sortValue` sorts when its header is clicked. `true` sorts by the row's value at `key`; a function sorts by what it returns.
+- The first click sorts in `defaultDirection`, `asc` unless set, and the next click flips it. `sort` gives the sort to start from.
+- `serverSort` leaves the rows in the order they came. The headers show the sort, and `onSort(sort)` lets the page fetch the rows sorted that way, from a load or an action.
+- `rowKey` is a field of the row or a function of it, and tells rows apart across a sort.
+
+### Segmented, TabNav, Toggle
+
+- `Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} value="day" label="Period" name="period" onChange={period.set})`: real radios, so arrow keys move between options and the group posts as `name` inside a form. A parent passing another `value` moves the choice.
+- `TabNav(links={[{ href: '/settings', label: 'Profile' }, { href: '/settings/keys', label: 'Keys' }]} current={ctx.url.pathname} label="Settings")`: tabs as links, one page each. The current tab is marked `aria-current="page"`, and on a narrow screen it is scrolled into view.
+- `Toggle(label="Public" checked={post.public} name="public" onChange={setPublic})`: a checkbox drawn as a switch, with `role="switch"`, that posts like a checkbox. Without `label`, give it `aria-label`.
+
+### TextInput, Select
+
+- `TextInput(value={title()} onInput={title.set} onChange={save})`:
+  - `onInput(value)` runs on each keystroke, and `onChange(value)` once the value is committed, on blur or Enter.
+  - A number box partway through a number, such as `1,`, reports nothing until it parses. A parent writing back its own spelling of the same number leaves the caret alone.
+- `Select(value={kind()} options={[{ value: 'post', label: 'Post' }]} onChange={kind.set} emptyOption="Any")`:
+  - `emptyOption` adds a first option worth `''`, labelled by the string, or blank with `true`.
+  - `loading` shows a disabled row saying `loadingLabel` while the options are on their way.
+  - The right option stays chosen when the options arrive after the value.
+
+### Card, Badge, EmptyState
+
+- `Card(title="Traffic")`: a `section.card` that frames its children in `.card-body`. `head` sits at the far end of the title's line, for a count or a link. `bare` drops the body's inset, for content that runs to the edge, such as a table.
+- `Badge(label="Draft" tone="warning" icon="info")`: `tone` is `neutral`, `accent`, `success`, `warning`, `danger` or `info`. Children render after `label`.
+- `EmptyState(title="No posts yet" description="Write the first one.")`: what a list shows when it holds nothing.
+
+### Popover, TooltipHost
+
+```kay
+Popover(id="post-menu" placement="bottom-end")
+  @trigger(attributes)
+    IconButton({...attributes} icon="chevron" label="More")
+  Button(label="Duplicate" onClick={duplicate})
+```
+
+- Popover is the browser's popover. A click on the trigger toggles it, and a click outside or Escape closes it. `id` must be unique on the page, since it pairs the panel with its trigger.
+- `@trigger(attributes)` renders the trigger, which spreads `attributes`: `popovertarget`, `aria-expanded` and its anchor.
+- `placement` is `bottom-start`, `bottom-end`, `top-start` or `top-end`, and the browser flips it when there is no room.
+- `open` opens or closes it from the page, and `onToggle(open)` runs however it changed.
+- TooltipHost shows the `data-tooltip` of whichever element the pointer or a tab lands on. `data-tooltip-placement`, a CSS `position-area`, says where it sits, `top` by default: `button(data-tooltip="Copy link" data-tooltip-placement="bottom")`. IconButton sets `data-tooltip` to its label.
+
+## Forms
+
+FormField frames a control with its label, hint and messages. FormDialog calls a page's action from a dialog and shows the message of each refused field on its FormField.
+
+```kay
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const rename = action(t.Object({ id: t.String(), title: t.String({ minLength: 2, error: 'Two letters at least' }) }), async ({ id, title }) => posts.rename(id, title))
+---
+```
+
+```kay
+---
+import { signal } from 'kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import { rename } from '../routes/posts/[id].kay'
+
+const { post } = props<{ post: Post }>()
+
+const editing = signal(false)
+const title = signal(post.title)
+---
+Button(label="Rename" onClick={() => editing.set(true)})
+FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" onSaved={saved => title.set(saved.title)} onClose={() => editing.set(false)})
+  input(type="hidden" name="id" value={post.id})
+  FormField(label="Title" name="title" required)
+    input.field-input(name="title" value={title()})
+```
+
+- FormDialog calls `action` with `values(new FormData(form))`, which by default is the form's fields as strings.
+- When the action refuses a field, its message shows on the FormField with that `name`, and the dialog stays open.
+- Any other failure toasts `failure`. A refusal of the whole form, under the empty name, toasts its own message instead.
+- A save hands what the action returned to `onSaved`, then closes the dialog.
+- The submit button sits in the footer, paired with the form by `id`. The `id` defaults to one named after the action, so give one when two dialogs on a page call the same action.
+- Enter submits from a single-line field, and Ctrl+Enter from a textarea. While the call is under way, the buttons are disabled, and Escape or a click outside leaves the dialog open.
+- `extra` fills the left end of the footer, for a ConfirmDelete with `trigger="button"`.
+
+FormField also works outside a dialog, in a plain form posting to an action:
+
+- `issue` shows a message of the page's own, such as `ctx.failed(rename)?.errors.title`.
+- `hint` explains the control, under it. `action` sits at the end of the label's line. `required` marks the label.
+- `group` makes it a `fieldset` with a `legend`, for a control made of several inputs.
+- Its messages sit in an `aria-live` region, so a screen reader reads them as they appear.
+
+## Testing an app's use of it
+
+A page that uses the components renders them in `testSite()` like the app's own. To test what their handlers do, `mount(file, props)` from `kay/test` renders a component of the app, once a DOM is registered, such as with `GlobalRegistrator.register()` from `@happy-dom/global-registrator`. happy-dom has no popover API, so Toaster and Popover need a shim of `showPopover`, `hidePopover`, `togglePopover` and `:popover-open` there.
