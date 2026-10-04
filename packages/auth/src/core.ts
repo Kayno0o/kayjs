@@ -1,6 +1,7 @@
 import type { EmailCore } from './email'
 import type { Keys } from './keys'
 import type { Limits } from './limits'
+import type { SecurityEvent } from './mail'
 import type { createOAuthClient } from './oauth/client'
 import type { OAuthFlow } from './oauth/flow'
 import type { createTokenRefresher, StoredCredential } from './oauth/refresher'
@@ -65,6 +66,7 @@ export interface Core {
   allow?: (profile: Profile) => boolean | Promise<boolean>
   onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
   onDelete?: (user: User) => void | Promise<void>
+  onEvent?: (event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>
 }
 
 // What a provider token refresh works on: the identity, and its tokens opened.

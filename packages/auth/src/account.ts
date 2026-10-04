@@ -3,6 +3,7 @@ import type { RequestState } from './state'
 import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword } from '@kaynooo/utils'
 import { publicUser } from './core'
+import { notify } from './notify'
 import { passwordProblem } from './rules'
 import { reprove } from './twoFactor'
 
@@ -20,8 +21,10 @@ export async function changePassword(state: RequestState, proof: Proof, password
 
   const updated = await state.core.store.users.update(proved.record.id, { passwordHash: await hashPassword(password), sessionVersion: proved.record.sessionVersion + 1 })
 
-  if (updated)
+  if (updated) {
     await state.renew(updated)
+    await notify(state.core, updated, 'password-changed')
+  }
 
   return { ok: true }
 }
@@ -46,6 +49,7 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
     return { ok: false, error: 'last-way-in' }
 
   await state.core.store.identities.delete(identity.provider, identity.providerId)
+  await notify(state.core, record, 'provider-unlinked', provider)
 
   return { ok: true }
 }
@@ -57,6 +61,7 @@ export async function deleteAccount(state: RequestState, proof: Proof, signOut: 
   if (!proved.ok)
     return proved
 
+  await notify(state.core, proved.record, 'account-deleted')
   await state.core.store.users.delete(proved.record.id)
   await state.core.onDelete?.(publicUser(proved.record))
   await signOut()

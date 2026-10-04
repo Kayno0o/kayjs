@@ -7,6 +7,7 @@ import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword } from '@kaynooo/utils'
 import { digest, randomToken } from './keys'
 import { spend } from './limits'
+import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail, passwordProblem } from './rules'
 import { reprove } from './twoFactor'
@@ -92,6 +93,7 @@ export async function resetPassword(state: RequestState, token: string, password
   }) ?? spent.record
 
   await store.tokens.deleteForUser(record.id)
+  await notify(state.core, record, 'password-changed')
 
   return { ok: true, redirect: await state.complete(record, '/') }
 }
@@ -153,6 +155,8 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
 
   await store.tokens.deleteForUser(record.id)
   await state.renew(record)
+  // To the address the account left, which is the one a thief would want silent.
+  await notify(state.core, record, 'email-changed', record.email!, spent.record.emailVerifiedAt === null ? null : spent.record.email)
 
   return { ok: true, redirect: '/' }
 }

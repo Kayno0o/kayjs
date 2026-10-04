@@ -5,6 +5,7 @@ import { comparePasswords, nanoid } from '@kaynooo/utils'
 import { qrCodeDataUri } from '@kaynooo/utils/tools'
 import { digest } from './keys'
 import { spend } from './limits'
+import { notify } from './notify'
 import { generateTotpSecret, otpauthUri, verifyTotp } from './totp'
 
 const CHALLENGE_MAX_AGE_MS = 10 * 60 * 1000
@@ -158,8 +159,10 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
 
   const updated = await state.core.store.users.update(record.id, { totpEnabledAt: new Date(), totpLastStep: step })
 
-  if (updated)
+  if (updated) {
     await state.renew(updated)
+    await notify(state.core, updated, 'two-factor-enabled')
+  }
 
   return { ok: true, recoveryCodes: await issueRecoveryCodes(state.core, record.id) }
 }
@@ -172,6 +175,7 @@ export async function disableTwoFactor(state: RequestState, proof: Proof): Promi
 
   await state.core.store.users.update(proved.record.id, { totpSecret: null, totpEnabledAt: null })
   await state.core.store.recoveryCodes.replace(proved.record.id, [])
+  await notify(state.core, proved.record, 'two-factor-disabled')
 
   return { ok: true }
 }
@@ -186,7 +190,11 @@ export async function regenerateRecoveryCodes(state: RequestState, proof: Proof)
   if (proved.record.totpEnabledAt === null)
     return { ok: false, error: 'disabled' }
 
-  return { ok: true, recoveryCodes: await issueRecoveryCodes(state.core, proved.record.id) }
+  const recoveryCodes = await issueRecoveryCodes(state.core, proved.record.id)
+
+  await notify(state.core, proved.record, 'recovery-codes-regenerated')
+
+  return { ok: true, recoveryCodes }
 }
 
 // An authenticator code, its step recorded so it works once; or a recovery code, spent.
@@ -199,7 +207,12 @@ async function spendSecondFactor(core: Core, record: UserRecord, code: string): 
 
   const normalized = code.toLowerCase().replace(NOT_CODE_CHARACTERS, '')
 
-  return normalized.length === RECOVERY_CODE_LENGTH && await core.store.recoveryCodes.consume(record.id, digest(normalized)) ? 'recovery' : undefined
+  if (normalized.length !== RECOVERY_CODE_LENGTH || !(await core.store.recoveryCodes.consume(record.id, digest(normalized))))
+    return undefined
+
+  await notify(core, record, 'recovery-code-used')
+
+  return 'recovery'
 }
 
 // Grouped by five, `abcde-fghij-klmno`, since a wall of characters is where people misread.

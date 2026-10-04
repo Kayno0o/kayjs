@@ -3,6 +3,7 @@ import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { digest, randomToken } from './keys'
+import { notify } from './notify'
 import { reprove } from './twoFactor'
 
 // A use is recorded at most this often, so a busy device does not write on every request.
@@ -37,6 +38,7 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
   const id = crypto.randomUUID()
 
   await state.core.store.bearerTokens.create({ id, userId: proved.record.id, label: name, digest: digest(token), createdAt: new Date(), lastUsedAt: null })
+  await notify(state.core, proved.record, 'token-created', name)
 
   return { ok: true, token, id }
 }

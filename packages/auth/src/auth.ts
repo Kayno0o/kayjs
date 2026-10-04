@@ -5,6 +5,7 @@ import type { BearerToken } from './bearer'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
 import type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult } from './email'
 import type { Limits } from './limits'
+import type { SecurityEvent } from './mail'
 import type { OAuthFailure } from './oauth/flow'
 import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
@@ -23,6 +24,7 @@ import { createGate } from './gate'
 import { deriveKeys } from './keys'
 import { DEFAULT_LIMITS } from './limits'
 import { defaultTemplates } from './mail'
+import { noteSignIn } from './notify'
 import { createOAuthClient } from './oauth/client'
 import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow'
 import { createOAuthTokenRefresher } from './oauth/refresher'
@@ -67,6 +69,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string> 
   onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
   // Called once a user is deleted, to delete the app's own records for them.
   onDelete?: (user: User) => void | Promise<void>
+  // Called with every change to what protects an account, the ones mailed to the user, for an audit log of the app's own.
+  onEvent?: (event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
   roles?: Record<Role, NoInfer<Role>[]>
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
@@ -283,6 +287,7 @@ export class Auth {
     await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now() })
     this.source = 'session'
     this.resolving = Promise.resolve(record)
+    await noteSignIn(this.core, record, this[STATE].client, this.request.headers.get('user-agent') ?? '')
   }
 
   private async record(): Promise<UserRecord | null> {
@@ -431,6 +436,7 @@ function createCore<Data extends AuthSessionData, Role extends string>(options: 
     allow: options.allow,
     onSignUp: options.onSignUp,
     onDelete: options.onDelete,
+    onEvent: options.onEvent,
   }
 
   for (const [name, { client }] of oauth) {

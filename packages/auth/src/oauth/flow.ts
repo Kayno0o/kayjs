@@ -4,6 +4,7 @@ import type { IdentityRecord, UserRecord } from '../store'
 import type { OAuthTokens } from './types'
 import { newUserRecord, publicUser, sameText } from '../core'
 import { randomToken } from '../keys'
+import { notify } from '../notify'
 import { normalizeEmail, normalizeUsername, usernameProblem } from '../rules'
 import { OAuthExchangeError } from './client'
 import { createPkcePair } from './pkce'
@@ -85,6 +86,9 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
 
     await saveIdentity(core, identity, current.id, profile, tokens)
     await adoptEmail(core, current, profile)
+
+    if (!identity)
+      await notify(core, current, 'provider-linked', provider)
 
     return { redirect: flow.redirect }
   }
