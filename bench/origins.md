@@ -2,14 +2,14 @@
 
 - AMD Ryzen 5 7600 6-Core Processor, 12 threads
 - Bun 1.4.2, Chromium 151.0.7922.34 headless
-- kay 6d50f45, solid-js 2.0.0-rc.13, @solidjs/web 2.0.0-rc.13
+- kay 5d698a0, solid-js 2.0.0-rc.13, @solidjs/web 2.0.0-rc.13
 - run on 2026-10-04
 
 How much of what kay costs is Solid's, to weigh replacing its runtime and compiler. Solid is solid-js, @solidjs/signals, @solidjs/web and seroval; kay is kay's runtime and the entry it generates; app is the bench app's components as Solid's compiler wrote them and its shared data. Reproduce with `bun run bench:origins`; the cross-framework numbers are in results.md.
 
 ## JS shipped
 
-The client kay builds for production, every byte attributed through its source maps. Raw bytes add up to the files' size; "gzip saved" is how much smaller the gzipped files get without that origin's bytes, so it does not add up to the total.
+The client kay builds for production, every byte attributed through its source maps. Raw bytes add up to the files' size, the comments a source map build adds left out; "gzip saved" is how much smaller the gzipped files get without that origin's bytes, so it does not add up to the total.
 
 |  | products raw | products gzip saved | table raw | table gzip saved |
 | --- | --- | --- | --- | --- |
@@ -17,8 +17,8 @@ The client kay builds for production, every byte attributed through its source m
 | kay | 2.2 KB (3%) | 1.0 KB (4%) | 2.2 KB (3%) | 1.0 KB (4%) |
 | app | 0.3 KB (0%) | 0.2 KB (1%) | 2.3 KB (3%) | 1.2 KB (4%) |
 | devalue | 4.6 KB (6%) | 1.7 KB (6%) | 4.6 KB (6%) | 1.7 KB (6%) |
-| bundler | 1.1 KB (1%) | 0.7 KB (2%) | 1.1 KB (1%) | 0.7 KB (2%) |
-| **total** | 74.8 KB | 28.6 KB gzip | 76.9 KB | 29.6 KB gzip |
+| bundler | 0.9 KB (1%) | 0.5 KB (2%) | 0.9 KB (1%) | 0.5 KB (2%) |
+| **total** | 74.6 KB | 28.5 KB gzip | 76.7 KB | 29.4 KB gzip |
 
 ## Server rendering
 
@@ -26,13 +26,13 @@ Microseconds per render of the products page, from Bun's CPU profiler over warm 
 
 |  | µs per render |
 | --- | --- |
-| Solid | 267 (61%) |
-| kay | 72 (16%) |
-| app | 81 (18%) |
+| Solid | 283 (61%) |
+| kay | 77 (16%) |
+| app | 87 (19%) |
 | elysia | 14 (3%) |
 | engine | 5 (1%) |
 | devalue | 2 (0%) |
-| **total** | 441 |
+| **total** | 468 |
 
 ## Page loads in Chromium
 
@@ -40,28 +40,28 @@ Main-thread milliseconds per fresh load up to network idle, from Chromium's CPU 
 
 |  | products | table |
 | --- | --- | --- |
-| Solid | 2.2 (4%) | 2.8 (19%) |
-| kay | 0.6 (1%) | 0.5 (4%) |
-| app | 0.2 (0%) | 1.1 (7%) |
-| engine | 50.7 (93%) | 9.6 (65%) |
-| bundler | 0.3 (1%) | 0.3 (2%) |
-| devalue | 0.4 (1%) | 0.2 (1%) |
+| Solid | 2.0 (4%) | 2.3 (18%) |
+| kay | 0.6 (1%) | 0.4 (4%) |
+| app | 0.2 (0%) | 1.0 (8%) |
+| engine | 46.8 (93%) | 8.4 (66%) |
+| bundler | 0.4 (1%) | 0.3 (3%) |
+| devalue | 0.2 (0%) | 0.2 (1%) |
+| GC | 0.1 (0%) | 0.1 (1%) |
 | inline scripts | 0.1 (0%) | 0.1 (0%) |
-| GC | 0.0 (0%) | 0.1 (0%) |
-| **total** | 54.6 | 14.7 |
+| **total** | 50.5 | 12.8 |
 
 ## Table operations in Chromium
 
-The operations of results.md, 10 profiled samples each, means in ms. "measured" is the click-to-DOM time as results.md times it, "profiled" the time the profiler saw over the same window. style and layout is the work the timing forces with `offsetHeight` once the DOM holds the result: what Chromium spends laying out the rows, whoever made them.
+The operations of results.md, 10 profiled samples each after 2 warmups, means in ms where results.md gives medians. "measured" is the click-to-DOM time as results.md times it, a little longer with the profiler running; "profiled" the time the profiler saw over the same window. style and layout is the work the timing forces with `offsetHeight` once the DOM holds the result: what Chromium spends laying out the rows, whoever made them.
 
 | operation | measured (ms) | profiled (ms) | Solid | kay | app | GC | engine | style and layout | other | Solid share |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| create 1,000 rows | 37.1 | 42.2 | 8.3 | 0.6 | 1.9 | 4.8 | 4.5 | 22.1 | 0.0 | **20%** |
-| replace 1,000 rows | 30.7 | 35.2 | 9.7 | 0.4 | 1.2 | 0.1 | 4.5 | 19.4 | 0.0 | **28%** |
-| update every 10th row | 4.0 | 4.9 | 1.3 | 0.0 | 0.0 | 0.0 | 0.8 | 2.8 | 0.0 | **26%** |
+| create 1,000 rows | 34.1 | 38.5 | 7.8 | 0.5 | 2.0 | 5.0 | 3.9 | 19.3 | 0.0 | **20%** |
+| replace 1,000 rows | 27.9 | 32.0 | 9.2 | 0.2 | 1.0 | 0.1 | 4.0 | 17.6 | 0.0 | **29%** |
+| update every 10th row | 3.8 | 4.3 | 1.1 | 0.1 | 0.1 | 0.0 | 0.4 | 2.7 | 0.0 | **25%** |
 | select row | 0.3 | 0.7 | 0.1 | 0.0 | 0.0 | 0.0 | 0.4 | 0.2 | 0.0 | **20%** |
-| swap rows | 3.0 | 3.9 | 1.0 | 0.0 | 0.0 | 0.0 | 0.7 | 2.1 | 0.0 | **26%** |
-| remove row | 3.0 | 4.7 | 1.1 | 0.0 | 0.0 | 0.0 | 1.6 | 2.0 | 0.0 | **23%** |
-| create 10,000 rows | 261 | 296 | 43.3 | 2.4 | 9.5 | 15.5 | 34.7 | 191 | 0.0 | **15%** |
-| append 1,000 rows | 28.3 | 32.6 | 6.4 | 0.3 | 1.1 | 0.0 | 4.1 | 20.7 | 0.0 | **20%** |
-| clear 1,000 rows | 3.8 | 4.5 | 3.6 | 0.1 | 0.0 | 0.0 | 0.6 | 0.2 | 0.0 | **81%** |
+| swap rows | 2.8 | 3.5 | 1.0 | 0.0 | 0.0 | 0.0 | 0.5 | 1.9 | 0.0 | **29%** |
+| remove row | 2.7 | 3.2 | 1.0 | 0.0 | 0.1 | 0.0 | 0.4 | 1.8 | 0.0 | **30%** |
+| create 10,000 rows | 262 | 298 | 44.8 | 2.3 | 9.0 | 15.8 | 36.0 | 191 | 0.0 | **15%** |
+| append 1,000 rows | 27.0 | 31.1 | 6.0 | 0.2 | 1.1 | 0.0 | 4.0 | 19.7 | 0.0 | **19%** |
+| clear 1,000 rows | 3.5 | 4.0 | 3.3 | 0.1 | 0.0 | 0.0 | 0.4 | 0.2 | 0.0 | **84%** |

@@ -29,7 +29,8 @@ export interface Operation {
 }
 
 const LOADS = 10
-const WARMUPS = 2
+
+export const WARMUPS = 2
 const SAMPLES = 10
 const OPERATION_TIMEOUT_MS = 10_000
 // More than any framework chains before its update lands.

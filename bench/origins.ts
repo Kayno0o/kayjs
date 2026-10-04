@@ -1,19 +1,12 @@
 import type { Browser, CDPSession } from 'playwright-core'
-import type { CpuProfile, FrameOrigin, OriginBytes, Piece, SourceMapFile } from './attribution'
+import type { Chunk, CpuProfile, FrameOrigin, OriginBytes, SourceMapFile } from './attribution'
 import { readdirSync } from 'node:fs'
 import { cpus } from 'node:os'
-import { basename, join, resolve } from 'node:path'
-import { decodeBundleMappings } from '../src/build/sourcemap'
+import { basename, join } from 'node:path'
 import { buildClient } from '../src/server/client'
-import { APP, BUNDLER, bytesByOrigin, ENGINE, GC, gzipSize, KAY, originOf, piecesOf, SOLID, sourceAt, timeByOrigin } from './attribution'
-import { launch, openTable, OPERATIONS, serve, timeClick } from './browser'
+import { APP, browserOrigin, bytesByOrigin, ENGINE, GC, gzipSize, INLINE, KAY, LAYOUT, readChunk, SOLID, timeByOrigin } from './attribution'
+import { launch, openTable, OPERATIONS, serve, timeClick, WARMUPS } from './browser'
 import { kilobytes, milliseconds, table } from './format'
-
-interface Chunk {
-  pieces: Piece[]
-  map: SourceMapFile
-  segments: number[][][]
-}
 
 interface PageProfile {
   // Each origin's main-thread milliseconds per load.
@@ -33,10 +26,6 @@ const DIST = join(ROOT, '.kay', 'client', 'dist')
 const LOADS = 10
 const SAMPLES = 10
 const SAMPLING_INTERVAL_US = 50
-const SSR_RENDERS_LABEL = 'products page'
-// Playwright's evaluations: nearly all of their time is the style and layout the timing loop forces once the DOM holds the result.
-const LAYOUT = 'style and layout'
-const INLINE = 'inline scripts'
 const MAIN_ORIGINS = [SOLID, KAY, APP]
 // The origins the operations table gives a column each; the rest are summed as "other".
 const OPERATION_ORIGINS = [...MAIN_ORIGINS, GC, ENGINE, LAYOUT]
@@ -52,27 +41,10 @@ async function buildChunks(): Promise<Map<string, Chunk>> {
     const mapFile = join(DIST, `${file}.map`)
     const map = await Bun.file(mapFile).json() as SourceMapFile
 
-    chunks.set(file, { pieces: piecesOf(await Bun.file(join(DIST, file)).text(), map, mapFile), map, segments: decodeBundleMappings(map.mappings) })
+    chunks.set(file, readChunk(await Bun.file(join(DIST, file)).text(), map, mapFile))
   }
 
   return chunks
-}
-
-// A Chromium frame's origin: a chunk's function by the source its first character maps to, a native one left to its caller.
-function browserOrigin(chunks: Map<string, Chunk>): FrameOrigin {
-  return (frame) => {
-    if (frame.url === '')
-      return frame.scriptId === '0' ? undefined : LAYOUT
-
-    const chunk = chunks.get(basename(new URL(frame.url).pathname))
-
-    if (chunk === undefined)
-      return INLINE
-
-    const source = sourceAt(chunk.map, chunk.segments, frame.lineNumber, frame.columnNumber)
-
-    return source === undefined ? BUNDLER : originOf(resolve(DIST, source))
-  }
 }
 
 async function startProfiler(session: CDPSession): Promise<void> {
@@ -120,13 +92,20 @@ async function profileOperations(browser: Browser, url: string, originOfFrame: F
     const times = new Map<string, number>()
     let measured = 0
 
-    for (let sample = 0; sample < SAMPLES; sample++) {
+    for (let run = 0; run < WARMUPS + SAMPLES; run++) {
       const page = await openTable(browser, url, operation)
       const session = await page.context().newCDPSession(page)
 
       await startProfiler(session)
-      measured += await timeClick(page, operation) / SAMPLES
-      addTimes(times, timeByOrigin(await stopProfiler(session), originOfFrame), 1 / 1000 / SAMPLES)
+
+      const time = await timeClick(page, operation)
+      const profile = await stopProfiler(session)
+
+      if (run >= WARMUPS) {
+        measured += time / SAMPLES
+        addTimes(times, timeByOrigin(profile, originOfFrame), 1 / 1000 / SAMPLES)
+      }
+
       await page.close()
     }
 
@@ -167,7 +146,14 @@ function ordered(origins: Iterable<string>, weight: (origin: string) => number):
 }
 
 function bytesSection(pages: { name: string, scripts: Set<string> }[], chunks: Map<string, Chunk>): string {
-  const files = pages.map(page => [...page.scripts].map(script => chunks.get(script)?.pieces ?? []))
+  const files = pages.map(page => [...page.scripts].map((script) => {
+    const chunk = chunks.get(script)
+
+    if (chunk === undefined)
+      throw new Error(`${page.name} fetched ${script}, which the client build does not hold`)
+
+    return chunk.pieces
+  }))
   const bytes = files.map(bytesByOrigin)
   const raw = files.map(pieces => sum(pieces.flat().map(piece => Buffer.byteLength(piece.text))))
   const gzip = files.map(pieces => sum(pieces.map(file => gzipSize(file.map(piece => piece.text).join('')))))
@@ -269,13 +255,13 @@ try {
       '',
       '## JS shipped',
       '',
-      'The client kay builds for production, every byte attributed through its source maps. Raw bytes add up to the files\' size; "gzip saved" is how much smaller the gzipped files get without that origin\'s bytes, so it does not add up to the total.',
+      'The client kay builds for production, every byte attributed through its source maps. Raw bytes add up to the files\' size, the comments a source map build adds left out; "gzip saved" is how much smaller the gzipped files get without that origin\'s bytes, so it does not add up to the total.',
       '',
       bytesSection([{ name: 'products', scripts: products.scripts }, { name: 'table', scripts: tablePage.scripts }], chunks),
       '',
       '## Server rendering',
       '',
-      `Microseconds per render of the ${SSR_RENDERS_LABEL}, from Bun's CPU profiler over warm in-process renders. A native function, such as a string method, counts for the JavaScript that called it.`,
+      `Microseconds per render of the products page, from Bun's CPU profiler over warm in-process renders. A native function, such as a string method, counts for the JavaScript that called it.`,
       '',
       timesSection([{ name: 'µs per render', times: server }], value => value.toFixed(0)),
       '',
@@ -287,7 +273,7 @@ try {
       '',
       '## Table operations in Chromium',
       '',
-      `The operations of results.md, ${SAMPLES} profiled samples each, means in ms. "measured" is the click-to-DOM time as results.md times it, "profiled" the time the profiler saw over the same window. ${LAYOUT} is the work the timing forces with \`offsetHeight\` once the DOM holds the result: what Chromium spends laying out the rows, whoever made them.`,
+      `The operations of results.md, ${SAMPLES} profiled samples each after ${WARMUPS} warmups, means in ms where results.md gives medians. "measured" is the click-to-DOM time as results.md times it, a little longer with the profiler running; "profiled" the time the profiler saw over the same window. ${LAYOUT} is the work the timing forces with \`offsetHeight\` once the DOM holds the result: what Chromium spends laying out the rows, whoever made them.`,
       '',
       operationsSection(operations),
       '',

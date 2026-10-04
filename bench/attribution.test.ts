@@ -1,15 +1,17 @@
 import type { CpuProfile } from './attribution'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { APP, BUNDLER, bytesByOrigin, ENGINE, GC, gzipSize, KAY, originOf, piecesOf, SOLID, sourceAt, timeByOrigin } from './attribution'
+import { APP, browserOrigin, BUNDLER, bytesByOrigin, ENGINE, GC, gzipSize, INLINE, KAY, LAYOUT, originOf, readChunk, SOLID, timeByOrigin } from './attribution'
 
 const REPO = join(import.meta.dir, '..')
 const MAP_FILE = join(REPO, 'bench/apps/kay/.kay/client/dist/entry.js.map')
-// `abc` from solid-js and `def` from kay on the first line; on the second, `g` before any segment and `h` from solid-js.
+// `abc` from solid-js and `déf` from kay on the first line; on the second, `g` before any segment and `h` from solid-js.
 const MAP = { sources: ['../../../../../../node_modules/solid-js/dist/solid.js', '../../../../../../src/runtime/client.ts'], mappings: 'AAAA,GCAA;CDAA' }
 
-function frame(url: string, functionName = 'f', scriptId = '1') {
-  return { functionName, url, scriptId, lineNumber: 0, columnNumber: 0 }
+const CODE = 'abcdéf\ngh\n//# debugId=E11AD20C\n//# sourceMappingURL=entry.js.map\n'
+
+function frame(url: string, functionName = 'f', scriptId = '1', lineNumber = 0, columnNumber = 0) {
+  return { functionName, url, scriptId, lineNumber, columnNumber }
 }
 
 describe('originOf', () => {
@@ -31,17 +33,24 @@ describe('originOf', () => {
   it('reads a file URL as its path', () => {
     expect(originOf(`file://${join(REPO, 'src/server/render.ts')}`)).toBe(KAY)
   })
+
+  it('reads a path that is not a file as other', () => {
+    expect(originOf('node:stream')).toBe('other')
+  })
 })
 
-describe('piecesOf', () => {
-  it('splits a bundle at its segments, the text no segment covers and the source map comment left to the bundler', () => {
-    expect(piecesOf('abcdef\ngh\n//# sourceMappingURL=entry.js.map\n', MAP, MAP_FILE)).toEqual([
+describe('readChunk', () => {
+  it('splits a bundle at its segments in UTF-16 columns, the text no segment covers to the bundler and the source map comments left out', () => {
+    const { pieces } = readChunk(CODE, MAP, MAP_FILE)
+
+    expect(pieces).toEqual([
       { origin: SOLID, text: 'abc' },
-      { origin: KAY, text: 'def' },
+      { origin: KAY, text: 'déf' },
       { origin: BUNDLER, text: '\n' },
       { origin: BUNDLER, text: 'g' },
       { origin: SOLID, text: 'h' },
     ])
+    expect(bytesByOrigin([pieces]).get(KAY)!.raw).toBe(4)
   })
 })
 
@@ -75,12 +84,22 @@ describe('timeByOrigin', () => {
   })
 })
 
-describe('sourceAt', () => {
-  it('maps a position to the last segment at or before it', () => {
-    const segments = [[[0, 0, 0, 0], [3, 1, 0, 0]], [[1, 0, 0, 0]]]
+describe('browserOrigin', () => {
+  const originOfFrame = browserOrigin(new Map([['entry.js', readChunk(CODE, MAP, MAP_FILE)]]))
 
-    expect(sourceAt(MAP, segments, 0, 2)).toBe(MAP.sources[0])
-    expect(sourceAt(MAP, segments, 0, 3)).toBe(MAP.sources[1])
-    expect(sourceAt(MAP, segments, 1, 0)).toBeUndefined()
+  it('leaves a native function to its caller and gives Playwright\'s evaluations the layout they force', () => {
+    expect(originOfFrame(frame('', 'cloneNode', '0'))).toBeUndefined()
+    expect(originOfFrame(frame('', '', '7'))).toBe(LAYOUT)
+  })
+
+  it('reads a function in a chunk by where its first character comes from', () => {
+    expect(originOfFrame(frame('http://localhost/_kay/entry.js', 'f', '5', 0, 1))).toBe(SOLID)
+    expect(originOfFrame(frame('http://localhost/_kay/entry.js', 'f', '5', 0, 4))).toBe(KAY)
+    expect(originOfFrame(frame('http://localhost/_kay/entry.js', 'f', '5', 1, 0))).toBe(BUNDLER)
+    expect(originOfFrame(frame('http://localhost/_kay/entry.js', 'f', '5', 9, 0))).toBe(BUNDLER)
+  })
+
+  it('reads a script outside the build as one of the page\'s inline scripts', () => {
+    expect(originOfFrame(frame('http://localhost/table'))).toBe(INLINE)
   })
 })

@@ -1,10 +1,18 @@
-import { dirname, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { decodeBundleMappings } from '../src/build/sourcemap'
 
 export interface SourceMapFile {
   sources: string[]
   mappings: string
+}
+
+// A bundle file with its map decoded once, for its bytes and its profiled functions alike.
+export interface Chunk {
+  // The origin of each of the map's sources, by index.
+  origins: string[]
+  segments: number[][][]
+  pieces: Piece[]
 }
 
 // A run of a bundle's text and where it came from.
@@ -43,12 +51,16 @@ export const APP = 'app'
 export const BUNDLER = 'bundler'
 export const GC = 'GC'
 export const ENGINE = 'engine'
+// Playwright's evaluations: nearly all of their time is the style and layout the timing loop forces once the DOM holds the result.
+export const LAYOUT = 'style and layout'
+export const INLINE = 'inline scripts'
 
 // Solid's packages and the serializer it hydrates with.
 const SOLID_PACKAGES = new Set(['solid-js', '@solidjs/signals', '@solidjs/web', 'seroval', 'seroval-plugins'])
 // The last `node_modules` of a path names its package.
 const PACKAGE = /.*node_modules\/((?:@[^/]+\/)?[^/]+)\//
-const SOURCE_MAP_COMMENT = /\n\/\/# sourceMappingURL=\S+\s*$/
+// What a build with source maps adds to each file: a debug id and the map's URL.
+const SOURCE_MAP_COMMENTS = /(?:\n\/\/# (?:debugId|sourceMappingURL)=\S+)+\s*$/
 const REPO = resolve(import.meta.dir, '..')
 // The profiler's own nodes: `(idle)` is left out, `(program)` and `(root)` are the engine's.
 const META_FRAMES = new Map([['(garbage collector)', GC], ['(program)', ENGINE], ['(root)', ENGINE], ['(idle)', undefined]])
@@ -60,7 +72,12 @@ export function originOf(path: string): string {
   if (name !== undefined)
     return SOLID_PACKAGES.has(name) ? SOLID : name === 'kay' ? KAY : name
 
-  const inRepo = relative(REPO, path.startsWith('file:') ? fileURLToPath(path) : path)
+  const file = path.startsWith('file:') ? fileURLToPath(path) : path
+
+  if (!isAbsolute(file))
+    return 'other'
+
+  const inRepo = relative(REPO, file)
 
   if (inRepo.startsWith('src/') || inRepo.includes('/.kay/'))
     return KAY
@@ -68,11 +85,16 @@ export function originOf(path: string): string {
   return inRepo.startsWith('bench/') ? APP : 'other'
 }
 
-// A bundle split into runs of text by the source each came from; text no source covers, newlines included, is the bundler's.
-export function piecesOf(code: string, map: SourceMapFile, mapFile: string): Piece[] {
+export function readChunk(code: string, map: SourceMapFile, mapFile: string): Chunk {
   const origins = map.sources.map(source => originOf(resolve(dirname(mapFile), source)))
-  const lines = code.replace(SOURCE_MAP_COMMENT, '').split('\n')
   const segments = decodeBundleMappings(map.mappings)
+
+  return { origins, segments, pieces: piecesOf(code, origins, segments) }
+}
+
+// A bundle split into runs of text by the source each came from; text no source covers, newlines included, is the bundler's.
+function piecesOf(code: string, origins: string[], segments: number[][][]): Piece[] {
+  const lines = code.replace(SOURCE_MAP_COMMENTS, '').split('\n')
   const pieces: Piece[] = []
 
   for (const [index, line] of lines.entries()) {
@@ -156,16 +178,28 @@ export function timeByOrigin(profile: CpuProfile, originOfFrame: FrameOrigin): M
   return totals
 }
 
-// The source a bundle's position comes from: the last segment at or before the column on that line.
-export function sourceAt(map: SourceMapFile, segments: number[][][], line: number, column: number): string | undefined {
+// The origin of a bundle position: that of the last segment at or before the column on that line.
+function originAt(chunk: Chunk, line: number, column: number): string {
   let found: number[] | undefined
 
-  for (const segment of segments[line] ?? []) {
+  for (const segment of chunk.segments[line] ?? []) {
     if (segment[0]! > column)
       break
 
     found = segment
   }
 
-  return found && found.length >= 4 ? map.sources[found[1]!] : undefined
+  return found && found.length >= 4 ? chunk.origins[found[1]!]! : BUNDLER
+}
+
+// A Chromium frame's origin: a chunk's function by where its first character comes from, a native one left to its caller, and a page's inline scripts together.
+export function browserOrigin(chunks: Map<string, Chunk>): FrameOrigin {
+  return (frame) => {
+    if (frame.url === '')
+      return frame.scriptId === '0' ? undefined : LAYOUT
+
+    const chunk = chunks.get(basename(new URL(frame.url).pathname))
+
+    return chunk === undefined ? INLINE : originAt(chunk, frame.lineNumber, frame.columnNumber)
+  }
 }
