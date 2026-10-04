@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { pages } from '../src/server'
+import { jsonLd } from '../src/runtime/seo'
 import { siteOrigin } from '../src/server/seo'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -78,6 +79,12 @@ describe('seo head', () => {
     expect(scripts).toHaveLength(2)
     expect(scripts.map(script => JSON.parse(script) as { name: string }).map(data => data.name)).toEqual(['Kay </script> site', 'Shop </script><!-- here'])
     expect(scripts.join('')).not.toContain('<')
+  })
+
+  it('puts JSON-LD in the schema.org context unless it names its own, several things in one graph', () => {
+    expect(JSON.parse(jsonLd({ '@type': 'Person', 'name': 'Ada' }))).toEqual({ '@context': 'https://schema.org', '@type': 'Person', 'name': 'Ada' })
+    expect(JSON.parse(jsonLd({ '@context': 'https://example.com/vocab', '@type': 'Thing' }))['@context']).toBe('https://example.com/vocab')
+    expect(JSON.parse(jsonLd([{ '@type': 'WebSite' }, { '@type': 'Organization' }]))).toEqual({ '@context': 'https://schema.org', '@graph': [{ '@type': 'WebSite' }, { '@type': 'Organization' }] })
   })
 
   it('gives an error page no canonical URL', async () => {

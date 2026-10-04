@@ -1,10 +1,12 @@
 --- server
-const place = { '@context': 'https://schema.org', '@type': 'LocalBusiness', name: 'Shop </script><!-- here' }
+import { jsonLd } from 'kay/seo'
+
+const place = jsonLd({ '@type': 'LocalBusiness', 'name': 'Shop </script><!-- here' })
 ---
 head
   title Custom
   link(rel="canonical" href="/about")
   meta(property="og:image" content="/custom.png")
   meta(property="og:title" content="Its own card")
-  script(type="application/ld+json") {JSON.stringify(place)}
+  script(type="application/ld+json") {place}
 h1 Custom

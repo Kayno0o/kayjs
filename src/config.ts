@@ -1,4 +1,5 @@
 import type { BunPlugin } from 'bun'
+import type { JsonLd } from './runtime/seo'
 import type { Prefetch } from './server/speculation'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -43,7 +44,7 @@ export interface SeoConfig {
   // `og:locale`, such as `fr_FR`.
   locale?: string
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
-  jsonLd?: Record<string, unknown>[]
+  jsonLd?: JsonLd[]
 }
 
 export interface FontConfig {

@@ -1,6 +1,7 @@
 import type { KayConfig, SeoConfig } from '../config'
 import type { HeadOptions, HeadTag } from '../runtime/head'
 import { join } from 'node:path'
+import { jsonLd } from '../runtime/seo'
 import { faviconTags } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
 
@@ -53,7 +54,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
     tags.push(meta('property', 'og:locale', seo.locale))
 
   for (const data of seo.jsonLd ?? [])
-    tags.push({ tag: 'script', props: { type: 'application/ld+json', children: data } })
+    tags.push({ tag: 'script', props: { type: 'application/ld+json', children: jsonLd(data) } })
 
   // An error page is no URL to point search engines at.
   return (url, status) => ({

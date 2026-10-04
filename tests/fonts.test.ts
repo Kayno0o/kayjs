@@ -22,14 +22,14 @@ describe('fonts', () => {
     const app = await pages({ routes: ROUTES, prebuilt: false, fonts: FONTS })
     const html = await (await app.handle(new Request('http://localhost/about'))).text()
     const preloads = [...html.matchAll(/<link rel="preload" href="([^"]+)" as="font" type="([^"]+)" crossorigin="">/g)].map(match => [match[1], match[2]])
-    const stylesheet = /<link rel="stylesheet" href="([^"]+)">/.exec(html)![1]!
+    const stylesheet = (/<link rel="stylesheet" href="([^"]+)">/).exec(html)![1]!
 
     expect(preloads).toEqual([[expect.stringMatching(/^\/_kay\/assets\/display-\w+\.woff2$/), 'font/woff2']])
     expect(html.indexOf(stylesheet)).toBeLessThan(html.indexOf('</head>'))
 
     const css = await (await app.handle(new Request(`http://localhost${stylesheet}`))).text()
 
-    expect(css).toBe(`@font-face{font-family:"Display \\"One\\"";src:url("${preloads[0]![0]}") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}\n@font-face{font-family:"Body";src:url("${/url\("(\/_kay\/assets\/body-italic-\w+\.woff)"\)/.exec(css)![1]}") format("woff");font-weight:400;font-style:italic;font-display:optional;unicode-range:U+0000-00FF}\n`)
+    expect(css).toBe(`@font-face{font-family:"Display \\"One\\"";src:url("${preloads[0]![0]}") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}\n@font-face{font-family:"Body";src:url("${(/url\("(\/_kay\/assets\/body-italic-\w+\.woff)"\)/).exec(css)![1]}") format("woff");font-weight:400;font-style:italic;font-display:optional;unicode-range:U+0000-00FF}\n`)
     expect((await app.handle(new Request(`http://localhost${preloads[0]![0]}`))).status).toBe(200)
   })
 
