@@ -71,7 +71,10 @@ export interface FormFailure<Input, Data> {
   data?: Data
 }
 
-export type FailureOf<Target> = Target extends Action<infer Input, infer Output> ? FormFailure<Input, FailureData<Output>> : never
+// Read off the result itself: inferring it through `Action<Input, infer Output>` drops the `undefined` of a handler that ends without returning, as after `ctx.redirect(...)`, and the call signature then no longer matches.
+type ResultOf<Target> = Target extends { readonly [RESULT]?: infer Output } ? Output : never
+
+export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailureData<ResultOf<Target>>> : never
 
 // What a page reads back through `ctx.succeeded(action)` after a plain form post succeeded.
 export interface FormSuccess<Output> {
@@ -79,7 +82,7 @@ export interface FormSuccess<Output> {
   data: Output
 }
 
-export type SuccessOf<Target> = Target extends Action<never, infer Output> ? FormSuccess<Success<Output>> : never
+export type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Awaited<ReturnType<Target>>> : never
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output, Honeypot extends string = never> {

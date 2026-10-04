@@ -153,6 +153,43 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('types what ctx.failed and ctx.succeeded read back from an action that ends without returning, as after ctx.redirect', async () => {
+    const page = [
+      '--- server',
+      'import { t } from \'elysia\'',
+      'import { action } from \'kay\'',
+      '',
+      'export const signIn = action(t.Object({ code: t.String() }), async ({ code }, ctx) => {',
+      '  if (code === \'x\')',
+      '    return ctx.fail(400, { error: \'bad\' })',
+      '  ctx.redirect(\'/\')',
+      '})',
+      'export const save = action(t.Object({ code: t.String() }), async ({ code }, ctx) => {',
+      '  if (code === \'x\')',
+      '    return ctx.fail(400, { error: \'bad\' })',
+      '  if (code === \'y\')',
+      '    return 1',
+      '})',
+      '',
+      'const failure = ctx.failed(signIn)',
+      'const saved: 1 | undefined = ctx.succeeded(save)?.data',
+      'const wrong: number | undefined = ctx.failed(save)?.data',
+      '---',
+      'if failure?.data as data',
+      '  p {data.error} {failure?.values.code} {saved}',
+      'p {wrong}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code ?? firstLine(d.message)])).toEqual([[19, 'TS2322']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('resolves -p against the directory being checked', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'tsconfig.app.json': tsconfig })
 
