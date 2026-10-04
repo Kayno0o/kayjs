@@ -15,3 +15,7 @@ major: # vX.0.0
 	bun pm version major
 	git push
 	git push --tags
+
+extension: # build kay.vsix and install it in code-server
+	cd editors/vscode && bun run package
+	code-server --install-extension editors/vscode/kay.vsix
