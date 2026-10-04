@@ -7,10 +7,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://git.kaynooo.fr/kaynooo/poc-framework"
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs"
   },
   "bugs": {
-    "url": "https://git.kaynooo.fr/kaynooo/poc-framework/issues"
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs/issues"
   },
   "publishConfig": {
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/",
