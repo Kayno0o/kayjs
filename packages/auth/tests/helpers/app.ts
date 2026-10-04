@@ -5,7 +5,7 @@ import { session } from 'kay/server'
 import { createAuth } from '../../src/auth'
 import { memoryStore } from '../../src/memoryStore'
 
-export const SECRET = 'a-test-secret-that-is-long-enough-for-kay-auth'
+export const SECRET = 'a-test-secret-that-is-long-enough-for-kayjs-auth'
 
 export function userRecord(fields: Partial<UserRecord> & Pick<UserRecord, 'id'>): UserRecord {
   return {
@@ -24,7 +24,7 @@ export function userRecord(fields: Partial<UserRecord> & Pick<UserRecord, 'id'>)
   }
 }
 
-// An Elysia app on kay-auth with routes to drive it, and a browser per call that keeps its own cookies.
+// An Elysia app on kayjs-auth with routes to drive it, and a browser per call that keeps its own cookies.
 export function testApp(options: Partial<Omit<AuthOptions<AuthSessionData, 'admin' | 'editor'>, 'store'>> & { store?: AuthStore } = {}) {
   const store = options.store ?? memoryStore()
   const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, roles: { admin: ['editor'], editor: [] }, ...options, store })

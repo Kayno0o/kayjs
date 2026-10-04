@@ -4,7 +4,7 @@ import { testSite } from 'kay/test'
 import { totpCode, totpStep } from '../../../src/totp'
 import { auth, mails } from '../src/auth'
 
-// The fixture is served the way an app serves itself: kay-auth's plugin, then kay's pages.
+// The fixture is served the way an app serves itself: kayjs-auth's plugin, then kay's pages.
 const ROOT = join(import.meta.dir, '..')
 const realFetch = globalThis.fetch
 const text = (html: string, id: string) => new RegExp(`id="${id}"[^>]*>([^<]*)<`).exec(html)?.[1]
@@ -12,7 +12,7 @@ const text = (html: string, id: string) => new RegExp(`id="${id}"[^>]*>([^<]*)<`
 // A browser without JavaScript, keeping its own cookies.
 const browser = () => testSite({ root: ROOT, use: [auth.plugin] })
 
-// Imported once a site has registered the .kay loader for the fixture, a project of its own beside kay-auth.
+// Imported once a site has registered the .kay loader for the fixture, a project of its own beside kayjs-auth.
 await browser()
 const { enable, setUp, signOut } = await import('../src/routes/account/index.kay')
 const { verify } = await import('../src/routes/two-factor.kay')
@@ -23,14 +23,14 @@ afterEach(() => {
   globalThis.fetch = realFetch
 })
 
-test('kay check passes on the fixture, its links to kay-auth routes, its use of ctx.locals.auth and this test included', async () => {
+test('kay check passes on the fixture, its links to kayjs-auth routes, its use of ctx.locals.auth and this test included', async () => {
   const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
 
   expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toBe('')
   expect(await check.exited).toBe(0)
 }, 60_000)
 
-describe('a kay site on kay-auth', () => {
+describe('a kay site on kayjs-auth', () => {
   test('a visitor reaching the account is sent to sign in, and comes back once signed up with a password', async () => {
     const ada = await browser()
 

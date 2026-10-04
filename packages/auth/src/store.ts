@@ -1,4 +1,4 @@
-// An account as kay-auth stores it. The app sees a `User`, which leaves the secrets out.
+// An account as kayjs-auth stores it. The app sees a `User`, which leaves the secrets out.
 export interface UserRecord {
   id: string
   // Lowercase; unique when set.
@@ -45,7 +45,7 @@ export interface BearerTokenRecord {
 // What an emailed link proves once used.
 export type TokenType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email'
 
-// A link kay-auth emailed, stored as the digest of the token it carries.
+// A link kayjs-auth emailed, stored as the digest of the token it carries.
 export interface TokenRecord {
   digest: string
   type: TokenType
@@ -57,7 +57,7 @@ export interface TokenRecord {
   expiresAt: Date
 }
 
-// Where kay-auth keeps its data. Every method may answer synchronously or with a promise.
+// Where kayjs-auth keeps its data. Every method may answer synchronously or with a promise.
 export interface AuthStore {
   users: {
     get: (id: string) => MaybePromise<UserRecord | undefined>
@@ -67,7 +67,7 @@ export interface AuthStore {
     create: (user: UserRecord) => MaybePromise<void>
     // The user once changed, or undefined when there is none; throws when the change takes an email or a username another user has.
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
-    // Deletes the user with everything kay-auth keeps for them: identities, links, bearer tokens and recovery codes.
+    // Deletes the user with everything kayjs-auth keeps for them: identities, links, bearer tokens and recovery codes.
     delete: (id: string) => MaybePromise<void>
     // Records `step` as the last one a code was accepted for, only when it is later than the one recorded: false when it is not, even when two requests try it together.
     advanceTotpStep: (id: string, step: number) => MaybePromise<boolean>

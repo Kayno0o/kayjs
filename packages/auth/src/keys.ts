@@ -20,9 +20,9 @@ export function deriveKeys(secret: string | string[]): Keys {
   const secrets = [secret].flat()
 
   if (secrets.length === 0 || secrets.some(value => value.length < MIN_SECRET_LENGTH))
-    throw new Error(`kay-auth: a secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
+    throw new Error(`kayjs-auth: a secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
 
-  const derive = (purpose: string) => secrets.map(value => Buffer.from(hkdfSync('sha256', value, '', `kay-auth ${purpose}`, KEY_BYTES)))
+  const derive = (purpose: string) => secrets.map(value => Buffer.from(hkdfSync('sha256', value, '', `kayjs-auth ${purpose}`, KEY_BYTES)))
   const encryption = derive('encryption')
   const fingerprint = derive('fingerprint')[0]!
 

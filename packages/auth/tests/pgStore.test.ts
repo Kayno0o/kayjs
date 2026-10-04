@@ -3,8 +3,8 @@ import { afterAll } from 'bun:test'
 import { authTables, pgStore } from '../src/pg'
 import { storeContract } from './helpers/storeContract'
 
-// The database `docker compose up -d` starts; another with KAY_AUTH_TEST_DATABASE_URL.
-const URL = process.env.KAY_AUTH_TEST_DATABASE_URL ?? 'postgres://test:test@127.0.0.1:8533/kay_auth_test'
+// The database `docker compose up -d` starts; another with KAYJS_AUTH_TEST_DATABASE_URL.
+const URL = process.env.KAYJS_AUTH_TEST_DATABASE_URL ?? 'postgres://test:test@127.0.0.1:8533/kayjs_auth_test'
 const db = new Database({ url: URL, tables: [...authTables] })
 const reachable = await db.ping()
 

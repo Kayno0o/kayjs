@@ -29,7 +29,7 @@ export const auth = createAuth({
   },
 })
 
-// The routes the app serves besides its pages are kay-auth's, so `kay check` checks links to them.
+// The routes the app serves besides its pages are kayjs-auth's, so `kay check` checks links to them.
 declare module 'kay' {
   interface Register {
     locals: LocalsOf<typeof auth.plugin>

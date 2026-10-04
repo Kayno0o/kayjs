@@ -201,7 +201,7 @@ async function issueQuietly(core: Core, record: UserRecord, type: TokenType, ema
     await issue(core, record, type, email, redirect)
   }
   catch (error) {
-    console.error(`kay-auth: mailing a ${type} link failed`, error)
+    console.error(`kayjs-auth: mailing a ${type} link failed`, error)
   }
 }
 

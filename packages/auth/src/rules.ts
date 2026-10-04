@@ -1,4 +1,4 @@
-// The credential rules, stated once so a form and the server agree. Browser-safe: an island imports them from `@kaynooo/kay-auth/rules` to refuse before posting, and the server checks every one again.
+// The credential rules, stated once so a form and the server agree. Browser-safe: an island imports them from `@kaynooo/kayjs-auth/rules` to refuse before posting, and the server checks every one again.
 
 export const PASSWORD_MIN_LENGTH = 10
 // Argon2id has no ceiling of its own, and an unbounded field is free CPU for whoever posts it.

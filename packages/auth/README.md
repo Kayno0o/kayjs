@@ -1,9 +1,9 @@
-# kay-auth
+# kayjs-auth
 
 Auth for kay apps, built on kay's sessions: OAuth sign-in, passwords, mailed links (verification, reset, magic links, email change), TOTP two-factor with recovery codes, bearer tokens and security mails. It works in kay pages, actions and guards, and in a plain Elysia app, with its data in memory, in Postgres through pg-orm, or in a store of your own.
 
 ```sh
-bun add @kaynooo/kay-auth
+bun add @kaynooo/kayjs-auth
 ```
 
 ```ts

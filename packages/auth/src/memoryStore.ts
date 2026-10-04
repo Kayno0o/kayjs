@@ -2,7 +2,7 @@ import type { AuthStore, BearerTokenRecord, IdentityRecord, TokenRecord, UserRec
 
 const SWEEP_EVERY = 1000
 
-// Everything in this process's memory, gone on restart: for tests, and for trying kay-auth before a database is wired.
+// Everything in this process's memory, gone on restart: for tests, and for trying kayjs-auth before a database is wired.
 export function memoryStore(): AuthStore {
   const users = new Map<string, UserRecord>()
   const identities = new Map<string, IdentityRecord>()
@@ -32,7 +32,7 @@ export function memoryStore(): AuthStore {
       const other = holder(field, user[field])
 
       if (other && other.id !== user.id)
-        throw new Error(`kay-auth: the ${field} ${user[field]} is taken`)
+        throw new Error(`kayjs-auth: the ${field} ${user[field]} is taken`)
     }
   }
 
@@ -96,7 +96,7 @@ export function memoryStore(): AuthStore {
         const key = identityKey(identity.provider, identity.providerId)
 
         if (identities.has(key))
-          throw new Error(`kay-auth: that ${identity.provider} account is linked already`)
+          throw new Error(`kayjs-auth: that ${identity.provider} account is linked already`)
 
         identities.set(key, { ...identity })
       },

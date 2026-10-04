@@ -10,7 +10,7 @@ export async function notify(core: Core, record: UserRecord, event: SecurityEven
     await core.onEvent?.(event, publicUser(record), detail)
   }
   catch (error) {
-    console.error(`kay-auth: onEvent failed for ${event}`, error)
+    console.error(`kayjs-auth: onEvent failed for ${event}`, error)
   }
 
   const mail = core.email
@@ -22,7 +22,7 @@ export async function notify(core: Core, record: UserRecord, event: SecurityEven
     await mail.mailer.send({ to, kind: event, ...mail.templates[event]({ site: core.site, email: to, detail }) })
   }
   catch (error) {
-    console.error(`kay-auth: mailing ${event} failed`, error)
+    console.error(`kayjs-auth: mailing ${event} failed`, error)
   }
 }
 

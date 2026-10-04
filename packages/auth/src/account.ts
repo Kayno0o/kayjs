@@ -56,7 +56,7 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
   return { ok: true }
 }
 
-// Deletes the signed-in user and everything kay-auth keeps for them, then signs this session out.
+// Deletes the signed-in user and everything kayjs-auth keeps for them, then signs this session out.
 export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
   const proved = await reprove(state, proof)
 

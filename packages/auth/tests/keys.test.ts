@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { deriveKeys, digest } from '../src/keys'
 
-const SECRET = 'a-test-secret-that-is-long-enough-for-kay-auth'
+const SECRET = 'a-test-secret-that-is-long-enough-for-kayjs-auth'
 const OTHER = 'another-test-secret-that-is-long-enough-too'
 
 describe('deriveKeys', () => {

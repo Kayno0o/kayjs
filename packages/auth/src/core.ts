@@ -11,7 +11,7 @@ import type { Challenge } from './twoFactor'
 import { Buffer } from 'node:buffer'
 import { timingSafeEqual } from 'node:crypto'
 
-// What kay-auth keeps in the app's kay session: the app's session type includes it, `session<AuthSessionData & { cart: Cart }>(...)`.
+// What kayjs-auth keeps in the app's kay session: the app's session type includes it, `session<AuthSessionData & { cart: Cart }>(...)`.
 export interface AuthSessionData {
   auth?: SignedIn
   authOAuth?: OAuthFlow
@@ -33,7 +33,7 @@ export interface OAuthApp {
   clientSecret: string
 }
 
-// A provider account as kay-auth reads it; `email` is set only when the provider says it is verified.
+// A provider account as kayjs-auth reads it; `email` is set only when the provider says it is verified.
 export interface Profile extends OAuthUser {
   provider: string
 }

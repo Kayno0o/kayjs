@@ -48,7 +48,7 @@ export function githubProvider(opts: { scopes?: string[] } = {}): OAuthProvider<
     userUrl: 'https://api.github.com/user',
     scopes: opts.scopes ?? ['read:user'],
     authHeaders: () => ({
-      'User-Agent': '@kaynooo/kay-auth',
+      'User-Agent': '@kaynooo/kayjs-auth',
       'Accept': 'application/vnd.github+json',
     }),
     parseTokens: parseStandardTokens,

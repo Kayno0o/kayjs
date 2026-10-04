@@ -159,7 +159,7 @@ describe('provider presets', () => {
   test('githubProvider normalizes ids to strings and sends a User-Agent', () => {
     const gh = githubProvider()
 
-    expect(gh.authHeaders?.('t')).toMatchObject({ 'User-Agent': '@kaynooo/kay-auth' })
+    expect(gh.authHeaders?.('t')).toMatchObject({ 'User-Agent': '@kaynooo/kayjs-auth' })
     expect(gh.normalizeUser({ id: 7, login: 'oz', name: 'Oz', avatar_url: 'u', email: null }))
       .toEqual({ providerId: '7', username: 'oz', displayName: 'Oz', avatar: 'u', email: null })
   })

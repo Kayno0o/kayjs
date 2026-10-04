@@ -35,13 +35,13 @@ import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, regenera
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
 
 const READ_METHODS = new Set(['GET', 'HEAD'])
-const STATE = Symbol('kay-auth.state')
+const STATE = Symbol('kayjs-auth.state')
 const TRAILING_SLASH = /\/$/
 
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
 export type AuthRequirement<Role extends string> = Requirement<User, Role>
 
-// The plugin kay's `session()` returns, whichever data the app keeps beside kay-auth's.
+// The plugin kay's `session()` returns, whichever data the app keeps beside kayjs-auth's.
 export interface SessionPlugin<Data extends AuthSessionData> { '~Ephemeral': { derive: { readonly session: Session<Data> } } }
 
 export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth'> {
@@ -51,7 +51,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   store: AuthStore
   // The site's public origin, such as `https://example.com`: OAuth callbacks are built on it.
   url?: string
-  // Where kay-auth's routes live, `/auth` by default: `/auth/discord` starts a Discord sign-in.
+  // Where kayjs-auth's routes live, `/auth` by default: `/auth/discord` starts a Discord sign-in.
   prefix?: Prefix
   // The site's name, as mails and authenticator apps show it; the URL's host by default.
   site?: string
@@ -125,7 +125,7 @@ export class Auth {
     const record = await this.core.store.users.get(user.id)
 
     if (!record)
-      throw new Error(`kay-auth: no user ${user.id} to sign in`)
+      throw new Error(`kayjs-auth: no user ${user.id} to sign in`)
 
     await this.establish(record)
   }
@@ -332,7 +332,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   const failed = (error: OAuthFailure) => withQuery(core.signInPage, `error=${error}`)
 
-  const plugin = new Elysia({ name: 'kay-auth' })
+  const plugin = new Elysia({ name: 'kayjs-auth' })
     // Typed as a plain instance: `AnyElysia` would merge `any` routes into the app's, and every link would check.
     .use(options.sessions as unknown as Elysia)
     .derive(ctx => ({ auth: new Auth((ctx as unknown as { session: Session<AuthSessionData> }).session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server))) }))
@@ -378,7 +378,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   const signedIn: Predicate<User> = user => user !== null
 
   return {
-    // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kay-auth's routes, and uses the session plugin itself.
+    // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
     plugin,
     hasRole,
     isGranted: (role: Role, user: User) => isGranted(role, user.roles as Role[]),
@@ -428,7 +428,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   const url = options.url?.replace(TRAILING_SLASH, '')
 
   if ((oauthApps.length > 0 || options.email) && url === undefined)
-    throw new Error('kay-auth: OAuth sign-in and mailed links need `url`, the site\'s public origin, to build their URLs')
+    throw new Error('kayjs-auth: OAuth sign-in and mailed links need `url`, the site\'s public origin, to build their URLs')
 
   for (const [name, app] of oauthApps)
     oauth.set(name, { app, client: createOAuthClient(app.provider, { clientId: app.clientId, clientSecret: app.clientSecret, redirectUri: `${url}${prefix}/${name}/callback` }) })
@@ -440,7 +440,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     prefix,
     signInPage: options.signInPage ?? '/',
     twoFactorPage: options.twoFactorPage ?? '/two-factor',
-    site: options.site ?? (url === undefined ? 'kay-auth' : new URL(url).host),
+    site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: { ...DEFAULT_LIMITS, ...options.limits },
     email: options.email && { requireVerified: false, ...options.email, templates: { ...defaultTemplates, ...options.email.templates } },
     oauth,
@@ -462,7 +462,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
         // A refresh that rotates no refresh token leaves the one held usable.
         await core.store.identities.update(name, subject.identity.providerId, tokens && tokens.refreshToken === undefined ? { ...sealed, refreshToken: subject.identity.refreshToken } : sealed)
       },
-      onError: error => console.error(`kay-auth: refreshing a ${name} token failed`, error),
+      onError: error => console.error(`kayjs-auth: refreshing a ${name} token failed`, error),
     }))
   }
 
@@ -482,7 +482,7 @@ function authOf(ctx: object): Auth {
   const auth = (ctx as { auth?: unknown }).auth
 
   if (!(auth instanceof Auth))
-    throw new Error('kay-auth: no `auth` in this context; `.use(auth.plugin)` before the routes and pages that read it')
+    throw new Error('kayjs-auth: no `auth` in this context; `.use(auth.plugin)` before the routes and pages that read it')
 
   return auth
 }

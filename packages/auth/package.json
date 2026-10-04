@@ -1,5 +1,5 @@
 {
-  "name": "@kaynooo/kay-auth",
+  "name": "@kaynooo/kayjs-auth",
   "type": "module",
   "version": "0.0.0",
   "description": "Auth for kay apps on kay sessions: OAuth, passwords, two-factor, magic links and bearer tokens",
