@@ -2,11 +2,15 @@ import type { Server } from 'bun'
 import type { Action } from '../src/runtime'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { describe, expect, it } from 'bun:test'
+import process from 'node:process'
+import { brotliDecompressSync } from 'node:zlib'
+import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { check } from '../src/check'
 import { inlineScriptHashes, pages } from '../src/server'
+import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { prerenderPages } from '../src/server/prerender'
 import { clientOf } from '../src/server/protection'
 import { testSite } from '../src/test'
 
@@ -131,6 +135,100 @@ describe('action protection', () => {
     }
     finally {
       await rm(typo, { force: true })
+    }
+  })
+})
+
+describe('revalidation', () => {
+  const routes = 'tests/fixtures/production/src/routes'
+
+  it('serves a stale prerendered page while rendering it again in the background, then the new one with its own tag', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const { news } = await import('./fixtures/production/src/news')
+
+    try {
+      await prerenderPages(root, { routes }, (await readClient(root))!)
+      const app = await pages({ routes, prebuilt: true, security: false })
+      const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
+      const built = await visit()
+      const etag = built.headers.get('etag')!
+
+      news.edition = 2
+      expect(await built.text()).toContain('<h1>Edition 1</h1>')
+      expect(await (await visit()).text()).toContain('<h1>Edition 1</h1>')
+
+      setSystemTime(Date.now() + 61_000)
+      // The first request past the period still gets the page as it was built.
+      expect(await (await visit()).text()).toContain('<h1>Edition 1</h1>')
+      await Bun.sleep(50)
+
+      const fresh = await visit({ 'if-none-match': etag, 'accept-encoding': 'br' })
+
+      expect(fresh.status).toBe(200)
+      expect(fresh.headers.get('etag')).not.toBe(etag)
+      expect(new TextDecoder().decode(brotliDecompressSync(await fresh.bytes()))).toContain('<h1>Edition 2</h1>')
+    }
+    finally {
+      setSystemTime()
+      news.edition = 1
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('keeps the page it has when a render fails, trying again a minute later at most', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const { news } = await import('./fixtures/production/src/news')
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await prerenderPages(root, { routes }, (await readClient(root))!)
+      const app = await pages({ routes, prebuilt: true, security: false })
+      const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
+
+      news.failing = true
+      setSystemTime(Date.now() + 61_000)
+      await visit()
+      await Bun.sleep(50)
+      expect(await visit()).toContain('<h1>Edition 1</h1>')
+      expect(logged).toHaveBeenCalled()
+
+      news.failing = false
+      news.edition = 3
+      await visit()
+      await Bun.sleep(50)
+      expect(await visit()).toContain('<h1>Edition 1</h1>')
+
+      setSystemTime(Date.now() + 122_000)
+      await visit()
+      await Bun.sleep(50)
+      expect(await visit()).toContain('<h1>Edition 3</h1>')
+    }
+    finally {
+      setSystemTime()
+      logged.mockRestore()
+      news.edition = 1
+      news.failing = false
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('refuses a revalidate that is not a positive number of seconds', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const page = join(routes, 'broken.kay')
+
+    try {
+      await Bun.write(page, '--- server\nexport const prerender = true\nexport const revalidate = \'1h\'\n---\np Broken\n')
+
+      await expect(prerenderPages(root, { routes }, (await readClient(root))!)).rejects.toThrow('exports a revalidate that is not a positive number of seconds')
+    }
+    finally {
+      await rm(page, { force: true })
+      await writeManifest(root, manifest)
     }
   })
 })

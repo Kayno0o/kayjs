@@ -61,8 +61,8 @@ const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
 const PRERENDER = 'prerender'
 // The page's query schema, which types and validates `ctx.query`.
 const QUERY = 'query'
-// The server exports that are no actions; `sitemap` lists the page in the sitemap.
-const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap'])
+// The server exports that are no actions; `sitemap` lists the page in the sitemap, `revalidate` renders a prerendered page again once stale.
+const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap', 'revalidate'])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
 const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
 // Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a `role`.

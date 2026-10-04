@@ -37,7 +37,10 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
     const file = relative(root, route.file)
 
-    for (const params of await listedParams(route, file, 'prerender', (await import(route.file) as { prerender?: unknown }).prerender)) {
+    const module = await import(route.file) as { prerender?: unknown, revalidate?: unknown }
+    const revalidate = revalidatePeriod(file, module.revalidate)
+
+    for (const params of await listedParams(route, file, 'prerender', module.prerender)) {
       const path = pathOf(route, params)
       // Guards run when the page is served, for whoever asks; the build renders what they let through.
       const response = await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${path}`), params: elysiaParams(route, params) }, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head })
@@ -53,16 +56,9 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         throw new Error(`kay: ${taken} and ${path} would both be prerendered to ${name}; leave one out of prerender`)
 
       paths.set(name, path)
-      const headers: Record<string, string> = {}
-
-      for (const [header, value] of response.headers) {
-        if (header !== 'set-cookie')
-          headers[header] = value
-      }
-
       await mkdir(join(dir, name, '..'), { recursive: true })
       await Bun.write(join(dir, name), html)
-      pages[path] = { pattern: route.pattern, file: name, status: response.status, headers, etag: `"${Bun.hash(html).toString(36)}"` }
+      pages[path] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate }
     }
   }
 
@@ -70,6 +66,33 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   client.pages = new Map(Object.entries(pages))
 
   return Object.keys(pages).length
+}
+
+// The headers a prerendered page is served with: the cookies its render set were for no one.
+export function storedHeaders(headers: Headers): Record<string, string> {
+  const stored: Record<string, string> = {}
+
+  for (const [header, value] of headers) {
+    if (header !== 'set-cookie')
+      stored[header] = value
+  }
+
+  return stored
+}
+
+export function pageEtag(html: string): string {
+  return `"${Bun.hash(html).toString(36)}"`
+}
+
+// A page's `revalidate` export: seconds, or undefined when it has none.
+function revalidatePeriod(file: string, value: unknown): number | undefined {
+  if (value === undefined)
+    return undefined
+
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
+    throw new Error(`kay: ${file} exports a revalidate that is not a positive number of seconds`)
+
+  return value
 }
 
 async function exportsPrerender(file: string): Promise<boolean> {

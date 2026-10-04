@@ -19,6 +19,8 @@ import { serveImages } from './image'
 import { registerLoader } from './loader'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
+import { reportServerError } from './report'
+import { revalidateStale } from './revalidate'
 import { decodePath, refuseClashes, scanRoutes, specialPagesOf } from './routes'
 import { securityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
@@ -60,7 +62,7 @@ async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<str
     if (!paths)
       byRoute.set(page.pattern, paths = new Map())
 
-    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), ...loaded[index]! })
+    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, ...loaded[index]! })
   }
 
   return byRoute
@@ -170,7 +172,13 @@ export async function servePages(root: string, options: PagesOptions, loadClient
       // A path `kay build` rendered is served from its file; any other path of the route renders per request.
       const page = served?.get(canonicalPath(url.pathname))
 
-      return page ? servePrerendered(route, page, context, client, renderOptions) : renderPage(route, context, client, renderOptions)
+      if (!page)
+        return renderPage(route, context, client, renderOptions)
+
+      // Rendered as `kay build` renders it: without the request, for whoever its guards let through.
+      revalidateStale(page, async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`), params: context.params }, client, { ...renderOptions, prerendering: true }), error => reportServerError(error, context.request, renderOptions.onError))
+
+      return servePrerendered(route, page, context, client, renderOptions)
     })
   }
 

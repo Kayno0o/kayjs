@@ -34,6 +34,25 @@ export async function compressFiles(dir: string): Promise<void> {
   }))
 }
 
+// A brotli and a gzip copy of text rendered while serving, at levels quick enough for a request path; none below the size worth it, nor one saving little.
+export async function compressText(text: string): Promise<Partial<Record<Encoding, Uint8Array<ArrayBuffer>>>> {
+  const bytes = new TextEncoder().encode(text)
+  const copies: Partial<Record<Encoding, Uint8Array<ArrayBuffer>>> = {}
+
+  if (bytes.length < MIN_SIZE)
+    return copies
+
+  const brotli = new Uint8Array(await compressBrotli(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: 5, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length } }))
+  const gzip = new Uint8Array(Bun.gzipSync(bytes, { level: 6 }))
+
+  for (const [encoding, copy] of [['br', brotli], ['gzip', gzip]] as const) {
+    if (copy.length < bytes.length * 0.9)
+      copies[encoding] = copy
+  }
+
+  return copies
+}
+
 // The copies `compressFiles` wrote, by the path of the file they copy.
 export async function encodedCopies(dir: string): Promise<Map<string, Set<Encoding>>> {
   const copies = new Map<string, Set<Encoding>>()

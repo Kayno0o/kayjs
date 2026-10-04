@@ -33,6 +33,10 @@ export interface PrerenderedPage {
   status: number
   headers: Record<string, string>
   etag: string
+  // When `kay build` rendered it, in ms since the epoch.
+  renderedAt: number
+  // Seconds after which the server renders it again in the background, from the page's `revalidate` export.
+  revalidate?: number
 }
 
 export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {

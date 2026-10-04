@@ -1,0 +1,12 @@
+--- server
+import { news } from '../news'
+
+export const prerender = true
+export const revalidate = 60
+
+if (news.failing)
+  throw new Error('the news feed is down')
+
+const edition = news.edition
+---
+h1 Edition {edition}
