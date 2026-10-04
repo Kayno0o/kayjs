@@ -1,4 +1,5 @@
 import type { Browser } from 'playwright-core'
+import type { AppName } from './apps'
 import { join } from 'node:path'
 import { APPS } from './apps'
 import { serve, tableRows } from './browser'
@@ -22,15 +23,18 @@ export function visibleMarkup(html: string): string {
 
 // What each app server-renders for a path, in `APPS` order, each in its own process.
 export async function serverMarkup(path: string): Promise<string[]> {
-  return Promise.all(APPS.map(async (app) => {
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, 'render.ts'), app, path], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, NODE_ENV: 'production' } })
-    const [html, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+  return Promise.all(APPS.map(async app => visibleMarkup(await serverHtml(app, path))))
+}
 
-    if (code !== 0)
-      throw new Error(`${app} failed to render ${path}`)
+// The document an app serves for a path, rendered in a process of its own.
+export async function serverHtml(app: AppName, path: string): Promise<string> {
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, 'render.ts'), app, path], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, NODE_ENV: 'production' } })
+  const [html, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
-    return visibleMarkup(html)
-  }))
+  if (code !== 0)
+    throw new Error(`${app} failed to render ${path}`)
+
+  return html
 }
 
 // The rows each app's table renders in the browser after creating 1,000 of them, in `APPS` order.

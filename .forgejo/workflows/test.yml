@@ -48,3 +48,6 @@ jobs:
           bun install --silent --frozen-lockfile --cwd bench/apps/solid
           bun install --silent --frozen-lockfile --cwd bench/apps/svelte
           bun run bench:check
+
+      - name: Check that kay's bench pages leave hydration markers to islands
+        run: bun test ./bench -t 'leave hydration markers'
