@@ -1,7 +1,9 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
+import { renderToString } from '@solidjs/web'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { sharedConfig } from 'solid-js/internal'
 import { transform } from '../src/build/solid-compiler'
 
 // Each test reproduces a Solid 2 bug kay works around, and fails once a Solid release fixes it: the workaround its name points at can then go.
@@ -48,6 +50,20 @@ describe('Solid 2 bugs kay works around', () => {
 
     expect(server.match(SSR_MARKER)).toHaveLength(2)
     expect(browser.match(DOM_MARKER)).toHaveLength(4)
+  })
+
+  it('leaves the render context of a nested renderToString in place of the outer one; drop the restore in src/runtime/island.server.ts once this fails', () => {
+    let before: unknown
+    let after: unknown
+
+    renderToString(() => {
+      before = sharedConfig.context
+      renderToString(() => 'island')
+      after = sharedConfig.context
+
+      return 'page'
+    })
+    expect(after).not.toBe(before)
   })
 
   it('calls a function item of a positional For as an updater; drop the boxing in src/runtime/loop.ts once this fails', async () => {

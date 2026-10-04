@@ -7,7 +7,7 @@ import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, writeAsset } from '../src/build/assets'
-import { mapStack } from '../src/build/sourcemap'
+import { mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { buildClient } from '../src/server/client'
@@ -37,6 +37,11 @@ describe('kay build', () => {
     try {
       const client = await buildClient(root, { sourcemap: true })
       const maps = (await readdir(client.dir)).filter(file => file.endsWith('.js.map'))
+
+      // As the server does when it first serves each; a second time changes nothing.
+      await Promise.all(maps.map(async file => mapBundleToKay(join(client.dir, file))))
+      await Promise.all(maps.map(async file => mapBundleToKay(join(client.dir, file))))
+
       const bundles = await Promise.all(maps.map(async file => await Bun.file(join(client.dir, file)).json() as { sources: string[], sourcesContent: string[], mappings: string }))
       const bundle = bundles.find(map => map.sources.some(path => path.endsWith('/counter.kay')))!
       const index = bundle.sources.findIndex(path => path.endsWith('/counter.kay'))

@@ -125,16 +125,16 @@ function cacheEntry(cacheDir: string, filename: string, kind: string, inputs: st
 function compile(source: string, filename: string, options: TransformOptions): Compiled {
   const server = options.target === 'ssr'
   const file = withoutTwin(filename)
-  const twin = file !== filename
+  const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, island, diagnostics } = compileKay(source, file, { root: options.root, includeServer: server, staticRender: server && hydratable && !twin })
+  const { tsx, map, island, diagnostics } = compileKay(source, file, { root: options.root, includeServer: server, staticRender: server && hydratable && !isTwin })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))
 
   // Only what renders inside an island carries hydration markers; on the server everything else renders once.
   // Server stacks and island bundles in development are mapped back to the `.kay` source through Solid's map.
-  const output = transform(tsx, { filename: `${file}.tsx`, generate: options.target, hydratable: hydratable && (!server || twin || island !== undefined), sourceMap: true })
+  const output = transform(tsx, { filename: `${file}.tsx`, generate: options.target, hydratable: hydratable && (!server || isTwin || island !== undefined), sourceMap: true })
 
   return { code: output.code, tsx, map, solidMap: output.map ?? undefined }
 }

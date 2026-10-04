@@ -142,10 +142,10 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   return promise as Deferred<T>
 }
 
-// What a page's template reads: every name its `--- server` fence declares.
 // What a page's query schema gives `ctx.query`.
 export type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
 
+// What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
 export type { Action, ActionContext, Failure, FailureOf, FieldName, FormFailure, FormSuccess, ServerAction, SuccessOf } from './action'

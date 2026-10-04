@@ -41,6 +41,7 @@ const VLQ_VALUE = 31
 const compiled = new Map<string, Compiled | (() => Compiled)>()
 // A file's browser build differs from its server one, so island bundles read maps of their own.
 const browserCompiled = new Map<string, Compiled | (() => Compiled)>()
+const mappedBundles = new Map<string, Promise<void>>()
 
 export function registerSourceMap(file: string, entry: Omit<Compiled, 'lines'> | (() => Omit<Compiled, 'lines'>), browser = false): void {
   (browser ? browserCompiled : compiled).set(file, entry)
@@ -58,7 +59,22 @@ function compiledFor(file: string, registry = compiled): Compiled | undefined {
 }
 
 // Bun maps a bundle to the JavaScript a plugin returned and ignores any map that came with it, so the `.kay` sources of an island bundle's map are pointed on at their `.kay` lines and text.
+// Done once per file, when a browser first asks for it: a module the compile cache served compiles again for its map.
 export async function mapBundleToKay(mapFile: string): Promise<void> {
+  let mapping = mappedBundles.get(mapFile)
+
+  if (!mapping)
+    mappedBundles.set(mapFile, mapping = rewriteBundleMap(mapFile))
+
+  await mapping
+}
+
+// A new client build writes its maps afresh, under names an earlier one may have used.
+export function forgetBundleMaps(): void {
+  mappedBundles.clear()
+}
+
+async function rewriteBundleMap(mapFile: string): Promise<void> {
   const bundle = await Bun.file(mapFile).json() as BundleMap
   const entries = bundle.sources.map(source => compiledFor(resolve(dirname(mapFile), source), browserCompiled))
 
@@ -82,7 +98,7 @@ export async function mapBundleToKay(mapFile: string): Promise<void> {
   await Bun.write(mapFile, JSON.stringify(bundle))
 }
 
-function decodeBundleMappings(mappings: string): BundleSegment[][] {
+export function decodeBundleMappings(mappings: string): BundleSegment[][] {
   const fields = [0, 0, 0, 0, 0]
 
   return mappings.split(';').map((line) => {

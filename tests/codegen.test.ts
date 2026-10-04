@@ -536,14 +536,15 @@ describe('accessibility checks', () => {
       'An `iframe` needs a `title` naming what it holds, which screen readers announce',
     ])
     expect(checked('img(src="/a.png" alt="")\niframe(src="/map" title="Map")')).toEqual([])
+    expect(checked('input(type="image" src="/go.png")\ninput(type="image" src="/go.png" alt="Search")')).toEqual(['An image button needs `alt` naming what it does'])
   })
 
   it('report a click handler on an element the keyboard never reaches, unless it has a role', () => {
     const click = 'onClick={() => undefined}'
 
     expect(checked(`.card(${click})\nli(${click}) x\nbutton(${click}) ok\na(href="/" ${click}) ok`)).toEqual([
-      'This `div` reacts to `onClick` but is out of reach of the keyboard and screen readers: use a `button`, or give it a `role`, a `tabindex` and a key handler',
-      'This `li` reacts to `onClick` but is out of reach of the keyboard and screen readers: use a `button`, or give it a `role`, a `tabindex` and a key handler',
+      'This `div` reacts to `onClick` but is out of reach of the keyboard and screen readers: use a `button`, or give it a `role` along with a `tabindex` and a key handler',
+      'This `li` reacts to `onClick` but is out of reach of the keyboard and screen readers: use a `button`, or give it a `role` along with a `tabindex` and a key handler',
     ])
     expect(checked(`li(role="option" ${click}) x`)).toEqual([])
   })

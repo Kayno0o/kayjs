@@ -7,7 +7,7 @@ import process from 'node:process'
 import { ASSET_PREFIX, clientDir } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { kay } from '../build/plugin'
-import { mapBundleToKay } from '../build/sourcemap'
+import { forgetBundleMaps } from '../build/sourcemap'
 import { styleImports, withoutStyles } from '../build/styles'
 import { analyzeKayCached, KayCompileError } from '../build/transform'
 
@@ -47,7 +47,7 @@ export interface ClientOptions {
   plugins?: BunPlugin[]
   // Page directory relative to the root: its pages and layouts are where stylesheets are gathered from.
   routes?: string
-  // Links each island chunk to a map of its `.kay` sources, for the browser's devtools.
+  // Links each island chunk to a map of its `.kay` sources, for the browser's devtools; the server points a map at them as it first serves it.
   sourcemap?: boolean
 }
 
@@ -101,6 +101,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   // A failed build must not leave the previous manifest pointing at files that are gone.
   await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true })])
   await mkdir(dir, { recursive: true })
+  forgetBundleMaps()
   // Tailwind reads class names from here: `@source "../.kay/classes.txt"` in the stylesheet importing it.
   await writeIfChanged(join(root, '.kay', 'classes.txt'), [...classes].sort().join('\n'))
 
@@ -167,8 +168,6 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 
   if (!build.success)
     throw new AggregateError(build.logs, 'kay: client build failed')
-
-  await Promise.all(build.outputs.filter(output => output.kind === 'sourcemap').map(async output => mapBundleToKay(output.path)))
 
   return islandManifest(root, build.metafile!.outputs as Outputs, islands)
 }

@@ -1033,8 +1033,21 @@ class Generator {
     if (required && !names.has(required[0]))
       this.error(at, required[1])
 
+    if (element.name === 'input' && this.staticAttribute(element, 'type') === 'image' && !names.has('alt'))
+      this.error(at, 'An image button needs `alt` naming what it does')
+
     if (names.has('onClick') && !names.has('role') && !INTERACTIVE_TAGS.has(element.name))
-      this.error(at, `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers: use a \`button\`, or give it a \`role\`, a \`tabindex\` and a key handler`)
+      this.error(at, `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers: use a \`button\`, or give it a \`role\` along with a \`tabindex\` and a key handler`)
+  }
+
+  // The text of an attribute written as a quoted string.
+  private staticAttribute(element: ElementNode, name: string): string | undefined {
+    for (const attribute of element.attributes) {
+      if (attribute.kind === 'static' && this.text(attribute.name) === name)
+        return attribute.text
+    }
+
+    return undefined
   }
 
   // `onclick` and `on:click` attach nothing in Solid, and the component would not become an island either.
@@ -1108,8 +1121,7 @@ class Generator {
       return
     }
 
-    const type = element.attributes.find(candidate => candidate.kind === 'static' && this.text(candidate.name) === 'type')
-    const inputType = type?.kind === 'static' ? type.text : 'text'
+    const inputType = this.staticAttribute(element, 'type') ?? 'text'
     const event = property === 'checked' || element.name === 'select' ? 'onChange' : 'onInput'
 
     if (element.attributes.some(candidate => candidate.kind !== 'spread' && this.text(candidate.name) === event))

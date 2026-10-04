@@ -97,8 +97,10 @@ export async function renderPage(route: ServedRoute, context: RequestContext, cl
     const modules = await importAll(files)
 
     // Read once the guards let the request through, so a refused query never renders what they protect; the layouts see the page's.
-    if (!options.prerendering)
-      rendering.ctx.query = readQuery(modules.at(-1)!.query, rendering.ctx.url)
+    const query = modules.at(-1)!.query
+
+    if (query !== undefined && !options.prerendering)
+      rendering.ctx.query = readQuery(query, rendering.ctx.url)
 
     const timings = options.dev ? Array.from<number>({ length: files.length }) : undefined
     const loads = await Promise.allSettled(modules.map(async (module, index) => runLoad(module, rendering.ctx, timings, index)))
@@ -206,6 +208,8 @@ function createRendering(context: RequestContext, params: Record<string, string>
   const readOnce = () => flash ??= hasFlash(request) ? readFlash(jar.cookies) ?? null : null
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
   const url = new URL(request.url)
+  // The search params as text until the page's schema reads them; most pages never look.
+  let query: Readonly<Record<string, unknown>> | undefined
   const rendering: Rendering = {
     headers,
     status: 200,
@@ -220,7 +224,12 @@ function createRendering(context: RequestContext, params: Record<string, string>
       request,
       url,
       params,
-      query: readQuery(undefined, url),
+      get query() {
+        return query ??= readQuery(undefined, url)
+      },
+      set query(value) {
+        query = value
+      },
       get cookies() {
         return jar.cookies
       },

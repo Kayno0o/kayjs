@@ -255,16 +255,17 @@ describe('bind:value on a number input', () => {
 })
 
 describe('the live reload script', () => {
-  it('swaps the stylesheets when the server comes back running the same code, and reloads on any other change', async () => {
+  it('swaps the stylesheets when the server comes back running the same code, and reloads on any other change or a page that fails', async () => {
     const script = (/<script>([\s\S]*)<\/script>/).exec(LIVE_RELOAD)![1]!
     const boot = (/let b="([^"]+)"/).exec(script)![1]!
     let onBoot: (event: { data: string }) => Promise<void> = async () => undefined
     const fetched: string[] = []
+    let status = 200
     const reload = spyOn(location, 'reload').mockImplementation(() => undefined)
     const fetchStub = spyOn(globalThis, 'fetch').mockImplementation((async (url: string) => {
       fetched.push(url)
 
-      return new Response('<html><head><link rel="stylesheet" href="/_kay/app-2.css"><link rel="stylesheet" href="/theme.css"></head><body></body></html>')
+      return new Response('<html><head><link rel="stylesheet" href="/_kay/app-2.css"><link rel="stylesheet" href="/theme.css"></head><body></body></html>', { status })
     }) as unknown as typeof fetch)
     const stylesheets = () => [...document.querySelectorAll('link[rel=stylesheet]')].map(link => link.getAttribute('href'))
 
@@ -291,8 +292,13 @@ describe('the live reload script', () => {
       expect(stylesheets()).toEqual(['/_kay/app-2.css', '/theme.css?kay-dev=next'])
       expect(reload).not.toHaveBeenCalled()
 
-      await onBoot({ data: 'again 4' })
+      status = 500
+      await onBoot({ data: 'broken 3' })
       expect(reload).toHaveBeenCalledTimes(1)
+      expect(stylesheets()).toEqual(['/_kay/app-2.css', '/theme.css?kay-dev=next'])
+
+      await onBoot({ data: 'again 4' })
+      expect(reload).toHaveBeenCalledTimes(2)
     }
     finally {
       reload.mockRestore()

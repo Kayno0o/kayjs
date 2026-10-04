@@ -14,7 +14,7 @@ export function defineEnv<Schema extends TSchema & { properties: Record<string, 
       input[name] = value
   }
 
-  const read = readFields(schema, input)
+  const read = readFields(schema, input, false)
 
   if ('refused' in read)
     throw new Error(`kay: the environment does not match its schema\n${[...read.refused].map(([name, message]) => `  ${name}: ${message}`).join('\n')}`)

@@ -6,4 +6,6 @@ dist
 .env
 *.vsix
 /types
+tests/.dom-*
+tests/.canary-*
 .claude/scheduled_tasks.lock

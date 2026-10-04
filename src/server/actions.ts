@@ -124,7 +124,8 @@ function actionFiles(routes: ServedRoute[]): Map<string, LoadedGuard[]> {
 }
 
 // A form posts text, as a query string is, and each field once per value or not at all: a top-level field is read the way its schema expects before it is validated.
-export function formInput(schema: TSchema, body: unknown): unknown {
+// `absentAsEmpty` reads a required list or boolean that is absent as empty or unticked, which only a form means by leaving it out.
+export function formInput(schema: TSchema, body: unknown, absentAsEmpty = true): unknown {
   const { properties, required = [] } = schema as { properties?: Record<string, FieldSchema>, required?: string[] }
 
   if (!properties || typeof body !== 'object' || body === null)
@@ -138,7 +139,7 @@ export function formInput(schema: TSchema, body: unknown): unknown {
 
     if (value === undefined) {
       // A required list may well be empty, and an unticked checkbox posts nothing; a required file list is no file chosen, refused as missing.
-      if (!optional && ((field.type === 'array' && field.items?.format !== 'binary') || field.type === 'boolean'))
+      if (absentAsEmpty && !optional && ((field.type === 'array' && field.items?.format !== 'binary') || field.type === 'boolean'))
         fields[name] = field.type === 'array' ? [] : false
 
       continue

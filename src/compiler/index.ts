@@ -41,6 +41,8 @@ const WORD = /[a-z0-9]+/gi
 const LEADING_DIGIT = /^\d/
 const KAY_EXTENSION = /\.kay$/
 const ERROR_PAGE = '_error.kay'
+// Rendered by the server around or instead of a page, never inside an island.
+const ROUTE_FILES = new Set(['_layout.kay', '_404.kay', ERROR_PAGE])
 const BACKSLASH = /\\/g
 
 export const ISLAND_TWIN = '?island'
@@ -59,7 +61,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   let name = freeName(componentName(filename), fences)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
-  const twin = options.staticRender && !island && !file.server ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
+  const twin = options.staticRender && !island && !file.server && !ROUTE_FILES.has(basename(filename)) ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const generateOptions = { island, twin, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })

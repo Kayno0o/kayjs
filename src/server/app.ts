@@ -5,6 +5,7 @@ import type { Route } from './routes'
 import { join, normalize, resolve, sep } from 'node:path'
 import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
+import { mapBundleToKay } from '../build/sourcemap'
 import { registerActionRoutes } from './actions'
 import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, preferredEncoding } from './compress'
@@ -17,6 +18,7 @@ import { decodePath, refuseClashes, scanRoutes, specialPagesOf } from './routes'
 
 // Every slash at either end of a path.
 const EDGE_SLASHES = /^\/+|\/+$/g
+const SOURCE_MAP = '.js.map'
 
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
@@ -84,7 +86,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
   if (options.dev)
-    app.get(DEV_EVENTS, devEvents)
+    app.get(DEV_EVENTS, () => devEvents())
 
   const assetCopies = await encodedCopies(client.dir)
 
@@ -95,6 +97,13 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
     if (!path.startsWith(client.dir + sep) || !await Bun.file(path).exists())
       return status(404)
+
+    // Only development writes maps, and a `.kay` edit can move lines without changing the chunk the map is named after.
+    if (path.endsWith(SOURCE_MAP)) {
+      await mapBundleToKay(path)
+
+      return new Response(Bun.file(path), { headers: { 'cache-control': 'no-cache' } })
+    }
 
     const copies = assetCopies.get(path)
     const encoding = preferredEncoding(request.headers.get('accept-encoding'), copies)

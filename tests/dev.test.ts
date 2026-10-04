@@ -239,6 +239,7 @@ describe('kay dev', () => {
     const events = await app.handle(new Request('http://localhost/_kay/dev/events'))
 
     expect(events.headers.get('content-type')).toBe('text/event-stream')
-    expect(await firstEvent(events)).toMatch(/^retry: 100\nevent: boot\ndata: [\w-]+ [\w-]+\n\n$/)
+    // Its code is its own id, so pages on either side of it always reload.
+    expect(await firstEvent(events)).toMatch(/^retry: 100\nevent: boot\ndata: ([\w-]+) \1\n\n$/)
   })
 })
