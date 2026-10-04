@@ -35,6 +35,10 @@
       "types": "./types/runtime/html.d.ts",
       "default": "./src/runtime/html.ts"
     },
+    "./image": {
+      "types": "./types/runtime/image.d.ts",
+      "default": "./src/runtime/image.ts"
+    },
     "./client": {
       "types": "./types/runtime/client.d.ts",
       "default": "./src/runtime/client.ts"

@@ -1,0 +1,7 @@
+---
+import { image } from 'kay/image'
+import hero from '../hero.png'
+---
+img({...image(hero, { sizes: '100vw' })} alt="Hero")
+img({...image('/uploads/photo.png', { width: 700, height: 420 })} alt="Upload")
+img({...image('/logo.svg')} alt="Logo")

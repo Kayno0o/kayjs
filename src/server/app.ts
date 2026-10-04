@@ -2,7 +2,9 @@ import type { KayConfig } from '../config'
 import type { ClientBuild } from './client'
 import type { ServedPage } from './render'
 import type { Route } from './routes'
+import { tmpdir } from 'node:os'
 import { join, normalize, resolve, sep } from 'node:path'
+import process from 'node:process'
 import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
@@ -12,6 +14,7 @@ import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents } from './dev'
 import { loadGuards } from './guards'
+import { serveImages } from './image'
 import { registerLoader } from './loader'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
@@ -126,6 +129,14 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   })
 
   const [, publicUrls] = await Promise.all([registerActionRoutes(app, routes, { dev: options.dev, onError: options.onError }), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
+
+  serveImages(app, {
+    clientDir: client.dir,
+    // An executable runs from wherever it was copied, away from the project it was built in.
+    cacheDir: bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', 'images'),
+    dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(bundle ? process.cwd() : root, dir)])),
+    quality: options.images?.quality,
+  })
 
   if (options.site !== undefined)
     serveSitemap(app, routes, siteOrigin(options.site), publicUrls, { dev: options.dev, onError: options.onError })

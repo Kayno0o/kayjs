@@ -14,6 +14,7 @@ export interface KayConfig {
   // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it.
   site?: string
   seo?: SeoConfig
+  images?: ImagesConfig
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
@@ -37,6 +38,13 @@ export interface SeoConfig {
   locale?: string
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
   jsonLd?: Record<string, unknown>[]
+}
+
+export interface ImagesConfig {
+  // Directories of images added at runtime, such as uploads, by the URL path the app serves them at: `{ '/uploads/': 'data/uploads' }`. The image route resizes those as well as imported images, reading them on each request; a directory is relative to the root, or where an executable runs.
+  dirs?: Record<string, string>
+  // WebP quality, 1 to 100. Defaults to 80.
+  quality?: number
 }
 
 export const CONFIG_FILE = 'kay.config.ts'

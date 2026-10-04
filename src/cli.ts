@@ -15,6 +15,7 @@ import { startServer } from './lsp/server'
 import { createProject } from './new'
 import { buildClient, PRERENDERED_DIR } from './server/client'
 import { compressFiles } from './server/compress'
+import { writeImageVariants } from './server/image'
 import { prerenderPages } from './server/prerender'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
@@ -146,6 +147,8 @@ async function build(args: string[]): Promise<number> {
   try {
     const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes })
     const prerendered = await prerenderPages(root, config, client)
+
+    await writeImageVariants(client.dir, config.images?.quality)
 
     await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 

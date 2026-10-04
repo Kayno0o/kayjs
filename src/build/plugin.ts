@@ -22,6 +22,25 @@ const KAY_FILE = /\.kay(?:\?island)?$/
 const TWIN_IMPORT = /\.kay\?island$/
 // Where the bundler keeps twins: unlike the runtime loader, it resolves no specifier holding a `?`.
 const TWIN_NAMESPACE = 'kay-island'
+const RESIZABLE = /\.(?:png|jpe?g|webp)$/i
+
+async function assetModule(path: string, url: string): Promise<string> {
+  if (!RESIZABLE.test(path))
+    return `export default ${JSON.stringify(url)}`
+
+  let size: { width: number, height: number }
+
+  // A file Bun cannot decode is still served at its URL, with no variants.
+  try {
+    size = await new Bun.Image(path).metadata()
+  }
+  catch {
+    return `export default ${JSON.stringify(url)}`
+  }
+
+  return `import { registerImage } from 'kay/image'
+export default registerImage(${JSON.stringify(url)}, ${size.width}, ${size.height})`
+}
 
 export function kay(options: KayPluginOptions = {}): BunPlugin {
   return {
@@ -43,8 +62,8 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
         build.onLoad({ filter: KAY_FILE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path))
       }
 
-      // `import logo from './logo.png'` gives the URL the server serves it at, on the server and in islands alike.
-      build.onLoad({ filter: ASSET_FILE }, async ({ path }) => ({ contents: `export default ${JSON.stringify(await writeAsset(path, options.root ?? process.cwd()))}`, loader: 'js' }))
+      // `import logo from './logo.png'` gives the URL the server serves it at, on the server and in islands alike; an image also records its size for `image()`.
+      build.onLoad({ filter: ASSET_FILE }, async ({ path }) => ({ contents: await assetModule(path, await writeAsset(path, options.root ?? process.cwd())), loader: 'js' }))
     },
   }
 }
