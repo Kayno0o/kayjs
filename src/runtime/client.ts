@@ -241,7 +241,7 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
       element.textContent = ''
 
       try {
-        disposers.set(element, rendering!(element, () => render(() => module.default(props), element), values))
+        disposers.set(element, rendering!(element, () => render(() => withIds(element.dataset.uid ?? freshPrefix(), () => module.default(props)), element), values))
       }
       catch (error) {
         reportError(error, id)

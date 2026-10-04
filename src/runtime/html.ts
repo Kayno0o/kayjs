@@ -3,6 +3,7 @@
 
 import { escape, escapeAttribute } from './escape'
 import { currentServerScope, scope } from './reactive'
+import { failedIds, idMark } from './uid'
 
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
@@ -254,6 +255,8 @@ export function omit(props: object, ...keys: string[]): object {
 
 // A `try` block: what it renders, or once that throws, its `catch` block, the error reported. The marker tells an island hydrating to keep that markup as it came, since the error stayed on the server.
 export function attempt(render: () => string, fallback?: (error: unknown) => string): string {
+  const mark = idMark()
+
   try {
     return render()
   }
@@ -265,7 +268,7 @@ export function attempt(render: () => string, fallback?: (error: unknown) => str
     else
       console.error(error)
 
-    return FAILED_MARKER + (fallback?.(error) ?? '')
+    return FAILED_MARKER + failedIds(mark, () => fallback?.(error) ?? '')
   }
 }
 

@@ -2,18 +2,20 @@
 interface IdScope {
   prefix: string
   next: number
+  // `try` blocks that failed, each of whose fallback draws from a prefix of its own.
+  failed: number
 }
 
 let current: IdScope | undefined
 // The page the server is rendering: its token keeps ids apart from those of a page swapped out around a persistent island.
 let page: { token: string, islands: number } | undefined
 // For what renders outside any of these, as a component a test mounts, or one the browser renders afresh.
-let fresh = 0
+let unscoped = 0
 
 // An id for a label and its control, a trigger and its popup: one per call, unique on the page.
 export function uid(): string {
   if (!current)
-    return `K${fresh++}`
+    return `K${unscoped++}`
 
   return `${current.prefix}${current.next++}`
 }
@@ -25,7 +27,7 @@ export function withIds<T>(prefix: string, run: () => T): T {
 // Also says how many ids `run` drew, so an island that drew none needs no prefix on its slot.
 export function countIds<T>(prefix: string, run: () => T): { result: T, count: number } {
   const previous = current
-  const scope = { prefix, next: 0 }
+  const scope = { prefix, next: 0, failed: 0 }
 
   current = scope
 
@@ -35,6 +37,21 @@ export function countIds<T>(prefix: string, run: () => T): { result: T, count: n
   finally {
     current = previous
   }
+}
+
+// Where the ids of a `try` block start, to give them back if it fails.
+export function idMark(): number | undefined {
+  return current?.next
+}
+
+// The fallback of a `try` block that failed on the server: the browser keeps the server's markup there and draws none of its ids, so the block's are given back and the fallback draws from a prefix no other id has.
+export function failedIds<T>(mark: number | undefined, run: () => T): T {
+  if (!current || mark === undefined)
+    return run()
+
+  current.next = mark
+
+  return withIds(`${current.prefix}e${current.failed++}-`, run)
 }
 
 // A page render on the server: its static components draw from the page, each island from a prefix of its own.
@@ -58,5 +75,5 @@ export function islandPrefix(): string {
 
 // A prefix no server render uses, upper case where the server's are lower: the browser's, for a component it renders afresh.
 export function freshPrefix(): string {
-  return `K${fresh++}-`
+  return `K${unscoped++}-`
 }

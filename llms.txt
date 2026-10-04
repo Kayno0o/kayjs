@@ -419,7 +419,8 @@ ul(id={id} hidden={!open()})
 ```
 
 - One per call, made once per component instance as its script runs, rows of a `for` included. An island draws the same ids in the browser as the server wrote, so `for`, `aria-controls` and `id` match once it hydrates.
-- Importing `uid` alone keeps a component static; the ids of a page differ from one render to the next, so a test reads them off the markup rather than writing them.
+- Importing `uid` alone keeps a component static; the ids of a page differ from one render to the next, so a test reads them off the markup rather than writing them, and a prerendered page that revalidates gets a new ETag each time.
+- A `try` whose block fails on the server draws its `catch` block's ids apart, so the ids after it match the browser's, which keeps the server's markup there.
 
 ### Browser-only components
 

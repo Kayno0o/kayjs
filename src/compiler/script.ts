@@ -429,7 +429,12 @@ function importsReactiveValue(statement: t.Statement): boolean {
   if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || !REACTIVE_MODULES.has(statement.source.value))
     return false
 
-  return statement.specifiers.some(specifier => specifier.type !== 'ImportSpecifier' || (specifier.importKind !== 'type' && !STATIC_EXPORTS.has(specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value)))
+  return statement.specifiers.some(specifier => specifier.type !== 'ImportSpecifier' || (specifier.importKind !== 'type' && !STATIC_EXPORTS.has(importedName(specifier))))
+}
+
+// The name an import specifier takes from its module, written as an identifier or, as `import { 'a b' as c }`, a string.
+function importedName(specifier: t.ImportSpecifier): string {
+  return specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
 }
 
 function moduleSpecifier(statement: t.Statement, shift: (node: t.Node) => Span): Span[] {
@@ -452,7 +457,7 @@ function importBindings(statement: t.Statement, shift: (node: t.Node) => Span): 
     if (specifier.type === 'ImportDefaultSpecifier')
       imported = 'default'
     else if (specifier.type === 'ImportSpecifier')
-      imported = specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
+      imported = importedName(specifier)
 
     return { local: specifier.local.name, imported, source, typeOnly, span: shift(specifier), declaration }
   })
