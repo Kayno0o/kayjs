@@ -158,8 +158,13 @@
     @apply inline-flex items-center gap-inline px-2.25 py-0.75 text-xs;
   }
 
+  /* An inline SVG drawing in currentColor, sized here rather than by the 1em its import gives it. */
   .icon {
-    @apply inline-block size-5 bg-current;
+    @apply inline-block size-5 shrink-0;
+  }
+
+  .spinner {
+    @apply animate-spin;
   }
 
   .icon-btn {

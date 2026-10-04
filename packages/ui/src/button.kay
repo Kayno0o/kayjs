@@ -1,0 +1,26 @@
+---
+import type { JSX } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import Icon from './icon.kay'
+
+const { variant = 'default', icon, busy = false, label, type = 'button', expanded, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & {
+  variant?: 'default' | 'accent' | 'danger'
+  // Drawn before the label.
+  icon?: IconSlot | IconProps
+  // Spins in place of the icon while what the press started is under way.
+  busy?: boolean
+  label?: string
+  type?: 'button' | 'submit' | 'reset'
+  // Whether the disclosure the button opens is showing, for a popover or a panel it toggles.
+  expanded?: boolean
+  class?: string
+}>()
+---
+button.btn({...rest} type={type} class={[{ 'btn-accent': variant === 'accent', 'btn-danger': variant === 'danger' }, className]} aria-expanded={expanded === undefined ? undefined : String(expanded)} aria-busy={busy ? 'true' : undefined})
+  if busy
+    Icon(icon="spinner" class="spinner")
+  else if icon
+    Icon(icon={icon})
+  | {label}
+  slot

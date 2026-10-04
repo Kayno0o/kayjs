@@ -1,0 +1,13 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Icon from '@kaynooo/kayjs-ui/icon.kay'
+import home from '~icons/tabler/home'
+---
+main
+  Icon#slot(icon="close")
+  Icon#own(icon={home} label="Home")
+  Button#plain(label="Save")
+  Button#accent(variant="accent" icon="plus" type="submit") Add
+  Button#busy(busy label="Saving")
+  IconButton#delete(icon="delete" label="Delete" variant="danger" size="sm")

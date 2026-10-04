@@ -1,0 +1,21 @@
+---
+import type { JSX } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import Icon from './icon.kay'
+
+const { icon, label, size = 'md', variant = 'solid', type = 'button', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children'> & {
+  icon: IconSlot | IconProps
+  // Names the action for screen readers and, as its tooltip, for everyone else, since the button shows nothing but the icon.
+  label: string
+  size?: 'xs' | 'sm' | 'md' | 'lg'
+  variant?: 'solid' | 'ghost' | 'inline' | 'danger'
+  type?: 'button' | 'submit' | 'reset'
+  class?: string
+}>()
+
+// Only the solid and danger variants are framed by the shell's hairline.
+const framed = () => variant === 'solid' || variant === 'danger'
+---
+button.icon-btn({...rest} type={type} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} class={[{ 'shell': framed(), 'shell-danger': variant === 'danger' }, className]})
+  Icon(icon={icon})
