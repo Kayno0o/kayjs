@@ -95,13 +95,13 @@ class Generator {
     const actions = server?.exportNames.filter(name => name !== PRERENDER) ?? []
     const staticLoops = this.staticLoops
     const used = usedHelpers(this.file.template, script)
-    const helpers = used.filter(helper => helper !== 'For' || !staticLoops)
+    const helpers = used.filter(helper => helper !== 'For')
 
     if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
 
-    if (staticLoops && used.includes('For'))
-      kayHelpers.push('staticFor')
+    if (used.includes('For'))
+      kayHelpers.push(staticLoops ? 'staticFor' : 'loopFor')
 
     if (kayHelpers.length > 0)
       b.add(`import { ${kayHelpers.map(helper => `${helper} as ${kayAlias(helper)}`).join(', ')} } from 'kay'\n`)
@@ -625,7 +625,7 @@ class Generator {
 
   private emitFor(node: ForNode) {
     const { b } = this
-    const tag = helperAlias('For')
+    const tag = kayAlias('loopFor')
     // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
     const positional = node.index !== undefined && this.text(node.key).trim() === this.text(node.index)
 
@@ -1148,7 +1148,7 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
 // An attribute written with a name, which a spread is not.
 type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
 
-type KayHelper = 'formAction' | 'registerActions' | 'actionStub' | 'staticFor'
+type KayHelper = 'formAction' | 'registerActions' | 'actionStub' | 'staticFor' | 'loopFor'
 
 function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`

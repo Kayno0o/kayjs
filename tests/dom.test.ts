@@ -173,6 +173,26 @@ describe('event handlers', () => {
   })
 })
 
+describe('loops', () => {
+  it('keeps rendering components a loop iterates over as the list changes', async () => {
+    const { root, dispose } = await mountKay({
+      'a.kay': '---\nconst { v } = props<{ v: number }>()\n---\np.row A{v}\n',
+      'b.kay': '---\nconst { v } = props<{ v: number }>()\n---\np.row B{v}\n',
+      'main.kay': '---\nimport { signal } from \'kay\'\nimport A from \'./a.kay\'\nimport B from \'./b.kay\'\n\nconst list = signal([A])\n---\nbutton(onClick={() => list.set([B, A])}) Grow\nfor Row, i of list() key={Row}\n  Row(v={i})\n',
+    })
+
+    try {
+      expect([...root.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['A0'])
+      root.querySelector('button')!.click()
+      await settle()
+      expect([...root.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['B0', 'A1'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('bind:value on a number input', () => {
   it('keeps the signal\'s last number while the input is empty', async () => {
     const dir = await mkdtemp(join(import.meta.dir, '.dom-'))

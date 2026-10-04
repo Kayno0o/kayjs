@@ -108,11 +108,11 @@ describe('control flow', () => {
   it('keys a for loop by an expression and reads the item through an accessor', () => {
     const out = jsx('ul\n  for todo, i of todos key={todo.id}\n    li(data-i={i}) {todo.title}')
 
-    expect(out).toBe('<ul><KayFor each={todos} keyed={(todo) => (todo.id)}>{(todo, i) => <li data-i={i()}>{todo().title}</li>}</KayFor></ul>')
+    expect(out).toBe('<ul><KayLoopFor each={todos} keyed={(todo) => (todo.id)}>{(todo, i) => <li data-i={i()}>{todo().title}</li>}</KayLoopFor></ul>')
   })
 
   it('matches rows by position when the key is the index', () => {
-    expect(jsx('for row, i of rows key={i}\n  p {i}: {row}')).toBe('<><KayFor each={rows} keyed={false}>{(row, i) => <p>{i}: {row()}</p>}</KayFor></>')
+    expect(jsx('for row, i of rows key={i}\n  p {i}: {row}')).toBe('<><KayLoopFor each={rows} keyed={false}>{(row, i) => <p>{i}: {row()}</p>}</KayLoopFor></>')
   })
 
   it('renders the loops of a page on the server without Solid\'s For, which only islands and browsers need', () => {
@@ -120,9 +120,9 @@ describe('control flow', () => {
     const server = compileKay(page, 'src/routes/index.kay', { includeServer: true }).tsx
 
     expect(server).toContain('{KayStaticFor(__props.rows, (row, i) => <li>{i()}: {row()}</li>, false, () => <li>none</li>)}')
-    expect(server).not.toContain('KayFor ')
-    expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).toContain('<KayFor each={__props.rows}')
-    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('<KayFor each={__props.rows}')
+    expect(server).not.toContain('KayLoopFor ')
+    expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).toContain('<KayLoopFor each={__props.rows}')
+    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('<KayLoopFor each={__props.rows}')
   })
 
   it('renders a for fallback', () => {
