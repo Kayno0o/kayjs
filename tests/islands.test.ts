@@ -137,6 +137,7 @@ describe('islands', () => {
     ['an await on a plain value', 'plainpage.kay', 'button.hi', 'hi Ada 1'],
     ['props holding a Date, a Set, a Map and a bigint', 'richpage.kay', 'button.rich', '2020 1 11 3'],
     ['a generic island', 'richpage.kay', 'button.picker', 'Ada 4'],
+    ['text joining constants and signals with nothing between', 'joinedpage.kay', 'button.joined', '2AdatAda2'],
   ])('hydrates %s in an island without a key miss, its handler working at once', async (_name, file, selector, expected) => {
     const issues: string[] = []
     const warn = spyOn(console, 'warn').mockImplementation((...args) => void issues.push(args.join(' ')))

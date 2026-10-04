@@ -1,0 +1,5 @@
+---
+import Joined from './joined.kay'
+---
+main
+  Joined

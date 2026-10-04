@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+
+const n = signal(1)
+const name = 'Ada'
+const tag = `t${name}`
+---
+button.joined(onClick={() => n.set(c => c + 1)}) {n()}{name}{tag}{n()}
