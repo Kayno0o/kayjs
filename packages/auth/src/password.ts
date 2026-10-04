@@ -4,6 +4,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, hashPassword, passwordNeedsRehash } from '@kaynooo/utils'
 import { newUserRecord, publicUser } from './core'
+import { welcome } from './email'
 import { randomToken } from './keys'
 import { exhausted, spend } from './limits'
 import { safeRedirect } from './oauth/redirect'
@@ -22,7 +23,8 @@ export interface RegisterErrors {
   username?: UsernameProblem | 'taken'
 }
 
-export type RegisterResult = { ok: true, user: User } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' }
+// `signedIn` is false when the app wants the address verified first.
+export type RegisterResult = { ok: true, user: User, signedIn: boolean } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' }
 
 export interface PasswordSignInInput {
   // An email, or a username when it holds no `@`.
@@ -33,7 +35,8 @@ export interface PasswordSignInInput {
 }
 
 // `invalid` whether no account matches or the password is wrong, so the answer tells nothing of which accounts exist.
-export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' }
+// `unverified` once the password is right, when the app wants the address verified first.
+export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'unverified' }
 
 let decoy: Promise<string> | undefined
 
@@ -52,7 +55,13 @@ export async function register(state: RequestState, input: RegisterInput): Promi
     username: username === null ? undefined : usernameProblem(username),
   }
 
-  if (!errors.email && await store.users.findByEmail(email))
+  const holder = errors.email ? undefined : await store.users.findByEmail(email)
+  const requireVerified = state.core.email?.requireVerified ?? false
+
+  // An address registered and never verified, where unverified accounts cannot sign in, holds nothing worth keeping: registering again replaces it, so no one can squat an address they do not own.
+  if (holder && requireVerified && holder.emailVerifiedAt === null && (await store.identities.listByUser(holder.id)).length === 0)
+    await store.users.delete(holder.id)
+  else if (holder)
     errors.email = 'taken'
 
   if (username !== null && !errors.username && await store.users.findByUsername(username))
@@ -74,9 +83,14 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   const user = publicUser(record)
 
   await state.core.onSignUp?.(user, undefined)
+  await welcome(state, record)
+
+  if (requireVerified)
+    return { ok: true, user, signedIn: false }
+
   await state.complete(record, '/')
 
-  return { ok: true, user }
+  return { ok: true, user, signedIn: true }
 }
 
 export async function signInWithPassword(state: RequestState, input: PasswordSignInInput): Promise<PasswordSignInResult> {
@@ -101,6 +115,9 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   }
 
   await store.attempts.reset(accountKey)
+
+  if (state.core.email?.requireVerified && record!.emailVerifiedAt === null)
+    return { ok: false, error: 'unverified' }
 
   // Hashed with weaker settings, or by bcrypt in an older app: rehashed while the password is at hand.
   if (passwordNeedsRehash(record!.passwordHash!))

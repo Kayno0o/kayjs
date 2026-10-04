@@ -11,4 +11,6 @@ export interface RequestState {
   current: () => Promise<UserRecord | null>
   // Signs `record` in and answers where the browser goes next.
   complete: (record: UserRecord, redirect: string) => Promise<string>
+  // Keeps this session signed in as `record` after its session version was raised, when it is that user's.
+  renew: (record: UserRecord) => Promise<void>
 }

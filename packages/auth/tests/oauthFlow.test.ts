@@ -98,7 +98,7 @@ describe('starting an OAuth sign-in', () => {
   })
 
   test('needs the site\'s URL to build callbacks', () => {
-    expect(() => testApp({ oauth: { discord: { provider: discordProvider(), clientId: 'a', clientSecret: 'b' } } })).toThrow('needs `url`')
+    expect(() => testApp({ oauth: { discord: { provider: discordProvider(), clientId: 'a', clientSecret: 'b' } } })).toThrow('need `url`')
   })
 })
 

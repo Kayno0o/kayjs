@@ -38,6 +38,12 @@ export function testApp(options: Partial<Omit<AuthOptions<AuthSessionData, 'admi
     })
     .post('/register', async ({ auth, body }) => auth.register(body as Parameters<typeof auth.register>[0]))
     .post('/password', async ({ auth, body }) => auth.signInWithPassword(body as Parameters<typeof auth.signInWithPassword>[0]))
+    // Calls any method of `auth` with the posted arguments, so a test drives what an action would.
+    .post('/call/:method', async ({ auth, params, body }) => {
+      const method = (auth as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>)[params.method]!
+
+      return (await method.apply(auth, body as unknown[])) ?? null
+    })
     .post('/sign-out', async ({ auth }) => {
       await auth.signOut()
 
@@ -75,6 +81,10 @@ export function browser(app: { handle: (request: Request) => Promise<Response> }
       }
 
       return response
+    },
+    // Calls `auth[method](...args)` in this browser and reads the answer.
+    async call(method: string, ...args: unknown[]): Promise<any> {
+      return this.post(`/call/${method}`, args)
     },
     // Posts `body` as JSON and reads the answer.
     async post(path: string, body: unknown): Promise<any> {

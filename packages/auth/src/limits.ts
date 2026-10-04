@@ -14,6 +14,17 @@ export const DEFAULT_LIMITS = {
   signIn: { max: 40, window: 15 * MINUTE },
   signInAccount: { max: 6, window: 15 * MINUTE },
   register: { max: 6, window: HOUR },
+  // Each of these mails a way into an account, so none may flood an inbox someone else owns.
+  resend: { max: 12, window: HOUR },
+  resendAccount: { max: 3, window: HOUR },
+  forgot: { max: 12, window: HOUR },
+  forgotAccount: { max: 3, window: HOUR },
+  magicLink: { max: 12, window: HOUR },
+  magicLinkAccount: { max: 3, window: HOUR },
+  emailChange: { max: 12, window: HOUR },
+  emailChangeAccount: { max: 5, window: HOUR },
+  // Guessing a token is hopeless; this keeps trying from being free.
+  link: { max: 40, window: HOUR },
 } satisfies Record<string, Limit>
 
 export type Limits = Record<keyof typeof DEFAULT_LIMITS, Limit>

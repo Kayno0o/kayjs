@@ -32,6 +32,21 @@ export interface IdentityRecord {
   createdAt: Date
 }
 
+// What an emailed link proves once used.
+export type TokenType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email'
+
+// A link kay-auth emailed, stored as the digest of the token it carries.
+export interface TokenRecord {
+  digest: string
+  type: TokenType
+  userId: string
+  // What the link acts on: the address it verifies, or the one an email change moves to.
+  email: string
+  // Where a magic link signs in to.
+  redirect: string | null
+  expiresAt: Date
+}
+
 // Where kay-auth keeps its data. Every method may answer synchronously or with a promise.
 export interface AuthStore {
   users: {
@@ -51,6 +66,13 @@ export interface AuthStore {
     create: (identity: IdentityRecord) => MaybePromise<void>
     update: (provider: string, providerId: string, patch: Partial<Pick<IdentityRecord, 'accessToken' | 'refreshToken' | 'tokenExpiresAt'>>) => MaybePromise<void>
     delete: (provider: string, providerId: string) => MaybePromise<void>
+  }
+  tokens: {
+    create: (token: TokenRecord) => MaybePromise<void>
+    // Deletes and answers the token when it exists, has that type and has not expired: once only, even when two requests spend it together.
+    consume: (digest: string, type: TokenType) => MaybePromise<TokenRecord | undefined>
+    // Deletes the user's tokens of that type, or of every type.
+    deleteForUser: (userId: string, type?: TokenType) => MaybePromise<void>
   }
   // Attempt counts, shared by every process the store is: a window starts with its first attempt.
   attempts: {

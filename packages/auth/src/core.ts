@@ -1,3 +1,4 @@
+import type { EmailCore } from './email'
 import type { Keys } from './keys'
 import type { Limits } from './limits'
 import type { createOAuthClient } from './oauth/client'
@@ -51,6 +52,7 @@ export interface Core {
   prefix: string
   signInPage: string
   limits: Limits
+  email?: EmailCore
   oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<any, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: (profile: Profile) => boolean | Promise<boolean>

@@ -1,4 +1,4 @@
-import type { AuthStore, IdentityRecord, UserRecord } from './store'
+import type { AuthStore, IdentityRecord, TokenRecord, UserRecord } from './store'
 
 const SWEEP_EVERY = 1000
 
@@ -6,6 +6,7 @@ const SWEEP_EVERY = 1000
 export function memoryStore(): AuthStore {
   const users = new Map<string, UserRecord>()
   const identities = new Map<string, IdentityRecord>()
+  const tokens = new Map<string, TokenRecord>()
   const attempts = new Map<string, { count: number, resetAt: number }>()
   let hits = 0
   const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
@@ -62,6 +63,11 @@ export function memoryStore(): AuthStore {
           if (identity.userId === id)
             identities.delete(key)
         }
+
+        for (const [key, token] of tokens) {
+          if (token.userId === id)
+            tokens.delete(key)
+        }
       },
     },
     identities: {
@@ -84,6 +90,27 @@ export function memoryStore(): AuthStore {
       },
       delete(provider, providerId) {
         identities.delete(identityKey(provider, providerId))
+      },
+    },
+    tokens: {
+      create(token) {
+        tokens.set(token.digest, { ...token })
+      },
+      consume(digest, type) {
+        const token = tokens.get(digest)
+
+        if (!token || token.type !== type)
+          return undefined
+
+        tokens.delete(digest)
+
+        return token.expiresAt.getTime() > Date.now() ? token : undefined
+      },
+      deleteForUser(userId, type) {
+        for (const [key, token] of tokens) {
+          if (token.userId === userId && (type === undefined || token.type === type))
+            tokens.delete(key)
+        }
       },
     },
     attempts: {

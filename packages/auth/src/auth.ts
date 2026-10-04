@@ -2,6 +2,7 @@ import type { AnyElysia } from 'elysia'
 import type { Guard } from 'kay'
 import type { Session } from 'kay/server'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
+import type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult } from './email'
 import type { Limits } from './limits'
 import type { OAuthFailure } from './oauth/flow'
 import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
@@ -12,9 +13,11 @@ import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { clientAddress, rateKey } from 'kay/server'
 import { publicUser } from './core'
+import { changeEmail, confirmEmailChange, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithMagicLink, verifyEmail } from './email'
 import { createGate } from './gate'
 import { deriveKeys } from './keys'
 import { DEFAULT_LIMITS } from './limits'
+import { defaultTemplates } from './mail'
 import { createOAuthClient } from './oauth/client'
 import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow'
 import { createOAuthTokenRefresher } from './oauth/refresher'
@@ -25,6 +28,7 @@ export type { AuthSessionData, OAuthApp, Profile, User } from './core'
 
 const READ_METHODS = new Set(['GET', 'HEAD'])
 const STATE = Symbol('kay-auth.state')
+const TRAILING_SLASH = /\/$/
 
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
 export type AuthRequirement<Role extends string> = Requirement<User, Role>
@@ -43,6 +47,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string> 
   prefix?: string
   // Where a sign-in that failed goes, with `?error=` saying why; `/` by default.
   signInPage?: string
+  // Mail for email verification, password resets, magic links and email changes.
+  email?: EmailOptions
   // OAuth apps by the name their routes take: `{ discord: { provider: discordProvider(), clientId, clientSecret } }`.
   oauth?: Record<string, OAuthApp>
   // Asked with every provider account before any user is touched; false refuses the sign-in, as an allowlist does.
@@ -72,6 +78,14 @@ export class Auth {
         await this.signIn(record)
 
         return redirect
+      },
+      renew: async (record) => {
+        // Read off the session, not through `record()`: the version it holds is the one just raised past.
+        if ((await this.session.get('auth'))?.user !== record.id)
+          return
+
+        await this.session.set('auth', { user: record.id, version: record.sessionVersion })
+        this.resolving = Promise.resolve(record)
       },
     }
   }
@@ -111,14 +125,10 @@ export class Auth {
 
     const updated = await this.core.store.users.update(record.id, { sessionVersion: record.sessionVersion + 1 })
 
-    if (updated && options.keepThisOne) {
-      await this.session.set('auth', { user: updated.id, version: updated.sessionVersion })
-      this.resolving = Promise.resolve(updated)
-
-      return
-    }
-
-    await this.signOut()
+    if (updated && options.keepThisOne)
+      await this[STATE].renew(updated)
+    else
+      await this.signOut()
   }
 
   // A new user with an email and a password, signed in on this session; field errors come back as codes.
@@ -129,6 +139,46 @@ export class Auth {
   // Signs in with an email or a username and a password; a wrong password and an unknown account answer alike.
   async signInWithPassword(input: PasswordSignInInput): Promise<PasswordSignInResult> {
     return signInWithPassword(this[STATE], input)
+  }
+
+  // Mails the signed-in user a new link verifying their address.
+  async sendVerification(): Promise<MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }> {
+    return sendVerification(this[STATE])
+  }
+
+  // Spends a verification link's token: the address is verified, and the user signed in.
+  async verifyEmail(token: string): Promise<LinkResult> {
+    return verifyEmail(this[STATE], token)
+  }
+
+  // Mails a reset link to that address when an account has it; answers alike when none does.
+  async requestPasswordReset(email: string): Promise<MailRequestResult> {
+    return requestPasswordReset(this[STATE], email)
+  }
+
+  // Spends a reset link's token on a new password, signing the user out everywhere else and in here.
+  async resetPassword(token: string, password: string): Promise<ResetPasswordResult> {
+    return resetPassword(this[STATE], token, password)
+  }
+
+  // Mails a sign-in link to that address when an account has it; answers alike when none does.
+  async requestMagicLink(email: string, redirect?: string): Promise<MailRequestResult> {
+    return requestMagicLink(this[STATE], email, redirect)
+  }
+
+  // Spends a magic link's token, signing its user in.
+  async signInWithMagicLink(token: string): Promise<LinkResult> {
+    return signInWithMagicLink(this[STATE], token)
+  }
+
+  // Mails the signed-in user's new address a link confirming it.
+  async changeEmail(email: string): Promise<ChangeEmailResult> {
+    return changeEmail(this[STATE], email)
+  }
+
+  // Spends an email change link's token: the account moves to the new address, and the user's other sessions end.
+  async confirmEmailChange(token: string): Promise<LinkResult> {
+    return confirmEmailChange(this[STATE], token)
   }
 
   // A fresh access token for the signed-in user's account at `provider`, refreshed when about to expire; null without one, or once the provider refuses a refresh.
@@ -255,20 +305,22 @@ function createCore<Data extends AuthSessionData, Role extends string>(options: 
   const prefix = options.prefix ?? '/auth'
   const oauth: Core['oauth'] = new Map()
   const oauthApps = Object.entries(options.oauth ?? {})
+  const url = options.url?.replace(TRAILING_SLASH, '')
 
-  if (oauthApps.length > 0 && options.url === undefined)
-    throw new Error('kay-auth: OAuth sign-in needs `url`, the site\'s public origin, to build its callback URLs')
+  if ((oauthApps.length > 0 || options.email) && url === undefined)
+    throw new Error('kay-auth: OAuth sign-in and mailed links need `url`, the site\'s public origin, to build their URLs')
 
   for (const [name, app] of oauthApps)
-    oauth.set(name, { app, client: createOAuthClient(app.provider, { clientId: app.clientId, clientSecret: app.clientSecret, redirectUri: `${options.url!.replace(/\/$/, '')}${prefix}/${name}/callback` }) })
+    oauth.set(name, { app, client: createOAuthClient(app.provider, { clientId: app.clientId, clientSecret: app.clientSecret, redirectUri: `${url}${prefix}/${name}/callback` }) })
 
   const core: Core = {
     store: options.store,
     keys: deriveKeys(options.secret),
-    url: options.url,
+    url,
     prefix,
     signInPage: options.signInPage ?? '/',
     limits: { ...DEFAULT_LIMITS, ...options.limits },
+    email: options.email && { requireVerified: false, ...options.email, templates: { ...defaultTemplates, ...options.email.templates } },
     oauth,
     refreshers: new Map(),
     allow: options.allow,
