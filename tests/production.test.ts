@@ -269,3 +269,80 @@ describe('compression', () => {
     expect((await app.handle(new Request('http://localhost/contact', { headers: { 'accept-encoding': 'br' } }))).headers.get('content-encoding')).toBeNull()
   })
 })
+
+describe('lifecycle', () => {
+  // A server in a process of its own, with the port it printed and what it prints after.
+  async function startServer(env: Record<string, string> = {}) {
+    const server = Bun.spawn(['bun', 'tests/fixtures/production/server.ts'], { env: { ...process.env, NODE_ENV: 'production', ...env }, stdout: 'pipe', stderr: 'pipe' })
+    const reader = server.stdout.getReader()
+    let output = ''
+
+    while (!output.includes('\n')) {
+      const { value, done } = await reader.read()
+
+      if (done)
+        throw new Error(`the server exited: ${await new Response(server.stderr).text()}`)
+
+      output += new TextDecoder().decode(value)
+    }
+
+    const port = (/port (\d+)/).exec(output)![1]
+    const rest = (async () => {
+      for (;;) {
+        const { value, done } = await reader.read()
+
+        if (done)
+          return output
+
+        output += new TextDecoder().decode(value)
+      }
+    })()
+
+    return { server, url: `http://localhost:${port}`, output: async () => rest }
+  }
+
+  it('answers the health route while it takes requests', async () => {
+    const app = await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false })
+    const unhealthy = await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, health: { path: '/up', check: () => false } })
+    const health = await app.handle(new Request('http://localhost/_kay/health'))
+
+    expect(health.status).toBe(200)
+    expect(await health.text()).toBe('ok')
+    expect(health.headers.get('cache-control')).toBe('no-store')
+    expect((await unhealthy.handle(new Request('http://localhost/up'))).status).toBe(503)
+    expect((await (await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, health: false })).handle(new Request('http://localhost/_kay/health'))).status).toBe(404)
+  })
+
+  it('on SIGTERM lets open requests finish, runs the stop hooks, and exits', async () => {
+    const { server, url, output } = await startServer()
+
+    expect((await fetch(`${url}/_kay/health`)).status).toBe(200)
+
+    const slow = fetch(`${url}/slow`)
+
+    await Bun.sleep(50)
+    server.kill('SIGTERM')
+
+    expect(await (await slow).text()).toBe('slow done')
+    expect(await server.exited).toBe(0)
+    expect(await output()).toContain('jobs stopped')
+  }, 20_000)
+
+  it('closes what is still open past the shutdown timeout and exits with 1', async () => {
+    const { server, url } = await startServer({ SHUTDOWN_TIMEOUT: '0.2', SLOW_MS: '5000' })
+    const slow = (async () => {
+      try {
+        return (await fetch(`${url}/slow`)).status
+      }
+      catch {
+        return 'closed'
+      }
+    })()
+
+    await Bun.sleep(50)
+    server.kill('SIGTERM')
+
+    expect(await server.exited).toBe(1)
+    expect(await slow).toBe('closed')
+  }, 20_000)
+})

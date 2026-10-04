@@ -26,6 +26,10 @@ export interface KayConfig {
   security?: SecurityConfig | false
   // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip: for a server with no proxy in front doing it. Off by default.
   compress?: boolean
+  // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
+  health?: HealthConfig | false
+  // Seconds a stopping server gives open requests and streams to finish before closing them; 10 by default.
+  shutdownTimeout?: number
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
@@ -49,6 +53,12 @@ export interface SeoConfig {
   locale?: string
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
   jsonLd?: JsonLd[]
+}
+
+export interface HealthConfig {
+  path?: string
+  // Fails the route with 503 when it returns false or throws, such as a database that does not answer.
+  check?: () => unknown
 }
 
 export interface SecurityConfig {

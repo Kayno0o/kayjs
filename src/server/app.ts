@@ -16,6 +16,7 @@ import { DEV_EVENTS, devEvents } from './dev'
 import { FAVICON_DIR, serveFavicons } from './favicon'
 import { loadGuards } from './guards'
 import { serveImages } from './image'
+import { serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
@@ -112,6 +113,15 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (options.compress) {
     app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue) : undefined)
   }
+
+  const lifecycle = { draining: false }
+
+  if (options.health !== false)
+    serveHealth(app, lifecycle, options.health)
+
+  // `kay dev` restarts the process on every change, so it has nothing to wait for.
+  if (!options.dev)
+    stopOnSignal(app, lifecycle, options.shutdownTimeout)
 
   if (options.dev)
     app.get(DEV_EVENTS, () => devEvents())

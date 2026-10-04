@@ -713,6 +713,12 @@ Every page carries speculation rules: Chromium prefetches the page a link points
 }
 ```
 
+## Health and shutdown
+
+`/_kay/health` answers `200 ok` while the server takes requests, for a load balancer or a container's health check. `health: { path: '/up', check: async () => await db.ping() }` in kay.config.ts moves it and adds a check: one returning `false` or throwing answers 503, the error logged. `health: false` leaves the route out.
+
+On SIGTERM or SIGINT, a server started with `.listen()` stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0; the health route answers 503 meanwhile. Requests still open after `shutdownTimeout` seconds, 10 by default, are closed and the process exits with 1. `kay dev` restarts at once instead.
+
 ## Security headers
 
 Every response the app sends, its own routes included, carries a Content-Security-Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: SAMEORIGIN`. The policy:
