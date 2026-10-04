@@ -133,7 +133,7 @@ describe('kay libraries', () => {
     await write(join(outer, 'fixture'), PROJECT)
     await write(join(outer, 'fixture/node_modules/kay-lib'), LIBRARY)
     // Imported before any `testSite` call, which only the preload makes possible.
-    await Bun.write(join(outer, 'site.kay-test.ts'), `import { expect, it } from 'bun:test'\nimport { testSite } from ${JSON.stringify(resolve('src/test'))}\nimport Badge from './fixture/node_modules/kay-lib/src/badge.kay'\n\nit('renders', async () => {\n  expect(Badge).toBeFunction()\n  expect((await (await testSite({ root: 'fixture' })).visit('/')).html).toContain('hi app:hi')\n})\n`)
+    await Bun.write(join(outer, 'site.kay-test.ts'), `import { expect, it } from 'bun:test'\nimport { testSite } from ${JSON.stringify(resolve('src/test'))}\nimport Badge from './fixture/node_modules/kay-lib/src/badge.kay'\n\nit('renders', async () => {\n  expect(Badge).toBeFunction()\n  expect((await (await testSite()).visit('/')).html).toContain('hi app:hi')\n})\n`)
 
     const child = Bun.spawn([process.execPath, 'test', '--preload', resolve('src/test/preload.ts'), './site.kay-test.ts'], { cwd: outer, env: { ...process.env, KAY_ROOT: 'fixture' }, stdout: 'pipe', stderr: 'pipe' })
     const [output, code] = await Promise.all([new Response(child.stderr).text(), child.exited])

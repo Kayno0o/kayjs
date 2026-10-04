@@ -3,8 +3,7 @@ import type { Action, Success } from '../runtime/action'
 import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
-import { join, resolve } from 'node:path'
-import process from 'node:process'
+import { join } from 'node:path'
 import { Elysia } from 'elysia'
 import { withConfig } from '../config'
 import { encodeCall, readActionResponse } from '../runtime/action'
@@ -12,6 +11,7 @@ import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { servePages } from '../server/app'
 import { shutDown } from '../server/lifecycle'
+import { testRoot } from './root'
 
 export interface TestOptions extends PagesOptions {
   // The plugins the server entry uses before the pages, in order, such as `session()`: their derives reach `ctx.locals` and their cookies the next request.
@@ -77,7 +77,7 @@ const MAX_REDIRECTS = 10
 
 // The project's pages and actions without a server or a browser build: pages render their islands' markup and no scripts.
 export async function testSite(options: TestOptions = {}): Promise<TestSite> {
-  const root = resolve(options.root ?? process.cwd())
+  const root = testRoot(options.root)
   const config = await withConfig(root, options)
   const client: ClientBuild = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(root, '.kay', 'client', 'dist') }
   const pages = await servePages(root, config, async () => client)
