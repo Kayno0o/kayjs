@@ -553,6 +553,52 @@ declare module 'kay' {
 }
 ```
 
+## Sessions
+
+`session()` from `kay/server` is an Elysia plugin adding `session` to the context: `ctx.locals.session` in pages, actions and guards, `({ session })` in the app's own Elysia routes.
+
+```ts
+import type { LocalsOf } from 'kay'
+import { session, sqliteStore } from 'kay/server'
+import { env } from './env'
+
+export const sessions = session<{ userId: string }>({ secret: env.SESSION_SECRET, store: sqliteStore('sessions.sqlite') })
+
+declare module 'kay' {
+  interface Register {
+    locals: LocalsOf<typeof sessions>
+  }
+}
+```
+
+The server entry uses it before the pages: `new Elysia().use(sessions).use(await pages())`. An app with locals of its own registers `LocalsOf` of an Elysia that uses both.
+
+```kay
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const signIn = action(t.Object({ email: t.String(), password: t.String() }), async (input, ctx) => {
+  const user = await verify(input)
+
+  if (!user)
+    return ctx.fail(401, { message: 'Wrong email or password' })
+
+  await ctx.locals.session.regenerate()
+  await ctx.locals.session.set('userId', user.id)
+  ctx.redirect('/')
+})
+
+const userId = await ctx.locals.session.get('userId')
+---
+```
+
+- `get(key)`, `set(key, value)` and `unset(key)` are typed from the plugin's type parameter. `destroy()` forgets the session and clears its cookie, for signing out. `regenerate()` moves the data to a new id, for right after signing in, so an id planted before it is worth nothing. All of them return promises.
+- `secret` is at least 32 characters, read from the environment. A list rotates secrets: the first seals new cookies, every one opens old ones.
+- Without a `store`, the data travels in the cookie, sealed with AES-GCM so it can be neither read nor altered, about 3.5 KB at most: past that the response fails with an error saying so. With a store, the cookie carries only a sealed id. `memoryStore()` keeps sessions in the process, gone on restart. `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine. Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, is a store too, such as one over Redis.
+- Values cross as island props do, Dates, Maps, Sets and bigints included.
+- The cookie, `session` unless `cookie` names another, is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` over https, `X-Forwarded-Proto` included. It is read on first use only, and written only when the session changed or is due an extension: a session lasts `maxAge` seconds without use, 30 days by default, and one used past half of it is extended. A forged or expired cookie reads as an empty session and is cleared.
+
 ## Environment
 
 `defineEnv` from `kay/server` reads `process.env` once against a schema, as the server boots, and gives it back typed:

@@ -244,8 +244,8 @@ function refuseCrossSite(request: Request) {
     throw new Refusal(new Response('Cross-site action refused', { status: 403 }))
 }
 
-// Over https, the flash cookie never travels in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came.
-function overHttps(request: Request): boolean {
+// Over https, kay's cookies never travel in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came.
+export function overHttps(request: Request): boolean {
   return new URL(request.url).protocol === 'https:' || FORWARDED_HTTPS.test(request.headers.get('x-forwarded-proto') ?? '')
 }
 

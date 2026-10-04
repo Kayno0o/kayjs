@@ -1,0 +1,18 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const signIn = action(t.Object({ user: t.String() }), async ({ user }, ctx) => {
+  await ctx.locals.session.regenerate()
+  await ctx.locals.session.set('user', user)
+  ctx.redirect('/account')
+})
+
+export const signOut = action(t.Object({}), async (_, ctx) => {
+  await ctx.locals.session.destroy()
+  ctx.redirect('/account')
+})
+
+const user = await ctx.locals.session.get('user')
+---
+p.user {user ?? 'nobody'}

@@ -19,6 +19,8 @@ export type { ScriptHashOptions } from './csp'
 export { inlineScriptHashes } from './csp'
 export { defineEnv } from './env'
 export type { Route } from './routes'
+export type { Session, SessionData, SessionOptions, SessionStore } from './session'
+export { memoryStore, session, sqliteStore } from './session'
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
