@@ -1,4 +1,5 @@
 import type { KayConfig } from '../config'
+import type { ApiModule } from './api'
 import type { Route, SpecialPages } from './routes'
 
 // What `kay build --compile` bakes into an executable: the routes as the build scanned them, every module they name, and where the embedded client build and public files sit.
@@ -8,6 +9,8 @@ export interface Bundle {
   routes: Route[]
   // The routes directory's own special pages, answering URLs no page serves.
   fallback: SpecialPages
+  // The modules under the API directory, mounted under `/api`.
+  api?: ApiModule[]
   modules: Record<string, unknown>
   config: KayConfig
   clientDir: string
@@ -28,7 +31,7 @@ export function bundled(): Bundle | undefined {
 // Bun already imports a file once per process; keeping what it gave spares every request the cost of asking it again.
 const imported = new Map<string, unknown>()
 
-// A page, layout, special page or guard: the executable's own copy, or the file imported through the `.kay` loader.
+// A page, layout, special page, guard or API module: the executable's own copy, or the file imported through the `.kay` loader.
 export async function importModule<Module>(file: string): Promise<Module> {
   if (bundle) {
     if (!(file in bundle.modules))

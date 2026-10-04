@@ -9,6 +9,7 @@ import { isCollection } from '../content'
 import { isAction } from '../runtime/action'
 import { runInLocale } from '../runtime/i18n.server'
 import { IMAGE_ROUTE } from '../runtime/image'
+import { scanApi } from './api'
 import { basePath } from './base'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { loadI18n, localeCopies, stateFor } from './i18n'
@@ -125,8 +126,10 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
     }
   }
 
-  if (problems.length > 0)
-    throw new ExportError(`kay: ${count(problems.length)} cannot be exported to static files, which no server answers for:\n${problems.map(problem => `  ${problem}`).join('\n')}`)
+  const apiProblems = options.exportAll ? (await scanApi(resolve(root, config.api ?? 'src/api'))).map(module => `${relative(root, module.file)}: an API module answers requests, which only a server does`) : []
+
+  if (problems.length > 0 || apiProblems.length > 0)
+    throw new ExportError(`kay: ${[count(problems.length, 'page'), count(apiProblems.length, 'API module')].filter(part => part !== '').join(' and ')} cannot be exported to static files, which no server answers for:\n${[...problems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)
 
   await writeManifest(root, { ...manifest, pages })
   client.pages = new Map(Object.entries(pages))
@@ -145,8 +148,11 @@ function refuseServerOnly(route: Route, module: Record<string, unknown>): void {
     throw new Error(`kay: it exports the action ${action}, which only a server can take`)
 }
 
-function count(problems: number): string {
-  return problems === 1 ? '1 page' : `${problems} pages`
+function count(problems: number, what: string): string {
+  if (problems === 0)
+    return ''
+
+  return problems === 1 ? `1 ${what}` : `${problems} ${what}s`
 }
 
 // The headers a prerendered page is served with: the cookies its render set were for no one.

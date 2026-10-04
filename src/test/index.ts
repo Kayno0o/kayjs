@@ -1,4 +1,5 @@
 import type { Action, Success } from '../runtime/action'
+import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
 import { join, resolve } from 'node:path'
@@ -6,7 +7,10 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { withConfig } from '../config'
 import { encodeCall, readActionResponse } from '../runtime/action'
+import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
+import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { servePages } from '../server/app'
+import { shutDown } from '../server/lifecycle'
 
 export interface TestOptions extends PagesOptions {
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
@@ -35,11 +39,37 @@ export interface TestSite {
   submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot, FormValue | FormValue[]>>, init?: VisitInit & { from?: string }) => Promise<Visit>
   // The call an island makes: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
   call: <Input, Output>(action: Action<Input, Output>, input: Input, init?: VisitInit) => Promise<Success<Output>>
+  // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
+  fetch: (path: string, init?: Omit<RequestInit, 'headers'> & VisitInit) => Promise<Response>
+  // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
+  socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => TestSocket<SocketOf<Module, Path>>
+  // A route of a module under `src/api` answering with `events()`, read as an island reads it.
+  stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
   cookies: Bun.CookieMap
   handle: (request: Request) => Promise<Response>
+  // Stops the server `socket()` started, if any.
+  close: () => Promise<void>
+}
+
+type Received<Client> = Client extends { on: (listener: (value: infer Value) => void) => unknown } ? Value : never
+
+export type TestSocket<Client> = Client & {
+  // Every message received so far, in order.
+  received: Received<Client>[]
+  // The oldest message `next()` has not returned yet, waiting for one when there is none.
+  next: () => Promise<Received<Client>>
+}
+
+export type TestStream<Client> = Client & {
+  received: Received<Client>[]
+  next: () => Promise<Received<Client>>
+  // Every value, once the stream ended, failed or was closed.
+  finished: () => Promise<Received<Client>[]>
 }
 
 const ORIGIN = 'http://localhost'
+// The DOM typings of WebSocket hide the options Bun takes, the upgrade's headers among them.
+const BunWebSocket = WebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
 const MAX_REDIRECTS = 10
 
 // The project's pages and actions without a server or a browser build: pages render their islands' markup and no scripts.
@@ -52,12 +82,17 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const app = locals ? new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request)).use(pages) : pages
   const cookies = new Bun.CookieMap()
 
-  const send = async (path: string, init: RequestInit & VisitInit): Promise<Response> => {
-    const headers = new Headers(init.headers)
+  const cookieHeader = (headers: Headers) => {
     const sent = [...cookies].map(([name, value]) => `${name}=${value}`).join('; ')
 
     if (sent !== '')
       headers.set('cookie', sent)
+
+    return headers
+  }
+
+  const send = async (path: string, init: RequestInit & VisitInit): Promise<Response> => {
+    const headers = cookieHeader(new Headers(init.headers))
 
     const response = await app.handle(new Request(new URL(path, ORIGIN), { ...init, headers, redirect: 'manual' }))
 
@@ -94,9 +129,58 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return { url: path, status: current.status, headers: current.headers, html: await current.text() }
   }
 
+  let server: Bun.Server<unknown> | undefined
+
+  const listening = (): Bun.Server<unknown> => {
+    if (!server) {
+      app.listen({ port: 0, hostname: 'localhost' })
+      server = app.server!
+      server.unref()
+    }
+
+    return server
+  }
+
   return {
     cookies,
     handle: async request => app.handle(request),
+    fetch: async (path, init = {}) => send(path, init),
+    socket: (module, path, ...[options]) => {
+      const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
+      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: Object.fromEntries(cookieHeader(new Headers(options?.headers))) }))
+      const tested = Object.assign(client, inbox(client))
+
+      client.start()
+
+      return tested as never
+    },
+    stream: (module, path, ...[options]) => {
+      const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
+      const init = streamRequest(options)
+      const reader = readEvents(async signal => send(url, { ...init, headers: { ...init.headers, ...options?.headers }, signal }), init.method === 'GET')
+      const tested = Object.assign(reader, inbox(reader))
+      const finished = new Promise<unknown[]>((resolve) => {
+        reactiveRoot(dispose => effect(() => {
+          const status = reader.status()
+
+          if (status !== 'connecting' && status !== 'open') {
+            dispose()
+            resolve(tested.received)
+          }
+        }))
+      })
+
+      Object.assign(tested, { finished: async () => finished })
+      reader.start()
+
+      return tested as never
+    },
+    close: async () => {
+      if (server)
+        await shutDown(app)
+
+      server = undefined
+    },
     visit: async (path, init = {}) => follow(await send(path, { headers: init.headers }), path, init.headers),
     submit: async (action, fields, init = {}) => {
       const from = init.from ?? '/'
@@ -122,5 +206,28 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
       return readActionResponse(await send(action.url, { method: 'POST', headers: { ...headers, origin: ORIGIN, ...init.headers }, body }))
     },
+  }
+}
+
+// Keeps every message a client receives, for a test to read in order.
+function inbox<T>(client: Pick<EventReader<T>, 'on'>): { received: T[], next: () => Promise<T> } {
+  const received: T[] = []
+  const waiting: ((value: T) => void)[] = []
+  let read = 0
+
+  client.on((value) => {
+    received.push(value)
+
+    const waiter = waiting.shift()
+
+    if (waiter) {
+      read++
+      waiter(value)
+    }
+  })
+
+  return {
+    received,
+    next: async () => read < received.length ? received[read++]! : new Promise<T>(resolve => waiting.push(resolve)),
   }
 }

@@ -11,6 +11,8 @@ import { join } from 'node:path'
 export interface KayConfig {
   // Page directory, relative to the root. Defaults to `src/routes`.
   routes?: string
+  // Elysia modules mounted under `/api` by their path, relative to the root: `src/api/chat.ts` serves `/api/chat`. Defaults to `src/api`.
+  api?: string
   // Files served as they are at their path, relative to the root. Defaults to `public`.
   publicDir?: string
   minify?: boolean

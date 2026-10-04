@@ -109,8 +109,8 @@ async function runCheck(args: string[]): Promise<number> {
   if (root === undefined)
     return 1
 
-  const { routes, publicDir, content, redirects, i18n } = await loadConfig(root)
-  const diagnostics = await check(root, { tsconfig, routes, publicDir, content, redirects, i18n })
+  const { routes, publicDir, api, content, redirects, i18n } = await loadConfig(root)
+  const diagnostics = await check(root, { tsconfig, routes, publicDir, api, content, redirects, i18n })
 
   const sources = new Map<string, string | undefined>()
 
@@ -168,7 +168,7 @@ async function build(args: string[]): Promise<number> {
     if (exported)
       refuseStaticConfig(config)
 
-    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, base: basePath(config.base) })
+    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, base: basePath(config.base) })
     // Before prerendering, whose pages read the collections from what it writes.
     const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
 

@@ -250,6 +250,9 @@ describe('kay build --compile', () => {
         'src/content/notes/first.md': '---\ntitle: First note\ndate: 2026-09-01\n---\n\n## Read me\n',
         'src/routes/notes/[slug].kay': '--- server\nimport { notes } from \'../../content.config\'\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\nconst { Content } = note\n---\nh1 {note.data.title}\nContent\n',
         'src/routes/photo.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero)} alt="Hero")\n',
+        'src/api/ping.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'pong\')\n',
+        'src/api/members/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Members only\'))\n',
+        'src/api/members/index.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'secret\')\n',
         'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }] })\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
       // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
@@ -291,6 +294,8 @@ describe('kay build --compile', () => {
         expect(badges.text).toContain('<slot data-component="src/components/tally.kay" data-props="[{}]"><!--[--><ul class="badges"><li><!--[--><i class="dot"></i><!--]--><!--[-->IN<!--]--></li></ul><!--]--><button>0</button></slot>')
         expect(parse(await call.text())).toBe('HI')
         expect(await get('/admin')).toEqual({ status: 403, text: 'Admins only' })
+        expect(await get('/api/ping')).toEqual({ status: 200, text: 'pong' })
+        expect(await get('/api/members')).toEqual({ status: 403, text: 'Members only' })
         expect((await get('/missing')).text).toContain('<h1>Nothing here</h1>')
 
         const photo = await get('/photo')

@@ -30,7 +30,7 @@ interface FieldSchema {
   anyOf?: FieldSchema[]
 }
 
-interface ActionRequest {
+export interface GuardedRequest {
   jar: CookieJar
   headers: Headers
 }
@@ -41,7 +41,7 @@ class Refusal {
 }
 
 // What the guards set on the response, carried to the handler they let through.
-const guarded = new WeakMap<Request, ActionRequest>()
+const guarded = new WeakMap<Request, GuardedRequest>()
 const TEXT = 'text/plain; charset=utf-8'
 // What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
 const SAME_SITE_FETCH = new Set(['same-origin', 'none'])
@@ -240,13 +240,17 @@ function isEmptyFile(value: unknown): boolean {
 }
 
 // Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused before anything else runs.
-// A browser names where a post comes from in `Origin`, and in `Sec-Fetch-Site` too, which it sends even when it leaves `Origin` out.
 function refuseCrossSite(request: Request) {
+  if (isCrossSite(request))
+    throw new Refusal(new Response('Cross-site action refused', { status: 403 }))
+}
+
+// A browser names where a request comes from in `Origin`, and in `Sec-Fetch-Site` too, which it sends even when it leaves `Origin` out.
+export function isCrossSite(request: Request): boolean {
   const origin = request.headers.get('origin')
   const site = request.headers.get('sec-fetch-site')
 
-  if ((origin !== null && !sameHost(request, origin)) || (site !== null && !SAME_SITE_FETCH.has(site)))
-    throw new Refusal(new Response('Cross-site action refused', { status: 403 }))
+  return (origin !== null && !sameHost(request, origin)) || (site !== null && !SAME_SITE_FETCH.has(site))
 }
 
 // Over https, kay's cookies never travel in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came.
@@ -254,7 +258,7 @@ export function overHttps(request: Request): boolean {
   return new URL(request.url).protocol === 'https:' || FORWARDED_HTTPS.test(request.headers.get('x-forwarded-proto') ?? '')
 }
 
-function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
+export function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
   if (!options.i18n)
     return run()
 
@@ -270,8 +274,20 @@ function contextLocale(): string {
 
 // The guards of the action's page, answering for it when one stops the request.
 async function admit(guards: LoadedGuard[], context: { request: Request }, options: ActionOptions): Promise<Response | undefined> {
+  const passed = await passGuards(guards, context, options)
+
+  if (passed instanceof Response)
+    return passed
+
+  guarded.set(context.request, passed)
+
+  return undefined
+}
+
+// Runs the guards of an action or an API route: the response when one stops the request, else the cookies and headers they set.
+export async function passGuards(guards: LoadedGuard[], context: { request: Request }, options: ActionOptions): Promise<Response | GuardedRequest> {
   const { request } = context
-  const state: ActionRequest = { jar: cookieJar(request), headers: new Headers() }
+  const state: GuardedRequest = { jar: cookieJar(request), headers: new Headers() }
   const ctx: GuardContext = {
     request,
     url: new URL(request.url),
@@ -290,12 +306,7 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, optio
   }
   const refusal = await runGuards(guards, ctx)
 
-  if (refusal)
-    return stopped(refusal.error, request, state, options)
-
-  guarded.set(request, state)
-
-  return undefined
+  return refusal ? stopped(refusal.error, request, state, options) : state
 }
 
 // Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http.
@@ -366,7 +377,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 }
 
 // A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.
-function stopped(error: unknown, request: Request, { jar, headers }: ActionRequest, { dev, onError }: ActionOptions): Response {
+function stopped(error: unknown, request: Request, { jar, headers }: GuardedRequest, { dev, onError }: ActionOptions): Response {
   if (error instanceof Redirect) {
     // `fetch` would follow a `location` and hand the island the next page's HTML; a call reads where to go instead.
     headers.set(isCall(request) ? REDIRECT_HEADER : 'location', error.location)

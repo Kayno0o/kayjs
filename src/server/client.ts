@@ -10,6 +10,7 @@ import { kay } from '../build/plugin'
 import { forgetBundleMaps } from '../build/sourcemap'
 import { styleImports, withoutStyles } from '../build/styles'
 import { analyzeKayCached, KayCompileError } from '../build/transform'
+import { apiStubs, scanApi } from './api'
 import { rebaseCss } from './base'
 
 // Written beside the bundle as `manifest.json`, so a production server reads it instead of bundling at boot.
@@ -52,6 +53,8 @@ export interface ClientOptions {
   plugins?: BunPlugin[]
   // Page directory relative to the root: its pages and layouts are where stylesheets are gathered from.
   routes?: string
+  // API directory relative to the root: an island importing a module there gets where its routes are served, not its code.
+  api?: string
   // Links each island chunk to a map of its `.kay` sources, for the browser's devtools; the server points a map at them as it first serves it.
   sourcemap?: boolean
   // The site's mount point, which the stylesheets' own paths go under, `url(/bg.png)` included.
@@ -156,6 +159,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     return { entryImports: [], islands: {} }
 
   const entryFile = join(base, 'entry.ts')
+  const apiDir = resolve(root, options.api ?? 'src/api')
   const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
 
   // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`.
@@ -172,7 +176,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
     define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') },
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
-    plugins: [withoutStyles(), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache') }), ...options.plugins ?? []],
+    plugins: [withoutStyles(), apiStubs(apiDir, await scanApi(apiDir)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache') }), ...options.plugins ?? []],
   })
 
   if (!build.success)

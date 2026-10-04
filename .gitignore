@@ -9,3 +9,4 @@ dist
 tests/.dom-*
 tests/.canary-*
 .claude/scheduled_tasks.lock
+tests/fixtures/live/src/**/*.kay

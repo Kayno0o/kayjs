@@ -18,16 +18,16 @@ export interface Refusal {
 }
 
 export async function loadGuards(route: Route): Promise<ServedRoute> {
-  const guards = await Promise.all(route.guards.map(async (guard) => {
-    const check = (await importModule<{ default?: unknown }>(guard.file)).default
+  return { ...route, guards: await Promise.all(route.guards.map(loadGuard)) }
+}
 
-    if (typeof check !== 'function')
-      throw new TypeError(`kay: ${guard.file} must export a guard by default: export default guard(ctx => ...)`)
+export async function loadGuard(guard: GuardFile): Promise<LoadedGuard> {
+  const check = (await importModule<{ default?: unknown }>(guard.file)).default
 
-    return { ...guard, check: check as Guard }
-  }))
+  if (typeof check !== 'function')
+    throw new TypeError(`kay: ${guard.file} must export a guard by default: export default guard(ctx => ...)`)
 
-  return { ...route, guards }
+  return { ...guard, check: check as Guard }
 }
 
 // Outermost first, each one awaited before the next; the first that stops the request is the answer.

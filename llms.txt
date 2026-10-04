@@ -739,6 +739,54 @@ export default guard(({ locals, redirect, deny }) => {
 - A denied page renders the nearest `_error.kay` outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
 - A layout's `ctx.redirect` is no guard: actions never run layout loads. Neither is an Elysia `onBeforeHandle` testing the page's path: actions are served under `/_kay/action/`.
 
+## API routes
+
+Each `.ts` module under `src/api/`, the `api` option of `kay.config.ts` naming another directory, exports an Elysia instance by default, which `pages()` mounts at `/api` plus its path there, with nothing to register: `src/api/chat.ts` serves its routes under `/api/chat`, `src/api/index.ts` under `/api`. Files and directories starting with `_`, and `.test.ts` files, are left out.
+
+```ts
+import { t } from 'elysia'
+import { api, events } from 'kay/server'
+import { complete, listRooms } from '../data'
+
+export default api()
+  .get('/rooms', () => listRooms())
+  .ws('/:room', {
+    body: t.Object({ text: t.String() }),
+    response: t.Object({ from: t.String(), text: t.String() }),
+    message(ws, { text }) {
+      ws.send({ from: ws.data.user?.name ?? 'guest', text })
+    },
+  })
+  .post('/answer', ({ body }) => events(complete(body.prompt)), { body: t.Object({ prompt: t.String() }) })
+```
+
+- `api()` is a `new Elysia()` whose handlers read the app's locals, typed through `Register`: `({ user })`, `ws.data.user`. A plain `new Elysia()` is mounted the same way.
+- A `_guard.ts` in `src/api/` or below runs before every route of the modules in its directory and below, outermost first, a websocket upgrade included, as it does for pages and actions: a redirect or a denial answers the request, and the cookies and headers it sets go out with the route's response.
+- A websocket upgrade another site sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403 once the guards let it through, since a browser lets any page open a websocket to any host with the user's cookies.
+- `events(source)` answers with server-sent events, one per value an async iterable, a generator or an array gives, crossing as island props do, Dates, Maps and Sets included. The source is read once the browser reads the response and stopped when it goes away; a source that throws ends the stream as failed, the error logged and handed to `onError`. A comment line every 5 seconds keeps a quiet stream open past Bun's `idleTimeout` and a proxy's.
+- `kay check` checks links and redirects against the modules' GET routes, `/api/chat/rooms` here; `kay build --compile` embeds the modules, and `kay build --static` refuses them.
+
+An island imports a module for its routes:
+
+```kay
+---
+import { signal, socket, stream } from 'kay'
+import chat from '../api/chat'
+
+const { room } = props<{ room: string }>()
+const messages = socket(chat, '/:room', { params: { room } })
+const text = signal('')
+---
+p {messages.status()}
+p {messages.last()?.text}
+input(bind:value={text})
+button(onClick={() => messages.send({ text: text() })}) Send
+```
+
+- `socket(module, path, options)` opens one of the module's websocket routes, the path written as the module writes it, `params` and `query` filling it in, all typed from the route. `send` takes the route's `body`, `last()` reads the last message reactively, typed from its `response`, `on(listener)` gets each one and returns what stops it, and `status()` is `connecting`, `open` or `closed`. Messages travel as Elysia sends them, as JSON. What is sent before the connection opens goes once it does. A connection that drops reconnects, waiting longer each time up to 30 seconds, unless the server closed it with code 1000; `close()` closes it for good.
+- `stream(module, path, options)` reads one of its routes answering with `events()`, with `last()`, `on()` and `status()` the same way, `status()` being `done` once the stream ran to its end and `failed` when a guard or the route refused it or its source threw. `{ method: 'post', body }` reads a route taking a body, such as an AI answer. A GET stream that drops reconnects; any other ends as failed.
+- Both open once the island is in the page, never on the server, and close with the component that opened them. The browser build gives the island the module's mount and none of its code, so its other exports never reach the browser.
+
 ## Testing
 
 `kay/test` serves the project's pages and actions inside the test process, with no server and no browser build:
@@ -758,13 +806,15 @@ it('shows why a todo was refused', async () => {
 ```
 
 - `site.visit(path)` GETs a page and follows redirects, stopping at one to another site. `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page. Both resolve with `{ url, status, headers, html }`. `site.call(action, input)` calls an action as an island does, resolving with its result, throwing `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
+- `site.fetch(path, init)` sends any request, an API route's included, with the cookies so far, and resolves with the response as it is, redirects not followed.
+- `site.socket(module, path, options)` opens a websocket route and `site.stream(module, path, options)` reads an event stream as an island does, the options taking `headers` too. Both keep every message in `received` and resolve `next()` with the oldest one not read yet, waiting for one if need be; a stream's `finished()` resolves with all its values once it ended. `site.socket` starts the site on a free port the first time, which `site.close()` stops.
 - Cookies a response sets go with the next request and read as `site.cookies`. `locals` stands in for the app's Elysia `derive`, called with each request.
 - Pages render their islands' markup without scripts. Test files import `.kay` files through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test.
 
 ## What `kay check` verifies
 
 - Every expression, prop and server name, as TypeScript does.
-- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/` and the GET routes of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a path may be spelled as written or percent-encoded, `/café` or `/caf%C3%A9`; a catch-all such as `docs/[...path]`, or an app route such as `/files/*`, is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
+- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/`, the GET routes of the modules under `src/api/` and those of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a path may be spelled as written or percent-encoded, `/café` or `/caf%C3%A9`; a catch-all such as `docs/[...path]`, or an app route such as `/files/*`, is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
 - Island props passed from static components can be serialized: no functions or class instances.
 - Every content collection entry against its schema and the components its collection names, reported at the entry's line.
@@ -837,7 +887,7 @@ export default defineConfig({
 
 `kay build --static` writes the site to `dist`, or `--outdir`, for any static host: Forgejo Pages, a CDN, plain nginx.
 
-- Every page is rendered: one without params as it is, one with params for the values its `prerender` lists. A page a guard covers, one exporting an action, one with params and no list, one exporting `prerender = false`, one that redirects or answers another status than 200, one linking an image only the image route makes, and one whose render fails cannot be served without a server, and the build fails naming each of them.
+- Every page is rendered: one without params as it is, one with params for the values its `prerender` lists. A page a guard covers, one exporting an action, one with params and no list, one exporting `prerender = false`, one that redirects or answers another status than 200, one linking an image only the image route makes, and one whose render fails cannot be served without a server, nor can a module under `src/api/`, and the build fails naming each of them.
 - Each page is written as `about.html` and `about/index.html`, so a host finds it at `/about` and `/about/` alike, `/` as `index.html`; the browser build goes under `_kay/`, the public files at the root, with the sitemap, `robots.txt`, feeds, favicons and `404.html` from `_404.kay`. Every compressible file has its `.br` and `.gz` copy beside it, for a server sending them as they are (nginx's `gzip_static`), and asset names carry their hash, so `_kay/` can be cached forever.
 - Imported images link the variants the build writes, `/_kay/images/hero-640.webp`, since no image route answers; an image from `images.dirs` is not exported.
 - A redirect without params becomes a page sending the browser on with `<meta http-equiv="refresh">`; every redirect also goes to `_redirects`, read by hosts such as Netlify and Cloudflare Pages. With `i18n.prefixDefault`, each unprefixed path sends the browser to the default locale's copy. Locales by domain need a server.
@@ -930,7 +980,7 @@ With no proxy in front compressing responses, `compress: true` in kay.config.ts 
 - `kay new <dir> [--kay <dependency>] [--template server|site]`: scaffold a project in an empty directory, an Elysia server by default or, with `--template site`, a static site whose `bun run build` runs `kay build --static`, with a Forgejo Pages workflow publishing `dist` to the `gitea-pages` branch under `/<owner>/<repo>` and a `Dockerfile` serving it with nginx instead; `--kay` sets the `kay` dependency, by default `npm:@kaynooo/kay@^<its version>`, or a packed copy when run from a checkout of kay. The package is named after the directory, lower case with other characters turned into `-`.
 - `kay dev [entry]`: run the server entry (default `src/server.ts`) with `NODE_ENV=development`, restarting it on every change; open pages reload by themselves, or only swap their stylesheets when nothing but `.css` files changed, and a project that fails to compile shows its errors in the browser. Island chunks carry source maps, so the browser's devtools show and break on `.kay` lines. The next server process waits with kay already loaded, and compiled files are kept in `.kay/cache`, so a restart compiles only the file that changed. A change to a file at the project root, such as `.env` or `package.json`, starts a fresh process, which reads the new `.env` values (variables set in the shell still win, unless they equal the file's value).
 - `kay build [dir]`: bundle the islands and stylesheets for production, minified, into `.kay/client`, and render the pages marked `prerender`; then start the server with `NODE_ENV=production`. Each page preloads the chunks of the islands it renders. Every text file it writes, prerendered pages included, gets a brotli and a gzip copy, sent to a browser whose `Accept-Encoding` takes one, with `Vary: Accept-Encoding`; other responses go uncompressed, left to a proxy in front, unless `compress` is on.
-- `kay build [dir] --compile <executable> [--entry src/server.ts]`: the same, then bundles the server entry, every page, layout, special page and guard, `kay.config.ts` and the client build and public files into one executable, which runs from anywhere as the production server would: `PORT=8080 ./server`. It reads nothing of the project from disk but a `.env` and `bunfig.toml` where it runs, as `bun` would, so a file a page reads at runtime by path, rather than importing it, is not in it; the root, routes and public directory it was built with win over the options given to `pages()`. `--compile` and `--entry` are relative to the current directory. The public directory cannot be named `client`.
+- `kay build [dir] --compile <executable> [--entry src/server.ts]`: the same, then bundles the server entry, every page, layout, special page, guard and API module, `kay.config.ts` and the client build and public files into one executable, which runs from anywhere as the production server would: `PORT=8080 ./server`. It reads nothing of the project from disk but a `.env` and `bunfig.toml` where it runs, as `bun` would, so a file a page reads at runtime by path, rather than importing it, is not in it; the root, routes and public directory it was built with win over the options given to `pages()`. `--compile` and `--entry` are relative to the current directory. The public directory cannot be named `client`.
 - `kay build [dir] --static [--outdir dist]`: the same, then writes the whole site to `--outdir` for a host with no server; see Static export.
 - `kay check [dir] [-p tsconfig.json]`: type-check the project, `.kay` files included; `-p` is relative to `dir`, and a tsconfig that is missing or matches no files fails the check.
 - `kay fmt [paths...] [--check]`: format `.kay` files; `--check` lists unformatted files and fails.

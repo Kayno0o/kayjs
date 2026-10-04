@@ -12,6 +12,8 @@ import { bootFailure } from './dev'
 
 export type { KayConfig } from '../config'
 export { defineConfig } from '../config'
+export type { ApiModule } from './api'
+export { api, events } from './api'
 export type { PagesOptions } from './app'
 export type { Bundle } from './bundle'
 // For the entry `kay build --compile` generates.
@@ -74,5 +76,5 @@ async function clientFor(root: string, options: PagesOptions): Promise<ClientBui
     console.warn('kay: no client build in .kay/client, bundling now; run `kay build` before starting in production')
   }
 
-  return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes, sourcemap: options.dev, base: basePath(options.base) })
+  return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes, api: options.api, sourcemap: options.dev, base: basePath(options.base) })
 }

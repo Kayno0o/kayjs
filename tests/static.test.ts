@@ -112,6 +112,7 @@ describe('kay build --static', () => {
   it('names every page only a server could answer, and fails', async () => {
     const guarded = join(FIXTURE, 'src/routes/members')
     const tags = join(FIXTURE, 'src/routes/tags')
+    const api = join(FIXTURE, 'src/api')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
 
     try {
@@ -119,11 +120,13 @@ describe('kay build --static', () => {
       await Bun.write(join(guarded, 'index.kay'), 'h1 Members\n')
       await Bun.write(join(tags, '[tag].kay'), 'h1 Tag\n')
       await Bun.write(join(tags, 'gone.kay'), '--- server\nctx.redirect(\'/about\')\n---\np x\n')
+      await Bun.write(join(api, 'ping.ts'), 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'pong\')\n')
 
       const { code, errors } = await exportSite(elsewhere)
 
       expect(code).toBe(1)
-      expect(errors).toContain('kay: 3 pages cannot be exported to static files, which no server answers for:')
+      expect(errors).toContain('kay: 3 pages and 1 API module cannot be exported to static files, which no server answers for:')
+      expect(errors).toContain('src/api/ping.ts: an API module answers requests, which only a server does')
       expect(errors).toContain('src/routes/tags/gone.kay: /tags/gone redirects to /about, which no static host does')
       expect(errors).toContain('src/routes/members/index.kay: a guard covers it, and only a server can run one per request')
       expect(errors).toContain('src/routes/tags/[tag].kay: it takes tag, so `prerender` lists the values to export')
@@ -131,6 +134,7 @@ describe('kay build --static', () => {
     finally {
       await rm(guarded, { recursive: true, force: true })
       await rm(tags, { recursive: true, force: true })
+      await rm(api, { recursive: true, force: true })
       await rm(elsewhere, { recursive: true, force: true })
     }
   })

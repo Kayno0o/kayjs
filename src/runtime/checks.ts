@@ -14,7 +14,7 @@ export interface IslandBrand { readonly [ISLAND]: true }
 // What an interactive component's default export is; only islands take `hydrate`.
 export type IslandComponent<Props> = ((props: Props & { hydrate?: HydrateWhen }) => JSX.Element) & IslandBrand
 
-// Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every page route and public file, and by the app with `locals: LocalsOf<typeof auth>` and `app: typeof app`.
+// Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every page route, public file and API module, and by the app with `locals: LocalsOf<typeof auth>` and `app: typeof app`.
 export interface Register {}
 
 // Nothing is readable off `ctx.locals` until the app registers its type.
@@ -52,9 +52,15 @@ type TreeMatches<Segments extends readonly string[], Tree, Slash extends boolean
   | ('*' extends keyof Tree ? ServesGet<Tree['*']> : false)
   : ServesGet<Tree> | (Slash extends true ? '*' extends keyof Tree ? ServesGet<Tree['*']> : false : false)
 type ServedByApp<Path extends string> = [AppRoutes] extends [never] ? false : TreeMatches<SegmentsOf<Path>, AppRoutes, EndsWithSlash<Path>>
+// The modules under `src/api`, each tree under its mount, as `kay check` registers them.
+type ApiRoutes = Register extends { api: infer Routes } ? Routes : never
+type ServedByApi<Path extends string> = [ApiRoutes] extends [never] ? false : TreeMatches<SegmentsOf<Path>, ApiRoutes, EndsWithSlash<Path>>
 type IsRoute<Path extends string> = [RoutePatterns] extends [never]
   ? true
-  : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns, EndsWithSlash<Path>> | (Path extends PublicFiles ? true : false) | ServedByApp<Path> ? true : false
+  : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns, EndsWithSlash<Path>> | (Path extends PublicFiles ? true : false) | ServedByApp<Path> | ServedByApi<Path> ? true : false
+
+// The route tree of a module under `src/api`, from its default export.
+export type ApiRoutesOf<Module> = Module extends { default: { '~Routes': infer Routes } } ? Routes : Record<never, never>
 
 // A site-relative literal must match a page; opaque strings, relative paths and other schemes are not checked.
 export type CheckedHref<Href extends string> = string extends Href

@@ -18,6 +18,7 @@ import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER } from '../content/server'
 import * as builtInMatchers from '../runtime/params'
+import { scanApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
 import { localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
@@ -37,6 +38,8 @@ export interface CheckOptions {
   routes?: string
   // Public file directory relative to the root, whose files links may point at.
   publicDir?: string
+  // API directory relative to the root, whose modules' GET routes links may point at.
+  api?: string
   // The content config relative to the root, whose collections' entries are read against their schemas.
   content?: string
   // The config's redirects, whose targets on the site must be a page or a public file.
@@ -94,7 +97,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message })
   }
 
-  const [routes, publicPaths] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public'))])
+  const [routes, publicPaths, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), scanApi(resolve(root, options.api ?? 'src/api'))])
 
   const shapes = routes.flatMap(route => patternShapes(route.pattern))
   const settings = options.i18n && i18nSettings(root, options.i18n, diagnostics)
@@ -102,7 +105,9 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const prefixes = settings && !settings.hosts ? settings.locales.filter(locale => locale !== settings.defaultLocale || settings.prefixDefault) : []
   const localized = [...shapes, ...prefixes.flatMap(locale => shapes.map(shape => `/${locale}${shape === '/' ? '' : shape}`))]
 
-  await writeIfChanged(environmentPath, environment(localized, publicPaths.map(file => file.url), settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }))
+  const apiMounts = apiModules.map(module => ({ mount: module.mount, module: relative(dirname(environmentPath), module.file).replace(TS_EXTENSION, '') }))
+
+  await writeIfChanged(environmentPath, environment(localized, publicPaths.map(file => file.url), apiMounts, settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
@@ -183,16 +188,17 @@ function matcherSource(routesDir: string, matcher: string): string | undefined {
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], i18n?: { locales: string[], messages: string }): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], messages: string }): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   const paths = files.length > 0 ? files.flatMap(spellings).map(file => JSON.stringify(file)).join(' | ') : 'never'
-  const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: typeof import(${JSON.stringify(i18n.messages.startsWith('.') ? i18n.messages : `./${i18n.messages}`)}).default` : ''
+  const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: typeof import(${importSpecifier(i18n.messages)}).default` : ''
+  const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
 
   return [
-    'import type { Action, CheckedHref, FieldName, FunctionProp, IslandProp } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, FieldName, FunctionProp, IslandProp } from \'kay\'',
     '',
     'declare module \'kay\' {',
-    `  interface Register { routes: ${routes}, files: ${paths}${locales} }`,
+    `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules} }`,
     '}',
     '',
     'declare global {',
@@ -203,6 +209,43 @@ function environment(patterns: string[], files: string[], i18n?: { locales: stri
     '}',
     '',
   ].join('\n')
+}
+
+function importSpecifier(path: string): string {
+  return JSON.stringify(path.startsWith('.') ? path : `./${path}`)
+}
+
+interface ApiNode {
+  modules: string[]
+  children: Map<string, ApiNode>
+}
+
+// The route trees of the API modules, each under the segments of its mount, as Elysia nests an app's own: `{ api: { chat: ... } }`.
+function apiTree(api: { mount: string, module: string }[]): string {
+  const top: ApiNode = { modules: [], children: new Map() }
+
+  for (const { mount, module } of api) {
+    let node = top
+
+    for (const segment of mount.split('/').filter(part => part !== '')) {
+      let child = node.children.get(segment)
+
+      if (!child)
+        node.children.set(segment, child = { modules: [], children: new Map() })
+
+      node = child
+    }
+
+    node.modules.push(`ApiRoutesOf<typeof import(${importSpecifier(module)})>`)
+  }
+
+  const render = (node: ApiNode): string => {
+    const children = node.children.size > 0 ? [`{ ${[...node.children].map(([segment, child]) => `${JSON.stringify(segment)}: ${render(child)}`).join(', ')} }`] : []
+
+    return [...node.modules, ...children].join(' & ') || '{}'
+  }
+
+  return render(top)
 }
 
 // `/todos/:id` becomes `['todos', ':']`, the shape `CheckedHref` matches paths against segment by segment.

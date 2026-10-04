@@ -14,6 +14,7 @@ import { projectCollections, serveFeeds } from '../content/server'
 import { localePath, splitLocale } from '../runtime/i18n'
 import { localeState, runInLocale } from '../runtime/i18n.server'
 import { overHttps, registerActionRoutes } from './actions'
+import { scanApi, serveApi } from './api'
 import { basePath, rebaseRedirects } from './base'
 import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
@@ -231,7 +232,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     return new Response(Bun.file(encodedPath(path, encoding)), { headers: { ...headers, 'content-encoding': encoding, 'content-type': Bun.file(path).type } })
   })
 
-  const [, publicUrls] = await Promise.all([registerActionRoutes(app, routes, { dev: options.dev, onError: options.onError, i18n }), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])
+  const actionOptions = { dev: options.dev, onError: options.onError, i18n }
+  const [, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
+
+  await serveApi(app, apiModules, actionOptions)
 
   serveImages(app, {
     clientDir: client.dir,
