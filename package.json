@@ -1,5 +1,5 @@
 {
-  "name": "@kaynooo/kay",
+  "name": "@kaynooo/kayjs",
   "type": "module",
   "version": "0.3.0",
   "description": "Pug-like, fully typed web framework on Bun, Elysia and pg-orm, with its own island runtime",

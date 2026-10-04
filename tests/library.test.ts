@@ -64,7 +64,8 @@ describe('a linked kay library', () => {
     linked = await mkdtemp(join(import.meta.dir, '.dom-'))
     library = await mkdtemp(join(import.meta.dir, '.dom-'))
     await write(linked, { ...PROJECT, 'kay.config.ts': 'export default {}\n' })
-    await write(library, LIBRARY)
+    // Naming kay by its published name rather than the alias.
+    await write(library, { ...LIBRARY, 'package.json': LIBRARY['package.json']!.replace('"kay":"*"', '"@kaynooo/kayjs":"*"') })
     await Bun.write(join(linked, 'node_modules/.keep'), '')
     await symlink(library, join(linked, 'node_modules/kay-lib'))
   })

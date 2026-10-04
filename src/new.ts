@@ -12,7 +12,7 @@ const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
 // Written as strings rather than template files, which the repository's own `.kay` scans would pick up.
 const FILES: Record<string, string> = {
   '.gitignore': 'node_modules\n.kay\n',
-  // kay is published to this registry as `@kaynooo/kay`, installed under the name `kay` its imports use.
+  // kay is published to this registry as `@kaynooo/kayjs`, installed under the name `kay` its imports use.
   '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
   // Lets test files import pages and their actions.
   'bunfig.toml': '[test]\npreload = ["kay/test/preload"]\n',

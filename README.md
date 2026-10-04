@@ -6,7 +6,7 @@ The full reference, written for people and coding agents alike, is [llms.txt](ll
 
 ## Start a project
 
-kay is published as `@kaynooo/kay` to the Forgejo registry at git.kaynooo.fr. Tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml`:
+kay is published as `@kaynooo/kayjs` to the Forgejo registry at git.kaynooo.fr. Tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml`:
 
 ```toml
 [install.scopes]
@@ -14,13 +14,13 @@ kay is published as `@kaynooo/kay` to the Forgejo registry at git.kaynooo.fr. Te
 ```
 
 ```sh
-bunx -p @kaynooo/kay kay new my-app
+bunx -p @kaynooo/kayjs kay new my-app
 cd my-app
 bun install
 bun run dev   # http://localhost:3000, reloads on every change
 ```
 
-The project depends on it as `"kay": "npm:@kaynooo/kay@^<version>"`, so imports read `kay`, `kay/server` and so on, and carries an `.npmrc` pointing the scope at the registry. `bun src/cli.ts new ../my-app` from a checkout of this repository depends on a packed copy of it instead.
+The project depends on it as `"kay": "npm:@kaynooo/kayjs@^<version>"`, so imports read `kay`, `kay/server` and so on, and carries an `.npmrc` pointing the scope at the registry. `bun src/cli.ts new ../my-app` from a checkout of this repository depends on a packed copy of it instead.
 
 ## Ship it
 

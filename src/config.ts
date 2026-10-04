@@ -55,7 +55,7 @@ export interface KayConfig {
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[]
-  // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kay-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
+  // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
   settings?: Record<string, string>
   // Receives every error a load, a render, a guard or an action throws, as it is logged: the place to send them to an error tracker.
   onError?: (error: unknown, request: Request) => void | Promise<void>

@@ -10,7 +10,7 @@ export interface KayLibrary {
   dir: string
   realDir: string
   files: string[]
-  // The `.kay` files by the specifiers its exports map gives them, `kay-ui/button.kay`.
+  // The `.kay` files by the specifiers its exports map gives them, `kayjs-ui/button.kay`.
   specifiers: Map<string, string>
 }
 
@@ -24,8 +24,8 @@ interface Manifest {
   kay?: { settings?: string }
 }
 
-// The names kay is installed under: its own and the alias projects import it as.
-const KAY_PACKAGES = new Set(['kay', '@kaynooo/kay'])
+// The names kay is installed under: the alias projects import it as, its own, and the one it was published as up to 0.3.
+const KAY_PACKAGES = new Set(['kay', '@kaynooo/kayjs', '@kaynooo/kay'])
 const KAY_EXTENSION = '.kay'
 const APP_DEPENDENCIES: (keyof Manifest)[] = ['dependencies', 'devDependencies', 'optionalDependencies']
 const LIBRARY_DEPENDENCIES: (keyof Manifest)[] = ['dependencies', 'optionalDependencies']
