@@ -1,0 +1,16 @@
+# The disposable database the pg store's tests run against: `docker compose up -d`, then `bun test`.
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: kay-auth-test
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: kay_auth_test
+    ports:
+      - '127.0.0.1:8533:5432'
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U test]
+      interval: 5s
+      timeout: 5s
+      retries: 5
