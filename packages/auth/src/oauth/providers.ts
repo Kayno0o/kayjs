@@ -6,6 +6,8 @@ interface DiscordRawUser {
   global_name?: string | null
   avatar?: string | null
   email?: string | null
+  // Whether Discord checked `email`.
+  verified?: boolean
 }
 
 /** Discord OAuth2 provider preset. */
@@ -17,14 +19,14 @@ export function discordProvider(opts: { scopes?: string[], apiBase?: string } = 
     authorizeUrl: 'https://discord.com/oauth2/authorize',
     tokenUrl: `${apiBase}/oauth2/token`,
     userUrl: `${apiBase}/users/@me`,
-    scopes: opts.scopes ?? ['identify', 'guilds'],
+    scopes: opts.scopes ?? ['identify', 'email'],
     parseTokens: parseStandardTokens,
     normalizeUser: raw => ({
       providerId: raw.id,
       username: raw.username,
       displayName: raw.global_name ?? undefined,
       avatar: raw.avatar ?? null,
-      email: raw.email ?? null,
+      email: raw.verified === true ? raw.email ?? null : null,
     }),
   }
 }

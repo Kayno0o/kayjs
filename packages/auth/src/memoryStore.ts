@@ -1,8 +1,10 @@
-import type { AuthStore, UserRecord } from './store'
+import type { AuthStore, IdentityRecord, UserRecord } from './store'
 
 // Everything in this process's memory, gone on restart: for tests, and for trying kay-auth before a database is wired.
 export function memoryStore(): AuthStore {
   const users = new Map<string, UserRecord>()
+  const identities = new Map<string, IdentityRecord>()
+  const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
 
   const holder = (field: 'email' | 'username', value: string | null) => {
     if (value === null)
@@ -51,6 +53,33 @@ export function memoryStore(): AuthStore {
       },
       delete(id) {
         users.delete(id)
+
+        for (const [key, identity] of identities) {
+          if (identity.userId === id)
+            identities.delete(key)
+        }
+      },
+    },
+    identities: {
+      find: (provider, providerId) => clone(identities.get(identityKey(provider, providerId))),
+      listByUser: userId => [...identities.values()].filter(identity => identity.userId === userId).map(identity => ({ ...identity })),
+      create(identity) {
+        const key = identityKey(identity.provider, identity.providerId)
+
+        if (identities.has(key))
+          throw new Error(`kay-auth: that ${identity.provider} account is linked already`)
+
+        identities.set(key, { ...identity })
+      },
+      update(provider, providerId, patch) {
+        const key = identityKey(provider, providerId)
+        const identity = identities.get(key)
+
+        if (identity)
+          identities.set(key, { ...identity, ...patch })
+      },
+      delete(provider, providerId) {
+        identities.delete(identityKey(provider, providerId))
       },
     },
   }
@@ -59,4 +88,8 @@ export function memoryStore(): AuthStore {
 // Callers get their own copy, as from a database, so changing one changes nothing stored.
 function copy(user: UserRecord | undefined): UserRecord | undefined {
   return user && { ...user, roles: [...user.roles] }
+}
+
+function clone<T extends object>(value: T | undefined): T | undefined {
+  return value && { ...value }
 }

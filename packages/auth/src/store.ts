@@ -20,6 +20,18 @@ export interface UserRecord {
   createdAt: Date
 }
 
+// An account at an OAuth provider, linked to a user.
+export interface IdentityRecord {
+  provider: string
+  providerId: string
+  userId: string
+  // The provider's tokens, encrypted with the auth secret and bound to the identity.
+  accessToken: string | null
+  refreshToken: string | null
+  tokenExpiresAt: Date | null
+  createdAt: Date
+}
+
 // Where kay-auth keeps its data. Every method may answer synchronously or with a promise.
 export interface AuthStore {
   users: {
@@ -31,6 +43,14 @@ export interface AuthStore {
     // The user once changed, or undefined when there is none; throws when the change takes an email or a username another user has.
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
     delete: (id: string) => MaybePromise<void>
+  }
+  identities: {
+    find: (provider: string, providerId: string) => MaybePromise<IdentityRecord | undefined>
+    listByUser: (userId: string) => MaybePromise<IdentityRecord[]>
+    // Throws when that provider account is linked already.
+    create: (identity: IdentityRecord) => MaybePromise<void>
+    update: (provider: string, providerId: string, patch: Partial<Pick<IdentityRecord, 'accessToken' | 'refreshToken' | 'tokenExpiresAt'>>) => MaybePromise<void>
+    delete: (provider: string, providerId: string) => MaybePromise<void>
   }
 }
 

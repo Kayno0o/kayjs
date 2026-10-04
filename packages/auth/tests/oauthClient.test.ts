@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { handleOAuthCallback } from '../src/oauth/callback'
 import { createOAuthClient, OAuthExchangeError } from '../src/oauth/client'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
 
@@ -36,7 +35,7 @@ describe('createOAuthClient.authorizeUrl', () => {
     expect(url.searchParams.get('client_id')).toBe('cid')
     expect(url.searchParams.get('redirect_uri')).toBe(CONFIG.redirectUri)
     expect(url.searchParams.get('response_type')).toBe('code')
-    expect(url.searchParams.get('scope')).toBe('identify guilds')
+    expect(url.searchParams.get('scope')).toBe('identify email')
     expect(url.searchParams.get('state')).toBe('st')
     expect(url.searchParams.get('code_challenge')).toBe('chal')
     expect(url.searchParams.get('code_challenge_method')).toBe('S256')
@@ -126,7 +125,7 @@ describe('createOAuthClient.exchangeCode', () => {
 describe('createOAuthClient.fetchUser', () => {
   test('sends the bearer token and normalizes the provider user', async () => {
     const calls = mockFetch(() => new Response(
-      JSON.stringify({ id: '42', username: 'bob', global_name: 'Bob', avatar: 'a', email: 'b@t.co' }),
+      JSON.stringify({ id: '42', username: 'bob', global_name: 'Bob', avatar: 'a', email: 'b@t.co', verified: true }),
       { status: 200 },
     ))
     const client = createOAuthClient(discordProvider(), CONFIG)
@@ -165,68 +164,15 @@ describe('provider presets', () => {
       .toEqual({ providerId: '7', username: 'oz', displayName: 'Oz', avatar: 'u', email: null })
   })
 
+  test('discordProvider reports an email only once Discord verified it', () => {
+    const discord = discordProvider()
+
+    expect(discord.normalizeUser({ id: '1', username: 'a', email: 'a@t.co', verified: false }).email).toBeNull()
+    expect(discord.normalizeUser({ id: '1', username: 'a', email: 'a@t.co' }).email).toBeNull()
+    expect(discord.normalizeUser({ id: '1', username: 'a', email: 'a@t.co', verified: true }).email).toBe('a@t.co')
+  })
+
   test('parseTokens rejects a payload with no access_token', () => {
     expect(() => discordProvider().parseTokens({ error: 'invalid_grant' })).toThrow('missing access_token: invalid_grant')
-  })
-})
-
-describe('handleOAuthCallback', () => {
-  test('verifies state before spending the code, then upserts and issues a session', async () => {
-    const order: string[] = []
-    const client = {
-      exchangeCode: async (code: string, opts?: { codeVerifier?: string }) => {
-        order.push('exchange')
-        expect(code).toBe('c')
-        expect(opts?.codeVerifier).toBe('ver')
-
-        return { accessToken: 'at' }
-      },
-      fetchUser: async (t: string) => {
-        order.push('fetchUser')
-        expect(t).toBe('at')
-
-        return { providerId: 'p1' }
-      },
-    }
-
-    const result = await handleOAuthCallback(client, {
-      code: 'c',
-      state: 's',
-      codeVerifier: 'ver',
-      verifyState: async () => {
-        order.push('verifyState')
-
-        return { redirect: '/home' }
-      },
-      upsertUser: async (u, tokens) => ({ appId: 1, providerId: u.providerId, token: tokens.accessToken }),
-      issueSession: async () => ({ jwt: 'signed' }),
-    })
-
-    expect(order).toEqual(['verifyState', 'exchange', 'fetchUser'])
-    expect(result.user).toEqual({ appId: 1, providerId: 'p1', token: 'at' })
-    expect(result.session).toEqual({ jwt: 'signed' })
-    expect(result.state).toEqual({ redirect: '/home' })
-  })
-
-  test('a rejected state stops the flow before the code is exchanged', async () => {
-    let exchanged = false
-    const client = {
-      exchangeCode: async () => {
-        exchanged = true
-
-        return { accessToken: 'at' }
-      },
-      fetchUser: async () => ({ providerId: 'p1' }),
-    }
-
-    await expect(handleOAuthCallback(client, {
-      code: 'c',
-      state: 'bad',
-      verifyState: () => { throw new Error('signature mismatch') },
-      upsertUser: async u => u,
-      issueSession: async () => ({}),
-    })).rejects.toThrow('signature mismatch')
-
-    expect(exchanged).toBe(false)
   })
 })

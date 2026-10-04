@@ -1,4 +1,4 @@
-import type { AuthSessionData } from '../../src/auth'
+import type { AuthOptions, AuthSessionData } from '../../src/auth'
 import type { AuthStore, UserRecord } from '../../src/store'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
@@ -25,8 +25,9 @@ export function userRecord(fields: Partial<UserRecord> & Pick<UserRecord, 'id'>)
 }
 
 // An Elysia app on kay-auth with routes to drive it, and a browser per call that keeps its own cookies.
-export function testApp(store: AuthStore = memoryStore()) {
-  const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store, roles: { admin: ['editor'], editor: [] } })
+export function testApp(options: Partial<Omit<AuthOptions<AuthSessionData, 'admin' | 'editor'>, 'store'>> & { store?: AuthStore } = {}) {
+  const store = options.store ?? memoryStore()
+  const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, roles: { admin: ['editor'], editor: [] }, ...options, store })
   const app = new Elysia()
     .use(auth.plugin)
     .get('/me', async ({ auth }) => (await auth.user()) ?? 'anonymous')
