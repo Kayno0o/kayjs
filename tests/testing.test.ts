@@ -51,8 +51,8 @@ describe('kay/test', () => {
 
   it('calls an action with a form\'s fields, read as a form post reads them and answered as a call', async () => {
     const signed = await testSite({ routes: 'tests/fixtures/session/src/routes', use: [session({ secret: 'a test secret of at least 32 characters' })], locals: () => ({ greeting: 'Hello' }) })
-    const { profile } = await import(join(import.meta.dir, 'fixtures/session/src/routes/index.kay')) as { profile: Action<{ age: number, admin: boolean, tags: string[], rank?: number }, unknown> }
-    const form = (fields: [string, string][]) => {
+    const { profile, signIn, signOut, limited } = await import(join(import.meta.dir, 'fixtures/session/src/routes/index.kay')) as { profile: Action<{ age: number, admin: boolean, tags: string[], rank?: number, avatar?: File }, unknown>, signIn: Action<{ name: string }, unknown>, signOut: Action<Record<string, never>, unknown>, limited: Action<Record<string, never>, unknown> }
+    const form = (fields: [string, string | File][]) => {
       const data = new FormData()
 
       for (const [name, value] of fields)
@@ -62,10 +62,15 @@ describe('kay/test', () => {
     }
 
     // Coerced as a form post's fields are, the blank optional left out.
-    expect(await signed.call(profile, form([['age', '36'], ['admin', 'on'], ['tags', 'a'], ['tags', 'b'], ['rank', '']]))).toEqual({ age: 36, admin: true, tags: ['a', 'b'] })
-
-    await expect(signed.call(profile, form([['age', 'old'], ['admin', 'on']]))).rejects.toBeInstanceOf(ActionError)
-    await expect(signed.call(profile, form([['age', 'old'], ['admin', 'on']]))).rejects.toMatchObject({ status: 422, errors: { age: expect.any(String) } })
+    expect(await signed.call(profile, form([['age', '36'], ['admin', 'on'], ['tags', 'a'], ['tags', 'b'], ['rank', ''], ['avatar', new File([], '')]]))).toEqual({ age: 36, admin: true, tags: ['a', 'b'] })
+    expect(await signed.call(profile, form([['age', '1'], ['avatar', new File(['png'], 'me.png', { type: 'image/png' })]]))).toMatchObject({ avatar: 'me.png' })
+    await expect(signed.call(profile, form([['age', 'old'], ['admin', 'on']]))).rejects.toMatchObject({ name: 'ActionError', status: 422, errors: { age: expect.any(String) } })
+    // What the handler passed to ctx.fail, and no flash cookie: the island reads the answer itself.
+    await expect(signed.call(signIn, form([['name', '']]))).rejects.toMatchObject({ status: 400, data: { error: 'Who are you?' } })
+    expect(signed.cookies.has('kay_flash')).toBe(false)
+    await expect(signed.call(signOut, form([]))).rejects.toMatchObject({ name: 'ActionRedirect', location: '/' })
+    expect(await signed.call(limited, form([]))).toBe('ok')
+    await expect(signed.call(limited, form([]))).rejects.toMatchObject({ status: 429 })
     // The honeypot catches a form's fields however they are sent.
     await expect(signed.call(profile, form([['age', '1'], ['website', 'spam']]))).rejects.toMatchObject({ status: 422, errors: { website: 'Leave this field empty' } })
   })

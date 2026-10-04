@@ -89,7 +89,7 @@ export type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSucc
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output, Honeypot extends string = never> {
   (input: Input): Promise<Success<Output>>
-  // A form's fields, read as a plain form post reads them: `add(new FormData(form))`.
+  // A form's fields, read as a plain form post reads them: `add(new FormData(form))`. Last, so `infer` and the editor read the typed input above, while `Parameters<typeof add>` reads this one.
   (form: FormData): Promise<Success<Output>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean

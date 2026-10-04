@@ -81,7 +81,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
 
           const call = isCall(context.request)
           // A call may send a form's fields, read as a plain form post's are.
-          const asForm = !call || context.request.headers.get('x-kay-action') === FORM_CALL
+          const asForm = !call || isFormCall(context.request)
           const refusal = protectionRefusal(value, context.request, context.body, asForm, context.server)
 
           // Before the schema reads the input: every attempt counts, a valid one or not.
@@ -248,9 +248,11 @@ function sameHost(request: Request, url: string | null): url is string {
 
 // A fetch from an island wants a result; a plain form post goes back to the page it came from.
 function isCall(request: Request): boolean {
-  const header = request.headers.get('x-kay-action')
+  return request.headers.get('x-kay-action') === '1' || isFormCall(request)
+}
 
-  return header === '1' || header === FORM_CALL
+function isFormCall(request: Request): boolean {
+  return request.headers.get('x-kay-action') === FORM_CALL
 }
 
 function backTo(request: Request): string {
