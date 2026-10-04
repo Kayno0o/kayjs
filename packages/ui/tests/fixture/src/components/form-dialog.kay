@@ -1,0 +1,35 @@
+---
+import type { Action } from 'kay'
+import { ActionError, signal } from 'kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+
+// `save` stands in for the server: it answers the saved name, or the messages a refusal carries, or throws for a call that failed outright.
+const { save, onSaved } = props<{ save: (input: { name: string }) => Promise<string | { errors: Record<string, string> }>, onSaved: (name: string) => void }>()
+
+const open = signal(true)
+const pending = signal(false)
+
+// What a page's action is to an island: a call that answers or throws ActionError, its `pending()` and its `url`.
+const rename = Object.assign(async (input: { name: string }) => {
+  pending.set(true)
+
+  try {
+    const answer = await save(input)
+
+    if (typeof answer !== 'string')
+      throw new ActionError(422, '', answer.errors)
+
+    return answer
+  }
+  finally {
+    pending.set(false)
+  }
+}, { pending, url: '/_kay/action/form/rename' }) as unknown as Action<{ name: string }, string>
+---
+button#open(onClick={() => open.set(true)}) Open
+FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" onSaved={onSaved} onClose={() => open.set(false)})
+  FormField(label="Name" name="name")
+    input#name(name="name" value="Ada")
+Toaster

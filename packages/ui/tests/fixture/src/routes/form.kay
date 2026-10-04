@@ -1,0 +1,17 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const rename = action(t.Object({ name: t.String({ minLength: 2, error: 'Two letters at least' }) }), async ({ name }) => name)
+
+const failure = ctx.failed(rename)
+---
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+---
+main
+  form#form(action={rename})
+    #field
+      FormField(label="Name" hint="As it shows on the site" issue={failure?.errors.name} required)
+        input(name="name" value={failure?.values.name})
+    button Rename

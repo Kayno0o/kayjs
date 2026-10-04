@@ -447,6 +447,11 @@
     @apply w-full;
   }
 
+  /* A control made of several inputs is a fieldset, its label the legend: neither draws a frame of its own. */
+  .form-field-group {
+    @apply m-0 min-w-0 border-0 p-0;
+  }
+
   .form-field-head {
     @apply flex flex-wrap items-center gap-2;
   }

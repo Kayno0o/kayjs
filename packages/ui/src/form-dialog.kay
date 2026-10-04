@@ -1,0 +1,90 @@
+--- <Input, Output>
+import type { Action, Failure, JSX } from 'kay'
+import { ActionError, signal } from 'kay'
+import Dialog from './dialog.kay'
+import { formIssues } from './forms'
+import { toast } from './toast'
+
+const NOT_WORD = /\W+/g
+
+const { open, title, action, submitLabel, failure, values = (form: FormData) => Object.fromEntries(form) as Input, onSaved, onClose, extra, id, class: className } = props<{
+  // Shows the dialog; the parent sets it back to false in `onClose`.
+  open: boolean
+  title: string
+  // The page's action the form calls, imported from the page.
+  action: Action<Input, Output>
+  submitLabel: string
+  // Toasted when the call fails other than on a field; a refused field shows its message on its FormField.
+  failure: string
+  // The action's input from what the form holds, every value a string as a form posts it: give it for an action taking numbers, booleans or lists.
+  values?: (form: FormData) => Input
+  // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
+  onSaved?: (result: Exclude<Output, Failure<unknown>>) => void
+  // Called however the dialog closes, saved or not.
+  onClose: () => void
+  // The left end of the footer, for a delete button.
+  extra?: JSX.Element
+  // Pairs the footer's submit button with the form; by default it is named after the action, so give one when two dialogs on a page call the same action.
+  id?: string
+  class?: string
+}>()
+
+const formId = id ?? `form-dialog${action.url.replace(NOT_WORD, '-')}`
+const issues = signal<Record<string, string>>({})
+let form: HTMLFormElement | undefined
+
+formIssues.provide(issues)
+
+// The dialog drops its content once closed, which empties the form; its messages are cleared too, so the next open starts afresh.
+function close() {
+  issues.set({})
+  onClose()
+}
+
+async function submit(event: SubmitEvent) {
+  event.preventDefault()
+
+  if (action.pending())
+    return
+
+  let result: Exclude<Output, Failure<unknown>>
+
+  try {
+    result = await action(values(new FormData(form)))
+  }
+  catch (error) {
+    const refused = error instanceof ActionError ? error.errors : {}
+
+    issues.set(refused)
+
+    // A limit or a refusal of the whole form says so under the empty name; anything else is the page's own message.
+    if (Object.keys(refused).length === 0 || refused[''] !== undefined)
+      toast.error(refused[''] ?? failure)
+
+    return
+  }
+
+  // Outside the `try`, so a page failing to patch the saved result in surfaces as the bug it is rather than as a refused save.
+  onSaved?.(result)
+  close()
+}
+
+// Enter in a single-line field submits on its own; a textarea keeps Enter for new lines and takes Ctrl+Enter.
+function submitOnCtrlEnter(event: KeyboardEvent) {
+  if (event.key !== 'Enter' || !event.ctrlKey)
+    return
+
+  event.preventDefault()
+  form?.requestSubmit()
+}
+---
+// Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
+Dialog(open={open} title={title} dirty={action.pending()} class={className} onClose={() => open && close()})
+  @footer
+    .form-dialog-footer
+      | {extra}
+      .form-dialog-actions
+        button.btn(type="button" disabled={action.pending()} onClick={close}) Cancel
+        button.btn.btn-accent(type="submit" form={formId} disabled={action.pending()}) {action.pending() ? 'Saving…' : submitLabel}
+  form.form-grid(id={formId} ref={element => form = element} onSubmit={submit} onKeyDown={submitOnCtrlEnter})
+    slot

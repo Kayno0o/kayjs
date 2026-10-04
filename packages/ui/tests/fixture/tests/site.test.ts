@@ -111,3 +111,16 @@ describe('content', () => {
     expect([...form.matchAll(/<option value(?:="(\w*)")?( selected)?>(\w*)<\/option>/g)].map(([, value = '', selected, label]) => `${value}${selected ?? ''}:${label}`)).toEqual([':Any', 'mars:Mars', 'earth selected:Earth'])
   })
 })
+
+describe('FormField', () => {
+  test('labels its control with what it takes, and shows the message a plain form post was refused with', async () => {
+    const field = (await element('/form', 'field')).replaceAll(/<!--[^>]*-->/g, '')
+
+    expect(field).toBe('<div id="field"><label class="form-field"><span class="form-field-head"><span class="label-text">Name<span class="form-field-required">*</span></span></span><input name="name"><span class="form-field-hint">As it shows on the site</span><span class="form-field-issues" aria-live="polite"></span></label></div>')
+
+    const { rename } = await import('../src/routes/form.kay')
+    const refused = await site.submit(rename, { name: 'A' }, { from: '/form' })
+
+    expect(refused.html).toContain('<span class="form-field-issue">Two letters at least</span>')
+  })
+})

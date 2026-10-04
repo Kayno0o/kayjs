@@ -1,0 +1,56 @@
+---
+import type { JSX } from 'kay'
+import { formIssues } from './forms'
+
+const { label, name, issue, hint, required = false, group = false, action, class: className } = props<{
+  label: string
+  // The field the control posts as: inside a FormDialog, the message its call was refused with for that field shows here.
+  name?: string
+  // A message of the page's own, such as `ctx.failed(add)?.errors.title` after a plain form post.
+  issue?: string
+  // What the control takes or what it does, under it and above any message.
+  hint?: string
+  required?: boolean
+  // A control made of several inputs, such as a picker, is a labelled group rather than one label.
+  group?: boolean
+  // Sits on the label's line, pushed right: a preset button, a unit, a count.
+  action?: JSX.Element
+  class?: string
+}>()
+
+const refused = formIssues.use()
+const messages = () => [name === undefined ? undefined : refused?.()[name], issue].filter(message => message !== undefined)
+---
+// The control, as children, takes the `field-input` look with no class of its own.
+if group
+  fieldset.form-field.form-field-group(class={className})
+    legend.form-field-head
+      span.label-text
+        | {label}
+        if required
+          span.form-field-required *
+      if action
+        span.form-field-action
+          | {action}
+    slot
+    if hint
+      span.form-field-hint {hint}
+    span.form-field-issues(aria-live="polite")
+      for message, index of messages() key={index}
+        span.form-field-issue {message}
+else
+  label.form-field(class={className})
+    span.form-field-head
+      span.label-text
+        | {label}
+        if required
+          span.form-field-required *
+      if action
+        span.form-field-action
+          | {action}
+    slot
+    if hint
+      span.form-field-hint {hint}
+    span.form-field-issues(aria-live="polite")
+      for message, index of messages() key={index}
+        span.form-field-issue {message}

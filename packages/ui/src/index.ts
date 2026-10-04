@@ -1,5 +1,6 @@
 export type { IconSlot, Settings } from './defaults'
 export { default as defaults } from './defaults'
+export { formIssues } from './forms'
 export type * from './popover'
 export * from './table'
 export * from './toast'
