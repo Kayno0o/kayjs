@@ -13,6 +13,7 @@ export { defineConfig } from '../config'
 export type { PagesOptions } from './app'
 export type { ScriptHashOptions } from './csp'
 export { inlineScriptHashes } from './csp'
+export { defineEnv } from './env'
 export type { Route } from './routes'
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
