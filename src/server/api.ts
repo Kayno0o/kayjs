@@ -34,6 +34,7 @@ const ROUTER_SYNTAX = /[:*']/
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: a comment line now and then keeps a quiet stream open.
 const HEARTBEAT_MS = 5000
 const HEARTBEAT = new TextEncoder().encode(':\n\n')
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
 
 // Where a failing event stream reports its error: logged, and handed to `onError` once the route answering with it is known.
@@ -78,7 +79,7 @@ function guardsOf(apiDir: string, dir: string): string[] {
   return guards
 }
 
-// Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade from another site is refused.
+// Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused.
 export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<void> {
   for (const module of modules) {
     const instance = (await importModule<{ default?: unknown }>(module.file)).default
@@ -109,9 +110,9 @@ async function admit(guards: LoadedGuard[], context: { request: Request, set: { 
   if (passed instanceof Response)
     return passed
 
-  // A browser lets any page open a websocket to any host, the user's cookies attached.
-  if (context.request.headers.get('upgrade')?.toLowerCase() === 'websocket' && isCrossSite(context.request))
-    return new Response('Cross-site websocket refused', { status: 403 })
+  // A browser lets any page open a websocket or post a form to any host, the user's cookies attached; a request with neither header, such as a webhook, is no browser's.
+  if ((!SAFE_METHODS.has(context.request.method) || context.request.headers.get('upgrade')?.toLowerCase() === 'websocket') && isCrossSite(context.request))
+    return new Response('Cross-site request refused', { status: 403 })
 
   if (!passed)
     return undefined
@@ -141,7 +142,7 @@ export function api(): Elysia<'', { decorator: Empty, store: Empty, derive: Empt
 }
 
 // Answers with a server-sent event per value `source` gives, which `stream()` reads typed in an island: values cross as island props do, Dates, Maps and Sets included.
-// The source is read once the browser reads the response, and stopped when it goes away; a source that throws ends the stream as failed, the error logged.
+// The source is read one value per value the browser takes, and stopped when it goes away; a source that throws ends the stream as failed, the error logged.
 export function events<T>(source: AsyncIterable<T> | Iterable<T>): EventStream<T> {
   let iterator: AsyncIterator<T> | Iterator<T> | undefined
   let heartbeat: ReturnType<typeof setInterval> | undefined
@@ -149,51 +150,44 @@ export function events<T>(source: AsyncIterable<T> | Iterable<T>): EventStream<T
   const encoder = new TextEncoder()
   const reporter = { report: logError }
 
-  const pump = async (controller: ReadableStreamDefaultController<Uint8Array>) => {
-    const send = (text: string) => controller.enqueue(encoder.encode(text))
+  const finish = (controller: ReadableStreamDefaultController<Uint8Array>, event: string) => {
+    clearInterval(heartbeat)
+    controller.enqueue(encoder.encode(`event: ${event}\ndata:\n\n`))
+    controller.close()
+  }
 
-    try {
-      for (;;) {
-        const next = await iterator!.next()
+  const response = new Response(new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (!iterator) {
+        iterator = Symbol.asyncIterator in source ? source[Symbol.asyncIterator]() : source[Symbol.iterator]()
+        heartbeat = setInterval(() => controller.enqueue(HEARTBEAT), HEARTBEAT_MS)
+      }
+
+      try {
+        const next = await iterator.next()
 
         if (cancelled)
           return
 
         if (next.done)
-          break
-
-        send(`data: ${encodeEvent(next.value)}\n\n`)
+          finish(controller, END_EVENT)
+        else
+          controller.enqueue(encoder.encode(`data: ${encodeEvent(next.value)}\n\n`))
       }
+      catch (error) {
+        if (cancelled)
+          return
 
-      send(`event: ${END_EVENT}\ndata:\n\n`)
-    }
-    catch (error) {
-      if (cancelled)
-        return
-
-      reporter.report(error)
-      send(`event: ${ERROR_EVENT}\ndata:\n\n`)
-    }
-    finally {
-      clearInterval(heartbeat)
-    }
-
-    controller.close()
-  }
-
-  const response = new Response(new ReadableStream<Uint8Array>({
-    pull(controller) {
-      if (iterator)
-        return
-
-      iterator = Symbol.asyncIterator in source ? source[Symbol.asyncIterator]() : source[Symbol.iterator]()
-      heartbeat = setInterval(() => controller.enqueue(HEARTBEAT), HEARTBEAT_MS)
-      void pump(controller)
+        reporter.report(error)
+        void iterator.return?.()
+        finish(controller, ERROR_EVENT)
+      }
     },
-    async cancel() {
+    // Not awaited: an async generator waiting on its next value only returns once it has one, which a quiet feed may never give.
+    cancel() {
       cancelled = true
       clearInterval(heartbeat)
-      await iterator?.return?.()
+      void iterator?.return?.()
     },
   }, { highWaterMark: 0 }), { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' } })
 

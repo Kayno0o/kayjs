@@ -275,8 +275,8 @@ async function runDev(args: string[]): Promise<number> {
   if (typeof parsed === 'number')
     return parsed
 
-  const { routes, publicDir } = await loadConfig(process.cwd())
-  const stop = await dev(process.cwd(), { entry: parsed.positionals[0], routes, publicDir })
+  const { routes, publicDir, api } = await loadConfig(process.cwd())
+  const stop = await dev(process.cwd(), { entry: parsed.positionals[0], routes, publicDir, api })
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)

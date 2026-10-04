@@ -762,7 +762,7 @@ export default api()
 
 - `api()` is a `new Elysia()` whose handlers read the app's locals, typed through `Register`: `({ user })`, `ws.data.user`. A plain `new Elysia()` is mounted the same way.
 - A `_guard.ts` in `src/api/` or below runs before every route of the modules in its directory and below, outermost first, a websocket upgrade included, as it does for pages and actions: a redirect or a denial answers the request, and the cookies and headers it sets go out with the route's response.
-- A websocket upgrade another site sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403 once the guards let it through, since a browser lets any page open a websocket to any host with the user's cookies.
+- A websocket upgrade, or a request other than GET, HEAD and OPTIONS, another site's page sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403 once the guards let it through, since a browser lets any page open a websocket or post a form to any host with the user's cookies. A request carrying neither header, such as a webhook, goes through; a route other sites' pages call from the browser belongs on the app's own Elysia instance.
 - `events(source)` answers with server-sent events, one per value an async iterable, a generator or an array gives, crossing as island props do, Dates, Maps and Sets included. The source is read once the browser reads the response and stopped when it goes away; a source that throws ends the stream as failed, the error logged and handed to `onError`. A comment line every 5 seconds keeps a quiet stream open past Bun's `idleTimeout` and a proxy's.
 - `kay check` checks links and redirects against the modules' GET routes, `/api/chat/rooms` here; `kay build --compile` embeds the modules, and `kay build --static` refuses them.
 
@@ -785,7 +785,8 @@ button(onClick={() => messages.send({ text: text() })}) Send
 
 - `socket(module, path, options)` opens one of the module's websocket routes, the path written as the module writes it, `params` and `query` filling it in, all typed from the route. `send` takes the route's `body`, `last()` reads the last message reactively, typed from its `response`, `on(listener)` gets each one and returns what stops it, and `status()` is `connecting`, `open` or `closed`. Messages travel as Elysia sends them, as JSON. What is sent before the connection opens goes once it does. A connection that drops reconnects, waiting longer each time up to 30 seconds, unless the server closed it with code 1000; `close()` closes it for good.
 - `stream(module, path, options)` reads one of its routes answering with `events()`, with `last()`, `on()` and `status()` the same way, `status()` being `done` once the stream ran to its end and `failed` when a guard or the route refused it or its source threw. `{ method: 'post', body }` reads a route taking a body, such as an AI answer. A GET stream that drops reconnects; any other ends as failed.
-- Both open once the island is in the page, never on the server, and close with the component that opened them. The browser build gives the island the module's mount and none of its code, so its other exports never reach the browser.
+- Both open once the island is in the page, never on the server, and close with the component that opened them. The browser build gives the island the module's mount and none of its code, so its other exports never reach the browser, and an island importing any other file under `src/api/`, such as a `_schemas.ts`, fails the build: code an island shares with a module lives outside it.
+- A refused upgrade looks like a dropped connection to the browser, so a socket a guard refuses keeps retrying, `connecting`, every 30 seconds at most.
 
 ## Testing
 

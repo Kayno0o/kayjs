@@ -63,6 +63,14 @@ describe('API modules', () => {
     expect((await site.handle(upgrade('/api/chat/general', { origin: 'https://evil.example' }))).status).toBe(403)
     expect((await site.handle(upgrade('/api/chat/general', { 'sec-fetch-site': 'cross-site' }))).status).toBe(403)
     expect((await site.handle(upgrade('/api/private/feed', { origin: 'https://evil.example' }))).status).toBe(401)
+    expect((await site.handle(upgrade('/api/chat/general', { origin: 'http://localhost' }))).status).not.toBe(403)
+  })
+
+  it('refuses a post another site\'s page sends, and lets one with no browser behind it through', async () => {
+    const answer = (headers: Record<string, string>) => site.fetch('/api/chat/answer', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ prompt: 'hi' }) })
+
+    expect((await answer({ origin: 'https://evil.example' })).status).toBe(403)
+    expect((await answer({})).status).toBe(200)
   })
 
   it('opens a typed websocket in process, with the locals and the cookies of the site', async () => {
@@ -128,6 +136,27 @@ describe('API modules', () => {
 
     expect(page.html).toContain('<p class="status">connecting</p>')
     expect(page.html).toContain('<p class="last">Nothing yet</p>')
+  })
+
+  it('makes no URL on the server, where a page prerendering the island imports the module unmounted', () => {
+    expect(() => root((dispose) => {
+      socket({} as never, '/' as never)
+      dispose()
+    })).not.toThrow()
+  })
+
+  it('splits lines on a \\r\\n arriving across two chunks once', async () => {
+    const chunks = ['event: message\r', '\ndata: [1]\r\n\r\nevent: end\r\ndata:\r\n\r\n']
+    const body = new ReadableStream<Uint8Array>({ pull: controller => chunks.length > 0 ? controller.enqueue(new TextEncoder().encode(chunks.shift())) : controller.close() })
+    const reader = readEvents<number>(async () => new Response(body), false)
+    const received: number[] = []
+
+    reader.on(value => received.push(value))
+    reader.start()
+    await Bun.sleep(20)
+
+    expect(received).toEqual([1])
+    expect(reader.status()).toBe('done')
   })
 
   it('closes a socket with the component that opened it', () => {

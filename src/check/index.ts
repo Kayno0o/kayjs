@@ -2,6 +2,7 @@ import type { Diagnostic, SourceMap } from '../compiler'
 import type { I18nConfig } from '../config'
 import type { ContentProblem } from '../content/validate'
 import type { LocaleSettings } from '../runtime/i18n'
+import type { ApiModule } from '../server/api'
 import type { Redirects } from '../server/redirects'
 import type { Route } from '../server/routes'
 import { existsSync } from 'node:fs'
@@ -97,7 +98,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message })
   }
 
-  const [routes, publicPaths, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), scanApi(resolve(root, options.api ?? 'src/api'))])
+  const [routes, publicPaths, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
 
   const shapes = routes.flatMap(route => patternShapes(route.pattern))
   const settings = options.i18n && i18nSettings(root, options.i18n, diagnostics)
@@ -127,6 +128,18 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await Promise.all(stale.map(async path => rm(path)))
 
   return { files, diagnostics }
+}
+
+// The API modules, or none with the reason the server would refuse them reported at the directory.
+async function apiModulesOf(apiDir: string, diagnostics: CheckDiagnostic[]): Promise<ApiModule[]> {
+  try {
+    return await scanApi(apiDir)
+  }
+  catch (error) {
+    diagnostics.push({ file: apiDir, line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
+
+    return []
+  }
 }
 
 // The locale settings, or undefined with the reason they cannot serve a page reported at the config, as the server would refuse them.

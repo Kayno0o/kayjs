@@ -22,7 +22,8 @@ const NORMAL_CLOSURE = 1000
 // What Elysia's websocket parser reads as JSON, by first character: `"`, `[`, `{`.
 const JSON_START = /^["[{]/
 const NUMERIC = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i
-const LINE_BREAK = /\r\n|\r|\n/
+// A `\r` ending a chunk may be half of a `\r\n`, so it waits for the next one.
+const LINE_BREAK = /\r\n|\r(?!$)|\n/
 const PARAM_SEGMENT = /^:(.+)$/
 // The one space a field's value may start with, which is not part of it.
 const LEADING_SPACE = /^ /
@@ -103,8 +104,15 @@ function listeners<T>(): Listeners<T> {
     receive: (value) => {
       setLast(value)
 
-      for (const listener of all)
-        listener(value)
+      // One listener failing leaves the others and the connection alone.
+      for (const listener of all) {
+        try {
+          listener(value)
+        }
+        catch (error) {
+          console.error(error)
+        }
+      }
     },
     on: (listener) => {
       all.add(listener)
@@ -229,7 +237,6 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
         return
       }
 
-      attempt = 0
       setStatus('open')
 
       ended = await parseEvents(response.body, (event, data) => {
@@ -239,7 +246,20 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
         if (event === ERROR_EVENT)
           return 'failed'
 
-        values.receive(decodeValue(data) as T)
+        let value: T
+
+        try {
+          value = decodeValue(data) as T
+        }
+        catch (error) {
+          console.error('kay: an event stream sent a value that does not decode', error)
+
+          return 'failed'
+        }
+
+        // Only a stream that delivered something counts as back, so one dropping as soon as it opens keeps backing off.
+        attempt = 0
+        values.receive(value)
 
         return undefined
       })
@@ -384,12 +404,12 @@ export type SocketOf<Module, Path> = Socket<Sent<SocketRoute<Module, Path>>, Rec
 // Opens a websocket route of a module under `src/api` from an island, once it is in the page: messages typed both ways from the route's `body` and `response` schemas, sent as Elysia reads them.
 // Reconnects after a drop, and closes with the component that opened it.
 export function socket<Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path>>): SocketOf<Module, Path> {
-  const url = routeUrl(module, path, options as UrlInput | undefined)
+  // The URL is made in the browser only: a page prerendering the island imports the module unmounted.
   const client = openSocket<Sent<SocketRoute<Module, Path>>, Received<SocketRoute<Module, Path>>>(() => {
     if (typeof document === 'undefined')
       return undefined
 
-    const target = new URL(withBase(url), location.href)
+    const target = new URL(withBase(routeUrl(module, path, options as UrlInput | undefined)), location.href)
 
     target.protocol = target.protocol === 'https:' ? 'wss:' : 'ws:'
 
@@ -421,9 +441,8 @@ export type StreamOptions<Module, Path, M> = { method?: M } & UrlOptions<StreamR
 // Reads a route of a module under `src/api` answering with `events()` from an island, once it is in the page: each value typed as the route sends it, Dates, Maps and Sets included.
 // A GET stream that drops reconnects; a stream closes with the component that opened it.
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M> {
-  const url = routeUrl(module, path, options as UrlInput | undefined)
   const init = streamRequest(options)
-  const reader = readEvents<StreamValue<StreamRoute<Module, Path, Chosen<M>>>>(async signal => fetch(withBase(url), { ...init, signal }), init.method === 'GET')
+  const reader = readEvents<StreamValue<StreamRoute<Module, Path, Chosen<M>>>>(async signal => fetch(withBase(routeUrl(module, path, options as UrlInput | undefined)), { ...init, signal }), init.method === 'GET')
 
   onMount(() => {
     if (typeof document !== 'undefined')

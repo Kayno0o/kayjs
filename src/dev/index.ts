@@ -9,9 +9,10 @@ import { writeShadowTypes } from '../check'
 export interface DevOptions {
   // The server entry, relative to the root.
   entry?: string
-  // Page and public file directories relative to the root, for the regenerated `.kay/types`.
+  // Page, public file and API directories relative to the root, for the regenerated `.kay/types`.
   routes?: string
   publicDir?: string
+  api?: string
   // Called with each server process once it is spawned.
   onRestart?: (child: Subprocess) => void
 }
@@ -97,9 +98,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 }
 
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
-async function regenerateTypes(root: string, { routes, publicDir }: DevOptions) {
+async function regenerateTypes(root: string, { routes, publicDir, api }: DevOptions) {
   try {
-    await writeShadowTypes(root, { routes, publicDir })
+    await writeShadowTypes(root, { routes, publicDir, api })
   }
   catch (error) {
     console.error(error)
