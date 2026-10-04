@@ -23,6 +23,36 @@ async function settle() {
   await new Promise(resolve => setTimeout(resolve, 0))
 }
 
+// Bundles `main.kay` and the files beside it for the browser, and mounts it in a fresh element.
+async function mountKay(files: Record<string, string>): Promise<{ root: HTMLElement, dispose: () => Promise<void> }> {
+  const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+
+  try {
+    await Promise.all(Object.entries({ ...files, 'entry.ts': 'import { render } from \'@solidjs/web\'\nimport Main from \'./main.kay\'\n\nexport function mount(element: HTMLElement) {\n  return render(() => Main({}), element)\n}\n' }).map(async ([name, text]) => Bun.write(join(dir, name), text)))
+
+    const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: join(dir, 'out'), target: 'browser', plugins: [kay()] })
+
+    if (!build.success)
+      throw new AggregateError(build.logs, 'client build failed')
+
+    const { mount } = await import(build.outputs[0]!.path) as Pick<ClientModule, 'mount'>
+    const root = document.createElement('div')
+
+    document.body.append(root)
+    const unmount = mount(root)
+
+    return { root, dispose: async () => {
+      unmount()
+      await rm(dir, { recursive: true, force: true })
+    } }
+  }
+  catch (error) {
+    await rm(dir, { recursive: true, force: true })
+
+    throw error
+  }
+}
+
 beforeAll(async () => {
   GlobalRegistrator.register()
   outdir = await mkdtemp(join(tmpdir(), 'kay-dom-'))
@@ -112,6 +142,34 @@ describe('client bundle', () => {
     await settle()
     expect([...root.querySelectorAll('li.todo')].map(li => li.classList.contains('selected'))).toEqual([false, true])
     dispose()
+  })
+})
+
+describe('event handlers', () => {
+  it('runs the handler a signal, a prop or a loop item holds when the event fires, not when it attached', async () => {
+    const { root, dispose } = await mountKay({
+      'button.kay': '---\nconst { onPress, label } = props<{ onPress?: () => void, label: string }>()\n---\nbutton(class={label} onClick={onPress}) {label}\n',
+      'main.kay': '---\nimport { signal } from \'kay\'\nimport Button from \'./button.kay\'\n\nconst mode = signal(1)\nconst out = signal(\'\')\nconst rows = signal([{ id: 1, run: () => out.set(\'first\') }])\n---\nbutton.direct(onClick={mode() === 1 ? () => out.set(\'one\') : () => out.set(\'two\')}) Direct\nButton(label="prop" onPress={mode() === 1 ? undefined : () => out.set(\'prop\')})\nfor row of rows() key={row.id}\n  button.row(onClick={row.run}) Row\nbutton.switch(onClick={() => { mode.set(2); rows.set([{ id: 1, run: () => out.set(\'second\') }]) }}) Switch\np {out()}\n',
+    })
+    const click = async (selector: string) => {
+      root.querySelector<HTMLElement>(selector)!.click()
+      await settle()
+
+      return root.querySelector('p')!.textContent
+    }
+
+    try {
+      expect(await click('.direct')).toBe('one')
+      expect(await click('.prop')).toBe('one')
+      expect(await click('.row')).toBe('first')
+      await click('.switch')
+      expect(await click('.direct')).toBe('two')
+      expect(await click('.prop')).toBe('prop')
+      expect(await click('.row')).toBe('second')
+    }
+    finally {
+      await dispose()
+    }
   })
 })
 

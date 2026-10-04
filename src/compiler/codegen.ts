@@ -40,6 +40,7 @@ const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 const LINK_ELEMENTS = new Set(['a', 'area'])
 const CTX_REFERENCE = /\bctx\b/
+const EVENT_HANDLER = /^on[A-Z]/
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
 const IMPORT_COMMA_AFTER = /^\s*,\s*/
@@ -958,6 +959,13 @@ class Generator {
 
         if (name.startsWith('bind:')) {
           this.emitBind(element, attribute, name.slice(5))
+
+          return
+        }
+
+        // Solid reads a handler once, when it attaches it; read at each event instead, a handler held by a prop, a signal or a loop item stays current.
+        if (!element.component && !this.options.check && EVENT_HANDLER.test(name) && !isFunctionExpression(this.text(attribute.expression))) {
+          b.addSource(attribute.name).add('={(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)}')
 
           return
         }

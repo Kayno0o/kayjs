@@ -117,7 +117,7 @@ section.todo-list
 - Classes: `.class` takes Tailwind names, `:`, `/`, `@` and `!` included: `div.md:flex.w-1/2.hover:underline`. A class holding `.` or `[` goes in `class="..."`.
 - `class={...}` takes a string, an array or a `{ name: boolean }` object, and merges with the `.class` shorthand and with the `class` of a `{...spread}`. An element has one `class` attribute and one id.
 - Attributes are separated by spaces, inside one pair of parentheses that may span lines: `a(href="/x" target="_blank")`. A value is a quoted string or `{expression}`. A name alone is a boolean attribute. `{...obj}` spreads.
-- Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`. A lowercase `onclick` or `on:click` attaches nothing, and kay reports it.
+- Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`. A lowercase `onclick` or `on:click` attaches nothing, and kay reports it. A handler is read when the event fires, so one a prop, a signal or a loop item holds stays current: `button(onClick={onPress})`.
 - `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways. On `type="number"` and `type="range"` the signal holds a `number`, and keeps its last one while the input is empty.
 - `ref={el => ...}` receives the DOM element.
 - Inline text follows the tag after one space. `\{` and `\#` are a literal brace and hash.
