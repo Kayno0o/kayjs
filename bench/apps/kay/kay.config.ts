@@ -1,3 +1,4 @@
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ routes: 'routes' })
+// No request log: the profile prints its result on stdout.
+export default defineConfig({ routes: 'routes', log: false })

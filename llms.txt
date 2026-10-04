@@ -729,7 +729,7 @@ export default defineConfig({
 
 ## Request logs
 
-With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms`, the method, the path without its query string, which may carry tokens, the status, and the milliseconds until the response went out, a streamed one's first bytes. kay's own `/_kay/` routes, assets and the health route included, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration }`, for a log collector; a function receives each `{ method, path, status, duration }` entry instead; `true` logs outside production too, `false` never.
+With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms`, the method, the path without its query string, which may carry tokens, the status, and the milliseconds until the response was made, a streamed one's headers. kay's own `/_kay/` routes, assets and the health route included, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration }`, for a log collector; a function receives each `{ method, path, status, duration }` entry instead; `true` logs outside production too, `false` never.
 
 ## Health and shutdown
 
