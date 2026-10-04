@@ -6,7 +6,7 @@ import { serve, tableRows } from './browser'
 const BODY = /<body>([\s\S]*)<\/body>/
 const COMMENT = /<!--[\s\S]*?-->/g
 const HYDRATION_KEY = / (?:data-hk="[^"]*"|_hk=\S+?(?=[ >]))/g
-const ISLAND_TAG = /<\/?kay-island[^>]*>/g
+const ISLAND_TAG = /<\/?slot(?: [^>]*)?>/g
 
 export const PATHS = ['/', '/table']
 

@@ -38,7 +38,7 @@ afterAll(async () => {
 describe('islands', () => {
   it('server-renders static markup with the interactive component as an island root', () => {
     expect(pageHtml).toContain('<h1>Static title</h1>')
-    expect(pageHtml).toContain('<kay-island data-component="tests/fixtures/islands/counter.kay" data-render-id="k')
+    expect(pageHtml).toContain('<slot data-component="tests/fixtures/islands/counter.kay" data-render-id="k')
     expect(pageHtml).toContain('data-props="[{&quot;start&quot;:1},2]"')
     expect(pageHtml).toContain('Count <!--$-->2<!--/-->')
     expect(pageHtml).toContain('<p>after</p>')
@@ -66,7 +66,7 @@ describe('islands', () => {
     expect(() => renderToString(() => Rich({ scores: new Map([['x', new Score(1)]]) }))).toThrow(new IslandPropsError('rich.kay is interactive, so it renders as an island, and its props cannot reach the browser: Cannot stringify arbitrary non-POJOs at .scores.get("x")'))
   })
 
-  it('hydrates the island in place and keeps it reactive, a visible one once it scrolls into view', async () => {
+  it('hydrates the island in place and keeps it reactive, a visible one once its markup scrolls into view', async () => {
     const observed: { callback: IntersectionObserverCallback, target: Element }[] = []
     let disconnected = 0
 
@@ -87,30 +87,32 @@ describe('islands', () => {
     // eslint-disable-next-line no-new-func -- runs Solid's own bootstrap script, which happy-dom does not execute from markup
     new Function(HYDRATION_SCRIPT.exec(generateHydrationScript())![1]!)()
     document.body.innerHTML = pageHtml
-    const button = document.querySelector('kay-island button')!
+    const button = document.querySelector('slot button')!
     const { ready } = await import(join(outdir, 'client.js')) as { ready: Promise<void> }
 
     await ready
-    expect(document.querySelector('kay-island button')).toBe(button)
+    expect(document.querySelector('slot button')).toBe(button)
 
     button.dispatchEvent(new Event('click', { bubbles: true }))
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(button.textContent).toBe('Count 3')
 
     const [lazy] = observed
-    const lazyButton = lazy!.target.querySelector('button')!
+    const lazyIsland = document.querySelector('slot[data-hydrate="visible"]')!
+    const lazyButton = lazyIsland.querySelector('button')!
 
-    expect(observed).toHaveLength(1)
+    // The wrapper has no box, so what scrolls into view is its markup.
+    expect(observed.map(({ target }) => target)).toEqual([...lazyIsland.children])
     lazy!.callback([{ isIntersecting: true, target: lazy!.target } as IntersectionObserverEntry], {} as IntersectionObserver)
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(disconnected).toBe(1)
-    expect(lazy!.target.querySelector('button')).toBe(lazyButton)
+    expect(lazyIsland.querySelector('button')).toBe(lazyButton)
     lazyButton.dispatchEvent(new Event('click', { bubbles: true }))
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(lazyButton.textContent).toBe('Count 6')
 
     // happy-dom has no requestIdleCallback, so an idle island waits for the timer standing in for it.
-    const idleButton = document.querySelector('kay-island[data-hydrate="idle"] button')!
+    const idleButton = document.querySelector('slot[data-hydrate="idle"] button')!
 
     await new Promise(resolve => setTimeout(resolve, 250))
     idleButton.dispatchEvent(new Event('click', { bubbles: true }))

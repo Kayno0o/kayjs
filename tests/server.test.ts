@@ -81,10 +81,10 @@ describe('pages', () => {
   it('ships the hydration script and the island bundle only to pages with islands', async () => {
     const home = await get('/')
 
-    expect(home.html).toContain('<kay-island data-component="tests/fixtures/site/src/components/counter.kay"')
+    expect(home.html).toContain('<slot data-component="tests/fixtures/site/src/components/counter.kay"')
     expect(home.html).toContain('window._$HY')
-    expect(home.html).toMatch(/<kay-island [^>]+><button _hk=k\w+-0 class="counter">/)
-    expect(home.html.replace(/<kay-island[\s\S]*<\/kay-island>/, '')).not.toContain('_hk=')
+    expect(home.html).toMatch(/<slot [^>]+><button _hk=k\w+-0 class="counter">/)
+    expect(home.html.replace(/<slot[\s\S]*<\/slot>/, '')).not.toContain('_hk=')
     const entry = (/<script type="module" src="(\/_kay\/[^"]+)"><\/script>/).exec(home.html)?.[1]
 
     expect(entry).toBeDefined()
@@ -218,11 +218,11 @@ describe('pages', () => {
       // eslint-disable-next-line no-new-func -- runs Solid's inline bootstrap script, which happy-dom does not execute from markup
       new Function(INLINE_SCRIPT.exec(html)![1]!)()
       document.body.innerHTML = BODY.exec(html)![1]!
-      const button = document.querySelector('kay-island button')!
+      const button = document.querySelector('slot button')!
       const card = document.querySelector('article.card')!
 
       await hydrateFrom(html)
-      expect(document.querySelector('kay-island button')).toBe(button)
+      expect(document.querySelector('slot button')).toBe(button)
       button.dispatchEvent(new Event('click', { bubbles: true }))
       await new Promise(resolve => setTimeout(resolve, 0))
       expect(button.textContent).toBe('Clicked 2')
@@ -484,7 +484,7 @@ describe('await blocks', () => {
     expect(page).toContain('<p class="now">right away</p></main>')
     expect(page).not.toContain('Feed down')
     expect(failed).toContain('<p class="error">Feed down</p></template>')
-    expect(ready).toContain('<ul><li>first</li><li>second</li></ul><kay-island')
+    expect(ready).toContain('<ul><li>first</li><li>second</li></ul><slot')
     expect(ready).toContain('<script type="module" async src="/_kay/')
     expect(end).toBe('</body></html>')
   })
@@ -530,9 +530,9 @@ describe('await blocks', () => {
 
       expect(document.querySelector('.pending')).toBeNull()
       expect(document.querySelector('template')).toBeNull()
-      expect([...document.querySelectorAll('main > *')].map(element => element.tagName.toLowerCase())).toEqual(['h1', 'ul', 'kay-island', 'p', 'p'])
+      expect([...document.querySelectorAll('main > *')].map(element => element.tagName.toLowerCase())).toEqual(['h1', 'ul', 'slot', 'p', 'p'])
       expect(document.querySelector('p.error')?.textContent).toBe('Feed down')
-      const button = document.querySelector('kay-island button')!
+      const button = document.querySelector('slot button')!
 
       button.dispatchEvent(new Event('click', { bubbles: true }))
       await new Promise(resolve => setTimeout(resolve, 0))

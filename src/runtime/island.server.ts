@@ -42,7 +42,8 @@ export class IslandPropsError extends Error {
   override name = 'IslandPropsError'
 }
 
-// On the server an interactive component renders as its own hydration root inside `<kay-island>`, its props serialized for the client.
+// On the server an interactive component renders as its own hydration root inside a `<slot>`, its props serialized for the client.
+// Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
 export function island<P extends object>(id: string, component: (props: P) => JSX.Element): IslandComponent<P> {
   const render = (props: P & { hydrate?: HydrateWhen }) => {
     const when = props.hydrate
@@ -75,7 +76,7 @@ export function island<P extends object>(id: string, component: (props: P) => JS
 
       const lazy = when === undefined || when === 'load' ? '' : ` data-hydrate="${escape(when, true)}"`
 
-      return ssr([`<kay-island data-component="${escape(id, true)}" data-render-id="${renderId}" data-props="${escape(serialized, true)}"${lazy}${data}>`, '</kay-island>'], html) as unknown as JSX.Element
+      return ssr([`<slot data-component="${escape(id, true)}" data-render-id="${renderId}" data-props="${escape(serialized, true)}"${lazy}${data}>`, '</slot>'], html) as unknown as JSX.Element
     }
     finally {
       sharedConfig.context = context

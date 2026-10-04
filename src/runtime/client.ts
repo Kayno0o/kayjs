@@ -8,13 +8,14 @@ export type IslandRegistry = Record<string, () => Promise<{ default: (props: obj
 const VISIBLE_MARGIN = '200px'
 const IDLE_FALLBACK_MS = 200
 const started = new WeakSet<HTMLElement>()
+const ISLAND = 'slot[data-component]'
 
-// Hydrates every `<kay-island>` the server rendered, loading each component's chunk on demand; resolves once the eager ones are done.
+// Hydrates every island the server rendered, loading each component's chunk on demand; resolves once the eager ones are done.
 // Running it again over the same root leaves the islands it already took alone.
 export async function hydrateIslands(registry: IslandRegistry, root: ParentNode = document): Promise<void> {
   const eager: Promise<void>[] = []
 
-  for (const element of root.querySelectorAll<HTMLElement>('kay-island')) {
+  for (const element of root.querySelectorAll<HTMLElement>(ISLAND)) {
     if (started.has(element))
       continue
 
@@ -72,7 +73,11 @@ function whenVisible(element: HTMLElement, run: () => Promise<void>) {
     void run()
   }, { rootMargin: VISIBLE_MARGIN })
 
-  observer.observe(element)
+  // The wrapper lays out as `display: contents`, so it has no box of its own to intersect.
+  const targets = element.children.length > 0 ? element.children : [element.parentElement ?? element]
+
+  for (const target of targets)
+    observer.observe(target)
 }
 
 function whenIdle(run: () => Promise<void>) {
