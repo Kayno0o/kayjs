@@ -1,6 +1,7 @@
 import { withBase } from './base'
 import { dispatch, hydrate, render } from './dom'
 import { recordSignals, reportError, root, setErrorReporter } from './reactive'
+import { freshPrefix, withIds } from './uid'
 import { decodeValue } from './wire'
 
 export { startNavigation } from './navigate'
@@ -111,11 +112,13 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
 
   const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
   const early = takeEvents(element)
+  // Counted again from where the server's were, so the ids it rendered are claimed as they are.
+  const ids = element.dataset.uid ?? freshPrefix()
 
   // A client-only island has no server markup to claim.
   if (element.dataset.client !== undefined) {
     try {
-      disposers.set(element, noted(element, () => render(() => component(props), element)))
+      disposers.set(element, noted(element, () => render(() => withIds(ids, () => component(props)), element)))
     }
     catch (error) {
       reportError(error, id)
@@ -126,7 +129,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
       disposers.set(element, dispose)
 
       try {
-        noted(element, () => hydrate(() => component(props), element))
+        noted(element, () => hydrate(() => withIds(ids, () => component(props)), element))
       }
       catch (error) {
         // Markup the island would not build, such as one a browser extension changed, can fail anywhere along the way: rendered afresh rather than left dead.
@@ -138,7 +141,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
         element.textContent = ''
 
         try {
-          disposers.set(element, noted(element, () => render(() => component(props), element)))
+          disposers.set(element, noted(element, () => render(() => withIds(ids, () => component(props)), element)))
         }
         catch (failure) {
           // An error of the component itself, thrown again: the server's markup stays, lifeless, rather than nothing.

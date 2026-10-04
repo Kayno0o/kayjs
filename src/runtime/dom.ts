@@ -2,6 +2,7 @@
 // A dynamic part sits between `<!--[-->` and `<!--]-->` comments unless it is the only content of its element; hydration walks the server's nodes in the order the generated code asks for them.
 
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
+import { freshPrefix, withIds } from './uid'
 
 export { renderEffect as effect } from './reactive'
 
@@ -62,13 +63,14 @@ export function hydrate<T>(render: () => T, container: Node): T {
 }
 
 // Runs `render` building new nodes even while an island hydrates: a client-only component has no server markup to claim.
+// Its ids come from a prefix of its own, so the island around it counts the same as on the server, which rendered nothing for it.
 export function fresh<T>(render: () => T): T {
   const previous = claim
 
   claim = undefined
 
   try {
-    return render()
+    return withIds(freshPrefix(), render)
   }
   finally {
     claim = previous

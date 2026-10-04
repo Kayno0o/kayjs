@@ -6,6 +6,8 @@ import { parse } from '@babel/parser'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 const REACTIVE_MODULES = new Set(['kay'])
+// What `kay` exports that a static component may use and stay static.
+const STATIC_EXPORTS = new Set(['uid'])
 
 export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.
@@ -427,7 +429,7 @@ function importsReactiveValue(statement: t.Statement): boolean {
   if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || !REACTIVE_MODULES.has(statement.source.value))
     return false
 
-  return statement.specifiers.some(specifier => specifier.type !== 'ImportSpecifier' || specifier.importKind !== 'type')
+  return statement.specifiers.some(specifier => specifier.type !== 'ImportSpecifier' || (specifier.importKind !== 'type' && !STATIC_EXPORTS.has(specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value)))
 }
 
 function moduleSpecifier(statement: t.Statement, shift: (node: t.Node) => Span): Span[] {

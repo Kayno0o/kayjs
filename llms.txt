@@ -402,6 +402,25 @@ export const Theme = context<'light' | 'dark'>('light')
 
 A component's script calls `Theme.provide('dark')`, and any component it renders, its children and their blocks included, reads `Theme.use()`; a component beside it, or above, reads the nearest value provided above itself, else the default. Provide a signal to share a value that changes. `use()` reads while a component renders: a handler or a timer calls it with nothing above, getting the default, so the script reads it once and keeps it. A layout's provide reaches its page. An island reads nothing the page's static components provide, in the browser as on the server, since it hydrates on its own: provide inside the island.
 
+### Unique ids
+
+`uid()` from `kay` gives a component an id unique on the page, for tying a label to its control or a trigger to its popup, with no `id` prop to pass:
+
+```kay
+---
+import { signal, uid } from 'kay'
+
+const id = uid()
+const open = signal(false)
+---
+button(aria-controls={id} aria-expanded={open() ? 'true' : 'false'} onClick={() => open.set(o => !o)}) Menu
+ul(id={id} hidden={!open()})
+  slot
+```
+
+- One per call, made once per component instance as its script runs, rows of a `for` included. An island draws the same ids in the browser as the server wrote, so `for`, `aria-controls` and `id` match once it hydrates.
+- Importing `uid` alone keeps a component static; the ids of a page differ from one render to the next, so a test reads them off the markup rather than writing them.
+
 ### Browser-only components
 
 Some components cannot render on the server: a package that touches `window` as it loads, such as CodeMirror or hls.js, or code reading `localStorage` while rendering. Such a component renders in the browser only: the server sends its island as an empty `<slot>`, props included, and the browser renders it there as soon as the page loads, instead of hydrating it. Inside another island it renders nothing on the server and is built in place as its parent hydrates.

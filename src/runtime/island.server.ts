@@ -5,6 +5,7 @@ import { omit } from './dom'
 import { escapeAttribute } from './escape'
 import { child } from './html'
 import { renderOnServer, scope } from './reactive'
+import { countIds, islandPrefix, pageIds } from './uid'
 import { encodeValue, unsendable } from './wire'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
@@ -26,7 +27,7 @@ export function collectIslands<T>(render: () => T): { result: T, islands: Render
   rendered = islands
 
   try {
-    return { result: render(), islands }
+    return { result: pageIds(render), islands }
   }
   finally {
     rendered = undefined
@@ -65,6 +66,8 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       return browserOnly ? { t: '' } as unknown as JSX.Element : component!(own)
 
     const serialized = serializeProps(id, own)
+    // The browser counts the island's ids from it again as it hydrates.
+    const ids = islandPrefix()
 
     depth++
 
@@ -77,9 +80,9 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     try {
       // Detached, as in the browser, where an island reads nothing the page's components provide.
-      const html = browserOnly ? '' : renderOnServer(() => scope(() => child(component!(own)), true))
+      const { result: html, count } = browserOnly ? { result: '', count: 0 } : renderOnServer(() => scope(() => countIds(ids, () => child(component!(own))), true))
       const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
-      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props="${escapeAttribute(serialized)}"${lazy}${browserOnly ? ' data-client' : ''}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}>${html}</slot>` }
+      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props="${escapeAttribute(serialized)}"${lazy}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}>${html}</slot>` }
 
       return markup as unknown as JSX.Element
     }
