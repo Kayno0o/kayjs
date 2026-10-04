@@ -32,7 +32,7 @@ export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
   // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser.
-  submit: <Input>(action: Action<Input, unknown>, fields: Partial<Record<Extract<keyof Input, string>, FormValue | FormValue[]>>, init?: VisitInit & { from?: string }) => Promise<Visit>
+  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot, FormValue | FormValue[]>>, init?: VisitInit & { from?: string }) => Promise<Visit>
   // The call an island makes: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
   call: <Input, Output>(action: Action<Input, Output>, input: Input, init?: VisitInit) => Promise<Success<Output>>
   cookies: Bun.CookieMap

@@ -9,6 +9,8 @@ const FAILURE = Symbol.for('kay.failure')
 
 // Type only: what the handler returns, failures included, so a page can type `ctx.failed(action)`.
 declare const RESULT: unique symbol
+// Type only: the honeypot field an action's forms render, which `kay check` then takes as one of their fields.
+declare const HONEYPOT: unique symbol
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 
 // Where a called action sends the browser, in place of `location`.
@@ -24,6 +26,13 @@ const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
 export interface EncodedCall {
   headers: Record<string, string>
   body: string | FormData
+}
+
+export interface ActionProtection<Honeypot extends string = never> {
+  // At most `max` posts from one client every `window` seconds; past that a post fails with 429 without reaching the handler.
+  rateLimit?: { max: number, window: number }
+  // A field the form renders out of sight, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.
+  honeypot?: Honeypot
 }
 
 export interface ActionContext {
@@ -69,18 +78,21 @@ export interface FormSuccess<Output> {
 export type SuccessOf<Target> = Target extends Action<never, infer Output> ? FormSuccess<Success<Output>> : never
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
-export interface Action<Input, Output> {
+export interface Action<Input, Output, Honeypot extends string = never> {
   (input: Input): Promise<Success<Output>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
   readonly url: string
   readonly [ACTION]: true
   readonly [RESULT]?: Output
+  // Taking the field rather than giving it, so an action with a honeypot still passes where any action is expected.
+  [HONEYPOT]?: (field: Honeypot) => void
 }
 
-export interface ServerAction<Schema extends TSchema, Output> extends Action<Static<Schema>, Output> {
+export interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Static<Schema>, Output, Honeypot> {
   readonly schema: Schema
   readonly handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>
+  readonly protection?: ActionProtection<string>
 }
 
 export class ActionError extends Error {
@@ -118,7 +130,7 @@ export function actionUrl(moduleId: string, name: string): string {
 }
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
-export function action<Schema extends TSchema, Output>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>): ServerAction<Schema, Awaited<Output>> {
+export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Awaited<Output>, Honeypot> {
   const state = { url: '' }
   const { call, pending } = callable(() => state.url)
 
@@ -127,8 +139,9 @@ export function action<Schema extends TSchema, Output>(schema: Schema, handler: 
     url: { get: () => state.url, set: (url: string) => void (state.url = url), enumerable: true },
     schema: { value: schema, enumerable: true },
     handler: { value: handler, enumerable: true },
+    protection: { value: protection, enumerable: true },
     [ACTION]: { value: true },
-  }) as unknown as ServerAction<Schema, Awaited<Output>>
+  }) as unknown as ServerAction<Schema, Awaited<Output>, Honeypot>
 }
 
 // What a browser build exports in place of a server action.
@@ -158,7 +171,9 @@ export function formAction(target: string | Action<never, unknown>): string {
   return typeof target === 'string' ? target : target.url
 }
 
-export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> : string
+export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> | HoneypotOf<Target> : string
+
+type HoneypotOf<Target> = Target extends { [HONEYPOT]?: (field: infer Field) => void } ? Field : never
 
 // Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes.
 function callable(url: () => string): { call: (input: never) => Promise<unknown>, pending: () => boolean } {

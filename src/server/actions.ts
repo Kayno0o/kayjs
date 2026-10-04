@@ -13,6 +13,7 @@ import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash, writeSuccess } from './flash'
 import { runGuards } from './guards'
+import { protectionRefusal } from './protection'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
 
@@ -88,7 +89,14 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
         transform: (context) => {
           refuseCrossSite(context.request)
 
-          context.body = isCall(context.request) ? callInput(context.body) : formInput(value.schema, withoutEmptyFiles(context.body))
+          const call = isCall(context.request)
+          const refusal = protectionRefusal(value, context.request, context.body, !call, context.server)
+
+          // Before the schema reads the input: every attempt counts, a valid one or not.
+          if (refusal)
+            throw new Refusal(failed(context.request, new Headers(refusal.headers), cookieJar(context.request).cookies, { action: value.url, status: refusal.status, values: call ? {} : submittedValues(context.body), errors: { [refusal.field]: refusal.message } }))
+
+          context.body = call ? callInput(context.body) : formInput(value.schema, withoutEmptyFiles(context.body))
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
         ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(guards, context, options) }),

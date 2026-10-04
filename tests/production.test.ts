@@ -1,6 +1,14 @@
+import type { Server } from 'bun'
+import type { Action } from '../src/runtime'
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { check } from '../src/check'
 import { inlineScriptHashes, pages } from '../src/server'
+import { clientOf } from '../src/server/protection'
+import { testSite } from '../src/test'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 
@@ -68,5 +76,61 @@ describe('security headers', () => {
     expect((await own.handle(new Request('http://localhost/about'))).headers.get('content-security-policy')).toBe('default-src *')
     expect(offResponse.headers.has('content-security-policy')).toBe(false)
     expect(offResponse.headers.has('x-content-type-options')).toBe(false)
+  })
+})
+
+describe('action protection', () => {
+  const FIXTURE = 'tests/fixtures/production'
+  // Held in a variable so tsc leaves the .kay import to Bun.
+  const CONTACT = './fixtures/production/src/routes/contact.kay'
+
+  it('refuses a form whose honeypot is filled in, with a message on the field, the handler never running', async () => {
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
+    const { send } = await import(CONTACT) as { send: Action<{ message: string }, number, 'website'> }
+    const trapped = await site.submit(send, { message: 'hello', website: 'https://spam.example' }, { from: '/contact' })
+    const human = await site.submit(send, { message: 'hello', website: '' }, { from: '/contact' })
+
+    expect(trapped.html).toContain('<p class="error">422 Leave this field empty</p>')
+    expect(human.html).toContain('<p class="sent">Sent 5</p>')
+  })
+
+  it('lets a client post as often as the limit allows in a window, then answers 429 with when to retry', async () => {
+    const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false })
+    const { send } = await import(CONTACT) as { send: Action<{ message: string }, number> }
+    const call = async (from: string) => app.handle(new Request(`http://localhost${send.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': from }, body: stringify({ message: 'hi' }) }))
+
+    expect((await call('203.0.113.7')).status).toBe(200)
+    expect((await call('203.0.113.7')).status).toBe(200)
+
+    const limited = await call('203.0.113.7')
+
+    expect(limited.status).toBe(429)
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
+    expect(parse(await limited.text())).toEqual({ errors: { '': expect.stringMatching(/^Too many attempts; try again in \d+ s$/) }, data: undefined })
+    expect((await call('198.51.100.2')).status).toBe(200)
+  })
+
+  it('takes the address a proxy appended last, never one the client wrote before it', () => {
+    const behind = new Request('http://localhost/', { headers: { 'x-forwarded-for': '1.1.1.1, 203.0.113.7' } })
+    const proxy = { requestIP: () => ({ address: '127.0.0.1' }) } as unknown as Server<unknown>
+    const direct = { requestIP: () => ({ address: '198.51.100.9' }) } as unknown as Server<unknown>
+
+    expect(clientOf(behind, proxy)).toBe('203.0.113.7')
+    expect(clientOf(behind, direct)).toBe('198.51.100.9')
+  })
+
+  it('types the honeypot as one of the form\'s fields for kay check, a misspelt one still refused', async () => {
+    const typo = join(FIXTURE, 'src/routes/typo.kay')
+
+    expect(await check(FIXTURE)).toEqual([])
+
+    try {
+      await Bun.write(typo, '---\nimport { send } from \'./contact.kay\'\n---\nform(action={send})\n  input(name="websit")\n')
+
+      expect((await check(FIXTURE)).map(diagnostic => diagnostic.line)).toEqual([5])
+    }
+    finally {
+      await rm(typo, { force: true })
+    }
   })
 })

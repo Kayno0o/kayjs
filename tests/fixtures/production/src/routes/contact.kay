@@ -1,0 +1,17 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const send = action(t.Object({ message: t.String() }), ({ message }) => message.length, { rateLimit: { max: 2, window: 60 }, honeypot: 'website' })
+
+const failure = ctx.failed(send)
+const sent = ctx.succeeded(send)
+---
+form(action={send})
+  input(name="message")
+  input(name="website" tabindex="-1" autocomplete="off" aria-hidden="true")
+  button Send
+if failure
+  p.error {failure.status} {Object.values(failure.errors).join(' ')}
+if sent
+  p.sent Sent {sent.data}
