@@ -23,6 +23,8 @@ export interface CompileOptions {
   // Output for type checking: adds the link, form field and island prop assertions.
   check?: boolean
   relocateImport?: (specifier: string) => string | undefined
+  // Server output for rendering outside islands, without hydration markers: a static component renders through its hydratable `?island` twin inside one.
+  staticRender?: boolean
 }
 
 export interface CompileResult {
@@ -41,6 +43,13 @@ const KAY_EXTENSION = /\.kay$/
 const ERROR_PAGE = '_error.kay'
 const BACKSLASH = /\\/g
 
+export const ISLAND_TWIN = '?island'
+
+// The `.kay` file a module path names, its `?island` twin included.
+export function withoutTwin(path: string): string {
+  return path.endsWith(ISLAND_TWIN) ? path.slice(0, -ISLAND_TWIN.length) : path
+}
+
 // Compiles a .kay component to TSX that is both type-checked and handed to Solid's compiler.
 export function compileKay(source: string, filename: string, options: CompileOptions = {}): CompileResult {
   const file = parseKay(source)
@@ -50,7 +59,8 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   let name = freeName(componentName(filename), fences)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
-  const generateOptions = { island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE }
+  const twin = options.staticRender && !island && !file.server ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
+  const generateOptions = { island, twin, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
   let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name)

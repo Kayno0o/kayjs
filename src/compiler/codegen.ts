@@ -20,6 +20,8 @@ export interface GenerateOptions {
   params?: string[]
   // `_error.kay`, whose `ctx` carries the error it renders.
   errorPage?: boolean
+  // Server output without hydration markers for a static component: inside an island it renders through this hydratable build of itself instead.
+  twin?: string
   // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
   relocateImport?: (specifier: string) => string | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
@@ -123,6 +125,9 @@ class Generator {
     if (this.options.island)
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
 
+    if (this.options.twin !== undefined)
+      b.add(`import { insideIsland as KayInsideIsland } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
+
     if (this.options.island && this.genericComponent)
       b.add(`import type { HydrateWhen as KayHydrateWhen, IslandBrand as KayIslandBrand } from 'kay'\n`)
 
@@ -140,7 +145,7 @@ class Generator {
     if (includeServer)
       this.emitLoad(server)
 
-    b.add(`\n${this.options.island ? '' : 'export default '}function ${this.options.name}`)
+    b.add(`\n${this.options.island || this.options.twin !== undefined ? '' : 'export default '}function ${this.options.name}`)
 
     if (this.file.typeParameters) {
       if (server)
@@ -181,6 +186,9 @@ class Generator {
     b.add('\nreturn ')
     this.emitRoot(template)
     b.add('\n}\n')
+
+    if (this.options.twin !== undefined)
+      b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${this.options.name}(props)) as typeof ${this.options.name}\n`)
 
     if (this.options.island)
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''})${this.genericIslandType()}\n`)
@@ -618,22 +626,26 @@ class Generator {
     })
   }
 
-  // Pages and layouts render once on the server and never hydrate, so their loops skip the owner Solid's `For` makes for every row.
+  // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops skip the owner Solid's `For` makes for every row.
   private get staticLoops(): boolean {
-    return this.server !== undefined && this.options.includeServer !== false && !this.options.check && !this.options.island
+    if (this.options.check || this.options.island)
+      return false
+
+    return this.options.twin !== undefined || (this.server !== undefined && this.options.includeServer !== false)
   }
 
   private emitFor(node: ForNode) {
     const { b } = this
-    const tag = kayAlias('loopFor')
-    // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
-    const positional = node.index !== undefined && this.text(node.key).trim() === this.text(node.index)
 
     if (this.staticLoops) {
-      this.emitStaticFor(node, positional)
+      this.emitStaticFor(node)
 
       return
     }
+
+    const tag = kayAlias('loopFor')
+    // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
+    const positional = node.index !== undefined && this.text(node.key).trim() === this.text(node.index)
 
     b.wrap(node, () => {
       b.add(`<${tag} each={`).addSource(node.each).add('} keyed={')
@@ -670,27 +682,19 @@ class Generator {
     })
   }
 
-  // The loop's callback takes the same parameters as `For`'s, so the reads the analysis pass rewrote stay right.
-  private emitStaticFor(node: ForNode, positional: boolean) {
+  // Nothing here updates, so the loop's callback gets the item and the index themselves rather than `For`'s accessors.
+  private emitStaticFor(node: ForNode) {
     const { b } = this
 
     b.wrap(node, () => {
       b.add(`{${kayAlias('staticFor')}(`).addSource(node.each).add(', (')
-      this.accessorSites.add(b.code.length)
       b.addSource(node.item)
 
-      if (node.index) {
-        b.add(', ')
-
-        if (!positional)
-          this.accessorSites.add(b.code.length)
-
-        b.addSource(node.index)
-      }
+      if (node.index)
+        b.add(', ').addSource(node.index)
 
       b.add(`) => `)
       this.emitRoot(node.children)
-      b.add(`, ${positional}`)
 
       if (node.fallback) {
         b.add(', () => ')

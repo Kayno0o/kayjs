@@ -586,7 +586,7 @@ describe('prerendering', () => {
         return { html: (await response.text()).replace(MARKERS, ''), etag: response.headers.get('etag') }
       }
 
-      expect(await Bun.file(join(root, '.kay/client/pages/docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html.replace('guide/intro', '<!--$-->guide/intro<!--/-->'))
+      expect(await Bun.file(join(root, '.kay/client/pages/docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html)
       expect(await Bun.file(join(root, '.kay/client/pages/docs/a%20b.html')).exists()).toBe(true)
       expect(await visit('/docs/guide/intro')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at guide/intro</p>'), etag: expect.any(String) })
       expect(await visit('/docs/a%20b')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a b</p>'), etag: expect.any(String) })

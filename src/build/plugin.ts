@@ -1,6 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { Target } from './transform'
 import process from 'node:process'
+import { withoutTwin } from '../compiler'
 import { ASSET_FILE, writeAsset } from './assets'
 import { transformKayCached } from './transform'
 
@@ -15,7 +16,8 @@ export interface KayPluginOptions {
   cacheDir?: string
 }
 
-const KAY_FILE = /\.kay$/
+// A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
+const KAY_FILE = /\.kay(?:\?island)?$/
 
 export function kay(options: KayPluginOptions = {}): BunPlugin {
   return {
@@ -24,7 +26,7 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
       const target = options.target ?? (build.config?.target === 'browser' ? 'dom' : 'ssr')
 
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => {
-        const source = await Bun.file(path).text()
+        const source = await Bun.file(withoutTwin(path)).text()
 
         return { contents: await transformKayCached(source, path, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir }), loader: 'ts' }
       })

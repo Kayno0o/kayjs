@@ -119,7 +119,7 @@ describe('control flow', () => {
     const page = '--- server\nconst rows = [1]\n---\nul\n  for row, i of rows key={row}\n    li {i}: {row}\n  else\n    li none'
     const server = compileKay(page, 'src/routes/index.kay', { includeServer: true }).tsx
 
-    expect(server).toContain('{KayStaticFor(__props.rows, (row, i) => <li>{i()}: {row()}</li>, false, () => <li>none</li>)}')
+    expect(server).toContain('{KayStaticFor(__props.rows, (row, i) => <li>{i}: {row}</li>, () => <li>none</li>)}')
     expect(server).not.toContain('KayLoopFor ')
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).toContain('<KayLoopFor each={__props.rows}')
     expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('<KayLoopFor each={__props.rows}')

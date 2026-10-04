@@ -47,14 +47,13 @@ describe('server rendering through the Bun plugin', () => {
 })
 
 describe('staticFor', () => {
-  it('renders each row once with the index for loops keyed by position, an accessor otherwise, and the fallback when empty', () => {
-    const row = (item: () => string, index: unknown) => typeof index === 'function' ? `${item()}@${(index as () => number)()}()` : `${item()}@${String(index)}`
+  it('renders each row once with its item and index, and the fallback when empty', () => {
+    const row = (item: string, index: number) => `${item}@${index}`
 
-    expect(staticFor(['a', 'b'], row, true)).toEqual(['a@0', 'b@1'])
-    expect(staticFor(['a', 'b'], row, false)).toEqual(['a@0()', 'b@1()'])
-    expect(staticFor(null, row, false, () => 'none')).toBe('none')
-    expect(staticFor(false, row, false)).toBeNull()
-    expect(staticFor([], row, true, () => 'none')).toBe('none')
+    expect(staticFor(['a', 'b'], row)).toEqual(['a@0', 'b@1'])
+    expect(staticFor(null, row, () => 'none')).toBe('none')
+    expect(staticFor(false, row)).toBeNull()
+    expect(staticFor([], row, () => 'none')).toBe('none')
   })
 })
 
@@ -84,11 +83,11 @@ async function renderKay(source: string, props: Record<string, unknown> = {}, di
 
 describe('server fence declarations', () => {
   it('render when a declaration carries a type annotation', async () => {
-    expect(await renderKay('--- server\nconst title: string = \'T\'\nlet count: number = 3\n---\nh1 {title} {count}')).toBe('<h1 _hk=0>T 3</h1>')
+    expect(await renderKay('--- server\nconst title: string = \'T\'\nlet count: number = 3\n---\nh1 {title} {count}')).toBe('<h1>T 3</h1>')
   })
 
   it('render enums, repeated var declarations and ambient declarations', async () => {
-    expect(await renderKay('--- server\nenum Color { Red = \'red\' }\nvar x = 1\nvar x = 2\ndeclare const dd: number\nnamespace Util { export const one = 1 }\n---\np {Color.Red} {x} {Util.one}')).toBe('<p _hk=0>red 2 1</p>')
+    expect(await renderKay('--- server\nenum Color { Red = \'red\' }\nvar x = 1\nvar x = 2\ndeclare const dd: number\nnamespace Util { export const one = 1 }\n---\np {Color.Red} {x} {Util.one}')).toBe('<p>red 2 1</p>')
   })
 
   it('render when both fences import the same names', async () => {
@@ -96,7 +95,7 @@ describe('server fence declarations', () => {
 
     const html = await renderKay('--- server\nimport { fmt } from \'./fmt\'\nimport type { Row } from \'./fmt\'\nconst a = fmt(1)\nconst row = { id: 2 } as Row\n---\n---\nimport { fmt } from \'./fmt\'\nimport type { Row } from \'./fmt\'\nconst b = fmt(row.id)\n---\np {a} {b}')
 
-    expect(html).toBe('<p _hk=0>#1 #2</p>')
+    expect(html).toBe('<p>#1 #2</p>')
   })
 })
 
@@ -107,14 +106,14 @@ describe('component tags', () => {
   it('render a prop as the component, children included', async () => {
     const html = await renderKay('---\nconst { Icon, Wrap, label } = props<{ Icon: unknown, Wrap: unknown, label: string }>()\n---\nIcon(n="x")\nWrap\n  p {label}', { Icon, Wrap, label: 'L' })
 
-    expect(html).toBe('&lt;i>x&lt;/i><p _hk=0>L</p>')
+    expect(html).toBe('&lt;i>x&lt;/i><p>L</p>')
   })
 
   it('render each loop item as the component', async () => {
     const html = await renderKay('---\nconst { comps } = props<{ comps: unknown[] }>()\n---\nfor C of comps key={C}\n  C(n="1")\n    p child', { comps: [Icon, Wrap] })
 
     expect(html).toContain('&lt;i>1&lt;/i>')
-    expect(html).toContain('<p _hk=')
+    expect(html).toContain('<p>child</p>')
   })
 
   it('render a prop default as the component', async () => {
@@ -132,7 +131,7 @@ describe('component function names', () => {
 
     const module = await import(join(directory, 'date.kay')) as InlineModule
 
-    expect(renderToString(() => module.default({ ts: 0 })).replace(MARKERS, '')).toBe('<p _hk=0>1970</p>')
+    expect(renderToString(() => module.default({ ts: 0 })).replace(MARKERS, '')).toBe('<p>1970</p>')
   })
 })
 
@@ -143,8 +142,8 @@ describe('prop defaults', () => {
   it('apply to undefined only, and a null stays null', async () => {
     Object.assign(globalThis, { calls })
 
-    expect(await renderKay(source, { size: 'lg', opts: { n: 1 }, label: null })).toBe('<p _hk=0>lg 1 </p>')
-    expect(await renderKay(source, {})).toBe('<p _hk=0>md 7 x</p>')
+    expect(await renderKay(source, { size: 'lg', opts: { n: 1 }, label: null })).toBe('<p>lg 1 </p>')
+    expect(await renderKay(source, {})).toBe('<p>md 7 x</p>')
   })
 
   it('run only for the props that are not passed', async () => {
@@ -159,7 +158,7 @@ describe('prop defaults', () => {
     Object.assign(globalThis, { calls })
     calls.length = 0
 
-    expect(await renderKay('---\nconst { opts = make() } = props<{ opts?: { n: number } }>()\nfunction make() {\n  calls.push(1)\n\n  return { n: 7 }\n}\n---\np {opts.n} {String(opts === opts)}', {})).toBe('<p _hk=0>7 true</p>')
+    expect(await renderKay('---\nconst { opts = make() } = props<{ opts?: { n: number } }>()\nfunction make() {\n  calls.push(1)\n\n  return { n: 7 }\n}\n---\np {opts.n} {String(opts === opts)}', {})).toBe('<p>7 true</p>')
     expect(calls).toEqual([1])
   })
 
@@ -169,7 +168,7 @@ describe('prop defaults', () => {
       return reads++ === 0 ? undefined : 'lg'
     } }
 
-    expect(await renderKay('---\nconst { size = \'md\' } = props<{ size?: string }>()\n---\np {size} {size}', props)).toBe('<p _hk=0>md lg</p>')
+    expect(await renderKay('---\nconst { size = \'md\' } = props<{ size?: string }>()\n---\np {size} {size}', props)).toBe('<p>md lg</p>')
   })
 })
 
@@ -187,7 +186,7 @@ describe('typeof in a template expression', () => {
   it('reads the type of a loop item, an alias and a prop with a default, which render as values', async () => {
     const source = '---\nconst { rows, size = \'md\' } = props<{ rows: { id: number }[], size?: string }>()\n---\nfor row of rows key={row.id}\n  p {[row.id as typeof row.id, size as typeof size].join()}\nif rows[0] as first\n  p {(first as typeof first).id}'
 
-    expect(await renderKay(source, { rows: [{ id: 1 }] })).toBe('<p _hk=000>1,md</p><p _hk=220>1</p>')
+    expect(await renderKay(source, { rows: [{ id: 1 }] })).toBe('<p>1,md</p><p>1</p>')
   })
 })
 
@@ -195,28 +194,28 @@ describe('class shorthand with a spread', () => {
   const spread = { class: 'FROM', title: 't' }
 
   it('merges the shorthand, the class attribute and the spread\'s class', async () => {
-    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp})', { sp: spread })).toBe('<p _hk=0 title="t" class="a FROM"></p>')
-    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp} class="z")', { sp: spread })).toBe('<p _hk=0 title="t" class="a FROM z"></p>')
-    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a(class="z" title="own" {...sp})', { sp: spread })).toBe('<p _hk=0 title="t" class="a z FROM"></p>')
-    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp} title="own")', { sp: spread })).toBe('<p _hk=0 title="own" class="a FROM"></p>')
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp})', { sp: spread })).toBe('<p title="t" class="a FROM"></p>')
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp} class="z")', { sp: spread })).toBe('<p title="t" class="a FROM z"></p>')
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a(class="z" title="own" {...sp})', { sp: spread })).toBe('<p title="t" class="a z FROM"></p>')
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp} title="own")', { sp: spread })).toBe('<p title="own" class="a FROM"></p>')
   })
 
   it('merges a class attribute with the spread\'s class without the shorthand too', async () => {
-    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np(class="z" {...sp})', { sp: spread })).toBe('<p _hk=0 title="t" class="z FROM"></p>')
-    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np({...sp} class={["y", "z"]})', { sp: spread })).toBe('<p _hk=0 title="t" class="FROM y z"></p>')
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np(class="z" {...sp})', { sp: spread })).toBe('<p title="t" class="z FROM"></p>')
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np({...sp} class={["y", "z"]})', { sp: spread })).toBe('<p title="t" class="FROM y z"></p>')
   })
 
   it('renders a spread without a class as before', async () => {
-    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp})', { sp: { title: 't' } })).toBe('<p _hk=0 title="t" class="a"></p>')
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np.a({...sp})', { sp: { title: 't' } })).toBe('<p title="t" class="a"></p>')
   })
 })
 
 describe('text lines', () => {
   it('keep their line breaks', async () => {
-    expect(await renderKay('pre\n  | a\n  | b\n  | c')).toBe('<pre _hk=0>a\nb\nc</pre>')
-    expect(await renderKay('pre\n  | a\n  |   b {"x"}  c\n  |    d')).toBe('<pre _hk=0>a\n  b x  c\n   d</pre>')
-    expect(await renderKay('textarea a   b')).toBe('<textarea _hk=0>a   b</textarea>')
-    expect(await renderKay('---\nconst { n } = props<{ n: string }>()\n---\np\n  | line one\n  | line two {n}', { n: 'N' })).toBe('<p _hk=0>line one\nline two N</p>')
+    expect(await renderKay('pre\n  | a\n  | b\n  | c')).toBe('<pre>a\nb\nc</pre>')
+    expect(await renderKay('pre\n  | a\n  |   b {"x"}  c\n  |    d')).toBe('<pre>a\n  b x  c\n   d</pre>')
+    expect(await renderKay('textarea a   b')).toBe('<textarea>a   b</textarea>')
+    expect(await renderKay('---\nconst { n } = props<{ n: string }>()\n---\np\n  | line one\n  | line two {n}', { n: 'N' })).toBe('<p>line one\nline two N</p>')
   })
 })
 
@@ -232,5 +231,17 @@ describe('stack frames', () => {
     expect(mapStack(`    at kaboom (${file}:${line + 1}:${column})`)).toBe(`    at kaboom (${file}:3:3)`)
     expect(mapStack(`    at ${file}:${line + 1}:${column}`)).toBe(`    at ${file}:3:3`)
     expect(mapStack(`    at async <anonymous> (${file}:${line + 1}:${column})\n    at other (/x/y.ts:1:2)`)).toBe(`    at async <anonymous> (${file}:3:3)\n    at other (/x/y.ts:1:2)`)
+  })
+
+  it('map a static component\'s island twin to its .kay file', () => {
+    const file = join(scratch, 'twin.kay')
+    const source = '---\nconst kaboom = (): string => {\n  throw new Error(\'boom\')\n}\n---\np {kaboom()}\n'
+    const compiled = transformKay(source, `${file}?island`, { target: 'ssr', hydratable: true })
+    const line = compiled.split('\n').findIndex(text => text.includes('throw new Error'))
+    const column = compiled.split('\n')[line]!.indexOf('throw') + 1
+
+    expect(compiled).toContain('_$ssrHydrationKey')
+    expect(mapStack(`    at kaboom (${file}?island:${line + 1}:${column})`)).toBe(`    at kaboom (${file}:3:3)`)
+    expect(mapStack(`Error at ${file}?island:${line + 1}:${column}`)).toBe(`Error at ${file}:3:3`)
   })
 })

@@ -1,4 +1,5 @@
 import type { SourceMap } from '../compiler'
+import { withoutTwin } from '../compiler'
 import { offsetAt, positionAt } from '../compiler/mapping'
 
 // A generated column and the 0-based source line and column it came from.
@@ -17,9 +18,10 @@ const BASE64_DIGITS = new Map([...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrs
 // A stack line is `at fn (path:line:column)` or `at path:line:column`, and the path may hold spaces and parentheses.
 const FRAME_START = /^\s*at\s+/
 const PATH_IN_PARENTHESES = /\s\((?=\/|[A-Z]:[\\/])/i
-const FRAME_POSITION = /\.kay:(\d+):(\d+)/
+// A static component's `?island` twin is a module of its own, with its own map, shown as its `.kay` file.
+const FRAME_POSITION = /\.kay(?:\?island)?:(\d+):(\d+)/
 // Anything else mentioning a position, such as an error message.
-const KAY_POSITION = /([^\s()]+\.kay):(\d+):(\d+)/g
+const KAY_POSITION = /([^\s()]+\.kay(?:\?island)?):(\d+):(\d+)/g
 const VLQ_CONTINUATION = 32
 const VLQ_VALUE = 31
 
@@ -53,7 +55,7 @@ export function mapStack(stack: string): string {
 
     const parenthesised = text.search(PATH_IN_PARENTHESES)
     const from = parenthesised !== -1 && parenthesised < position.index ? parenthesised + 2 : start[0].length
-    const file = text.slice(from, position.index + 4)
+    const file = text.slice(from, position.index + position[0].indexOf(':'))
     const end = position.index + position[0].length
 
     return `${text.slice(0, from)}${mapPosition(file, position[1]!, position[2]!) ?? text.slice(from, end)}${text.slice(end)}`
@@ -64,7 +66,7 @@ function mapPosition(file: string, line: string, column: string): string | undef
   const module = compiledFor(file)
   const position = module && toKay(module, Number(line), Number(column))
 
-  return position ? `${file}:${position.line}:${position.column}` : undefined
+  return position ? `${withoutTwin(file)}:${position.line}:${position.column}` : undefined
 }
 
 // Bun would print the compiled code around the throw, so an error goes out as its stack mapped to `.kay` lines.

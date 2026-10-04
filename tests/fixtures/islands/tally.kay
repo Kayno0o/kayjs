@@ -1,0 +1,9 @@
+---
+import { signal } from 'kay'
+import Badge from './badge.kay'
+
+const n = signal(0)
+---
+section.tally
+  Badge(labels={n() > 0 ? ['a', 'b', 'c'] : ['a', 'b']})
+  button.tally(onClick={() => n.set(c => c + 1)}) Tally {n()}

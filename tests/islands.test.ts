@@ -165,4 +165,34 @@ describe('islands', () => {
     expect(button.textContent).toBe(expected)
     expect(issues).toEqual([])
   })
+
+  it('renders a static component without hydration markers, and through its hydratable twin inside an island', async () => {
+    const issues: string[] = []
+    const warn = spyOn(console, 'warn').mockImplementation((...args) => void issues.push(args.join(' ')))
+    const error = spyOn(console, 'error').mockImplementation((...args) => void issues.push(args.join(' ')))
+    const { default: Fixture } = await import(join(fixtures, 'tallypage.kay')) as { default: () => unknown }
+
+    delete (globalThis as { _$HY?: unknown })._$HY
+    // eslint-disable-next-line no-new-func -- runs Solid's own bootstrap script, which happy-dom does not execute from markup
+    new Function(HYDRATION_SCRIPT.exec(generateHydrationScript())![1]!)()
+    const html = renderToString(() => Fixture())
+
+    expect(html).toContain('<main><ul class="badges"><li class="badge">x</li></ul><slot')
+    expect(html).toMatch(/<ul _hk=\S+ class="badges">/)
+    document.body.innerHTML = html
+
+    const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+
+    await hydrateAgain()
+    const button = document.querySelector('button.tally')!
+
+    button.dispatchEvent(new Event('click', { bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    warn.mockRestore()
+    error.mockRestore()
+    expect(document.querySelector('button.tally')).toBe(button)
+    expect(button.textContent).toBe('Tally 1')
+    expect([...document.querySelectorAll('slot li.badge')].map(item => item.textContent)).toEqual(['a', 'b', 'c'])
+    expect(issues).toEqual([])
+  })
 })

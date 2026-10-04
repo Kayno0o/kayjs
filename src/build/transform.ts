@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { mkdir, rename } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
-import { compileKay, formatDiagnostic } from '../compiler'
+import { compileKay, formatDiagnostic, withoutTwin } from '../compiler'
 import { transform } from './solid-compiler'
 import { registerSourceMap } from './sourcemap'
 
@@ -123,15 +123,20 @@ function cacheEntry(cacheDir: string, filename: string, kind: string, inputs: st
   }
 }
 
+// `filename` may name a static component's `?island` twin, the build of it that renders inside islands.
 function compile(source: string, filename: string, options: TransformOptions): Compiled {
   const server = options.target === 'ssr'
-  const { tsx, map, diagnostics } = compileKay(source, filename, { root: options.root, includeServer: server })
+  const file = withoutTwin(filename)
+  const twin = file !== filename
+  const hydratable = options.hydratable ?? false
+  const { tsx, map, island, diagnostics } = compileKay(source, file, { root: options.root, includeServer: server, staticRender: server && hydratable && !twin })
 
   if (diagnostics.length > 0)
-    throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file: filename, source })))
+    throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))
 
+  // Only what renders inside an island carries hydration markers; on the server everything else renders once.
   // Server code is what throws inside loads and renders, so its stacks are the ones mapped back to the `.kay` source.
-  const output = transform(tsx, { filename: `${filename}.tsx`, generate: options.target, hydratable: options.hydratable ?? false, sourceMap: server })
+  const output = transform(tsx, { filename: `${file}.tsx`, generate: options.target, hydratable: hydratable && (!server || twin || island !== undefined), sourceMap: server })
 
   return { code: output.code, tsx, map, solidMap: server ? output.map ?? undefined : undefined }
 }

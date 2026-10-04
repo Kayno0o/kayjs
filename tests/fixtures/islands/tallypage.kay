@@ -1,0 +1,7 @@
+---
+import Badge from './badge.kay'
+import Tally from './tally.kay'
+---
+main
+  Badge(labels={['x']})
+  Tally

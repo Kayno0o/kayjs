@@ -1,0 +1,6 @@
+---
+const { labels } = props<{ labels: string[] }>()
+---
+ul.badges
+  for label of labels key={label}
+    li.badge {label}
