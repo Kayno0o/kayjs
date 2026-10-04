@@ -1,0 +1,25 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const verify = action(t.Object({ code: t.String() }), async ({ code }, ctx) => {
+  const result = await ctx.locals.auth.verifyTwoFactor(code)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+const pending = await ctx.locals.auth.twoFactorPending()
+const failure = ctx.failed(verify)
+---
+h1 Two-factor
+if pending
+  form#code(action={verify})
+    input(name="code" autocomplete="one-time-code")
+    button Verify
+else
+  p#nothing Nothing to verify
+if failure?.data as data
+  p#error {data.error}

@@ -1,0 +1,24 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const query = t.Object({ token: t.Optional(t.String()) })
+
+// The link only shows this button: a mail scanner opening it spends nothing.
+export const spend = action(t.Object({ token: t.String() }), async ({ token }, ctx) => {
+  const result = await ctx.locals.auth.signInWithMagicLink(token)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+const token = ctx.query.token ?? ''
+const failure = ctx.failed(spend)
+---
+form#spend(action={spend})
+  input(type="hidden" name="token" value={token})
+  button Sign in
+if failure?.data as data
+  p#error {data.error}

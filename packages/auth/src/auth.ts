@@ -44,7 +44,7 @@ export type AuthRequirement<Role extends string> = Requirement<User, Role>
 // The plugin kay's `session()` returns, whichever data the app keeps beside kay-auth's.
 export interface SessionPlugin<Data extends AuthSessionData> { '~Ephemeral': { derive: { readonly session: Session<Data> } } }
 
-export interface AuthOptions<Data extends AuthSessionData, Role extends string> {
+export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth'> {
   sessions: SessionPlugin<Data>
   // At least 32 characters, from the environment; each use gets its own key derived from it. A list rotates them: the first writes, every one reads.
   secret: string | string[]
@@ -52,7 +52,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string> 
   // The site's public origin, such as `https://example.com`: OAuth callbacks are built on it.
   url?: string
   // Where kay-auth's routes live, `/auth` by default: `/auth/discord` starts a Discord sign-in.
-  prefix?: string
+  prefix?: Prefix
   // The site's name, as mails and authenticator apps show it; the URL's host by default.
   site?: string
   // Where a sign-in that failed goes, with `?error=` saying why; `/` by default.
@@ -319,24 +319,26 @@ export class Auth {
 }
 
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
-export function createAuth<Data extends AuthSessionData, Role extends string = string>(options: AuthOptions<Data, Role>) {
+export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth'>(options: AuthOptions<Data, Role, Prefix>) {
   const core = createCore(options)
   const { hasRole, isGranted } = createRoleHierarchy<User, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 
   const failed = (error: OAuthFailure) => `${core.signInPage}?error=${error}`
 
   const plugin = new Elysia({ name: 'kay-auth' })
-    .use(options.sessions as unknown as AnyElysia)
-    .derive(({ session, request, server }) => ({ auth: new Auth(session as unknown as Session<AuthSessionData>, core, request, rateKey(clientAddress(request, server))) }))
+    // Typed as a plain instance: `AnyElysia` would merge `any` routes into the app's, and every link would check.
+    .use(options.sessions as unknown as Elysia)
+    .derive(ctx => ({ auth: new Auth((ctx as unknown as { session: Session<AuthSessionData> }).session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server))) }))
     // The session's derive reaches this instance only; lifting both lets them reach the app's routes.
     .as('scoped')
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
-    .get(`${core.prefix}/:provider`, async ({ auth, params, query, redirect, status }) => {
+    // Typed as their literal paths, so `kay check` checks links to them once the app registers its Elysia app.
+    .get(`${core.prefix}/:provider` as `${Prefix}/:provider`, async ({ auth, params, query, redirect, status }) => {
       const location = await startOAuth(auth[STATE], params.provider, { redirect: query.redirect, link: query.link === '1' })
 
       return location === undefined ? status(404, 'Not Found') : redirect(location, 303)
     })
-    .get(`${core.prefix}/:provider/callback`, async ({ auth, params, query, redirect }) => {
+    .get(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ auth, params, query, redirect }) => {
       const outcome = await finishOAuth(auth[STATE], params.provider, query)
 
       return redirect('error' in outcome ? failed(outcome.error) : outcome.redirect, 303)
@@ -409,7 +411,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   }
 }
 
-function createCore<Data extends AuthSessionData, Role extends string>(options: AuthOptions<Data, Role>): Core {
+function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string>(options: AuthOptions<Data, Role, Prefix>): Core {
   const prefix = options.prefix ?? '/auth'
   const oauth: Core['oauth'] = new Map()
   const oauthApps = Object.entries(options.oauth ?? {})

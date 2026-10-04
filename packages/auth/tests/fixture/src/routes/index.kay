@@ -1,0 +1,7 @@
+--- server
+const user = await ctx.locals.auth.user()
+---
+if user as signedIn
+  p#who Signed in as {signedIn.email}
+else
+  p#who Anonymous

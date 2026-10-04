@@ -1,0 +1,48 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const register = action(t.Object({ email: t.String(), password: t.String() }), async (input, ctx) => {
+  const result = await ctx.locals.auth.register(input)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: 'errors' in result ? Object.values(result.errors).join(', ') : result.error })
+
+  return ctx.redirect('/account')
+})
+
+export const password = action(t.Object({ identifier: t.String(), password: t.String() }), async (input, ctx) => {
+  const result = await ctx.locals.auth.signInWithPassword({ ...input, redirect: '/account' })
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+export const magic = action(t.Object({ email: t.String() }), async ({ email }, ctx) => {
+  await ctx.locals.auth.requestMagicLink(email, '/account')
+
+  return 'sent'
+})
+
+const failure = ctx.failed(password) ?? ctx.failed(register)
+const sent = ctx.succeeded(magic)
+---
+h1 Sign in
+a#discord(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
+form#register(action={register})
+  input(name="email")
+  input(name="password" type="password")
+  button Create an account
+form#password(action={password})
+  input(name="identifier")
+  input(name="password" type="password")
+  button Sign in
+form#magic(action={magic})
+  input(name="email")
+  button Mail me a link
+if failure?.data as data
+  p#error {data.error}
+if sent
+  p#sent Check your mail
