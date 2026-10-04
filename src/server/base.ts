@@ -5,7 +5,7 @@ import { joinBase } from '../runtime/base'
 const BASE_PATH = /^(?:\/[\w.~-]+)+$/
 const SRCSET_ENTRY = /^(\s*)(\S+)(\s.*)?$/s
 const CSS_URL = /url\(\s*(["']?)(\/(?!\/)[^"')\s]*)\1\s*\)/g
-// The attributes holding a URL a page links to or loads.
+// The attributes holding a URL a page links to or loads, `data` being an `object`'s.
 const URL_ATTRIBUTES = ['href', 'src', 'action', 'formaction', 'poster', 'data']
 
 // The mount point a config's `base` gives, `''` at the root: `/docs/` reads as `/docs`.
@@ -72,9 +72,21 @@ export function rebaseRedirects(app: Elysia, base: string): void {
 
     const location = responseValue.headers.get('location')
 
-    if (location !== null)
+    if (location === null)
+      return undefined
+
+    try {
       responseValue.headers.set('location', joinBase(base, location))
 
-    return undefined
+      return undefined
+    }
+    catch {
+      // A response whose headers cannot change, such as one `fetch()` returned, goes out as a copy.
+      const headers = new Headers(responseValue.headers)
+
+      headers.set('location', joinBase(base, location))
+
+      return new Response(responseValue.body, { status: responseValue.status, statusText: responseValue.statusText, headers })
+    }
   })
 }

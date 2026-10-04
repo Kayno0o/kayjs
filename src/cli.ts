@@ -6,7 +6,7 @@ import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { compileServer } from './build/compile'
-import { exportStatic } from './build/static'
+import { exportStatic, refuseStaticConfig } from './build/static'
 import { KayCompileError } from './build/transform'
 import { check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
@@ -23,7 +23,7 @@ import { buildClient, PRERENDERED_DIR } from './server/client'
 import { compressFiles } from './server/compress'
 import { FAVICON_DIR, writeFavicons } from './server/favicon'
 import { writeImageVariants } from './server/image'
-import { prerenderPages } from './server/prerender'
+import { ExportError, prerenderPages } from './server/prerender'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site]\n       kay dev [entry]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
@@ -165,6 +165,9 @@ async function build(args: string[]): Promise<number> {
   const started = performance.now()
 
   try {
+    if (exported)
+      refuseStaticConfig(config)
+
     const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, base: basePath(config.base) })
     // Before prerendering, whose pages read the collections from what it writes.
     const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
@@ -202,7 +205,7 @@ async function build(args: string[]): Promise<number> {
     return 0
   }
   catch (error) {
-    console.error(error instanceof KayCompileError || error instanceof ContentError ? error.message.trimStart() : error)
+    console.error(error instanceof KayCompileError || error instanceof ContentError || error instanceof ExportError ? error.message.trimStart() : error)
 
     return 1
   }

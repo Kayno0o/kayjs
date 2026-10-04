@@ -254,7 +254,7 @@ export async function readActionResponse<Output>(response: Response): Promise<Ou
       throw new TypeError(`kay: the action redirected to ${JSON.stringify(target)}, which is no page`)
 
     // The page goes away, so whatever awaited the call never resumes.
-    window.location.assign(target)
+    window.location.assign(withBase(target))
 
     return new Promise<never>(() => undefined)
   }

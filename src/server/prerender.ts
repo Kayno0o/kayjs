@@ -8,6 +8,7 @@ import { analyzeServer } from '../compiler/script'
 import { isCollection } from '../content'
 import { isAction } from '../runtime/action'
 import { runInLocale } from '../runtime/i18n.server'
+import { IMAGE_ROUTE } from '../runtime/image'
 import { basePath } from './base'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { loadI18n, localeCopies, stateFor } from './i18n'
@@ -18,6 +19,11 @@ import { refuseClashes, scanRoutes } from './routes'
 import { configHead } from './seo'
 
 const KAY_PREFIX = /^kay: /
+
+// The pages a static export cannot hold, each named: a message for the person building, with no stack to read past.
+export class ExportError extends Error {
+  override name = 'ExportError'
+}
 
 export interface PrerenderOptions {
   // Every page, for `kay build --static`: one without params prerenders unless it opts out, and a page that cannot is reported rather than left to a server.
@@ -75,7 +81,15 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         if (response.status >= 500)
           throw new Error(`kay: prerendering ${copy.path} from ${file} failed with ${response.status}; the error is logged above`)
 
+        // A static host answers every file with a 200, so a redirect or a 404 would go out as a page.
+        if (options.exportAll && response.status !== 200)
+          throw new Error(response.headers.has('location') ? `kay: ${copy.path} redirects to ${response.headers.get('location')}, which no static host does` : `kay: ${copy.path} answers ${response.status}, where a static host answers 200`)
+
         const html = await response.text()
+
+        if (options.exportAll && html.includes(`${IMAGE_ROUTE}?`))
+          throw new Error(`kay: ${copy.path} links an image only the image route resizes, such as one from images.dirs, and no file of it is exported`)
+
         const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
         const taken = paths.get(name)
 
@@ -112,7 +126,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   }
 
   if (problems.length > 0)
-    throw new Error(`kay: ${count(problems.length)} cannot be exported to static files, which no server answers for:\n${problems.map(problem => `  ${problem}`).join('\n')}`)
+    throw new ExportError(`kay: ${count(problems.length)} cannot be exported to static files, which no server answers for:\n${problems.map(problem => `  ${problem}`).join('\n')}`)
 
   await writeManifest(root, { ...manifest, pages })
   client.pages = new Map(Object.entries(pages))

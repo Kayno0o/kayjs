@@ -24,6 +24,8 @@ export interface FaviconOptions {
   builtDir: string
   name?: string
   manifest?: ManifestConfig
+  // The site's mount point, which the manifest's paths go under.
+  base?: string
 }
 
 // The favicon in the sizes browsers ask for: an ICO of PNGs, the Apple touch icon and the manifest's icons.
@@ -91,12 +93,13 @@ export function faviconTags(manifest?: ManifestConfig): HeadTag[] {
   return tags
 }
 
-export function manifestJson(name: string | undefined, manifest: ManifestConfig = {}): string {
+// Its icons and start page under the site's mount point.
+export function manifestJson(name: string | undefined, manifest: ManifestConfig = {}, base = ''): string {
   return JSON.stringify({
     name,
     short_name: manifest.shortName ?? name,
-    icons: [192, 512].map(size => ({ src: `/icon-${size}.png`, sizes: `${size}x${size}`, type: 'image/png' })),
-    start_url: '/',
+    icons: [192, 512].map(size => ({ src: `${base}/icon-${size}.png`, sizes: `${size}x${size}`, type: 'image/png' })),
+    start_url: `${base}/`,
     display: manifest.display,
     theme_color: manifest.themeColor,
     background_color: manifest.backgroundColor,
@@ -143,7 +146,7 @@ export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconO
   }
 
   if (!taken.has(MANIFEST)) {
-    const manifest = manifestJson(options.name, options.manifest)
+    const manifest = manifestJson(options.name, options.manifest, options.base)
 
     app.get(MANIFEST, ({ request }) => respond(request, manifest, 'application/manifest+json'))
   }

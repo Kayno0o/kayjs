@@ -13,8 +13,11 @@ import { localePath } from '../runtime/i18n'
 import { pages as servePages } from '../server'
 import { basePath } from '../server/base'
 import { PRERENDERED_DIR } from '../server/client'
+import { compressPaths } from '../server/compress'
 import { FAVICON_PATHS } from '../server/favicon'
 import { localeSettings } from '../server/i18n'
+import { publicFiles } from '../server/public'
+import { siteOrigin } from '../server/seo'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 
 // Left in the directory a static export writes, so a later export knows it may clear it, and never clears one it did not write.
@@ -31,19 +34,24 @@ export interface StaticExport {
   files: number
 }
 
+// What a static export cannot do, checked before anything is built.
+export function refuseStaticConfig(config: KayConfig): void {
+  if (config.i18n?.domains)
+    throw new Error('kay: a static export is one directory for one host, so it cannot serve locales by domain; drop i18n.domains or deploy a server')
+}
+
 // Writes the whole site to `outdir`, as any static host serves it: every prerendered page, the browser build under `/_kay/`, the public files, the sitemap, feeds and favicons, `404.html`, and a page for each redirect.
 // Each page goes in as `about.html` and `about/index.html`, which every host finds for `/about` and `/about/` alike, beside the compressed copies a host may send as they are.
 export async function exportStatic(root: string, config: KayConfig, client: ClientBuild, outdir: string): Promise<StaticExport> {
   const out = resolve(outdir)
 
-  if (config.i18n?.domains)
-    throw new Error('kay: a static export is one directory for one host, so it cannot serve locales by domain; drop i18n.domains or deploy a server')
-
+  refuseStaticConfig(config)
   await clear(root, out)
 
   const pagesDir = join(root, '.kay', 'client', PRERENDERED_DIR)
   const pages = [...client.pages]
-  let files = 0
+  // What is written here rather than copied from the build, compressed once it is all in.
+  const written: string[] = []
 
   await cp(client.dir, join(out, '_kay'), { recursive: true, filter: source => !SOURCE_MAP.test(source) })
 
@@ -62,8 +70,10 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
 
   const publicDir = resolve(root, config.publicDir ?? 'public')
 
-  if (existsSync(publicDir))
+  if (existsSync(publicDir)) {
     await cp(publicDir, out, { recursive: true })
+    written.push(...(await publicFiles(publicDir)).map(file => join(out, relative(publicDir, file.path))))
+  }
 
   // What kay serves itself comes from the app, as a server would answer it.
   const app = new Elysia().use(await servePages({ ...config, root, prebuilt: true, log: false, health: false, security: false, compress: false }))
@@ -72,35 +82,43 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
   for (const path of fetched) {
     const response = await app.handle(new Request(`http://localhost${path}`))
 
-    if (response.ok) {
-      await Bun.write(join(out, decodeURIComponent(path)), await response.arrayBuffer())
-      files++
-    }
+    if (!response.ok)
+      throw new Error(`kay: ${path} answered ${response.status} while exporting it; the error is logged above`)
+
+    const file = join(out, decodeURIComponent(path))
+
+    await Bun.write(file, await response.arrayBuffer())
+    written.push(file)
   }
 
   const missing = await app.handle(new Request(`http://localhost${MISSING}`))
 
   if (missing.status === 404 && missing.headers.get('content-type')?.startsWith('text/html')) {
     await Bun.write(join(out, '404.html'), await missing.text())
-    files++
+    written.push(join(out, '404.html'))
   }
 
   const base = basePath(config.base)
+  const origin = config.site === undefined ? '' : siteOrigin(config.site)
 
-  files += await writeRedirects(out, config.redirects ?? {}, base)
+  written.push(...await writeRedirects(out, config.redirects ?? {}, base, origin))
 
   // With every locale prefixed, a path without one has no file of its own: it goes to the default locale's.
   if (config.i18n?.prefixDefault) {
     const settings = localeSettings(config.i18n)
     const prefix = `/${settings.defaultLocale}`
 
-    for (const [path] of pages.filter(([path]) => path === prefix || path.startsWith(`${prefix}/`)))
-      files += await writeRefresh(out, path.slice(prefix.length) || '/', joinBase(base, localePath(settings, path.slice(prefix.length) || '/', settings.defaultLocale)))
+    for (const [path] of pages.filter(([path]) => path === prefix || path.startsWith(`${prefix}/`))) {
+      const unprefixed = path.slice(prefix.length) || '/'
+
+      written.push(...await writeRefresh(out, unprefixed, joinBase(base, localePath(settings, unprefixed, settings.defaultLocale)), origin))
+    }
   }
 
+  await compressPaths(written)
   await Bun.write(join(out, MARKER), '')
 
-  return { pages: pages.length, files }
+  return { pages: pages.length, files: written.length }
 }
 
 // A directory kay may write to: never the project or what holds it, and one with files in it only when an export wrote them.
@@ -123,26 +141,29 @@ function pageFiles(path: string): string[] {
 }
 
 // A static host answers no redirect, so each one without params becomes a page sending the browser on; all of them also go to `_redirects`, which hosts such as Netlify and Cloudflare Pages read.
-async function writeRedirects(out: string, redirects: Redirects, base: string): Promise<number> {
+async function writeRedirects(out: string, redirects: Redirects, base: string, origin: string): Promise<string[]> {
   const entries = Object.entries(redirects).map(([from, target]) => ({ from, ...typeof target === 'string' ? { to: target, permanent: true } : { to: target.to, permanent: target.permanent ?? true } }))
-  let written = 0
 
   if (entries.length === 0)
-    return written
+    return []
+
+  const written: string[] = []
 
   for (const { from, to } of entries.filter(entry => !PARAM_OR_REST.test(entry.from)))
-    written += await writeRefresh(out, from, joinBase(base, to))
+    written.push(...await writeRefresh(out, from, joinBase(base, to), origin))
 
   const lines = entries.map(({ from, to, permanent }) => `${joinBase(base, from)} ${joinBase(base, to).replace(REST, ':splat')} ${permanent ? 301 : 302}`)
 
   await Bun.write(join(out, '_redirects'), `${lines.join('\n')}\n`)
 
-  return written + 1
+  return [...written, join(out, '_redirects')]
 }
 
-// A page at `from` that sends the browser to `to` at once, telling search engines the page that counts.
-async function writeRefresh(out: string, from: string, to: string): Promise<number> {
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=${escapeAttribute(to)}"><link rel="canonical" href="${escapeAttribute(to)}"><title>${escape(to)}</title></head><body><a href="${escapeAttribute(to)}">${escape(to)}</a></body></html>`
+// A page at `from` that sends the browser to `to` at once, telling search engines the page that counts; a file a page already took is left alone.
+async function writeRefresh(out: string, from: string, to: string, origin: string): Promise<string[]> {
+  const canonical = to.startsWith('/') && !to.startsWith('//') ? origin + to : to
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=${escapeAttribute(to)}"><link rel="canonical" href="${escapeAttribute(canonical)}"><title>${escape(to)}</title></head><body><a href="${escapeAttribute(to)}">${escape(to)}</a></body></html>`
+  const written: string[] = []
 
   for (const target of pageFiles(from)) {
     if (existsSync(join(out, target)))
@@ -150,7 +171,8 @@ async function writeRefresh(out: string, from: string, to: string): Promise<numb
 
     await mkdir(dirname(join(out, target)), { recursive: true })
     await Bun.write(join(out, target), html)
+    written.push(join(out, target))
   }
 
-  return 1
+  return written
 }

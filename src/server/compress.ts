@@ -25,7 +25,12 @@ const NO_TRANSFORM = /\bno-transform\b/i
 
 // Writes a brotli and a gzip copy beside every compressible file under the directory, at the strongest levels since it happens once, at build time; a copy saving little is not written.
 export async function compressFiles(dir: string): Promise<void> {
-  await Promise.all((await filesUnder(dir)).filter(path => COMPRESSIBLE.test(path)).map(async (path) => {
+  await compressPaths(await filesUnder(dir))
+}
+
+// The same for the files listed, those not worth compressing left out.
+export async function compressPaths(paths: string[]): Promise<void> {
+  await Promise.all(paths.filter(path => COMPRESSIBLE.test(path)).map(async (path) => {
     const bytes = await Bun.file(path).bytes()
 
     if (bytes.length < MIN_SIZE)

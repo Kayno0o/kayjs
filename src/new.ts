@@ -134,6 +134,7 @@ jobs:
 
       - name: Build the site
         env:
+          # The host your Forgejo instance publishes Pages on.
           SITE_URL: https://pages.kaynooo.fr
           SITE_BASE: /\${{ github.repository }}
         run: bun run build
@@ -160,6 +161,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
   listen 80;
   root /usr/share/nginx/html;
   gzip_static on;
+  gzip_vary on;
 
   location /_kay/ {
     add_header Cache-Control "public, max-age=31536000, immutable";

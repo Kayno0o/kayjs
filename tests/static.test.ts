@@ -4,8 +4,9 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { setBase } from '../src/runtime/base'
+import { joinBase } from '../src/runtime/base'
 import { pages } from '../src/server'
+import { rebaseHtml } from '../src/server/base'
 
 const FIXTURE = resolve('tests/fixtures/static')
 const CLI = resolve('src/cli.ts')
@@ -117,11 +118,13 @@ describe('kay build --static', () => {
       await Bun.write(join(guarded, '_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n')
       await Bun.write(join(guarded, 'index.kay'), 'h1 Members\n')
       await Bun.write(join(tags, '[tag].kay'), 'h1 Tag\n')
+      await Bun.write(join(tags, 'gone.kay'), '--- server\nctx.redirect(\'/about\')\n---\np x\n')
 
       const { code, errors } = await exportSite(elsewhere)
 
       expect(code).toBe(1)
-      expect(errors).toContain('kay: 2 pages cannot be exported to static files, which no server answers for:')
+      expect(errors).toContain('kay: 3 pages cannot be exported to static files, which no server answers for:')
+      expect(errors).toContain('src/routes/tags/gone.kay: /tags/gone redirects to /about, which no static host does')
       expect(errors).toContain('src/routes/members/index.kay: a guard covers it, and only a server can run one per request')
       expect(errors).toContain('src/routes/tags/[tag].kay: it takes tag, so `prerender` lists the values to export')
     }
@@ -151,7 +154,15 @@ describe('kay build --static', () => {
 })
 
 describe('base on a server', () => {
-  afterAll(() => setBase(''))
+  it('puts a route starting like the base under it too, and rewrites srcset and inline styles', async () => {
+    expect(joinBase('/blog', '/blog/hello')).toBe('/blog/blog/hello')
+    expect(joinBase('/blog', '//cdn.example/x.js')).toBe('//cdn.example/x.js')
+    expect(joinBase('/blog', 'relative.png')).toBe('relative.png')
+
+    const html = await rebaseHtml(new Response('<img srcset="/a.webp 320w, /b.webp 640w"><style>body { background: url("/bg.png") }</style><object data="/x.svg"></object>'), '/repo').text()
+
+    expect(html).toBe('<img srcset="/repo/a.webp 320w, /repo/b.webp 640w"><style>body { background: url("/repo/bg.png") }</style><object data="/repo/x.svg"></object>')
+  })
 
   it('puts the links, assets and redirects of every page under the mount point', async () => {
     const app = new Elysia().use(await pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, security: false, base: '/repo/', redirects: { '/old': '/about' } }))
@@ -162,6 +173,12 @@ describe('base on a server', () => {
     expect(about).toMatch(/<link rel="stylesheet" href="\/repo\/_kay\/[\w-]+\.css">/)
     expect((await visit('/old')).headers.get('location')).toBe('/repo/about')
     expect((await visit('/about/')).headers.get('location')).toBe('/repo/about')
+
+    const favicon = new Elysia().use(await pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, security: false, base: '/repo', favicon: 'tests/fixtures/static/src/hero.png' }))
+    const manifest = await (await favicon.handle(new Request('http://localhost/manifest.webmanifest'))).json() as { start_url: string, icons: { src: string }[] }
+
+    expect(manifest.start_url).toBe('/repo/')
+    expect(manifest.icons[0]!.src).toBe('/repo/icon-192.png')
     await expect(pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, base: 'repo' })).rejects.toThrow('base is repo, which is no path such as /docs')
   })
 })
