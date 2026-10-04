@@ -856,7 +856,7 @@ it('shows why a todo was refused', async () => {
 - `site.fetch(path, init)` sends any request, an API route's included, with the cookies so far, and resolves with the response as it is, redirects not followed.
 - `site.socket(module, path, options)` opens a websocket route and `site.stream(module, path, options)` reads an event stream as an island does, the options taking `headers` too. Both keep every message in `received` and resolve `next()` with the oldest one not read yet, waiting for one if need be; a stream's `finished()` resolves with all its values once it ended. `site.socket` starts the site on a free port the first time, which `site.close()` stops.
 - Cookies a response sets go with the next request and read as `site.cookies`. `use` takes the plugins the server entry uses before the pages, in order, so an app on `session()` signs in through `site.submit` and stays signed in: `testSite({ use: [sessions] })`. `locals` stands in for the app's Elysia `derive`, called with each request, after those plugins.
-- Pages render their islands' markup without scripts. Test files import `.kay` files through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test.
+- Pages render their islands' markup without scripts. Test files import `.kay` files through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test. The preload serves the project in the working directory, or the one `KAY_ROOT` names when it is nested, such as a library's fixture app run as `KAY_ROOT=tests/fixture bun test` with `testSite({ root: 'tests/fixture' })`.
 
 ## What `kay check` verifies
 
@@ -871,7 +871,7 @@ it('shows why a todo was refused', async () => {
 
 ## Project setup
 
-kay is published as `@kaynooo/kayjs` to the registry at `https://git.kaynooo.fr/api/packages/kaynooo/npm/` and installed under the name its imports use: `"kay": "npm:@kaynooo/kayjs@^0.4.0"` in `package.json`, with `@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/` in the project's `.npmrc`. `bunx -p @kaynooo/kayjs kay new my-app` writes a project that already checks, builds and runs, both of those included: this setup, a layout, a page, a `_404.kay` and an island. By hand, the server entry is:
+kay is published as `@kaynooo/kayjs` to the registry at `https://git.kaynooo.fr/api/packages/kaynooo/npm/` and installed under the name its imports use: `"kay": "npm:@kaynooo/kayjs@^<version>"` in `package.json`, with `@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/` in the project's `.npmrc`. `bunx -p @kaynooo/kayjs kay new my-app` writes a project that already checks, builds and runs, both of those included: this setup, a layout, a page, a `_404.kay` and an island. By hand, the server entry is:
 
 ```ts
 import { Elysia } from 'elysia'

@@ -5,9 +5,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 
 const CLI = resolve('src/cli.ts')
 
+// A library's manifest, naming kay as a peer by `kay`, the name it is published as, or the one it was published as up to 0.3.
+function manifest(kay: 'kay' | '@kaynooo/kayjs' | '@kaynooo/kay'): string {
+  return JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { [kay]: '*' }, exports: { './*.kay': './src/*.kay', '.': './src/index.ts' }, kay: { settings: './src/settings' } })
+}
+
 // A kay library as it is installed: `.kay` sources, `kay` as a peer, an exports map giving each component a specifier, and default settings the app can replace, named without their extension.
 const LIBRARY: Record<string, string> = {
-  'package.json': JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay', '.': './src/index.ts' }, kay: { settings: './src/settings' } }),
+  'package.json': manifest('kay'),
   'src/defaults.ts': 'export interface Settings {\n  tone: string\n  icon: (name: string) => string\n}\n\nconst defaults: Settings = { tone: \'text-gray-500\', icon: name => `default:${name}` }\n\nexport default defaults\n',
   'src/settings.ts': 'export { default } from \'./defaults\'\n',
   'src/badge.kay': '---\nimport settings from \'./settings\'\n\nconst { label } = props<{ label: string }>()\n---\nspan.badge.lib-badge-class(class={settings.tone}) {label} {settings.icon(label)}\n',
@@ -56,7 +61,8 @@ afterAll(async () => {
   await Promise.all(projects.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
-describe('a linked kay library', () => {
+// Named by either published name, the current one or the one up to 0.3.
+describe.each(['@kaynooo/kayjs', '@kaynooo/kay'] as const)('a linked kay library naming kay %s', (kay) => {
   let linked: string
   let library: string
 
@@ -64,8 +70,7 @@ describe('a linked kay library', () => {
     linked = await mkdtemp(join(import.meta.dir, '.dom-'))
     library = await mkdtemp(join(import.meta.dir, '.dom-'))
     await write(linked, { ...PROJECT, 'kay.config.ts': 'export default {}\n' })
-    // Naming kay by its published name rather than the alias.
-    await write(library, { ...LIBRARY, 'package.json': LIBRARY['package.json']!.replace('"kay":"*"', '"@kaynooo/kayjs":"*"') })
+    await write(library, { ...LIBRARY, 'package.json': manifest(kay) })
     await Bun.write(join(linked, 'node_modules/.keep'), '')
     await symlink(library, join(linked, 'node_modules/kay-lib'))
   })
@@ -115,6 +120,22 @@ describe('kay libraries', () => {
     await Bun.write(join(project, 'site.kay-test.ts'), `import { expect, it } from 'bun:test'\nimport { testSite } from ${JSON.stringify(resolve('src/test'))}\n\nit('renders', async () => {\n  expect((await (await testSite()).visit('/')).html).toContain('hi app:hi')\n})\n`)
 
     const child = Bun.spawn([process.execPath, 'test', '--preload', resolve('src/test/preload.ts'), './site.kay-test.ts'], { cwd: project, stdout: 'pipe', stderr: 'pipe' })
+    const [output, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    expect(output).toContain('1 pass')
+    expect(code).toBe(0)
+  })
+
+  it('renders a project nested below the working directory under kay test, named by KAY_ROOT', async () => {
+    const outer = await mkdtemp(join(import.meta.dir, '.dom-'))
+
+    projects.push(outer)
+    await write(join(outer, 'fixture'), PROJECT)
+    await write(join(outer, 'fixture/node_modules/kay-lib'), LIBRARY)
+    // Imported before any `testSite` call, which only the preload makes possible.
+    await Bun.write(join(outer, 'site.kay-test.ts'), `import { expect, it } from 'bun:test'\nimport { testSite } from ${JSON.stringify(resolve('src/test'))}\nimport Badge from './fixture/node_modules/kay-lib/src/badge.kay'\n\nit('renders', async () => {\n  expect(Badge).toBeFunction()\n  expect((await (await testSite({ root: 'fixture' })).visit('/')).html).toContain('hi app:hi')\n})\n`)
+
+    const child = Bun.spawn([process.execPath, 'test', '--preload', resolve('src/test/preload.ts'), './site.kay-test.ts'], { cwd: outer, env: { ...process.env, KAY_ROOT: 'fixture' }, stdout: 'pipe', stderr: 'pipe' })
     const [output, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     expect(output).toContain('1 pass')
