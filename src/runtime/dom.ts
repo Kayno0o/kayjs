@@ -56,6 +56,20 @@ export function hydrate<T>(render: () => T, container: Node): T {
   }
 }
 
+// Runs `render` building new nodes even while an island hydrates: a client-only component has no server markup to claim.
+export function fresh<T>(render: () => T): T {
+  const previous = claim
+
+  claim = undefined
+
+  try {
+    return render()
+  }
+  finally {
+    claim = previous
+  }
+}
+
 function claimNode(): Node {
   const node = claim!.next
 
@@ -288,6 +302,18 @@ function removeUnit(unit: Unit): void {
   }
 }
 
+// The units `render` claims from the region's server markup; one a client-only component built afresh goes in where the server left its part empty.
+function claimUnits(region: Region, render: () => unknown): Unit[] {
+  const claimed = region.claim(() => units(render()))
+
+  for (const unit of claimed) {
+    if (firstOf(unit).parentNode !== region.parent)
+      region.insert(unit)
+  }
+
+  return claimed
+}
+
 function firstOf(unit: Unit): Node {
   return unit instanceof Range ? unit.first : unit
 }
@@ -384,7 +410,7 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
 
   const first = () => {
     if (claim)
-      current = region.claim(() => units(fn()))
+      current = claimUnits(region, fn)
     else
       update(fn())
   }
@@ -411,7 +437,7 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
 // Swaps the unit a dynamic part holds for the one `render` builds, claimed instead when hydrating.
 function show(region: Region, previous: Unit[], render: () => unknown): Unit[] {
   if (claim)
-    return region.claim(() => units(render()))
+    return claimUnits(region, render)
 
   for (const unit of previous)
     removeUnit(unit)

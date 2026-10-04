@@ -1,11 +1,11 @@
 import type { Diagnostic, Node } from './ast'
-import type { SourceMap } from './mapping'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { awaitBlocks } from './ast'
-import { generate, isInteractive } from './codegen'
+import { browserReads } from './browser'
+import { generate, isInteractive, islandMessages } from './codegen'
 import { codeFrame } from './frame'
-import { positionAt } from './mapping'
+import { positionAt, SourceMap } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
 import { analyzeScript, analyzeServer } from './script'
@@ -31,6 +31,8 @@ export interface CompileOptions {
   hydratable?: boolean
   // Server output of a static component's `?island` twin, which carries markers like an island.
   twinBuild?: boolean
+  // Renders in the browser only, as `--- client` does: set when a package the component imports cannot load on the server.
+  clientOnly?: boolean
 }
 
 export interface CompileResult {
@@ -66,10 +68,11 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   // A name a fence uses may clash with the component's own; the template's reads are found once the code is generated.
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   let name = freeName(componentName(filename), fences)
-  const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
+  const client = file.client !== undefined || options.clientOnly === true
+  const island = client || isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && !island && !file.server && !ROUTE_FILES.has(basename(filename)) ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const generateOptions = { island, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
+  const generateOptions = { island, client, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
   let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name)
@@ -87,6 +90,17 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.
   if (found.syntaxError && diagnostics.length === 0)
     diagnostics.push(found.syntaxError)
+
+  // Type checking only, so a page still runs while it is fixed, and fails there in development naming the same fixes.
+  if (options.check && !client)
+    diagnostics.push(...browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? []))
+
+  if (file.client && (file.server || ROUTE_FILES.has(basename(filename))))
+    diagnostics.push({ ...file.client, message: 'A page, layout or special page renders on the server; only a component it renders can be `--- client`' })
+
+  // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.
+  if (client && options.output === 'html' && island)
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true)})\n`, map: new SourceMap([], []), island, classes: shorthandClasses(file.template, source), diagnostics: diagnostics.sort((a, b) => a.start - b.start) }
 
   return {
     tsx: final.builder.code,

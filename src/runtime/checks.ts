@@ -5,8 +5,8 @@ import type { Component, JSX } from './jsx'
 
 declare const ISLAND: unique symbol
 
-// When an island hydrates: right away, once the browser is idle, or once it scrolls near the viewport.
-export type HydrateWhen = 'load' | 'idle' | 'visible'
+// When an island hydrates: right away, once the browser is idle, or once it scrolls near the viewport; `client` renders it in the browser only, right away.
+export type HydrateWhen = 'load' | 'idle' | 'visible' | 'client'
 
 // Lets the checker tell islands from plain components.
 export interface IslandBrand { readonly [ISLAND]: true }

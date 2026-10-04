@@ -6,6 +6,16 @@ export interface Span {
 
 export interface Diagnostic extends Span {
   message: string
+  // What the editor offers to fix it with.
+  fixes?: Fix[]
+  // Reported by type checking only: the code generated around it is whole, so the file's type errors still count.
+  checkOnly?: boolean
+}
+
+// Edits to the `.kay` source, by offset into it.
+export interface Fix {
+  title: string
+  edits: (Span & { text: string })[]
 }
 
 export type Attribute
@@ -120,6 +130,8 @@ export interface KayFile {
   server?: Span
   // Inside the angle brackets of `--- <T extends Row>`: the component function's type parameters.
   typeParameters?: Span
+  // The `client` of `--- client`: the component renders in the browser only.
+  client?: Span
   // Where the template begins, past the fences.
   templateStart: number
   template: Node[]

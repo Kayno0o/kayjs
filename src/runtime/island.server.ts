@@ -48,18 +48,20 @@ export function noteMessage(key: string): void {
 }
 
 // On the server an interactive component renders inside a `<slot>` the browser hydrates, its props serialized for the client.
+// A client-only one, `client` or rendered with `hydrate="client"`, leaves the slot empty for the browser to render into, and inside another island renders nothing.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
 // `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser.
-export function island<P extends object>(id: string, component: (props: P) => JSX.Element, messages: readonly string[] = []): IslandComponent<P> {
+export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false): IslandComponent<P> {
   const render = (props: P & { hydrate?: HydrateWhen }) => {
     const when = props.hydrate
     const own = 'hydrate' in props ? omit(props, 'hydrate') as P : props
+    const browserOnly = client || when === 'client'
 
     for (const key of messages)
       noteMessage(key)
 
     if (depth > 0)
-      return component(own)
+      return browserOnly ? { t: '' } as unknown as JSX.Element : component!(own)
 
     const serialized = serializeProps(id, own)
 
@@ -68,14 +70,14 @@ export function island<P extends object>(id: string, component: (props: P) => JS
     if (rendered) {
       rendered.count++
 
-      if (when === undefined || when === 'load')
+      if (when !== 'idle' && when !== 'visible')
         rendered.eager.add(id)
     }
 
     try {
-      const html = renderOnServer(() => child(component(own)))
-      const lazy = when === undefined || when === 'load' ? '' : ` data-hydrate="${escapeAttribute(when)}"`
-      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props="${escapeAttribute(serialized)}"${lazy}>${html}</slot>` }
+      const html = browserOnly ? '' : renderOnServer(() => child(component!(own)))
+      const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
+      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props="${escapeAttribute(serialized)}"${lazy}${browserOnly ? ' data-client' : ''}>${html}</slot>` }
 
       return markup as unknown as JSX.Element
     }

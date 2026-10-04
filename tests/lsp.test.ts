@@ -328,6 +328,19 @@ describe('kay lsp imports', () => {
     expect(await fixes('Badge\n', 3)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
     expect(await fixes('---\nimport { signal } from \'kay\'\n---\nBadge\n', 4)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport { signal } from \'kay\'\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
   })
+
+  it('reports a browser-only global read while rendering next to the type errors, fixed with an effect or `--- client`', async () => {
+    const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nlocalStorage.clear()\n---\np {count().missing}\n'
+    const diagnostics = await editor.change(page, source, 6)
+    const line = { start: { line: 4, character: 0 }, end: { line: 4, character: 12 } }
+    const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range: line, context: { diagnostics } })
+
+    expect(diagnostics.map(diagnostic => diagnostic.source === 'kay' ? diagnostic.message.slice(0, diagnostic.message.indexOf(',')) : diagnostic.code)).toEqual(['`localStorage` exists only in the browser', 2339])
+    expect(actions.map(action => ({ title: action.title, text: applyEdits(source, action.edit!.changes![editor.uri(page)]!) }))).toEqual([
+      { title: 'Read `localStorage` in an effect, once the component renders in the browser', text: source.replace('signal }', 'signal, effect }').replace('localStorage.clear()', 'effect(() => localStorage.clear())') },
+      { title: 'Render the component in the browser only with `--- client`', text: source.replace('---', '--- client') },
+    ])
+  })
 })
 
 describe('kay lsp following files on disk', () => {

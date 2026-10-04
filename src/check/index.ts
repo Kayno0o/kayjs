@@ -55,6 +55,8 @@ export interface CheckDiagnostic {
   column: number
   message: string
   code?: string
+  // Found by type checking only, so the file's type errors are still reported.
+  checkOnly?: boolean
 }
 
 export interface ShadowFile {
@@ -95,7 +97,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
     await writeIfChanged(path, shadow.tsx)
     files.set(path, shadow)
     for (const diagnostic of compileDiagnostics)
-      diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message })
+      diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message, checkOnly: diagnostic.checkOnly })
   }
 
   const [routes, publicPaths, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
@@ -290,7 +292,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
-  const broken = new Set(diagnostics.map(diagnostic => diagnostic.file))
+  const broken = new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file))
 
   if (errors.trim() !== '')
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })

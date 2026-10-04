@@ -1,6 +1,8 @@
 import type { SourceMap } from '../compiler'
-import { dirname, resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
+import process from 'node:process'
 import { withoutTwin } from '../compiler'
+import { browserGlobalMissing } from '../compiler/browser'
 import { offsetAt, positionAt } from '../compiler/mapping'
 
 // What a `.kay` file compiled to, run as it is: a position in it maps straight back through kay's own map.
@@ -28,6 +30,7 @@ const PATH_IN_PARENTHESES = /\s\((?=\/|[A-Z]:[\\/])/i
 const FRAME_POSITION = /\.kay(?:\?island)?:(\d+):(\d+)/
 // Anything else mentioning a position, such as an error message.
 const KAY_POSITION = /([^\s()]+\.kay(?:\?island)?):(\d+):(\d+)/g
+const FIRST_KAY_POSITION = /([^\s()]+\.kay):(\d+):(\d+)/
 const VLQ_CONTINUATION = 32
 const VLQ_VALUE = 31
 
@@ -165,9 +168,25 @@ function mapPosition(file: string, line: string, column: string): string | undef
   return position ? `${withoutTwin(file)}:${position.line}:${position.column}` : undefined
 }
 
-// Bun would print the compiled code around the throw, so an error goes out as its stack mapped to `.kay` lines.
+// Bun would print the compiled code around the throw, so an error goes out as its stack mapped to `.kay` lines, after what to do about a browser-only global.
 export function logError(error: unknown): void {
-  console.error(error instanceof Error && error.stack ? mapStack(error.stack) : error)
+  const stack = error instanceof Error && error.stack ? mapStack(error.stack) : undefined
+  const hint = stack && browserOnlyHint(error, stack)
+
+  console.error(hint ? `${hint}\n${stack}` : stack ?? error)
+}
+
+// What a server render failing on a browser-only global should say: the global, the `.kay` line reading it, and the two ways out.
+export function browserOnlyHint(error: unknown, mappedStack: string): string | undefined {
+  const name = browserGlobalMissing(error)
+
+  if (name === undefined)
+    return undefined
+
+  const at = FIRST_KAY_POSITION.exec(mappedStack)
+  const where = at ? `${relative(process.cwd(), at[1]!)}:${at[2]}:${at[3]}` : 'a component'
+
+  return `\`${name}\` exists only in the browser, and ${where} reads it while rendering on the server: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``
 }
 
 function toKay(entry: Compiled, line: number, column: number): { line: number, column: number } | undefined {

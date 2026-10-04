@@ -52,20 +52,27 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
   const early = takeEvents(element)
 
-  root((dispose) => {
-    try {
-      hydrate(() => component(props), element)
-    }
-    catch (error) {
-      // Markup the island would not build, such as one a browser extension changed, can fail anywhere along the way: rendered afresh rather than left dead.
-      // An error of the component itself throws again from the fresh render.
-      console.warn(`[kay] island ${id} did not match its server markup, rendering it again: ${error instanceof Error ? error.message : String(error)}`)
-      dispose()
-      element.textContent = ''
-      render(() => component(props), element)
-    }
-  })
-  ;(element as IslandElement)._$k = true
+  // A client-only island has no server markup to claim.
+  if (element.dataset.client !== undefined) {
+    render(() => component(props), element)
+  }
+  else {
+    root((dispose) => {
+      try {
+        hydrate(() => component(props), element)
+      }
+      catch (error) {
+        // Markup the island would not build, such as one a browser extension changed, can fail anywhere along the way: rendered afresh rather than left dead.
+        // An error of the component itself throws again from the fresh render.
+        console.warn(`[kay] island ${id} did not match its server markup, rendering it again: ${error instanceof Error ? error.message : String(error)}`)
+        dispose()
+        element.textContent = ''
+        render(() => component(props), element)
+      }
+    })
+  }
+
+  (element as IslandElement)._$k = true
 
   // A click or an input reaches the handlers alone, its default action done already; a change, heard on the element itself, fires again. A target an afresh render replaced is gone with its event.
   for (const event of early) {

@@ -12,6 +12,8 @@ export interface GenerateOptions {
   name: string
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
   island?: string
+  // The island renders in the browser only: `--- client`, or a package it imports cannot load on the server.
+  client?: boolean
   // Path relative to the project root, naming the module's actions.
   moduleId: string
   // Type-checking output: adds assertions on links, form fields and island props through globals `kay check` declares.
@@ -244,7 +246,7 @@ class Generator {
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${this.options.name}(props)) as typeof ${this.options.name}\n`)
 
     if (this.options.island)
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''}${islandMessages(this.src)})${this.genericIslandType()}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''}${islandMessages(this.src, this.options.client)})${this.genericIslandType()}\n`)
 
     return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
   }
@@ -1074,13 +1076,13 @@ class Generator {
     const required = REQUIRED_TEXT.get(element.name)
 
     if (required && !names.has(required[0]))
-      this.error(at, required[1])
+      this.lint(at, required[1])
 
     if (element.name === 'input' && this.staticAttribute(element, 'type') === 'image' && !names.has('alt'))
-      this.error(at, 'An image button needs `alt` naming what it does')
+      this.lint(at, 'An image button needs `alt` naming what it does')
 
     if (names.has('onClick') && !names.has('role') && !INTERACTIVE_TAGS.has(element.name))
-      this.error(at, `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers: use a \`button\`, or give it a \`role\` along with a \`tabindex\` and a key handler`)
+      this.lint(at, `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers: use a \`button\`, or give it a \`role\` along with a \`tabindex\` and a key handler`)
   }
 
   // The text of an attribute written as a quoted string.
@@ -1235,6 +1237,11 @@ class Generator {
   private error(span: Span, message: string) {
     if (!this.options.rewrites)
       this.diagnostics.push({ start: span.start, end: span.end, message })
+  }
+
+  private lint(span: Span, message: string) {
+    if (!this.options.rewrites)
+      this.diagnostics.push({ start: span.start, end: span.end, message, checkOnly: true })
   }
 }
 
@@ -1432,8 +1439,11 @@ function typeParameterNames(parameters: string): string[] {
 }
 
 // The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none.
-function islandMessages(source: string): string {
+export function islandMessages(source: string, client = false): string {
   const keys = [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]
+
+  if (client)
+    return `, ${JSON.stringify(keys)}, true`
 
   return keys.length > 0 ? `, ${JSON.stringify(keys)}` : ''
 }

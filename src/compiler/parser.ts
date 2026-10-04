@@ -1,7 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 
-// `--- server`, or `--- <T extends Row>` making the component generic, its type parameters in the third group.
-const FENCE = /---(?:([ \t]*)([a-z]+)|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
+// `--- server`, `--- client`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
+const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
 const CLOSING_FENCE = /^---[ \t]*$/gm
 const CLOSING_LINE = /---[ \t]*(?=\r?\n|$)/y
 const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
@@ -46,9 +46,10 @@ export function parseKay(source: string): KayFile {
   const diagnostics: Diagnostic[] = []
   const fences: Partial<Record<'script' | 'server', Span>> = {}
   let typeParameters: Span | undefined
+  let client: Span | undefined
   let templateStart = 0
 
-  // Fences come first, in any order: `---` holds the component script, `--- server` the code that runs on the server only.
+  // Fences come first, in any order: `---` holds the component script, `--- client` one rendering in the browser only, `--- server` the code that runs on the server only.
   while (true) {
     BLANK_LINES.lastIndex = templateStart
     BLANK_LINES.exec(source)
@@ -58,7 +59,7 @@ export function parseKay(source: string): KayFile {
     if (!fence)
       break
 
-    const kind = fence[2] === undefined ? 'script' : fence[2]
+    const kind = fence[2] === undefined || fence[2] === 'client' ? 'script' : fence[2]
     const spaced = fence[1] !== ''
     const bodyStart = fence.index + fence[0].length
 
@@ -71,22 +72,29 @@ export function parseKay(source: string): KayFile {
       diagnostics.push({ start: fence.index, end: fence.index + 3, message: 'This fence is never closed with a `---` line' })
 
     if (!spaced || (kind !== 'script' && kind !== 'server'))
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`${fence[0].trim()}\`; use \`---\` for the component script or \`--- server\` for server code` })
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`${fence[0].trim()}\`; use \`---\` for the component script, \`--- client\` for one rendering in the browser only, or \`--- server\` for server code` })
     else if (fences[kind])
       diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `A file has one ${kind === 'server' ? '`--- server`' : 'script'} fence` })
     else
       fences[kind] = span
 
-    if (kind === 'script' && fence.indices?.[3] && fences.script === span) {
-      const [start, end] = fence.indices[3]
+    const parameters = fence.indices?.[3] ?? fence.indices?.[4]
 
-      typeParameters = { start, end }
+    if (kind === 'server' && parameters)
+      diagnostics.push({ start: parameters[0], end: parameters[1], message: 'Type parameters go on the component script fence: `--- <T>`' })
+
+    if (kind === 'script' && fences.script === span) {
+      if (parameters)
+        typeParameters = { start: parameters[0], end: parameters[1] }
+
+      if (fence[2] === 'client')
+        client = { start: fence.indices![2]![0], end: fence.indices![2]![1] }
     }
   }
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, typeParameters, templateStart, template: parser.parseTemplate(), diagnostics }
+  return { source, script: fences.script, server: fences.server, typeParameters, client, templateStart, template: parser.parseTemplate(), diagnostics }
 }
 
 // The `---` line closing a fence, past any inside a template literal or a comment, such as a markdown front matter the code holds.

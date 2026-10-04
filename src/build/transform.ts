@@ -1,9 +1,14 @@
 import type { Diagnostic, SourceMap } from '../compiler'
+import type { CacheSlot } from './cache'
 import { readdirSync, readFileSync } from 'node:fs'
-import { mkdir, rename } from 'node:fs/promises'
-import { dirname, join, relative } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
 import { compileKay, formatDiagnostic, withoutTwin } from '../compiler'
+import { isInteractive } from '../compiler/codegen'
+import { parseKay } from '../compiler/parser'
+import { analyzeScript } from '../compiler/script'
+import { readCacheEntry, writeCacheEntry } from './cache'
+import { importsBrowserOnly, mayImportPackage } from './probe'
 import { registerSourceMap } from './sourcemap'
 
 export type Target = 'dom' | 'ssr'
@@ -16,16 +21,13 @@ export interface TransformOptions {
   root?: string
   // Where compiled files are kept between runs, so a restart compiles only what changed; none when unset.
   cacheDir?: string
+  // Renders in the browser only: an island importing a package that cannot load on the server.
+  clientOnly?: boolean
 }
 
 interface Compiled {
   code: string
   map: SourceMap
-}
-
-interface CacheEntry<Value> {
-  key: string
-  value: Value
 }
 
 // What `buildClient` reads off each component before bundling.
@@ -62,12 +64,14 @@ export function transformKay(source: string, filename: string, options: Transfor
 }
 
 // `transformKay` through the cache: one entry per file and target, replaced when the source or the compiler changes.
-export async function transformKayCached(source: string, filename: string, options: TransformOptions): Promise<string> {
+export async function transformKayCached(source: string, filename: string, given: TransformOptions): Promise<string> {
+  const options = await clientOnlyIsland(source, filename, given.cacheDir) ? { ...given, clientOnly: true } : given
+
   if (options.cacheDir === undefined)
     return transformKay(source, filename, options)
 
   const hydratable = options.hydratable ?? false
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}`, `${options.target}\0${hydratable}\0${options.root ?? process.cwd()}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.root ?? process.cwd()}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   if (cached !== undefined) {
@@ -104,11 +108,6 @@ export async function analyzeKayCached(source: string, filename: string, root: s
   return analysis
 }
 
-interface CacheSlot {
-  file: string
-  key: string
-}
-
 // One slot per source file and kind of output, so an edit replaces its entry rather than adding one.
 function cacheEntry(cacheDir: string, filename: string, kind: string, inputs: string): CacheSlot {
   return {
@@ -123,12 +122,27 @@ function compile(source: string, filename: string, options: TransformOptions): C
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, diagnostics } = compileKay(source, file, { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))
 
   return { code: tsx, map }
+}
+
+// An island importing a package that throws as it loads without a DOM renders in the browser only, with no flag to write.
+async function clientOnlyIsland(source: string, filename: string, cacheDir: string | undefined): Promise<boolean> {
+  if (filename !== withoutTwin(filename) || !mayImportPackage(source))
+    return false
+
+  const file = parseKay(source)
+
+  if (file.client || !file.script)
+    return false
+
+  const script = analyzeScript(source, file.script)
+
+  return isInteractive(file, script) && await importsBrowserOnly(source, script, filename, cacheDir)
 }
 
 function compilerFingerprint(): string {
@@ -151,27 +165,4 @@ function compilerFingerprint(): string {
   }
 
   return fingerprint
-}
-
-async function readCacheEntry<Value>(slot: CacheSlot): Promise<Value | undefined> {
-  try {
-    const entry = await Bun.file(slot.file).json() as CacheEntry<Value>
-
-    return entry.key === slot.key ? entry.value : undefined
-  }
-  catch {
-    return undefined
-  }
-}
-
-// Written aside, then renamed over the entry, so another process never reads half of it; a read-only disk only loses the cache.
-async function writeCacheEntry(slot: CacheSlot, value: unknown): Promise<void> {
-  const written = `${slot.file}.${process.pid}.tmp`
-
-  try {
-    await mkdir(dirname(slot.file), { recursive: true })
-    await Bun.write(written, JSON.stringify({ key: slot.key, value }))
-    await rename(written, slot.file)
-  }
-  catch {}
 }

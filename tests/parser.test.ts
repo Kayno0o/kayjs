@@ -79,6 +79,22 @@ describe('fence', () => {
     expect(parse('--- Server\nconst a = 1\n---\np hi').diagnostics[0]?.message).toContain('Unknown fence `--- Server`')
     expect(parse('---server\nconst a = 1\n---\np hi').diagnostics[0]?.message).toContain('Unknown fence `---server`')
   })
+
+  it('reads `--- client` as the script fence of a component rendering in the browser only, generic ones included', () => {
+    const client = parse('--- client\nconst a = 1\n---\np hi\n')
+    const generic = parse('--- client <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
+
+    expect(text(client, client.script)).toBe('const a = 1\n')
+    expect(text(client, client.client)).toBe('client')
+    expect(text(generic, generic.typeParameters)).toBe('T extends string')
+    expect(text(generic, generic.client)).toBe('client')
+    expect([...client.diagnostics, ...generic.diagnostics]).toEqual([])
+    expect(parse('---\nconst a = 1\n---\np hi\n').client).toBeUndefined()
+  })
+
+  it('reports type parameters on the server fence', () => {
+    expect(parse('--- server <T>\nconst a = 1\n---\np hi\n').diagnostics.map(diagnostic => diagnostic.message)).toEqual(['Type parameters go on the component script fence: `--- <T>`'])
+  })
 })
 
 describe('elements', () => {

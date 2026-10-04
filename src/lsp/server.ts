@@ -288,14 +288,14 @@ export class KayLanguageServer {
   }
 
   private async publishDiagnostics(document: Document) {
-    // A compile error leaves the shadow TSX half-written, so its type errors would only be noise.
+    // A compile error leaves the shadow TSX half-written, so its type errors would only be noise; one found by type checking only leaves it whole.
     const compileErrors = document.diagnostics.map(diagnostic => ({
       range: { start: toPosition(document.source, diagnostic.start), end: toPosition(document.source, Math.max(diagnostic.end, diagnostic.start + 1)) },
       severity: ERROR,
       source: 'kay',
       message: diagnostic.message,
     }))
-    const report = compileErrors.length > 0 ? undefined : await this.server.request<DocumentDiagnosticReport>('textDocument/diagnostic', { textDocument: { uri: document.shadowUri } })
+    const report = document.diagnostics.some(diagnostic => !diagnostic.checkOnly) ? undefined : await this.server.request<DocumentDiagnosticReport>('textDocument/diagnostic', { textDocument: { uri: document.shadowUri } })
 
     if (this.documents.get(document.uri) !== document)
       return
@@ -351,14 +351,19 @@ export class KayLanguageServer {
     return { ...(document ? mapCompletionItem(document, resolved, offset) : resolved), data: item.data }
   }
 
-  // Quick fixes whose every edit lands in what the user wrote, an added import moved into its fence.
+  // Quick fixes whose every edit lands in what the user wrote, an added import moved into its fence: kay's own, then TypeScript's.
   private async codeActions(params: CodeActionParams): Promise<CodeAction[] | null> {
     const document = this.documents.get(params.textDocument.uri)
-    const range = document && toShadowRange(document, params.range)
     const wanted = params.context.only?.includes(QUICK_FIX) ?? true
 
-    if (!document || !range || !wanted)
+    if (!document || !wanted)
       return null
+
+    const own = kayFixes(document, toOffset(document.source, params.range.start), toOffset(document.source, params.range.end))
+    const range = toShadowRange(document, params.range)
+
+    if (!range)
+      return own.length > 0 ? own : null
 
     const diagnostics = params.context.diagnostics.flatMap((diagnostic) => {
       const mapped = diagnostic.source === 'kay' ? undefined : toShadowRange(document, diagnostic.range)
@@ -368,12 +373,12 @@ export class KayLanguageServer {
     const actions = await this.server.request<CodeAction[] | null>('textDocument/codeAction', { textDocument: { uri: document.shadowUri }, range, context: { ...params.context, diagnostics, only: [QUICK_FIX] } })
     const offset = toOffset(document.source, params.range.start)
 
-    return (actions ?? []).flatMap((action): CodeAction[] => {
+    return [...own, ...(actions ?? []).flatMap((action): CodeAction[] => {
       const changes = action.edit && !action.command ? fileEdits(action.edit) : undefined
       const edits = changes?.length === 1 && changes[0]![0] === document.shadowUri ? sourceEdits(document, changes[0]![1], offset) : undefined
 
       return edits ? [{ title: action.title, kind: action.kind, isPreferred: action.isPreferred, edit: { changes: { [document.uri]: edits } } }] : []
-    })
+    })]
   }
 
   private format(uri: string): TextEdit[] {
@@ -844,6 +849,15 @@ function zeroRange(): Range {
 }
 
 // LSP positions are 0-based, the mapping helpers 1-based; both count UTF-16 code units like JS strings.
+// The fixes kay's own diagnostics carry, for those touching the range the editor asks about.
+function kayFixes(document: Document, start: number, end: number): CodeAction[] {
+  return document.diagnostics.filter(diagnostic => diagnostic.start <= end && diagnostic.end >= start).flatMap(diagnostic => (diagnostic.fixes ?? []).map(fix => ({
+    title: fix.title,
+    kind: QUICK_FIX,
+    edit: { changes: { [document.uri]: fix.edits.map(change => ({ range: { start: toPosition(document.source, change.start), end: toPosition(document.source, change.end) }, newText: change.text })) } },
+  })))
+}
+
 function toOffset(text: string, position: Position): number {
   return Math.min(offsetAt(text, { line: position.line + 1, column: position.character + 1 }), text.length)
 }

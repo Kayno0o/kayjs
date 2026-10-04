@@ -10,6 +10,7 @@
 - A promise an `await` block renders is made with `defer()`, never left bare.
 - The component script exports types only. Shared values live in `.ts` modules.
 - A page has no props: its data comes from its `--- server` fence.
+- `window`, `document`, `localStorage` and the other globals only a browser has are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.
 
@@ -32,6 +33,7 @@ button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times
 
 - `---` holds the component script: imports, props, signals, functions. It runs wherever the component renders.
 - `--- server` exists on pages and layouts only. It runs on the server for each request and never reaches the browser.
+- `--- client` in place of `---` makes the component render in the browser only, generic ones written `--- client <T>`; see Islands.
 
 ## Component script
 
@@ -360,6 +362,16 @@ A component is interactive when any element in it has an `on*` handler, a `bind:
 Props a static component passes to an island are serialized for the browser: plain objects and arrays, strings, numbers, booleans, `null` and `undefined`, and also Dates, Maps, Sets, bigints, URLs and RegExps, which arrive as themselves, a value referenced twice arriving once. `kay check` rejects functions and class instances there, and rendering throws on a class instance it could not tell apart, naming the prop. Children cannot cross either: rendering an island with children from a static parent throws.
 
 An island hydrates as soon as the page loads, its chunks preloaded. `hydrate="idle"` waits until the browser is idle and `hydrate="visible"` until it scrolls near the viewport, neither preloaded: `Comments(postId={post.id} hydrate="visible")`. Only an island takes `hydrate`, and only from a static parent.
+
+### Browser-only components
+
+Some components cannot render on the server: a package that touches `window` as it loads, such as CodeMirror or hls.js, or code reading `localStorage` while rendering. Such a component renders in the browser only: the server sends its island as an empty `<slot>`, props included, and the browser renders it there as soon as the page loads, instead of hydrating it. Inside another island it renders nothing on the server and is built in place as its parent hydrates.
+
+- An island importing a package that throws on a browser-only global as it loads renders in the browser only, with nothing to write. Each package is imported once, in a Bun process of its own, and the answer is kept per package version in `.kay/cache`. The server never loads the package: an island's server module carries none of its script.
+- A component whose script fence is `--- client` always renders in the browser only, and is an island even without state. Pages, layouts and special pages render on the server, so they cannot be.
+- `hydrate="client"` renders one use of an island in the browser only: `Map(center={center} hydrate="client")`.
+
+A browser-only global is one lib.dom declares and Bun lacks: `window`, `document`, `localStorage`, `sessionStorage`, `innerWidth` and the like. `fetch`, `URL`, `WebSocket`, `crypto` and `navigator` exist on the server too and are never reported. `kay check` and the editor report one read while the component renders: at the script's top level, in a `memo` or an array callback such as `.map`, in a function of the script the render calls, or in a template value. Handlers, refs, `effect`, `onMount` and other callbacks run in the browser only and report nothing. The editor offers two fixes: wrap the statement in `effect`, offered for a statement that is a plain call or assignment, since a declaration would take its name out of reach, or turn the fence into `--- client`. `typeof window` while an island renders is reported too: it is `'undefined'` on the server, so the island would render something else in the browser than the markup it hydrates. A global reached through a module of the app or a package is not seen; in development, a server render failing on one names it, the `.kay` line reading it, and the same two fixes.
 
 ## Pages and routing
 
@@ -818,6 +830,7 @@ it('shows why a todo was refused', async () => {
 - `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/`, the GET routes of the modules under `src/api/` and those of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a path may be spelled as written or percent-encoded, `/café` or `/caf%C3%A9`; a catch-all such as `docs/[...path]`, or an app route such as `/files/*`, is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
 - Island props passed from static components can be serialized: no functions or class instances.
+- No component reads a browser-only global while it renders, and no island branches on `typeof window` (see Browser-only components). Reported by `kay check` and the editor only, with quick fixes in the editor.
 - Every content collection entry against its schema and the components its collection names, reported at the entry's line.
 - With `i18n`, every `t()` key and its placeholders against the default locale's messages, and every other locale's messages against them: a key one lacks or has alone, a placeholder it drops or adds, plural forms where the default has text. Links may carry a locale's prefix.
 - What a page needs to be usable without seeing it: an `img` has `alt` (`alt=""` for decoration), an `iframe` a `title`, an `input(type="image")` an `alt`, and an element with `onClick` is one a keyboard reaches, such as a `button` or an `a`, or has a `role`. An element with a `{...spread}` is not checked. These are reported by `kay check` and the editor only: the page still runs meanwhile.

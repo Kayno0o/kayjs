@@ -9,7 +9,7 @@ import type { SeoHead } from './seo'
 import type { Prefetch } from './speculation'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { mapStack } from '../build/sourcemap'
+import { browserOnlyHint, mapStack } from '../build/sourcemap'
 import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
 import { localeState } from '../runtime/i18n.server'
@@ -441,5 +441,10 @@ function describeError(error: unknown, dev = false): PageError {
   if (!dev)
     return { status: 500, message: 'Internal Server Error' }
 
-  return error instanceof Error ? { status: 500, message: error.message, stack: error.stack && mapStack(error.stack) } : { status: 500, message: String(error) }
+  if (!(error instanceof Error))
+    return { status: 500, message: String(error) }
+
+  const stack = error.stack && mapStack(error.stack)
+
+  return { status: 500, message: (stack && browserOnlyHint(error, stack)) || error.message, stack }
 }
