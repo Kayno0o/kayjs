@@ -102,7 +102,7 @@ toast.info('Copied')
 const post = await attempt(() => publish({ id }), 'Could not publish')
 ```
 
-A toast stays for four seconds, or until its close button is pressed. Toaster is a manual popover in the top layer, so toasts show above an open dialog.
+A toast stays for four seconds, or until its close button is pressed. Its clock stops while the pointer rests on the toasts or focus is inside them, and goes on with the time it had left once both are gone. Toaster is a manual popover in the top layer, so toasts show above an open dialog.
 
 ### Dialog, ConfirmDelete
 
@@ -151,7 +151,7 @@ Table(columns={columns} rows={posts} rowKey="id")
 ### Segmented, TabNav, Toggle
 
 - `Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} value="day" label="Period" name="period" onChange={period.set})`: real radios, so arrow keys move between options and the group posts as `name` inside a form. A parent passing another `value` moves the choice. `name` is required for now, until kay gives components a unique id.
-- `TabNav(links={[{ href: '/settings', label: 'Profile' }, { href: '/settings/keys', label: 'Keys' }]} current={ctx.url.pathname} label="Settings")`: tabs as links, one page each. The current tab is marked `aria-current="page"`, and on a narrow screen it is scrolled into view.
+- `TabNav(links={[{ href: '/settings', label: 'Profile' }, { href: '/settings/keys', label: 'Keys' }]} current={ctx.url.pathname} label="Settings")`: tabs as links, one page each. The current tab is marked `aria-current="page"`, and a bar too narrow for every tab scrolls to centre it, without moving the page.
 - `Toggle(label="Public" checked={post.public} name="public" onChange={setPublic})`: a checkbox drawn as a switch, with `role="switch"`, that posts like a checkbox. Without `label`, give it `aria-label`.
 
 ### TextInput, Select

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, test } from 'bun:test'
-import { attempt, dismissToast, toast, toasts } from '../src/toast'
+import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test'
+import { attempt, dismissToast, holdToasts, toast, toasts } from '../src/toast'
 
 function shown() {
   return toasts().map(({ message, type }) => ({ message, type }))
@@ -23,6 +23,63 @@ describe('toast', () => {
     dismissToast(toasts()[0]!.id)
 
     expect(shown()).toEqual([{ message: 'second', type: 'info' }])
+  })
+})
+
+describe('a toast\'s time', () => {
+  beforeEach(() => {
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  test('runs out after four seconds', () => {
+    toast.info('Copied')
+    jest.advanceTimersByTime(3999)
+
+    expect(shown()).toEqual([{ message: 'Copied', type: 'info' }])
+
+    jest.advanceTimersByTime(1)
+
+    expect(shown()).toEqual([])
+  })
+
+  test('stops while anything holds the toasts, then goes on with what it had left', () => {
+    toast.info('Copied')
+    jest.advanceTimersByTime(1000)
+    holdToasts('pointer', true)
+    holdToasts('focus', true)
+    toast.info('Saved')
+    jest.advanceTimersByTime(10_000)
+    holdToasts('pointer', false)
+    jest.advanceTimersByTime(10_000)
+
+    expect(shown().map(item => item.message)).toEqual(['Copied', 'Saved'])
+
+    holdToasts('focus', false)
+    jest.advanceTimersByTime(2999)
+
+    expect(shown().map(item => item.message)).toEqual(['Copied', 'Saved'])
+
+    jest.advanceTimersByTime(1)
+
+    expect(shown().map(item => item.message)).toEqual(['Saved'])
+
+    jest.advanceTimersByTime(1000)
+
+    expect(shown()).toEqual([])
+  })
+
+  test('lets go of every hold once the last toast is dismissed, since the toaster hides with it', () => {
+    toast.info('Copied')
+    holdToasts('pointer', true)
+    dismissToast(toasts()[0]!.id)
+    toast.info('Saved')
+    jest.advanceTimersByTime(4000)
+
+    expect(shown()).toEqual([])
   })
 })
 

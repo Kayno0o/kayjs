@@ -4,7 +4,7 @@ import type { ToastType } from './toast'
 import { effect } from 'kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
-import { dismissToast, toasts } from './toast'
+import { dismissToast, holdToasts, toasts } from './toast'
 
 const ICONS: Record<ToastType, IconSlot> = { error: 'alert', success: 'success', info: 'info' }
 
@@ -24,7 +24,8 @@ effect(() => {
     toaster.showPopover()
 })
 ---
-.toaster(ref={element => toaster = element} popover="manual")
+// Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
+.toaster(ref={element => toaster = element} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
   for item of toasts() key={item.id}
     .toast(role={item.type === 'error' ? 'alert' : 'status'} data-type={item.type})
       Icon(icon={ICONS[item.type]} class="toast-icon")

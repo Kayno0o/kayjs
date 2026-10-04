@@ -1,5 +1,6 @@
 ---
 import type { JSX } from 'kay'
+import { onMount } from 'kay'
 
 const { links, current, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
   links: readonly { href: string, label: string }[]
@@ -10,12 +11,22 @@ const { links, current, label, class: className, ...rest } = props<Omit<JSX.Intr
   class?: string
 }>()
 
-// A tab bar wider than a phone scrolls, so the current tab is brought into it rather than left off screen.
-function reveal(link: HTMLAnchorElement) {
-  link.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-}
+let nav: HTMLElement | undefined
+
+// A tab bar wider than a phone scrolls, so the current tab is centred in it rather than left off screen. Only the bar scrolls: `scrollIntoView` would also move the page to it.
+onMount(() => {
+  const link = nav?.querySelector('[aria-current="page"]')
+
+  if (!nav || !link)
+    return
+
+  const bar = nav.getBoundingClientRect()
+  const tab = link.getBoundingClientRect()
+
+  nav.scrollLeft += tab.left - bar.left - (bar.width - tab.width) / 2
+})
 ---
 // Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens.
-nav.tab-nav({...rest} aria-label={label} class={className})
+nav.tab-nav({...rest} ref={element => nav = element} aria-label={label} class={className})
   for link of links key={link.href}
-    a.tab-nav-link(href={link.href} aria-current={link.href === current ? 'page' : undefined} ref={element => link.href === current && reveal(element)}) {link.label}
+    a.tab-nav-link(href={link.href} aria-current={link.href === current ? 'page' : undefined}) {link.label}
