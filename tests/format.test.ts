@@ -164,6 +164,7 @@ describe('formatFiles, explicit paths', () => {
       expect(await Bun.file(join(dir, 'page.kay')).text()).toBe('ul\n    li One\n')
       expect((await formatFiles([dir], { write: false })).changed).toEqual([join(dir, 'page.kay'), join(dir, 'src/dist/inner.kay')])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([join(dir, 'src/dist/inner.kay')])
+      expect((await formatFiles([dir, join(dir, 'page.kay'), `${dir}/./page.kay`], { write: false })).changed).toEqual([join(dir, 'page.kay'), join(dir, 'src/dist/inner.kay')])
     }
     finally {
       await rm(dir, { recursive: true, force: true })

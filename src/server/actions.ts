@@ -22,6 +22,7 @@ interface FieldSchema {
   format?: unknown
   pattern?: unknown
   minLength?: unknown
+  anyOf?: FieldSchema[]
 }
 
 interface ActionRequest {
@@ -40,6 +41,10 @@ const TEXT = 'text/plain; charset=utf-8'
 
 // A checkbox posts `on` unless it has a value of its own.
 const BOOLEAN_TEXT = new Map([['true', true], ['on', true], ['false', false]])
+// A decimal number as a number input posts it; `Number()` alone would also read `0x10` or `Infinity`.
+const DECIMAL = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i
+// The string formats Elysia gives the numeric text `t.Integer()` and `t.Numeric()` also take.
+const NUMERIC_FORMATS = new Set<unknown>(['integer', 'numeric'])
 
 // The top-level field of a validation path such as `/address/street`.
 const FIELD = /^\/([^/]*)/
@@ -156,10 +161,16 @@ function fromText(field: FieldSchema | undefined, value: unknown): unknown {
   if (typeof value !== 'string')
     return value
 
-  if ((field?.type === 'number' || field?.type === 'integer') && value.trim() !== '' && Number.isFinite(Number(value)))
-    return Number(value)
+  // Elysia would read the text with `Number()` itself, so text that is no decimal number becomes one the schema refuses.
+  if (field !== undefined && isNumeric(field))
+    return DECIMAL.test(value) ? Number(value) : Number.NaN
 
   return field?.type === 'boolean' ? BOOLEAN_TEXT.get(value) ?? value : value
+}
+
+// `t.Number()`, or `t.Integer()` and `t.Numeric()`, which Elysia writes as a number or a numeric string; `t.Date()` takes a number too, but not only.
+function isNumeric(field: FieldSchema): boolean {
+  return field.type === 'number' || field.type === 'integer' || (field.anyOf?.every(member => isNumeric(member) || NUMERIC_FORMATS.has(member.format)) ?? false)
 }
 
 // A call's input comes encoded, multipart when it carries files; input that does not decode is answered 400.

@@ -4,6 +4,12 @@ import { action } from 'kay'
 
 const EARLIEST = new Date(Date.UTC(2000, 0, 1))
 
+interface Section { id: number, name: string, parent: Section | null, rows: Section[] }
+
+const hall: Section = { id: 1, name: 'Hall', parent: null, rows: [] }
+
+hall.rows.push({ id: 2, name: 'Front', parent: hall, rows: [] })
+
 export const schedule = action(t.Object({ title: t.String({ minLength: 1 }), at: t.Date() }), ({ title, at }, ctx) => {
   if (at < EARLIEST)
     return ctx.fail(422, { earliest: EARLIEST })
@@ -23,6 +29,7 @@ import Since from '../components/since.kay'
 ---
 Since(at={EARLIEST} seats={new Map([['front', 2n]])})
 Picker(items={[{ id: 1, name: 'Front' }, { id: 2, name: 'Back' }]} field="name")
+Picker(items={hall.rows} field="name")
 List(items={[EARLIEST]} show={day => day.toISOString()})
 form(action={schedule})
   input(name="title")

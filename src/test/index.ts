@@ -83,6 +83,10 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
       const next = new URL(current.headers.get('location')!, new URL(path, ORIGIN))
 
+      // Another site is not this app's to answer, so the visit ends at the redirect.
+      if (next.origin !== ORIGIN)
+        break
+
       path = next.pathname + next.search
       current = await send(path, { headers })
     }

@@ -35,6 +35,14 @@ describe('kay/test', () => {
     expect(site.cookies.get('seen')).toBe('admin')
   })
 
+  it('stops at a redirect to another site', async () => {
+    const bare = await testSite({ routes: 'tests/fixtures/bare/src/routes' })
+    const away = await bare.visit(`/?next=${encodeURIComponent('https://example.com/about')}`)
+
+    expect(away).toMatchObject({ url: '/?next=https%3A%2F%2Fexample.com%2Fabout', status: 302 })
+    expect(away.headers.get('location')).toBe('https://example.com/about')
+  })
+
   it('submits a form without JavaScript and lands back on the page with its failure', async () => {
     const failed = await site.submit(add, { title: '' }, { from: '/' })
 

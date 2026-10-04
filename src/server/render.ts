@@ -17,6 +17,7 @@ import { LIVE_RELOAD } from './dev'
 import { FLASH_COOKIE, readFlash } from './flash'
 import { runGuards } from './guards'
 import { errorPage } from './overlay'
+import { matchesEtag } from './public'
 import { reportServerError } from './report'
 import { decodePath } from './routes'
 import { Denied, NotFound, Redirect } from './signals'
@@ -70,7 +71,6 @@ const VIEWPORT_TAG = /<meta\s[^>]*\bdata-dh="meta:name:viewport"/
 const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()
 const stylesCache = new WeakMap<ClientBuild, Map<string, string>>()
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
-const WEAK_PREFIX = /^W\//
 // Header values are bytes, so a file name outside ASCII is escaped.
 const NOT_ASCII = /[^\x20-\x7E]/g
 
@@ -183,11 +183,6 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, con
   headers.set('content-encoding', encoding)
 
   return respond(rendering, page.encoded[encoding]!)
-}
-
-// Caches and proxies may send several tags, or a weak one.
-function matchesEtag(header: string | null, etag: string): boolean {
-  return header !== null && header.split(',').some(tag => tag.trim().replace(WEAK_PREFIX, '') === etag)
 }
 
 // A URL no page serves, answered by the routes directory's own `_404.kay` or `_error.kay`.

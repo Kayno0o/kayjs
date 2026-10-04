@@ -141,12 +141,18 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
+  // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
+  const broken = new Set(diagnostics.map(diagnostic => diagnostic.file))
 
   if (errors.trim() !== '')
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })
 
-  for (const diagnostic of reported)
-    diagnostics.push(remap(diagnostic, files))
+  for (const diagnostic of reported) {
+    const remapped = remap(diagnostic, files)
+
+    if (!broken.has(remapped.file))
+      diagnostics.push(remapped)
+  }
 
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && reported.length === 0 && errors.trim() === '')

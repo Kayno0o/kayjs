@@ -98,6 +98,10 @@ export class ActionRedirect extends ActionError {
 }
 
 export function failure<Data>(status: number, data: Data): Failure<Data> {
+  // A call reads a success status as the handler's result, so a failure must not carry one.
+  if (!Number.isInteger(status) || status < 400 || status > 599)
+    throw new RangeError(`kay: ctx.fail takes an error status, from 400 to 599, not ${status}`)
+
   return { [FAILURE]: true, status, data }
 }
 

@@ -40,7 +40,8 @@ export async function formatFiles(paths: string[], options: { write: boolean }):
   }))).flat()
   const result: FormatFilesResult = { changed: [], errors: [] }
 
-  await Promise.all(files.map(async (file) => {
+  // Overlapping paths, such as `src src/page.kay`, name a file once.
+  await Promise.all([...new Set(files)].map(async (file) => {
     const source = await Bun.file(file).text()
     const { code, diagnostics } = formatKay(source)
 

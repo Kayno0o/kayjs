@@ -9,7 +9,8 @@ import { parse } from '@babel/parser'
 import { defaultName } from './codegen'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
-const POSITION_SUFFIX = / \(\d+:\d+\)$/
+
+export const POSITION_SUFFIX = / \(\d+:\d+\)$/
 const require = createRequire(import.meta.url)
 let loadedTraverse: typeof traverseModule | undefined
 

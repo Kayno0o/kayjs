@@ -440,6 +440,11 @@ describe('invalid code', () => {
     expect(at('---\nconst p = 1\n---\np {await p}')).toEqual([{ message: expect.stringContaining('read async data in the `--- server` fence'), text: 'await' }])
   })
 
+  it('reports code that does not parse in a fence at its position, with no position of its own in the message', () => {
+    expect(at('---\nconst a = 1 2\n---\np {a}')).toEqual([{ message: 'Missing semicolon.', text: ' 2\n--' }])
+    expect(at('--- server\nconst a = \n---\np {a}')).toEqual([{ message: 'Unexpected token', text: '---\np' }])
+  })
+
   it('flags an await in the component script', () => {
     expect(at('---\nconst x = await Promise.resolve(1)\n---\np {x}')).toEqual([{ message: expect.stringContaining('\'await\''), text: 'await' }])
   })

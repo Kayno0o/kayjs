@@ -19,6 +19,8 @@ export const gallery = action(t.Object({ photos: t.Files() }), ({ photos }) => p
 
 export const nothing = action(t.Object({}), () => undefined)
 
+export const fails = action(t.Object({ status: t.Number() }), ({ status }, ctx) => ctx.fail(status, 'Refused'))
+
 export const away = action(t.Object({ to: t.String() }), ({ to }, ctx) => ctx.redirect(to))
 ---
 p Survey

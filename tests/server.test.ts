@@ -909,7 +909,10 @@ describe('public files', () => {
     expect(await robots.text()).toStartWith('User-agent: *')
     expect(robots.headers.get('content-type')).toStartWith('text/plain')
     expect(robots.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
-    expect((await app.handle(new Request('http://localhost/robots.txt', { headers: { 'if-none-match': etag } }))).status).toBe(304)
+    for (const tags of [etag, `"other", ${etag}`, etag.slice(2), '*'])
+      expect((await app.handle(new Request('http://localhost/robots.txt', { headers: { 'if-none-match': tags } }))).status).toBe(304)
+
+    expect((await app.handle(new Request('http://localhost/robots.txt', { headers: { 'if-none-match': '"other"' } }))).status).toBe(200)
     expect((await app.handle(new Request('http://localhost/.well-known/security.txt'))).status).toBe(200)
   })
 
@@ -1084,6 +1087,11 @@ describe('action input', () => {
     noPhoto.append('photos', new File([], ''))
     expect(cookiePair(await post('gallery', noPhoto))).toStartWith('kay_flash=')
 
+    for (const count of ['0x10', '0b11', '0o7', 'Infinity', '1_000'])
+      expect(await answered(new URLSearchParams(`count=${count}&agree=on`))).toEqual({ status: 303, answer: null })
+
+    expect(await answered(new URLSearchParams('count=1e3&agree=on&age=-.5'))).toEqual({ status: 303, answer: { tags: [], count: 1000, agree: true, age: -0.5 } })
+
     const refused = await post('answer', new URLSearchParams('tags=a&count=1.5&agree=on&age=old'))
 
     expect(refused.status).toBe(303)
@@ -1110,6 +1118,29 @@ describe('action input', () => {
     finally {
       logged.mockRestore()
     }
+  })
+
+  it('fails a call with the status ctx.fail gives, refusing one that is no error status', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const fail = (status: number) => post('fails', stringify({ status }), { 'content-type': 'application/json', 'x-kay-action': '1' })
+
+    try {
+      expect((await fail(418)).status).toBe(418)
+      expect((await fail(200)).status).toBe(500)
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('ctx.fail takes an error status, from 400 to 599, not 200'))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('percent-encodes a redirect to a path holding characters a header cannot carry', async () => {
+    const away = await post('away', stringify({ to: '/blog/日本語' }), { 'content-type': 'application/json', 'x-kay-action': '1' })
+    const page = await bare.handle(new Request(`http://localhost/?next=${encodeURIComponent('/blog/日本語?q=é%20x')}`))
+
+    expect(away.headers.get('x-kay-redirect')).toBe('/blog/%E6%97%A5%E6%9C%AC%E8%AA%9E')
+    expect(page.status).toBe(302)
+    expect(page.headers.get('location')).toBe('/blog/%E6%97%A5%E6%9C%AC%E8%AA%9E?q=%C3%A9%20x')
   })
 
   it('serves the actions layouts export, behind the guards of their directory', async () => {

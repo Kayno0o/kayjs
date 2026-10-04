@@ -113,6 +113,17 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('reports a file that did not compile with its own errors only, none TypeScript makes of the code around them', async () => {
+    const root = await scratchProject({ 'src/a.kay': '---\nconst a = \n---\np {a}\n', 'src/b.kay': 'p {1 +}\n' })
+
+    try {
+      expect((await check(root)).map(d => [basename(d.file), d.line, d.code])).toEqual([['a.kay', 3, undefined], ['b.kay', 1, undefined]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('resolves -p against the directory being checked', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'tsconfig.app.json': tsconfig })
 

@@ -3,7 +3,7 @@ import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import { parse } from '@babel/parser'
-import { loadTraverse } from './rewrite'
+import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 const REACTIVE_MODULES = new Set(['kay', 'solid-js'])
 
@@ -354,7 +354,7 @@ function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): { as
   catch (error) {
     const at = span.start + ((error as { pos?: number }).pos ?? 0)
 
-    diagnostics.push({ start: at, end: at + 1, message: (error as Error).message })
+    diagnostics.push({ start: at, end: at + 1, message: (error as Error).message.replace(POSITION_SUFFIX, '') })
 
     return undefined
   }
@@ -362,7 +362,7 @@ function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): { as
   for (const error of ast.errors ?? []) {
     const at = span.start + ((error as unknown as { pos?: number }).pos ?? 0)
 
-    diagnostics.push({ start: at, end: at + 1, message: error.reasonCode ?? 'Syntax error' })
+    diagnostics.push({ start: at, end: at + 1, message: error.message.replace(POSITION_SUFFIX, '') })
   }
 
   return { ast, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }

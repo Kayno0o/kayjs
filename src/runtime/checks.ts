@@ -70,19 +70,24 @@ export type Redirect = <const Location extends string>(location: Location & Chec
 // What crosses to the browser besides plain objects and arrays, as `src/runtime/wire.ts` encodes it.
 type Sendable = string | number | boolean | bigint | null | undefined | Date | RegExp | URL | URLSearchParams
 
-type IsSerializable<T> = T extends Sendable
+// A type already being checked further up, such as a tree's own children, adds nothing new, so recursive types end there.
+type Visiting<T, Seen> = Seen extends unknown ? [T] extends [Seen] ? [Seen] extends [T] ? true : never : never : never
+
+type IsSerializable<T, Seen = never> = T extends Sendable
   ? true
   : T extends ((...args: never[]) => unknown) | symbol
     ? false
-    : T extends ReadonlyMap<infer Key, infer Value>
-      ? [IsSerializable<Key>, IsSerializable<Value>] extends [true, true] ? true : false
-      : T extends ReadonlySet<infer Item>
-        ? IsSerializable<Item>
-        : T extends readonly (infer Item)[]
-          ? IsSerializable<Item>
-          : T extends object
-            ? false extends { [Key in keyof T]-?: IsSerializable<T[Key]> }[keyof T] ? false : true
-            : false
+    : true extends Visiting<T, Seen>
+      ? true
+      : T extends ReadonlyMap<infer Key, infer Value>
+        ? [IsSerializable<Key, Seen | T>, IsSerializable<Value, Seen | T>] extends [true, true] ? true : false
+        : T extends ReadonlySet<infer Item>
+          ? IsSerializable<Item, Seen | T>
+          : T extends readonly (infer Item)[]
+            ? IsSerializable<Item, Seen | T>
+            : T extends object
+              ? false extends { [Key in keyof T]-?: IsSerializable<T[Key], Seen | T> }[keyof T] ? false : true
+              : false
 
 // Props a static parent passes to an island are serialized for the browser, so they must survive it.
 export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? unknown : { kayError: 'An island receives its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances' } : unknown

@@ -10,6 +10,7 @@ const CACHE_CONTROL = 'public, max-age=0, must-revalidate'
 const SENT_AS_IS = /%(?:40|2B|2C|3B|3D|26|24|5B|5D|7C)/g
 // What `encodeURIComponent` keeps but Elysia reads as a wildcard or breaks the code it generates on.
 const ROUTER_SYNTAX = /['*]/g
+const WEAK_PREFIX = /^W\//
 
 // Every file under the directory with the URL path it is served at, written the way a browser sends it: `/logo@2x.png`, `/c%3Ad.txt`.
 export async function publicFiles(dir: string): Promise<{ path: string, url: string }[]> {
@@ -29,6 +30,13 @@ function urlSegment(name: string): string {
   return encodeURIComponent(name).replace(SENT_AS_IS, decodeURIComponent).replace(ROUTER_SYNTAX, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
 }
 
+// Caches and proxies may send several tags, a weak one or `*`; a revalidation compares them weakly.
+export function matchesEtag(header: string | null, etag: string): boolean {
+  const tag = etag.replace(WEAK_PREFIX, '')
+
+  return header !== null && header.split(',').some(item => item.trim() === '*' || item.trim().replace(WEAK_PREFIX, '') === tag)
+}
+
 // One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.
 // Files keep their names, so browsers revalidate them every time and get a 304 while they are unchanged.
 export async function servePublic(app: Elysia, dir: string, routes: Route[]): Promise<void> {
@@ -41,7 +49,7 @@ export async function servePublic(app: Elysia, dir: string, routes: Route[]): Pr
     const { size, mtimeMs } = await stat(path)
     const etag = `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
 
-    app.get(url, ({ request }) => request.headers.get('if-none-match') === etag
+    app.get(url, ({ request }) => matchesEtag(request.headers.get('if-none-match'), etag)
       ? new Response(null, { status: 304, headers: { etag, 'cache-control': CACHE_CONTROL } })
       : new Response(Bun.file(path), { headers: { etag, 'cache-control': CACHE_CONTROL } }))
   }
