@@ -5,6 +5,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { ASSET_EXTENSIONS } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
+import { iconTypes } from '../build/icons'
 import { compileKay } from '../compiler'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -56,6 +57,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   const environmentPath = join(root, SHADOW_DIR, 'kay-env.d.ts')
   const assetsPath = join(root, SHADOW_DIR, 'kay-assets.d.ts')
+  const iconsPath = join(root, SHADOW_DIR, 'kay-icons.d.ts')
 
   for (const file of await findKayFiles(root, { project: true, ownOnly: true })) {
     const source = await Bun.file(file).text()
@@ -73,12 +75,13 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await writeIfChanged(environmentPath, environment(routes.map(route => route.pattern), publicPaths.map(file => file.url)))
   // A script rather than a module, which is what lets it declare a wildcard module.
   await writeIfChanged(assetsPath, ASSET_TYPES)
+  await writeIfChanged(iconsPath, iconTypes(root))
 
   // Rewriting in place keeps every shadow file present for editors reading the tree meanwhile; only stale ones go.
   const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))
     .filter(entry => entry.isFile())
     .map(entry => join(entry.parentPath, entry.name))
-    .filter(path => path !== environmentPath && path !== assetsPath && !files.has(path))
+    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && !files.has(path))
 
   await Promise.all(stale.map(async path => rm(path)))
 

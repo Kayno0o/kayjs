@@ -301,6 +301,23 @@ img({...image(hero, { sizes: '(min-width: 60rem) 50vw, 100vw' })} alt="The works
 - `images.quality` sets the WebP quality, 80 by default. Variants are WebP, which every current browser reads; AVIF encoding is not available on Linux.
 - An element with a spread is not checked for `alt`, so write it.
 
+### Icons
+
+Any [Iconify](https://icon-sets.iconify.design) set the project depends on as `@iconify-json/<prefix>` is imported one icon at a time, `~icons/<prefix>/<name>`, and drawn by spreading it into an `svg`:
+
+```kay
+---
+import home from '~icons/tabler/home'
+---
+a(href="/")
+  svg({...home} class="size-5")
+  | Home
+```
+
+- The import gives the `viewBox`, the markup inlined as `innerHTML`, `aria-hidden="true"`, and a height of `1em` with the width of the icon's ratio, so it sizes to the text around it and takes its colour from `currentColor`; a class or style sizes it otherwise. An icon that means something on its own, with no text beside it, takes `role="img"` and an `aria-label`.
+- Only the icons a page or an island imports are in the build; an alias renders as the icon it points at.
+- `kay check` declares every icon of the installed sets, so a misspelt name is reported as a module it cannot find; a bundle naming one fails with the set and the name.
+
 ## Islands
 
 A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script imports a value from `kay` or `solid-js`, such as `signal`. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript. Interactive components rendered inside an island are part of it.

@@ -1,0 +1,7 @@
+---
+import home from '~icons/tabler/home'
+import twelve from '~icons/tabler/12-hours'
+---
+nav
+  svg({...home} class="icon")
+  svg({...twelve})

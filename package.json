@@ -35,6 +35,10 @@
       "types": "./types/runtime/html.d.ts",
       "default": "./src/runtime/html.ts"
     },
+    "./icons": {
+      "types": "./types/runtime/icons.d.ts",
+      "default": "./src/runtime/icons.ts"
+    },
     "./image": {
       "types": "./types/runtime/image.d.ts",
       "default": "./src/runtime/image.ts"
@@ -102,6 +106,7 @@
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
+    "@iconify-json/tabler": "^1.2.41",
     "@kaynooo/eslint": "^6.0.1",
     "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.2",

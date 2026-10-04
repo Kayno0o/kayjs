@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
 import { ASSET_FILE, writeAsset } from './assets'
+import { iconModule, iconNames, installedIconSets } from './icons'
 import { transformKayCached } from './transform'
 
 export interface KayPluginOptions {
@@ -23,6 +24,9 @@ const TWIN_IMPORT = /\.kay\?island$/
 // Where the bundler keeps twins: unlike the runtime loader, it resolves no specifier holding a `?`.
 const TWIN_NAMESPACE = 'kay-island'
 const RESIZABLE = /\.(?:png|jpe?g|webp)$/i
+const ICON_SPECIFIER = /^~icons\//
+const ICON_NAMESPACE = 'kay-icon'
+const ANY = /.*/
 
 async function assetModule(path: string, url: string): Promise<string> {
   if (!RESIZABLE.test(path))
@@ -56,10 +60,21 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
 
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))
 
+      const iconSets = installedIconSets(options.root ?? process.cwd())
+
       // Only a bundle has a config; the runtime loader takes the specifier as it is.
       if (build.config) {
         build.onResolve({ filter: TWIN_IMPORT }, ({ path, importer }) => ({ path: `${resolve(dirname(importer), withoutTwin(path))}${ISLAND_TWIN}`, namespace: TWIN_NAMESPACE }))
         build.onLoad({ filter: KAY_FILE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path))
+        build.onResolve({ filter: ICON_SPECIFIER }, ({ path }) => ({ path, namespace: ICON_NAMESPACE }))
+        build.onLoad({ filter: ANY, namespace: ICON_NAMESPACE }, ({ path }) => ({ contents: iconModule(iconSets, path), loader: 'js' }))
+      }
+      // The runtime resolves no made-up specifier through a plugin, so every icon of the installed sets is a virtual module, built when first imported.
+      else {
+        for (const [prefix, file] of iconSets) {
+          for (const name of iconNames(prefix, file))
+            build.module(`~icons/${name}`, () => ({ contents: iconModule(iconSets, `~icons/${name}`), loader: 'js' }))
+        }
       }
 
       // `import logo from './logo.png'` gives the URL the server serves it at, on the server and in islands alike; an image also records its size for `image()`.

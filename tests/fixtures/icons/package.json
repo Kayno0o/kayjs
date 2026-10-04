@@ -1,0 +1,7 @@
+{
+  "name": "icons-fixture",
+  "private": true,
+  "devDependencies": {
+    "@iconify-json/tabler": "*"
+  }
+}
