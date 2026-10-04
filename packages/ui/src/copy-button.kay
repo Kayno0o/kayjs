@@ -1,0 +1,40 @@
+---
+import type { JSX } from 'kay'
+import { copy } from '@kaynooo/utils/browser/clipboard'
+import { signal } from 'kay'
+import { attempt } from './toast'
+
+const COPIED_MS = 2000
+
+const { text, label, html, copiedLabel = 'Copied!', failure = 'Could not copy to the clipboard', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
+  text: string
+  label: string
+  // A rendered version copied alongside `text`, which rich editors paste instead.
+  html?: string
+  // What the button says for two seconds once the copy went through.
+  copiedLabel?: string
+  // Toasted when the browser refuses the copy.
+  failure?: string
+  class?: string
+}>()
+
+const copied = signal(false)
+
+async function press() {
+  if (!text)
+    return
+
+  const done = await attempt(async () => {
+    await copy(text, { html })
+
+    return true
+  }, failure)
+
+  if (!done)
+    return
+
+  copied.set(true)
+  setTimeout(() => copied.set(false), COPIED_MS)
+}
+---
+button.btn.copy-btn({...rest} type="button" class={className} onClick={press}) {copied() ? copiedLabel : label}

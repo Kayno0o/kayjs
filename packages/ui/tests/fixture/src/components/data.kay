@@ -1,0 +1,12 @@
+---
+import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+
+const { onSelect, src } = props<{ onSelect: (key: string) => void, src: string }>()
+---
+BarList#bars(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1 }]} onSelect={row => onSelect(row.key)})
+SiteFavicon#favicon(src={src} name="kaynooo.fr")
+CopyButton#copy(text="https://kaynooo.fr" html={'<b>kaynooo.fr</b>'} label="Copy link")
+Toaster

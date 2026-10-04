@@ -146,3 +146,33 @@ describe('layout', () => {
     expect(await page('row')).toBe('<article id="row"><div class="card-row"><span class="dot"></span><div class="card-row-body">Mars</div><span>3 moons</span><div class="card-row-actions"><a href="/form">Edit</a></div></div></article>')
   })
 })
+
+describe('data', () => {
+  // Islands render inside a `slot` carrying their props, which these tests leave out.
+  const page = async (id: string) => (await element('/data', id)).replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<\/?slot[^>]*>/g, '').replaceAll(/<svg[^>]*>.*?<\/svg>/g, '<svg/>')
+
+  test('Stat reads a figure with what it counts', async () => {
+    expect(await page('stat')).toBe('<article id="stat"><span class="stat-badge"><svg/><span class="stat-value">12</span><span class="stat-label">moons</span></span></article>')
+  })
+
+  test('Meter is a named meter holding its value between 0 and 100, its fill styled apart', async () => {
+    expect(await page('meter')).toBe('<article id="meter"><div role="meter" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Disk" class="meter"><div class="meter-fill bg-error" style="width: 100%"></div></div></article>')
+  })
+
+  test('BarList measures each row against the largest, reads its display, and says when it has none', async () => {
+    const bars = await page('bars')
+
+    expect([...bars.matchAll(/bar-list-value">([^<]*)<.*?width: (\d+)%/g)].map(match => [match[1], match[2]])).toEqual([['2', '100'], ['one', '50'], ['0', '0']])
+    expect(bars).not.toContain('<button')
+    expect(await page('no-bars')).toBe('<article id="no-bars"><p class="bar-list-empty">No planets</p></article>')
+  })
+
+  test('SiteFavicon shows the site\'s icon, or the globe in a colour of the site\'s own', async () => {
+    expect(await page('favicon')).toBe('<article id="favicon"><span class="site-favicon"><img class="site-favicon-img" src="/favicon.png" alt></span></article>')
+    expect(await element('/data', 'no-favicon')).toMatch(/<svg[^>]*style="color: #[0-9A-F]{6}"[^>]*class="icon site-favicon-icon"/)
+  })
+
+  test('CopyButton is a plain button saying what it copies', async () => {
+    expect(await page('copy')).toBe('<article id="copy"><button type="button" class="btn copy-btn">Copy link</button></article>')
+  })
+})

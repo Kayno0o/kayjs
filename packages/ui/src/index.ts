@@ -1,6 +1,7 @@
 export type { IconSlot, Settings } from './defaults'
 export { default as defaults } from './defaults'
 export { formIssues } from './forms'
+export type { BarListRow } from './plot'
 export type * from './popover'
 export type { Column, RowKey, SortDirection, SortState } from './table'
 export * from './toast'

@@ -1,0 +1,22 @@
+---
+import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import Meter from '@kaynooo/kayjs-ui/meter.kay'
+import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
+import Stat from '@kaynooo/kayjs-ui/stat.kay'
+---
+main
+  article#stat
+    Stat(value={12} label="moons" icon="info")
+  article#meter
+    Meter(value={140} label="Disk" fillClass="bg-error")
+  article#bars
+    BarList(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1, display: 'one' }, { key: 'venus', label: 'Venus', value: 0 }]})
+  article#no-bars
+    BarList(rows={[]} empty="No planets")
+  article#favicon
+    SiteFavicon(src="/favicon.png" name="kaynooo.fr")
+  article#no-favicon
+    SiteFavicon(name="kaynooo.fr")
+  article#copy
+    CopyButton(text="https://kaynooo.fr" label="Copy link")

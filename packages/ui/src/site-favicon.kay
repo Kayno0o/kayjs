@@ -1,0 +1,27 @@
+---
+import type { JSX } from 'kay'
+import { stringToHexColor } from '@kaynooo/utils/colors'
+import { effect, signal } from 'kay'
+import Icon from './icon.kay'
+
+const { src, name, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
+  src?: string | null
+  // Names the site: it colours the fallback icon, and goes unused once the image loads.
+  name: string
+  class?: string
+}>()
+
+const failed = signal(false)
+
+// A new src is a new load: a failure recorded for the one before it no longer applies.
+effect(() => {
+  void src
+  failed.set(false)
+})
+---
+// A site's icon, or the globe slot in a colour of the site's own when it has none or it fails to load.
+span.site-favicon({...rest} class={className})
+  if src && !failed()
+    img.site-favicon-img(src={src} alt="" onError={() => failed.set(true)})
+  else
+    Icon(icon="globe" class="site-favicon-icon" style={`color: ${stringToHexColor(name)}`})
