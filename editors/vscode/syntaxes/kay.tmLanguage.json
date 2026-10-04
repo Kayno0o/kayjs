@@ -39,13 +39,21 @@
   ],
   "repository": {
     "fence": {
-      "begin": "^(---)(?:[ \\t]+(server))?[ \\t]*$",
+      "begin": "^(---)(?:[ \\t]+(server)|[ \\t]*(<.*>))?[ \\t]*$",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.fence.kay"
         },
         "2": {
           "name": "keyword.other.server.kay"
+        },
+        "3": {
+          "name": "meta.type.parameters.kay",
+          "patterns": [
+            {
+              "include": "source.ts#type-parameters"
+            }
+          ]
         }
       },
       "end": "^(---)[ \\t]*$",

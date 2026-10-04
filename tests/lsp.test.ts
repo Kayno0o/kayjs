@@ -209,6 +209,16 @@ describe('kay lsp', () => {
     expect(await site.request('textDocument/prepareRename', 'src/routes/index.kay', 23, 5)).toBeNull()
   })
 
+  it('renames a generic component\'s type parameter from its fence line and from its uses', async () => {
+    await site.open('src/components/list.kay')
+
+    const uses = [[0, 5, 6], [1, 39, 40], [1, 57, 58]]
+
+    expect(spots((await site.rename('src/components/list.kay', 0, 5, 'Item'))['src/components/list.kay']!)).toEqual(uses)
+    expect(spots((await site.rename('src/components/list.kay', 1, 57, 'Item'))['src/components/list.kay']!)).toEqual(uses)
+    expect(JSON.stringify((await site.request<Hover>('textDocument/hover', 'src/components/list.kay', 0, 5)).contents)).toContain('T')
+  })
+
   it('shows the signature of the call under the cursor', async () => {
     const help = await site.request<{ signatures: { label: string }[] }>('textDocument/signatureHelp', 'src/components/quick-add.kay', 9, 28)
 

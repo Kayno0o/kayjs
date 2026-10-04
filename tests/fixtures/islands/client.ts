@@ -6,6 +6,7 @@ const registry = {
   'tests/fixtures/islands/slow.kay': () => import('./slow.kay'),
   'tests/fixtures/islands/plain.kay': () => import('./plain.kay'),
   'tests/fixtures/islands/rich.kay': () => import('./rich.kay'),
+  'tests/fixtures/islands/picker.kay': () => import('./picker.kay'),
 }
 
 export const ready = hydrateIslands(registry)

@@ -1,0 +1,7 @@
+--- <T extends { id: number }>
+import { signal } from 'kay'
+
+const { items, field } = props<{ items: T[], field: keyof T & string }>()
+const chosen = signal(0)
+---
+button.picker(onClick={() => chosen.set(items[0]!.id)}) {String(items[0]![field])} {chosen()}

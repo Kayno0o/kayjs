@@ -1,0 +1,6 @@
+--- <T>
+const { items, show } = props<{ items: T[], show: (item: T) => string }>()
+---
+ul.list
+  for item, i of items key={i}
+    li {show(item)}

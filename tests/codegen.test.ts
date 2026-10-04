@@ -380,6 +380,31 @@ describe('prop defaults', () => {
   })
 })
 
+describe('generic components', () => {
+  it('declares the type parameters of the script fence on the component function', () => {
+    const code = tsx('--- <T extends { id: number }, const K extends keyof T = keyof T>\nconst { items } = props<{ items: T[], key?: K }>()\n---\np {items.length}')
+
+    expect(code).toContain('export default function Test<T extends { id: number }, const K extends keyof T = keyof T>(__props: { items: T[], key?: K })')
+  })
+
+  it('keeps an island generic, instantiated per use, with hydrate', () => {
+    const code = tsx('--- <T extends Record<string, (a: number) => void>, U>\nimport { signal } from \'kay\'\n\nconst { items } = props<{ items: T[], other: U }>()\nconst n = signal(0)\n---\nbutton(onClick={() => n.set(1)}) {items.length}')
+
+    expect(code).toContain('function Test<T extends Record<string, (a: number) => void>, U>(')
+    expect(code).toContain('export default KayIsland("test.kay", Test as never) as unknown as KayIslandBrand & (<T extends Record<string, (a: number) => void>, U>(props: Parameters<typeof Test<T, U>>[0] & { hydrate?: KayHydrateWhen }) => ReturnType<typeof Test>)')
+  })
+
+  it('refuses type parameters on a page', () => {
+    expect(errors('--- server\nconst a = 1\n---\n--- <T>\n---\np {a}')).toEqual([expect.stringContaining('takes no props, so it has no type parameters')])
+  })
+
+  it('leaves a function given to a component unwrapped in check output, so a generic one types its parameters', () => {
+    const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[1]} show={n => String(n)})', 'test.kay', { check: true }).tsx
+
+    expect(code).toContain('<List items={KayProp(List)(([1]))} {...KayFunctionProp(List)(0)} show={n => String(n)} />')
+  })
+})
+
 describe('types in the component script', () => {
   it('keeps a type of a script name in the body, and the types built from it', () => {
     const code = tsx('---\nimport type { Foo } from \'./foo\'\nconst { a } = props<{ a: string }>()\nconst rows = [{ id: 1 }]\ntype Row = typeof rows[number]\ntype Rows = Row[]\ntype A = typeof a\ntype Plain = { id: number }\ninterface Shape { row: Row }\n---\np x')

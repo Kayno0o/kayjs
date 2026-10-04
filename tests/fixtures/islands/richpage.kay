@@ -1,5 +1,7 @@
 ---
+import Picker from './picker.kay'
 import Rich from './rich.kay'
 ---
 main
   Rich(since={new Date(Date.UTC(2020, 0, 1))} tags={new Set(['a'])} scores={new Map([['x', 3]])} big={10n})
+  Picker(items={[{ id: 4, name: 'Ada' }]} field="name")

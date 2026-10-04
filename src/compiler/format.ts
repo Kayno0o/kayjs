@@ -20,7 +20,7 @@ interface AttributeEdit extends Span {
 }
 
 const INDENT = '  '
-const FENCE_OPEN = /^---(?:[ \t]+([a-z]+))?[ \t]*$/
+const FENCE_OPEN = /^---(?:[ \t]+([a-z]+)|[ \t]*(<.*>))?[ \t]*$/
 const LEADING_SPACES = /^ */
 const CRLF = /\r\n/g
 const WHITESPACE_END = /\s$/
@@ -48,7 +48,7 @@ function formatFences(text: string): string[] {
       const open = FENCE_OPEN.exec(line)
 
       if (open)
-        out.push(open[1] === undefined ? '---' : `--- ${open[1]}`)
+        out.push(open[1] === undefined && open[2] === undefined ? '---' : `--- ${open[1] ?? open[2]}`)
 
       body = open ? [] : undefined
 

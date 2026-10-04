@@ -8,8 +8,11 @@ declare const ISLAND: unique symbol
 // When an island hydrates: right away, once the browser is idle, or once it scrolls near the viewport.
 export type HydrateWhen = 'load' | 'idle' | 'visible'
 
-// What an interactive component's default export is: the brand lets the checker tell islands from plain components, and only islands take `hydrate`.
-export type IslandComponent<Props> = ((props: Props & { hydrate?: HydrateWhen }) => JSX.Element) & { readonly [ISLAND]: true }
+// Lets the checker tell islands from plain components.
+export interface IslandBrand { readonly [ISLAND]: true }
+
+// What an interactive component's default export is; only islands take `hydrate`.
+export type IslandComponent<Props> = ((props: Props & { hydrate?: HydrateWhen }) => JSX.Element) & IslandBrand
 
 // Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every page route and public file, and by the app with `locals: LocalsOf<typeof auth>` and `app: typeof app`.
 export interface Register {}
@@ -82,9 +85,10 @@ type IsSerializable<T> = T extends Sendable
             : false
 
 // Props a static parent passes to an island are serialized for the browser, so they must survive it.
-export type IslandProp<Component, Value> = Component extends { readonly [ISLAND]: true }
-  ? [IsSerializable<Value>] extends [true] ? unknown : { kayError: 'An island receives its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances' }
-  : unknown
+export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? unknown : { kayError: 'An island receives its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances' } : unknown
+
+// A function written in the attribute is checked apart from its value, which a wrapping call would stop a generic component from typing: `0` stands for the attribute.
+export type FunctionProp<Component> = Component extends IslandBrand ? { kayError: 'An island receives its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances' } : 0
 
 declare const DEFERRED: unique symbol
 

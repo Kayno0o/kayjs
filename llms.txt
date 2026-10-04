@@ -55,6 +55,21 @@ li(class={size})
 - `selection<Key>(initial?)` from `kay` holds one selected string or number key among many rows, or none. It reads as `selected()` and writes as `selected.set(id)`, and `selected.is(row.id)` re-runs only for the rows a change selects or unselects, not every row: `tr(class={{ danger: selected.is(row.id) }})`.
 - Other Solid primitives come from `solid-js`.
 
+### Generic components
+
+Type parameters on the script fence line make a component generic, written as TypeScript writes them; each use infers them from its props, islands included:
+
+```kay
+--- <T extends { id: number }>
+const { items, show } = props<{ items: T[], show: (item: T) => string }>()
+---
+ul
+  for item of items key={item.id}
+    li {show(item)}
+```
+
+`List(items={todos} show={todo => todo.title})` types `todo` as one of `todos`, and `kay fmt` writes the line `--- <T ...>`. A page has no props, so it takes no type parameters.
+
 ## Template lines
 
 Each line is one of the following; deeper indentation nests children under the line above.

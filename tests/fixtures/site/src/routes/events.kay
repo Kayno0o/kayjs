@@ -17,9 +17,13 @@ const scheduled = ctx.succeeded(schedule)
 const failure = ctx.failed(schedule)
 ---
 ---
+import List from '../components/list.kay'
+import Picker from '../components/picker.kay'
 import Since from '../components/since.kay'
 ---
 Since(at={EARLIEST} seats={new Map([['front', 2n]])})
+Picker(items={[{ id: 1, name: 'Front' }, { id: 2, name: 'Back' }]} field="name")
+List(items={[EARLIEST]} show={day => day.toISOString()})
 form(action={schedule})
   input(name="title")
   input(name="at")

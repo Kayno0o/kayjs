@@ -1,6 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 
-const FENCE = /---(?:([ \t]*)([a-z]+))?[ \t]*\r?\n/iy
+// `--- server`, or `--- <T extends Row>` making the component generic, its type parameters in the third group.
+const FENCE = /---(?:([ \t]*)([a-z]+)|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
 const CLOSING_FENCE = /^---[ \t]*$/gm
 const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
 const TAG_NAME = /[A-Z][\w-]*/iy
@@ -29,6 +30,7 @@ const TYPE_KEYWORDS = new Set(['any', 'unknown', 'never', 'string', 'number', 'b
 export function parseKay(source: string): KayFile {
   const diagnostics: Diagnostic[] = []
   const fences: Partial<Record<'script' | 'server', Span>> = {}
+  let typeParameters: Span | undefined
   let templateStart = 0
 
   // Fences come first, in any order: `---` holds the component script, `--- server` the code that runs on the server only.
@@ -60,11 +62,17 @@ export function parseKay(source: string): KayFile {
       diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `A file has one ${kind === 'server' ? '`--- server`' : 'script'} fence` })
     else
       fences[kind] = span
+
+    if (kind === 'script' && fence.indices?.[3] && fences.script === span) {
+      const [start, end] = fence.indices[3]
+
+      typeParameters = { start, end }
+    }
   }
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, templateStart, template: parser.parseTemplate(), diagnostics }
+  return { source, script: fences.script, server: fences.server, typeParameters, templateStart, template: parser.parseTemplate(), diagnostics }
 }
 
 class TemplateParser {

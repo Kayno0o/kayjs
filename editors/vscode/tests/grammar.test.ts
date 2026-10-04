@@ -79,6 +79,13 @@ describe('kay grammar', () => {
     expect(lines[6]).toEqual(['p: entity.name.tag.kay', 'Hi: meta.element.kay'])
   })
 
+  it('reads the type parameters of a generic component on its fence line', () => {
+    const lines = tokenize('--- <T extends Row>\nconst x = 1\n---\np Hi')
+
+    expect(lines[0]).toEqual(['---: punctuation.definition.fence.kay', '<T extends Row>: meta.type.parameters.kay'])
+    expect(lines[3]).toEqual(['p: entity.name.tag.kay', 'Hi: meta.element.kay'])
+  })
+
   it('tells components, tags, classes, ids and attributes apart', () => {
     const [line] = tokenize('Card.p-4.md:flex#main(title="Todos" open onClick={go} {...rest}) Hello {name}')
 

@@ -110,7 +110,7 @@ function environment(patterns: string[], files: string[]): string {
   const paths = files.length > 0 ? files.map(file => JSON.stringify(file)).join(' | ') : 'never'
 
   return [
-    'import type { Action, CheckedHref, FieldName, IslandProp } from \'kay\'',
+    'import type { Action, CheckedHref, FieldName, FunctionProp, IslandProp } from \'kay\'',
     '',
     'declare module \'kay\' {',
     `  interface Register { routes: ${routes}, files: ${paths} }`,
@@ -120,6 +120,7 @@ function environment(patterns: string[], files: string[]): string {
     '  function KayHref<const Href extends string>(href: Href & CheckedHref<Href>): string',
     '  function KayField<Target extends string | Action<never, unknown>>(target: Target, name: FieldName<Target>): string',
     '  function KayProp<Component>(component: Component): <Value>(value: Value & IslandProp<Component, Value>) => Value',
+    '  function KayFunctionProp<Component>(component: Component): (attribute: FunctionProp<Component>) => Record<never, never>',
     '}',
     '',
   ].join('\n')

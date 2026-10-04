@@ -94,6 +94,8 @@ export interface KayFile {
   source: string
   script?: Span
   server?: Span
+  // Inside the angle brackets of `--- <T extends Row>`: the component function's type parameters.
+  typeParameters?: Span
   // Where the template begins, past the fences.
   templateStart: number
   template: Node[]

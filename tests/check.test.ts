@@ -39,11 +39,13 @@ describe('kay check', () => {
       { file: 'broken/src/routes/feed.kay', line: 12, column: 7, code: 'TS2322', message: expect.stringContaining('Wrap the promise in defer()') },
       { file: 'broken/src/routes/form.kay', line: 10, column: 15, code: 'TS2345', message: 'Argument of type \'"titel"\' is not assignable to parameter of type \'"title"\'.' },
       { file: 'broken/src/routes/form.kay', line: 11, column: 22, code: 'TS2551', message: expect.stringContaining('Property \'titel\' does not exist') },
+      { file: 'broken/src/routes/generic.kay', line: 5, column: 44, code: 'TS2551', message: 'Property \'toISOStrin\' does not exist on type \'Date\'. Did you mean \'toISOString\'?' },
+      { file: 'broken/src/routes/generic.kay', line: 6, column: 43, code: 'TS2322', message: 'Type \'"nmae"\' is not assignable to type \'"id" | "name"\'.' },
       { file: 'broken/src/routes/head.kay', line: 2, column: 8, code: 'TS2322', message: expect.stringContaining('nmae') },
       { file: 'broken/src/routes/lazy.kay', line: 4, column: 57, code: 'TS2322', message: expect.stringContaining('hydrate: string') },
       { file: 'broken/src/routes/links.kay', line: 5, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /form/extra') },
       { file: 'broken/src/routes/links.kay', line: 8, column: 39, code: 'TS2345', message: expect.stringContaining('An island receives its props serialized') },
-      { file: 'broken/src/routes/links.kay', line: 8, column: 72, code: 'TS2345', message: expect.stringContaining('An island receives its props serialized') },
+      { file: 'broken/src/routes/links.kay', line: 8, column: 64, code: 'TS2345', message: expect.stringContaining('An island receives its props serialized') },
       { file: 'broken/src/routes/links.kay', line: 13, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /api/feed.json') },
       { file: 'broken/src/routes/links.kay', line: 14, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /api/import') },
       { file: 'broken/src/routes/links.kay', line: 15, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /docs/guide.txt') },
@@ -71,7 +73,7 @@ describe('kay check', () => {
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     expect(code).toBe(1)
-    expect(errors).toContain('22 errors')
+    expect(errors).toContain('24 errors')
     expect(errors).toContain('2 | const id = Number(ctx.params.slug)\n  |                              ^')
   })
 })

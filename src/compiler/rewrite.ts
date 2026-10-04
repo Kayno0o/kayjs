@@ -10,7 +10,6 @@ import { defaultName } from './codegen'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const POSITION_SUFFIX = / \(\d+:\d+\)$/
-const ISLAND_WRAPPER = 'KayIsland'
 const require = createRequire(import.meta.url)
 let loadedTraverse: typeof traverseModule | undefined
 
@@ -90,7 +89,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
   traverse(ast, {
     Program: (path) => {
       // The export of the function counts as a reference to it, and a tag of that name is the component rendering itself; neither is a read of a global.
-      shadowsName = path.scope.getBinding(componentName)?.referencePaths.some(reference => reference.isIdentifier() && !isIslandWrapperArgument(reference) && tagPosition(reference) === undefined) ?? false
+      shadowsName = path.scope.getBinding(componentName)?.referencePaths.some(reference => reference.isIdentifier() && !inIslandExport(reference) && tagPosition(reference) === undefined) ?? false
     },
     ArrowFunctionExpression: (path) => {
       for (const param of path.node.params) {
@@ -148,10 +147,11 @@ function tagPosition(reference: NodePath): 'opening' | 'closing' | undefined {
   return node.parentPath?.isJSXClosingElement() ? 'closing' : undefined
 }
 
-function isIslandWrapperArgument(reference: NodePath): boolean {
-  const call = reference.parent
+// `export default KayIsland(id, Name)`, a generic island's type naming the function too.
+function inIslandExport(reference: NodePath): boolean {
+  const exported = reference.findParent(path => path.isExportDefaultDeclaration())?.node
 
-  return call.type === 'CallExpression' && call.callee.type === 'Identifier' && call.callee.name === ISLAND_WRAPPER
+  return exported?.type === 'ExportDefaultDeclaration' && exported.declaration.type !== 'FunctionDeclaration'
 }
 
 // `<__props.Icon>` is a tag; anything else a read produces is not.

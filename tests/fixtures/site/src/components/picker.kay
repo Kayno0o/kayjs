@@ -1,0 +1,9 @@
+--- <T extends { id: number }>
+import { signal } from 'kay'
+
+const { items, field } = props<{ items: T[], field: keyof T & string }>()
+const chosen = signal<number>()
+---
+ul.picker
+  for item of items key={item.id}
+    li(class={{ chosen: chosen() === item.id }} onClick={() => chosen.set(item.id)}) {String(item[field])}

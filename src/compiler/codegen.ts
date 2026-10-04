@@ -1,6 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
+import { parseExpression } from '@babel/parser'
 import { actionUrl } from '../runtime/action'
 import { awaitBlocks } from './ast'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
@@ -46,6 +47,8 @@ const DEFAULT_PREFIX = '__default_'
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
 // The one server export that is no action: `kay build` renders the page once when it is `true`.
 const PRERENDER = 'prerender'
+// A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
+const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script` and `base` elements only'
 
 export function defaultName(index: number): string {
@@ -118,6 +121,9 @@ class Generator {
     if (this.options.island)
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
 
+    if (this.options.island && this.genericComponent)
+      b.add(`import type { HydrateWhen as KayHydrateWhen, IslandBrand as KayIslandBrand } from 'kay'\n`)
+
     if (usesAwait(this.file.template))
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
 
@@ -132,7 +138,16 @@ class Generator {
     if (includeServer)
       this.emitLoad(server)
 
-    b.add(`\n${this.options.island ? '' : 'export default '}function ${this.options.name}(`)
+    b.add(`\n${this.options.island ? '' : 'export default '}function ${this.options.name}`)
+
+    if (this.file.typeParameters) {
+      if (server)
+        this.error(this.file.typeParameters, 'A page gets its data from `--- server` and takes no props, so it has no type parameters')
+      else
+        b.add('<').addSource(this.file.typeParameters).add('>')
+    }
+
+    b.add('(')
 
     if (server) {
       b.add(`__props: KayPageData<typeof load>${childrenSlot ? childrenType : ''}`)
@@ -166,9 +181,24 @@ class Generator {
     b.add('\n}\n')
 
     if (this.options.island)
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name})\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''})${this.genericIslandType()}\n`)
 
     return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
+  }
+
+  private get genericComponent(): boolean {
+    return this.file.typeParameters !== undefined && this.server === undefined
+  }
+
+  // `island()` would fix the type parameters to their constraints, so a generic island keeps its own signature, instantiated per use, plus `hydrate`.
+  private genericIslandType(): string {
+    if (!this.genericComponent)
+      return ''
+
+    const parameters = this.text(this.file.typeParameters!)
+    const { name } = this.options
+
+    return ` as unknown as KayIslandBrand & (<${parameters}>(props: Parameters<typeof ${name}<${typeParameterNames(parameters).join(', ')}>>[0] & { hydrate?: KayHydrateWhen }) => ReturnType<typeof ${name}>)`
   }
 
   // Both fences land in one module, so a name they both import is declared once; the server fence's copy is the one left out, and a name imported two different ways is reported.
@@ -926,7 +956,7 @@ class Generator {
     this.error(attribute.name, `\`${this.text(attribute.name)}\` does not attach a handler: events are written in camelCase, as \`on${capitalize(camel)}\``)
   }
 
-  // Check-only wrappers: a site link must match a page, and a static parent passes an island JSON-safe props only.
+  // Check-only wrappers: a site link must match a page, and a static parent passes an island serializable props only.
   private emitCheckedAttribute(element: ElementNode, attribute: Attribute): boolean {
     const { b } = this
 
@@ -950,6 +980,14 @@ class Generator {
 
     if (!element.component || this.options.island || attribute.kind !== 'expression' || name.startsWith('bind:'))
       return false
+
+    // A function never reaches an island, and left unwrapped it takes its parameter types from a generic component's other props.
+    if (isFunctionExpression(this.text(attribute.expression))) {
+      b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(attribute.name, () => b.add('0')).add(')} ')
+      b.addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
+
+      return true
+    }
 
     b.addSource(attribute.name).add('={KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
 
@@ -1225,4 +1263,43 @@ function quoteAttribute(value: string): string {
     return `'${value}'`
 
   return `{${JSON.stringify(value)}}`
+}
+
+// `T extends Record<string, U>, const U = number` names `T` and `U`: the first identifier of each parameter, split at the commas outside any brackets.
+function typeParameterNames(parameters: string): string[] {
+  const names: string[] = []
+  let depth = 0
+  let start = 0
+
+  for (let index = 0; index <= parameters.length; index++) {
+    const char = parameters[index]
+
+    if (char === '<' || char === '(' || char === '[' || char === '{')
+      depth++
+    else if ((char === '>' && parameters[index - 1] !== '=') || char === ')' || char === ']' || char === '}')
+      depth--
+
+    if (index < parameters.length && (char !== ',' || depth > 0))
+      continue
+
+    const name = TYPE_PARAMETER_NAME.exec(parameters.slice(start, index))?.[1]
+
+    if (name !== undefined)
+      names.push(name)
+
+    start = index + 1
+  }
+
+  return names
+}
+
+function isFunctionExpression(code: string): boolean {
+  try {
+    const expression = parseExpression(code, { plugins: ['typescript'] })
+
+    return expression.type === 'ArrowFunctionExpression' || expression.type === 'FunctionExpression'
+  }
+  catch {
+    return false
+  }
 }
