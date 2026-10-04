@@ -1,0 +1,58 @@
+{
+  "name": "@kaynooo/kayjs-ui",
+  "type": "module",
+  "version": "0.0.0",
+  "description": "kay components: dialogs, tables, toasts, forms and the rest of what the user's sites share, as .kay sources the app compiles as its own",
+  "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs-ui"
+  },
+  "bugs": {
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs-ui/issues"
+  },
+  "publishConfig": {
+    "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/",
+    "access": "restricted"
+  },
+  "kay": {
+    "settings": "./src/settings.ts"
+  },
+  "exports": {
+    "./*.kay": "./src/*.kay",
+    "./theme.css": "./src/theme.css",
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "llms.txt",
+    "src"
+  ],
+  "engines": {
+    "bun": ">=1.4.2"
+  },
+  "scripts": {
+    "postinstall": "bun scripts/link-fixture.ts",
+    "check": "tsgo --noEmit",
+    "lint": "keslint --cache",
+    "lint:fix": "keslint --fix --cache",
+    "test": "bun test"
+  },
+  "peerDependencies": {
+    "@iconify-json/tabler": "^1.2.41",
+    "kay": "^0.3.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@iconify-json/tabler": "^1.2.41",
+    "@kaynooo/eslint": "^6.0.1",
+    "@types/bun": "^1.4.2",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "elysia": "^1.4.30",
+    "kay": "npm:@kaynooo/kay@^0.3.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3"
+  }
+}

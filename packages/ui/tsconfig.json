@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "moduleDetection": "force",
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "types": [
+      "bun"
+    ],
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src",
+    "tests",
+    "env.d.ts"
+  ],
+  "exclude": [
+    "tests/fixture"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "jsx": "preserve",
+    "jsxImportSource": "kay",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "rootDirs": [".", ".kay/types"],
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "types": ["bun"],
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["src", "tests", ".kay/types"]
+}

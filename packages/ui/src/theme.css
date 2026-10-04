@@ -1,0 +1,1338 @@
+/*
+ * The tokens and classes behind every component, for a Tailwind v4 app: import it right after tailwindcss.
+ * Tokens are `@theme default`, so the app's own `@theme` overrides them wherever it sits, and components write no utility of their own, only the classes below: a rule of the app's on one of them restyles every instance, and a utility through `class` restyles one.
+ */
+
+@theme default {
+  /* Surfaces from darkest to lightest, then text. surface2 and overlay0 are the hairlines, white at an alpha so a line holds on any surface. */
+  --color-mantle: #0d0d0d;
+  --color-canvas: #111111;
+  --color-surface0: #161616;
+  --color-surface1: #1b1b1b;
+  --color-surface2: rgb(255 255 255 / 0.11);
+  --color-overlay0: rgb(255 255 255 / 0.22);
+  --color-overlay1: #6e6a63;
+  --color-subtext0: #9c978e;
+  --color-muted: var(--color-subtext0);
+  --color-text: #e0dcd4;
+
+  /* The one accent, the two statuses, and the fills state is drawn with. */
+  --color-accent: #ec9086;
+  --color-accent-hi: #f4a79d;
+  --color-on-accent: #1a0d0b;
+  --color-success: #b4c79b;
+  --color-error: #ec9086;
+  --color-fill-hover: #1c1c1c;
+  --color-fill-danger: #241615;
+  --color-row-hover: rgb(255 255 255 / 0.05);
+
+  /* The colours a chart series takes when it names none, in order. */
+  --color-chart-1: var(--color-accent);
+  --color-chart-2: var(--color-success);
+  --color-chart-3: #8fb8de;
+  --color-chart-4: #d8b27a;
+  --color-chart-5: #b9a3de;
+  --color-chart-6: #7fc8b8;
+
+  --text-micro: 0.5625rem;
+  --text-micro--line-height: 1.4;
+  --text-2xs: 0.6rem;
+  --text-2xs--line-height: 1.4;
+  --font-weight-heading: 600;
+  --font-weight-label: 400;
+  --tracking-label: 0.15em;
+  --tracking-section: 0.18em;
+  --tracking-action: 0.16em;
+  --spacing-card: 0.625rem;
+  --spacing-inline: 0.3125rem;
+  --spacing-section: 0.875rem;
+  --border-card: 1px;
+  --border-input: 1px;
+  --radius-card: 0px;
+}
+
+/* The one rule outside the layers, so no display utility passed to a dialog or a popover, nor a component's own layout on one, can show it closed. */
+.dialog:not([open]),
+.command-palette:not([open]),
+.side-panel:not([open]),
+.popover:not(:popover-open) {
+  display: none;
+}
+
+/* Every selector below weighs one class plus its state, with variants and nested parts inside :where(), so rules win in source order and the app's own, imported later, win over these. */
+@layer components {
+  /* A rectangle drawn as a fill on the element and a hairline in ::before, so the line adds nothing to the box. Variants only redeclare --shell-line and --shell-fill. */
+  .shell,
+  .btn,
+  .stat-badge {
+    --shell-line: var(--color-overlay0);
+    --shell-fill: var(--color-surface0);
+    position: relative;
+    background-color: var(--shell-fill);
+  }
+
+  :is(.shell, .btn, .stat-badge)::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: var(--border-card) solid var(--shell-line);
+    pointer-events: none;
+  }
+
+  /* :where() keeps these at one class, so the variants below still win. */
+  :where(button, a, [role='button'], summary).shell:hover,
+  .btn:hover {
+    --shell-line: var(--color-subtext0);
+    --shell-fill: var(--color-fill-hover);
+  }
+
+  :where(button, a, [role='button'], summary).shell:focus-visible,
+  .btn:focus-visible {
+    --shell-line: var(--color-accent);
+    outline: none;
+  }
+
+  .shell-danger:hover {
+    --shell-line: var(--color-error);
+    --shell-fill: var(--color-fill-danger);
+  }
+
+  .heading-section {
+    @apply text-2xs font-label tracking-section text-subtext0 uppercase;
+  }
+
+  .label-text {
+    @apply text-micro font-label tracking-label text-subtext0 uppercase;
+  }
+
+  .btn {
+    --shell-fill: var(--color-canvas);
+    @apply inline-flex cursor-pointer items-center justify-center gap-inline border-0 px-3 py-1 text-xs font-label tracking-action text-text uppercase transition-[color] duration-150;
+  }
+
+  .btn-accent {
+    --shell-line: var(--color-accent);
+    --shell-fill: var(--color-accent);
+    @apply text-on-accent;
+
+    &:hover {
+      --shell-line: var(--color-accent-hi);
+      --shell-fill: var(--color-accent-hi);
+    }
+  }
+
+  .btn-danger {
+    @apply text-error;
+
+    &:hover {
+      --shell-line: var(--color-error);
+      --shell-fill: var(--color-fill-danger);
+    }
+  }
+
+  /* A form field's own controls take this look with no class, all but the inputs a text box does not fit. */
+  .field-input,
+  .form-field
+    :where(
+      input:not([type='hidden'], [type='checkbox'], [type='radio'], [type='color'], [type='range'], [type='file']),
+      select,
+      textarea
+    ) {
+    @apply rounded-card bg-surface0 px-2.25 py-1 text-sm text-text outline-none;
+    border: var(--border-input) solid var(--color-overlay0);
+
+    &::placeholder {
+      @apply text-overlay1;
+    }
+
+    &:focus {
+      @apply border-accent;
+    }
+
+    &:disabled {
+      @apply cursor-default opacity-50;
+    }
+  }
+
+  .stat-badge {
+    @apply inline-flex items-center gap-inline px-2.25 py-0.75 text-xs;
+  }
+
+  .icon {
+    @apply inline-block size-5 bg-current;
+  }
+
+  .icon-btn {
+    @apply inline-flex shrink-0 items-center justify-center p-0 transition disabled:pointer-events-none disabled:opacity-40;
+
+    &:where([data-size='xs']) {
+      @apply size-5;
+    }
+
+    &:where([data-size='sm']) {
+      @apply size-6;
+    }
+
+    &:where([data-size='md']) {
+      @apply size-7;
+    }
+
+    &:where([data-size='lg']) {
+      @apply size-8;
+    }
+
+    &:where([data-variant='solid']) {
+      @apply text-text;
+    }
+
+    &:where([data-variant='ghost']) {
+      @apply text-subtext0 hover:bg-surface0 hover:text-text;
+    }
+
+    &:where([data-variant='inline']) {
+      @apply text-subtext0;
+    }
+
+    &:where([data-variant='danger']) {
+      @apply text-error;
+    }
+  }
+
+  .icon-btn :where(.icon) {
+    @apply size-4;
+  }
+
+  .bar-list {
+    @apply flex flex-col gap-2;
+  }
+
+  /* Label and value on one line, the bar spanning both under them, so a long label never squeezes the bar. */
+  .bar-list-row {
+    @apply grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 text-left text-sm;
+
+    &:where([data-interactive]) {
+      @apply cursor-pointer hover:text-accent;
+    }
+  }
+
+  .bar-list-label {
+    @apply truncate text-text;
+  }
+
+  .bar-list-value {
+    @apply text-xs text-subtext0 tabular-nums;
+  }
+
+  .bar-list-track {
+    @apply col-span-2 block h-1.5 overflow-hidden bg-surface1;
+  }
+
+  .bar-list-fill {
+    @apply block h-full bg-accent;
+  }
+
+  .bar-list-empty {
+    @apply text-xs text-subtext0;
+  }
+
+  .card-row {
+    @apply flex items-center gap-3 border border-surface2 bg-surface0 p-4;
+  }
+
+  .card-row-body {
+    @apply min-w-0 flex-1;
+  }
+
+  /* Dimmed until the row is hovered or holds focus. */
+  .card-row-actions {
+    @apply flex shrink-0 items-center gap-2 opacity-60 transition-opacity;
+  }
+
+  :where(.card-row:hover, .card-row:focus-within) .card-row-actions {
+    @apply opacity-100;
+  }
+
+  .collapsible-section {
+    @apply flex flex-col;
+
+    /* Boxed, the summary is the card's header band and the body the card's padding, so a run of sections reads as separate blocks rather than as headings in one column. */
+    &:where([data-boxed]) {
+      @apply border border-surface2 bg-surface0;
+    }
+  }
+
+  .collapsible-section-summary {
+    @apply flex w-full cursor-pointer list-none items-center justify-between gap-2 py-1 text-left;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  /* The band and the body take the card's own padding, so a boxed section and a card side by side line their titles up. */
+  :where(.collapsible-section[data-boxed]) > .collapsible-section-summary {
+    @apply px-card py-1.5;
+  }
+
+  :where(.collapsible-section[data-boxed][open]) > .collapsible-section-summary {
+    @apply border-b border-surface2;
+  }
+
+  .collapsible-section-title {
+    @apply min-w-0 flex-1;
+  }
+
+  .collapsible-section-meta {
+    @apply shrink-0 text-2xs text-subtext0;
+  }
+
+  .collapsible-section-chevron {
+    @apply shrink-0 text-subtext0 transition-transform;
+  }
+
+  :where(.collapsible-section[open]) .collapsible-section-chevron {
+    @apply rotate-180;
+  }
+
+  .collapsible-section-body {
+    @apply flex flex-col gap-3 pt-2;
+  }
+
+  :where(.collapsible-section[data-boxed]) > .collapsible-section-body {
+    @apply gap-4 p-card;
+  }
+
+  .command-palette {
+    @apply mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden border border-overlay0 bg-surface0 p-0 text-text;
+  }
+
+  .command-palette-search {
+    @apply flex shrink-0 items-center gap-2 border-b border-surface2 px-4;
+  }
+
+  .command-palette-search :where(.icon) {
+    @apply size-5 shrink-0 text-overlay1;
+  }
+
+  .command-palette-input {
+    @apply h-11 min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-overlay1;
+  }
+
+  .command-palette-list {
+    @apply min-h-0 flex-1 overflow-y-auto py-1;
+  }
+
+  .command-palette-heading {
+    @apply px-4 pt-2 pb-1;
+  }
+
+  .command-palette-option {
+    @apply flex h-11 w-full cursor-pointer items-center gap-3 px-4 text-left text-sm text-text no-underline outline-none;
+
+    &:where([aria-selected='true']) {
+      @apply bg-row-hover;
+    }
+  }
+
+  .command-palette-option :where(.icon) {
+    @apply size-5 shrink-0 text-overlay1;
+  }
+
+  .command-palette-label {
+    @apply min-w-0 flex-1 truncate;
+  }
+
+  .command-palette-group {
+    @apply shrink-0 text-xs text-subtext0;
+  }
+
+  .command-palette-empty {
+    @apply px-4 py-6 text-center text-sm text-subtext0;
+  }
+
+  .confirm-delete-message {
+    @apply text-muted;
+  }
+
+  .contribution-graph {
+    @apply grid w-fit grid-flow-col grid-rows-7 gap-[3px];
+  }
+
+  /* Cells are placed by hand under a row of month labels, and fixed-width columns let a label run past its own week. */
+  .contribution-graph-months {
+    @apply grid-flow-row auto-cols-[0.75rem] grid-rows-[auto_repeat(7,0.75rem)];
+  }
+
+  .contribution-month {
+    @apply row-start-1 w-0 text-2xs leading-none whitespace-nowrap text-subtext0;
+  }
+
+  .contribution-cell {
+    @apply size-3 rounded-[3px] bg-surface0 transition-transform hover:scale-125;
+
+    &[data-today] {
+      @apply ring-1 ring-accent ring-offset-1 ring-offset-surface0;
+    }
+  }
+
+  .copy-btn {
+    @apply px-1.5 py-0.5;
+  }
+
+  .dialog {
+    @apply m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden border border-overlay0 bg-surface0 p-0;
+  }
+
+  .dialog-title {
+    @apply shrink-0 border-b border-surface2 px-5 py-4 text-lg font-heading tracking-label text-text uppercase;
+  }
+
+  .dialog-body {
+    @apply min-h-0 flex-1 overflow-y-auto px-5 py-4;
+  }
+
+  .dialog-footer {
+    @apply flex shrink-0 justify-end gap-2 border-t border-surface2 px-5 py-4;
+  }
+
+  .empty-state {
+    @apply flex flex-col items-center gap-3 py-16;
+  }
+
+  .empty-state-title {
+    @apply text-xs font-heading tracking-label text-accent uppercase;
+  }
+
+  .empty-state-description {
+    @apply text-xs text-overlay1;
+  }
+
+  .file-drop {
+    @apply flex flex-col items-center justify-center gap-3 border border-dashed border-surface2 p-6 text-center transition-colors;
+
+    &:where([data-dragging]) {
+      @apply border-accent bg-accent/10;
+    }
+
+    &:where([data-disabled]) {
+      @apply opacity-50;
+    }
+  }
+
+  .file-drop-input {
+    @apply hidden;
+  }
+
+  .form-grid {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2;
+  }
+
+  .form-field {
+    @apply flex w-full flex-col gap-1;
+  }
+
+  .form-field
+    :where(
+      input:not([type='hidden'], [type='checkbox'], [type='radio'], [type='color'], [type='range'], [type='file']),
+      select,
+      textarea
+    ) {
+    @apply w-full;
+  }
+
+  .form-field-head {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .form-field-action {
+    @apply ml-auto flex flex-wrap items-center gap-1.5;
+  }
+
+  .form-field-required {
+    @apply ml-0.5 text-error;
+  }
+
+  .form-field-hint {
+    @apply text-xs text-subtext0;
+  }
+
+  .form-field-issues {
+    @apply flex flex-col;
+  }
+
+  .form-field-issue {
+    @apply text-xs text-error;
+  }
+
+  .form-dialog-footer {
+    @apply flex w-full items-center gap-2;
+  }
+
+  .form-dialog-actions {
+    @apply ml-auto flex gap-2;
+  }
+
+  .icon-grid {
+    @apply grid max-h-48 grid-cols-8 gap-1 overflow-y-auto border border-surface2 bg-mantle p-2;
+  }
+
+  .icon-grid-option {
+    @apply flex w-full items-center justify-center p-1.5 text-text transition-colors hover:bg-row-hover;
+
+    &[aria-pressed='true'] {
+      @apply bg-accent text-on-accent;
+    }
+  }
+
+  .icon-grid-option :where(.icon) {
+    @apply size-4;
+  }
+
+  .icon-grid-empty {
+    @apply col-span-full py-4 text-center text-xs text-subtext0;
+  }
+
+  .icon-grid-bar {
+    @apply flex items-center justify-between text-xs text-subtext0;
+  }
+
+  .icon-grid-selection {
+    @apply flex items-center gap-1.5;
+  }
+
+  .icon-grid-selection > :where(.icon) {
+    @apply size-3.5;
+  }
+
+  .icon-grid-clear {
+    @apply text-overlay1 hover:text-text;
+  }
+
+  .icon-grid-more {
+    @apply ml-auto hover:text-text;
+  }
+
+  .icon-picker {
+    @apply flex flex-col gap-2;
+  }
+
+  .icon-picker-pending {
+    @apply border border-surface2 bg-mantle py-4 text-center text-xs text-subtext0;
+  }
+
+  /* chartist draws the plot; only the rules a line chart needs from its own stylesheet are here, so the app imports none. */
+  /* Tailwind emits a theme variable only where something reads it, and a series colour is read from script, so the palette is named here for the app's `--color-chart-*` to survive its build. */
+  .line-chart {
+    @apply flex flex-col gap-2;
+    --chart-1: var(--color-chart-1);
+    --chart-2: var(--color-chart-2);
+    --chart-3: var(--color-chart-3);
+    --chart-4: var(--color-chart-4);
+    --chart-5: var(--color-chart-5);
+    --chart-6: var(--color-chart-6);
+  }
+
+  .line-chart-frame {
+    @apply relative;
+  }
+
+  .line-chart-plot {
+    height: var(--line-chart-height, 9rem);
+
+    & :where(.ct-grid) {
+      @apply stroke-surface2;
+      stroke-width: 1px;
+      stroke-dasharray: 4px;
+    }
+    & :where(.ct-label) {
+      @apply flex fill-overlay1 text-2xs leading-none text-overlay1;
+    }
+    & :where(.ct-label.ct-vertical.ct-start) {
+      @apply items-end justify-end text-right;
+    }
+    /* Zero width so a tick's label ignores its step, which is a couple of pixels wide on a long series, and centres on the tick by overflowing evenly. */
+    & :where(.ct-label.ct-horizontal.ct-end) {
+      @apply w-0! items-center justify-center whitespace-nowrap;
+    }
+    & :where(.ct-line) {
+      fill: none;
+      stroke-width: 2px;
+    }
+    & :where(.ct-point) {
+      stroke-width: 6px;
+      stroke-linecap: round;
+    }
+    & :where(.ct-area) {
+      stroke: none;
+      fill-opacity: 0.08;
+    }
+  }
+
+  .line-chart-overlay {
+    @apply absolute inset-0;
+  }
+
+  .line-chart-cursor {
+    @apply pointer-events-none absolute w-px bg-overlay0;
+  }
+
+  .line-chart-dot {
+    @apply pointer-events-none absolute size-2 -translate-1/2 border border-canvas;
+  }
+
+  .line-chart-tooltip {
+    @apply pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-[calc(100%+0.75rem)] flex-col gap-0.5 border border-overlay0 bg-surface1 px-3 py-2 text-xs;
+  }
+
+  .line-chart-tooltip-label {
+    @apply mb-1 text-text;
+  }
+
+  .line-chart-tooltip-row {
+    @apply flex items-center gap-1.5 text-subtext0;
+  }
+
+  .line-chart-tooltip-name {
+    @apply truncate;
+  }
+
+  .line-chart-tooltip-value {
+    @apply ml-auto pl-3 font-mono text-text tabular-nums;
+  }
+
+  .line-chart-swatch {
+    @apply size-2 shrink-0;
+  }
+
+  .line-chart-legend {
+    @apply flex flex-wrap gap-4 pl-1;
+  }
+
+  .line-chart-legend-item {
+    @apply flex items-center gap-1.5 text-xs text-subtext0;
+  }
+
+  /* Takes field-input's look beside its own class, so a text box and the editor stay one style. */
+  .markdown-editor {
+    @apply w-full resize-none font-mono;
+
+    &:where([aria-busy='true']) {
+      @apply cursor-progress;
+    }
+  }
+
+  /* A plain grid of the same lanes until the width is known, then tiles placed by hand. */
+  .masonry {
+    @apply grid items-start;
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--masonry-min), 100%), 1fr));
+    gap: var(--masonry-gap);
+
+    &:where([data-laid-out]) {
+      @apply relative block;
+    }
+  }
+
+  .masonry-item {
+    @apply min-w-0;
+
+    &:where([data-placed]) {
+      @apply absolute;
+      top: var(--masonry-top);
+      left: calc(var(--masonry-lane) * (100% + var(--masonry-gap)) / var(--masonry-lanes));
+      width: calc((100% - (var(--masonry-lanes) - 1) * var(--masonry-gap)) / var(--masonry-lanes));
+    }
+
+    &:where([data-pending]) {
+      @apply invisible;
+    }
+  }
+
+  .media-gallery {
+    @apply flex flex-col gap-2 outline-none;
+  }
+
+  .media-gallery-stage {
+    @apply relative w-full touch-pan-y overflow-hidden bg-black;
+  }
+
+  .media-gallery-zoom {
+    @apply block size-full cursor-zoom-in;
+  }
+
+  .media-gallery-frame {
+    @apply size-full object-contain;
+  }
+
+  .media-gallery-step {
+    @apply absolute top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/80;
+
+    &:where([data-side='previous']) {
+      @apply left-2 rotate-90;
+    }
+
+    &:where([data-side='next']) {
+      @apply right-2 -rotate-90;
+    }
+  }
+
+  .media-gallery-counter {
+    @apply pointer-events-none absolute top-2 left-2 bg-black/60 px-2 py-0.5 text-2xs text-white tabular-nums;
+  }
+
+  .media-gallery-caption {
+    @apply pointer-events-none absolute inset-x-0 bottom-0 truncate bg-linear-to-t from-black/70 to-transparent px-3 pt-6 pb-2 text-xs text-white;
+  }
+
+  .media-gallery-strip {
+    @apply flex gap-1.5 overflow-x-auto pb-1;
+  }
+
+  .media-gallery-thumb {
+    @apply relative aspect-video h-12 shrink-0 overflow-hidden border-2 border-transparent opacity-60 transition hover:opacity-100;
+
+    &:where([aria-current='true']) {
+      @apply border-accent opacity-100;
+    }
+  }
+
+  .media-gallery-thumb-image {
+    @apply size-full bg-black object-cover;
+  }
+
+  .media-gallery-play {
+    @apply absolute inset-0 m-auto size-5 text-white;
+  }
+
+  .media-gallery-lightbox {
+    @apply m-auto max-h-dvh max-w-dvw overflow-visible border-0 bg-transparent p-0;
+
+    &::backdrop {
+      @apply bg-black/80;
+    }
+  }
+
+  .media-gallery-full {
+    @apply max-h-[96dvh] max-w-[96vw] object-contain;
+  }
+
+  .media-gallery-close {
+    @apply absolute top-2 right-2 bg-black/60 text-white hover:bg-black/80;
+  }
+
+  .media-gallery-empty {
+    @apply text-xs text-subtext0;
+  }
+
+  .menu {
+    @apply min-w-48;
+  }
+
+  .menu-list {
+    @apply flex flex-col gap-px p-1 outline-none;
+  }
+
+  .menu-item {
+    @apply flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-text outline-none hover:bg-row-hover focus:bg-row-hover;
+
+    &:where([data-danger]) {
+      @apply text-error;
+    }
+
+    &:disabled {
+      @apply cursor-default opacity-50;
+    }
+  }
+
+  .menu-item :where(.icon) {
+    @apply size-4 shrink-0;
+  }
+
+  .menu-separator {
+    @apply my-1 border-0 border-t border-surface2;
+  }
+
+  .multi-select {
+    @apply inline-flex min-w-0;
+  }
+
+  .multi-select-trigger {
+    @apply flex w-full min-w-0 cursor-pointer items-center gap-2 text-left;
+
+    &:where([data-empty]) {
+      @apply text-overlay1;
+    }
+  }
+
+  .multi-select-summary {
+    @apply min-w-0 flex-1 truncate;
+  }
+
+  .multi-select-chevron {
+    @apply size-4 shrink-0 text-subtext0;
+  }
+
+  .multi-select-panel {
+    @apply flex max-h-80 w-64 flex-col;
+    min-inline-size: anchor-size(width);
+  }
+
+  .multi-select-search {
+    @apply m-2 mb-0;
+  }
+
+  .multi-select-bar {
+    @apply flex gap-3 border-b border-surface2 px-3 py-1.5;
+  }
+
+  .multi-select-action {
+    @apply cursor-pointer text-2xs tracking-label text-subtext0 uppercase hover:text-text disabled:cursor-default disabled:opacity-40;
+  }
+
+  .multi-select-options {
+    @apply min-h-0 flex-1 overflow-y-auto p-1;
+  }
+
+  .multi-select-option {
+    @apply flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-text hover:bg-row-hover;
+  }
+
+  .multi-select-checkbox {
+    @apply size-3.5 shrink-0 accent-accent;
+  }
+
+  .multi-select-label {
+    @apply min-w-0 truncate;
+  }
+
+  .multi-select-empty {
+    @apply px-2 py-3 text-center text-xs text-subtext0;
+  }
+
+  .meter {
+    @apply h-2 w-full overflow-hidden bg-surface0;
+  }
+
+  .meter-fill {
+    @apply h-full bg-accent transition-[width];
+  }
+
+  .page-section {
+    @apply flex flex-col gap-section;
+  }
+
+  .page-section-head {
+    @apply flex items-center gap-3;
+  }
+
+  .page-section-title {
+    @apply min-w-0 flex-1;
+  }
+
+  /* A native popover, anchored to its trigger through CSS anchor positioning and flipped by the browser when it would overflow. */
+  .popover {
+    @apply border border-overlay0 bg-mantle p-0 text-text;
+    inset: auto;
+    margin: 0.25rem 0;
+    position-try-fallbacks: flip-block, flip-inline;
+
+    &:where([data-placement='bottom-start']) {
+      position-area: block-end span-inline-end;
+    }
+
+    &:where([data-placement='bottom-end']) {
+      position-area: block-end span-inline-start;
+    }
+
+    &:where([data-placement='top-start']) {
+      position-area: block-start span-inline-end;
+    }
+
+    &:where([data-placement='top-end']) {
+      position-area: block-start span-inline-start;
+    }
+  }
+
+  .range-input {
+    @apply inline-flex items-center gap-1.5;
+  }
+
+  .range-input-box {
+    @apply w-20 min-w-0 tabular-nums;
+  }
+
+  .range-input-separator,
+  .range-input-unit {
+    @apply text-xs text-subtext0;
+  }
+
+  .scatter-chart {
+    @apply m-0 grid grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] gap-2;
+  }
+
+  .scatter-chart-axis-label {
+    @apply text-center text-2xs text-subtext0;
+
+    &:where([data-axis='y']) {
+      @apply row-start-1 rotate-180 self-center [writing-mode:vertical-rl];
+    }
+
+    &:where([data-axis='x']) {
+      @apply col-start-2;
+    }
+  }
+
+  /* Tick labels hang outside the plot, into the margin it keeps for them. */
+  .scatter-chart-plot {
+    @apply relative col-start-2 mb-5 ml-8 border border-surface2;
+    height: var(--scatter-chart-height, 18rem);
+  }
+
+  .scatter-chart-grid,
+  .scatter-chart-guide {
+    @apply absolute bg-surface2;
+
+    &:where([data-axis='y']) {
+      @apply inset-x-0 h-px;
+    }
+
+    &:where([data-axis='x']) {
+      @apply inset-y-0 w-px;
+    }
+  }
+
+  .scatter-chart-guide {
+    @apply bg-overlay0;
+  }
+
+  .scatter-chart-tick {
+    @apply absolute text-2xs whitespace-nowrap text-overlay1 tabular-nums;
+  }
+
+  :where(.scatter-chart-grid[data-axis='y']) .scatter-chart-tick {
+    @apply right-full mr-2 -translate-y-1/2;
+  }
+
+  :where(.scatter-chart-grid[data-axis='x']) .scatter-chart-tick {
+    @apply top-full mt-1 -translate-x-1/2;
+  }
+
+  .scatter-chart-corner {
+    @apply pointer-events-none absolute text-2xs text-overlay1;
+
+    &:where([data-corner='topLeft']) {
+      @apply top-1.5 left-2;
+    }
+
+    &:where([data-corner='topRight']) {
+      @apply top-1.5 right-2;
+    }
+
+    &:where([data-corner='bottomLeft']) {
+      @apply bottom-1.5 left-2;
+    }
+
+    &:where([data-corner='bottomRight']) {
+      @apply right-2 bottom-1.5;
+    }
+  }
+
+  .scatter-chart-dot {
+    @apply absolute -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100;
+    width: var(--dot-size);
+    height: var(--dot-size);
+
+    &:where([data-interactive]) {
+      @apply cursor-pointer focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-text;
+    }
+  }
+
+  .scatter-chart-empty {
+    @apply text-xs text-subtext0;
+  }
+
+  .segmented {
+    @apply inline-flex border border-surface2 bg-surface0;
+  }
+
+  .segmented-option {
+    @apply relative cursor-pointer;
+  }
+
+  .segmented-input {
+    @apply absolute size-0 opacity-0;
+  }
+
+  .segmented-label {
+    @apply block px-3 py-1.5 text-xs text-subtext0 transition-colors hover:text-text;
+  }
+
+  :where(.segmented-input:checked) + .segmented-label {
+    @apply bg-accent text-on-accent;
+  }
+
+  :where(.segmented-input:focus-visible) + .segmented-label {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+
+  .image-cropper {
+    @apply flex flex-col gap-2;
+  }
+
+  .image-cropper-stage {
+    @apply relative cursor-crosshair touch-none overflow-hidden border border-surface2 select-none;
+  }
+
+  .image-cropper-image {
+    @apply block h-auto w-full;
+  }
+
+  .image-cropper-crop {
+    @apply absolute cursor-move border-2 border-dashed border-white bg-no-repeat shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] outline-none;
+
+    &:focus-visible {
+      @apply border-solid border-accent;
+    }
+  }
+
+  .image-cropper-grid-cols {
+    @apply pointer-events-none absolute inset-y-0 right-1/3 left-1/3 border-x border-white/70;
+  }
+
+  .image-cropper-grid-rows {
+    @apply pointer-events-none absolute inset-x-0 top-1/3 bottom-1/3 border-y border-white/70;
+  }
+
+  /* A 16px dot inside a 40px hit area, so a finger can grab a corner. */
+  .image-cropper-handle {
+    @apply absolute size-10 before:absolute before:inset-3 before:rounded-full before:border-2 before:border-white before:bg-accent before:content-[""];
+
+    &:where([data-handle='nw']) {
+      @apply -top-5 -left-5 cursor-nw-resize;
+    }
+    &:where([data-handle='ne']) {
+      @apply -top-5 -right-5 cursor-ne-resize;
+    }
+    &:where([data-handle='sw']) {
+      @apply -bottom-5 -left-5 cursor-sw-resize;
+    }
+    &:where([data-handle='se']) {
+      @apply -right-5 -bottom-5 cursor-se-resize;
+    }
+  }
+
+  /* A modal dialog along the right edge, sliding in when it opens. */
+  .side-panel {
+    @apply inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-l border-overlay0 bg-surface0 p-0 text-text;
+    transition:
+      translate 0.2s ease-out,
+      overlay 0.2s allow-discrete,
+      display 0.2s allow-discrete;
+
+    &:where([open]) {
+      @starting-style {
+        translate: 100% 0;
+      }
+    }
+
+    &:where(:not([open])) {
+      translate: 100% 0;
+    }
+
+    &::backdrop {
+      @apply bg-black/50;
+    }
+  }
+
+  .side-panel-head {
+    @apply flex shrink-0 items-center gap-2 border-b border-surface2 px-5 py-3;
+  }
+
+  .side-panel-title {
+    @apply min-w-0 flex-1 truncate text-lg font-heading tracking-label text-text uppercase;
+  }
+
+  .side-panel-body {
+    @apply min-h-0 flex-1 overflow-y-auto px-5 py-4;
+  }
+
+  .side-panel-footer {
+    @apply flex shrink-0 justify-end gap-2 border-t border-surface2 px-5 py-4;
+  }
+
+  .site-favicon {
+    @apply inline-flex size-5 shrink-0 items-center justify-center overflow-hidden;
+  }
+
+  .site-favicon-img {
+    @apply size-full object-contain;
+  }
+
+  .site-favicon-icon {
+    @apply size-full;
+  }
+
+  /* One pane at a time below md, the detail replacing the list once open and the sidebar covering both; side by side from md up. */
+  .split-layout {
+    @apply relative grid h-full grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[var(--split-list-width)_minmax(0,1fr)];
+
+    &:where([data-sidebar]) {
+      @apply md:grid-cols-[13.75rem_var(--split-list-width)_minmax(0,1fr)];
+    }
+  }
+
+  .split-layout-sidebar {
+    @apply hidden min-h-0 flex-col overflow-hidden border-r border-surface2 md:flex;
+  }
+
+  :where(.split-layout[data-sidebar-open]) .split-layout-sidebar {
+    @apply absolute inset-0 z-20 flex bg-canvas md:static md:z-auto md:bg-transparent;
+  }
+
+  .split-layout-sidebar-head {
+    @apply flex shrink-0 items-center gap-2 border-b border-surface2 px-3 py-2 md:hidden;
+  }
+
+  .split-layout-sidebar-title {
+    @apply truncate text-sm;
+  }
+
+  .split-layout-sidebar-body {
+    @apply min-h-0 flex-1 overflow-y-auto;
+  }
+
+  .split-layout-list {
+    @apply relative flex min-h-0 flex-col overflow-hidden border-r border-surface2;
+  }
+
+  :where(.split-layout[data-detail-open]) .split-layout-list {
+    @apply hidden md:flex;
+  }
+
+  .split-layout-list-head,
+  .split-layout-detail-head {
+    @apply flex shrink-0 items-center gap-2 border-b border-surface2 px-3 py-2;
+  }
+
+  .split-layout-detail {
+    @apply hidden min-h-0 flex-col overflow-hidden md:flex;
+  }
+
+  :where(.split-layout[data-detail-open]) .split-layout-detail {
+    @apply flex;
+  }
+
+  .split-layout-resizer {
+    @apply absolute inset-y-0 right-0 z-10 hidden w-1.5 cursor-col-resize touch-none outline-none hover:bg-surface2 focus-visible:bg-accent md:block;
+  }
+
+  .stat-badge :where(.icon) {
+    @apply size-4 shrink-0;
+  }
+
+  .stat-value {
+    @apply font-semibold text-text;
+  }
+
+  .stat-label {
+    @apply text-subtext0;
+  }
+
+  .tab-nav {
+    @apply flex gap-1 overflow-x-auto border-b border-surface2 pb-px;
+  }
+
+  .tab-nav-link {
+    @apply -mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-subtext0 transition-colors hover:text-text;
+
+    &:where([aria-current='page']) {
+      @apply border-accent text-accent;
+    }
+  }
+
+  .table-wrap {
+    @apply w-full overflow-x-auto border border-surface2 bg-surface0;
+  }
+
+  .table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .table-head-cell {
+    @apply border-b border-surface2 px-3 py-2 text-left text-xs font-label tracking-label text-subtext0 uppercase;
+
+    &:where([data-align='center']) {
+      @apply text-center;
+    }
+
+    &:where([data-align='end']) {
+      @apply text-right;
+    }
+
+    &:where([aria-sort='ascending'], [aria-sort='descending']) {
+      @apply text-accent;
+    }
+  }
+
+  .table-sort-btn {
+    @apply inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit uppercase;
+  }
+
+  .table-sort-icon {
+    @apply size-3.5;
+  }
+
+  :where(.table-sort-btn[data-direction='asc']) .table-sort-icon {
+    @apply rotate-180;
+  }
+
+  .table-row {
+    @apply border-b border-surface2;
+
+    &:hover {
+      @apply bg-row-hover;
+    }
+  }
+
+  .table-cell {
+    @apply px-3 py-1.5 text-text;
+
+    &:where([data-align='center']) {
+      @apply text-center;
+    }
+
+    &:where([data-align='end']) {
+      @apply text-right;
+    }
+  }
+
+  .table-empty-cell {
+    @apply px-3 py-8 text-center text-xs text-subtext0;
+  }
+
+  .toaster {
+    @apply pointer-events-none fixed inset-auto right-4 bottom-4 z-100 m-0 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 overflow-visible border-0 bg-transparent p-0;
+  }
+
+  /* --toast-tone is the colour of the toast's type, which its icon takes. */
+  .toast {
+    --toast-tone: var(--color-accent);
+    @apply pointer-events-auto flex items-start gap-2 border border-overlay0 bg-surface0 px-3 py-2;
+
+    &:where([data-type='error']) {
+      --toast-tone: var(--color-error);
+    }
+
+    &:where([data-type='success']) {
+      --toast-tone: var(--color-success);
+    }
+  }
+
+  .toast-icon {
+    @apply mt-0.5 size-4 shrink-0;
+    color: var(--toast-tone);
+  }
+
+  .toast-message {
+    @apply min-w-0 flex-1 text-xs/snug text-text;
+  }
+
+  .toast-dismiss {
+    @apply shrink-0 text-overlay1 hover:text-text;
+  }
+
+  .toggle {
+    @apply relative inline-flex cursor-pointer items-center gap-2;
+
+    &:where(:has(.toggle-input:disabled)) {
+      @apply cursor-not-allowed opacity-50;
+    }
+  }
+
+  .toggle-input {
+    @apply absolute size-0 opacity-0;
+  }
+
+  .toggle-track {
+    @apply relative inline-flex h-5 w-9 shrink-0 items-center border border-overlay0 bg-surface0 transition-colors;
+
+    &::before {
+      content: '';
+      @apply block size-3.5 translate-x-0.5 bg-subtext0 transition-transform;
+    }
+  }
+
+  :where(.toggle-input:checked) ~ .toggle-track {
+    @apply border-accent bg-accent;
+
+    &::before {
+      @apply translate-x-4 bg-on-accent;
+    }
+  }
+
+  :where(.toggle-input:focus-visible) ~ .toggle-track {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  .toggle-label {
+    @apply text-sm text-text;
+  }
+
+  /* Anchored to whichever element TooltipHost names --tooltip-anchor. */
+  .tooltip {
+    @apply pointer-events-none inset-auto m-1.5 max-w-xs overflow-visible border border-overlay0 bg-surface1 px-2 py-1 text-2xs text-text;
+    position-anchor: --tooltip-anchor;
+    position-try-fallbacks: flip-block, flip-inline;
+  }
+
+  .widget {
+    @apply flex w-full flex-col gap-3 border border-surface2 bg-surface0 p-4;
+  }
+
+  .widget-head {
+    @apply flex items-center gap-2;
+  }
+
+  .widget-title {
+    @apply min-w-0 flex-1;
+  }
+
+  /* The window a plate is looked at through: it clips whatever runs past its edge, and the plate inside it carries the transform. */
+  .zoom-pane {
+    @apply relative overflow-hidden select-none;
+    cursor: grab;
+  }
+
+  /* A picture is draggable of its own accord, and that native drag would take the pointer off the pan before it began. */
+  .zoom-plate :where(img, a) {
+    -webkit-user-drag: none;
+  }
+
+  :where(.zoom-pane[data-dragging]) {
+    cursor: grabbing;
+  }
+
+  :where(.zoom-pane:focus-visible) {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+
+  .zoom-plate {
+    @apply size-full;
+    transform-origin: 0 0;
+  }
+
+  .zoom-tools {
+    @apply absolute top-1 right-1 flex gap-1;
+  }
+
+  /* Last, so a disabled button keeps its muted look under the pointer whatever its variant's hover says. */
+  :where(button, a, [role='button']).shell:disabled,
+  .btn:disabled {
+    --shell-line: var(--color-surface2);
+    --shell-fill: var(--color-canvas);
+    color: var(--color-overlay1);
+    cursor: not-allowed;
+  }
+}
