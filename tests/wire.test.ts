@@ -133,6 +133,14 @@ describe('kay decodes devalue text', () => {
     expect(unflattenValue(JSON.parse(text), revivers)).toStrictEqual({ a: point, b: point })
   })
 
+  it('takes a forged sparse length of 2 ** 32 - 1 without allocating its slots', () => {
+    const decoded = decodeValue('[[-7,4294967295,4294967294,1],"last"]') as unknown[]
+
+    expect(decoded).toHaveLength(4294967295)
+    expect(decoded[4294967294]).toBe('last')
+    expect(Object.keys(decoded)).toEqual(['4294967294'])
+  })
+
   it('reads a top-level constant', () => {
     expect(unflattenValue(-1)).toBeUndefined()
     expect(unflattenValue(-3)).toBeNaN()

@@ -56,8 +56,8 @@ export function unflattenValue(flat: unknown, revivers: Record<string, Reviver> 
     if (!Array.isArray(raw)) {
       const object = keep(index, {})
 
-      for (const [key, item] of Object.entries(raw))
-        assign(object, key, read(item), index)
+      for (const key in raw)
+        assign(object, key, read((raw as Record<string, unknown>)[key]), index)
 
       return object
     }
@@ -70,9 +70,9 @@ export function unflattenValue(flat: unknown, revivers: Record<string, Reviver> 
       if (type !== SPARSE) {
         array.length = raw.length
 
-        for (const [at, item] of raw.entries()) {
-          if (item !== HOLE)
-            array[at] = read(item)
+        for (let at = 0; at < raw.length; at++) {
+          if (raw[at] !== HOLE)
+            array[at] = read(raw[at])
         }
 
         return array
