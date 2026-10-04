@@ -53,6 +53,11 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   }
 
   const { default: component } = await load()
+
+  // A page swap took it away while its chunk loaded: hydrated now, its effects would outlive it.
+  if (!element.isConnected)
+    return
+
   const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
   const early = takeEvents(element)
 

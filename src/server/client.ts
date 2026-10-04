@@ -213,7 +213,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   if (!build.success)
     throw new AggregateError(build.logs, 'kay: client build failed')
 
-  return { ...islandManifest(root, build.metafile!.outputs as Outputs, islands), navigation }
+  return { ...islandManifest(root, build.metafile!.outputs as Outputs, islands, entryFile), navigation }
 }
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders.
@@ -256,9 +256,10 @@ async function buildStyles(root: string, dir: string, pages: string[], libraries
   return styles
 }
 
-function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>): Omit<ClientManifest, 'styles'> {
+function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string): Omit<ClientManifest, 'styles'> {
   const idByFile = new Map([...islands].map(([id, file]) => [file, id]))
   const files = new Set(islands.values())
+  const entries = new Set([entry])
   // Every chunk a chunk needs before it can run, itself included.
   const closure = (output: string, seen = new Set<string>()): Set<string> => {
     if (seen.has(output))
@@ -285,6 +286,10 @@ function islandManifest(root: string, outputs: Outputs, islands: Map<string, str
 
       continue
     }
+
+    // Any other entry point is a chunk some code imports dynamically, loaded when it asks for it.
+    if (!entryFile(root, meta.entryPoint, entries))
+      continue
 
     manifest.entry = assetUrl(output)
     manifest.entryImports = [...closure(output)].filter(chunk => chunk !== output).map(assetUrl)

@@ -1,4 +1,6 @@
+import type { FetchedPage } from './swap'
 import { withBase, withoutBase } from './base'
+import { NAVIGATE_HEADER, prefetched, REDIRECT_HEADER } from './swap'
 import { checkForm } from './validate'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
@@ -16,13 +18,6 @@ export interface NavigateOptions {
   replace?: boolean
 }
 
-interface Fetched {
-  url: string
-  status: number
-  type: string
-  html: string
-}
-
 interface Swap {
   // `push` adds a history entry, `replace` takes the current one's place, `none` leaves history alone, as going back does.
   history: 'push' | 'replace' | 'none'
@@ -34,15 +29,18 @@ interface Swap {
   focus?: Element | null
 }
 
+// What the server answered a form the swap posted.
+interface Answer {
+  type: string
+  text: string
+  redirect: string | null
+}
+
 interface HistoryState {
   kay: true
   scroll: [number, number]
 }
 
-// Where a called action, or a form the swap posts, sends the browser, in place of `location`, which fetch and XMLHttpRequest would follow.
-export const REDIRECT_HEADER = 'x-kay-redirect'
-// Marks a request of the swap: a page it fetches, or a form it posts, which then reads where to go from `REDIRECT_HEADER` as a call does.
-export const NAVIGATE_HEADER = 'x-kay-navigate'
 const ISLAND = 'slot[data-component]'
 const PERSISTENT = 'slot[data-persist]'
 const PREFETCH_TTL_MS = 30_000
@@ -53,13 +51,19 @@ const ACTION_PATH = /^\/_kay\/action\//
 const HTML = /^text\/html\b/
 const SPECULATION = 'script[type="speculationrules"]'
 const SWAP_PATTERN = /\$kayAwait/
+const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
+const SCROLL_SAVE_MS = 150
+// Scripts the browser runs; any other type, such as `application/json` or `application/ld+json`, holds data of the page it came with.
+const RUNNABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/javascript', 'importmap'])
 
 type Eagerness = 'conservative' | 'moderate' | 'eager' | false
 
 let hooks: NavigationHooks | undefined
 let current = 0
 let eagerness: Eagerness = false
-const prefetched = new Map<string, { at: number, page: Promise<Fetched> }>()
+// The page shown, by URL without its hash: going back to an entry of the same page only scrolls.
+let shown = ''
+let scrollTimer: ReturnType<typeof setTimeout> | undefined
 const busyForms = new WeakSet<HTMLFormElement>()
 // A form handed back to the browser after the swap could not send it, which the next submit event lets through.
 const nativeSubmits = new WeakSet<HTMLFormElement>()
@@ -72,7 +76,14 @@ export function startNavigation(given: NavigationHooks): void {
   hooks = given
   eagerness = speculationEagerness()
 
-  if (!history.state?.kay)
+  shown = pageKey(new URL(location.href))
+
+  const saved = history.state as HistoryState | null
+
+  // An entry this script made before: a reload, or back from another site, where the browser no longer restores the scroll.
+  if (saved?.kay)
+    scrollTo(...saved.scroll)
+  else
     history.replaceState(state(), '')
 
   // The swap would never use what the browser prefetches for a full load, so it prefetches the same links itself.
@@ -83,6 +94,8 @@ export function startNavigation(given: NavigationHooks): void {
   document.addEventListener('click', onClick)
   document.addEventListener('submit', onSubmit)
   window.addEventListener('popstate', onPopState)
+  window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('pagehide', saveScroll)
 
   if (eagerness === 'conservative') {
     document.addEventListener('pointerdown', onPrefetchHint, { passive: true })
@@ -120,11 +133,23 @@ export async function refresh(): Promise<void> {
     return
   }
 
+  prefetched.clear()
   await go(new URL(location.href), { history: 'none', scroll: 'keep', refresh: true, focus: document.activeElement })
 }
 
 function state(): HistoryState {
   return { kay: true, scroll: [scrollX, scrollY] }
+}
+
+// The scroll position goes in the entry as it changes, a while after it stops, for going back and forward to restore it.
+function onScroll(): void {
+  clearTimeout(scrollTimer)
+  scrollTimer = setTimeout(saveScroll, SCROLL_SAVE_MS)
+}
+
+function saveScroll(): void {
+  clearTimeout(scrollTimer)
+  history.replaceState(state(), '')
 }
 
 // How eagerly the server's speculation rules prefetch, which the swap follows.
@@ -190,12 +215,17 @@ function onClick(event: MouseEvent): void {
 }
 
 function onPopState(event: PopStateEvent): void {
+  // A save pending would land on the entry just reached.
+  clearTimeout(scrollTimer)
+
   const saved = event.state as HistoryState | null
+  const url = new URL(location.href)
+  const swap: Swap = { history: 'none', scroll: saved?.kay ? saved.scroll : 'top' }
 
-  if (!saved?.kay)
-    return
-
-  void go(new URL(location.href), { history: 'none', scroll: saved.scroll })
+  if (pageKey(url) === shown)
+    restoreScroll(swap, url.hash)
+  else
+    void go(url, swap)
 }
 
 let hoverTimer: ReturnType<typeof setTimeout> | undefined
@@ -235,7 +265,7 @@ function prefetch(link: HTMLAnchorElement): void {
 }
 
 // A prefetch that fails is fetched again by the navigation that wants it.
-async function forgetFailed(key: string, page: Promise<Fetched>): Promise<void> {
+async function forgetFailed(key: string, page: Promise<FetchedPage>): Promise<void> {
   try {
     await page
   }
@@ -251,14 +281,22 @@ function pageKey(url: URL): string {
   return hash === -1 ? url.href : url.href.slice(0, hash)
 }
 
-async function fetchPage(url: URL): Promise<Fetched> {
+async function fetchPage(url: URL): Promise<FetchedPage> {
   const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1' } })
+  const type = response.headers.get('content-type') ?? ''
 
-  return { url: response.url, status: response.status, type: response.headers.get('content-type') ?? '', html: await response.text() }
+  // A file the browser loads itself once the swap gives up on it, so it is not read twice.
+  if (!HTML.test(type)) {
+    void response.body?.cancel()
+
+    return { url: response.url, type, html: '' }
+  }
+
+  return { url: response.url, type, html: await response.text() }
 }
 
 // The page a navigation shows: one prefetched in the last few seconds, else fetched now.
-async function pageFor(url: URL): Promise<Fetched> {
+async function pageFor(url: URL): Promise<FetchedPage> {
   const key = pageKey(url)
   const held = prefetched.get(key)
 
@@ -278,12 +316,12 @@ async function go(url: URL, swap: Swap): Promise<void> {
   const token = ++current
 
   if (swap.history !== 'none')
-    history.replaceState(state(), '')
+    saveScroll()
 
   document.documentElement.setAttribute('aria-busy', 'true')
 
   try {
-    let page: Fetched
+    let page: FetchedPage
 
     try {
       page = await pageFor(url)
@@ -297,7 +335,16 @@ async function go(url: URL, swap: Swap): Promise<void> {
     if (token !== current)
       return
 
-    await show(page, url.hash, swap)
+    try {
+      await show(page, url.hash, swap, () => token === current)
+    }
+    catch (error) {
+      // A page the swap could not put in place is loaded instead, as following the link would have.
+      console.error(error)
+
+      if (token === current)
+        leave(new URL(page.url), pageKey(new URL(location.href)) === pageKey(new URL(page.url)) ? { ...swap, history: 'none' } : swap)
+    }
   }
   finally {
     if (token === current)
@@ -306,7 +353,7 @@ async function go(url: URL, swap: Swap): Promise<void> {
 }
 
 // Puts a fetched page in place of this one; anything that is no page of this build, a file or an error answered as text, is loaded or shown as the browser would.
-async function show(page: Fetched, hash: string, swap: Swap): Promise<void> {
+async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () => boolean = () => true): Promise<void> {
   const target = new URL(page.url)
 
   target.hash = hash
@@ -330,8 +377,20 @@ async function show(page: Fetched, hash: string, swap: Swap): Promise<void> {
 
   applyStreamed(next)
 
-  const stylesheets = await mergeHead(next)
+  const head = mergeHead(next)
+
+  await head.loaded
+
+  // Another navigation started meanwhile and shows its own page; the head it merges drops what this one added.
+  if (!isCurrent())
+    return
+
   const commit = () => {
+    if (!isCurrent())
+      return
+
+    document.title = next.title
+    head.commit()
     swapBody(next, swap)
 
     if (swap.history === 'push')
@@ -339,12 +398,11 @@ async function show(page: Fetched, hash: string, swap: Swap): Promise<void> {
     else if (swap.history === 'replace')
       history.replaceState(state(), '', target)
 
+    shown = pageKey(target)
     restoreScroll(swap, hash)
     moveFocus(swap)
     hooks!.hydrate(document.body)
   }
-
-  await stylesheets
 
   if (viewTransitions() && !swap.refresh)
     await (document as Document & { startViewTransition: (update: () => void) => { finished: Promise<void> } }).startViewTransition(commit).finished
@@ -402,10 +460,8 @@ function applyStreamed(page: Document): void {
   }
 }
 
-// Leaves what both heads hold, drops what only this one holds and adds what only the next one does; resolves once new stylesheets loaded, so the page never shows unstyled.
-async function mergeHead(next: Document): Promise<void> {
-  document.title = next.title
-
+// Adds what only the next head holds now, and drops what only this one holds as the page is swapped: the page keeps its own styles until the next one's loaded.
+function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => void } {
   const keep = new Map<string, Element>()
 
   for (const element of document.head.children)
@@ -431,13 +487,20 @@ async function mergeHead(next: Document): Promise<void> {
     document.head.append(added)
   }
 
-  for (const [key, element] of keep) {
-    // A script ran already, and taking it out undoes nothing.
-    if (!wanted.has(key) && element.tagName !== 'SCRIPT' && element.tagName !== 'TITLE')
-      element.remove()
-  }
+  const stale = [...keep].filter(([key, element]) => !wanted.has(key) && element.tagName !== 'TITLE' && !ranAlready(element)).map(([, element]) => element)
 
-  await Promise.all(loading)
+  return {
+    loaded: Promise.all(loading),
+    commit: () => {
+      for (const element of stale)
+        element.remove()
+    },
+  }
+}
+
+// A script that ran stays, since taking it out undoes nothing; one holding data, such as the schemas of the page's forms, goes with its page.
+function ranAlready(element: Element): boolean {
+  return element instanceof HTMLScriptElement && RUNNABLE_TYPES.has(element.type.toLowerCase())
 }
 
 // A script a parser made never runs once moved into another document, so it is made again.
@@ -507,6 +570,16 @@ function swapBody(next: Document, swap: Swap): void {
   old.replaceWith(body)
 }
 
+// The element id a hash points at, kept as written when it is no valid escape, as `#100%` is.
+function fragment(hash: string): string {
+  try {
+    return decodeURIComponent(hash.slice(1))
+  }
+  catch {
+    return hash.slice(1)
+  }
+}
+
 function restoreScroll(swap: Swap, hash: string): void {
   if (swap.scroll === 'keep')
     return
@@ -517,7 +590,7 @@ function restoreScroll(swap: Swap, hash: string): void {
     return
   }
 
-  const anchor = hash === '' ? null : document.getElementById(decodeURIComponent(hash.slice(1)))
+  const anchor = hash === '' ? null : document.getElementById(fragment(hash))
 
   if (anchor)
     anchor.scrollIntoView()
@@ -624,10 +697,22 @@ function onSubmit(event: SubmitEvent): void {
   if (busyForms.has(form))
     return
 
-  if (!form.noValidate && !checkForm(form, withoutBase(url.pathname)))
+  if (!form.noValidate && !event.submitter?.hasAttribute('formnovalidate') && !passes(form, withoutBase(url.pathname)))
     return
 
   void send(form, event.submitter, url)
+}
+
+// A check that breaks, on a pattern the browser cannot read for one, leaves the form to the server rather than unsendable.
+function passes(form: HTMLFormElement, action: string): boolean {
+  try {
+    return checkForm(form, action)
+  }
+  catch (error) {
+    console.error(error)
+
+    return true
+  }
 }
 
 // Posts the form as the browser would, multipart unless it says otherwise, then shows the page the action sends the browser back to.
@@ -638,55 +723,83 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
 
   busyForms.add(form)
   form.setAttribute('aria-busy', 'true')
+  prefetched.clear()
+
+  let response: Answer
 
   try {
-    const response = await upload(url, multipart ? data : new URLSearchParams(data as unknown as Record<string, string>), form)
-    const location = response.redirect
-
-    if (location !== null) {
-      const next = new URL(location, window.location.href)
-
-      if (!swappable(next)) {
-        window.location.assign(next)
-
-        return
-      }
-
-      const same = next.pathname === window.location.pathname && next.search === window.location.search
-
-      await go(next, same ? { history: 'replace', scroll: 'keep', focus: focused } : { history: 'push', scroll: 'top' })
-
-      return
-    }
-
-    // An error page is shown as it came; a denial answered as text, as the browser shows text.
-    if (HTML.test(response.type)) {
-      await show({ url: window.location.href, status: response.status, type: response.type, html: response.text }, '', { history: 'none', scroll: 'top' })
-
-      return
-    }
-
-    hooks!.dispose(document.body)
-
-    const text = document.createElement('pre')
-
-    text.textContent = response.text
-    document.body.replaceChildren(text)
+    response = await upload(url, multipart ? data : urlEncoded(data), form)
   }
   catch {
     // The swap could not send it: the browser does, as it would have.
     nativeSubmits.add(form)
     form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : null)
+
+    return
   }
   finally {
     busyForms.delete(form)
     form.removeAttribute('aria-busy')
     form.style.removeProperty('--kay-progress')
   }
+
+  // Sent once: from here on a failure loads the page rather than posting again.
+  if (response.redirect !== null) {
+    const next = new URL(response.redirect, location.href)
+
+    if (!HTTP_PROTOCOLS.has(next.protocol))
+      return
+
+    if (!swappable(next)) {
+      location.assign(next)
+
+      return
+    }
+
+    const same = next.pathname === location.pathname && next.search === location.search
+
+    await go(next, same ? { history: 'replace', scroll: 'keep', focus: focused } : { history: 'push', scroll: 'top' })
+
+    return
+  }
+
+  // An error page is shown as it came; a denial answered as text, as the browser shows text.
+  if (HTML.test(response.type)) {
+    try {
+      await show({ url: location.href, type: response.type, html: response.text }, '', { history: 'none', scroll: 'top' })
+    }
+    catch (error) {
+      console.error(error)
+      showText(response.text)
+    }
+
+    return
+  }
+
+  showText(response.text)
+}
+
+function showText(text: string): void {
+  hooks!.dispose(document.body)
+
+  const pre = document.createElement('pre')
+
+  pre.textContent = text
+  document.body.replaceChildren(pre)
+}
+
+// What the browser posts for a form that is not multipart: a file goes as its name.
+function urlEncoded(data: FormData): URLSearchParams {
+  const body = new URLSearchParams()
+
+  for (const [name, value] of data)
+    body.append(name, typeof value === 'string' ? value : value.name)
+
+  return body
 }
 
 // XMLHttpRequest rather than fetch, for the upload's progress: `--kay-progress` on the form, and the value of each `progress` inside it, go from 0 to 1.
-async function upload(url: URL, body: FormData | URLSearchParams, form: HTMLFormElement): Promise<{ status: number, type: string, text: string, redirect: string | null }> {
+async function upload(url: URL, body: FormData | URLSearchParams, form: HTMLFormElement): Promise<Answer> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest()
 
@@ -705,8 +818,11 @@ async function upload(url: URL, body: FormData | URLSearchParams, form: HTMLForm
         bar.value = done
       }
     })
-    request.addEventListener('load', () => resolve({ status: request.status, type: request.getResponseHeader('content-type') ?? '', text: request.responseText, redirect: request.getResponseHeader(REDIRECT_HEADER) }))
-    request.addEventListener('error', () => reject(new Error('kay: the form could not be sent')))
+    request.addEventListener('load', () => resolve({ type: request.getResponseHeader('content-type') ?? '', text: request.responseText, redirect: request.getResponseHeader(REDIRECT_HEADER) }))
+
+    for (const failure of ['error', 'abort', 'timeout'])
+      request.addEventListener(failure, () => reject(new Error('kay: the form could not be sent')))
+
     request.send(body)
   })
 }

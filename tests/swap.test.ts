@@ -3,12 +3,19 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { t, ValidationError } from 'elysia'
+import { action } from '../src/runtime/action'
+import { hydrateIslands } from '../src/runtime/client'
+import { formInput } from '../src/runtime/form'
 import { child } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
 import { checkForm } from '../src/runtime/validate'
 import { servePages } from '../src/server/app'
+import { formsScript } from '../src/server/forms'
 
 const routes = 'tests/fixtures/navigation/src/routes'
+// The field an issue of the server's validation is about, as it reads it.
+const FIELD = /^\/([^/]*)/
 const FORMS = /<script type="application\/json" data-kay-forms>(.*?)<\/script>/
 const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(process.cwd(), '.kay', 'client', 'dist'), navigation: true }
 const app = await servePages(process.cwd(), { routes, security: false }, async () => client)
@@ -99,5 +106,71 @@ describe('page swap, checking a form in the browser', () => {
 
   it('leaves a form to the server when the page holds no schema for its action', () => {
     expect(checkForm(form('<input name="title" value="">', { properties: {}, required: [] }), '/other')).toBe(true)
+  })
+
+  it('refuses each field with the very message the server gives it', () => {
+    const schema = t.Object({
+      short: t.String({ minLength: 3 }),
+      long: t.String({ maxLength: 2 }),
+      word: t.String({ pattern: '^[a-z]+$' }),
+      mail: t.String({ format: 'email' }),
+      id: t.String({ format: 'uuid' }),
+      count: t.Integer({ minimum: 1 }),
+      amount: t.Numeric({ exclusiveMaximum: 10 }),
+      ratio: t.Number({ maximum: 1 }),
+      kind: t.Literal('a'),
+      tags: t.Array(t.String({ minLength: 2, error: 'Tag too short' })),
+      sizes: t.Array(t.Integer(), { minItems: 3 }),
+      named: t.String({ minLength: 5, error: 'Five letters at least' }),
+    })
+    const posted: [string, string][] = [['short', 'ab'], ['long', 'abc'], ['word', 'A1'], ['mail', 'nope'], ['id', '123'], ['count', '1.5'], ['amount', '10'], ['ratio', 'x'], ['kind', 'b'], ['tags', 'ok'], ['tags', 'x'], ['sizes', '1'], ['named', 'abc']]
+    const submitted = action(schema, () => undefined)
+
+    ;(submitted as { url: string }).url = '/act'
+    document.head.innerHTML = formsScript(new Set([submitted]))
+    document.body.innerHTML = `<form>${posted.map(([name, value]) => `<input name="${name}" value="${value}">`).join('')}</form>`
+
+    const element = document.querySelector('form')!
+    const body: Record<string, unknown> = {}
+
+    for (const [name, value] of posted)
+      body[name] = name in body ? [body[name]].flat().concat(value) : value
+
+    const server: Record<string, string> = {}
+
+    for (const issue of new ValidationError('body', schema, formInput(schema, body)).all) {
+      const field = 'path' in issue ? FIELD.exec(issue.path)?.[1] ?? '' : ''
+      const custom = 'schema' in issue ? (issue.schema as { error?: unknown }).error : undefined
+
+      server[field] ??= typeof custom === 'string' ? custom : issue.summary!
+    }
+
+    expect(checkForm(element, '/act')).toBe(false)
+    expect(Object.keys(server).sort()).toEqual([...new Set(posted.map(([name]) => name))].sort())
+
+    for (const name of Object.keys(server))
+      expect([name, element.querySelector<HTMLInputElement>(`input[name="${name}"]`)!.validationMessage]).toEqual([name, server[name]!])
+  })
+
+  it('leaves alone an island a swap took away while its chunk loaded', async () => {
+    let rendered = false
+    let release!: () => void
+    const loaded = new Promise<void>(resolve => (release = resolve))
+
+    document.body.innerHTML = '<slot data-component="late.kay" data-props="[{}]"></slot>'
+
+    const hydrating = hydrateIslands({
+      'late.kay': async () => {
+        await loaded
+
+        return { default: () => (rendered = true) }
+      },
+    })
+
+    document.body.innerHTML = ''
+    release()
+    await hydrating
+
+    expect(rendered).toBe(false)
   })
 })

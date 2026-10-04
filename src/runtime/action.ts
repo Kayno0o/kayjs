@@ -3,8 +3,8 @@ import type { Static, TSchema } from 'elysia'
 import type { Locals, Redirect } from './checks'
 import type { Locale } from './i18n'
 import { withBase } from './base'
-import { navigate, REDIRECT_HEADER } from './navigate'
 import { createSignal, untrack } from './reactive'
+import { prefetched, REDIRECT_HEADER } from './swap'
 import { decodeValue, encodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
@@ -224,7 +224,11 @@ function callable(url: () => string): { call: (input: never) => Promise<unknown>
 }
 
 async function post<Output>(url: string, input: unknown): Promise<Output> {
-  return readActionResponse(await fetch(withBase(url), { method: 'POST', ...encodeCall(input) }))
+  const response = await fetch(withBase(url), { method: 'POST', ...encodeCall(input) })
+
+  prefetched.clear()
+
+  return readActionResponse(response)
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
@@ -278,7 +282,7 @@ export async function readActionResponse<Output>(response: Response): Promise<Ou
       throw new TypeError(`kay: the action redirected to ${JSON.stringify(target)}, which is no page`)
 
     // The page goes away, so whatever awaited the call never resumes.
-    void navigate(target)
+    void goTo(target)
 
     return new Promise<never>(() => undefined)
   }
@@ -292,4 +296,11 @@ export async function readActionResponse<Output>(response: Response): Promise<Ou
   }
 
   return (body === '' ? undefined : decodeValue(body)) as Output
+}
+
+// Imported when needed: an island calling actions on a site with `navigation: false` ships none of the swap.
+async function goTo(target: string): Promise<void> {
+  const { navigate } = await import('./navigate')
+
+  await navigate(target)
 }

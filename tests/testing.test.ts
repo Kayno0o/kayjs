@@ -125,6 +125,8 @@ describe('kay/test', () => {
 
     try {
       void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }))
+      // The swap is imported first, which takes a tick.
+      await Bun.sleep(10)
       expect(window.location.href).toBe('http://localhost/about')
       await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': 'javascript:alert(1)' } }))).rejects.toThrow('which is no page')
       expect(window.location.href).toBe('http://localhost/about')

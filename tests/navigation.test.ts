@@ -148,6 +148,7 @@ describe.skipIf(!browserInstalled)('page swap in Chromium', () => {
   it('restores where the page was scrolled to when going back', async () => {
     await page.goto(origin)
     await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
       scrollTo(0, 1500)
       document.querySelector<HTMLElement>('a.second')!.click()
     })
@@ -155,10 +156,43 @@ describe.skipIf(!browserInstalled)('page swap in Chromium', () => {
 
     expect(await page.evaluate(() => scrollY)).toBe(0)
 
+    await page.evaluate(() => scrollTo(0, 700))
+    await Bun.sleep(300)
     await page.goBack()
     await page.locator('h1', { hasText: 'Home' }).waitFor()
 
     expect(await page.evaluate(() => scrollY)).toBe(1500)
+
+    await page.goForward()
+    await page.locator('h1', { hasText: 'Second' }).waitFor()
+
+    expect(await page.evaluate(() => scrollY)).toBe(700)
+    expect(await sameDocument()).toBe(true)
+
+    await page.reload()
+    await page.locator('h1', { hasText: 'Second' }).waitFor()
+    await page.waitForFunction(() => scrollY === 700)
+  })
+
+  it('goes back to a jump within the page by scrolling, the page left as it is', async () => {
+    await page.goto(origin)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+      const link = document.createElement('a')
+
+      link.href = '#end'
+      link.className = 'jump'
+      document.querySelector('div[style]')!.id = 'end'
+      document.body.append(link)
+      link.click()
+    })
+    await page.waitForFunction(() => scrollY > 0)
+    await page.click('button.player')
+    await page.goBack()
+    await page.waitForFunction(() => scrollY === 0)
+
+    expect(await sameDocument()).toBe(true)
+    expect(await page.textContent('button.player')).toBe('Played 1')
   })
 
   it('still works without JavaScript, as full page loads', async () => {

@@ -7,6 +7,9 @@ export const bump = action(t.Object({}), () => {
   store.bumps++
 })
 
+// A form on the page the swap leaves, whose schema must not stand in for the next page's.
+export const note = action(t.Object({ text: t.String({ maxLength: 5 }) }), () => undefined)
+
 const bumps = store.bumps
 ---
 ---
@@ -17,4 +20,7 @@ head
 h1 Home
 p.bumps Bumped {bumps}
 Bump
+form(action={note})
+  input(name="text")
+  button.note Note
 div(style="height: 3000px")

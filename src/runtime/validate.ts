@@ -57,7 +57,8 @@ export function checkForm(form: HTMLFormElement, action: string): boolean {
   for (const [name, field] of Object.entries(rules.properties)) {
     const control = controlOf(form, name)
 
-    if (!control || (control instanceof HTMLInputElement && control.type === 'file'))
+    // A file is checked by its bytes, and a hidden field's message would show nowhere: both are the server's.
+    if (!control || (control instanceof HTMLInputElement && (control.type === 'file' || control.type === 'hidden')))
       continue
 
     const value = fields[name]
@@ -98,7 +99,11 @@ function controlOf(form: HTMLFormElement, name: string): HTMLInputElement | HTML
 function fieldMessage(name: string, field: FieldRules, value: unknown): string | undefined {
   const message = refusal(name, field, value)
 
-  return message === undefined ? undefined : field.error ?? message
+  if (message !== undefined)
+    return field.error ?? message
+
+  // An item is named by its index, as the server names it, and refused with its own `error`.
+  return field.items && Array.isArray(value) ? value.map((item, index) => fieldMessage(`${name}.${index}`, field.items!, item)).find(found => found !== undefined) : undefined
 }
 
 function refusal(name: string, field: FieldRules, value: unknown): string | undefined {
@@ -106,7 +111,7 @@ function refusal(name: string, field: FieldRules, value: unknown): string | unde
     return field.anyOf.some(member => refusal(name, member, value) === undefined) && bounds(field, value) === undefined ? undefined : `Property '${name}' should be one of: ${field.anyOf.map(member => `'${member.format ?? member.type}'`).join(', ')}`
 
   if (field.const !== undefined)
-    return value === field.const ? undefined : `Expected ${JSON.stringify(field.const)}`
+    return value === field.const ? undefined : `Expected ${typeof field.const === 'string' ? `'${field.const}'` : String(field.const)}`
 
   switch (field.type) {
     case 'string':
