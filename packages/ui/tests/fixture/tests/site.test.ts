@@ -52,3 +52,7 @@ describe('Button', () => {
 test('IconButton names its action for screen readers and as its tooltip', async () => {
   expect(await element('/buttons', 'delete')).toMatch(/^<button id="delete" type="button" aria-label="Delete" data-tooltip="Delete" data-size="sm" data-variant="danger" class="icon-btn shell shell-danger">/)
 })
+
+test('Toaster is an island rendering an empty manual popover, filled in the browser only', async () => {
+  expect(await element('/buttons', 'toasts')).toMatch(/^<div id="toasts"><slot data-component="[^"]*\/toaster\.kay"[^>]*><div class="toaster" popover="manual"><\/div>/)
+})

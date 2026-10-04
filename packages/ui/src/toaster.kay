@@ -1,0 +1,32 @@
+---
+import type { IconSlot } from './defaults'
+import type { ToastType } from './toast'
+import { effect } from 'kay'
+import Icon from './icon.kay'
+import IconButton from './icon-button.kay'
+import { dismissToast, toasts } from './toast'
+
+const ICONS: Record<ToastType, IconSlot> = { error: 'alert', success: 'success', info: 'info' }
+
+let toaster: HTMLElement | undefined
+
+// A manual popover lives in the top layer, and showing it again lifts it above any dialog opened since.
+effect(() => {
+  const shown = toasts().length > 0
+
+  if (!toaster)
+    return
+
+  if (toaster.matches(':popover-open'))
+    toaster.hidePopover()
+
+  if (shown)
+    toaster.showPopover()
+})
+---
+.toaster(ref={element => toaster = element} popover="manual")
+  for item of toasts() key={item.id}
+    .toast(role={item.type === 'error' ? 'alert' : 'status'} data-type={item.type})
+      Icon(icon={ICONS[item.type]} class="toast-icon")
+      p.toast-message {item.message}
+      IconButton(icon="close" label="Dismiss notification" size="sm" variant="inline" class="toast-dismiss" onClick={() => dismissToast(item.id)})
