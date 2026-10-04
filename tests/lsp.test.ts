@@ -367,6 +367,45 @@ describe('kay lsp following files on disk', () => {
   })
 })
 
+// An editor opened on a folder holding several projects, each with its own tsconfig.json, as a monorepo is.
+describe('kay lsp in a project nested in the workspace', () => {
+  let editor: Editor
+  let dir: string
+  const page = 'apps/web/src/pages/[id].kay'
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'kay-nested-'))
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ include: ['src'] })),
+      Bun.write(join(dir, 'src/home.kay'), 'p Home\n'),
+      Bun.write(join(dir, 'shared/data.ts'), 'export const label: string = \'Item \'\n'),
+      Bun.write(join(dir, 'apps/web/tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, 'apps/web/kay.config.ts'), 'export default { routes: \'src/pages\' }\n'),
+      Bun.write(join(dir, 'apps/web/src/counter.kay'), '---\nconst { start } = props<{ start: number }>()\n---\np {start}\n'),
+      Bun.write(join(dir, page), '--- server\nimport { label } from \'../../../../shared/data\'\n\nconst id: string = ctx.params.id\nconst title = label + id\n---\n---\nimport Counter from \'../counter.kay\'\n---\nh1 {title}\nCounter(start={0})\n'),
+    ])
+    await mkdir(join(dir, 'node_modules'))
+    await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
+    editor = new Editor(dir)
+    await editor.start()
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('checks a .kay file against its own project\'s tsconfig, routes and kay environment', async () => {
+    expect(await editor.open(page)).toEqual([])
+  })
+
+  it('keeps a nested project\'s shadow files out of the workspace folder\'s', async () => {
+    expect(await Bun.file(join(dir, 'apps/web/.kay/types/src/pages/[id].kay.tsx')).exists()).toBe(true)
+    expect(await Bun.file(join(dir, '.kay/types/src/home.kay.tsx')).exists()).toBe(true)
+    expect(await Bun.file(join(dir, '.kay/types/apps/web/src/pages/[id].kay.tsx')).exists()).toBe(false)
+  })
+})
+
 // VS Code writes a project's path with more percent-escapes than Node does, and tsgo echoes URIs the VS Code way.
 describe('kay lsp in a path VS Code percent-encodes', () => {
   let editor: Editor

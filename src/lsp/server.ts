@@ -3,9 +3,11 @@ import type { CheckOptions, ShadowFile } from '../check'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { KayConfig } from '../config'
 import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
-import { resolve } from 'node:path'
+import { existsSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { findKayFiles, TSCONFIG } from '../build/files'
 import { compileShadow, SHADOW_DIR, shadowPath, TSGO, writeShadowTypes } from '../check'
 import { formatKay } from '../compiler/format'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -18,6 +20,16 @@ import { Connection } from './rpc'
 interface Target {
   uri: string
   shadow?: ShadowFile
+}
+
+// A folder holding a tsconfig.json: its .kay files compile against its own routes and config, into its own shadow tree.
+interface Project {
+  root: string
+  options: CheckOptions
+  routesDir: string
+  shadowTree: string
+  shadowFiles: Set<string>
+  configured: boolean
 }
 
 interface Document extends ShadowFile {
@@ -54,12 +66,10 @@ const MAX_HOPS = 16
 // Serves .kay files by compiling each to its shadow TSX, forwarding requests to tsgo's language server and mapping positions both ways.
 export class KayLanguageServer {
   private root = ''
-  private routesDir = ''
-  private shadowOptions: CheckOptions = {}
-  private shadowTree = ''
+  private routesSetting?: string
   private nodeUris = false
   private watchesFiles = false
-  private shadowFiles = new Set<string>()
+  private readonly projects = new Map<string, Project>()
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
   private diagnosticsTimer?: Timer
@@ -102,17 +112,11 @@ export class KayLanguageServer {
     const rootUri = params.rootUri ?? params.workspaceFolders?.[0]?.uri
 
     this.root = rootUri ? resolve(fileURLToPath(rootUri)) : resolve(params.rootPath ?? process.cwd())
-
-    const config = await projectConfig(this.root)
-
-    // The editor's setting wins over the project's `kay.config.ts`, as `pages()` options do.
-    this.shadowOptions = { routes: params.initializationOptions?.routes ?? config.routes, publicDir: config.publicDir }
-    this.routesDir = resolve(this.root, this.shadowOptions.routes ?? 'src/routes')
-    this.shadowTree = `${resolve(this.root, SHADOW_DIR)}/`
+    this.routesSetting = params.initializationOptions?.routes
     // A client that writes URIs the way Node does keeps getting them that way, any other the way VS Code does.
     this.nodeUris = rootUri !== undefined && rootUri !== vscodeUri(this.root) && rootUri === pathToFileURL(this.root).href
 
-    this.shadowFiles = new Set((await writeShadowTypes(this.root, this.shadowOptions)).files.keys())
+    await this.writeShadows()
     this.watchesFiles = (params.capabilities.workspace as { didChangeWatchedFiles?: { dynamicRegistration?: boolean } } | undefined)?.didChangeWatchedFiles?.dynamicRegistration === true
 
     const child = Bun.spawn([process.execPath, TSGO, '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
@@ -157,7 +161,7 @@ export class KayLanguageServer {
 
   // A .kay file changing on disk rewrites the shadow tree; any other file goes to tsgo as is. The shadow tree is this server's own to report.
   private async filesChanged(changes: FileEvent[]) {
-    const others = changes.flatMap(change => change.uri.startsWith('file:') && !KAY_FILE.test(change.uri) && !fileURLToPath(change.uri).startsWith(this.shadowTree) ? [{ uri: pathToFileURL(fileURLToPath(change.uri)).href, type: change.type }] : [])
+    const others = changes.flatMap(change => change.uri.startsWith('file:') && !KAY_FILE.test(change.uri) && !this.shadowProject(fileURLToPath(change.uri)) ? [{ uri: pathToFileURL(fileURLToPath(change.uri)).href, type: change.type }] : [])
 
     if (others.length > 0)
       this.server.notify('workspace/didChangeWatchedFiles', { changes: others })
@@ -204,23 +208,69 @@ export class KayLanguageServer {
 
   // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code; tsgo hears which shadow files came and went, so imports of them resolve again.
   private async saved() {
-    const files = new Set((await writeShadowTypes(this.root, this.shadowOptions)).files.keys())
-    const changes = [
-      ...[...files].map(path => ({ uri: pathToFileURL(path).href, type: this.shadowFiles.has(path) ? CHANGED : CREATED })),
-      ...[...this.shadowFiles].filter(path => !files.has(path)).map(path => ({ uri: pathToFileURL(path).href, type: DELETED })),
-      { uri: pathToFileURL(resolve(this.root, SHADOW_DIR, 'kay-env.d.ts')).href, type: CHANGED },
-    ]
-
-    this.shadowFiles = files
-
-    this.server.notify('workspace/didChangeWatchedFiles', { changes })
+    this.server.notify('workspace/didChangeWatchedFiles', { changes: await this.writeShadows() })
     this.scheduleDiagnostics()
+  }
+
+  // Writes the shadow tree of every project holding a .kay file, and returns the shadow files that came, changed and went.
+  private async writeShadows(): Promise<FileEvent[]> {
+    const roots = new Set((await findKayFiles(this.root, { project: true })).map(file => projectRoot(this.root, file)))
+    const changes: FileEvent[] = []
+
+    for (const [root, project] of this.projects) {
+      if (!roots.has(root)) {
+        changes.push(...[...project.shadowFiles].map((path): FileEvent => ({ uri: pathToFileURL(path).href, type: DELETED })))
+        this.projects.delete(root)
+      }
+    }
+
+    await Promise.all([...roots].map(async (root) => {
+      const project = this.projectAt(root)
+
+      if (!project.configured)
+        await this.configure(project)
+
+      const files = new Set((await writeShadowTypes(root, project.options)).files.keys())
+
+      changes.push(
+        ...[...files].map((path): FileEvent => ({ uri: pathToFileURL(path).href, type: project.shadowFiles.has(path) ? CHANGED : CREATED })),
+        ...[...project.shadowFiles].filter(path => !files.has(path)).map((path): FileEvent => ({ uri: pathToFileURL(path).href, type: DELETED })),
+        { uri: pathToFileURL(join(project.shadowTree, 'kay-env.d.ts')).href, type: CHANGED },
+      )
+      project.shadowFiles = files
+    }))
+
+    return changes
+  }
+
+  // The editor's setting wins over the project's `kay.config.ts`, as `pages()` options do; it names the workspace folder's pages, so only that project takes it.
+  private async configure(project: Project) {
+    const config = await projectConfig(project.root)
+
+    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, publicDir: config.publicDir }
+    project.routesDir = resolve(project.root, project.options.routes ?? 'src/routes')
+    project.configured = true
+  }
+
+  // A project first met here compiles with the defaults until the next save reads its config.
+  private projectAt(root: string): Project {
+    let project = this.projects.get(root)
+
+    if (!project)
+      this.projects.set(root, project = { root, options: {}, routesDir: resolve(root, 'src/routes'), shadowTree: `${resolve(root, SHADOW_DIR)}/`, shadowFiles: new Set(), configured: false })
+
+    return project
+  }
+
+  private shadowProject(path: string): Project | undefined {
+    return [...this.projects.values()].find(project => path.startsWith(project.shadowTree))
   }
 
   private compile(uri: string, source: string, version: number): Document {
     const file = fileURLToPath(uri)
-    const { shadow, diagnostics } = compileShadow(this.root, this.routesDir, file, source)
-    const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(this.root, file)).href, version, diagnostics }
+    const project = this.projectAt(projectRoot(this.root, file))
+    const { shadow, diagnostics } = compileShadow(project.root, project.routesDir, file, source)
+    const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics }
 
     this.documents.set(uri, document)
 
@@ -543,7 +593,7 @@ export class KayLanguageServer {
     if (shadow)
       return { uri: this.clientUri(shadow.file), shadow }
 
-    return filePath(uri).startsWith(this.shadowTree) ? undefined : { uri: this.clientUri(filePath(uri)) }
+    return this.shadowProject(filePath(uri)) ? undefined : { uri: this.clientUri(filePath(uri)) }
   }
 
   private async shadowOf(uri: string): Promise<ShadowFile | undefined> {
@@ -553,15 +603,15 @@ export class KayLanguageServer {
     if (open)
       return open
 
-    const prefix = this.shadowTree
+    const project = this.shadowProject(path)
 
-    if (!path.startsWith(prefix) || !path.endsWith('.kay.tsx'))
+    if (!project || !path.endsWith('.kay.tsx'))
       return undefined
 
-    const file = resolve(this.root, path.slice(prefix.length, -'.tsx'.length))
+    const file = resolve(project.root, path.slice(project.shadowTree.length, -'.tsx'.length))
     const source = Bun.file(file)
 
-    return await source.exists() ? compileShadow(this.root, this.routesDir, file, await source.text()).shadow : undefined
+    return await source.exists() ? compileShadow(project.root, project.routesDir, file, await source.text()).shadow : undefined
   }
 
   // `offset` is the position in the .kay source.
@@ -596,6 +646,16 @@ async function projectConfig(root: string): Promise<KayConfig> {
 
     return {}
   }
+}
+
+// The nearest folder above `file` holding a tsconfig.json, within the workspace; the workspace folder itself otherwise.
+function projectRoot(workspace: string, file: string): string {
+  for (let dir = dirname(file); dir.startsWith(`${workspace}/`); dir = dirname(dir)) {
+    if (existsSync(join(dir, TSCONFIG)))
+      return dir
+  }
+
+  return workspace
 }
 
 // Runs until the editor closes the stream.

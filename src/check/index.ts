@@ -47,7 +47,7 @@ const ASSET_TYPES = ['declare module \'*.css\' {}\n', ...ASSET_EXTENSIONS.flatMa
 
 export const TSGO = join(dirname(fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))), 'bin', 'tsgo')
 
-// Compiles every .kay file under `root` to `.kay/types/<path>.kay.tsx`, the tree tsconfig `rootDirs` merges with the sources.
+// Compiles every .kay file of the project at `root`, nested projects left to their own, to `.kay/types/<path>.kay.tsx`, the tree tsconfig `rootDirs` merges with the sources.
 export async function writeShadowTypes(projectRoot: string, options: CheckOptions = {}): Promise<{ files: Map<string, ShadowFile>, diagnostics: CheckDiagnostic[] }> {
   const root = resolve(projectRoot)
   const files = new Map<string, ShadowFile>()
@@ -57,7 +57,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const environmentPath = join(root, SHADOW_DIR, 'kay-env.d.ts')
   const assetsPath = join(root, SHADOW_DIR, 'kay-assets.d.ts')
 
-  for (const file of await findKayFiles(root, { project: true })) {
+  for (const file of await findKayFiles(root, { project: true, ownOnly: true })) {
     const source = await Bun.file(file).text()
     const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source)
     const path = shadowPath(root, file)
