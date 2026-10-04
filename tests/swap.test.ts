@@ -2,16 +2,20 @@ import type { ClientBuild } from '../src/server/client'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t, ValidationError } from 'elysia'
+import { context } from '../src/runtime'
 import { action } from '../src/runtime/action'
 import { hydrateIslands } from '../src/runtime/client'
 import { formInput } from '../src/runtime/form'
-import { child } from '../src/runtime/html'
+import { child, component } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
 import { checkForm } from '../src/runtime/validate'
+import { encodeValue } from '../src/runtime/wire'
 import { servePages } from '../src/server/app'
+import { BrowserError } from '../src/server/errors'
 import { formsScript } from '../src/server/forms'
+import { renderStatic } from '../src/server/stream'
 
 const routes = 'tests/fixtures/navigation/src/routes'
 // The field an issue of the server's validation is about, as it reads it.
@@ -48,6 +52,72 @@ describe('page swap, on the server', () => {
     expect(response.status).toBe(303)
     expect(response.headers.get('location')).toBeNull()
     expect(response.headers.get('x-kay-redirect')).toBe('http://localhost/second')
+  })
+
+  it('renders one state for the islands of a page, kept per request, a persisted one read from the request\'s cookie', async () => {
+    expect(await html('/state')).toContain('<p class="total">Total <!--[-->5<!--]--></p>')
+    expect(await html('/alone')).toContain('<p class="total">Total <!--[-->0<!--]--></p>')
+    expect(await html('/alone')).toContain('Theme <!--[-->light<!--]-->')
+
+    const dark = await app.handle(new Request('http://localhost/alone', { headers: { cookie: `theme=${encodeURIComponent(encodeValue('dark'))}` } }))
+
+    expect(await dark.text()).toContain('Theme <!--[-->dark<!--]-->')
+    expect(await html('/alone')).toContain('Theme <!--[-->light<!--]-->')
+  })
+
+  it('renders a try block\'s catch block when it throws, the error reported, marked for hydration to keep', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const caught: unknown[] = []
+    const reporting = await servePages(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }, async () => client)
+    const page = await (await reporting.handle(new Request('http://localhost/fallback'))).text()
+
+    logged.mockRestore()
+
+    expect(page).toContain('<!--kay-failed--><p class="unavailable">Unavailable</p>')
+    expect(page).toContain('<p class="fragile">Fine</p>')
+    expect(caught.map(error => (error as Error).message)).toEqual(['Broken on the server'])
+  })
+
+  it('hands what a browser reports to onError, refusing another site\'s, a malformed one and a flood', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const caught: unknown[] = []
+    const reporting = await servePages(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }, async () => client)
+    const report = async (body: string, headers: Record<string, string> = {}) => (await reporting.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body }))).status
+    const sent = JSON.stringify({ name: 'TypeError', message: 'x is undefined', stack: 'TypeError: x is undefined\n    at chunk.js:1:2', url: 'http://localhost/fallback' })
+
+    expect(await report(sent, { origin: 'http://localhost' })).toBe(204)
+    expect(caught).toHaveLength(1)
+    expect(caught[0]).toBeInstanceOf(BrowserError)
+    expect(caught[0]).toMatchObject({ kind: 'TypeError', message: 'x is undefined', url: 'http://localhost/fallback' })
+    expect(await report(sent, { origin: 'https://evil.example' })).toBe(403)
+    expect(await report('{"message":1}')).toBe(400)
+
+    const statuses = await Promise.all(Array.from({ length: 25 }, async () => report(sent)))
+
+    expect(statuses).toContain(429)
+    logged.mockRestore()
+  })
+
+  it('hands what a component provides to what it renders, and to nothing beside it', async () => {
+    const page = await html('/tone')
+
+    expect(page).toContain('<section class="box"><!--[--><p class="tone">loud</p><!--]-->')
+    expect(page).toMatch(/<\/slot><p class="tone">plain<\/p>/)
+  })
+
+  it('lets a layout provide to its page, and a component to what it renders only', () => {
+    const Tone = context('plain')
+    const Label = () => ({ t: Tone.use() })
+    const Layout = (props: { children: unknown }) => {
+      Tone.provide('layout')
+
+      return { t: child(props.children) }
+    }
+    const markup = renderStatic(() => [component(Layout, { get children() {
+      return component(Label, {})
+    } }), component(Label, {})]).html
+
+    expect(markup).toBe('layoutplain')
   })
 
   it('marks an island kept across navigations, under its component or a key of its own', () => {

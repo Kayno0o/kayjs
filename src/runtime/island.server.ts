@@ -4,7 +4,7 @@ import type { JSX } from './jsx'
 import { omit } from './dom'
 import { escapeAttribute } from './escape'
 import { child } from './html'
-import { renderOnServer } from './reactive'
+import { renderOnServer, scope } from './reactive'
 import { encodeValue, unsendable } from './wire'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
@@ -76,7 +76,8 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     }
 
     try {
-      const html = browserOnly ? '' : renderOnServer(() => child(component!(own)))
+      // Detached, as in the browser, where an island reads nothing the page's components provide.
+      const html = browserOnly ? '' : renderOnServer(() => scope(() => child(component!(own)), true))
       const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
       const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props="${escapeAttribute(serialized)}"${lazy}${browserOnly ? ' data-client' : ''}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}>${html}</slot>` }
 

@@ -34,6 +34,9 @@
       "include": "#await-branch"
     },
     {
+      "include": "#try"
+    },
+    {
       "include": "#element"
     }
   ],
@@ -214,6 +217,14 @@
         },
         "4": {
           "name": "variable.other.readwrite.alias.kay"
+        }
+      }
+    },
+    "try": {
+      "match": "^[ \\t]*(try)[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.trycatch.kay"
         }
       }
     },

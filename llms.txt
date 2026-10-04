@@ -92,6 +92,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `@name(a, b)` | The same, as a function of its parameters the component calls. |
 | `head` | At the top level: its `title`, `meta`, `link`, `style`, `script` and `base` children go in the document head. |
 | `await value` / `then name` / `catch error` | Renders the indented block under `await` until `value` settles; see Streaming. |
+| `try` / `catch error` | Renders the `catch` block instead when the `try` block throws; see Error fallbacks. |
 
 ```kay
 ---
@@ -363,6 +364,44 @@ Props a static component passes to an island are serialized for the browser: pla
 
 An island hydrates as soon as the page loads, its chunks preloaded. `hydrate="idle"` waits until the browser is idle and `hydrate="visible"` until it scrolls near the viewport, neither preloaded: `Comments(postId={post.id} hydrate="visible")`. Only an island takes `hydrate`, and only from a static parent.
 
+### Shared and persisted state
+
+A signal a `.ts` module exports is one state for every island of the page that imports it: `export const cart = signal<Item[]>([])` in `src/cart.ts`, read by a header badge and written by a product's button.
+
+- On the server a module outlives the request, so a value an island's script writes to such a signal while it renders, as `cart.set(items)` seeding it from props, holds for that request only, and every island rendered after it reads it. A module's `memo` is computed afresh on each read there.
+- `signal('light', { persist: 'theme' })` keeps its value across pages and visits in a cookie named `theme`, which the server reads too, so a page rendered for the request shows the kept value from the first paint. A page `kay build` prerendered, or `cached` HTML, renders the default, and the island corrects it as it hydrates.
+- `{ persist: 'draft', storage: 'local' }` keeps it in localStorage instead, which the server never sees: the page renders the default and the kept value applies once the islands reading it have hydrated, so it suits what the first paint does not show.
+- A persisted value crosses as island props do, Dates, Maps and Sets included. A cookie value over about 3.8 KB encoded is not kept, with a warning; one written by another version of the app, or by hand, that does not decode leaves the default. The cookie is `SameSite=Lax`, for the site's mount point, kept a year, and `Secure` over https.
+
+### Error fallbacks
+
+A `try` block renders its `catch` block instead when what it renders throws, so one broken widget does not take the page down:
+
+```kay
+try
+  Chart(points={points})
+catch error
+  p.error The chart could not be drawn: {(error as Error).message}
+```
+
+- It works in any template. On the server, a block that throws renders `catch`, and the error goes to the log and `onError` like any render error, the page answering 200. Without `try`, a render error fails the page as before.
+- In an island, a block that throws while it hydrates, or later as a signal it reads changes, renders `catch` in its place, its effects disposed. The error is logged and sent to the server, where `onError` gets it as a `BrowserError` from `kay/server`, with `kind`, the error's own name such as `TypeError`, `message`, `stack` and the page's `url`. A block the server rendered `catch` for keeps that markup as it came, since the error stayed on the server.
+- `catch` takes the error under a name or none, typed `unknown`. A `try` without `catch` renders nothing when it throws.
+- An error no `try` catches in the browser, from an effect, a handler or a promise nobody awaited, is reported the same way; an island whose script throws as it hydrates keeps its server markup, lifeless. The browser sends at most 10 distinct errors per page, and the server takes 20 reports a minute per client, refusing another site's and any over 16 KB.
+
+### Context
+
+`context(defaultValue)` makes a value a component hands everything it renders, however deep, without passing it through each one's props:
+
+```ts
+// src/theme.ts
+import { context } from 'kay'
+
+export const Theme = context<'light' | 'dark'>('light')
+```
+
+A component's script calls `Theme.provide('dark')`, and any component it renders, its children and their blocks included, reads `Theme.use()`; a component beside it, or above, reads the nearest value provided above itself, else the default. Provide a signal to share a value that changes. A layout's provide reaches its page. An island reads nothing the page's static components provide, in the browser as on the server, since it hydrates on its own: provide inside the island.
+
 ### Browser-only components
 
 Some components cannot render on the server: a package that touches `window` as it loads, such as CodeMirror or hls.js, or code reading `localStorage` while rendering. Such a component renders in the browser only: the server sends its island as an empty `<slot>`, props included, and the browser renders it there as soon as the page loads, instead of hydrating it. Inside another island it renders nothing on the server and is built in place as its parent hydrates.
@@ -469,7 +508,7 @@ h1 {todo.title}
 p.status {todo.done ? 'Done' : 'Open'}
 ```
 
-Each error kay logs while answering a request, from a load, a render, a guard, an action or a streamed block without `catch`, also goes to the `onError` option of `kay.config.ts` or `pages()`, the place to send it to an error tracker. The response does not wait for a promise it returns, and an error it throws is logged:
+Each error kay logs while answering a request, from a load, a render, a guard, an action, a streamed block without `catch` or a `try` block's, also goes to the `onError` option of `kay.config.ts` or `pages()`, the place to send it to an error tracker. The response does not wait for a promise it returns, and an error it throws is logged:
 
 ```ts
 import { defineConfig } from 'kay/server'

@@ -56,7 +56,7 @@ function filledIn(value: unknown): boolean {
 }
 
 // Seconds until the client may post again, or undefined while it is under the limit.
-function overLimit(action: object, client: string, max: number, windowMs: number): number | undefined {
+export function overLimit(action: object, client: string, max: number, windowMs: number): number | undefined {
   let clients = windows.get(action)
 
   if (!clients)

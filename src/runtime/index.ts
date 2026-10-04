@@ -3,8 +3,10 @@ import type { Static, TSchema } from 'elysia'
 import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect } from './checks'
 import type { Locale } from './i18n'
+import type { Storage } from './persist'
 import type { SignalOptions } from './reactive'
-import { createSignal, onCleanup, tracking, untrack } from './reactive'
+import { persisted } from './persist'
+import { createSignal, onCleanup, provideContext, readContext, tracking, untrack } from './reactive'
 
 // Writes a value, or what a function makes of the current one.
 export type Setter<T> = (next: T | ((current: T) => T)) => void
@@ -17,14 +19,47 @@ export interface Signal<T> {
 // A function passed to `set` is an updater, so a signal holds no functions.
 type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
+export interface SignalSettings<T> extends SignalOptions<T> {
+  // Keeps the value across pages and visits under this name.
+  persist?: string
+  // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated.
+  storage?: Storage
+}
+
 // A signal read as `count()` and written as `count.set(1)` or `count.set(c => c + 1)`.
 export function signal<T>(): Signal<T | undefined>
-export function signal<T>(value: PlainValue<T>, options?: SignalOptions<T>): Signal<T>
-export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | undefined>): Signal<T | undefined> {
-  const [read, write] = createSignal<T | undefined>(value, options)
-  const set: Setter<T | undefined> = next => write(typeof next === 'function' ? (next as (current: T | undefined) => T | undefined)(untrack(read)) : next)
+export function signal<T>(value: PlainValue<T>, options?: SignalSettings<T>): Signal<T>
+export function signal<T>(value?: PlainValue<T>, options?: SignalSettings<T | undefined>): Signal<T | undefined> {
+  const [own, write] = createSignal<T | undefined>(value, options)
+  const kept = options?.persist === undefined ? undefined : persisted(options.persist, options.storage ?? 'cookie', own, write)
+  const read = kept?.read ?? own
+  const set: Setter<T | undefined> = (next) => {
+    write(typeof next === 'function' ? (next as (current: T | undefined) => T | undefined)(untrack(read)) : next)
+    kept?.save(untrack(own))
+  }
 
   return Object.assign(read, { set })
+}
+
+export interface Context<T> {
+  // Makes `value` what the components this one renders read, called in its script.
+  provide: (value: T) => void
+  // What the nearest component above provided, else the default.
+  use: () => T
+}
+
+// A value a component hands what it renders, however deep, without passing it through each one's props: `Theme.provide('dark')` in one, `Theme.use()` below it.
+export function context<T>(fallback: T): Context<T> {
+  const key = Symbol('kay.context')
+
+  return {
+    provide: value => provideContext(key, value),
+    use: () => {
+      const found = readContext(key)
+
+      return found.found ? found.value as T : fallback
+    },
+  }
 }
 
 export interface Selection<Key> {
@@ -162,5 +197,6 @@ export type { EventReader, EventStream, Socket, SocketPath, SocketStatus, Stream
 export { socket, stream } from './live'
 export type { NavigateOptions } from './navigate'
 export { navigate, refresh } from './navigate'
+export type { Storage } from './persist'
 export type { SignalOptions } from './reactive'
 export { batch, effect, flush, memo, onCleanup, onMount, root, untrack } from './reactive'

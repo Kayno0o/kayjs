@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 
 // `--- server`, `--- client`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
@@ -11,7 +11,7 @@ const ID_NAME = /[\w-]+/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
-const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch)(?=[ \t]|\r?\n|$)/y
+const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch|try)(?=[ \t]|\r?\n|$)/y
 // Pug lines kay has no counterpart for, which would otherwise read as an element named after the keyword.
 const PUG_KEYWORD = /(each|while|unless|case|when|include|extends|block|mixin|doctype)(?=[ \t]|\r?\n|$)/y
 const PUG_HINTS: Record<string, string> = {
@@ -242,6 +242,12 @@ class TemplateParser {
       return
     }
 
+    if (keyword === 'try') {
+      siblings.push(this.parseTry(indent))
+
+      return
+    }
+
     if (keyword === 'then' || keyword === 'catch') {
       this.attachAwaitBranch(indent, siblings.at(-1), keyword)
 
@@ -415,13 +421,24 @@ class TemplateParser {
     return { kind: 'await', start, end, value, pending: [], resolved: { start: value.end, end, alias, children } }
   }
 
-  // `then name` directly follows an `await`, and `catch error` its `then`; both names are optional.
+  private parseTry(indent: number): TryNode {
+    const start = this.pos
+
+    this.pos = start + 'try'.length
+    this.expectLineEnd('`try` takes nothing on its line: its block goes below it, indented')
+
+    const children = this.parseBlock(indent)
+
+    return { kind: 'try', start, end: this.lastContentEnd(), children }
+  }
+
+  // `then name` directly follows an `await`, and `catch error` its `then` or a `try`; both names are optional.
   private attachAwaitBranch(indent: number, previous: Node | undefined, keyword: 'then' | 'catch') {
     const start = this.pos
-    const valid = previous?.kind === 'await' && (keyword === 'then' ? !previous.resolved : previous.resolved !== undefined && !previous.rejected)
+    const valid = previous?.kind === 'try' ? keyword === 'catch' && !previous.rejected : previous?.kind === 'await' && (keyword === 'then' ? !previous.resolved : previous.resolved !== undefined && !previous.rejected)
 
-    if (!valid) {
-      this.error(start, this.lineEnd(start), keyword === 'then' ? '`then` must directly follow an `await` at the same indentation' : '`catch` must directly follow the `then` of an `await` at the same indentation')
+    if (!valid || !previous || (previous.kind !== 'try' && previous.kind !== 'await')) {
+      this.error(start, this.lineEnd(start), keyword === 'then' ? '`then` must directly follow an `await` at the same indentation' : '`catch` must directly follow a `try`, or the `then` of an `await`, at the same indentation')
       this.pos = this.lineEnd(start)
       this.skipChildren(indent)
 
@@ -441,7 +458,11 @@ class TemplateParser {
     const children = this.parseBlock(indent)
     const branch: AwaitBranch = { start, end: this.lastContentEnd(), alias, children }
 
-    previous[keyword === 'then' ? 'resolved' : 'rejected'] = branch
+    if (previous.kind === 'try')
+      previous.rejected = branch
+    else
+      previous[keyword === 'then' ? 'resolved' : 'rejected'] = branch
+
     previous.end = branch.end
   }
 

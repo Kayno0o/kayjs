@@ -1,4 +1,4 @@
-import type { Attribute, AwaitNode, ElementNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
+import type { Attribute, AwaitNode, ElementNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import { actionOf } from './ast'
@@ -7,7 +7,7 @@ import { BEHAVIOUR, CONTENT_PROPERTIES, END_MARKER, escapeStaticAttribute, escap
 import { childItems, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attribute', 'awaited', 'branches', 'close', 'component', 'dynamic', 'effect', 'fragment', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'setClass', 'setStyle', 'spread', 'template', 'text']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'dynamic', 'effect', 'fragment', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'setClass', 'setStyle', 'spread', 'template', 'text']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 
 export function domHelperImport(): string {
@@ -114,6 +114,10 @@ export class DomTemplate {
         b.wrap(item.node, () => this.await(item.node, at))
 
         break
+      case 'try':
+        b.wrap(item.node, () => this.try(item.node, at))
+
+        break
     }
   }
 
@@ -168,6 +172,32 @@ export class DomTemplate {
     if (node.fallback) {
       b.add(', () => ')
       this.block(node.fallback)
+    }
+
+    b.add(');')
+  }
+
+  private try(node: TryNode, at: string): void {
+    const { b } = this
+    const branch = node.rejected
+
+    b.add(`KayAttempt(${at}, () => `)
+    this.block(node.children)
+    b.add(', ')
+
+    if (branch) {
+      b.wrap(branch, () => {
+        b.add('(')
+
+        if (branch.alias)
+          b.addSource(branch.alias)
+
+        b.add(') => ')
+        this.block(branch.children)
+      })
+    }
+    else {
+      b.add('undefined')
     }
 
     b.add(');')

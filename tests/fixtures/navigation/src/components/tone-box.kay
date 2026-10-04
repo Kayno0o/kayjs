@@ -1,0 +1,14 @@
+---
+import { signal } from 'kay'
+import { Tone } from '../tone'
+import ToneLabel from './tone-label.kay'
+
+const opened = signal(false)
+
+Tone.provide('loud')
+---
+section.box
+  ToneLabel
+  button.open(onClick={() => opened.set(true)}) {opened() ? 'Open' : 'Closed'}
+  if opened()
+    ToneLabel

@@ -2,6 +2,7 @@
 // A rendered value is `{ t: markup }`: what a component or an island rendered goes into its parent's markup as it is.
 
 import { escape, escapeAttribute } from './escape'
+import { currentServerScope, scope } from './reactive'
 
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
@@ -10,6 +11,8 @@ export interface Html {
   t: string
 }
 
+// Leads the markup of a `try` block the server rendered its `catch` block for.
+export const FAILED_MARKER = '<!--kay-failed-->'
 const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 // Properties that set an element's content rather than an attribute.
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
@@ -212,11 +215,16 @@ export function element(tag: string, sources: readonly object[], content?: () =>
 }
 
 // A component tag read off a prop or through a call: a string names an element, a function is the component.
-export function dynamic(component: unknown, props: object): unknown {
-  if (typeof component === 'string')
-    return element(component, [props])
+export function dynamic(tag: unknown, props: object): unknown {
+  if (typeof tag === 'string')
+    return element(tag, [props])
 
-  return typeof component === 'function' ? (component as (props: object) => unknown)(props) : undefined
+  return typeof tag === 'function' ? component(tag as (props: object) => unknown, props) : undefined
+}
+
+// Calls a component under an owner of its own, so what it provides reaches only what it renders.
+export function component<P>(fn: (props: P) => unknown, props: P): unknown {
+  return scope(() => fn(props))
 }
 
 // Props from several objects, later ones winning, each keeping its getters, so a spread `children` still renders only when read.
@@ -242,6 +250,23 @@ export function omit(props: object, ...keys: string[]): object {
 }
 
 // An `if` naming its value: the branch reads it through a function, as the island build of the same template does.
+// A `try` block: what it renders, or once that throws, its `catch` block, the error reported. The marker tells an island hydrating to keep that markup as it came, since the error stayed on the server.
+export function attempt(render: () => string, fallback?: (error: unknown) => string): string {
+  try {
+    return render()
+  }
+  catch (error) {
+    const server = currentServerScope()
+
+    if (server)
+      server.report(error)
+    else
+      console.error(error)
+
+    return FAILED_MARKER + (fallback?.(error) ?? '')
+  }
+}
+
 export function show<T>(value: T, render: (value: () => NonNullable<T>) => string, fallback?: () => string): string {
   if (!value)
     return fallback?.() ?? ''

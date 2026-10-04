@@ -1,7 +1,7 @@
 // What islands run on in the browser: DOM built from templates, kept in step with signals, and the server's markup claimed in place when an island hydrates.
 // A dynamic part sits between `<!--[-->` and `<!--]-->` comments unless it is the only content of its element; hydration walks the server's nodes in the order the generated code asks for them.
 
-import { createSignal, memo, onCleanup, renderEffect, root, untrack } from './reactive'
+import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, untrack } from './reactive'
 
 export { renderEffect as effect } from './reactive'
 
@@ -37,6 +37,8 @@ interface DelegatingDocument extends Document {
 }
 
 let claim: Claim | undefined
+// The comment `FAILED_MARKER` of kay/html holds.
+const FAILED_MARKER_DATA = 'kay-failed'
 
 type ElementRecord = Element & Record<string, unknown>
 
@@ -47,12 +49,14 @@ export function hydrate<T>(render: () => T, container: Node): T {
   const previous = claim
 
   claim = { parent: container, next: container.firstChild }
+  hydrationStarted()
 
   try {
     return untrack(render)
   }
   finally {
     claim = previous
+    hydrationEnded()
   }
 }
 
@@ -821,6 +825,8 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
 
       // The pending block and the block replacing it each own what they create, so landing disposes the pending one.
       let dispose: (() => void) | undefined
+      // Where the block was declared, for one landing later to read what was provided there.
+      const parent = getOwner()
 
       // Gone before the promise settles, the block never lands.
       onCleanup(() => {
@@ -838,7 +844,7 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
 
       const land = (render: () => unknown) => {
         if (own === version)
-          block(render)
+          runWithOwner(parent, () => block(render))
       }
 
       // A `then` block that throws while rendering is not the promise failing, so it stays out of the catch.
@@ -865,11 +871,65 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
   })
 }
 
+// A `try` block: its content under an owner catching what its effects throw later, or its `catch` block once it throws, the error reported either way.
+export function attempt(element: Node | null, start: Node | null, end: Node | null, render: () => unknown, fallback: ((error: unknown) => unknown) | undefined): void {
+  const region = new Region(element, start, end)
+
+  // The server rendered the `catch` block: kept as it came, since the error it shows stayed on the server.
+  if (claim && failedOnServer(region))
+    return
+
+  let current: Unit[] = []
+  let failed = false
+  let disposeBlock: (() => void) | undefined
+  let disposeFallback: (() => void) | undefined
+  const parent = getOwner()
+
+  onCleanup(() => disposeFallback?.())
+
+  const fail = (error: unknown) => {
+    reportError(error)
+
+    if (failed)
+      return
+
+    failed = true
+    disposeBlock?.()
+    // What the block built, or claimed before it threw, goes; the fallback is built afresh.
+    region.clear()
+    current = []
+
+    if (fallback) {
+      runWithOwner(parent, () => root((dispose) => {
+        disposeFallback = dispose
+        current = fresh(() => show(region, [], () => fallback(error)))
+      }))
+    }
+  }
+
+  catchError((dispose) => {
+    disposeBlock = dispose
+
+    try {
+      current = show(region, current, render)
+    }
+    catch (error) {
+      fail(error)
+    }
+  }, fail)
+}
+
+function failedOnServer(region: Region): boolean {
+  const first = region.start ? region.start.nextSibling : region.element!.firstChild
+
+  return first?.nodeType === 8 && (first as Comment).data === FAILED_MARKER_DATA
+}
+
 // ---- components
 
 // Calls a component without the caller depending on what it reads as it builds itself.
 export function component<P>(fn: (props: P) => unknown, props: P): unknown {
-  return untrack(() => fn(props))
+  return untrack(() => scope(() => fn(props)))
 }
 
 // A component tag read off a prop or through a call: a string names an element, a function is the component.

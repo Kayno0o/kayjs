@@ -1,7 +1,7 @@
 import type { Diagnostic, Node } from './ast'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
-import { awaitBlocks } from './ast'
+import { awaitBlocks, tryBlocks } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandMessages } from './codegen'
 import { codeFrame } from './frame'
@@ -129,6 +129,9 @@ function shorthandClasses(nodes: Node[], source: string, found: string[] = []): 
     }
     else if (node.kind === 'await') {
       shorthandClasses(awaitBlocks(node).flat(), source, found)
+    }
+    else if (node.kind === 'try') {
+      shorthandClasses(tryBlocks(node).flat(), source, found)
     }
     else {
       shorthandClasses([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], source, found)

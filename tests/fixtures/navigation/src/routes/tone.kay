@@ -1,0 +1,9 @@
+---
+import ToneBox from '../components/tone-box.kay'
+import ToneLabel from '../components/tone-label.kay'
+---
+head
+  title Tone
+h1 Tone
+ToneBox
+ToneLabel

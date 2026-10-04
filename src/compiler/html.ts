@@ -1,4 +1,4 @@
-import type { Attribute, AwaitNode, ElementNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
+import type { Attribute, AwaitNode, ElementNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import { actionOf } from './ast'
@@ -6,7 +6,7 @@ import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attribute', 'child', 'className', 'dynamic', 'element', 'head', 'loop', 'merge', 'omit', 'raw', 'selectOptions', 'show', 'style']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'dynamic', 'element', 'head', 'loop', 'merge', 'omit', 'raw', 'selectOptions', 'show', 'style']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -158,6 +158,10 @@ export class HtmlTemplate {
         this.await(item.node)
 
         break
+      case 'try':
+        this.try(item.node)
+
+        break
     }
   }
 
@@ -224,6 +228,31 @@ export class HtmlTemplate {
 
       if (this.options.accessorLoops)
         b.add(node.index !== undefined && this.source(node.key).trim() === this.source(node.index) ? ', "positional"' : ', "keyed"')
+
+      b.add(')')
+    })
+  }
+
+  private try(node: TryNode): void {
+    const { b } = this
+
+    b.wrap(node, () => {
+      b.add(`${htmlAlias('attempt')}(() => `)
+      this.markup(node.children)
+
+      const branch = node.rejected
+
+      if (branch) {
+        b.wrap(branch, () => {
+          b.add(', (')
+
+          if (branch.alias)
+            b.addSource(branch.alias)
+
+          b.add(') => ')
+          this.markup(branch.children)
+        })
+      }
 
       b.add(')')
     })
@@ -470,7 +499,7 @@ export class HtmlTemplate {
     if (dynamic)
       b.add(`${htmlAlias('dynamic')}(`).addSource(element.tag).add(', ')
     else
-      b.addSource(element.tag).add('(')
+      b.add(`${htmlAlias('component')}(`).addSource(element.tag).add(', ')
 
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
 

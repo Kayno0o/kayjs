@@ -3,6 +3,7 @@ import type { Html } from './html'
 import type { JSX } from './jsx'
 import { child } from './html'
 import { insideIsland } from './island.server'
+import { getOwner, runWithOwner } from './reactive'
 
 // A block whose value was still pending when the page rendered, streamed in once it settles.
 export interface PendingBlock {
@@ -45,8 +46,11 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
 
   const id = (nextId++).toString(36)
   const blocks = deferred
+  // Rendered once the value settles, under the component that declared it, for what it provided.
+  const parent = getOwner()
+  const failed = props.failed
 
-  blocks.push({ id, value, ready: props.ready as PendingBlock['ready'], failed: props.failed })
+  blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => props.ready(settled)), failed: failed && (error => runWithOwner(parent, () => failed(error))) })
   // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
   deferred = undefined
 

@@ -1,8 +1,8 @@
-import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, awaitBlocks, isChildrenSlot, isHead } from './ast'
+import { actionOf, awaitBlocks, isChildrenSlot, isHead, tryBlocks } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -170,6 +170,9 @@ class Generator {
 
     if (usesAwait(this.file.template) && !dom)
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
+
+    if (usesTry(this.file.template) && !runnable)
+      declared.push(['KayTry', 'Try'])
 
     if (!runnable && this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
       declared.push([DYNAMIC_TAG, 'Dynamic'])
@@ -608,6 +611,10 @@ class Generator {
           this.emitAwait(node)
 
           break
+        case 'try':
+          this.emitTry(node)
+
+          break
         case 'slot':
           this.reportSlot(node)
 
@@ -678,6 +685,21 @@ class Generator {
 
       if (node.resolved)
         this.emitAwaitBranch('ready', node.resolved)
+
+      if (node.rejected)
+        this.emitAwaitBranch('failed', node.rejected)
+
+      b.add(' />')
+    })
+  }
+
+  private emitTry(node: TryNode) {
+    const { b } = this
+
+    b.wrap(node, () => {
+      b.add('<KayTry block={() => ')
+      this.emitRoot(node.children)
+      b.add('}')
 
       if (node.rejected)
         this.emitAwaitBranch('failed', node.rejected)
@@ -1266,6 +1288,8 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
         return visit(node.children) || visit(node.fallback ?? [])
       case 'await':
         return awaitBlocks(node).some(visit)
+      case 'try':
+        return tryBlocks(node).some(visit)
       case 'slot':
         return visit(node.children)
     }
@@ -1296,6 +1320,8 @@ function formHelpers(file: KayFile): KayHelper[] {
         return hasActionForm(node.children) || hasActionForm(node.fallback ?? [])
       case 'await':
         return awaitBlocks(node).some(hasActionForm)
+      case 'try':
+        return tryBlocks(node).some(hasActionForm)
       case 'slot':
         return hasActionForm(node.children)
     }
@@ -1309,7 +1335,7 @@ function formHelpers(file: KayFile): KayHelper[] {
 type Helper = 'For' | 'Show' | 'omit'
 
 // The members of `TemplateHelpers` in src/runtime/checks.ts.
-type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head'
+type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head' | 'Try'
 
 function helperAlias(helper: Helper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
@@ -1332,6 +1358,8 @@ function usesChildrenSlot(nodes: Node[]): boolean {
         return usesChildrenSlot(node.children) || usesChildrenSlot(node.fallback ?? [])
       case 'await':
         return awaitBlocks(node).some(usesChildrenSlot)
+      case 'try':
+        return tryBlocks(node).some(usesChildrenSlot)
     }
 
     return false
@@ -1352,6 +1380,30 @@ function usesAwait(nodes: Node[]): boolean {
         return node.branches.some(branch => usesAwait(branch.children))
       case 'for':
         return usesAwait(node.children) || usesAwait(node.fallback ?? [])
+      case 'try':
+        return tryBlocks(node).some(usesAwait)
+    }
+
+    return false
+  })
+}
+
+function usesTry(nodes: Node[]): boolean {
+  return nodes.some((node) => {
+    switch (node.kind) {
+      case 'try':
+        return true
+      case 'element':
+      case 'slot':
+        return usesTry(node.children)
+      case 'text':
+        return usesTry(node.parts.filter(part => part.kind === 'element'))
+      case 'if':
+        return node.branches.some(branch => usesTry(branch.children))
+      case 'for':
+        return usesTry(node.children) || usesTry(node.fallback ?? [])
+      case 'await':
+        return awaitBlocks(node).some(usesTry)
     }
 
     return false
@@ -1384,6 +1436,10 @@ function usedHelpers(nodes: Node[], script: ScriptAnalysis): Helper[] {
       }
       else if (node.kind === 'await') {
         for (const block of awaitBlocks(node))
+          visit(block)
+      }
+      else if (node.kind === 'try') {
+        for (const block of tryBlocks(node))
           visit(block)
       }
       else {

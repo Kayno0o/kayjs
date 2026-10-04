@@ -1,5 +1,6 @@
+import { withBase } from './base'
 import { dispatch, hydrate, render } from './dom'
-import { root } from './reactive'
+import { reportError, root, setErrorReporter } from './reactive'
 import { decodeValue } from './wire'
 
 export { startNavigation } from './navigate'
@@ -18,6 +19,39 @@ const started = new WeakSet<HTMLElement>()
 // What disposes each hydrated island, so a page swap can end the ones it takes away: their effects, timers and connections.
 const disposers = new WeakMap<HTMLElement, () => void>()
 const ISLAND = 'slot[data-component]'
+// Where the browser sends the errors it meets, for the server's `onError`.
+const ERROR_URL = '/_kay/error'
+const MAX_REPORTS = 10
+const reported = new Set<string>()
+
+setErrorReporter((error) => {
+  console.error(error)
+  sendError(error)
+})
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', event => sendError(event.error ?? event.message))
+  window.addEventListener('unhandledrejection', event => sendError(event.reason))
+}
+
+// Sends an error to the server once per message and place, a few per page at most.
+function sendError(error: unknown): void {
+  const { name, message, stack } = error instanceof Error ? error : { name: 'Error', message: String(error), stack: undefined }
+  const key = `${message}\n${stack}`
+
+  if (reported.has(key) || reported.size >= MAX_REPORTS)
+    return
+
+  reported.add(key)
+  void post(JSON.stringify({ name, message, stack, url: location.href }))
+}
+
+async function post(body: string): Promise<void> {
+  try {
+    await fetch(withBase(ERROR_URL), { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' }, body })
+  }
+  catch {}
+}
 
 // Hydrates every island the server rendered, loading each component's chunk on demand; resolves once the eager ones are done.
 // Running it again over the same root leaves the islands it already took alone.
@@ -63,7 +97,12 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
 
   // A client-only island has no server markup to claim.
   if (element.dataset.client !== undefined) {
-    disposers.set(element, render(() => component(props), element))
+    try {
+      disposers.set(element, render(() => component(props), element))
+    }
+    catch (error) {
+      reportError(error)
+    }
   }
   else {
     root((dispose) => {
@@ -74,11 +113,21 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
       }
       catch (error) {
         // Markup the island would not build, such as one a browser extension changed, can fail anywhere along the way: rendered afresh rather than left dead.
-        // An error of the component itself throws again from the fresh render.
         console.warn(`[kay] island ${id} did not match its server markup, rendering it again: ${error instanceof Error ? error.message : String(error)}`)
         dispose()
+
+        const markup = [...element.childNodes]
+
         element.textContent = ''
-        disposers.set(element, render(() => component(props), element))
+
+        try {
+          disposers.set(element, render(() => component(props), element))
+        }
+        catch (failure) {
+          // An error of the component itself, thrown again: the server's markup stays, lifeless, rather than nothing.
+          element.replaceChildren(...markup)
+          reportError(failure)
+        }
       }
     })
   }

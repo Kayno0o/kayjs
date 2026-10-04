@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { parse } from '@babel/parser'
-import { awaitBlocks } from './ast'
+import { awaitBlocks, tryBlocks } from './ast'
 import { loadTraverse } from './rewrite'
 
 // One part of the program `browserReads` analyzes: generated text standing for the source from `source` on, character for character.
@@ -270,8 +270,8 @@ function templateNames(file: KayFile): string[] {
         names.push(...words(branch.alias))
       }
     }
-    else if (node.kind === 'await') {
-      names.push(...words(node.resolved?.alias), ...words(node.rejected?.alias))
+    else if (node.kind === 'await' || node.kind === 'try') {
+      names.push(...words(node.kind === 'await' ? node.resolved?.alias : undefined), ...words(node.rejected?.alias))
     }
     else if (node.kind === 'slot') {
       names.push(...words(node.params))
@@ -338,6 +338,11 @@ function visit(nodes: Node[], each: (node: Node) => void): void {
     }
     else if (node.kind === 'await') {
       for (const block of awaitBlocks(node)) {
+        visit(block, each)
+      }
+    }
+    else if (node.kind === 'try') {
+      for (const block of tryBlocks(node)) {
         visit(block, each)
       }
     }

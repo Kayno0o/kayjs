@@ -137,4 +137,5 @@ export interface TemplateHelpers {
   Dynamic: <Tag>(props: { component: Tag } & PropsOf<Tag>) => JSX.Element
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
   head: (tags: { tag: string, props: Record<string, unknown> }[]) => void
+  Try: (props: { block: () => JSX.Element, failed?: (error: unknown) => JSX.Element }) => JSX.Element
 }

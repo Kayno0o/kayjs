@@ -1,0 +1,8 @@
+---
+import { added } from '../shared'
+
+const { start } = props<{ start: number }>()
+
+added.set(start)
+---
+button.adder(onClick={() => added.set(n => n + 1)}) Add

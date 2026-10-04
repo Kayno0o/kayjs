@@ -20,6 +20,7 @@ import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents } from './dev'
+import { serveErrorReports } from './errors'
 import { FAVICON_DIR, serveFavicons } from './favicon'
 import { loadGuards } from './guards'
 import { cookieLocale, hostLocale, loadI18n, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
@@ -236,6 +237,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const [, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
 
   await serveApi(app, apiModules, actionOptions)
+  serveErrorReports(app, options.onError)
 
   serveImages(app, {
     clientDir: client.dir,

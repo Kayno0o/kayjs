@@ -1,0 +1,4 @@
+---
+import { Tone } from '../tone'
+---
+p.tone {Tone.use()}

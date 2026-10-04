@@ -1,0 +1,7 @@
+---
+import Total from '../components/total.kay'
+---
+head
+  title Alone
+h1 Alone
+Total

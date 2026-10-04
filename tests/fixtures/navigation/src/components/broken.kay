@@ -1,0 +1,17 @@
+---
+import { signal } from 'kay'
+
+const { fail } = props<{ fail: boolean }>()
+const count = signal(0)
+
+function counted(): number {
+  if (fail)
+    throw new Error('Broken on the server')
+
+  return count()
+}
+---
+try
+  button.counted(onClick={() => count.set(n => n + 1)}) Count {counted()}
+catch
+  p.unavailable Unavailable

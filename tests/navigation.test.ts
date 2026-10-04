@@ -218,4 +218,74 @@ describe.skipIf(!browserInstalled)('page swap in Chromium', () => {
 
     expect(await sameDocument()).toBe(false)
   })
+
+  it('shares a module\'s signal between the islands of a page', async () => {
+    await page.goto(`${origin}/state`)
+    await page.locator('p.total', { hasText: 'Total 5' }).waitFor()
+    await page.click('button.adder')
+    await page.locator('p.total', { hasText: 'Total 6' }).waitFor()
+  })
+
+  it('renders a try block\'s catch block once it throws, keeping the one the server rendered, and reports the error', async () => {
+    const reports: string[] = []
+    const warnings: string[] = []
+
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/_kay/error')
+        reports.push(request.postData() ?? '')
+    })
+    page.on('console', (message) => {
+      if (message.type() === 'warning')
+        warnings.push(message.text())
+    })
+    await page.goto(`${origin}/fallback`)
+    await page.locator('p.fragile', { hasText: 'Fine' }).waitFor()
+
+    expect(await page.textContent('p.unavailable')).toBe('Unavailable')
+
+    await page.click('button.break')
+    await page.locator('p.fallback', { hasText: 'Failed: Fragile broke' }).waitFor()
+
+    expect(await page.locator('p.fragile').count()).toBe(0)
+    await Bun.sleep(100)
+    expect(reports.map(body => (JSON.parse(body) as { message: string }).message)).toEqual(['Fragile broke'])
+    expect(warnings).toEqual([])
+  })
+
+  it('hands what a component provides to what it renders in the browser too, a block rendered later included', async () => {
+    const warnings: string[] = []
+
+    page.on('console', (message) => {
+      if (message.type() === 'warning' || message.type() === 'error')
+        warnings.push(message.text())
+    })
+    await page.goto(`${origin}/tone`)
+    await page.click('button.open')
+    await page.locator('button.open', { hasText: 'Open' }).waitFor()
+
+    expect(await page.locator('section.box p.tone').allTextContents()).toEqual(['loud', 'loud'])
+    expect(await page.locator('body > p.tone').textContent()).toBe('plain')
+    expect(warnings).toEqual([])
+  })
+
+  it('keeps a persisted signal in a cookie the server renders with, and one in localStorage applied once hydrated', async () => {
+    const warnings: string[] = []
+
+    page.on('console', (message) => {
+      if (message.type() === 'warning' || message.type() === 'error')
+        warnings.push(message.text())
+    })
+    await page.goto(`${origin}/state`)
+    await page.click('button.theme')
+    await page.click('button.note')
+    await page.locator('button.note', { hasText: 'Note kept' }).waitFor()
+
+    expect(await (await page.request.get(`${origin}/alone`)).text()).toContain('Theme <!--[-->dark<!--]-->')
+
+    await page.goto(`${origin}/alone`)
+    await page.locator('button.note', { hasText: 'Note kept' }).waitFor()
+
+    expect(await page.textContent('button.theme')).toBe('Theme dark')
+    expect(warnings).toEqual([])
+  })
 })

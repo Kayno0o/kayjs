@@ -13,6 +13,7 @@ import { browserOnlyHint, mapStack } from '../build/sourcemap'
 import { collectForms } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
+import { component } from '../runtime/html'
 import { localeState } from '../runtime/i18n.server'
 import { rebaseHtml } from './base'
 import { importModule } from './bundle'
@@ -28,6 +29,7 @@ import { errorPage } from './overlay'
 import { matchesEtag } from './public'
 import { readQuery } from './query'
 import { reportServerError } from './report'
+import { inServerScope } from './scope'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
 import { renderStatic, streamDocument } from './stream'
@@ -368,13 +370,18 @@ async function importAll(files: string[]): Promise<PageModule[]> {
 
 // The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
 function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
+  return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.onError), () => documentOf(files, modules, data, client, rendering, options))
+}
+
+function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
   const page = modules.length - 1
-  let view = () => modules[page]!.default(data[page]!)
+  // Each through `component`, so what a layout provides reaches its page.
+  let view = () => component(modules[page]!.default, data[page]!)
 
   for (let index = page - 1; index >= 0; index--) {
     const inner = view
 
-    view = () => modules[index]!.default({ ...data[index], get children() {
+    view = () => component(modules[index]!.default, { ...data[index], get children() {
       return inner()
     } })
   }

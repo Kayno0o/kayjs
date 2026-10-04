@@ -1,5 +1,5 @@
 import type { Attribute, Diagnostic, ElementNode, KayFile, Node, Span } from './ast'
-import { awaitBlocks } from './ast'
+import { awaitBlocks, tryBlocks } from './ast'
 import { parseKay } from './parser'
 
 export interface FormatResult {
@@ -157,6 +157,8 @@ function multiLineSpans(nodes: Node[]): Span[] {
         return [node.each, { start: node.key.start - 1, end: node.key.end + 1 }, ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]
       case 'await':
         return [node.value, ...multiLineSpans(awaitBlocks(node).flat())]
+      case 'try':
+        return multiLineSpans(tryBlocks(node).flat())
       default:
         return [...(node.params ? [node.params] : []), ...multiLineSpans(node.children)]
     }
@@ -199,6 +201,11 @@ function trailingTextEnds(nodes: Node[]): Set<number> {
         break
       case 'await':
         for (const end of trailingTextEnds(awaitBlocks(node).flat()))
+          ends.add(end)
+
+        break
+      case 'try':
+        for (const end of trailingTextEnds(tryBlocks(node).flat()))
           ends.add(end)
 
         break
@@ -257,6 +264,8 @@ function elementsOf(nodes: Node[]): ElementNode[] {
         return [...elementsOf(node.children), ...elementsOf(node.fallback ?? [])]
       case 'await':
         return elementsOf(awaitBlocks(node).flat())
+      case 'try':
+        return elementsOf(tryBlocks(node).flat())
       default:
         return elementsOf(node.children)
     }

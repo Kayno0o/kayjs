@@ -1,0 +1,17 @@
+---
+import { signal } from 'kay'
+
+const broken = signal(false)
+
+function shown(): string {
+  if (broken())
+    throw new Error('Fragile broke')
+
+  return 'Fine'
+}
+---
+try
+  p.fragile {shown()}
+  button.break(onClick={() => broken.set(true)}) Break
+catch error
+  p.fallback Failed: {(error as Error).message}

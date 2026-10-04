@@ -1,0 +1,9 @@
+---
+import Broken from '../components/broken.kay'
+import Fragile from '../components/fragile.kay'
+---
+head
+  title Fallback
+h1 Fallback
+Fragile
+Broken(fail={true})

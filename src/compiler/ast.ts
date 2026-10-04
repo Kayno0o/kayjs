@@ -95,7 +95,14 @@ export interface AwaitNode extends Span {
   rejected?: AwaitBranch
 }
 
-export type Node = ElementNode | TextNode | IfNode | ForNode | AwaitNode | SlotNode
+// `try` and its block, then `catch error` at the same indentation: what renders instead once the block throws.
+export interface TryNode extends Span {
+  kind: 'try'
+  children: Node[]
+  rejected?: AwaitBranch
+}
+
+export type Node = ElementNode | TextNode | IfNode | ForNode | AwaitNode | TryNode | SlotNode
 
 // An attribute written with a name, which a spread is not.
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
@@ -122,6 +129,11 @@ export function isChildrenSlot(node: Node): boolean {
 // The pending, resolved and failed blocks, in source order.
 export function awaitBlocks(node: AwaitNode): Node[][] {
   return [node.pending, node.resolved?.children ?? [], node.rejected?.children ?? []]
+}
+
+// The block and its `catch` block, in source order.
+export function tryBlocks(node: TryNode): Node[][] {
+  return [node.children, node.rejected?.children ?? []]
 }
 
 export interface KayFile {

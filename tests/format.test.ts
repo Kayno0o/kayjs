@@ -107,6 +107,10 @@ describe('formatKay', () => {
     expect(format('List\n    @row(\n      todo,\n    )\n        li x\n')).toBe('List\n  @row(\n    todo,\n  )\n    li x\n')
   })
 
+  it('indents a try and its catch block like any block', () => {
+    expect(format('try\n    p {\n      a\n    }\ncatch error\n      p b\n')).toBe('try\n  p {\n    a\n  }\ncatch error\n  p b\n')
+  })
+
   it('keeps the braces of a multi-line key with the for, so children stay under it', () => {
     expect(format('ul\n  for todo of todos key={todo.id\n\n}\n    li x\n')).toBe('ul\n  for todo of todos key={todo.id\n\n}\n    li x\n')
   })

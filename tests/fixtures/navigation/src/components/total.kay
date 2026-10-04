@@ -1,0 +1,6 @@
+---
+import { added, note, theme } from '../shared'
+---
+p.total Total {added()}
+button.theme(onClick={() => theme.set(theme() === 'light' ? 'dark' : 'light')}) Theme {theme()}
+button.note(onClick={() => note.set('kept')}) Note {note() || 'none'}

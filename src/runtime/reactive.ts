@@ -16,6 +16,15 @@ interface Source {
 interface SignalNode<T> extends Source {
   value: T
   equals: Equals<T>
+  // Made outside any render, at a module's top level: on the server it outlives the request, so a render's writes are kept per request.
+  shared: boolean
+}
+
+// What the server keeps per request it renders: the values its renders wrote to shared signals, its cookies, and where an error a `try` block caught goes.
+export interface ServerScope {
+  values: WeakMap<object, unknown>
+  cookie: (name: string) => string | undefined
+  report: (error: unknown) => void
 }
 
 const CLEAN = 0
@@ -33,6 +42,10 @@ interface Owner {
   children: Owner[] | undefined
   cleanups: (() => void)[] | undefined
   state: State
+  // Set by `catchError`: what an effect under it throws goes there.
+  catcher?: (error: unknown) => void
+  // What a component provided, for what it renders to read.
+  context?: Map<symbol, unknown>
 }
 
 interface Computation extends Owner, Source {
@@ -54,19 +67,34 @@ let batching = 0
 // Set while an island renders on the server, where nothing reacts afterwards: effects there never run.
 let serverRendering = 0
 const MAX_ROUNDS = 100_000
+let serverScope: (() => ServerScope | undefined) | undefined
+let reporter: (error: unknown) => void = error => console.error(error)
+// Set while an island claims its server markup, with what waits for it to be done.
+let hydrating = 0
+let afterHydration: (() => void)[] = []
 
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
 export function createSignal<T>(value: T, options?: SignalOptions<T>): [read: () => T, write: (next: T) => void] {
-  const node: SignalNode<T> = { value, observers: undefined, equals: options?.equals ?? defaultEquals }
+  const node: SignalNode<T> = { value, observers: undefined, equals: options?.equals ?? defaultEquals, shared: serverRendering === 0 }
 
   const read = () => {
     track(node)
 
-    return node.value
+    const values = scopedValues(node)
+
+    return values?.has(node) ? values.get(node) as T : node.value
   }
 
   const write = (next: T) => {
+    const values = scopedValues(node)
+
+    if (values) {
+      values.set(node, next)
+
+      return
+    }
+
     if (node.equals !== false && node.equals(node.value, next))
       return
 
@@ -77,13 +105,139 @@ export function createSignal<T>(value: T, options?: SignalOptions<T>): [read: ()
   return [read, write]
 }
 
+// A component's call: an owner of its own, so what it provides reaches what it renders and nothing beside it. `detached`, as an island is, it reads nothing provided above.
+export function scope<T>(fn: () => T, detached = false): T {
+  const node: Owner = { owner: detached ? undefined : owner, children: undefined, cleanups: undefined, state: CLEAN }
+  const previous = owner
+
+  if (owner && !detached)
+    (owner.children ??= []).push(node)
+
+  owner = node
+
+  try {
+    return fn()
+  }
+  finally {
+    owner = previous
+  }
+}
+
+export function provideContext(key: symbol, value: unknown): void {
+  if (!owner) {
+    throw new Error('kay: provide() runs in a component\'s script, as it renders')
+  }
+
+  (owner.context ??= new Map()).set(key, value)
+}
+
+// The value the nearest component above provided under `key`, if any did.
+export function readContext(key: symbol): { found: boolean, value?: unknown } {
+  for (let node = owner; node; node = node.owner) {
+    if (node.context?.has(key))
+      return { found: true, value: node.context.get(key) }
+  }
+
+  return { found: false }
+}
+
+// The owner now, for a block rendered later to read what was provided where it was declared.
+export function getOwner(): object | undefined {
+  return owner
+}
+
+export function runWithOwner<T>(parent: object | undefined, fn: () => T): T {
+  const previous = owner
+
+  owner = parent as Owner | undefined
+
+  try {
+    return fn()
+  }
+  finally {
+    owner = previous
+  }
+}
+
+// Runs `fn` under an owner of its own, so an effect created in it that throws later hands the error to `handler` rather than the console.
+export function catchError<T>(fn: (dispose: () => void) => T, handler: (error: unknown) => void): T {
+  const node: Owner = { owner, children: undefined, cleanups: undefined, state: CLEAN, catcher: handler }
+  const previous = owner
+
+  if (owner)
+    (owner.children ??= []).push(node)
+
+  owner = node
+
+  try {
+    return fn(() => dispose(node))
+  }
+  finally {
+    owner = previous
+  }
+}
+
+// Logs an error no `try` block caught, or one it did, and hands it to what the page reports errors to.
+export function reportError(error: unknown): void {
+  reporter(error)
+}
+
+// Installed by the browser's entry: where errors go besides the console.
+export function setErrorReporter(report: (error: unknown) => void): void {
+  reporter = report
+}
+
+// Installed by the server: the scope of the request being rendered.
+export function setServerScope(scope: () => ServerScope | undefined): void {
+  serverScope = scope
+}
+
+// The scope of the request rendering now, on the server.
+export function currentServerScope(): ServerScope | undefined {
+  return serverScope?.()
+}
+
+function scopedValues(node: { shared: boolean }): WeakMap<object, unknown> | undefined {
+  return node.shared && serverRendering > 0 ? serverScope?.()?.values : undefined
+}
+
+// Runs `fn` now, or once the islands claiming their server markup are done, so a value they did not render with never meets that markup.
+export function whenHydrated(fn: () => void): void {
+  if (hydrating > 0)
+    afterHydration.push(fn)
+  else
+    fn()
+}
+
+// Brackets an island claiming its server markup.
+export function hydrationStarted(): void {
+  hydrating++
+}
+
+export function hydrationEnded(): void {
+  if (--hydrating > 0)
+    return
+
+  const waiting = afterHydration
+
+  afterHydration = []
+
+  for (const fn of waiting)
+    fn()
+}
+
 // A derived value, computed when read and cached until what it read changes.
 export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
   const node = computation(fn, undefined, options?.equals ?? defaultEquals)
+  const shared = serverRendering === 0
 
   node.state = DIRTY
 
   return () => {
+    // A module's memo on the server would keep what one request's render derived for the next.
+    if (shared && serverRendering > 0 && serverScope)
+      return untrack(fn)
+
     if (node.state !== DISPOSED) {
       update(node)
       track(node)
@@ -305,7 +459,15 @@ function runEffect(node: Computation): void {
     update(node)
   }
   catch (error) {
-    console.error(error)
+    let catcher: Owner | undefined = node.owner
+
+    while (catcher && !catcher.catcher)
+      catcher = catcher.owner
+
+    if (catcher)
+      catcher.catcher!(error)
+    else
+      reportError(error)
   }
 }
 

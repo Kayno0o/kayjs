@@ -37,6 +37,8 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
         return { for: text(file, node.item), index: text(file, node.index), of: text(file, node.each), key: text(file, node.key), children: outline(file, node.children), fallback: node.fallback && outline(file, node.fallback) }
       case 'await':
         return { await: text(file, node.value), pending: outline(file, node.pending), resolved: node.resolved && { alias: text(file, node.resolved.alias), children: outline(file, node.resolved.children) }, rejected: node.rejected && { alias: text(file, node.rejected.alias), children: outline(file, node.rejected.children) } }
+      case 'try':
+        return { try: outline(file, node.children), rejected: node.rejected && { alias: text(file, node.rejected.alias), children: outline(file, node.rejected.children) } }
       case 'slot':
         return { slot: text(file, node.name), ...(node.params && { params: text(file, node.params) }), children: outline(file, node.children) }
     }
@@ -287,8 +289,24 @@ describe('control flow', () => {
   it('requires then after await and rejects a stray then or catch', () => {
     expect(parse('await x\n  p wait\np after').diagnostics[0]?.message).toContain('needs a `then` block')
     expect(parse('p a\nthen x').diagnostics[0]?.message).toContain('`then` must directly follow an `await`')
-    expect(parse('await x\n  p\ncatch e\n  p').diagnostics.map(d => d.message)).toContain('`catch` must directly follow the `then` of an `await` at the same indentation')
+    expect(parse('await x\n  p\ncatch e\n  p').diagnostics.map(d => d.message)).toContain('`catch` must directly follow a `try`, or the `then` of an `await`, at the same indentation')
     expect(parse('await x then a\n  p\nthen b\n  p').diagnostics[0]?.message).toContain('`then` must directly follow')
+  })
+
+  it('reads try with its catch block, the error named or not', () => {
+    const file = parse('try\n  Chart\ncatch error\n  p {error}\ntry\n  p a\np after')
+
+    expect(outline(file)).toEqual([
+      { try: [{ tag: 'Chart' }], rejected: { alias: 'error', children: [{ tag: 'p', children: [['{error}']] }] } },
+      { try: [{ tag: 'p', children: [['a']] }], rejected: undefined },
+      { tag: 'p', children: [['after']] },
+    ])
+    expect(file.diagnostics).toEqual([])
+  })
+
+  it('rejects text on a try line, and a second catch', () => {
+    expect(parse('try now\n  p').diagnostics.map(d => d.message)).toEqual(['`try` takes nothing on its line: its block goes below it, indented'])
+    expect(parse('try\n  p\ncatch\n  p\ncatch\n  p').diagnostics.map(d => d.message)).toEqual(['`catch` must directly follow a `try`, or the `then` of an `await`, at the same indentation'])
   })
 
   it('reads slots under a component', () => {

@@ -1,0 +1,9 @@
+---
+import Adder from '../components/adder.kay'
+import Total from '../components/total.kay'
+---
+head
+  title State
+h1 State
+Adder(start={5})
+Total

@@ -1,4 +1,4 @@
-import type { AwaitNode, ElementNode, ForNode, IfNode, Node, TextExpression } from './ast'
+import type { AwaitNode, ElementNode, ForNode, IfNode, Node, TextExpression, TryNode } from './ast'
 import { isChildrenSlot, isHead } from './ast'
 
 // The children of an element or a block as the markup holds them: runs of static text, plain elements, and dynamic parts.
@@ -12,6 +12,7 @@ export type Item
     | { kind: 'if', node: IfNode }
     | { kind: 'for', node: ForNode }
     | { kind: 'await', node: AwaitNode }
+    | { kind: 'try', node: TryNode }
 
 export type DynamicItem = Exclude<Item, { kind: 'text' | 'element' }>
 
@@ -68,6 +69,7 @@ export function childItems(nodes: Node[]): Item[] {
       case 'if':
       case 'for':
       case 'await':
+      case 'try':
         items.push({ kind: node.kind, node } as Item)
 
         break
