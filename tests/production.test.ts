@@ -395,3 +395,49 @@ describe('request logging', () => {
     }
   })
 })
+
+describe('rewrites', () => {
+  const routes = 'tests/fixtures/production/src/routes'
+  const rewrite = (url: URL) => url.hostname === 'shop.localhost' ? `/shop${url.pathname}${url.search}` : undefined
+
+  it('serves a host from a section through the whole app, the query kept and derives reached', async () => {
+    const app = new Elysia()
+      .derive(({ request }) => ({ seenAt: new URL(request.url).pathname }))
+      .use(await pages({ routes, prebuilt: false, security: false, rewrite }))
+      .get('/shop/api/where', ({ seenAt }) => seenAt)
+      .listen(0)
+    const fetchAt = async (host: string, path: string) => fetch(`http://localhost:${app.server!.port}${path}`, { headers: { host } })
+
+    try {
+      expect(await (await fetchAt('shop.localhost', '/mug?color=red')).text()).toContain('<p class="item">Shop mug in red at /shop/mug</p>')
+      expect(await (await fetchAt('shop.localhost', '/api/where')).text()).toBe('/shop/api/where')
+      expect(await (await fetchAt('localhost', '/shop/mug')).text()).toContain('<p class="item">Shop mug in any at /shop/mug</p>')
+      expect((await fetchAt('localhost', '/mug')).status).toBe(404)
+      // Without a server, kay's own pages serve it.
+      expect(await (await (await pages({ routes, prebuilt: false, rewrite })).handle(new Request('http://shop.localhost/mug'))).text()).toContain('<p class="item">Shop mug in any at /shop/mug</p>')
+    }
+    finally {
+      await shutDown(app)
+    }
+  })
+
+  it('keeps the socket\'s address for a rewritten request, a client never passing for one', async () => {
+    const { rewrittenAddress } = await import('../src/server/rewrite')
+    const forged = new Request('http://localhost/', { headers: { 'x-kay-rewritten': 'guess', 'x-kay-client': '1.2.3.4' } })
+
+    expect(rewrittenAddress(forged)).toBeUndefined()
+  })
+
+  it('refuses a rewrite to anything but a path', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const app = await pages({ routes, prebuilt: false, rewrite: () => 'https://elsewhere.example/' })
+
+    try {
+      expect((await app.handle(new Request('http://localhost/contact'))).status).toBe(500)
+      expect(String(logged.mock.calls[0]![0])).toContain('it returns a path starting with one /')
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+})

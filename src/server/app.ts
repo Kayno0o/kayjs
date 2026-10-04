@@ -23,6 +23,7 @@ import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
 import { reportServerError } from './report'
 import { revalidateStale } from './revalidate'
+import { rewriteRequests } from './rewrite'
 import { decodePath, refuseClashes, scanRoutes, specialPagesOf } from './routes'
 import { securityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
@@ -119,6 +120,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   if (log)
     logRequests(app, log)
+
+  if (options.rewrite)
+    rewriteRequests(app, options.rewrite, app)
 
   const lifecycle = { draining: false }
 

@@ -1,0 +1,6 @@
+--- server
+const { item } = ctx.params
+const color = ctx.url.searchParams.get('color') ?? 'any'
+const path = ctx.url.pathname
+---
+p.item Shop {item} in {color} at {path}

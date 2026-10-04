@@ -713,6 +713,20 @@ Every page carries speculation rules: Chromium prefetches the page a link points
 }
 ```
 
+## Rewrites
+
+`rewrite` in kay.config.ts serves a request from another path, the browser keeping its URL, such as one host's pages from a section of the routes:
+
+```ts
+export default defineConfig({
+  rewrite: url => url.hostname === 'shop.example.com' ? `/shop${url.pathname}${url.search}` : undefined,
+})
+```
+
+- It returns a path starting with one `/`, query included, or `undefined` to serve the request as it came; anything else answers 500 and is logged.
+- The rewritten request goes through the whole app again, the app's own routes, derives and guards included, and everything there sees the new path: `ctx.url`, `ctx.params`, links a page builds from them. It is not rewritten twice, and keeps its method, headers, cookies and body. Rate limits still count the client's own address.
+- Under `app.handle()` with no listening server, as in a test, only kay's pages serve a rewritten request.
+
 ## Request logs
 
 With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms`, the method, the path without its query string, which may carry tokens, the status, and the milliseconds until the response went out, a streamed one's first bytes. kay's own `/_kay/` routes, assets and the health route included, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration }`, for a log collector; a function receives each `{ method, path, status, duration }` entry instead; `true` logs outside production too, `false` never.

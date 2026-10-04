@@ -1,6 +1,7 @@
 import type { Server } from 'bun'
 import type { TSchema } from 'elysia'
 import type { ServerAction } from '../runtime/action'
+import { rewrittenAddress } from './rewrite'
 
 export interface ProtectionRefusal {
   status: number
@@ -68,7 +69,7 @@ function overLimit(action: object, client: string, max: number, windowMs: number
 
 // The socket's address, unless it is a proxy on this machine or network: then the address that proxy appended last to `X-Forwarded-For`, which a client cannot forge.
 export function clientOf(request: Request, server: Server<unknown> | null | undefined): string {
-  const address = server?.requestIP(request)?.address
+  const address = rewrittenAddress(request) ?? server?.requestIP(request)?.address
   const forwarded = request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim()
 
   if (address !== undefined && !LOOPBACK_OR_PRIVATE.test(address))
