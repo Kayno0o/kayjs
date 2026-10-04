@@ -101,6 +101,7 @@ class RequestSession<Data extends object> implements Session<Data> {
   private changed = false
   // An id `regenerate` or `destroy` left behind, deleted from the store on commit.
   private retired?: string
+  private oldKey = false
 
   constructor(private readonly request: Request, private readonly config: SessionConfig) {}
 
@@ -146,7 +147,8 @@ class RequestSession<Data extends object> implements Session<Data> {
     const { store, maxAge, name } = this.config
     const now = Math.floor(Date.now() / 1000)
     const empty = Object.keys(this.data).length === 0
-    const due = this.issued !== undefined && now - this.issued > maxAge / 2
+    // Past half its life, or sealed with a secret the app is rotating out.
+    const due = this.issued !== undefined && (now - this.issued > maxAge / 2 || this.oldKey)
 
     if (!this.changed && !due)
       return undefined
@@ -169,7 +171,7 @@ class RequestSession<Data extends object> implements Session<Data> {
       sealed = { id: this.id, issued: now }
     }
 
-    const cookie = this.cookie(seal(stringify(sealed), this.config.keys[0]!), maxAge)
+    const cookie = this.cookie(seal(stringify(sealed), this.config.keys[0]!, name), maxAge)
 
     if (cookie.length > MAX_COOKIE_LENGTH)
       throw new Error(`kay: the session cookie ${name} would take ${cookie.length} bytes, more than a browser keeps; hold less in it, or give session() a store`)
@@ -185,7 +187,8 @@ class RequestSession<Data extends object> implements Session<Data> {
 
   private async read(): Promise<void> {
     const value = new Bun.CookieMap(this.request.headers.get('cookie') ?? '').get(this.config.name)
-    const sealed = value ? opened(value, this.config.keys) : undefined
+    const opening = value ? opened(value, this.config.keys, this.config.name) : undefined
+    const sealed = opening?.sealed
 
     if (!sealed || sealed.issued + this.config.maxAge < Date.now() / 1000) {
       // An expired or forged cookie is cleared with the next write.
@@ -195,6 +198,7 @@ class RequestSession<Data extends object> implements Session<Data> {
     }
 
     this.issued = sealed.issued
+    this.oldKey = opening!.oldKey
 
     if (!this.config.store) {
       this.data = sealed.data ?? {}
@@ -215,28 +219,32 @@ class RequestSession<Data extends object> implements Session<Data> {
   }
 }
 
-// AES-256-GCM: the cookie can be neither read nor altered without the secret.
-function seal(text: string, key: Buffer): string {
+// AES-256-GCM: the cookie can be neither read nor altered without the secret, nor passed off under another cookie's name.
+function seal(text: string, key: Buffer, name: string): string {
   const iv = randomBytes(IV_BYTES)
   const cipher = createCipheriv('aes-256-gcm', key, iv)
+
+  cipher.setAAD(Buffer.from(name))
   const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
 
   return Buffer.concat([iv, encrypted, cipher.getAuthTag()]).toString('base64url')
 }
 
-function opened(value: string, keys: Buffer[]): Sealed | undefined {
+// What the cookie holds, and whether a secret other than the first sealed it.
+function opened(value: string, keys: Buffer[], name: string): { sealed: Sealed, oldKey: boolean } | undefined {
   const bytes = Buffer.from(value, 'base64url')
 
   if (bytes.length <= IV_BYTES + TAG_BYTES)
     return undefined
 
-  for (const key of keys) {
+  for (const [index, key] of keys.entries()) {
     try {
       const decipher = createDecipheriv('aes-256-gcm', key, bytes.subarray(0, IV_BYTES))
 
+      decipher.setAAD(Buffer.from(name))
       decipher.setAuthTag(bytes.subarray(-TAG_BYTES))
 
-      return parse(Buffer.concat([decipher.update(bytes.subarray(IV_BYTES, -TAG_BYTES)), decipher.final()]).toString('utf8')) as Sealed
+      return { sealed: parse(Buffer.concat([decipher.update(bytes.subarray(IV_BYTES, -TAG_BYTES)), decipher.final()]).toString('utf8')) as Sealed, oldKey: index > 0 }
     }
     // Sealed with another key, or not by kay at all.
     catch {}

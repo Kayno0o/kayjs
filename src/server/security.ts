@@ -22,6 +22,9 @@ const DIRECTIVES: Record<string, string[]> = {
   'frame-ancestors': ['\'self\''],
 }
 
+// The directives kay's inline scripts are let through by.
+const SCRIPT_DIRECTIVES = ['script-src', 'script-src-elem']
+
 const HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
@@ -50,7 +53,7 @@ export function securityHeaders(options: SecurityOptions): Record<string, string
   return headers
 }
 
-// kay's directives with the app's merged over them, a directive given `false` left out; `script-src` always keeps the hashes of kay's inline scripts.
+// kay's directives with the app's merged over them, a directive given `false` left out; `script-src` and `script-src-elem` always keep the hashes of kay's inline scripts.
 function policy(overrides: Record<string, string[] | false>, hashes: string[]): string {
   const directives = new Map(Object.entries(DIRECTIVES))
 
@@ -61,10 +64,13 @@ function policy(overrides: Record<string, string[] | false>, hashes: string[]): 
       directives.set(name, sources)
   }
 
-  const script = directives.get('script-src')
+  // A browser reads `script-src-elem` over `script-src` for script tags, so whichever the policy holds lets kay's through.
+  for (const name of SCRIPT_DIRECTIVES) {
+    const sources = directives.get(name)
 
-  if (script)
-    directives.set('script-src', [...script, ...hashes])
+    if (sources)
+      directives.set(name, [...sources, ...hashes])
+  }
 
   return [...directives].map(([name, sources]) => sources.length > 0 ? `${name} ${sources.join(' ')}` : name).join('; ')
 }

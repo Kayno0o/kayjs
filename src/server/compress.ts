@@ -86,34 +86,55 @@ export function compressResponse(request: Request, response: Response): Response
   if (etag?.startsWith('"'))
     compressed.set('etag', `W/${etag}`)
 
-  return new Response(response.body.pipeThrough(compressor(encoding)), { status: response.status, statusText: response.statusText, headers: compressed })
+  return new Response(compressedStream(response.body, encoding), { status: response.status, statusText: response.statusText, headers: compressed })
 }
 
 // Levels quick enough for a request path: brotli 5 and gzip 6 compress a 150 KB page in a millisecond or so.
-function compressor(encoding: Encoding): TransformStream<Uint8Array, Uint8Array> {
+// Each chunk is flushed and sent before the next is read, so at most one waits in zlib; a browser going away stops both the source and zlib.
+function compressedStream(body: ReadableStream<Uint8Array>, encoding: Encoding): ReadableStream<Uint8Array> {
   const zlib = encoding === 'br' ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: 5 } }) : createGzip({ level: 6 })
+  const reader = body.getReader()
   const output: Uint8Array[] = []
+  let failure: Error | undefined
+  const stopped = new Promise<void>(resolve => zlib.once('error', (error: Error) => {
+    failure = error
+    resolve()
+  }))
+  // A zlib error fails the response's stream instead of the process.
+  const settle = async (operation: Promise<void>) => {
+    await Promise.race([operation, stopped])
+
+    if (failure)
+      throw failure
+  }
 
   zlib.on('data', (chunk: Uint8Array) => output.push(chunk))
 
-  const drain = (controller: TransformStreamDefaultController<Uint8Array>) => {
-    for (const chunk of output.splice(0))
-      controller.enqueue(chunk)
-  }
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { value, done } = await reader.read()
 
-  return new TransformStream({
-    async transform(chunk, controller) {
-      zlib.write(chunk)
-      await new Promise<void>(resolve => zlib.flush(() => resolve()))
-      drain(controller)
+      if (done) {
+        // 'end' comes once the last bytes went out as data.
+        const ended = new Promise<void>(resolve => zlib.once('end', resolve))
+
+        zlib.end()
+        await settle(ended)
+      }
+      else {
+        zlib.write(value)
+        await settle(new Promise<void>(resolve => zlib.flush(() => resolve())))
+      }
+
+      for (const chunk of output.splice(0))
+        controller.enqueue(chunk)
+
+      if (done)
+        controller.close()
     },
-    async flush(controller) {
-      // 'end' comes once the last bytes went out as data.
-      const ended = new Promise<void>(resolve => zlib.once('end', resolve))
-
-      zlib.end()
-      await ended
-      drain(controller)
+    async cancel(reason) {
+      zlib.destroy()
+      await reader.cancel(reason)
     },
   })
 }

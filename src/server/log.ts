@@ -12,16 +12,16 @@ export interface RequestLog {
 
 export type RequestLogger = boolean | 'json' | ((entry: RequestLog) => void)
 
-// Logs one line per request to stdout, `GET /blog/hello 200 12ms`, or one JSON object with `json`, or hands each entry to a function; kay's own `/_kay/` routes are left out.
+// Logs one line per request to stdout, `GET /blog/hello 200 12ms`, or one JSON object with `json`, or hands each entry to a function; kay's own `/_kay/` routes and the health route are left out.
 // A hook, so it reaches the app's routes registered after `pages()`.
-export function logRequests(app: Elysia, logger: Exclude<RequestLogger, false>): void {
+export function logRequests(app: Elysia, logger: Exclude<RequestLogger, false>, healthPath?: string): void {
   const started = new WeakMap<Request, { at: number, method: string, path: string, answered?: number }>()
   const write = typeof logger === 'function' ? logger : logger === 'json' ? (entry: RequestLog) => console.log(JSON.stringify({ time: new Date().toISOString(), ...entry })) : (entry: RequestLog) => console.log(`${entry.method} ${entry.path} ${entry.status} ${entry.duration}ms`)
 
   app.onRequest(({ request }) => {
     const { pathname } = new URL(request.url)
 
-    if (!pathname.startsWith(ASSET_PREFIX))
+    if (!pathname.startsWith(ASSET_PREFIX) && pathname !== healthPath)
       started.set(request, { at: performance.now(), method: request.method, path: pathname })
   })
 

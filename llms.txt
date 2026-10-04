@@ -534,7 +534,7 @@ form(action={add})
 - A handler that throws answers 500 with a generic message and logs the error.
 - The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers`, `redirect(location)` and `fail(status, data)`, whose status is an error status, 400 to 599. A location outside ASCII, such as `/blog/日本語`, goes out percent-encoded, from pages and guards too; one holding a control character, or a scheme other than `http:` and `https:`, such as `javascript:`, throws.
 - A post another site sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403. The cookie carrying `ctx.failed` and `ctx.succeeded` back is `HttpOnly`, `SameSite=Lax`, and `Secure` when the request came over https, `X-Forwarded-Proto` included.
-- A third argument protects an action from scripts: `action(schema, handler, { rateLimit: { max: 5, window: 60 }, honeypot: 'website' })`. `rateLimit` lets one client post `max` times every `window` seconds, then answers 429 with `Retry-After` and `errors['']` saying when to retry, counting every attempt, valid or not; the client is the request's address, or behind a proxy on the same machine or network the address it appended last to `X-Forwarded-For`. Counts live in the process, so each server process keeps its own. `honeypot` names a field the form renders out of sight, `input(name="website" tabindex="-1" autocomplete="off" aria-hidden="true")` hidden by a class, which people leave empty and bots fill in: a form post filling it fails with 422 and `errors.website`, and `kay check` takes it as one of the form's fields. Neither reaches the handler.
+- A third argument protects an action from scripts: `action(schema, handler, { rateLimit: { max: 5, window: 60 }, honeypot: 'website' })`. `rateLimit` lets one client post `max` times every `window` seconds, then answers 429 with `Retry-After` and `errors['']` saying when to retry, counting every attempt, valid or not; the client is the request's address, or behind a proxy on the same machine or network the address it appended last to `X-Forwarded-For`. An IPv6 client counts as its /64 block, which one host or home network holds. Counts live in the process, so each server process keeps its own, for at most 10,000 clients per action, the oldest windows dropped past that. `honeypot` names a field the form renders out of sight, `input(name="website" tabindex="-1" autocomplete="off" aria-hidden="true")` hidden by a class, which people leave empty and bots fill in: a form post giving it any value, a file included, fails with 422 and `errors.website`, and `kay check` takes it as one of the form's fields. Neither reaches the handler.
 
 ## Locals
 
@@ -594,8 +594,8 @@ const userId = await ctx.locals.session.get('userId')
 ```
 
 - `get(key)`, `set(key, value)` and `unset(key)` are typed from the plugin's type parameter. `destroy()` forgets the session and clears its cookie, for signing out. `regenerate()` moves the data to a new id, for right after signing in, so an id planted before it is worth nothing. All of them return promises.
-- `secret` is at least 32 characters, read from the environment. A list rotates secrets: the first seals new cookies, every one opens old ones.
-- Without a `store`, the data travels in the cookie, sealed with AES-GCM so it can be neither read nor altered, about 3.5 KB at most: past that the response fails with an error saying so. With a store, the cookie carries only a sealed id. `memoryStore()` keeps sessions in the process, gone on restart. `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine. Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, is a store too, such as one over Redis.
+- `secret` is at least 32 characters, read from the environment. A list rotates secrets: the first seals new cookies, every one opens old ones, and a cookie an older one sealed goes out sealed with the first on its next use.
+- Without a `store`, the data travels in the cookie, sealed with AES-GCM so it can be neither read nor altered, about 3.5 KB at most: past that the response fails with an error saying so. Such a cookie cannot be revoked: `destroy()` clears the browser's copy, but one taken before stays valid until `maxAge`, so a site that must end a session everywhere, after a password change say, uses a store. With a store, the cookie carries only a sealed id, and `destroy()` deletes the session itself. `memoryStore()` keeps sessions in the process, gone on restart. `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine. Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, is a store too, such as one over Redis.
 - Values cross as island props do, Dates, Maps, Sets and bigints included.
 - The cookie, `session` unless `cookie` names another, is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` over https, `X-Forwarded-Proto` included. It is read on first use only, and written only when the session changed or is due an extension: a session lasts `maxAge` seconds without use, 30 days by default, and one used past half of it is extended. A forged or expired cookie reads as an empty session and is cleared.
 
@@ -723,19 +723,19 @@ export default defineConfig({
 })
 ```
 
-- It returns a path starting with one `/`, query included, or `undefined` to serve the request as it came; anything else answers 500 and is logged.
-- The rewritten request goes through the whole app again, the app's own routes, derives and guards included, and everything there sees the new path: `ctx.url`, `ctx.params`, links a page builds from them. It is not rewritten twice, and keeps its method, headers, cookies and body. Rate limits still count the client's own address.
+- It returns a path starting with one `/`, query included, or `undefined` to serve the request as it came; anything else answers 500 and is logged. kay's own `/_kay/` routes, assets, actions, images and the health route, are never rewritten, so they work on every host.
+- The rewritten request goes through the whole app again, the app's own routes, derives and guards included, and everything there sees the new path: `ctx.url`, `ctx.params`, links a page builds from them. It is not rewritten twice, and keeps its method, headers, cookies and body. Rate limits still count the client's own address. The request log shows the path it was rewritten to.
 - Under `app.handle()` with no listening server, as in a test, only kay's pages serve a rewritten request.
 
 ## Request logs
 
-With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms`, the method, the path without its query string, which may carry tokens, the status, and the milliseconds until the response was made, a streamed one's headers. kay's own `/_kay/` routes, assets and the health route included, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration }`, for a log collector; a function receives each `{ method, path, status, duration }` entry instead; `true` logs outside production too, `false` never.
+With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms`, the method, the path without its query string, which may carry tokens, the status, and the milliseconds until the response was made, a streamed one's headers. kay's own `/_kay/` routes, assets included, and the health route, wherever `health.path` puts it, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration }`, for a log collector; a function receives each `{ method, path, status, duration }` entry instead; `true` logs outside production too, `false` never.
 
 ## Health and shutdown
 
-`/_kay/health` answers `200 ok` while the server takes requests, for a load balancer or a container's health check. `health: { path: '/up', check: async () => await db.ping() }` in kay.config.ts moves it and adds a check: one returning `false` or throwing answers 503, the error logged. `health: false` leaves the route out.
+`/_kay/health` answers `200 ok` while the server takes requests, for a load balancer or a container's health check. `health: { path: '/up', check: async () => await db.ping() }` in kay.config.ts moves it and adds a check: one returning `false`, throwing, or taking over 5 s answers 503, the error logged. `health: false` leaves the route out.
 
-On SIGTERM or SIGINT, a server started with `.listen()` stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0; the health route answers 503 meanwhile. Requests still open after `shutdownTimeout` seconds, 10 by default, are closed and the process exits with 1. `kay dev` restarts at once instead.
+On SIGTERM or SIGINT, a server started with `.listen()` stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0. New connections are refused from the signal on, so a load balancer stops sending any; a client on a connection kept alive gets 503 from the health route meanwhile. Requests still open after `shutdownTimeout` seconds, 10 by default, are closed and the process exits with 1. `kay dev` restarts at once instead.
 
 ## Background jobs
 
@@ -782,7 +782,7 @@ export default defineConfig({
 })
 ```
 
-- `csp` merges directives over kay's, one given `false` left out; `script-src` keeps kay's hashes whatever it lists. `csp: false` sends no policy, `security: false` none of these headers.
+- `csp` merges directives over kay's, one given `false` left out; `script-src`, and `script-src-elem` when the app sets one, keep kay's hashes whatever they list. `'script-src': false` leaves kay's inline scripts to `default-src`, which blocks them, islands and streamed blocks with them. `csp: false` sends no policy, `security: false` none of these headers.
 - `headers` merges headers over kay's, one given `false` not sent. HSTS is not sent by default: it binds the domain to https for its `max-age`, so it is the app's call.
 - A header the app sets itself, in an Elysia `onRequest` or a handler, wins over kay's.
 - `inlineScriptHashes({ prefetch, dev })` from `kay/server` gives the hashes, for a policy written elsewhere, such as by a proxy.

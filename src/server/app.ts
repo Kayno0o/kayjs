@@ -16,7 +16,7 @@ import { DEV_EVENTS, devEvents } from './dev'
 import { FAVICON_DIR, serveFavicons } from './favicon'
 import { loadGuards } from './guards'
 import { serveImages } from './image'
-import { serveHealth, stopOnSignal } from './lifecycle'
+import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
 import { logRequests } from './log'
 import { servePublic } from './public'
@@ -119,7 +119,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const log = options.log ?? process.env.NODE_ENV === 'production'
 
   if (log)
-    logRequests(app, log)
+    logRequests(app, log, options.health === false ? undefined : options.health?.path ?? HEALTH_PATH)
 
   if (options.rewrite)
     rewriteRequests(app, options.rewrite, app)

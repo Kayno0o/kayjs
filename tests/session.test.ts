@@ -100,6 +100,22 @@ describe('sessions', () => {
 
     expect(await response.text()).toBe('3')
     expect(await (await counter({ secret: `other ${SECRET}` }).handle(new Request('http://localhost/peek', { headers: { cookie } }))).text()).toBe('none')
+
+    // Only read, the session still goes out sealed with the new secret.
+    const resealed = (await rotated.handle(new Request('http://localhost/peek', { headers: { cookie } }))).headers.getSetCookie()[0]!
+    const fresh = `session=${COOKIE_VALUE.exec(resealed)![1]}`
+
+    expect(await (await counter({ secret: `new ${SECRET}` }).handle(new Request('http://localhost/peek', { headers: { cookie: fresh } }))).text()).toBe('2')
+  })
+
+  it('opens a cookie under its own name only, another session with the same secret refusing it', async () => {
+    const visit = browser(counter())
+
+    await visit('/count')
+    const value = COOKIE_VALUE.exec((await visit('/count')).cookie())![1]
+    const other = counter({ cookie: 'admin' })
+
+    expect(await (await other.handle(new Request('http://localhost/peek', { headers: { cookie: `admin=${value}` } }))).text()).toBe('none')
   })
 
   it('forgets a session unused for maxAge, and extends one used past half of it', async () => {
@@ -163,7 +179,14 @@ describe('sessions', () => {
     expect(signedIn.set).toBeDefined()
     expect((await visit('/account')).text).toContain('<p class="user">ada</p>')
 
+    expect((await visit('/members')).text).toContain('<p class="members">Members only</p>')
+
     await post(signOut.url, {})
     expect((await visit('/account')).text).toContain('<p class="user">nobody</p>')
+
+    const turnedAway = await visit('/members')
+
+    expect(turnedAway.response.status).toBe(302)
+    expect(turnedAway.response.headers.get('location')).toBe('/account')
   })
 })

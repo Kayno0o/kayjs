@@ -3,7 +3,7 @@ import type { Action } from '../src/runtime'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { brotliDecompressSync } from 'node:zlib'
+import { brotliDecompressSync, constants } from 'node:zlib'
 import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
@@ -11,7 +11,7 @@ import { check } from '../src/check'
 import { inlineScriptHashes, pages, shutDown } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
-import { clientOf } from '../src/server/protection'
+import { clientOf, protectionRefusal, rateKey } from '../src/server/protection'
 import { testSite } from '../src/test'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -68,6 +68,20 @@ describe('security headers', () => {
     expect(response.headers.has('x-frame-options')).toBe(false)
   })
 
+  it('keeps a header a route sets, on its Response or through set.headers', async () => {
+    const app = new Elysia()
+      .use(await pages({ routes: ROUTES, prebuilt: false }))
+      .get('/api/own', () => new Response('own', { headers: { 'x-frame-options': 'DENY' } }))
+      .get('/api/set', ({ set }) => {
+        set.headers['content-security-policy'] = 'default-src \'none\''
+
+        return 'set'
+      })
+
+    expect((await app.handle(new Request('http://localhost/api/own'))).headers.get('x-frame-options')).toBe('DENY')
+    expect((await app.handle(new Request('http://localhost/api/set'))).headers.get('content-security-policy')).toBe('default-src \'none\'')
+  })
+
   it('keeps a header the app set itself, and sends none with security off', async () => {
     const own = new Elysia()
       .onRequest(({ set }) => {
@@ -96,6 +110,12 @@ describe('action protection', () => {
 
     expect(trapped.html).toContain('<p class="error">422 Leave this field empty</p>')
     expect(human.html).toContain('<p class="sent">Sent 5</p>')
+
+    // Repeated, or a file, it is filled in all the same.
+    for (const website of [['', 'https://spam.example'], new File(['x'], 'x.txt')])
+      expect(protectionRefusal(send as never, new Request('http://localhost/'), { website }, true, null)?.status).toBe(422)
+
+    expect(protectionRefusal(send as never, new Request('http://localhost/'), { website: [''] }, true, null)).toBeUndefined()
   })
 
   it('lets a client post as often as the limit allows in a window, then answers 429 with when to retry', async () => {
@@ -112,6 +132,13 @@ describe('action protection', () => {
     expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
     expect(parse(await limited.text())).toEqual({ errors: { '': expect.stringMatching(/^Too many attempts; try again in \d+ s$/) }, data: undefined })
     expect((await call('198.51.100.2')).status).toBe(200)
+  })
+
+  it('counts an IPv6 client by its /64, so rotating addresses inside it buys nothing', () => {
+    expect(rateKey('2001:db8:0:1:aaaa::1')).toBe('2001:db8:0:1::/64')
+    expect(rateKey('2001:0db8:0000:0001:ffff:ffff:ffff:ffff')).toBe('2001:db8:0:1::/64')
+    expect(rateKey('203.0.113.7')).toBe('203.0.113.7')
+    expect(rateKey('::ffff:203.0.113.7')).toBe('::ffff:203.0.113.7')
   })
 
   it('takes the address a proxy appended last, never one the client wrote before it', () => {
@@ -263,6 +290,34 @@ describe('compression', () => {
     expect((await fetch('/api/raw', 'br')).headers.get('content-encoding')).toBeNull()
   })
 
+  it('sends a streamed page\'s early chunks before the stream ends', async () => {
+    const { compressResponse } = await import('../src/server/compress')
+    let push!: (text: string) => void
+    let close!: () => void
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        push = text => controller.enqueue(new TextEncoder().encode(text))
+        close = () => controller.close()
+      },
+    })
+    const response = compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': 'br' } }), new Response(body, { headers: { 'content-type': 'text/html' } }))!
+    const reader = response.body!.getReader()
+    const parts: Uint8Array[] = []
+
+    push(`<p>${'shell '.repeat(100)}</p>`)
+    parts.push((await reader.read()).value!)
+    // The shell decodes on its own, before the rest exists.
+    expect(new TextDecoder().decode(brotliDecompressSync(Buffer.concat(parts), { finishFlush: constants.BROTLI_OPERATION_FLUSH }))).toStartWith('<p>shell')
+
+    push('<p>later</p>')
+    close()
+
+    for (let read = await reader.read(); !read.done; read = await reader.read())
+      parts.push(read.value)
+
+    expect(new TextDecoder().decode(brotliDecompressSync(Buffer.concat(parts)))).toEndWith('<p>later</p>')
+  })
+
   it('leaves responses alone unless compress is on', async () => {
     const app = await pages({ routes, prebuilt: false })
 
@@ -405,12 +460,21 @@ describe('rewrites', () => {
       .derive(({ request }) => ({ seenAt: new URL(request.url).pathname }))
       .use(await pages({ routes, prebuilt: false, security: false, rewrite }))
       .get('/shop/api/where', ({ seenAt }) => seenAt)
+      .get('/shop/api/marked', ({ request }) => String(request.headers.has('x-kay-rewritten') || request.headers.has('x-kay-client')))
+      .post('/shop/api/echo', ({ body }) => body)
       .listen(0)
     const fetchAt = async (host: string, path: string) => fetch(`http://localhost:${app.server!.port}${path}`, { headers: { host } })
 
     try {
       expect(await (await fetchAt('shop.localhost', '/mug?color=red')).text()).toContain('<p class="item">Shop mug in red at /shop/mug</p>')
       expect(await (await fetchAt('shop.localhost', '/api/where')).text()).toBe('/shop/api/where')
+      expect(await (await fetchAt('shop.localhost', '/api/marked')).text()).toBe('false')
+      // kay's own routes keep their paths on every host.
+      expect((await fetchAt('shop.localhost', '/_kay/health')).status).toBe(200)
+
+      const echoed = await fetch(`http://localhost:${app.server!.port}/api/echo`, { method: 'POST', headers: { 'host': 'shop.localhost', 'content-type': 'application/json' }, body: JSON.stringify({ mug: 'red' }) })
+
+      expect(await echoed.json()).toEqual({ mug: 'red' })
       expect(await (await fetchAt('localhost', '/shop/mug')).text()).toContain('<p class="item">Shop mug in any at /shop/mug</p>')
       expect((await fetchAt('localhost', '/mug')).status).toBe(404)
       // Without a server, kay's own pages serve it.
