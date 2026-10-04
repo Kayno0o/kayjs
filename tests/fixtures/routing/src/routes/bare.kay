@@ -1,0 +1,4 @@
+--- server
+export const layouts = false
+---
+p.bare Bare

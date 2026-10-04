@@ -1,0 +1,115 @@
+import type { Route } from './routes'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import * as builtIn from '../runtime/params'
+import { bundled, importModule } from './bundle'
+import { decodePath, patternShapes } from './routes'
+
+const TRAILING_SLASH = /\/$/
+
+// Gives the param's value, or undefined to refuse the URL, which then falls through to the next page serving its path.
+export type Matcher = (value: string) => unknown
+
+// One path a route serves as the router registers it: params named by position, `/blog/:p2`, so pages naming the same segment apart share one router path.
+export interface RouterShape {
+  path: string
+  // The route's param at each segment index of the path.
+  positions: [number, string][]
+}
+
+// The project's own matchers live beside the routes directory, one default export per file: `src/params/even.ts`.
+export function matcherFile(routesDir: string, name: string): string {
+  return join(routesDir, '..', 'params', `${name}.ts`)
+}
+
+// Every matcher the routes name: the project's own file, else the one kay ships of that name.
+export async function loadMatchers(routesDir: string, routes: Route[]): Promise<Map<string, Matcher>> {
+  const matchers = new Map<string, Matcher>()
+  const bundle = bundled()
+
+  for (const route of routes) {
+    for (const name of Object.values(route.matchers ?? {})) {
+      if (matchers.has(name))
+        continue
+
+      const file = matcherFile(routesDir, name)
+
+      if (bundle ? file in bundle.modules : existsSync(file)) {
+        const matcher = (await importModule<{ default?: unknown }>(file)).default
+
+        if (typeof matcher !== 'function')
+          throw new TypeError(`kay: ${file} must export a matcher by default: export default (value: string) => value or undefined`)
+
+        matchers.set(name, matcher as Matcher)
+
+        continue
+      }
+
+      if (!Object.hasOwn(builtIn, name))
+        throw new Error(`kay: ${route.file} names the matcher ${name}, which is neither ${file} nor one kay ships: ${Object.keys(builtIn).join(', ')}`)
+
+      matchers.set(name, builtIn[name as keyof typeof builtIn])
+    }
+  }
+
+  return matchers
+}
+
+export function routerShapes(route: Route): RouterShape[] {
+  return patternShapes(route.pattern).map((shape) => {
+    const positions: [number, string][] = []
+    const path = shape.split('/').map((segment, index) => {
+      if (segment === '*') {
+        positions.push([index, route.catchAll!])
+
+        return segment
+      }
+
+      if (!segment.startsWith(':'))
+        return segment
+
+      positions.push([index, segment.slice(1)])
+
+      return `:p${index}`
+    }).join('/')
+
+    return { path, positions }
+  })
+}
+
+// The route's params from the router's positional ones, or `malformed` for an encoding that decodes to nothing; Elysia decodes named params, null when malformed, and leaves the catch-all encoded.
+// A catch-all served with a trailing slash, as `trailingSlash: 'always'` serves it, reads the same as without.
+export function positionalParams(shape: RouterShape, route: Route, raw: Record<string, string | null | undefined>): Record<string, string> | 'malformed' {
+  const params: Record<string, string> = {}
+
+  for (const [index, name] of shape.positions) {
+    const value = name === route.catchAll ? decodePath((raw['*'] ?? '').replace(TRAILING_SLASH, '')) : raw[`p${index}`]
+
+    if (typeof value !== 'string')
+      return 'malformed'
+
+    params[name] = value
+  }
+
+  return params
+}
+
+// The params as the page reads them, each matcher's value in place of its text; undefined when a matcher refuses one.
+export function matchedParams(route: Route, params: Record<string, string>, matchers: Map<string, Matcher>): Record<string, unknown> | undefined {
+  const matched: Record<string, unknown> = { ...params }
+
+  for (const [name, matcher] of Object.entries(route.matchers ?? {})) {
+    const value = params[name]
+
+    // An optional param left out of the URL has nothing to check.
+    if (value === undefined)
+      continue
+
+    matched[name] = matchers.get(matcher)!(value)
+
+    if (matched[name] === undefined)
+      return undefined
+  }
+
+  return matched
+}

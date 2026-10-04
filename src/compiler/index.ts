@@ -20,6 +20,8 @@ export interface CompileOptions {
   includeServer?: boolean
   // Parameters of the route this file serves, typing `ctx.params`.
   params?: string[]
+  // A param's type when it is not `string`, such as a matcher's value.
+  paramTypes?: Record<string, string>
   // Output for type checking: adds the link, form field and island prop assertions.
   check?: boolean
   relocateImport?: (specifier: string) => string | undefined
@@ -67,7 +69,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && !island && !file.server && !ROUTE_FILES.has(basename(filename)) ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const generateOptions = { island, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
+  const generateOptions = { island, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
   let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name)

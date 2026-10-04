@@ -371,12 +371,26 @@ Pages live in `src/routes/`:
 | `about.kay` | `/about` |
 | `todos/[id].kay` | `/todos/:id`, read as `ctx.params.id` |
 | `docs/[...path].kay` | `/docs/*`, read as `ctx.params.path` |
+| `blog/[[page]].kay` | `/blog` and `/blog/:page`, `ctx.params.page` a `string \| undefined` |
+| `items/[id=integer].kay` | `/items/:id` where the matcher `integer` takes the segment, `ctx.params.id` the `number` it returns |
+| `(marketing)/pricing.kay` | `/pricing`: a group, in parentheses, adds nothing to the URL, only its `_layout.kay` and `_guard.ts` |
 | `_layout.kay` | Wraps every page in its directory and below, outermost first, rendering the page at its `slot`. |
 | `_404.kay` | Rendered with status 404 for `ctx.notFound()` in its directory and below; the root one also answers URLs no page serves. |
 | `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
 | `_guard.ts` | Runs before every page and every action in its directory and below; see Guards. |
 
-A page URL ending in a slash redirects with 308 to the one without, query kept: `/about/` to `/about`.
+A page URL ending in a slash redirects with 308 to the one without, query kept: `/about/` to `/about`. `trailingSlash` in kay.config.ts changes that: `'always'` redirects `/about` to `/about/` instead, `'ignore'` serves both.
+
+A matcher checks a param, `[name=matcher]` or `[[name=matcher]]`: it returns the value `ctx.params` hands the page, typed as it returns it, or `undefined` to refuse the URL. kay ships `integer` (a safe whole number, as a number), `uuid` (lowercased) and `slug` (lowercase words joined by dashes), in `kay/params`; a project adds its own as `src/params/<name>.ts`, beside `src/routes/`, its default export the matcher, and one of that name wins over kay's. A matcher nobody provides stops the server.
+
+```ts
+// src/params/even.ts
+export default (value: string) => Number(value) % 2 === 0 ? Number(value) : undefined
+```
+
+A URL a matcher refuses falls through to the page without one serving the same path, `items/[slug].kay` beside `items/[id=integer].kay`, and is a 404 when none does. Two pages serving one path, neither with a matcher, stop the server, whatever they name their params: `todos/[id].kay` and `todos/[slug].kay`, `blog/index.kay` and `blog/[[page]].kay`, `about.kay` and `(site)/about.kay`. A `prerender` list leaves an optional param out to prerender the path without it, and an entry a matcher refuses fails the build.
+
+A page or a layout exporting `layouts = false` from its server fence is wrapped by none of the layouts above it: `export const layouts = false` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
 
 Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence runs per request and may use top-level `await` and the `ctx` object, except what an export such as an action reads: that runs once, when the module loads, so it may neither await nor read `ctx`, which `kay check` reports. The fence's `ctx`:
 
@@ -763,6 +777,23 @@ Every page carries speculation rules: Chromium prefetches the page a link points
   "include": ["src", ".kay/types"]
 }
 ```
+
+## Redirects
+
+`redirects` in kay.config.ts sends old paths elsewhere, with a 308, or a 307 when `permanent` is false:
+
+```ts
+export default defineConfig({
+  redirects: {
+    '/blog/:slug': '/posts/:slug',
+    '/docs/*': '/guide/*',
+    '/sale': { to: 'https://shop.example.com/sale', permanent: false },
+  },
+})
+```
+
+- An old path names params as `:name` segments and may end in `*`; its target uses them, the `*` carrying the rest of the path, and the request's query goes along unless the target has its own. A target naming a param the old path lacks, or an old path a page serves, stops the server.
+- `kay check` reports a target on the site that no page or public file serves; a `:param` stands for any segment there, and another site's URL is not checked.
 
 ## Rewrites
 

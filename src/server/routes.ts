@@ -1,14 +1,18 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
 import { findKayFiles } from '../build/files'
 
 export interface Route {
-  // Elysia path pattern: `/todos/:id`, `/docs/*`.
+  // Path pattern: `/todos/:id`, `/docs/*`, an optional param as `/blog/:page?`.
   pattern: string
   file: string
   params: string[]
   // The parameter a `[...name].kay` file binds to Elysia's `*`.
   catchAll?: string
+  // Params a `[[name]]` segment makes optional.
+  optional?: string[]
+  // The matcher a `[name=matcher]` segment checks its param with, by param.
+  matchers?: Record<string, string>
   // `_layout.kay` files wrapping the page, outermost first.
   layouts: string[]
   special: SpecialPages
@@ -34,7 +38,12 @@ export interface SpecialPages {
   error?: SpecialPage
 }
 
-const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)\]$/i
+const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]$/i
+const OPTIONAL_SEGMENT = /^\[\[([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]\]$/i
+// `(marketing)`: groups pages for their layouts and guards, adding nothing to the URL.
+const GROUP_SEGMENT = /^\(.+\)$/
+// A file exporting this is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones.
+const NO_LAYOUTS = /^export\s+const\s+layouts\s*=\s*false\b/m
 const KAY_EXTENSION = /\.kay$/
 const LAYOUT = '_layout.kay'
 const NOT_FOUND = '_404.kay'
@@ -49,20 +58,37 @@ export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts' 
   if (basename(file).startsWith('_'))
     return undefined
 
-  const segments = relative(routesDir, file).replace(KAY_EXTENSION, '').split(sep)
+  const segments = relative(routesDir, file).replace(KAY_EXTENSION, '').split(sep).filter(segment => !GROUP_SEGMENT.test(segment))
 
   if (segments.at(-1) === 'index')
     segments.pop()
 
   const params: string[] = []
+  const optional: string[] = []
+  const matchers: Record<string, string> = {}
   let catchAll: string | undefined
   const parts = segments.map((segment) => {
+    const maybe = OPTIONAL_SEGMENT.exec(segment)
+
+    if (maybe) {
+      params.push(maybe[1]!)
+      optional.push(maybe[1]!)
+
+      if (maybe[2])
+        matchers[maybe[1]!] = maybe[2]
+
+      return `:${maybe[1]}?`
+    }
+
     const match = DYNAMIC_SEGMENT.exec(segment)
 
     if (!match)
       return segment
 
     params.push(match[2]!)
+
+    if (match[3])
+      matchers[match[2]!] = match[3]
 
     if (!match[1])
       return `:${match[2]}`
@@ -72,7 +98,25 @@ export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts' 
     return '*'
   })
 
-  return { pattern: `/${parts.join('/')}`, file, params, catchAll }
+  return { pattern: `/${parts.join('/')}`, file, params, catchAll, ...optional.length > 0 && { optional }, ...Object.keys(matchers).length > 0 && { matchers } }
+}
+
+// The concrete paths a pattern serves, each optional segment present and left out: `/blog/:page?` serves `/blog` and `/blog/:page`.
+export function patternShapes(pattern: string): string[] {
+  let shapes = ['']
+
+  for (const segment of pattern.split('/').slice(1)) {
+    shapes = segment.endsWith('?')
+      ? shapes.flatMap(shape => [shape, `${shape}/${segment.slice(0, -1)}`])
+      : shapes.map(shape => `${shape}/${segment}`)
+  }
+
+  return shapes.map(shape => shape === '' ? '/' : shape)
+}
+
+// Every path the routes serve, one per optional segment present or not, for what a public file or a built-in route must not take.
+export function servedPaths(routes: Route[]): Set<string> {
+  return new Set(routes.flatMap(route => patternShapes(route.pattern)))
 }
 
 export async function scanRoutes(routesDir: string): Promise<Route[]> {
@@ -91,43 +135,54 @@ export async function scanRoutes(routesDir: string): Promise<Route[]> {
   return routes
 }
 
-// Elysia serves one page per path, takes one param name per segment and misreads some characters in a file name: each stops the server with its own message, rather than a page shadowing another or a raw router error.
+// Two pages serving the same path stop the server, unless all but one check a param with a matcher, which a refused URL falls through; so does a name the router misreads.
 // The server and the build call it; `kay check` and the editor read routes mid-edit and leave it out.
 export function refuseClashes(routesDir: string, routes: Route[]): void {
-  const byPath = new Map<string, Route>()
-  const paramAt = new Map<string, { name: string, route: Route }>()
+  const plainAt = new Map<string, Route>()
 
   for (const route of routes) {
-    if (relative(routesDir, route.file).replace(KAY_EXTENSION, '').split(sep).some(segment => !DYNAMIC_SEGMENT.test(segment) && ROUTER_SYNTAX.test(segment)))
+    if (relative(routesDir, route.file).replace(KAY_EXTENSION, '').split(sep).some(segment => !DYNAMIC_SEGMENT.test(segment) && !OPTIONAL_SEGMENT.test(segment) && !GROUP_SEGMENT.test(segment) && ROUTER_SYNTAX.test(segment)))
       throw new Error(`kay: ${route.file} has a :, * or ' in its name, which the router cannot serve; rename it`)
 
-    const path = route.pattern.replace(PARAM_NAME, ':')
-    const same = byPath.get(path)
-
-    if (same)
-      throw new Error(`kay: ${same.file} and ${route.file} both serve ${same.pattern}`)
-
-    byPath.set(path, route)
-
-    const segments = route.pattern.split('/')
-
-    for (const [index, segment] of segments.entries()) {
-      if (!segment.startsWith(':'))
+    for (const shape of patternShapes(route.pattern)) {
+      // A shape with a matcher on one of its params refuses what it does not match; `/blog` from `[[page=integer]]` has none to.
+      if (paramsIn(shape, route).some(name => route.matchers?.[name] !== undefined))
         continue
 
-      const prefix = segments.slice(0, index + 1).join('/').replace(PARAM_NAME, ':')
-      const named = paramAt.get(prefix)
+      const path = shape.replace(PARAM_NAME, ':')
+      const same = plainAt.get(path)
 
-      if (named && named.name !== segment)
-        throw new Error(`kay: ${named.route.file} and ${route.file} name the same segment ${named.name} and ${segment}; give it one name`)
+      if (same)
+        throw new Error(`kay: ${same.file} and ${route.file} both serve ${shape}; give one a matcher, [id=integer], for the other to take what it refuses`)
 
-      paramAt.set(prefix, { name: segment, route })
+      plainAt.set(path, route)
     }
   }
 }
 
+// The params a shape of the route's pattern names, in order.
+export function paramsIn(shape: string, route: Pick<Route, 'catchAll'>): string[] {
+  return shape.split('/').flatMap((segment) => {
+    if (segment === '*')
+      return [route.catchAll!]
+
+    return segment.startsWith(':') ? [segment.slice(1)] : []
+  })
+}
+
 function layoutsOf(routesDir: string, file: string): string[] {
-  return directoriesUp(routesDir, dirname(file)).map(dir => join(dir, LAYOUT)).filter(layout => existsSync(layout)).reverse()
+  if (exportsNoLayouts(file))
+    return []
+
+  const layouts = directoriesUp(routesDir, dirname(file)).map(dir => join(dir, LAYOUT)).filter(layout => existsSync(layout)).reverse()
+  // The innermost layout that leaves its parents out starts the chain.
+  const reset = layouts.findLastIndex(exportsNoLayouts)
+
+  return reset === -1 ? layouts : layouts.slice(reset)
+}
+
+function exportsNoLayouts(file: string): boolean {
+  return NO_LAYOUTS.test(readFileSync(file, 'utf8'))
 }
 
 function guardsOf(routesDir: string, file: string): GuardFile[] {

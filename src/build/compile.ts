@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG } from '../content/server'
+import { matcherFile } from '../server/params'
 import { refuseClashes, scanRoutes, specialPagesOf } from '../server/routes'
 import { kay } from './plugin'
 import { withoutStyles } from './styles'
@@ -38,8 +39,9 @@ export async function compileServer(root: string, config: KayConfig, options: Co
 
   const fallback = specialPagesOf(routesDir, routesDir)
   const contentConfig = resolve(root, config.content ?? CONTENT_CONFIG)
-  // The content config too, which the server reads the collections and their feeds from.
-  const modules = [...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : []]
+  // The content config too, which the server reads the collections and their feeds from, and the project's own param matchers.
+  const matcherFiles = [...new Set(routes.flatMap(route => Object.values(route.matchers ?? {})))].map(name => matcherFile(routesDir, name)).filter(file => existsSync(file))
+  const modules = [...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles]
   const configFile = join(root, CONFIG_FILE)
   const generated = join(root, '.kay', 'compile', 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`

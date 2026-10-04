@@ -105,8 +105,8 @@ async function runCheck(args: string[]): Promise<number> {
   if (root === undefined)
     return 1
 
-  const { routes, publicDir, content } = await loadConfig(root)
-  const diagnostics = await check(root, { tsconfig, routes, publicDir, content })
+  const { routes, publicDir, content, redirects } = await loadConfig(root)
+  const diagnostics = await check(root, { tsconfig, routes, publicDir, content, redirects })
 
   const sources = new Map<string, string | undefined>()
 

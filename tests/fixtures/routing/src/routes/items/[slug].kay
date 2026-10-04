@@ -1,0 +1,4 @@
+--- server
+const slug: string = ctx.params.slug
+---
+p.slug Slug {slug}

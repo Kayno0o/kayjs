@@ -1,0 +1,4 @@
+--- server
+const id: number = ctx.params.id
+---
+p.id Item {id + 1}

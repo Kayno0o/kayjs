@@ -8,6 +8,7 @@ import { analyzeServer } from '../compiler/script'
 import { isCollection } from '../content'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { registerLoader } from './loader'
+import { loadMatchers, matchedParams } from './params'
 import { renderPage } from './render'
 import { refuseClashes, scanRoutes } from './routes'
 import { configHead } from './seo'
@@ -30,6 +31,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   const routes = await scanRoutes(routesDir)
 
   refuseClashes(routesDir, routes)
+  const matchers = await loadMatchers(routesDir, routes)
 
   for (const route of routes) {
     // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
@@ -43,8 +45,13 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
     for (const params of await listedParams(route, file, 'prerender', module.prerender)) {
       const path = pathOf(route, params)
+      const matched = matchedParams(route, params, matchers)
+
+      if (!matched)
+        throw new Error(`kay: ${file} lists ${JSON.stringify(params)} in prerender, which its matchers refuse, so no request would reach it`)
+
       // Guards run when the page is served, for whoever asks; the build renders what they let through.
-      const response = await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${path}`), params: elysiaParams(route, params) }, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head })
+      const response = await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${path}`) }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head })
 
       if (response.status >= 500)
         throw new Error(`kay: prerendering ${path} from ${file} failed with ${response.status}; the error is logged above`)
@@ -134,34 +141,32 @@ export async function listedParams(route: Route, file: string, name: string, val
     throw new Error(`kay: ${file} exports a ${name} that is neither true, false, a list of params, a function returning one, nor a collection`)
 
   for (const params of list) {
-    if (typeof params !== 'object' || params === null || route.params.some(param => !isPathPart(param === route.catchAll, (params as Record<string, unknown>)[param])))
-      throw new Error(`kay: ${file} lists ${JSON.stringify(params)} in ${name}, which needs a string for each of ${route.params.join(', ')}, with no empty, . or .. segment`)
+    if (typeof params !== 'object' || params === null || route.params.some(param => !isPathPart(route, param, (params as Record<string, unknown>)[param])))
+      throw new Error(`kay: ${file} lists ${JSON.stringify(params)} in ${name}, which needs a string for each of ${route.params.join(', ')}, with no empty, . or .. segment${route.optional ? `; ${route.optional.join(', ')} may be left out` : ''}`)
   }
 
   return list as Record<string, string>[]
 }
 
-// A segment, or for a catch-all a slash-separated run of them, that names a file inside the prerendered pages.
-function isPathPart(catchAll: boolean, value: unknown): boolean {
-  return typeof value === 'string' && (catchAll ? value.split('/') : [value]).every(segment => segment !== '' && segment !== '.' && segment !== '..')
+// A segment, or for a catch-all a slash-separated run of them, that names a file inside the prerendered pages; an optional param may be left out.
+function isPathPart(route: Route, param: string, value: unknown): boolean {
+  if (value === undefined && route.optional?.includes(param))
+    return true
+
+  return typeof value === 'string' && (param === route.catchAll ? value.split('/') : [value]).every(segment => segment !== '' && segment !== '.' && segment !== '..')
 }
 
-// The URL path the params fill in, each segment encoded as the server looks pages up; a catch-all keeps its slashes.
+// The URL path the params fill in, each segment encoded as the server looks pages up; a catch-all keeps its slashes, an optional param left out leaves its segment out.
 export function pathOf(route: Route, params: Record<string, string>): string {
-  return route.pattern.split('/').map((segment) => {
+  const path = route.pattern.split('/').flatMap((segment) => {
     if (segment === '*')
-      return params[route.catchAll!]!.split('/').map(encodeURIComponent).join('/')
+      return [params[route.catchAll!]!.split('/').map(encodeURIComponent).join('/')]
 
-    return encodeURIComponent(segment.startsWith(':') ? params[segment.slice(1)]! : segment)
+    if (segment.endsWith('?'))
+      return params[segment.slice(1, -1)] === undefined ? [] : [encodeURIComponent(params[segment.slice(1, -1)]!)]
+
+    return [encodeURIComponent(segment.startsWith(':') ? params[segment.slice(1)]! : segment)]
   }).join('/')
-}
 
-// What Elysia hands the page for that path: named params decoded, the catch-all still encoded.
-function elysiaParams(route: Route, params: Record<string, string>): Record<string, string> {
-  const raw: Record<string, string> = {}
-
-  for (const name of route.params)
-    raw[name === route.catchAll ? '*' : name] = name === route.catchAll ? params[name]!.split('/').map(encodeURIComponent).join('/') : params[name]!
-
-  return raw
+  return path === '' ? '/' : path
 }

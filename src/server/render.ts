@@ -22,14 +22,13 @@ import { errorPage } from './overlay'
 import { matchesEtag } from './public'
 import { readQuery } from './query'
 import { reportServerError } from './report'
-import { decodePath } from './routes'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
 import { renderStatic, streamDocument } from './stream'
 
 interface PageModule {
   default: (props: Record<string, unknown>) => unknown
-  load?: (ctx: PageContext) => Promise<Record<string, unknown>>
+  load?: (ctx: PageContext<Record<string, unknown>>) => Promise<Record<string, unknown>>
   // The page's schema for its search params.
   query?: unknown
 }
@@ -59,11 +58,10 @@ export interface RenderOptions {
 // What Elysia hands a route handler, derived and resolved values included; pages see it whole as `ctx.locals`.
 export interface RequestContext {
   request: Request
-  params: Record<string, string>
 }
 
 interface Rendering {
-  ctx: PageContext
+  ctx: PageContext<Record<string, unknown>>
   headers: Headers
   status: number
   writeCookies: () => void
@@ -78,12 +76,8 @@ const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Header values are bytes, so a file name outside ASCII is escaped.
 const NOT_ASCII = /[^\x20-\x7E]/g
 
-export async function renderPage(route: ServedRoute, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
-  const params = routeParams(route, context.params)
-
-  if (!params)
-    return new Response('Bad request', { status: 400, headers: TEXT })
-
+// The params come resolved, each matcher's value in place of its text.
+export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const rendering = createRendering(context, params, options.prerendering)
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
 
@@ -130,7 +124,7 @@ export async function renderPage(route: ServedRoute, context: RequestContext, cl
 }
 
 // Development times each load, for the browser's network panel.
-async function runLoad(module: PageModule, ctx: PageContext, timings: number[] | undefined, index: number): Promise<Record<string, unknown>> {
+async function runLoad(module: PageModule, ctx: PageContext<Record<string, unknown>>, timings: number[] | undefined, index: number): Promise<Record<string, unknown>> {
   if (!timings)
     return await module.load?.(ctx) ?? {}
 
@@ -202,7 +196,7 @@ export async function renderUnmatched(special: SpecialPages, context: RequestCon
   return renderFailure(new NotFound(), special, createRendering(context, {}), new Map(), client, options)
 }
 
-function createRendering(context: RequestContext, params: Record<string, string>, prerendering = false): Rendering {
+function createRendering(context: RequestContext, params: Record<string, unknown>, prerendering = false): Rendering {
   const { request } = context
   const jar = cookieJar(request)
   let flash: Flash | SuccessFlash | null | undefined
@@ -433,20 +427,4 @@ function describeError(error: unknown, dev = false): PageError {
     return { status: 500, message: 'Internal Server Error' }
 
   return error instanceof Error ? { status: 500, message: error.message, stack: error.stack && mapStack(error.stack) } : { status: 500, message: String(error) }
-}
-
-// Elysia decodes named params already, null when malformed; only the catch-all arrives encoded. Undefined when one is malformed.
-function routeParams(route: ServedRoute, raw: Record<string, string>): Record<string, string> | undefined {
-  const params: Record<string, string> = {}
-
-  for (const name of route.params) {
-    const value = name === route.catchAll ? decodePath(raw['*'] ?? '') : raw[name]
-
-    if (typeof value !== 'string')
-      return undefined
-
-    params[name] = value
-  }
-
-  return params
 }

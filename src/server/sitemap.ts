@@ -7,6 +7,7 @@ import { escape } from '../runtime/escape'
 import { importModule } from './bundle'
 import { listedParams, pathOf } from './prerender'
 import { reportServerError } from './report'
+import { servedPaths } from './routes'
 
 const SITEMAP = '/sitemap.xml'
 const ROBOTS = '/robots.txt'
@@ -25,7 +26,7 @@ export interface SitemapOptions {
 
 // `/sitemap.xml` and `/robots.txt` for a project with a `site`, unless a public file or a page already serves that path.
 export function serveSitemap(app: Elysia, routes: ServedRoute[], origin: string, taken: Set<string>, options: SitemapOptions = {}): void {
-  const served = new Set([...taken, ...routes.map(route => route.pattern)])
+  const served = new Set([...taken, ...servedPaths(routes)])
   let cached: { xml: Promise<string>, at: number } | undefined
 
   if (!served.has(SITEMAP)) {

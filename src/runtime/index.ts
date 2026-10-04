@@ -89,7 +89,7 @@ export function selection<Key extends string | number>(initial?: Key): Selection
   return Object.assign(read, { set, is })
 }
 
-export interface PageContext<Params extends Record<string, string> = Record<string, string>, Query = Readonly<Record<string, unknown>>> {
+export interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> {
   request: Request
   url: URL
   params: Params
@@ -121,7 +121,7 @@ export interface PageError {
 }
 
 // The context of `_error.kay`, rendered when a page's load or render throws.
-export interface ErrorPageContext<Params extends Record<string, string> = Record<string, string>> extends PageContext<Params> {
+export interface ErrorPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params> {
   error: PageError
 }
 

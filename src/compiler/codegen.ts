@@ -20,6 +20,7 @@ export interface GenerateOptions {
   includeServer?: boolean
   // Route parameters, typing `ctx.params` in `load`.
   params?: string[]
+  paramTypes?: Record<string, string>
   // `_error.kay`, whose `ctx` carries the error it renders.
   errorPage?: boolean
   // A layout or special page, which reads the query its page declares rather than one of its own.
@@ -62,7 +63,7 @@ const PRERENDER = 'prerender'
 // The page's query schema, which types and validates `ctx.query`.
 const QUERY = 'query'
 // The server exports that are no actions; `sitemap` lists the page in the sitemap, `revalidate` renders a prerendered page again once stale.
-const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap', 'revalidate'])
+const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap', 'revalidate', 'layouts'])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
 const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
 // Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a `role`.
@@ -354,7 +355,7 @@ class Generator {
     if (server.exportNames.length > 0)
       b.add(`KayRegisterActions(${JSON.stringify(this.options.moduleId)}, { ${server.exportNames.join(', ')} })\n`)
 
-    const params = this.options.params ? `{ ${this.options.params.map(name => `${JSON.stringify(name)}: string`).join(', ')} }` : 'Record<string, string>'
+    const params = this.options.params ? `{ ${this.options.params.map(name => `${JSON.stringify(name)}: ${this.options.paramTypes?.[name] ?? 'string'}`).join(', ')} }` : 'Record<string, string>'
 
     // An unused parameter would trip `noUnusedParameters` in the user's tsconfig, so it is named `_ctx` when the fence never reads it.
     const ctx = server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'

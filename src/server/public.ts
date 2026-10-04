@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
+import { servedPaths } from './routes'
 
 // For a file served under a name that stays when its content changes.
 export const REVALIDATE = 'public, max-age=0, must-revalidate'
@@ -49,7 +50,7 @@ export function revalidated(request: Request, etag: string, body: () => BodyInit
 }
 
 export async function servePublic(app: Elysia, dir: string, routes: Route[]): Promise<Set<string>> {
-  const pages = new Set(routes.map(route => route.pattern))
+  const pages = servedPaths(routes)
   const files = await publicFiles(dir)
 
   for (const { path, url } of files) {

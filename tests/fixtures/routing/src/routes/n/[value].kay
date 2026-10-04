@@ -1,0 +1,4 @@
+--- server
+const value: string = ctx.params.value
+---
+p.odd Odd {value}

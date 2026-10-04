@@ -1,5 +1,7 @@
 import type { Diagnostic, SourceMap } from '../compiler'
 import type { ContentProblem } from '../content/validate'
+import type { Redirects } from '../server/redirects'
+import type { Route } from '../server/routes'
 import { existsSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -11,9 +13,12 @@ import { iconTypes } from '../build/icons'
 import { compileKay } from '../compiler'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER } from '../content/server'
+import { matcherFile } from '../server/params'
 import { publicFiles } from '../server/public'
-import { routeOf, scanRoutes } from '../server/routes'
+import { redirectProblems } from '../server/redirects'
+import { patternShapes, routeOf, scanRoutes } from '../server/routes'
 
 export const SHADOW_DIR = join('.kay', 'types')
 const CONTENT_PROBLEMS = fileURLToPath(new URL('../content/problems.ts', import.meta.url))
@@ -26,6 +31,8 @@ export interface CheckOptions {
   publicDir?: string
   // The content config relative to the root, whose collections' entries are read against their schemas.
   content?: string
+  // The config's redirects, whose targets on the site must be a page or a public file.
+  redirects?: Redirects
 }
 
 export interface CheckDiagnostic {
@@ -47,6 +54,7 @@ const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
 // An error about the whole run, such as a tsconfig that does not exist.
 const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
 const UNWRITABLE = /[%?#]/
+const TS_EXTENSION = /\.ts$/
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.
 const NOT_IN_URL = /[^\x21-\x7E]+/g
 // Stylesheets import for their effect, other assets for their URL. TypeScript matches a wildcard module case-sensitively, so both `.png` and `.PNG` are declared; a mixed case such as `.Png` is not.
@@ -78,7 +86,10 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   const [routes, publicPaths] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public'))])
 
-  await writeIfChanged(environmentPath, environment(routes.map(route => route.pattern), publicPaths.map(file => file.url)))
+  await writeIfChanged(environmentPath, environment(routes.flatMap(route => patternShapes(route.pattern)), publicPaths.map(file => file.url)))
+
+  for (const message of redirectProblems(options.redirects ?? {}, routes.flatMap(route => patternShapes(route.pattern)), publicPaths.map(file => file.url)))
+    diagnostics.push({ file: join(root, CONFIG_FILE), line: 1, column: 1, message })
   // A script rather than a module, which is what lets it declare a wildcard module.
   await writeIfChanged(assetsPath, ASSET_TYPES)
   await writeIfChanged(iconsPath, iconTypes(root))
@@ -100,7 +111,7 @@ export function shadowPath(root: string, file: string): string {
 
 // Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`.
 export function compileShadow(root: string, routesDir: string, file: string, source: string): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
-  const params = file.startsWith(routesDir + sep) ? routeOf(routesDir, file)?.params : undefined
+  const route = file.startsWith(routesDir + sep) ? routeOf(routesDir, file) : undefined
   const shadowDir = dirname(shadowPath(root, file))
   // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
   const relocateImport = (specifier: string) => {
@@ -111,9 +122,21 @@ export function compileShadow(root: string, routesDir: string, file: string, sou
 
     return target.startsWith(root + sep) ? undefined : relative(shadowDir, target)
   }
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params, check: true, relocateImport })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, relocateImport })
 
   return { shadow: { source, file, tsx, map }, diagnostics }
+}
+
+// A matcher's param is what it returns, the project's own or kay's; an optional one may be missing.
+function paramTypesOf(routesDir: string, shadowDir: string, route: Pick<Route, 'params' | 'optional' | 'matchers'>): Record<string, string> {
+  return Object.fromEntries(route.params.map((name) => {
+    const matcher = route.matchers?.[name]
+    const file = matcher === undefined ? undefined : matcherFile(routesDir, matcher)
+    const module = file !== undefined && existsSync(file) ? `${JSON.stringify(relative(shadowDir, file).replace(TS_EXTENSION, ''))}).default` : `'kay/params').${matcher}`
+    const type = matcher === undefined ? 'string' : `Exclude<ReturnType<typeof import(${module}>, undefined>`
+
+    return [name, route.optional?.includes(name) ? `${type} | undefined` : type]
+  }))
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.

@@ -1,6 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { JsonLd } from './runtime/seo'
 import type { RequestLogger } from './server/log'
+import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
 import { existsSync } from 'node:fs'
@@ -34,6 +35,10 @@ export interface KayConfig {
   log?: RequestLogger
   // Serves a request from another path, query included, such as a host's pages from a section: `url => url.hostname === 'blog.example.com' ? `/blog${url.pathname}` : undefined`. The browser keeps its URL.
   rewrite?: Rewrite
+  // Old paths sent elsewhere with a 308, or a 307 with `permanent: false`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*' }`. `kay check` reports a target no page serves.
+  redirects?: Redirects
+  // Whether a page's URL ends with a slash: `never`, the default, redirects `/about/` to `/about`; `always` the other way; `ignore` serves both.
+  trailingSlash?: TrailingSlash
   // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.
   content?: string
   // Seconds a stopping server gives open requests and streams to finish before closing them; 10 by default.
@@ -105,6 +110,8 @@ export interface ImagesConfig {
   // WebP quality, 1 to 100. Defaults to 80.
   quality?: number
 }
+
+export type TrailingSlash = 'never' | 'always' | 'ignore'
 
 export const CONFIG_FILE = 'kay.config.ts'
 

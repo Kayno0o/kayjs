@@ -1,0 +1,4 @@
+--- server
+const half: number = ctx.params.value / 2
+---
+p.even Half {half}

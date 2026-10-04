@@ -729,7 +729,7 @@ describe('prerendering', () => {
 
     try {
       const account = (await scanRoutes(join(process.cwd(), routes))).find(route => route.pattern === '/account')!
-      const response = await renderPage({ ...account, guards: [] }, { request: new Request('http://localhost/account'), params: {} }, (await readClient(process.cwd()))!, { prerendering: true })
+      const response = await renderPage({ ...account, guards: [] }, { request: new Request('http://localhost/account') }, {}, (await readClient(process.cwd()))!, { prerendering: true })
 
       expect(response.status).toBe(500)
       expect(logged).toHaveBeenCalledWith(expect.stringContaining('a prerendered page renders once, at build time, so it has no ctx.locals'))
@@ -827,9 +827,14 @@ describe('route scan', () => {
       }
     }
 
-    expect(await clash(['about.kay', 'about/index.kay'])).toBe('kay: <routes>/about.kay and <routes>/about/index.kay both serve /about')
-    expect(await clash(['todos/[id].kay', 'todos/[slug].kay'])).toBe('kay: <routes>/todos/[id].kay and <routes>/todos/[slug].kay both serve /todos/:id')
-    expect(await clash(['u/[id]/a.kay', 'u/[slug]/b.kay'])).toBe('kay: <routes>/u/[id]/a.kay and <routes>/u/[slug]/b.kay name the same segment :id and :slug; give it one name')
+    const advice = '; give one a matcher, [id=integer], for the other to take what it refuses'
+
+    expect(await clash(['about.kay', 'about/index.kay'])).toBe(`kay: <routes>/about.kay and <routes>/about/index.kay both serve /about${advice}`)
+    expect(await clash(['todos/[id].kay', 'todos/[slug].kay'])).toBe(`kay: <routes>/todos/[id].kay and <routes>/todos/[slug].kay both serve /todos/:slug${advice}`)
+    expect(await clash(['(site)/about.kay', 'about.kay'])).toBe(`kay: <routes>/(site)/about.kay and <routes>/about.kay both serve /about${advice}`)
+    expect(await clash(['blog/index.kay', 'blog/[[page]].kay'])).toBe(`kay: <routes>/blog/[[page]].kay and <routes>/blog/index.kay both serve /blog${advice}`)
+    // Positions, not names, reach the router, and a matcher lets a page take what another refuses.
+    expect(await clash(['u/[id]/a.kay', 'u/[slug]/b.kay', 'todos/[id=integer].kay', 'todos/[slug].kay'])).toBe('scanned')
     expect(await clash(['x:y.kay'])).toBe('kay: <routes>/x:y.kay has a :, * or \' in its name, which the router cannot serve; rename it')
     expect(await clash(['it\'s.kay'])).toBe('kay: <routes>/it\'s.kay has a :, * or \' in its name, which the router cannot serve; rename it')
     expect(await clash(['todos/[id].kay', 'todos/new.kay', 'docs/[...path].kay', 'docs/index.kay', 'a b.kay'])).toBe('scanned')

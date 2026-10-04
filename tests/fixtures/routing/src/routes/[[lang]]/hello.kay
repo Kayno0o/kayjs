@@ -1,0 +1,4 @@
+--- server
+const lang: string = ctx.params.lang ?? 'en'
+---
+p.hello Hello in {lang}

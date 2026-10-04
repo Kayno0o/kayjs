@@ -47,6 +47,10 @@
       "types": "./types/content/index.d.ts",
       "default": "./src/content/index.ts"
     },
+    "./params": {
+      "types": "./types/runtime/params.d.ts",
+      "default": "./src/runtime/params.ts"
+    },
     "./cache": {
       "types": "./types/runtime/cache.d.ts",
       "default": "./src/runtime/cache.ts"
