@@ -193,6 +193,25 @@ describe('loops', () => {
   })
 })
 
+describe('slots with parameters', () => {
+  it('render a row per item the component passes, following its list and the parent\'s signals', async () => {
+    const { root, dispose } = await mountKay({
+      'rows.kay': '--- <T>\nimport type { JSX } from \'@solidjs/web\'\n\nconst { items, row } = props<{ items: T[], row: (item: T) => JSX.Element }>()\n---\nul\n  for item of items key={item}\n    | {row(item)}\n',
+      'main.kay': '---\nimport { signal } from \'kay\'\nimport Rows from \'./rows.kay\'\n\nconst names = signal([\'a\'])\nconst mark = signal(\'!\')\n---\nbutton(onClick={() => {\n  names.set([\'a\', \'b\'])\n  mark.set(\'?\')\n}}) Grow\nRows(items={names()})\n  @row(name)\n    li.row {name}{mark()}\n',
+    })
+
+    try {
+      expect([...root.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['a!'])
+      root.querySelector('button')!.click()
+      await settle()
+      expect([...root.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['a?', 'b?'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('bind:value on a number input', () => {
   it('keeps the signal\'s last number while the input is empty', async () => {
     const dir = await mkdtemp(join(import.meta.dir, '.dom-'))

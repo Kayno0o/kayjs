@@ -749,7 +749,17 @@ class Generator {
 
         passed.set(name, `another \`@${name}\``)
 
+        // `@row(todo)` passes a function the component calls per item, its parameters typed from the prop.
+        if (slot.params && this.options.check && !this.options.island) {
+          b.add(' ')
+          this.emitFunctionPropCheck(element, slot.name)
+        }
+
         b.add(' ').addSource(slot.name).add('={')
+
+        if (slot.params)
+          b.add('(').addSource(slot.params).add(') => ')
+
         this.emitRoot(slot.children)
         b.add('}')
       }
@@ -1014,8 +1024,8 @@ class Generator {
 
     // A function never reaches an island, and left unwrapped it takes its parameter types from a generic component's other props.
     if (isFunctionExpression(this.text(attribute.expression))) {
-      b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(attribute.name, () => b.add('0')).add(')} ')
-      b.addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
+      this.emitFunctionPropCheck(element, attribute.name)
+      b.add(' ').addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
 
       return true
     }
@@ -1023,6 +1033,11 @@ class Generator {
     b.addSource(attribute.name).add('={KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
 
     return true
+  }
+
+  // Reports a function passed to an island, `0` standing for the prop.
+  private emitFunctionPropCheck(element: ElementNode, name: Span) {
+    this.b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(name, () => this.b.add('0')).add(')}')
   }
 
   // `bind:value={name}` reads the signal and writes it back from the matching input event.

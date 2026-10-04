@@ -97,6 +97,11 @@ describe('formatKay', () => {
     expect(format('p {\n  a\n} x  \n')).toBe('p {\n  a\n} x  \n')
   })
 
+  it('keeps the parameters of a slot as written, shifting the lines they span', () => {
+    expect(format('List\n    @row({ id }, i)\n        li {id}\n')).toBe('List\n  @row({ id }, i)\n    li {id}\n')
+    expect(format('List\n    @row(\n      todo,\n    )\n        li x\n')).toBe('List\n  @row(\n    todo,\n  )\n    li x\n')
+  })
+
   it('keeps the braces of a multi-line key with the for, so children stay under it', () => {
     expect(format('ul\n  for todo of todos key={todo.id\n\n}\n    li x\n')).toBe('ul\n  for todo of todos key={todo.id\n\n}\n    li x\n')
   })

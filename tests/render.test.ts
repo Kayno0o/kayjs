@@ -17,6 +17,7 @@ interface TodoListModule {
 
 // Hydratable markup separates dynamic text with comment markers; the assertions read the text alone.
 const MARKERS = /<!--[$/]-->/g
+const HYDRATION_KEY = / _hk=\w+/g
 
 const { default: TodoList } = await import(join(import.meta.dir, 'fixtures/app/src/todo-list.kay')) as TodoListModule
 
@@ -169,6 +170,16 @@ describe('prop defaults', () => {
     } }
 
     expect(await renderKay('---\nconst { size = \'md\' } = props<{ size?: string }>()\n---\np {size} {size}', props)).toBe('<p _hk=0>md lg</p>')
+  })
+})
+
+describe('slots with parameters', () => {
+  it('render once per call the component makes, with the arguments it passes', async () => {
+    await Bun.write(join(scratch, 'rows.kay'), '--- <T>\nimport type { JSX } from \'@solidjs/web\'\n\nconst { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()\n---\nul\n  for item, i of items key={i}\n    | {row(item, i)}\n')
+
+    const html = await renderKay('---\nimport Rows from \'./rows.kay\'\nconst { names } = props<{ names: string[] }>()\n---\nRows(items={names})\n  @row(name, i)\n    li {i}: {name}', { names: ['a', 'b'] })
+
+    expect(html.replaceAll(HYDRATION_KEY, '')).toBe('<ul><li>0: a</li><li>1: b</li></ul>')
   })
 })
 

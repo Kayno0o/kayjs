@@ -173,6 +173,15 @@ describe('elements', () => {
     expect(errors('div\n  @header\n    h2 Title')).toEqual([expect.stringContaining('directly under a component')])
   })
 
+  it('passes a slot with parameters as a function of them, checked like a function attribute', () => {
+    expect(jsx('List(items={todos})\n  @row(todo, i)\n    li {i}. {todo.title}\n  @empty\n    p none')).toBe('<List items={todos} row={(todo, i) => <li>{i}. {todo.title}</li>} empty={<p>none</p>} />')
+    expect(jsx('List\n  @row()\n    li x')).toBe('<List row={() => <li>x</li>} />')
+
+    const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[1]})\n  @row(n)\n    li {n}', 'test.kay', { check: true }).tsx
+
+    expect(code).toContain('<List items={KayProp(List)(([1]))} {...KayFunctionProp(List)(0)} row={(n) => <li>{n}</li>} />')
+  })
+
   it('reports a prop a slot passes a second time', () => {
     expect(errors('Card\n  @a\n    p x\n  @a\n    p y')).toEqual(['`a` is passed twice, by another `@a` and by this `@a`'])
     expect(errors('Card(a="1")\n  @a\n    p x')).toEqual(['`a` is passed twice, by an attribute and by this `@a`'])

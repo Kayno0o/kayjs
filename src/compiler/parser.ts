@@ -292,11 +292,21 @@ class TemplateParser {
 
     const name = { start: start + 1, end: start + match[0].length }
 
+    let params: Span | undefined
+
     this.pos = name.end
-    this.expectLineEnd('Nothing may follow a slot name on its line')
+
+    if (this.src[this.pos] === '(') {
+      const close = this.scanBalanced(this.pos)
+
+      params = { start: this.pos + 1, end: close - 1 }
+      this.pos = close
+    }
+
+    this.expectLineEnd(params ? 'Nothing may follow the parameters of a slot on its line' : 'Nothing may follow a slot name on its line')
     const children = this.parseBlock(indent)
 
-    return { kind: 'slot', start, end: this.lastContentEnd(), name, children }
+    return { kind: 'slot', start, end: this.lastContentEnd(), name, params, children }
   }
 
   private parseIf(indent: number): IfNode {

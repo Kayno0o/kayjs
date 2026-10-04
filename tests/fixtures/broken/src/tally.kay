@@ -1,0 +1,6 @@
+---
+import type { JSX } from '@solidjs/web'
+
+const { label } = props<{ label: (count: number) => JSX.Element }>()
+---
+button(onClick={() => console.log(1)}) {label(1)}

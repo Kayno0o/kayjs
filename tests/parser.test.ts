@@ -38,7 +38,7 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
       case 'await':
         return { await: text(file, node.value), pending: outline(file, node.pending), resolved: node.resolved && { alias: text(file, node.resolved.alias), children: outline(file, node.resolved.children) }, rejected: node.rejected && { alias: text(file, node.rejected.alias), children: outline(file, node.rejected.children) } }
       case 'slot':
-        return { slot: text(file, node.name), children: outline(file, node.children) }
+        return { slot: text(file, node.name), ...(node.params && { params: text(file, node.params) }), children: outline(file, node.children) }
     }
 
     return node
@@ -279,6 +279,12 @@ describe('control flow', () => {
     const file = parse('Loading\n  @fallback\n    p wait\n  p ready')
 
     expect(outline(file)).toEqual([{ tag: 'Loading', children: [{ slot: 'fallback', children: [{ tag: 'p', children: [['wait']] }] }, { tag: 'p', children: [['ready']] }] }])
+  })
+
+  it('reads the parameters of a slot, which may span lines', () => {
+    expect(outline(parse('List\n  @row({ id, title }, i)\n    li {title}'))).toEqual([{ tag: 'List', children: [{ slot: 'row', params: '{ id, title }, i', children: [{ tag: 'li', children: [['{title}']] }] }] }])
+    expect(outline(parse('List\n  @row(\n    todo,\n  )\n    li x'))).toEqual([{ tag: 'List', children: [{ slot: 'row', params: '\n    todo,\n  ', children: [{ tag: 'li', children: [['x']] }] }] }])
+    expect(parse('List\n  @row(todo) li x').diagnostics.map(d => d.message)).toEqual(['Nothing may follow the parameters of a slot on its line'])
   })
 })
 

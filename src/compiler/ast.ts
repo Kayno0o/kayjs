@@ -66,6 +66,8 @@ export interface ForNode extends Span {
 export interface SlotNode extends Span {
   kind: 'slot'
   name: Span
+  // Inside the brackets of `@row(todo)`: the block is then a function of these parameters.
+  params?: Span
   children: Node[]
 }
 

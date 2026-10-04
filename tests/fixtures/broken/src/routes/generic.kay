@@ -1,6 +1,10 @@
 ---
 import List from '../list.kay'
 import Picker from '../picker.kay'
+import Rows from '../rows.kay'
 ---
 List(items={[new Date()]} show={day => day.toISOStrin()})
 Picker(items={[{ id: 1, name: 'Front' }]} field="nmae")
+Rows(items={[new Date()]})
+  @row(day)
+    li {day.toISOStrin()}

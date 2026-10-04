@@ -1,0 +1,8 @@
+--- <T>
+import type { JSX } from '@solidjs/web'
+
+const { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()
+---
+ul.rows
+  for item, i of items key={i}
+    | {row(item, i)}

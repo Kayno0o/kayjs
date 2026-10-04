@@ -156,7 +156,7 @@ function multiLineSpans(nodes: Node[]): Span[] {
       case 'await':
         return [node.value, ...multiLineSpans(awaitBlocks(node).flat())]
       default:
-        return multiLineSpans(node.children)
+        return [...(node.params ? [node.params] : []), ...multiLineSpans(node.children)]
     }
   })
 }

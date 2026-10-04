@@ -1,5 +1,6 @@
 ---
 import Clicker from '../clicker.kay'
+import Tally from '../tally.kay'
 ---
 a(href="/form") A page
 a(href="/form/extra?tab=1") No such page
@@ -13,3 +14,6 @@ a(href="/docs/guide.pdf") Guide
 a(href="/api/feed.json") No such route
 a(href="/api/import") Posts only
 a(href="/docs/guide.txt") No such file
+Tally
+  @label(count)
+    b {count}

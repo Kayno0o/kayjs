@@ -87,6 +87,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `for item, i of list key={i}` | Rows matched by position. |
 | `slot` | Where a layout or wrapper renders its children. |
 | `@name` | Directly under a component: passes the indented block as its `name` prop. |
+| `@name(a, b)` | The same, as a function of its parameters the component calls. |
 | `head` | At the top level: its `title`, `meta`, `link`, `style`, `script` and `base` children go in the document head. |
 | `await value` / `then name` / `catch error` | Renders the indented block under `await` until `value` settles; see Streaming. |
 
@@ -149,6 +150,31 @@ Card(title="Todos")
   @actions
     a(href="/new") New
   p Body text
+```
+
+A block taking parameters is passed as a function the component calls, once per row for instance, and its parameters take their types from the prop. A static parent cannot pass one to an island, since no function reaches the browser.
+
+```kay
+--- <T extends { id: number }>
+import type { JSX } from '@solidjs/web'
+
+const { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()
+---
+ul
+  for item, i of items key={item.id}
+    | {row(item, i)}
+```
+
+```kay
+---
+import type { Todo } from './todo'
+import List from './list.kay'
+
+const { todos } = props<{ todos: Todo[] }>()
+---
+List(items={todos})
+  @row(todo, i)
+    li {i + 1}. {todo.title}
 ```
 
 ### Head
