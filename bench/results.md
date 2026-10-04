@@ -18,10 +18,10 @@ The products page (layout, 500 products, one counter) rendered in-process throug
 
 |  | kay | solid | svelte |
 | --- | --- | --- | --- |
-| renders/s | **4710** | 1735 (2.71x) | 3770 (1.25x) |
-| mean (ms) | **0.2** | 0.6 (2.71x) | 0.3 (1.25x) |
-| p50 (ms) | **0.2** | 0.5 (2.82x) | 0.2 (1.32x) |
-| p99 (ms) | **0.7** | 1.6 (2.25x) | 0.8 (1.06x) |
+| renders/s | **4085** | 1599 (2.56x) | 3794 (1.08x) |
+| mean (ms) | **0.2** | 0.6 (2.56x) | 0.3 (1.08x) |
+| p50 (ms) | **0.2** | 0.5 (2.69x) | 0.2 (1.21x) |
+| p99 (ms) | 0.9 (1.18x) | 1.8 (2.26x) | **0.8** |
 
 ## Products page in Chromium
 
@@ -29,29 +29,29 @@ Medians of fresh loads with an empty cache: Chromium's main-thread time up to ne
 
 |  | kay | solid | svelte |
 | --- | --- | --- | --- |
-| JS shipped (gzip) | **7.5 KB** | 8.0 KB (1.06x) | 21.8 KB (2.90x) |
-| JS shipped (raw) | **17.4 KB** | 20.3 KB (1.16x) | 57.6 KB (3.30x) |
+| JS shipped (gzip) | **6.6 KB** | 8.0 KB (1.22x) | 21.8 KB (3.33x) |
+| JS shipped (raw) | **14.5 KB** | 20.3 KB (1.40x) | 57.6 KB (3.98x) |
 | JS files | 4 | 1 | 1 |
 | HTML (gzip) | **8.1 KB** | 21.6 KB (2.66x) | 15.6 KB (1.93x) |
 | HTML (raw) | **85.3 KB** | 171.8 KB (2.01x) | 138.6 KB (1.62x) |
-| script (ms) | **1.1** | 12.2 (10.64x) | 15.6 (13.55x) |
-| style (ms) | 6.6 (1.04x) | 6.4 (1.02x) | **6.3** |
-| layout (ms) | **31.3** | 32.0 (1.02x) | 31.6 (1.01x) |
-| JS heap | **1199.3 KB** | 2982.1 KB (2.49x) | 3134.8 KB (2.61x) |
+| script (ms) | **1.1** | 14.2 (12.58x) | 16.0 (14.14x) |
+| style (ms) | 6.6 (1.05x) | 6.4 (1.03x) | **6.2** |
+| layout (ms) | **30.9** | 32.1 (1.04x) | 31.9 (1.03x) |
+| JS heap | **1193.9 KB** | 3017.9 KB (2.53x) | 3126.7 KB (2.62x) |
 
 ## Table page in Chromium
 
 |  | kay | solid | svelte |
 | --- | --- | --- | --- |
-| JS shipped (gzip) | 8.5 KB (1.06x) | **8.0 KB** | 21.8 KB (2.73x) |
-| JS shipped (raw) | **19.6 KB** | 20.3 KB (1.04x) | 57.6 KB (2.94x) |
+| JS shipped (gzip) | **7.5 KB** | 8.0 KB (1.06x) | 21.8 KB (2.90x) |
+| JS shipped (raw) | **16.7 KB** | 20.3 KB (1.22x) | 57.6 KB (3.46x) |
 | JS files | 4 | 1 | 1 |
 | HTML (gzip) | 0.7 KB (1.60x) | 0.7 KB (1.58x) | **0.4 KB** |
 | HTML (raw) | 1.4 KB (1.61x) | 1.3 KB (1.49x) | **0.9 KB** |
-| script (ms) | **1.9** | 2.6 (1.38x) | 4.2 (2.24x) |
-| style (ms) | 0.4 (2.01x) | 0.2 (1.06x) | **0.2** |
-| layout (ms) | 3.2 (1.21x) | **2.6** | 2.8 (1.08x) |
-| JS heap | 1592.3 KB (1.03x) | **1542.7 KB** | 1604.9 KB (1.04x) |
+| script (ms) | **1.9** | 2.9 (1.55x) | 4.8 (2.58x) |
+| style (ms) | 0.4 (2.05x) | 0.2 (1.01x) | **0.2** |
+| layout (ms) | 3.1 (1.11x) | **2.8** | 2.8 (1.01x) |
+| JS heap | **1581.3 KB** | 1607.0 KB (1.02x) | 1633.9 KB (1.03x) |
 
 ## Table operations
 
@@ -59,12 +59,12 @@ The js-framework-benchmark keyed operations, median ms over fresh pages: from th
 
 | operation | kay | solid | svelte |
 | --- | --- | --- | --- |
-| create 1,000 rows | 33.8 (1.09x) | **30.9** | 31.5 (1.02x) |
-| replace 1,000 rows | 28.8 (1.05x) | **27.5** | 30.1 (1.10x) |
-| update every 10th row | 3.6 (1.18x) | 3.4 (1.11x) | **3.1** |
-| select row | **0.2** | 0.3 (1.50x) | 1.2 (6.00x) |
-| swap rows | 2.6 (1.13x) | **2.3** | 2.5 (1.11x) |
-| remove row | **2.2** | 2.3 (1.02x) | 2.5 (1.14x) |
-| create 10,000 rows | 240 (1.02x) | 251 (1.07x) | **236** |
-| append 1,000 rows | **27.3** | 28.2 (1.03x) | 28.5 (1.05x) |
-| clear 1,000 rows | 3.4 (1.02x) | **3.3** | 3.9 (1.18x) |
+| create 1,000 rows | 32.2 (1.04x) | **31.1** | 32.4 (1.04x) |
+| replace 1,000 rows | **28.3** | 29.6 (1.04x) | 30.1 (1.06x) |
+| update every 10th row | 3.7 (1.21x) | 3.3 (1.05x) | **3.1** |
+| select row | **0.2** | 0.3 (1.50x) | 1.1 (5.25x) |
+| swap rows | 2.6 (1.11x) | **2.3** | 2.4 (1.02x) |
+| remove row | 2.3 (1.05x) | **2.2** | 2.6 (1.18x) |
+| create 10,000 rows | 243 (1.06x) | **229** | 232 (1.01x) |
+| append 1,000 rows | **27.1** | 27.5 (1.01x) | 28.2 (1.04x) |
+| clear 1,000 rows | 3.3 (1.02x) | **3.2** | 4.0 (1.23x) |

@@ -1,0 +1,179 @@
+import { describe, expect, it } from 'bun:test'
+import { parse, stringify } from 'devalue'
+import { decodeValue, unflattenValue } from '../src/runtime/wire'
+
+const MALFORMED = /^kay: the devalue text received is malformed at index/
+
+// Through devalue's stringify, as the server writes it, and kay's decoder, as the browser reads it.
+function roundTrip(value: unknown): unknown {
+  return decodeValue(stringify(value))
+}
+
+// An array of `length` with only the given entries set, the others left as holes.
+function holed(length: number, entries: Record<number, unknown>): unknown[] {
+  const array: unknown[] = []
+
+  array.length = length
+
+  for (const [index, value] of Object.entries(entries))
+    array[Number(index)] = value
+
+  return array
+}
+
+describe('kay decodes devalue text', () => {
+  it('reads back every value an island prop may hold', () => {
+    const values: unknown[] = [
+      { name: 'kay', count: 3, ok: true, none: null, nested: { list: [1, 'two', [3]] } },
+      [],
+      {},
+      '',
+      'text with "quotes", </script> and \u2028\u2029',
+      0,
+      -12.5,
+      true,
+      null,
+      undefined,
+      Number.NaN,
+      Infinity,
+      -Infinity,
+      new Date('2026-10-04T21:01:00.000Z'),
+      new Map<unknown, unknown>([['a', 1], [{ key: true }, [2]]]),
+      new Set([1, 'two', { three: 3 }]),
+      123_456_789_012_345_678_901_234_567_890n,
+      -5n,
+      new URL('https://example.com/a?b=c#d'),
+      /^a.b$/,
+      /x\/y/giu,
+      { missing: undefined, list: [undefined, Number.NaN] },
+      holed(3, { 0: 1, 2: 3 }),
+      holed(2, {}),
+      holed(1_000_001, { 1_000_000: 'last' }),
+      Object.assign(Object.create(null) as object, { a: 1, b: { c: 2 } }),
+    ]
+
+    for (const value of values) {
+      const decoded = roundTrip(value)
+
+      expect(decoded).toStrictEqual(value)
+      // Written again, it must come out as devalue's own parse would have rebuilt it.
+      expect(stringify(decoded)).toBe(stringify(parse(stringify(value))))
+    }
+  })
+
+  // Apart from the others, since Bun's toStrictEqual never finds two Invalid Dates or two URLSearchParams equal.
+  it('reads back an invalid Date and URLSearchParams', () => {
+    const date = roundTrip(new Date(Number.NaN))
+    const search = roundTrip(new URLSearchParams('a=1&b=two&a=3'))
+
+    expect(date).toBeInstanceOf(Date)
+    expect((date as Date).getTime()).toBeNaN()
+    expect(search).toBeInstanceOf(URLSearchParams)
+    expect(String(search)).toBe('a=1&b=two&a=3')
+  })
+
+  it('keeps -0 apart from 0', () => {
+    const [negative, positive] = roundTrip([-0, 0]) as number[]
+
+    expect(Object.is(roundTrip(-0), -0)).toBe(true)
+    expect(Object.is(negative, -0)).toBe(true)
+    expect(Object.is(positive, 0)).toBe(true)
+  })
+
+  it('keeps holes as holes', () => {
+    const decoded = roundTrip(holed(3, { 0: 1, 2: 3 })) as unknown[]
+
+    expect(decoded).toHaveLength(3)
+    expect(1 in decoded).toBe(false)
+  })
+
+  it('keeps a value shared between two places as one value', () => {
+    const shared = { id: 1 }
+    const decoded = roundTrip({ a: shared, b: [shared], c: new Map([[shared, shared]]) }) as { a: object, b: object[], c: Map<object, object> }
+
+    expect(decoded.b[0]).toBe(decoded.a)
+    expect([...decoded.c.keys()][0]).toBe(decoded.a)
+    expect([...decoded.c.values()][0]).toBe(decoded.a)
+  })
+
+  it('rebuilds cyclic references', () => {
+    const object: Record<string, unknown> = { name: 'root' }
+    const list: unknown[] = [object]
+    const map = new Map<string, unknown>()
+    const set = new Set<unknown>()
+
+    object.self = object
+    object.list = list
+    list.push(list)
+    map.set('map', map)
+    set.add(set)
+
+    const decoded = roundTrip({ object, map, set }) as { object: typeof object, map: typeof map, set: typeof set }
+
+    expect(decoded.object.self).toBe(decoded.object)
+    expect((decoded.object.list as unknown[])[0]).toBe(decoded.object)
+    expect((decoded.object.list as unknown[])[1]).toBe(decoded.object.list)
+    expect(decoded.map.get('map')).toBe(decoded.map)
+    expect([...decoded.set][0]).toBe(decoded.set)
+  })
+
+  it('revives a custom type from what its reducer returned', () => {
+    class Point {
+      constructor(readonly x: number, readonly y: number) {}
+    }
+
+    const point = new Point(1, 2)
+    const text = stringify({ a: point, b: point }, { Point: value => value instanceof Point && [value.x, value.y] })
+    const revivers = { Point: ([x, y]: [number, number]) => new Point(x, y) }
+    const decoded = decodeValue(text, revivers) as { a: Point, b: Point }
+
+    expect(decoded.a).toBeInstanceOf(Point)
+    expect(decoded.a).toStrictEqual(point)
+    expect(decoded.b).toBe(decoded.a)
+    expect(unflattenValue(JSON.parse(text), revivers)).toStrictEqual({ a: point, b: point })
+  })
+
+  it('reads a top-level constant', () => {
+    expect(unflattenValue(-1)).toBeUndefined()
+    expect(unflattenValue(-3)).toBeNaN()
+  })
+})
+
+describe('kay refuses a malformed payload', () => {
+  const cases: [string, string, Record<string, (value: never) => unknown>?][] = [
+    ['an empty list', '[]'],
+    ['a bare object', '{}'],
+    ['a bare string', '"text"'],
+    ['an unknown constant', '-9'],
+    ['an index past the end', '[[1]]'],
+    ['a fractional index', '[[0.5]]'],
+    ['an index that is not a number', '[{"a":"1"},2]'],
+    ['an unknown constant inside', '[[-8]]'],
+    ['a type kay never sends', '[["Uint8Array",1],["ArrayBuffer","AAAA"]]'],
+    ['a boxed primitive', '[["Object",1],2]'],
+    ['a Date that is not a string', '[["Date",5]]'],
+    ['a RegExp with flags that are not a string', '[["RegExp","a",1]]'],
+    ['a __proto__ key', '[{"__proto__":1},{"polluted":2},3]'],
+    ['a __proto__ key on a null-prototype object', '[["null","__proto__",1],{}]'],
+    ['a null-prototype key that is not a string', '[["null",1,1],2]'],
+    ['a sparse array with a negative length', '[[-7,-1]]'],
+    ['a sparse array with a length too long', '[[-7,4294967296]]'],
+    ['a sparse array index past its length', '[[-7,2,5,1],"x"]'],
+    ['a revived type containing itself', '[["Custom",0]]', { Custom: value => value }],
+  ]
+
+  for (const [name, text, revivers] of cases) {
+    it(`such as ${name}`, () => {
+      expect(() => decodeValue(text, revivers)).toThrow(MALFORMED)
+    })
+  }
+
+  it('such as text that is not JSON', () => {
+    expect(() => decodeValue('{not json')).toThrow(SyntaxError)
+  })
+
+  it('such as a URL or a bigint that does not parse', () => {
+    expect(() => decodeValue('[["URL","not a url"]]')).toThrow(TypeError)
+    expect(() => decodeValue('[["BigInt","1.5"]]')).toThrow(SyntaxError)
+  })
+})
