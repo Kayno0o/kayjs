@@ -249,7 +249,6 @@ export function omit(props: object, ...keys: string[]): object {
   return Object.defineProperties({}, descriptors)
 }
 
-// An `if` naming its value: the branch reads it through a function, as the island build of the same template does.
 // A `try` block: what it renders, or once that throws, its `catch` block, the error reported. The marker tells an island hydrating to keep that markup as it came, since the error stayed on the server.
 export function attempt(render: () => string, fallback?: (error: unknown) => string): string {
   try {
@@ -267,6 +266,7 @@ export function attempt(render: () => string, fallback?: (error: unknown) => str
   }
 }
 
+// An `if` naming its value: the branch reads it through a function, as the island build of the same template does.
 export function show<T>(value: T, render: (value: () => NonNullable<T>) => string, fallback?: () => string): string {
   if (!value)
     return fallback?.() ?? ''

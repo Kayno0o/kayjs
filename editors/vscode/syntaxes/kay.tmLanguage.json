@@ -224,7 +224,7 @@
       "match": "^[ \\t]*(try)[ \\t]*$",
       "captures": {
         "1": {
-          "name": "keyword.control.trycatch.kay"
+          "name": "keyword.control.flow.kay"
         }
       }
     },

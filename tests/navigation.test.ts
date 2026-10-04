@@ -248,7 +248,7 @@ describe.skipIf(!browserInstalled)('page swap in Chromium', () => {
 
     expect(await page.locator('p.fragile').count()).toBe(0)
     await Bun.sleep(100)
-    expect(reports.map(body => (JSON.parse(body) as { message: string }).message)).toEqual(['Fragile broke'])
+    expect(reports.map(body => JSON.parse(body) as Record<string, unknown>)).toEqual([{ name: 'Error', message: 'Fragile broke', stack: expect.any(String), island: 'tests/fixtures/navigation/src/components/fragile.kay', url: `${origin}/fallback` }])
     expect(warnings).toEqual([])
   })
 
@@ -264,7 +264,8 @@ describe.skipIf(!browserInstalled)('page swap in Chromium', () => {
     await page.locator('button.open', { hasText: 'Open' }).waitFor()
 
     expect(await page.locator('section.box p.tone').allTextContents()).toEqual(['loud', 'loud'])
-    expect(await page.locator('body > p.tone').textContent()).toBe('plain')
+    expect(await page.locator('body > p.tone').textContent()).toBe('layout')
+    expect(await page.textContent('button.reader')).toBe('plain')
     expect(warnings).toEqual([])
   })
 

@@ -16,7 +16,7 @@ interface Source {
 interface SignalNode<T> extends Source {
   value: T
   equals: Equals<T>
-  // Made outside any render, at a module's top level: on the server it outlives the request, so a render's writes are kept per request.
+  // Made outside any island's render, as at a module's top level: on the server it outlives the request, so what a request's render writes is kept for that request.
   shared: boolean
 }
 
@@ -68,7 +68,7 @@ let batching = 0
 let serverRendering = 0
 const MAX_ROUNDS = 100_000
 let serverScope: (() => ServerScope | undefined) | undefined
-let reporter: (error: unknown) => void = error => console.error(error)
+let reporter: (error: unknown, island?: string) => void = error => console.error(error)
 // Set while an island claims its server markup, with what waits for it to be done.
 let hydrating = 0
 let afterHydration: (() => void)[] = []
@@ -177,13 +177,13 @@ export function catchError<T>(fn: (dispose: () => void) => T, handler: (error: u
   }
 }
 
-// Logs an error no `try` block caught, or one it did, and hands it to what the page reports errors to.
-export function reportError(error: unknown): void {
-  reporter(error)
+// Logs an error no `try` block caught, or one it did, and hands it to what the page reports errors to, with the island it happened in when known.
+export function reportError(error: unknown, island?: string): void {
+  reporter(error, island)
 }
 
 // Installed by the browser's entry: where errors go besides the console.
-export function setErrorReporter(report: (error: unknown) => void): void {
+export function setErrorReporter(report: (error: unknown, island?: string) => void): void {
   reporter = report
 }
 
@@ -197,8 +197,9 @@ export function currentServerScope(): ServerScope | undefined {
   return serverScope?.()
 }
 
+// Any write while a request renders, a page's script or an island's, stays with that request; the browser installs no scope.
 function scopedValues(node: { shared: boolean }): WeakMap<object, unknown> | undefined {
-  return node.shared && serverRendering > 0 ? serverScope?.()?.values : undefined
+  return node.shared && serverScope !== undefined ? serverScope()?.values : undefined
 }
 
 // Runs `fn` now, or once the islands claiming their server markup are done, so a value they did not render with never meets that markup.
@@ -235,7 +236,7 @@ export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
 
   return () => {
     // A module's memo on the server would keep what one request's render derived for the next.
-    if (shared && serverRendering > 0 && serverScope)
+    if (shared && serverScope?.() !== undefined)
       return untrack(fn)
 
     if (node.state !== DISPOSED) {
@@ -464,10 +465,19 @@ function runEffect(node: Computation): void {
     while (catcher && !catcher.catcher)
       catcher = catcher.owner
 
-    if (catcher)
-      catcher.catcher!(error)
-    else
+    if (!catcher) {
       reportError(error)
+
+      return
+    }
+
+    // A `catch` block throwing in turn must not stop the effects still queued.
+    try {
+      catcher.catcher!(error)
+    }
+    catch (failure) {
+      reportError(failure)
+    }
   }
 }
 

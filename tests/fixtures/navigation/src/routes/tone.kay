@@ -1,9 +1,11 @@
 ---
 import ToneBox from '../components/tone-box.kay'
 import ToneLabel from '../components/tone-label.kay'
+import ToneReader from '../components/tone-reader.kay'
 ---
 head
   title Tone
 h1 Tone
 ToneBox
 ToneLabel
+ToneReader

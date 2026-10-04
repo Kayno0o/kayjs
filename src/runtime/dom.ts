@@ -39,6 +39,7 @@ interface DelegatingDocument extends Document {
 let claim: Claim | undefined
 // The comment `FAILED_MARKER` of kay/html holds.
 const FAILED_MARKER_DATA = 'kay-failed'
+const ISLAND_SLOT = 'slot[data-component]'
 
 type ElementRecord = Element & Record<string, unknown>
 
@@ -888,7 +889,7 @@ export function attempt(element: Node | null, start: Node | null, end: Node | nu
   onCleanup(() => disposeFallback?.())
 
   const fail = (error: unknown) => {
-    reportError(error)
+    reportError(error, islandOf(region.parent))
 
     if (failed)
       return
@@ -914,9 +915,18 @@ export function attempt(element: Node | null, start: Node | null, end: Node | nu
       current = show(region, current, render)
     }
     catch (error) {
+      // Markup the island would not claim is the island's to recover from, rendering it afresh, not the block's to fall back from.
+      if (error instanceof HydrationMismatch)
+        throw error
+
       fail(error)
     }
   }, fail)
+}
+
+// The island a node sits in, named in what an error report says.
+function islandOf(node: Node): string | undefined {
+  return (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>(ISLAND_SLOT)?.dataset.component
 }
 
 function failedOnServer(region: Region): boolean {

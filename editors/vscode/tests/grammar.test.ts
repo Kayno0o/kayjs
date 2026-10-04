@@ -151,6 +151,13 @@ describe('kay grammar', () => {
     expect(lines[8]).toEqual(['|: punctuation.definition.text.kay', 'plain: source.kay', '{: punctuation.section.embedded.begin.kay', 'x: variable.other.ts', '}: punctuation.section.embedded.end.kay'])
   })
 
+  it('reads a try block with its catch branch', () => {
+    const lines = tokenize(['try', '  p Fine', 'catch error'].join('\n'))
+
+    expect(lines[0]).toEqual(['try: keyword.control.flow.kay'])
+    expect(lines[2]).toEqual(['catch: keyword.control.flow.kay', 'error: variable.other.readwrite.alias.kay'])
+  })
+
   it('reads await blocks with their then and catch branches', () => {
     const lines = tokenize(['await comments', '  p Loading', 'then list', 'catch error', 'await user then found', 'then'].join('\n'))
 

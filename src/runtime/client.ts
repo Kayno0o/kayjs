@@ -24,18 +24,22 @@ const ERROR_URL = '/_kay/error'
 const MAX_REPORTS = 10
 const reported = new Set<string>()
 
-setErrorReporter((error) => {
+setErrorReporter((error, island) => {
   console.error(error)
-  sendError(error)
+  sendError(error, island)
 })
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('error', event => sendError(event.error ?? event.message))
+  // An error with no error object is another origin's script, whose details the browser hides: nothing to report.
+  window.addEventListener('error', (event) => {
+    if (event.error !== undefined && event.error !== null)
+      sendError(event.error)
+  })
   window.addEventListener('unhandledrejection', event => sendError(event.reason))
 }
 
-// Sends an error to the server once per message and place, a few per page at most.
-function sendError(error: unknown): void {
+// Sends an error to the server once per message and place, a few per page load at most, with the page's path only: its query and hash may hold what the user typed.
+function sendError(error: unknown, island?: string): void {
   const { name, message, stack } = error instanceof Error ? error : { name: 'Error', message: String(error), stack: undefined }
   const key = `${message}\n${stack}`
 
@@ -43,7 +47,7 @@ function sendError(error: unknown): void {
     return
 
   reported.add(key)
-  void post(JSON.stringify({ name, message, stack, url: location.href }))
+  void post(JSON.stringify({ name, message, stack, island, url: location.origin + location.pathname }))
 }
 
 async function post(body: string): Promise<void> {
@@ -101,7 +105,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
       disposers.set(element, render(() => component(props), element))
     }
     catch (error) {
-      reportError(error)
+      reportError(error, id)
     }
   }
   else {
@@ -126,7 +130,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
         catch (failure) {
           // An error of the component itself, thrown again: the server's markup stays, lifeless, rather than nothing.
           element.replaceChildren(...markup)
-          reportError(failure)
+          reportError(failure, id)
         }
       }
     })

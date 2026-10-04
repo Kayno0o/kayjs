@@ -1,0 +1,4 @@
+---
+import { Tone } from '../tone'
+---
+button.reader(onClick={() => undefined}) {Tone.use()}

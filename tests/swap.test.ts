@@ -4,22 +4,26 @@ import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t, ValidationError } from 'elysia'
-import { context } from '../src/runtime'
+import { signal } from '../src/runtime'
 import { action } from '../src/runtime/action'
 import { hydrateIslands } from '../src/runtime/client'
+import { attempt, hydrate, HydrationMismatch } from '../src/runtime/dom'
 import { formInput } from '../src/runtime/form'
-import { child, component } from '../src/runtime/html'
+import { child } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
+import { createSignal } from '../src/runtime/reactive'
 import { checkForm } from '../src/runtime/validate'
 import { encodeValue } from '../src/runtime/wire'
 import { servePages } from '../src/server/app'
 import { BrowserError } from '../src/server/errors'
 import { formsScript } from '../src/server/forms'
-import { renderStatic } from '../src/server/stream'
+import { inServerScope } from '../src/server/scope'
 
 const routes = 'tests/fixtures/navigation/src/routes'
 // The field an issue of the server's validation is about, as it reads it.
 const FIELD = /^\/([^/]*)/
+// Made at module level, as an app's shared state is.
+const shared = createSignal('default')
 const FORMS = /<script type="application\/json" data-kay-forms>(.*?)<\/script>/
 const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(process.cwd(), '.kay', 'client', 'dist'), navigation: true }
 const app = await servePages(process.cwd(), { routes, security: false }, async () => client)
@@ -102,22 +106,24 @@ describe('page swap, on the server', () => {
     const page = await html('/tone')
 
     expect(page).toContain('<section class="box"><!--[--><p class="tone">loud</p><!--]-->')
-    expect(page).toMatch(/<\/slot><p class="tone">plain<\/p>/)
+    // The layout's value reaches the page; the island beside, detached, reads the default.
+    expect(page).toMatch(/<\/slot><p class="tone">layout<\/p>/)
+    expect(page).toContain('<button class="reader">plain</button>')
   })
 
-  it('lets a layout provide to its page, and a component to what it renders only', () => {
-    const Tone = context('plain')
-    const Label = () => ({ t: Tone.use() })
-    const Layout = (props: { children: unknown }) => {
-      Tone.provide('layout')
+  it('tells caches a page a persisted cookie shaped depends on cookies', async () => {
+    expect((await app.handle(new Request('http://localhost/alone'))).headers.get('vary')).toContain('cookie')
+    expect((await app.handle(new Request('http://localhost/plain'))).headers.get('vary') ?? '').not.toContain('cookie')
+  })
 
-      return { t: child(props.children) }
-    }
-    const markup = renderStatic(() => [component(Layout, { get children() {
-      return component(Label, {})
-    } }), component(Label, {})]).html
+  it('keeps a write a page\'s own render makes to a module\'s signal for that request only', () => {
+    const request = new Request('http://localhost/')
+    const report = () => undefined
 
-    expect(markup).toBe('layoutplain')
+    inServerScope(request, report, () => shared[1]('first request'))
+
+    expect(inServerScope(request, report, () => shared[0]())).toBe('default')
+    expect(shared[0]()).toBe('default')
   })
 
   it('marks an island kept across navigations, under its component or a key of its own', () => {
@@ -220,6 +226,22 @@ describe('page swap, checking a form in the browser', () => {
 
     for (const name of Object.keys(server))
       expect([name, element.querySelector<HTMLInputElement>(`input[name="${name}"]`)!.validationMessage]).toEqual([name, server[name]!])
+  })
+
+  it('leaves the default for a persisted cookie cut short', () => {
+    document.cookie = 'cut=%E0%A4%A'
+
+    expect(signal('light', { persist: 'cut' })()).toBe('light')
+  })
+
+  it('leaves markup a try block would not claim to its island, which renders afresh', () => {
+    const element = document.createElement('div')
+
+    element.innerHTML = '<p>changed</p>'
+
+    expect(() => hydrate(() => attempt(element, null, null, () => {
+      throw new HydrationMismatch('the markup changed')
+    }, () => 'fallback'), element)).toThrow('the markup changed')
   })
 
   it('leaves alone an island a swap took away while its chunk loaded', async () => {

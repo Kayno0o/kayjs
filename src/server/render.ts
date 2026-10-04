@@ -370,7 +370,8 @@ async function importAll(files: string[]): Promise<PageModule[]> {
 
 // The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
 function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
-  return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.onError), () => documentOf(files, modules, data, client, rendering, options))
+  // A page a persisted signal's cookie shaped is told apart by it in any cache.
+  return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.onError), () => documentOf(files, modules, data, client, rendering, options), () => rendering.headers.append('vary', 'cookie'))
 }
 
 function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {

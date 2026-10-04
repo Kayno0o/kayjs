@@ -15,6 +15,7 @@ const YEAR_SECONDS = 365 * 24 * 60 * 60
 // Browsers drop a cookie past about 4 KB, its name and attributes included.
 const MAX_COOKIE_BYTES = 3800
 const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
+const TRAILING_SLASH = /\/$/
 
 // What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
 export function persisted<T>(key: string, storage: Storage, read: () => T, write: (value: T) => void): Persisted<T> {
@@ -103,8 +104,16 @@ function cookie(name: string): string | undefined {
   for (const pair of document.cookie.split('; ')) {
     const at = pair.indexOf('=')
 
-    if (pair.slice(0, at) === name)
+    if (pair.slice(0, at) !== name)
+      continue
+
+    try {
       return decodeURIComponent(pair.slice(at + 1))
+    }
+    catch {
+      // Cut short or written by hand: the default stands.
+      return undefined
+    }
   }
 
   return undefined
@@ -119,7 +128,10 @@ function saveCookie(name: string, value: unknown): void {
     return
   }
 
-  document.cookie = `${name}=${text}; path=${withBase('/')}; max-age=${YEAR_SECONDS}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
+  // `/docs`, not `/docs/`, which a request for `/docs` itself would not send it to.
+  const path = withBase('/').replace(TRAILING_SLASH, '') || '/'
+
+  document.cookie = `${name}=${text}; path=${path}; max-age=${YEAR_SECONDS}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
 }
 
 function readLocal(key: string): string | null {

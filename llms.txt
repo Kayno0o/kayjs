@@ -368,10 +368,10 @@ An island hydrates as soon as the page loads, its chunks preloaded. `hydrate="id
 
 A signal a `.ts` module exports is one state for every island of the page that imports it: `export const cart = signal<Item[]>([])` in `src/cart.ts`, read by a header badge and written by a product's button.
 
-- On the server a module outlives the request, so a value an island's script writes to such a signal while it renders, as `cart.set(items)` seeding it from props, holds for that request only, and every island rendered after it reads it. A module's `memo` is computed afresh on each read there.
-- `signal('light', { persist: 'theme' })` keeps its value across pages and visits in a cookie named `theme`, which the server reads too, so a page rendered for the request shows the kept value from the first paint. A page `kay build` prerendered, or `cached` HTML, renders the default, and the island corrects it as it hydrates.
+- On the server a module outlives the request, so a value a page's, a layout's or an island's script writes to such a signal while the page renders, as `cart.set(items)` seeding it from props, holds for that request only, and everything rendered after it reads it. A module's `memo` is computed afresh on each read there.
+- `signal('light', { persist: 'theme' })` keeps its value across pages and visits in a cookie named `theme`, which the server reads too, so a page rendered for the request shows the kept value from the first paint, and answers with `Vary: Cookie`. A page `kay build` prerendered renders the default, and the island corrects it as it hydrates. The cookie is named after `persist` as it is, so it never reuses the name of a cookie the app sets itself.
 - `{ persist: 'draft', storage: 'local' }` keeps it in localStorage instead, which the server never sees: the page renders the default and the kept value applies once the islands reading it have hydrated, so it suits what the first paint does not show.
-- A persisted value crosses as island props do, Dates, Maps and Sets included. A cookie value over about 3.8 KB encoded is not kept, with a warning; one written by another version of the app, or by hand, that does not decode leaves the default. The cookie is `SameSite=Lax`, for the site's mount point, kept a year, and `Secure` over https.
+- A persisted value crosses as island props do, Dates, Maps and Sets included. A cookie value over about 3.8 KB encoded is not kept, with a warning; one written by another version of the app, or by hand, that does not decode leaves the default. A value that decodes is not checked against the signal's type, so one whose shape the code relies on is checked before use. The cookie is `SameSite=Lax`, for the site's mount point, kept a year, and `Secure` over https.
 
 ### Error fallbacks
 
@@ -385,9 +385,9 @@ catch error
 ```
 
 - It works in any template. On the server, a block that throws renders `catch`, and the error goes to the log and `onError` like any render error, the page answering 200. Without `try`, a render error fails the page as before.
-- In an island, a block that throws while it hydrates, or later as a signal it reads changes, renders `catch` in its place, its effects disposed. The error is logged and sent to the server, where `onError` gets it as a `BrowserError` from `kay/server`, with `kind`, the error's own name such as `TypeError`, `message`, `stack` and the page's `url`. A block the server rendered `catch` for keeps that markup as it came, since the error stayed on the server.
+- In an island, a block that throws while it hydrates, or later as a signal it reads changes, renders `catch` in its place, its effects disposed. The error is logged and sent to the server, where `onError` gets it as a `BrowserError` from `kay/server`, with `kind`, the error's own name such as `TypeError`, `message`, `stack`, the page's `url`, its path without query or hash, and `island`, the island's component path, when known. A block the server rendered `catch` for keeps that markup as it came, since the error stayed on the server.
 - `catch` takes the error under a name or none, typed `unknown`. A `try` without `catch` renders nothing when it throws.
-- An error no `try` catches in the browser, from an effect, a handler or a promise nobody awaited, is reported the same way; an island whose script throws as it hydrates keeps its server markup, lifeless. The browser sends at most 10 distinct errors per page, and the server takes 20 reports a minute per client, refusing another site's and any over 16 KB.
+- An error no `try` catches in the browser, from an effect, a handler or a promise nobody awaited, is reported the same way; an island whose script throws as it hydrates keeps its server markup, lifeless. The browser sends at most 10 distinct errors per page load, leaving out another origin's scripts, whose details it hides, and the server takes 20 reports a minute per client, refusing another site's and any over 16 KB.
 
 ### Context
 
@@ -400,7 +400,7 @@ import { context } from 'kay'
 export const Theme = context<'light' | 'dark'>('light')
 ```
 
-A component's script calls `Theme.provide('dark')`, and any component it renders, its children and their blocks included, reads `Theme.use()`; a component beside it, or above, reads the nearest value provided above itself, else the default. Provide a signal to share a value that changes. A layout's provide reaches its page. An island reads nothing the page's static components provide, in the browser as on the server, since it hydrates on its own: provide inside the island.
+A component's script calls `Theme.provide('dark')`, and any component it renders, its children and their blocks included, reads `Theme.use()`; a component beside it, or above, reads the nearest value provided above itself, else the default. Provide a signal to share a value that changes. `use()` reads while a component renders: a handler or a timer calls it with nothing above, getting the default, so the script reads it once and keeps it. A layout's provide reaches its page. An island reads nothing the page's static components provide, in the browser as on the server, since it hydrates on its own: provide inside the island.
 
 ### Browser-only components
 

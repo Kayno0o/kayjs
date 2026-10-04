@@ -8,6 +8,7 @@ import { reportServerError } from './report'
 export const ERROR_REPORTS = '/_kay/error'
 // A report holds a message and a stack: past this it is no report.
 const MAX_REPORT_BYTES = 16 * 1024
+const MAX_URL_LENGTH = 2048
 const REPORTS_PER_MINUTE = 20
 const MINUTE_MS = 60_000
 // What the rate limit counts reports under, apart from any action's.
@@ -21,9 +22,11 @@ export class BrowserError extends Error {
     // The name of the error the browser met, such as `TypeError`.
     readonly kind: string,
     message: string,
-    // The page it was met on.
+    // The page it was met on, its path without query or hash.
     readonly url: string,
     stack: string | undefined,
+    // The island it was met in, when the browser knows it: its component's path.
+    readonly island?: string,
   ) {
     super(message)
     this.stack = stack === undefined ? `${kind}: ${message}` : stack
@@ -42,28 +45,47 @@ export function serveErrorReports(app: Elysia, onError: KayConfig['onError']): v
     if (overLimit(REPORTS, clientOf(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined)
       return new Response(null, { status: 429 })
 
-    const report = readReport(await request.text())
+    const text = await readCapped(request)
+
+    if (text === undefined)
+      return new Response(null, { status: 413 })
+
+    const report = readReport(text)
 
     if (!report)
       return new Response(null, { status: 400 })
 
-    reportServerError(new BrowserError(report.name, report.message, report.url, report.stack), request, onError)
+    reportServerError(new BrowserError(report.name, report.message, report.url, report.stack, report.island), request, onError)
 
     return new Response(null, { status: 204 })
   }, { parse: 'none' })
 }
 
-function readReport(text: string): { name: string, message: string, url: string, stack?: string } | undefined {
-  if (text.length > MAX_REPORT_BYTES)
-    return undefined
+// The body, read only up to the cap, whatever `content-length` claims or when it is missing; undefined past it.
+async function readCapped(request: Request): Promise<string | undefined> {
+  const chunks: Uint8Array[] = []
+  let size = 0
 
-  try {
-    const { name, message, url, stack } = JSON.parse(text) as Record<string, unknown>
+  for await (const chunk of request.body ?? []) {
+    size += chunk.byteLength
 
-    if (typeof name !== 'string' || typeof message !== 'string' || typeof url !== 'string' || (stack !== undefined && typeof stack !== 'string'))
+    if (size > MAX_REPORT_BYTES)
       return undefined
 
-    return { name, message, url, stack }
+    chunks.push(chunk)
+  }
+
+  return new TextDecoder().decode(Buffer.concat(chunks))
+}
+
+function readReport(text: string): { name: string, message: string, url: string, stack?: string, island?: string } | undefined {
+  try {
+    const { name, message, url, stack, island } = JSON.parse(text) as Record<string, unknown>
+
+    if (typeof name !== 'string' || typeof message !== 'string' || typeof url !== 'string' || url.length > MAX_URL_LENGTH || (stack !== undefined && typeof stack !== 'string') || (island !== undefined && typeof island !== 'string'))
+      return undefined
+
+    return { name, message, url, stack, island }
   }
   catch {
     return undefined
