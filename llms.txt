@@ -719,6 +719,30 @@ Every page carries speculation rules: Chromium prefetches the page a link points
 
 On SIGTERM or SIGINT, a server started with `.listen()` stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0; the health route answers 503 meanwhile. Requests still open after `shutdownTimeout` seconds, 10 by default, are closed and the process exits with 1. `kay dev` restarts at once instead.
 
+## Background jobs
+
+`schedule(cron, job)` and `background(work)` from `kay/server` are Elysia plugins, so a job runs in the server's process, from `.listen()` to the server stopping, once per process:
+
+```ts
+import { Elysia } from 'elysia'
+import { background, pages, schedule } from 'kay/server'
+
+new Elysia()
+  .use(schedule('@hourly', async () => purgeExpiredCarts()))
+  .use(schedule('30 2 * * MON', sendWeeklyReport, { tz: 'Europe/Paris' }))
+  .use(background(async (signal) => {
+    while (!signal.aborted)
+      await handleNextEmail(signal)
+  }))
+  .use(await pages())
+  .listen(3000)
+```
+
+- `schedule` takes five cron fields, `minute hour day-of-month month day-of-week`, or a nickname such as `@daily`, read in the system's time zone unless `tz` names one. One it cannot read, or one that never comes, fails the boot. Runs never overlap: the next is planned once the last settles. A run that throws is logged and the next one comes as planned.
+- `background` starts `work` with the server, for a queue consumer or anything else that runs the whole time. On stop its signal aborts and the server waits for it to return. Work that throws is logged and not started again.
+- Stopping on a signal waits for a scheduled run in progress, and for every `onStop` hook the app registers, async ones included, in turn. `shutDown(app)` from `kay/server` stops a server the same way, as a test does; Elysia's own `app.stop()` does not wait for the hooks.
+- With several server processes, each runs its own schedules: a job that must run once overall belongs to one process only, or takes a lock.
+
 ## Security headers
 
 Every response the app sends, its own routes included, carries a Content-Security-Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: SAMEORIGIN`. The policy:

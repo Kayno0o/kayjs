@@ -27,7 +27,8 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, config: HealthCon
         return new Response('unhealthy', { status: 503, headers })
     }
     catch (error) {
-      logError(new Error(`kay: the health check failed for ${request.url}`, { cause: error }))
+      console.error(`kay: the health check failed for ${request.url}`)
+      logError(error)
 
       return new Response('unhealthy', { status: 503, headers })
     }
@@ -54,18 +55,11 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, timeout = DEFAUL
 
       const forced = setTimeout(() => {
         console.error(`kay: requests still open after ${timeout} s; closing them`)
-        void root.stop(true)
+        void root.server?.stop(true)
         process.exit(1)
       }, timeout * 1000)
 
-      try {
-        await root.stop()
-      }
-      catch (error) {
-        logError(error)
-        process.exitCode = 1
-      }
-
+      await shutDown(root)
       clearTimeout(forced)
       process.exit()
     }
@@ -73,4 +67,25 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, timeout = DEFAUL
     process.once('SIGTERM', () => void stop('SIGTERM'))
     process.once('SIGINT', () => void stop('SIGINT'))
   })
+}
+
+// Stops the server once its open requests finished, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
+export async function shutDown(app: Elysia): Promise<void> {
+  const server = app.server
+
+  if (!server)
+    return
+
+  await server.stop()
+  app.server = null
+
+  for (const hook of app.event.stop ?? []) {
+    try {
+      await hook.fn(app)
+    }
+    catch (error) {
+      logError(error)
+      process.exitCode = 1
+    }
+  }
 }

@@ -9,7 +9,10 @@ const app = new Elysia()
 
     return 'slow done'
   })
-  .onStop(() => console.log('jobs stopped'))
+  .onStop(async () => {
+    await Bun.sleep(50)
+    console.log('jobs stopped')
+  })
   .listen(0)
 
 console.log(`port ${app.server!.port}`)
