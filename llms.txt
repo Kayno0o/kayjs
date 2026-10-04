@@ -216,7 +216,7 @@ Pages live in `src/routes/`:
 
 A page URL ending in a slash redirects with 308 to the one without, query kept: `/about/` to `/about`.
 
-Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence may use top-level `await` and the `ctx` object:
+Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence runs per request and may use top-level `await` and the `ctx` object, except what an export such as an action reads: that runs once, when the module loads, so it may neither await nor read `ctx`, which `kay check` reports. The fence's `ctx`:
 
 - `ctx.params`, typed from the file name, `ctx.url`, `ctx.request`
 - `ctx.cookies`, a `Bun.CookieMap`: `ctx.cookies.get('theme')`; what `set` and `delete` change is sent back, redirects included

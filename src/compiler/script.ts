@@ -1,7 +1,9 @@
 import type { ParseResult } from '@babel/parser'
+import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import { parse } from '@babel/parser'
+import { loadTraverse } from './rewrite'
 
 const REACTIVE_MODULES = new Set(['kay', 'solid-js'])
 
@@ -135,6 +137,9 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
 
   const { ast, shift } = parsed
   const local = bodyTypes(ast.program.body, [], shift, analysis.diagnostics)
+  const exported = ast.program.body.filter(statement => !isHoisted(statement, local) && statement.type === 'ExportNamedDeclaration' && statement.declaration)
+  const perRequest = ast.program.body.filter(statement => !isHoisted(statement, local) && !isExport(statement))
+  const shared = sharedWithExports(ast, exported, perRequest, shift, analysis.diagnostics)
   let cursor = server.start
 
   for (const statement of ast.program.body) {
@@ -150,14 +155,21 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
       for (const identifier of declaredIdentifiers(statement.declaration))
         analysis.exportNames.push(identifier.name)
     }
-    else if (statement.type === 'ExportDefaultDeclaration' || statement.type === 'ExportAllDeclaration' || statement.type === 'ExportNamedDeclaration') {
+    else if (isExport(statement)) {
       analysis.diagnostics.push({ ...span, message: 'A server fence exports declarations only: `export const add = action(...)`' })
     }
     else {
-      if (span.start > cursor)
-        analysis.body.push({ start: cursor, end: span.start })
+      // What an export reads is declared at module level, next to it, and the template still reads it.
+      if (shared.has(statement)) {
+        analysis.exports.push(span)
+      }
+      else {
+        if (span.start > cursor)
+          analysis.body.push({ start: cursor, end: span.start })
 
-      analysis.body.push(span)
+        analysis.body.push(span)
+      }
+
       for (const identifier of declaredIdentifiers(statement)) {
         if (!analysis.data.some(data => data.name === identifier.name))
           analysis.data.push({ name: identifier.name, local: nameSpan(identifier, shift) })
@@ -168,6 +180,120 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   }
 
   return analysis
+}
+
+function isExport(statement: t.Statement): boolean {
+  return statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration' || statement.type === 'ExportAllDeclaration'
+}
+
+interface StatementReads {
+  // Names other statements of the fence declare, with where this one reads them.
+  names: Map<string, Span[]>
+  readsCtx: boolean
+  awaits: boolean
+}
+
+// The statements an export reads, directly or through one another, which therefore run once at module level rather than per request in `load`.
+// One that reads `ctx` or awaits has to stay per request, and the export reading it is reported.
+function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], perRequest: t.Statement[], shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): Set<t.Statement> {
+  const shared = new Set<t.Statement>()
+  const declaredBy = new Map<string, t.Statement>()
+
+  for (const statement of perRequest) {
+    for (const identifier of declaredIdentifiers(statement))
+      declaredBy.set(identifier.name, statement)
+  }
+
+  const named = new Set<string>()
+
+  for (const statement of exported)
+    eachNode(statement, node => node.type === 'Identifier' && named.add(node.name))
+
+  // Most fences have no export reading their names, and Babel's scope analysis is worth loading only when one may.
+  if (![...named].some(name => declaredBy.has(name)))
+    return shared
+
+  loadTraverse()(ast, {
+    Program(program) {
+      const reads = new Map<t.Statement, StatementReads>()
+      const readsOf = (statement: NodePath<t.Statement>): StatementReads => {
+        const known = reads.get(statement.node)
+
+        if (known)
+          return known
+
+        const found: StatementReads = { names: new Map(), readsCtx: false, awaits: false }
+
+        statement.traverse({
+          ReferencedIdentifier(reference) {
+            const name = reference.node.name
+            const binding = reference.scope.getBinding(name)
+
+            if (binding === undefined)
+              found.readsCtx ||= name === 'ctx'
+            else if (binding.scope === program.scope && declaredBy.get(name) !== undefined && declaredBy.get(name) !== statement.node)
+              found.names.set(name, [...found.names.get(name) ?? [], shift(reference.node)])
+          },
+          AwaitExpression(expression) {
+            found.awaits ||= expression.getFunctionParent() === null
+          },
+          ForOfStatement(loop) {
+            found.awaits ||= loop.node.await === true && loop.getFunctionParent() === null
+          },
+        })
+        reads.set(statement.node, found)
+
+        return found
+      }
+      const paths = new Map(program.get('body').map(statement => [statement.node, statement]))
+      const queue = exported.flatMap(statement => [...readsOf(paths.get(statement)!).names.keys()].map(name => declaredBy.get(name)!))
+
+      for (let statement = queue.pop(); statement !== undefined; statement = queue.pop()) {
+        if (shared.has(statement))
+          continue
+
+        shared.add(statement)
+        queue.push(...[...readsOf(paths.get(statement)!).names.keys()].map(name => declaredBy.get(name)!))
+      }
+
+      // Why a statement stays per request, settled until nothing changes, since it may only read one that does.
+      const why = new Map<t.Statement, string>()
+
+      for (let changed = true; changed;) {
+        changed = false
+
+        for (const statement of shared) {
+          if (why.has(statement))
+            continue
+
+          const { names, readsCtx, awaits } = reads.get(statement)!
+          const perRequestName = [...names.keys()].find(name => why.has(declaredBy.get(name)!))
+          const reason = readsCtx ? 'it reads `ctx`' : awaits ? 'it awaits' : perRequestName === undefined ? undefined : `it reads \`${perRequestName}\`, which is computed per request`
+
+          if (reason !== undefined) {
+            why.set(statement, reason)
+            changed = true
+          }
+        }
+      }
+
+      for (const statement of exported) {
+        for (const [name, spans] of reads.get(statement)!.names) {
+          const reason = why.get(declaredBy.get(name)!)
+
+          if (reason !== undefined)
+            diagnostics.push(...spans.map(span => ({ ...span, message: `\`${name}\` is computed per request, in the page's load, since ${reason}; an export runs outside the load, so compute it there instead` })))
+        }
+      }
+
+      for (const statement of why.keys())
+        shared.delete(statement)
+
+      program.stop()
+    },
+  })
+
+  return shared
 }
 
 // The name alone: an annotated identifier's range runs on through `: string`.

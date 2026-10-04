@@ -276,6 +276,37 @@ describe('server fence names', () => {
     expect(load).not.toContain('namespace')
     expect(load).not.toContain('declare')
   })
+
+  it('declares what an action reads at module level, through one another, the template still reading it', () => {
+    const result = rewritten('--- server\nimport { action } from \'kay\'\n\nconst LIMIT = 3\nconst max = () => LIMIT * 2\nexport const add = action(schema, () => max())\nconst todos = await list()\n---\np {LIMIT} {todos}')
+    const [module, load] = result.tsx.split('export async function load')
+
+    expect(result.diagnostics).toEqual([])
+    expect(module).toContain('const LIMIT = 3\nconst max = () => LIMIT * 2\nexport const add')
+    expect(load).toContain('const todos = await list()')
+    expect(load).not.toContain('LIMIT =')
+    expect(load).toContain('return { LIMIT, max, todos }')
+  })
+
+  it('leaves a name an action only shadows in the load', () => {
+    const result = rewritten('--- server\nimport { action } from \'kay\'\n\nconst todos = await list()\nexport const add = action(schema, ({ todos }) => todos.length)\n---\np {todos}')
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.tsx.slice(result.tsx.indexOf('export async function load'))).toContain('const todos = await list()')
+  })
+
+  it('reports an action reading what is computed per request, through another name too', () => {
+    const at = (server: string) => {
+      const source = `--- server\nimport { action } from 'kay'\n\n${server}\n---\np x`
+
+      return compileKay(source, 'test.kay', { includeServer: true }).diagnostics.map(d => ({ message: d.message, text: source.slice(d.start, d.end) }))
+    }
+
+    expect(at('const id = ctx.params.id\nexport const add = action(schema, () => id)')).toEqual([{ message: expect.stringContaining('`id` is computed per request, in the page\'s load, since it reads `ctx`'), text: 'id' }])
+    expect(at('const todos = await list()\nexport const add = action(schema, () => todos)')).toEqual([{ message: expect.stringContaining('since it awaits'), text: 'todos' }])
+    expect(at('const todos = await list()\nconst count = () => todos.length\nexport const add = action(schema, () => count())')).toEqual([{ message: expect.stringContaining('since it reads `todos`, which is computed per request'), text: 'count' }])
+    expect(at('const fetchAll = async () => await list()\nexport const add = action(schema, () => fetchAll())')).toEqual([])
+  })
 })
 
 describe('imports in both fences', () => {
