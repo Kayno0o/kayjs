@@ -1,0 +1,112 @@
+---
+import type { JSX } from 'kay'
+import { onMount, signal } from 'kay'
+import IconButton from './icon-button.kay'
+
+const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
+
+const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = 'Resize list', backLabel = 'Back', class: className, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
+  list: JSX.Element
+  detail: JSX.Element
+  listHead?: JSX.Element
+  detailHead?: JSX.Element
+  // A navigation column left of the list, from `md` up; below it, an overlay `sidebarOpen` shows.
+  sidebar?: JSX.Element
+  sidebarTitle?: string
+  // Below `md`, whether the detail pane takes the list's place.
+  detailOpen?: boolean
+  // Below `md`, whether the sidebar covers the layout; its back button calls `onSidebarClose` for the parent to set it back to false.
+  sidebarOpen?: boolean
+  onSidebarClose?: () => void
+  // A handle on the list's right edge, from `md` up, dragged or moved with the arrow keys.
+  resizableList?: boolean
+  // The `localStorage` key the list's width is kept under, from one visit to the next.
+  listWidthKey?: string
+  resizeLabel?: string
+  backLabel?: string
+  class?: string
+  style?: string
+}>()
+
+const listWidth = signal(WIDTH.default)
+
+function clampWidth(px: number): number {
+  return Math.min(WIDTH.max, Math.max(WIDTH.min, px))
+}
+
+// Read once mounted, since the server has no storage: the page renders at the default width, then takes the kept one.
+onMount(() => {
+  if (!listWidthKey)
+    return
+
+  try {
+    const stored = Number(localStorage.getItem(listWidthKey))
+
+    if (stored)
+      listWidth.set(clampWidth(stored))
+  }
+  catch {
+    // Storage can be blocked; the default width stands.
+  }
+})
+
+function remember() {
+  if (!listWidthKey)
+    return
+
+  try {
+    localStorage.setItem(listWidthKey, String(listWidth()))
+  }
+  catch {
+    // Storage can be blocked; the width just lasts the visit.
+  }
+}
+
+function startResize(event: PointerEvent) {
+  const handle = event.currentTarget as HTMLElement
+  const startX = event.clientX
+  const startWidth = listWidth()
+  const move = (next: PointerEvent) => listWidth.set(clampWidth(startWidth + next.clientX - startX))
+
+  event.preventDefault()
+  handle.setPointerCapture(event.pointerId)
+  handle.addEventListener('pointermove', move)
+  handle.addEventListener('pointerup', () => {
+    handle.removeEventListener('pointermove', move)
+    remember()
+  }, { once: true })
+}
+
+function resizeByKey(event: KeyboardEvent) {
+  const delta = { ArrowLeft: -WIDTH.step, ArrowRight: WIDTH.step }[event.key]
+
+  if (delta === undefined)
+    return
+
+  event.preventDefault()
+  listWidth.set(clampWidth(listWidth() + delta))
+  remember()
+}
+---
+// The sidebar is rendered once: from `md` up a column, below it the overlay `data-sidebar-open` shows.
+.split-layout({...rest} class={className} style={`--split-list-width: ${listWidth()}px;${style ? ` ${style}` : ''}`} data-sidebar={sidebar ? '' : undefined} data-sidebar-open={sidebarOpen ? '' : undefined} data-detail-open={detailOpen ? '' : undefined})
+  if sidebar
+    aside.split-layout-sidebar
+      .split-layout-sidebar-head
+        IconButton(icon="back" label={backLabel} variant="ghost" size="lg" onClick={() => onSidebarClose?.()})
+        span.split-layout-sidebar-title {sidebarTitle}
+      .split-layout-sidebar-body
+        | {sidebar}
+  section.split-layout-list
+    if listHead
+      .split-layout-list-head
+        | {listHead}
+    | {list}
+    if resizableList
+      // A focusable separator is a widget, moved with the arrow keys as well as dragged.
+      .split-layout-resizer(role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation="vertical" aria-valuenow={listWidth()} aria-valuemin={WIDTH.min} aria-valuemax={WIDTH.max} onPointerDown={startResize} onKeyDown={resizeByKey})
+  section.split-layout-detail
+    if detailHead
+      .split-layout-detail-head
+        | {detailHead}
+    | {detail}

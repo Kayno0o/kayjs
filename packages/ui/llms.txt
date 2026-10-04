@@ -6,7 +6,7 @@
 
 - Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`.
 - Components write no Tailwind utility, only the classes of `theme.css`. A rule of the app's on one of those classes restyles every instance; utilities passed through a component's `class` prop restyle one.
-- A static page cannot pass functions, `JSX.Element` props or children to an island. Render Dialog, Popover, FormDialog, or a Table with a `@cell` or `@empty` block, a function `sortValue` or a function `rowKey` from a component of the app that is an island itself: one with an `on*` handler, a `ref`, a `bind:` or a value import from `'kay'`. The examples below are written as such components.
+- A static page cannot pass functions, `JSX.Element` props or children to an island. Render Dialog, SidePanel, SplitLayout, Popover, FormDialog, or a Table with a `@cell` or `@empty` block, a function `sortValue` or a function `rowKey` from a component of the app that is an island itself: one with an `on*` handler, a `ref`, a `bind:` or a value import from `'kay'`. The examples below are written as such components.
 - `toast` only shows in the browser, called from an island. The server's copy of the toast list is shared by every request, so it stays empty. Render one `Toaster` and one `TooltipHost` in the root layout.
 - An icon is either a slot name such as `'close'`, which the app's settings map to any icon set, or an icon imported from `~icons/<prefix>/<name>`. The default slots use Tabler, so the app installs `@iconify-json/tabler`.
 - Dialog and FormDialog follow `open`. The parent sets it, then sets it back to false in `onClose`, which runs however the dialog closed. Their content renders only while they are open. A Popover the page opens through `open` is set back the same way, in `onToggle`.
@@ -184,6 +184,37 @@ Popover(id="post-menu" placement="bottom-end")
 - `placement` is `bottom-start`, `bottom-end`, `top-start` or `top-end`, and the browser flips it when there is no room.
 - `open` opens or closes it from the page, and `onToggle(open)` runs however it changed: a page driving `open` sets its own value back there, or it could not open the panel again after a click outside closed it.
 - TooltipHost shows the `data-tooltip` of whichever element the pointer or a tab lands on. `data-tooltip-placement`, a CSS `position-area`, says where it sits, `top` by default: `button(data-tooltip="Copy link" data-tooltip-placement="bottom")`. IconButton sets `data-tooltip` to its label.
+
+### PageSection, CollapsibleSection, Widget, CardRow, SidePanel, SplitLayout
+
+```kay
+PageSection(title="Moons")
+  @actions
+    a(href="/moons/new") New moon
+  CollapsibleSection(title="Archived" open={false} boxed)
+    @meta
+      Badge(label={archived.length})
+    for moon of archived
+      CardRow
+        @left
+          Icon(icon="success")
+        @right
+          span {moon.radius} km
+        @actions
+          a(href={`/moons/${moon.id}`}) Edit
+        | {moon.name}
+```
+
+- `PageSection(title)`: a titled `section` of a page, its `h2` one level under the page's own. `@actions` sits at the end of the head line.
+- `CollapsibleSection(title)`: a native `details`, so it folds without script and a static page can hold it. `open` is whether it starts unfolded, `true` by default. `boxed` draws it as a card whose title is a band over a padded body. `@meta` sits in the band before the chevron, for a count the folded section would hide.
+- `Widget(title icon)`: a dashboard tile, a framed body under a head line of icon, title and `@actions`. `isEmpty` swaps the body for the `@empty` block, keeping the frame; with no `@empty` block, an empty widget renders nothing.
+- `CardRow`: one line of a list drawn as cards. Children are its body, `@left` leads, `@right` trails, and `@actions` comes last, dimmed until the row is hovered or focused.
+- `SidePanel(open title onClose)`: a modal `dialog` along the edge, driven by `open` like Dialog and named by its title. `@actions` sits in its head before the close button, such as previous and next; `@footer` under its body. A click outside, Escape and its close button all close it through `onClose`; `closeLabel` names that button, `Close` by default.
+- `SplitLayout`: a list and a detail pane side by side from `md` up, given as `@list` and `@detail`, each with an optional `@listHead` and `@detailHead`.
+  - `@sidebar` adds a navigation column left of the list, rendered once: below `md` it is an overlay shown while `sidebarOpen` is set, titled `sidebarTitle`, whose back button calls `onSidebarClose` for the parent to set it back to false.
+  - Below `md`, `detailOpen` shows the detail pane in the list's place.
+  - `resizableList` adds a handle on the list's right edge, a `separator` dragged with the pointer or moved 20px at a time with the arrow keys, between 180px and 560px. `listWidthKey` keeps the width in `localStorage` under that key: the page renders at 260px, then takes the kept width once mounted.
+  - It renders inside an island, since its panes are blocks and its handle has handlers.
 
 ## Forms
 

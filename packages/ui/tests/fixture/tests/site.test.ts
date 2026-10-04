@@ -124,3 +124,25 @@ describe('FormField', () => {
     expect(refused.html).toContain('<span class="form-field-issue">Two letters at least</span>')
   })
 })
+
+describe('layout', () => {
+  const page = async (id: string) => (await element('/layout', id)).replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<svg[^>]*>.*?<\/svg>/g, '<svg/>')
+
+  test('PageSection titles its stretch and holds an actions block at the end of the head line', async () => {
+    expect(await page('section')).toBe('<article id="section"><section class="page-section"><div class="page-section-head"><h2 class="heading-section page-section-title">Moons</h2><a href="/table">New</a></div><p>Phobos</p></section></article>')
+  })
+
+  test('CollapsibleSection is a native disclosure, folded when asked, boxed, with its meta before the chevron', async () => {
+    expect(await page('collapsed')).toBe('<article id="collapsed"><details data-boxed class="collapsible-section"><summary class="collapsible-section-summary"><span class="heading-section collapsible-section-title">Older</span><span class="collapsible-section-meta"><span data-tone="neutral" class="badge">2</span></span><svg/></summary><div class="collapsible-section-body"><p>Deimos</p></div></details></article>')
+  })
+
+  test('Widget heads its body with icon, title and actions, swaps an empty body for its @empty block, and renders nothing empty without one', async () => {
+    expect(await page('widget')).toBe('<article id="widget"><div class="widget"><div class="widget-head"><svg/><h2 class="heading-section widget-title">Visits</h2><a href="/content">All</a></div><p>42</p></div></article>')
+    expect(await page('empty-widget')).toBe('<article id="empty-widget"><div class="widget"><div class="widget-head"><h2 class="heading-section widget-title">Visits</h2></div><p class="none">No visits yet</p></div></article>')
+    expect(await page('hidden-widget')).toBe('<article id="hidden-widget"></article>')
+  })
+
+  test('CardRow lays its body between what leads and what trails, its actions last', async () => {
+    expect(await page('row')).toBe('<article id="row"><div class="card-row"><span class="dot"></span><div class="card-row-body">Mars</div><span>3 moons</span><div class="card-row-actions"><a href="/form">Edit</a></div></div></article>')
+  })
+})

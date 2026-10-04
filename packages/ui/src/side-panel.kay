@@ -1,0 +1,44 @@
+---
+import type { JSX } from 'kay'
+import { effect } from 'kay'
+import IconButton from './icon-button.kay'
+
+const { open, title, actions, footer, onClose, closeLabel = 'Close', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy'> & {
+  // Shows the panel as a modal along the edge; the parent sets it back to false in `onClose`.
+  open: boolean
+  title: string
+  // Controls in the head line, before its close button, such as previous and next.
+  actions?: JSX.Element
+  footer?: JSX.Element
+  // Called however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
+  onClose: (event: Event) => void
+  closeLabel?: string
+  class?: string
+}>()
+
+let panel: HTMLDialogElement | undefined
+
+effect(() => {
+  const shown = open
+
+  if (!panel)
+    return
+
+  if (shown && !panel.open)
+    panel.showModal()
+  else if (!shown && panel.open)
+    panel.close()
+})
+---
+// Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onClose` is the one place the parent learns of it.
+dialog.side-panel(aria-label={title} {...rest} ref={element => panel = element} closedby="any" onClose={onClose} class={className})
+  if open
+    header.side-panel-head
+      h2.side-panel-title {title}
+      | {actions}
+      IconButton(icon="close" label={closeLabel} variant="ghost" onClick={() => panel?.close()})
+    .side-panel-body
+      slot
+    if footer
+      .side-panel-footer
+        | {footer}

@@ -1,0 +1,31 @@
+---
+import type { JSX } from 'kay'
+import type { IconSlot } from './defaults'
+import type { IconProps } from 'kay/icons'
+import Icon from './icon.kay'
+
+const { title, icon, actions, isEmpty = false, empty, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title'> & {
+  title?: string
+  icon?: IconSlot | IconProps
+  // The end of the head line: a link, a button, a row of actions.
+  actions?: JSX.Element
+  // Whether the data behind the widget is empty. With an `@empty` block, the frame and its head stay while the body shows the block; without one, an empty widget renders nothing at all.
+  isEmpty?: boolean
+  empty?: JSX.Element
+  class?: string
+}>()
+---
+// A dashboard tile: a framed body under a head line of icon, title and actions.
+if empty !== undefined || !isEmpty
+  .widget({...rest} class={className})
+    if title || icon || actions
+      .widget-head
+        if icon
+          Icon(icon={icon})
+        if title
+          h2.heading-section.widget-title {title}
+        | {actions}
+    if isEmpty
+      | {empty}
+    else
+      slot
