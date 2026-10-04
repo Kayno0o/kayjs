@@ -7,11 +7,14 @@ import type { Limits } from './limits'
 import type { OAuthFailure } from './oauth/flow'
 import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
+import type { PasswordProblem } from './rules'
 import type { RequestState } from './state'
 import type { AuthStore, UserRecord } from './store'
+import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { clientAddress, rateKey } from 'kay/server'
+import { changePassword, deleteAccount, unlink } from './account'
 import { publicUser } from './core'
 import { changeEmail, confirmEmailChange, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithMagicLink, verifyEmail } from './email'
 import { createGate } from './gate'
@@ -23,6 +26,7 @@ import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
+import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, regenerateRecoveryCodes, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
 
@@ -45,8 +49,12 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string> 
   url?: string
   // Where kay-auth's routes live, `/auth` by default: `/auth/discord` starts a Discord sign-in.
   prefix?: string
+  // The site's name, as mails and authenticator apps show it; the URL's host by default.
+  site?: string
   // Where a sign-in that failed goes, with `?error=` saying why; `/` by default.
   signInPage?: string
+  // Where a sign-in goes to ask for the second factor, `/two-factor` by default: a page whose form posts the code to an action calling `verifyTwoFactor`.
+  twoFactorPage?: string
   // Mail for email verification, password resets, magic links and email changes.
   email?: EmailOptions
   // OAuth apps by the name their routes take: `{ discord: { provider: discordProvider(), clientId, clientSecret } }`.
@@ -55,6 +63,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string> 
   allow?: (profile: Profile) => boolean | Promise<boolean>
   // Called once a new user exists, to create the app's own records for them.
   onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
+  // Called once a user is deleted, to delete the app's own records for them.
+  onDelete?: (user: User) => void | Promise<void>
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
   roles?: Record<Role, NoInfer<Role>[]>
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
@@ -74,17 +84,15 @@ export class Auth {
       session,
       client,
       current: () => this.record(),
-      complete: async (record, redirect) => {
-        await this.signIn(record)
-
-        return redirect
-      },
+      complete: async (record, redirect) => completeSignIn(this[STATE], record, redirect, signedIn => this.establish(signedIn)),
       renew: async (record) => {
         // Read off the session, not through `record()`: the version it holds is the one just raised past.
-        if ((await this.session.get('auth'))?.user !== record.id)
+        const signedIn = await this.session.get('auth')
+
+        if (signedIn?.user !== record.id)
           return
 
-        await this.session.set('auth', { user: record.id, version: record.sessionVersion })
+        await this.session.set('auth', { ...signedIn, version: record.sessionVersion })
         this.resolving = Promise.resolve(record)
       },
     }
@@ -97,16 +105,14 @@ export class Auth {
     return record && publicUser(record)
   }
 
-  // Signs `user` in on this session, under a new session id so one planted before is worth nothing.
+  // Signs `user` in on this session, without asking for their second factor: for a way of signing in the app proves itself.
   async signIn(user: Pick<User, 'id'>): Promise<void> {
     const record = await this.core.store.users.get(user.id)
 
     if (!record)
       throw new Error(`kay-auth: no user ${user.id} to sign in`)
 
-    await this.session.regenerate()
-    await this.session.set('auth', { user: record.id, version: record.sessionVersion })
-    this.resolving = Promise.resolve(record)
+    await this.establish(record)
   }
 
   // Signs this session out. A session held in the cookie alone stays valid wherever it was copied until it expires; `signOutEverywhere` ends those too.
@@ -172,8 +178,8 @@ export class Auth {
   }
 
   // Mails the signed-in user's new address a link confirming it.
-  async changeEmail(email: string): Promise<ChangeEmailResult> {
-    return changeEmail(this[STATE], email)
+  async changeEmail(proof: Proof, email: string): Promise<ChangeEmailResult> {
+    return changeEmail(this[STATE], proof, email)
   }
 
   // Spends an email change link's token: the account moves to the new address, and the user's other sessions end.
@@ -191,6 +197,65 @@ export class Auth {
     const record = await this.record()
 
     return record ? (await this.core.store.identities.listByUser(record.id)).map(identity => identity.provider) : []
+  }
+
+  // Whether this session holds a sign-in waiting for its second factor, for the page that asks for it.
+  async twoFactorPending(): Promise<boolean> {
+    return challenged(this[STATE])
+  }
+
+  // Finishes a sign-in waiting for its second factor with an authenticator code or a recovery code.
+  async verifyTwoFactor(code: string): Promise<TwoFactorResult> {
+    return verifyTwoFactor(this[STATE], code, record => this.establish(record))
+  }
+
+  // A secret for the signed-in user's authenticator, as text and as a QR code; the second factor turns on once `enableTwoFactor` gets a code from it.
+  async setUpTwoFactor(proof: Proof): Promise<{ ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' }> {
+    return setUpTwoFactor(this[STATE], proof)
+  }
+
+  // Turns the second factor on with a code from the authenticator just set up; answers the recovery codes, to show this once.
+  async enableTwoFactor(code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' }> {
+    return enableTwoFactor(this[STATE], code)
+  }
+
+  async disableTwoFactor(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
+    return disableTwoFactor(this[STATE], proof)
+  }
+
+  // A new set of recovery codes, the old ones void.
+  async regenerateRecoveryCodes(proof: Proof): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }> {
+    return regenerateRecoveryCodes(this[STATE], proof)
+  }
+
+  // How many unused recovery codes the signed-in user has, to warn when few are left.
+  async recoveryCodesLeft(): Promise<number> {
+    const record = await this.record()
+
+    return record ? this.core.store.recoveryCodes.count(record.id) : 0
+  }
+
+  // Sets the signed-in user's password, or a first one, and ends their other sessions.
+  async changePassword(proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem } }> {
+    return changePassword(this[STATE], proof, password)
+  }
+
+  // Unlinks a provider from the signed-in user, unless it is their last way in.
+  async unlink(provider: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-linked' | 'last-way-in' }> {
+    return unlink(this[STATE], provider, proof)
+  }
+
+  // Deletes the signed-in user, calling `onDelete` for the app's own records, and signs this session out.
+  async deleteAccount(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
+    return deleteAccount(this[STATE], proof, () => this.signOut())
+  }
+
+  // Under a new session id, so one planted before is worth nothing.
+  private async establish(record: UserRecord): Promise<void> {
+    await this.session.unset('authChallenge')
+    await this.session.regenerate()
+    await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now() })
+    this.resolving = Promise.resolve(record)
   }
 
   private async record(): Promise<UserRecord | null> {
@@ -319,12 +384,15 @@ function createCore<Data extends AuthSessionData, Role extends string>(options: 
     url,
     prefix,
     signInPage: options.signInPage ?? '/',
+    twoFactorPage: options.twoFactorPage ?? '/two-factor',
+    site: options.site ?? (url === undefined ? 'kay-auth' : new URL(url).host),
     limits: { ...DEFAULT_LIMITS, ...options.limits },
     email: options.email && { requireVerified: false, ...options.email, templates: { ...defaultTemplates, ...options.email.templates } },
     oauth,
     refreshers: new Map(),
     allow: options.allow,
     onSignUp: options.onSignUp,
+    onDelete: options.onDelete,
   }
 
   for (const [name, { client }] of oauth) {

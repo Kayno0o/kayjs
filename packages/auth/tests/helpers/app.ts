@@ -94,7 +94,13 @@ export function browser(app: { handle: (request: Request) => Promise<Response> }
       const response = await this.fetch(path, init)
       const text = await response.text()
 
-      return text.startsWith('{') ? JSON.parse(text) : text
+      try {
+        return JSON.parse(text)
+      }
+      // Plain text, such as 'anonymous'.
+      catch {
+        return text
+      }
     },
   }
 }

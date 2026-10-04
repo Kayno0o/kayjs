@@ -9,13 +9,13 @@ function setup(options: { requireVerified?: boolean } = {}) {
   const mails: Mail[] = []
   const app = testApp({
     url: 'https://site.test/',
+    site: 'Site',
     email: {
       mailer: {
         send: (mail) => {
           mails.push(mail)
         },
       },
-      site: 'Site',
       links: LINKS,
       requireVerified: options.requireVerified,
     },
@@ -203,7 +203,7 @@ describe('changing an email', () => {
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
     await elsewhere.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    expect(await ada.call('changeEmail', 'ada@new.test')).toEqual({ ok: true })
+    expect(await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')).toEqual({ ok: true })
     expect(mails.at(-1)).toMatchObject({ to: 'ada@new.test', kind: 'change-email' })
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
 
@@ -219,9 +219,9 @@ describe('changing an email', () => {
     await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com' }))
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect(await ada.call('changeEmail', 'BOB@example.com')).toEqual({ ok: false, errors: { email: 'taken' } })
-    expect(await ada.call('changeEmail', 'ada@example.com')).toEqual({ ok: false, errors: { email: 'unchanged' } })
-    expect(await browser().call('changeEmail', 'x@example.com')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.call('changeEmail', { password: PASSWORD }, 'BOB@example.com')).toEqual({ ok: false, errors: { email: 'taken' } })
+    expect(await ada.call('changeEmail', { password: PASSWORD }, 'ada@example.com')).toEqual({ ok: false, errors: { email: 'unchanged' } })
+    expect(await browser().call('changeEmail', { password: PASSWORD }, 'x@example.com')).toEqual({ ok: false, error: 'signed-out' })
   })
 
   test('an address taken between the mail and the click is not moved to', async () => {
@@ -229,7 +229,7 @@ describe('changing an email', () => {
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.call('changeEmail', 'ada@new.test')
+    await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')
     await store.users.create(userRecord({ id: 'u2', email: 'ada@new.test' }))
 
     expect(await ada.call('confirmEmailChange', tokenOf('change-email'))).toEqual({ ok: false, error: 'invalid' })

@@ -57,7 +57,10 @@ export interface AuthStore {
     create: (user: UserRecord) => MaybePromise<void>
     // The user once changed, or undefined when there is none; throws when the change takes an email or a username another user has.
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
+    // Deletes the user with everything kay-auth keeps for them: identities, tokens and recovery codes.
     delete: (id: string) => MaybePromise<void>
+    // Records `step` as the last one a code was accepted for, only when it is later than the one recorded: false when it is not, even when two requests try it together.
+    advanceTotpStep: (id: string, step: number) => MaybePromise<boolean>
   }
   identities: {
     find: (provider: string, providerId: string) => MaybePromise<IdentityRecord | undefined>
@@ -73,6 +76,14 @@ export interface AuthStore {
     consume: (digest: string, type: TokenType) => MaybePromise<TokenRecord | undefined>
     // Deletes the user's tokens of that type, or of every type.
     deleteForUser: (userId: string, type?: TokenType) => MaybePromise<void>
+  }
+  // Digests of the codes that sign in in place of a second factor.
+  recoveryCodes: {
+    // Replaces the user's whole set.
+    replace: (userId: string, digests: string[]) => MaybePromise<void>
+    // Deletes and answers whether the user had that code: once only, even when two requests spend it together.
+    consume: (userId: string, digest: string) => MaybePromise<boolean>
+    count: (userId: string) => MaybePromise<number>
   }
   // Attempt counts, shared by every process the store is: a window starts with its first attempt.
   attempts: {

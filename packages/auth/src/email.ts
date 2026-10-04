@@ -3,11 +3,13 @@ import type { Mailer, Templates } from './mail'
 import type { EmailProblem, PasswordProblem } from './rules'
 import type { RequestState } from './state'
 import type { TokenType, UserRecord } from './store'
+import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword } from '@kaynooo/utils'
 import { digest, randomToken } from './keys'
 import { spend } from './limits'
 import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail, passwordProblem } from './rules'
+import { reprove } from './twoFactor'
 
 const MINUTE_MS = 60 * 1000
 const HOUR_MS = 60 * MINUTE_MS
@@ -22,8 +24,6 @@ const TOKEN_LIFETIME_MS: Record<TokenType, number> = {
 
 export interface EmailOptions {
   mailer: Mailer
-  // The site's name, as mails write it.
-  site: string
   // The app's page each link opens, the token in `?token=`. Each shows a button, or the new password's form, posting the token to an action, so a mail scanner opening the link spends nothing.
   links: Record<TokenType, string>
   templates?: Partial<Templates>
@@ -40,7 +40,7 @@ export type LinkResult = { ok: true, redirect: string } | { ok: false, error: 'i
 
 export type ResetPasswordResult = LinkResult | { ok: false, errors: { password: PasswordProblem } }
 
-export type ChangeEmailResult = { ok: true } | { ok: false, error: 'signed-out' | 'limited' | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
+export type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
 
 // Mails the signed-in user a link verifying their address.
 export async function sendVerification(state: RequestState): Promise<MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }> {
@@ -112,12 +112,13 @@ export async function signInWithMagicLink(state: RequestState, token: string): P
 }
 
 // Mails the new address a link confirming it; the account keeps the old one until then.
-export async function changeEmail(state: RequestState, email: string): Promise<ChangeEmailResult> {
-  const record = await state.current()
+export async function changeEmail(state: RequestState, proof: Proof, email: string): Promise<ChangeEmailResult> {
+  const proved = await reprove(state, proof)
 
-  if (!record)
-    return { ok: false, error: 'signed-out' }
+  if (!proved.ok)
+    return proved
 
+  const { record } = proved
   const address = normalizeEmail(email)
   const problem = emailProblem(address)
 
@@ -195,7 +196,7 @@ async function issue(core: Core, record: UserRecord, type: TokenType, email: str
 
   await core.store.tokens.deleteForUser(record.id, type)
   await core.store.tokens.create({ digest: digest(token), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[type]) })
-  await mail.mailer.send({ to: email, kind: type, url, ...mail.templates[type]({ site: mail.site, email, url }) })
+  await mail.mailer.send({ to: email, kind: type, url, ...mail.templates[type]({ site: core.site, email, url }) })
 }
 
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.

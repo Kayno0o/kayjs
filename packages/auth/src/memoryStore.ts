@@ -7,6 +7,7 @@ export function memoryStore(): AuthStore {
   const users = new Map<string, UserRecord>()
   const identities = new Map<string, IdentityRecord>()
   const tokens = new Map<string, TokenRecord>()
+  const recoveryCodes = new Map<string, Set<string>>()
   const attempts = new Map<string, { count: number, resetAt: number }>()
   let hits = 0
   const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
@@ -68,6 +69,18 @@ export function memoryStore(): AuthStore {
           if (token.userId === id)
             tokens.delete(key)
         }
+
+        recoveryCodes.delete(id)
+      },
+      advanceTotpStep(id, step) {
+        const user = users.get(id)
+
+        if (!user || step <= user.totpLastStep)
+          return false
+
+        users.set(id, { ...user, totpLastStep: step })
+
+        return true
       },
     },
     identities: {
@@ -112,6 +125,13 @@ export function memoryStore(): AuthStore {
             tokens.delete(key)
         }
       },
+    },
+    recoveryCodes: {
+      replace(userId, digests) {
+        recoveryCodes.set(userId, new Set(digests))
+      },
+      consume: (userId, digest) => recoveryCodes.get(userId)?.delete(digest) ?? false,
+      count: userId => recoveryCodes.get(userId)?.size ?? 0,
     },
     attempts: {
       count(key) {

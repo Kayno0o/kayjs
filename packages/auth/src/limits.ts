@@ -23,6 +23,11 @@ export const DEFAULT_LIMITS = {
   magicLinkAccount: { max: 3, window: HOUR },
   emailChange: { max: 12, window: HOUR },
   emailChangeAccount: { max: 5, window: HOUR },
+  // A six-digit code is guessed in minutes without these: they are what makes the second factor strong.
+  twoFactor: { max: 30, window: 15 * MINUTE },
+  twoFactorAccount: { max: 8, window: 15 * MINUTE },
+  // Re-proving is a password guess like any other.
+  reprove: { max: 6, window: 15 * MINUTE },
   // Guessing a token is hopeless; this keeps trying from being free.
   link: { max: 40, window: HOUR },
 } satisfies Record<string, Limit>

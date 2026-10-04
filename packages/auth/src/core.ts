@@ -6,6 +6,7 @@ import type { OAuthFlow } from './oauth/flow'
 import type { createTokenRefresher, StoredCredential } from './oauth/refresher'
 import type { OAuthProvider, OAuthUser } from './oauth/types'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
+import type { Challenge } from './twoFactor'
 import { Buffer } from 'node:buffer'
 import { timingSafeEqual } from 'node:crypto'
 
@@ -13,12 +14,15 @@ import { timingSafeEqual } from 'node:crypto'
 export interface AuthSessionData {
   auth?: SignedIn
   authOAuth?: OAuthFlow
+  authChallenge?: Challenge
 }
 
 export interface SignedIn {
   user: string
   // The user's session version when they signed in: raising it signs this session out.
   version: number
+  // When they signed in, in milliseconds since the epoch.
+  at: number
 }
 
 // An OAuth app registered at a provider: `{ provider: discordProvider(), clientId, clientSecret }`.
@@ -51,12 +55,16 @@ export interface Core {
   url?: string
   prefix: string
   signInPage: string
+  twoFactorPage: string
+  // The site's name, as mails and authenticators show it.
+  site: string
   limits: Limits
   email?: EmailCore
   oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<any, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: (profile: Profile) => boolean | Promise<boolean>
   onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
+  onDelete?: (user: User) => void | Promise<void>
 }
 
 // What a provider token refresh works on: the identity, and its tokens opened.
