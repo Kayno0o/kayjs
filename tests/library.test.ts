@@ -2,6 +2,7 @@ import { mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { throughLinks } from '../src/build/libraries'
 
 const CLI = resolve('src/cli.ts')
 
@@ -88,11 +89,31 @@ describe.each(['@kaynooo/kayjs', '@kaynooo/kay'] as const)('a linked kay library
     const html = await Bun.file(join(out, 'index.html')).text()
 
     expect(html).toContain('<span class="badge lib-badge-class text-gray-500">hi default:hi</span>')
-    // Named as an installed copy's island is, not by where the link points.
+    // Named as an installed copy's island is, not by where the link points, in the markup and in the browser's registry alike.
     expect(html).toContain('data-component="node_modules/kay-lib/src/counter.kay"')
+    expect((await Promise.all((await readdir(join(out, '_kay'))).filter(name => name.endsWith('.js')).map(async name => Bun.file(join(out, '_kay', name)).text()))).join('\n')).toContain('"node_modules/kay-lib/src/counter.kay"')
     expect(built.output).toContain('built 1 island')
     expect(checked.output).toBe('')
     expect(checked.code).toBe(0)
+  })
+})
+
+describe('throughLinks', () => {
+  it('names a file of a linked package by its path under node_modules, scoped ones included, and leaves any other file as it is', async () => {
+    const tree = await mkdtemp(join(import.meta.dir, '.dom-'))
+    const app = join(tree, 'app')
+
+    projects.push(tree)
+    await write(tree, { 'lib/src/a.kay': 'p a\n', 'scoped/src/b.kay': 'p b\n', 'app/node_modules/@kaynooo/.keep': '' })
+    await symlink(join(tree, 'lib'), join(app, 'node_modules/lib'))
+    await symlink(join(tree, 'scoped'), join(app, 'node_modules/@kaynooo/ui'))
+    // A link whose target is gone is skipped rather than failing every compile.
+    await symlink(join(tree, 'gone'), join(app, 'node_modules/gone'))
+
+    expect(throughLinks(app, join(tree, 'lib/src/a.kay'))).toBe(join(app, 'node_modules/lib/src/a.kay'))
+    expect(throughLinks(app, join(tree, 'scoped/src/b.kay'))).toBe(join(app, 'node_modules/@kaynooo/ui/src/b.kay'))
+    expect(throughLinks(app, join(tree, 'elsewhere/c.kay'))).toBe(join(tree, 'elsewhere/c.kay'))
+    expect(throughLinks(app, join(app, 'src/d.kay'))).toBe(join(app, 'src/d.kay'))
   })
 })
 

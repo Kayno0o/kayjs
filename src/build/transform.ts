@@ -72,7 +72,7 @@ export async function transformKayCached(source: string, filename: string, given
     return transformKay(source, filename, options)
 
   const hydratable = options.hydratable ?? false
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.root ?? process.cwd()}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   if (cached !== undefined) {
@@ -94,7 +94,8 @@ export async function transformKayCached(source: string, filename: string, given
 
 // The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept.
 export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string): Promise<Analysis> {
-  const entry = cacheEntry(cacheDir, filename, 'analysis', `${root}\0${source}`)
+  // The id the file goes by is part of what it compiles to, and a link may change it.
+  const entry = cacheEntry(cacheDir, filename, 'analysis', `${root}\0${throughLinks(root, filename)}\0${source}`)
   const cached = await readCacheEntry<Analysis>(entry)
 
   if (cached !== undefined)
