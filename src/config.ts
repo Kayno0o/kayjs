@@ -11,12 +11,32 @@ export interface KayConfig {
   publicDir?: string
   minify?: boolean
   lang?: string
+  // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it.
+  site?: string
+  seo?: SeoConfig
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[]
   // Receives every error a load, a render, a guard or an action throws, as it is logged: the place to send them to an error tracker.
   onError?: (error: unknown, request: Request) => void | Promise<void>
+}
+
+// What every page's head starts from; a layout or the page setting the same tag wins.
+export interface SeoConfig {
+  // The site's name: the title of a page that sets none, and `og:site_name`.
+  name?: string
+  // Wraps the title a layout or the page sets: `%s | Site`.
+  titleTemplate?: string
+  description?: string
+  // The social card image, a URL or a path such as an imported asset's.
+  image?: string
+  // The site's Twitter handle, `@site`.
+  twitter?: string
+  // `og:locale`, such as `fr_FR`.
+  locale?: string
+  // Structured data every page carries, such as the site's `WebSite` or `Organization`.
+  jsonLd?: Record<string, unknown>[]
 }
 
 export const CONFIG_FILE = 'kay.config.ts'

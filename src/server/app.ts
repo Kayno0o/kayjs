@@ -16,6 +16,7 @@ import { registerLoader } from './loader'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
 import { decodePath, refuseClashes, scanRoutes, specialPagesOf } from './routes'
+import { seoHead } from './seo'
 
 // Every slash at either end of a path.
 const EDGE_SLASHES = /^\/+|\/+$/g
@@ -76,7 +77,7 @@ function withoutTrailingSlash(url: URL, route: Route): Response {
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(root: string, options: PagesOptions, loadClient: () => Promise<ClientBuild>) {
   const routesDir = resolve(root, options.routes ?? 'src/routes')
-  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError }
+  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: seoHead(options.site, options.seo) }
 
   // An executable carries its routes and modules compiled; anything else finds them on disk and compiles them as they load.
   const bundle = bundled()

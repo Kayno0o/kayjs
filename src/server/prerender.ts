@@ -9,6 +9,7 @@ import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { registerLoader } from './loader'
 import { renderPage } from './render'
 import { refuseClashes, scanRoutes } from './routes'
+import { seoHead } from './seo'
 
 // Renders every page whose server fence exports `prerender = true` into `.kay/client/pages`, listing them in the manifest the server boots from.
 export async function prerenderPages(root: string, config: KayConfig, client: ClientBuild): Promise<number> {
@@ -20,6 +21,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
     throw new Error('kay: no client build to add prerendered pages to; run buildClient first')
 
   const dir = join(root, '.kay', 'client', PRERENDERED_DIR)
+  const head = seoHead(config.site, config.seo)
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
 
@@ -38,7 +40,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
     for (const params of await paramsToPrerender(route, file, (await import(route.file) as { prerender?: unknown }).prerender)) {
       const path = pathOf(route, params)
       // Guards run when the page is served, for whoever asks; the build renders what they let through.
-      const response = await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${path}`), params: elysiaParams(route, params) }, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true })
+      const response = await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${path}`), params: elysiaParams(route, params) }, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head })
 
       if (response.status >= 500)
         throw new Error(`kay: prerendering ${path} from ${file} failed with ${response.status}; the error is logged above`)

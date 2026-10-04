@@ -1,0 +1,4 @@
+--- server
+ctx.notFound()
+---
+h1 Never

@@ -5,6 +5,7 @@ import type { Encoding } from './compress'
 import type { Flash, SuccessFlash } from './flash'
 import type { ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
+import type { SeoHead } from './seo'
 import type { Prefetch } from './speculation'
 import { relative } from 'node:path'
 import process from 'node:process'
@@ -51,6 +52,8 @@ export interface RenderOptions {
   // Renders once at build time: what only a request carries throws instead of reading as empty.
   prerendering?: boolean
   onError?: KayConfig['onError']
+  // The tags `site` and `seo` give every page.
+  head?: SeoHead
 }
 
 // What Elysia hands a route handler, derived and resolved values included; pages see it whole as `ctx.locals`.
@@ -366,7 +369,7 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
     } })
   }
 
-  const { result: { html: body, islands, deferred }, head } = collectHead(() => renderStatic(view))
+  const { result: { html: body, islands, deferred }, head } = collectHead(() => renderStatic(view), options.head?.(rendering.ctx.url, rendering.status))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   const scripts = hasIslands ? islandScripts(client, islands.eager, streamed) : ''
