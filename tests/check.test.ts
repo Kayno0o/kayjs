@@ -76,6 +76,16 @@ describe('kay check', () => {
     expect(errors).toContain('24 errors')
     expect(errors).toContain('2 | const id = Number(ctx.params.slug)\n  |                              ^')
   })
+
+  it('refuses a path that is no directory, for check and build alike', async () => {
+    for (const command of ['check', 'build']) {
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), command, join(fixtures, 'missing')], { stdout: 'pipe', stderr: 'pipe' })
+      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+      expect(code).toBe(1)
+      expect(errors).toBe(`kay ${command}: ${join(fixtures, 'missing')} is not a directory\n`)
+    }
+  })
 })
 
 const scratchRoot = join(import.meta.dir, '../node_modules/.cache')

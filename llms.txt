@@ -317,7 +317,7 @@ catch
 ```
 
 - The page goes out at once with the block under `await`. Each `then` block streams in as its value resolves, in whatever order they do, swapped in by a few bytes of inline script; islands inside it hydrate when it lands.
-- `await value then name` on one line has no pending block. `catch error` binds the rejection; without `catch`, a rejection removes the pending block and is logged.
+- `await value then name` on one line has no pending block. `catch error` binds the rejection; without `catch`, a rejection removes the pending block and is logged. A `then` block that throws while rendering is a bug, not a rejection: it removes the pending block and is logged too, never showing `catch`.
 - `defer()` handles a rejection where the promise is made. Without it, a promise rejecting before the page renders it would crash the server, so `kay check` refuses a bare promise in `await`.
 - Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them, and a `head` block inside one is ignored. A block renders on its own, outside the layouts' Solid context, and an `await` inside a pending block renders its own pending block only.
 - The response stays open until the last value settles. Bun closes a connection idle for `idleTimeout` seconds, 10 by default, so a value slower than that needs `Bun.serve({ idleTimeout })` raised.

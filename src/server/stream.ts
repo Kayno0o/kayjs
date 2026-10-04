@@ -73,29 +73,34 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
 }
 
 // The `then` block once the value resolves, or the `catch` block once it rejects; without one, the pending block just goes away and the error is reported.
+// A block that throws while rendering is a bug in the page, not the value failing, so it is reported rather than shown as `catch`.
 async function settle(block: PendingBlock, cancelled: () => boolean, report: (error: unknown) => void): Promise<Rendered> {
+  let value: unknown
+
   try {
-    const value = await block.value
-
-    if (cancelled())
-      return EMPTY
-
-    return renderStatic(() => block.ready(value as never))
+    value = await block.value
   }
   catch (error) {
-    if (block.failed) {
-      const failed = block.failed
-
-      try {
-        return renderStatic(() => failed(error))
-      }
-      catch (renderError) {
-        report(renderError)
-      }
-    }
-    else {
+    if (!block.failed) {
       report(error)
+
+      return EMPTY
     }
+
+    const failed = block.failed
+
+    return renderOrReport(() => failed(error), report)
+  }
+
+  return cancelled() ? EMPTY : renderOrReport(() => block.ready(value as never), report)
+}
+
+function renderOrReport(view: () => JSX.Element, report: (error: unknown) => void): Rendered {
+  try {
+    return renderStatic(view)
+  }
+  catch (error) {
+    report(error)
 
     return EMPTY
   }

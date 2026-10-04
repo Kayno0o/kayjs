@@ -161,8 +161,9 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, con
 
   headers.set('etag', etag)
 
+  // Added to what a guard varies on, such as the cookie it reads.
   if (encodings.length > 0)
-    headers.set('vary', 'accept-encoding')
+    headers.append('vary', 'accept-encoding')
 
   // Behind a guard the page is for whoever passed it, so no shared cache may keep it, whatever the page set.
   if (route.guards.length > 0)

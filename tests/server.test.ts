@@ -245,6 +245,8 @@ describe('pages', () => {
     expect(await redirect('/docs/guide/intro/')).toEqual([308, '/docs/guide/intro'])
     expect(await redirect('/admin/')).toEqual([308, '/admin'])
     expect(await redirect('/docs/')).toEqual([200, null])
+    expect(await redirect('/docs//?q=2')).toEqual([308, '/docs/?q=2'])
+    expect(await redirect('/docs/a//')).toEqual([308, '/docs/a'])
 
     // A catch-all at the root matches `//evil.example/`, whose redirect must stay on this site.
     const dir = await mkdtemp(join(process.cwd(), '.kay/routes-'))
@@ -483,6 +485,20 @@ describe('await blocks', () => {
     expect(end).toBe('</body></html>')
   })
 
+  it('reports a then block that throws while rendering, rather than showing its catch block', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const html = await (await bare.handle(new Request('http://localhost/stream'))).text()
+
+      expect(html).not.toContain('Unavailable')
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('boom is not a function'))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('loads the entry right after a shell holding islands, and streams nothing for an await inside a pending block', async () => {
     const [shell, block, end] = await chunksOf('/live')
 
@@ -619,6 +635,12 @@ describe('prerendering', () => {
       expect((await fetch('/docs/guide/intro', { 'accept-encoding': 'br', 'if-none-match': etag })).status).toBe(304)
       expect((await fetch('/docs/guide/intro', { 'if-none-match': etag })).status).toBe(200)
       expect(await (await fetch('/docs/guide/intro')).text()).toBe(file)
+
+      const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+      const report = await signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': 'ada', 'accept-encoding': 'br' } }))
+
+      expect(report.headers.get('content-encoding')).toBe('br')
+      expect(report.headers.get('vary')).toBe('x-user, accept-encoding')
     }
     finally {
       for (const copy of new Bun.Glob('**/*.{br,gz}').scanSync(client.dir))

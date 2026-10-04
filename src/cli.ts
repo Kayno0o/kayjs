@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import type { ParseArgsOptionsConfig } from 'node:util'
+import { statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
@@ -94,7 +95,11 @@ async function runCheck(args: string[]): Promise<number> {
     return parsed
 
   const tsconfig = typeof parsed.values.project === 'string' ? parsed.values.project : 'tsconfig.json'
-  const root = resolve(parsed.positionals[0] ?? '.')
+  const root = projectRoot('check', parsed.positionals[0])
+
+  if (root === undefined)
+    return 1
+
   const { routes, publicDir } = await loadConfig(root)
   const diagnostics = await check(root, { tsconfig, routes, publicDir })
 
@@ -120,7 +125,11 @@ async function build(args: string[]): Promise<number> {
   if (typeof parsed === 'number')
     return parsed
 
-  const root = resolve(parsed.positionals[0] ?? '.')
+  const root = projectRoot('build', parsed.positionals[0])
+
+  if (root === undefined)
+    return 1
+
   const config = await loadConfig(root)
   const started = performance.now()
 
@@ -139,6 +148,18 @@ async function build(args: string[]): Promise<number> {
 
     return 1
   }
+}
+
+// The directory a command works on, or nothing once it said that the path is none.
+function projectRoot(command: string, path = '.'): string | undefined {
+  const root = resolve(path)
+
+  if (statSync(root, { throwIfNoEntry: false })?.isDirectory())
+    return root
+
+  console.error(`kay ${command}: ${path} is not a directory`)
+
+  return undefined
 }
 
 function count(amount: number, noun: string): string {

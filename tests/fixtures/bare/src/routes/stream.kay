@@ -1,0 +1,9 @@
+--- server
+import { defer } from 'kay'
+
+const rows = defer(Promise.resolve([1, 2]))
+---
+await rows then list
+  p {(list as unknown as { boom: () => string }).boom()}
+catch
+  p.failed Unavailable

@@ -1,6 +1,7 @@
 import type { KayConfig } from '../config'
 import type { ClientBuild } from './client'
 import type { ServedPage } from './render'
+import type { Route } from './routes'
 import { join, normalize, resolve, sep } from 'node:path'
 import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
@@ -61,8 +62,12 @@ function canonicalPath(pathname: string): string {
 }
 
 // `/about/` redirects to `/about`, so a page has one URL and its relative links resolve one way; leading slashes collapse too, so `//host/` never becomes a redirect off the site.
-function withoutTrailingSlash(url: URL): Response {
-  return new Response(null, { status: 308, headers: { location: `/${url.pathname.replace(EDGE_SLASHES, '')}${url.search}` } })
+// A catch-all's own directory keeps one slash: `/docs//` goes to `/docs/`, since `/docs` is not one of its paths.
+function withoutTrailingSlash(url: URL, route: Route): Response {
+  const path = `/${url.pathname.replace(EDGE_SLASHES, '')}`
+  const directory = route.catchAll !== undefined && path.split('/').length === route.pattern.split('/').length - 1
+
+  return new Response(null, { status: 308, headers: { location: `${path}${directory ? '/' : ''}${url.search}` } })
 }
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
@@ -115,7 +120,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
       // A catch-all's own `/docs/` stays: `/docs` is not one of its paths.
       if (url.pathname.length > 1 && url.pathname.endsWith('/') && !(route.catchAll !== undefined && (context.params as Record<string, string>)['*'] === ''))
-        return withoutTrailingSlash(url)
+        return withoutTrailingSlash(url, route)
 
       // A path `kay build` rendered is served from its file; any other path of the route renders per request.
       const page = served?.get(canonicalPath(url.pathname))
