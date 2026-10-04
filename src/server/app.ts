@@ -6,6 +6,7 @@ import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { registerActionRoutes } from './actions'
 import { PRERENDERED_DIR } from './client'
+import { encodedCopies, encodedPath, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents } from './dev'
 import { loadGuards } from './guards'
 import { registerLoader } from './loader'
@@ -26,11 +27,21 @@ export interface PagesOptions extends KayConfig {
   prebuilt?: boolean
 }
 
-// The prerendered pages by route pattern, then by path, read once at boot.
+// The prerendered pages by route pattern, then by path, read once at boot with the compressed copies `kay build` wrote.
 async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<string, ServedPage>>> {
   const byRoute = new Map<string, Map<string, ServedPage>>()
+  const dir = join(client.dir, '..', PRERENDERED_DIR)
+  const copies = await encodedCopies(dir)
 
-  const htmls = await Promise.all([...client.pages.values()].map(async page => Bun.file(join(client.dir, '..', PRERENDERED_DIR, page.file)).text()))
+  const loaded = await Promise.all([...client.pages.values()].map(async (page) => {
+    const file = join(dir, page.file)
+    const encoded: ServedPage['encoded'] = {}
+
+    for (const encoding of copies.get(file) ?? [])
+      encoded[encoding] = await Bun.file(encodedPath(file, encoding)).bytes()
+
+    return { html: await Bun.file(file).text(), encoded }
+  }))
 
   for (const [index, [path, page]] of [...client.pages].entries()) {
     let paths = byRoute.get(page.pattern)
@@ -38,7 +49,7 @@ async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<str
     if (!paths)
       byRoute.set(page.pattern, paths = new Map())
 
-    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), html: htmls[index]! })
+    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), ...loaded[index]! })
   }
 
   return byRoute
@@ -65,7 +76,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (options.dev)
     app.get(DEV_EVENTS, devEvents)
 
-  app.get(`${ASSET_PREFIX}*`, async ({ params, status }) => {
+  const assetCopies = await encodedCopies(client.dir)
+
+  app.get(`${ASSET_PREFIX}*`, async ({ params, status, request }) => {
     const name = decodePath(params['*'])
     // A NUL byte makes Bun.file throw, with the server path in its message.
     const path = name === undefined || name.includes('\0') ? '' : normalize(resolve(client.dir, name))
@@ -73,7 +86,17 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     if (!path.startsWith(client.dir + sep) || !await Bun.file(path).exists())
       return status(404)
 
-    return new Response(Bun.file(path), { headers: { 'cache-control': 'public, max-age=31536000, immutable' } })
+    const copies = assetCopies.get(path)
+    const encoding = preferredEncoding(request.headers.get('accept-encoding'), copies)
+    const headers: Record<string, string> = { 'cache-control': 'public, max-age=31536000, immutable' }
+
+    if (copies)
+      headers.vary = 'accept-encoding'
+
+    if (!encoding)
+      return new Response(Bun.file(path), { headers })
+
+    return new Response(Bun.file(encodedPath(path, encoding)), { headers: { ...headers, 'content-encoding': encoding, 'content-type': Bun.file(path).type } })
   })
 
   await Promise.all([registerActionRoutes(app, routes, { dev: options.dev, onError: options.onError }), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes)])

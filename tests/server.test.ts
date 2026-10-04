@@ -1,8 +1,10 @@
 import type { ClientManifest } from '../src/server/client'
+import type { Encoding } from '../src/server/compress'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { brotliDecompressSync } from 'node:zlib'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
@@ -10,6 +12,7 @@ import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { compressFiles, preferredEncoding } from '../src/server/compress'
 import { submittedValues, writeFlash } from '../src/server/flash'
 import { prerenderPages } from '../src/server/prerender'
 import { renderPage } from '../src/server/render'
@@ -573,6 +576,64 @@ describe('prerendering', () => {
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
+  })
+
+  it('serves the compressed copies kay build writes to a browser accepting them, each encoding with its own tag', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const client = (await readClient(root))!
+
+    try {
+      await prerenderPages(root, { routes }, client)
+      await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay/client/pages'))])
+      const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+      const fetch = async (path: string, headers: Record<string, string> = {}) => served.handle(new NativeRequest(`http://localhost${path}`, { headers }))
+      const plain = await fetch(manifest.entry!)
+      const brotli = await fetch(manifest.entry!, { 'accept-encoding': 'gzip, deflate, br, zstd' })
+      const gzip = await fetch(manifest.entry!, { 'accept-encoding': 'gzip;q=1, br;q=0' })
+
+      expect(plain.headers.get('content-encoding')).toBeNull()
+      expect(plain.headers.get('vary')).toBe('accept-encoding')
+      expect(brotli.headers.get('content-encoding')).toBe('br')
+      expect(brotli.headers.get('content-type')).toBe(plain.headers.get('content-type'))
+      expect(brotli.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+
+      const bytes = await plain.bytes()
+
+      expect(new Uint8Array(brotliDecompressSync(await brotli.bytes()))).toEqual(bytes)
+      expect(gzip.headers.get('content-encoding')).toBe('gzip')
+      expect(Bun.gunzipSync(await gzip.bytes())).toEqual(bytes)
+
+      const file = await Bun.file(join(root, '.kay/client/pages/docs/guide/intro.html')).text()
+      const page = await fetch('/docs/guide/intro', { 'accept-encoding': 'br' })
+      const etag = page.headers.get('etag')!
+
+      expect(page.headers.get('content-encoding')).toBe('br')
+      expect(page.headers.get('vary')).toBe('accept-encoding')
+      expect(etag).toEndWith('-br"')
+      expect(brotliDecompressSync(await page.bytes()).toString()).toBe(file)
+      expect((await fetch('/docs/guide/intro', { 'accept-encoding': 'br', 'if-none-match': etag })).status).toBe(304)
+      expect((await fetch('/docs/guide/intro', { 'if-none-match': etag })).status).toBe(200)
+      expect(await (await fetch('/docs/guide/intro')).text()).toBe(file)
+    }
+    finally {
+      for (const copy of new Bun.Glob('**/*.{br,gz}').scanSync(client.dir))
+        await rm(join(client.dir, copy))
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('picks the encoding the request weighs highest among the copies at hand', () => {
+    const both = new Set<Encoding>(['br', 'gzip'])
+
+    expect(preferredEncoding('gzip, deflate, br', both)).toBe('br')
+    expect(preferredEncoding('br;q=0.5, gzip', both)).toBe('gzip')
+    expect(preferredEncoding('BR;Q=0, *', both)).toBe('gzip')
+    expect(preferredEncoding('*', new Set<Encoding>(['gzip']))).toBe('gzip')
+    expect(preferredEncoding('identity', both)).toBeUndefined()
+    expect(preferredEncoding('br', new Set<Encoding>(['gzip']))).toBeUndefined()
+    expect(preferredEncoding(null, both)).toBeUndefined()
   })
 
   it('asks a dynamic route marked prerender = true for the params to render', async () => {

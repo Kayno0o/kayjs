@@ -85,13 +85,16 @@ describe('kay build', () => {
       const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root], { stdout: 'pipe', stderr: 'pipe' })
       const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
       const manifest = await Bun.file(join(root, '.kay/client/manifest.json')).json() as { entry: string, islands: Record<string, string[]> }
-      const entry = await Bun.file(join(root, '.kay/client/dist', manifest.entry.slice('/_kay/'.length))).text()
+      const entryFile = join(root, '.kay/client/dist', manifest.entry.slice('/_kay/'.length))
+      const entry = await Bun.file(entryFile).text()
 
       expect(code).toBe(0)
       expect(errors).toStartWith('built 5 islands, 0 stylesheets and 0 prerendered pages in ')
       expect(Object.keys(manifest.islands).sort()).toEqual(['counter.kay', 'greeting.kay', 'plain.kay', 'rich.kay', 'slow.kay'])
       // Minified: no line of the bundle is indented.
       expect(entry).not.toContain('\n  ')
+      expect(Bun.gunzipSync(await Bun.file(`${entryFile}.gz`).bytes())).toEqual(await Bun.file(entryFile).bytes())
+      expect(await Bun.file(`${entryFile}.br`).exists()).toBe(true)
     }
     finally {
       await rm(join(root, '.kay'), { recursive: true, force: true })

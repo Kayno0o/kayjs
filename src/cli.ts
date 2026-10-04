@@ -11,7 +11,8 @@ import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
 import { createProject } from './new'
-import { buildClient } from './server/client'
+import { buildClient, PRERENDERED_DIR } from './server/client'
+import { compressFiles } from './server/compress'
 import { prerenderPages } from './server/prerender'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
@@ -126,6 +127,8 @@ async function build(args: string[]): Promise<number> {
   try {
     const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes })
     const prerendered = await prerenderPages(root, config, client)
+
+    await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 
     console.error(`built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')} in ${Math.round(performance.now() - started)} ms`)
 

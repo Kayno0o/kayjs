@@ -2,6 +2,7 @@ import type { JSX } from '@solidjs/web'
 import type { KayConfig } from '../config'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
+import type { Encoding } from './compress'
 import type { Flash, SuccessFlash } from './flash'
 import type { ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
@@ -10,6 +11,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { createComponent, generateHydrationScript } from '@solidjs/web'
 import { mapStack } from '../build/sourcemap'
+import { preferredEncoding } from './compress'
 import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
 import { FLASH_COOKIE, readFlash } from './flash'
@@ -31,6 +33,8 @@ type Loaded = PromiseSettledResult<Record<string, unknown>>
 // A prerendered page as the server holds it from boot.
 export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | 'headers'> {
   html: string
+  // The compressed copies `kay build` wrote.
+  encoded: Partial<Record<Encoding, Uint8Array<ArrayBuffer>>>
   headers: [string, string][]
 }
 
@@ -150,13 +154,21 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, con
   for (const [name, value] of page.headers)
     headers.set(name, value)
 
-  headers.set('etag', page.etag)
+  const encodings = Object.keys(page.encoded) as Encoding[]
+  const encoding = preferredEncoding(context.request.headers.get('accept-encoding'), new Set(encodings))
+  // Each encoding is a representation of its own, with its own tag.
+  const etag = encoding ? `${page.etag.slice(0, -1)}-${encoding}"` : page.etag
+
+  headers.set('etag', etag)
+
+  if (encodings.length > 0)
+    headers.set('vary', 'accept-encoding')
 
   // Behind a guard the page is for whoever passed it, so no shared cache may keep it, whatever the page set.
   if (route.guards.length > 0)
     headers.set('cache-control', 'private, no-cache')
 
-  if (matchesEtag(context.request.headers.get('if-none-match'), page.etag)) {
+  if (matchesEtag(context.request.headers.get('if-none-match'), etag)) {
     headers.delete('content-type')
     rendering.status = 304
 
@@ -165,7 +177,12 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, con
 
   rendering.status = page.status
 
-  return respond(rendering, page.html)
+  if (!encoding)
+    return respond(rendering, page.html)
+
+  headers.set('content-encoding', encoding)
+
+  return respond(rendering, page.encoded[encoding]!)
 }
 
 // Caches and proxies may send several tags, or a weak one.
@@ -251,7 +268,7 @@ function hasFlash(request: Request): boolean {
   return request.headers.get('cookie')?.includes(FLASH_COOKIE) ?? false
 }
 
-function respond(rendering: Rendering, body: string | ReadableStream<Uint8Array>): Response {
+function respond(rendering: Rendering, body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>): Response {
   rendering.writeCookies()
 
   return new Response(body, { status: rendering.status, headers: rendering.headers })
