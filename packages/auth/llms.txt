@@ -8,7 +8,7 @@
 - `auth.user()` is a method returning a promise, resolved once per request: `const user = await ctx.locals.auth.user()`.
 - A method that can fail answers `{ ok: true, ... }` or `{ ok: false, error }`, and field errors come as `errors` holding codes such as `'too-short'` or `'taken'`, never messages: the page words them in its own language.
 - A mailed link opens an app page that shows a button, or the new password's form, posting the token to an action. The page never spends the token on load: mail scanners open links.
-- A sign-in may stop at the second factor. `signInWithPassword`, `signInWithMagicLink`, `verifyEmail`, `resetPassword` and the OAuth callback then answer the `twoFactorPage` as where to go, and the user is signed in once `verifyTwoFactor` gets the code. Redirect to the `redirect` they answer, never to a path of your own.
+- A sign-in may stop at the second factor. `signInWithPassword`, `signInWithMagicLink`, `resetPassword` and the OAuth callback then answer the `twoFactorPage` as where to go, and the user is signed in once `verifyTwoFactor` gets the code. Redirect to the `redirect` they answer, never to a path of your own.
 - An action that redirects writes `return ctx.redirect(...)`, with the `return`, so `kay check` types `ctx.failed(action)` right.
 - A link to an OAuth route changes the session on GET: give it `data-no-prefetch`, so a hover starts nothing.
 
@@ -55,7 +55,7 @@ The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(
 `createAuth` options:
 
 - `sessions`: the plugin kay's `session()` returns, its data type including `AuthSessionData`.
-- `secret`: at least 32 characters, from the environment. Each use gets its own key derived from it: encrypting TOTP secrets and provider tokens, and digesting where a sign-in came from. A list rotates secrets: the first writes, every one reads.
+- `secret`: at least 32 characters, from the environment, and not the session's secret: kay-auth cannot derive the session's keys, so the two stay apart only when the app keeps them apart. Each use gets its own key derived from it: encrypting TOTP secrets and provider tokens, and digesting where a sign-in came from. A list rotates secrets: the first writes, every one reads. After a rotation each user gets one `new-sign-in` mail, since the digest of where they sign in from changes with the secret.
 - `store`: see Stores.
 - `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
 - `prefix`: where the OAuth routes live, `/auth` by default.
@@ -105,7 +105,8 @@ const api = new Elysia({ prefix: '/api' })
   .get('/health', () => 'ok', { auth: false })
 ```
 
-- Every route of the instance the gate is used on needs a signed-in user, or `gate({ require })`'s requirement. A route asks for more with `auth: <requirement>` and stays open with `auth: false`. Routes added through `group`, `guard`, `route`, `all`, `ws` or a used plugin are closed too, so a route that forgets `auth:` stays closed.
+- Every route the instance declares after `.use(auth.gate())` needs a signed-in user, or `gate({ require })`'s requirement. A route asks for more with `auth: <requirement>` and stays open with `auth: false`. Routes added through `group`, `guard`, `route`, `all`, `ws` or a used plugin are closed too, so a route that forgets `auth:` stays closed. A route declared before the gate stays open: use the gate first.
+- Gates nest: a sub-router behind `auth.gate({ require: 'admin' })` inside an app behind `auth.gate()` needs both.
 - 401 to an anonymous caller, 403 to a signed-in one who is denied. A bearer token passes as its user.
 
 ## OAuth
@@ -121,9 +122,9 @@ a(href="/auth/github?link=1&redirect=/account" data-no-prefetch) Link GitHub
 - The flow keeps its state and PKCE verifier in the session, so a callback works once, in the browser that started it, within ten minutes. `redirect` is kept to a path on the site.
 - A provider account signs into the user it is linked to. A new one signs up a new user, taking its email and its name only when no other user has them: no account is ever merged into another by email. `onSignUp(user, profile)` runs for every new user, to create the app's own records; `profile` is `undefined` for a password sign-up.
 - `allow(profile)` is asked before any user is touched; false refuses, as an allowlist of provider ids does.
-- `?link=1` links the provider account to the signed-in user instead, refused when another user has it linked.
-- A failure goes to `signInPage?error=<code>`: `oauth` (a state or code that did not check out), `cancelled`, `refused`, `taken`, `unavailable` (the provider failed), `signed-out` (a link without a signed-in user).
-- `providerToken('discord')` gives the signed-in user's access token, refreshed when about to expire, or `null` once the provider refuses a refresh. Provider tokens are stored encrypted. `identities()` lists the providers the user linked.
+- `?link=1` links the provider account to the signed-in user instead, refused when another user has it linked. A linked provider is a way in that outlives every sign-out, so linking needs a session that signed in or re-proved in the last ten minutes (see Re-proof): past that the link goes to `signInPage?error=stale`, and the page asks for `auth.reprove(proof)` first.
+- A failure goes to `signInPage?error=<code>`: `oauth` (a state or code that did not check out, or a provider account without an id), `cancelled`, `refused`, `taken`, `unavailable` (the provider failed), `signed-out` (a link without a signed-in user), `stale` (a link without a recent proof).
+- `providerToken('discord')` gives the signed-in user's access token, refreshed when about to expire, or `null` when it cannot be: the tokens are forgotten once the provider refuses the refresh token, and kept through an outage. Provider tokens are stored encrypted. `identities()` lists the providers the user linked.
 
 ## Passwords
 
@@ -152,7 +153,7 @@ if failure?.data?.error === 'invalid'
 ```
 
 - `register({ email, password, username? })` answers `{ ok: true, user, signedIn }`, or `errors` by field (`email`: `'invalid'` or `'taken'`; `password`: `'too-short'` or `'too-long'`; `username`: `'length'`, `'characters'`, `'mixed-scripts'` or `'taken'`), or `error: 'limited'`. It signs the user in unless the app requires verified addresses, and mails a verification link when the app sends mail.
-- `signInWithPassword({ identifier, password, redirect? })` takes an email, or a username when it holds no `@`. A wrong password and an unknown account answer alike, `'invalid'`, in the same time. `'unverified'` comes once the password is right, when `email.requireVerified` is set. `'limited'` past the attempts allowed.
+- `signInWithPassword({ identifier, password, redirect? })` takes an email, or a username when it holds no `@`. A wrong password and an unknown account answer alike, `'invalid'`, in the same time. `'unverified'` comes once the password is right, when `email.requireVerified` is set. `'limited'` past the attempts allowed: six wrong passwords for one account hold it for 15 minutes, the right password included, a lockout anyone who knows the address can cause.
 - Passwords are hashed with argon2id; a hash made weaker, or by bcrypt in an older app, is rehashed on the next sign-in.
 - The rules are browser-safe, so an island refuses before posting: `passwordProblem`, `emailProblem`, `usernameProblem`, `normalizeEmail` and `normalizeUsername` from `@kaynooo/kay-auth/rules`. Passwords are 10 to 128 characters, usernames 2 to 32. Emails and usernames are stored NFKC-folded, emails lowercased, usernames compared without case, and a name or an email's local part mixing Latin with Cyrillic or Greek is refused.
 
@@ -195,16 +196,17 @@ if failure
   p.error This link has expired or was already used
 ```
 
-- `requestMagicLink(email, redirect?)` and `requestPasswordReset(email)` answer `{ ok: true }` whether or not an account has that address, so they tell nothing of which ones exist; `'limited'` past the mails allowed, `'unavailable'` without a mailer. `signInWithMagicLink(token)` signs in, to where the link was asked for, and verifies the address.
-- `resetPassword(token, password)` sets the password, verifies the address, ends every other session and signs in. A refused password leaves the link usable.
-- `sendVerification()` mails the signed-in user a new link; `verifyEmail(token)` verifies the address and signs in.
+- `requestMagicLink(email, redirect?)` and `requestPasswordReset(email)` answer alike whether or not an account has that address: counted per address either way, and mailed off the response's path, so neither the answer nor its time tells which addresses exist. They answer `{ ok: true }`, `'limited'` past the mails allowed, or `'unavailable'` without a mailer. `signInWithMagicLink(token)` signs in, to where the link was asked for, and verifies the address.
+- `resetPassword(token, password)` sets the password, verifies the address, ends every other session and bearer token, voids the other mailed links and signs in. A refused password leaves the link usable.
+- `sendVerification()` mails the signed-in user a new link. `verifyEmail(token)` verifies the address and never signs in: whoever opens the mail may be confirming an account a stranger registered with their address. It answers `/` as where to go when this session is the user's, `signInPage` otherwise.
+- A magic link or a reset that proves an address for the first time hands the account over clean: whatever was set on it before, perhaps by someone who registered the address first, is dropped (the password, the second factor and its recovery codes, linked providers, bearer tokens), and every other session ends. A user who registered with a password and never verified the address loses that password this way, and sets another.
 - `changeEmail(proof, email)` mails a link to the new address (`errors.email` `'invalid'`, `'taken'` or `'unchanged'` otherwise); `confirmEmailChange(token)` moves the account to it, ends its other sessions and warns the address it left, when that one was verified.
 - A link works once, even when two requests spend it together: verification for 24 hours, a reset and an email change for one hour, a magic link for 15 minutes. A new link of a kind voids the last one, a link to an address the account has since left opens nothing, and links are stored as digests only. A spent or unknown link answers `'invalid'`.
 - `requireVerified` refuses password sign-in until the address is verified and signs no one in on registering. An address registered and never verified can then be registered again, so no one squats an address they do not own.
 
 ## Two-factor
 
-- `setUpTwoFactor(proof)` answers `setup: { secret, uri, qr }`: the base32 secret to type in, its `otpauth://` URI, and the URI as a QR code, an SVG data URI for an `img`. `enableTwoFactor(code)` turns the factor on once the authenticator gives a right code, and answers ten recovery codes, `abcde-fghij-klmno`, to show this once.
+- `setUpTwoFactor(proof)` answers `setup: { secret, uri, qr }`: the base32 secret to type in, its `otpauth://` URI, and the URI as a QR code, an SVG data URI for an `img`. `enableTwoFactor(code)` turns the factor on once the authenticator gives a right code, and answers ten recovery codes, `abcde-fghij-klmno`, to show this once. Its tries count as a sign-in code's do, `'limited'` past them.
 - From then on every way of signing in stops at the `twoFactorPage`. `twoFactorPending()` says whether a sign-in waits there (for ten minutes), and `verifyTwoFactor(code)` finishes it with an authenticator code or a recovery code, answering `{ ok: true, redirect }`, or `'invalid'`, `'expired'` or `'limited'`.
 - An authenticator code works once, even at two sign-ins at the same moment, and the step either side of now is accepted. A recovery code works once and mails a warning. Eight tries in 15 minutes stop the account's attempts.
 - `regenerateRecoveryCodes(proof)` voids the old set, `recoveryCodesLeft()` counts the unused ones, `disableTwoFactor(proof)` turns the factor off and voids the codes. TOTP secrets are stored encrypted, bound to their user.
@@ -215,23 +217,24 @@ Changing what protects the account takes a `proof`: `changePassword`, `changeEma
 
 - `{ password }` when the user has a password; otherwise `{ code }`, an authenticator or recovery code, when they have a second factor.
 - A user with neither proves nothing but a sign-in under ten minutes old: past that, the method answers `'stale'` and the page asks them to sign in again first. A stolen session thus cannot set a password and an address and keep the account.
+- `auth.reprove(proof)` proves the user without changing anything, as before linking a provider. Any proof counts for ten minutes, as a sign-in does.
 - `'proof'` for a wrong or missing proof, `'limited'` after six tries in 15 minutes, `'signed-out'` without a user.
 
 ## Account
 
-- `changePassword(proof, password)` sets the password, or a first one, and ends the user's other sessions.
+- `changePassword(proof, password)` sets the password, or a first one, ends the user's other sessions and voids the links mailed before.
 - `unlink(provider, proof)` unlinks a provider: `'not-linked'` when it is not, `'last-way-in'` when the user would have no password, no other provider and no verified address to get a magic link at.
 - `deleteAccount(proof)` deletes the user with everything kay-auth keeps for them, calls `onDelete(user)` for the app's own records, and signs out. Asking the user to type their name first is the page's job.
 
 ## Bearer tokens
 
 - `createToken(proof, label)` answers `{ ok: true, token, id }`: the token, shown this once, for a device or an API client to send as `Authorization: Bearer <token>`. It is minted from a session only, never with another token. `'label'` for an empty label or one over 64 characters.
-- `tokens()` lists `{ id, label, createdAt, lastUsedAt }`, since only the token's digest is stored; `revokeToken(id)` revokes one. A use is recorded at most every five minutes.
+- `tokens()` lists `{ id, label, createdAt, lastUsedAt }`, since only the token's digest is stored; `revokeToken(id)` revokes one. A use is recorded at most every five minutes. A token survives a password change and `signOutEverywhere`, being a device the user named, and ends with a password reset, which recovers the account.
 - A token reads as its user in `user()`, guards and gates. A websocket checks the token its first message carries with `auth.userFromToken(token)`, which `createWsAuthStore(verify)` keeps per connection.
 
 ## Security mails
 
-A change to what protects an account is mailed to its verified address, never an unverified one, and handed to `onEvent(event, user, detail)` for the app's audit log:
+A change to what protects an account is mailed to its verified address, never an unverified one, and handed to `onEvent(event, user, detail)` for the app's audit log. A mailer or an `onEvent` that throws is logged, never turned into a failed sign-in:
 
 - `new-sign-in`: a device or network the account had not used before; the first sign-in has nothing to compare against.
 - `password-changed`, `two-factor-enabled`, `two-factor-disabled`, `recovery-code-used`, `recovery-codes-regenerated`, `account-deleted`.
@@ -244,8 +247,8 @@ Attempts are counted in the store, so every process shares them, per client addr
 
 - `signIn` 40 and `signInAccount` 6 per 15 minutes; the account counts failures only, and a success clears it.
 - `register` 6 per hour.
-- `resend`, `forgot` and `magicLink` 12 per client and 3 per account per hour (`resendAccount`, `forgotAccount`, `magicLinkAccount`); `emailChange` 12 and `emailChangeAccount` 5.
-- `twoFactor` 30 and `twoFactorAccount` 8 per 15 minutes; `reprove` 6 per 15 minutes; `link` 40 per hour.
+- `resend`, `forgot` and `magicLink` 12 per client and 3 per account per hour (`resendAccount`, `forgotAccount` and `magicLinkAccount`, the last two counted per address); `emailChange` 12 and `emailChangeAccount` 5.
+- `twoFactor` 30 and `twoFactorAccount` 8 per 15 minutes, for signing in and for turning the factor on; `reprove` 6 per 15 minutes; `link` 40 per hour.
 
 ## Stores
 

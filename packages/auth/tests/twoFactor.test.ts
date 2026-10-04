@@ -73,6 +73,20 @@ describe('setting up a second factor', () => {
     expect(await ada.call('enableTwoFactor', '000000')).toEqual({ ok: false, error: 'invalid' })
     expect(await ada.json('/me')).toMatchObject({ twoFactor: false })
   })
+
+  test('turning on takes no more guesses than a sign-in code does, so a session alone cannot search the pending secret', async () => {
+    const { browser } = testApp()
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    const setup = await ada.call('setUpTwoFactor', { password: PASSWORD })
+
+    for (let attempt = 0; attempt < 8; attempt++)
+      await ada.call('enableTwoFactor', '000000')
+
+    expect(await ada.call('enableTwoFactor', await totpCode(setup.setup.secret, totpStep()))).toEqual({ ok: false, error: 'limited' })
+    expect(await ada.json('/me')).toMatchObject({ twoFactor: false })
+  })
 })
 
 describe('signing in with a second factor', () => {
@@ -148,6 +162,8 @@ describe('signing in with a second factor', () => {
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    // Verified first: a magic link that proves an address for the first time hands the account over clean, its second factor dropped.
+    await ada.call('verifyEmail', new URL(mails.findLast(mail => mail.kind === 'verify-email')!.url!).searchParams.get('token'))
     const { setup } = await ada.call('setUpTwoFactor', { password: PASSWORD })
 
     await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))

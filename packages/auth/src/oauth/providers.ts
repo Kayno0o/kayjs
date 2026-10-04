@@ -53,7 +53,8 @@ export function githubProvider(opts: { scopes?: string[] } = {}): OAuthProvider<
     }),
     parseTokens: parseStandardTokens,
     normalizeUser: raw => ({
-      providerId: String(raw.id),
+      // Not `String(raw.id)`, which makes a missing id the string "undefined".
+      providerId: typeof raw.id === 'number' ? String(raw.id) : '',
       username: raw.login,
       displayName: raw.name ?? undefined,
       avatar: raw.avatar_url ?? null,

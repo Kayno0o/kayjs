@@ -55,15 +55,17 @@ describe('verifying an email', () => {
     expect(await ada.call('verifyEmail', token)).toEqual({ ok: false, error: 'invalid' })
   })
 
-  test('opening the link in another browser signs the user in there', async () => {
+  test('opening the link in another browser verifies the address without signing in there', async () => {
     const { browser, tokenOf } = setup()
+    const ada = browser()
 
-    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
     const elsewhere = browser()
 
-    await elsewhere.call('verifyEmail', tokenOf('verify-email'))
-
-    expect(await elsewhere.json('/me')).toMatchObject({ email: 'ada@example.com', emailVerified: true })
+    // Whoever opens it may be confirming an account a stranger registered with their address.
+    expect(await elsewhere.call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/' })
+    expect(await elsewhere.json('/me')).toBe('anonymous')
+    expect(await ada.json('/me')).toMatchObject({ emailVerified: true })
   })
 
   test('with `requireVerified`, registering signs no one in, and the password waits for the address', async () => {
@@ -125,15 +127,17 @@ describe('resetting a password', () => {
     expect(mails.filter(mail => mail.kind === 'reset-password').map(mail => mail.to)).toEqual(['ada@example.com'])
   })
 
-  test('sets the new password, ends every other session, and signs in here', async () => {
+  test('sets the new password, ends every other session and bearer token, and signs in here', async () => {
     const { browser, ada, tokenOf } = await registered()
     const reset = browser()
+    const minted = await ada.call('createToken', { password: PASSWORD }, 'phone')
 
     await reset.call('requestPasswordReset', 'ada@example.com')
 
     expect(await reset.call('resetPassword', tokenOf('reset-password'), 'a brand new password')).toEqual({ ok: true, redirect: '/' })
     expect(await reset.json('/me')).toMatchObject({ email: 'ada@example.com', emailVerified: true })
     expect(await ada.json('/me')).toBe('anonymous')
+    expect(await browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'a brand new password' })).toMatchObject({ ok: true })
   })
 
@@ -148,12 +152,18 @@ describe('resetting a password', () => {
     expect(await reset.call('resetPassword', token, 'a brand new password')).toMatchObject({ ok: true })
   })
 
-  test('limits how many mails one account is sent', async () => {
+  test('limits how many mails one address is sent, and answers alike whether or not an account has it', async () => {
     const { browser, mails } = await registered()
+    const answers = async (email: string) => {
+      const all = []
 
-    for (let index = 0; index < 4; index++)
-      await browser().call('requestPasswordReset', 'ada@example.com')
+      for (let index = 0; index < 4; index++)
+        all.push(await browser().call('requestPasswordReset', email))
 
+      return all
+    }
+
+    expect(await answers('ada@example.com')).toEqual(await answers('nobody@example.com'))
     expect(mails.filter(mail => mail.kind === 'reset-password')).toHaveLength(3)
   })
 })
@@ -172,6 +182,23 @@ describe('magic links', () => {
     expect(await ada.call('signInWithMagicLink', token)).toEqual({ ok: true, redirect: '/account' })
     expect(await ada.json('/me')).toMatchObject({ id: 'u1', emailVerified: true })
     expect(await browser().call('signInWithMagicLink', token)).toEqual({ ok: false, error: 'invalid' })
+  })
+
+  test('an account a stranger registered with the address goes to its owner clean, the stranger signed out and their password void', async () => {
+    const { browser, tokenOf } = setup()
+    const stranger = browser()
+
+    await stranger.call('register', { email: 'ada@example.com', password: 'squatter password' })
+    const minted = await stranger.call('createToken', { password: 'squatter password' }, 'stranger')
+    const ada = browser()
+
+    await ada.call('requestMagicLink', 'ada@example.com')
+    await ada.call('signInWithMagicLink', tokenOf('magic-link'))
+
+    expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com', emailVerified: true, hasPassword: false, twoFactor: false })
+    expect(await stranger.json('/me')).toBe('anonymous')
+    expect(await browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
+    expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'squatter password' })).toEqual({ ok: false, error: 'invalid' })
   })
 
   test('a link for an address the account has since left is spent for nothing', async () => {

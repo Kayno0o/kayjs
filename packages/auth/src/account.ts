@@ -22,6 +22,8 @@ export async function changePassword(state: RequestState, proof: Proof, password
   const updated = await state.core.store.users.update(proved.record.id, { passwordHash: await hashPassword(password), sessionVersion: proved.record.sessionVersion + 1 })
 
   if (updated) {
+    // Links mailed before, a reset among them, no longer outrank the password just set.
+    await state.core.store.tokens.deleteForUser(updated.id)
     await state.renew(updated)
     await notify(state.core, updated, 'password-changed')
   }

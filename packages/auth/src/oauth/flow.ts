@@ -6,6 +6,7 @@ import { newUserRecord, publicUser, sameText } from '../core'
 import { randomToken } from '../keys'
 import { notify } from '../notify'
 import { normalizeEmail, normalizeUsername, usernameProblem } from '../rules'
+import { provedLately } from '../twoFactor'
 import { OAuthExchangeError } from './client'
 import { createPkcePair } from './pkce'
 import { safeRedirect } from './redirect'
@@ -13,7 +14,7 @@ import { safeRedirect } from './redirect'
 const FLOW_MAX_AGE_MS = 10 * 60 * 1000
 
 // Why an OAuth sign-in failed, sent to the sign-in page as `?error=`.
-export type OAuthFailure = 'oauth' | 'cancelled' | 'refused' | 'taken' | 'unavailable' | 'signed-out'
+export type OAuthFailure = 'oauth' | 'cancelled' | 'refused' | 'taken' | 'unavailable' | 'signed-out' | 'stale'
 
 // What a sign-in in progress keeps in the session between leaving for the provider and coming back.
 export interface OAuthFlow {
@@ -26,11 +27,20 @@ export interface OAuthFlow {
 }
 
 // The provider's authorize URL, the flow parked in the session; undefined for a provider the app has not configured.
-export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string, link?: boolean }): Promise<string | undefined> {
+export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string, link?: boolean }): Promise<string | { error: OAuthFailure } | undefined> {
   const entry = state.core.oauth.get(provider)
 
   if (!entry)
     return undefined
+
+  // A linked provider is a way in that outlives every sign-out, so a stolen session alone may not add one.
+  if (options.link) {
+    if (!(await state.current()) || state.via() !== 'session')
+      return { error: 'signed-out' }
+
+    if (!(await provedLately(state)))
+      return { error: 'stale' }
+  }
 
   const pkce = await createPkcePair()
   const flowState = randomToken()
@@ -69,6 +79,10 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
 
     throw error
   }
+
+  // A provider answering without an id would put every such sign-in in one shared account.
+  if (typeof profile.providerId !== 'string' || profile.providerId === '')
+    return { error: 'oauth' }
 
   if (core.allow && !(await core.allow(profile)))
     return { error: 'refused' }

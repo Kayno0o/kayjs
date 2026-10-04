@@ -30,7 +30,7 @@ import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
-import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, regenerateRecoveryCodes, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
+import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
 
@@ -225,13 +225,20 @@ export class Auth {
     return verifyTwoFactor(this[STATE], code, record => this.establish(record))
   }
 
+  // Re-proves the signed-in user, as before linking a provider: a proof counts for ten minutes, as a sign-in does.
+  async reprove(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
+    const proved = await reprove(this[STATE], proof)
+
+    return proved.ok ? { ok: true } : proved
+  }
+
   // A secret for the signed-in user's authenticator, as text and as a QR code; the second factor turns on once `enableTwoFactor` gets a code from it.
   async setUpTwoFactor(proof: Proof): Promise<{ ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' }> {
     return setUpTwoFactor(this[STATE], proof)
   }
 
   // Turns the second factor on with a code from the authenticator just set up; answers the recovery codes, to show this once.
-  async enableTwoFactor(code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' }> {
+  async enableTwoFactor(code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }> {
     return enableTwoFactor(this[STATE], code)
   }
 
@@ -323,7 +330,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   const core = createCore(options)
   const { hasRole, isGranted } = createRoleHierarchy<User, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 
-  const failed = (error: OAuthFailure) => `${core.signInPage}?error=${error}`
+  const failed = (error: OAuthFailure) => withQuery(core.signInPage, `error=${error}`)
 
   const plugin = new Elysia({ name: 'kay-auth' })
     // Typed as a plain instance: `AnyElysia` would merge `any` routes into the app's, and every link would check.
@@ -334,12 +341,15 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
     // Typed as their literal paths, so `kay check` checks links to them once the app registers its Elysia app.
     .get(`${core.prefix}/:provider` as `${Prefix}/:provider`, async ({ auth, params, query, redirect, status }) => {
-      const location = await startOAuth(auth[STATE], params.provider, { redirect: query.redirect, link: query.link === '1' })
+      const started = await startOAuth(auth[STATE], params.provider, { redirect: text(query.redirect), link: query.link === '1' })
 
-      return location === undefined ? status(404, 'Not Found') : redirect(location, 303)
+      if (started === undefined)
+        return status(404, 'Not Found')
+
+      return redirect(typeof started === 'string' ? started : failed(started.error), 303)
     })
     .get(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ auth, params, query, redirect }) => {
-      const outcome = await finishOAuth(auth[STATE], params.provider, query)
+      const outcome = await finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error) })
 
       return redirect('error' in outcome ? failed(outcome.error) : outcome.redirect, 303)
     })
@@ -399,7 +409,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
         if (!user) {
           if (guardOptions.redirect !== undefined && reading)
-            ctx.redirect(`${guardOptions.redirect}?redirect=${encodeURIComponent(ctx.url.pathname + ctx.url.search)}`)
+            ctx.redirect(withQuery(guardOptions.redirect, `redirect=${encodeURIComponent(ctx.url.pathname + ctx.url.search)}`))
 
           ctx.deny(401, 'Sign in to continue')
         }
@@ -457,6 +467,15 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   }
 
   return core
+}
+
+// A query value as text: a name repeated in the URL arrives as a list, which no flow takes.
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
+}
+
+function withQuery(path: string, query: string): string {
+  return `${path}${path.includes('?') ? '&' : '?'}${query}`
 }
 
 function authOf(ctx: object): Auth {

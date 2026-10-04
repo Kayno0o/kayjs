@@ -1,3 +1,6 @@
+const URL_STRIPPED = /[\t\n\r]/g
+const LEADING_SPACE = /^\s+/
+
 /** True if the string holds a C0 control char or DEL - things browsers strip/normalize in URLs. */
 function hasControlChar(s: string): boolean {
   for (let i = 0; i < s.length; i++) {
@@ -16,7 +19,7 @@ export function safeRedirect(path: string | undefined | null, fallback = '/'): s
     return fallback
 
   // Browsers strip tab/newline anywhere in a URL; mirror that before validating.
-  const cleaned = path.replace(/[\t\n\r]/g, '').replace(/^\s+/, '')
+  const cleaned = path.replace(URL_STRIPPED, '').replace(LEADING_SPACE, '')
 
   if (cleaned.startsWith('/') && !cleaned.startsWith('//') && !cleaned.includes('\\') && !hasControlChar(cleaned))
     return cleaned

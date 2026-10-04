@@ -4,15 +4,26 @@ import type { UserRecord } from './store'
 import { publicUser } from './core'
 
 // Tells the user and the app of a change to what protects the account; mail goes to a verified address only, so a typo never warns a stranger.
+// A failure is logged, not thrown: the change is made by then, and a mail outage must not turn every sign-in into an error.
 export async function notify(core: Core, record: UserRecord, event: SecurityEvent, detail?: string, to = record.emailVerifiedAt === null ? null : record.email): Promise<void> {
-  await core.onEvent?.(event, publicUser(record), detail)
+  try {
+    await core.onEvent?.(event, publicUser(record), detail)
+  }
+  catch (error) {
+    console.error(`kay-auth: onEvent failed for ${event}`, error)
+  }
 
   const mail = core.email
 
   if (!mail || to === null)
     return
 
-  await mail.mailer.send({ to, kind: event, ...mail.templates[event]({ site: core.site, email: to, detail }) })
+  try {
+    await mail.mailer.send({ to, kind: event, ...mail.templates[event]({ site: core.site, email: to, detail }) })
+  }
+  catch (error) {
+    console.error(`kay-auth: mailing ${event} failed`, error)
+  }
 }
 
 // Mails a sign-in from a device or network the account has not used before, then remembers this one.

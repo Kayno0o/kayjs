@@ -119,6 +119,16 @@ describe('coming back from the provider', () => {
     expect(identity?.accessToken).not.toContain('token-1')
   })
 
+  test('refuses a provider account without an id, which would share one account with every other such sign-in', async () => {
+    providers({ blank: { id: '', username: 'nobody' } })
+    const { browser, signUps } = setup()
+    const { response } = await signInWith(browser(), 'discord', 'blank')
+
+    expect(response.headers.get('location')).toBe('/login?error=oauth')
+    expect(signUps).toEqual([])
+    expect(githubProvider().normalizeUser({ login: 'nobody' } as never).providerId).toBe('')
+  })
+
   test('signs a returning user into the same account', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const { browser, signUps } = setup()
@@ -261,7 +271,40 @@ describe('linking a provider', () => {
     await signInWith(bob, 'discord', '2')
 
     expect((await signInWith(ada, 'discord', '2', '/auth/discord?link=1')).response.headers.get('location')).toBe('/login?error=taken')
-    expect((await signInWith(browser(), 'discord', '2', '/auth/discord?link=1')).response.headers.get('location')).toBe('/login?error=signed-out')
+    expect((await browser().fetch('/auth/discord?link=1')).headers.get('location')).toBe('/login?error=signed-out')
+  })
+
+  test('needs a sign-in or a proof from the last ten minutes, so a stolen session alone adds no way in', async () => {
+    providers({ 1: { id: '1', username: 'ada' }, 7: { id: '7', username: 'ada-gh' } })
+    const { browser, store } = setup()
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+    setSystemTime(new Date(Date.now() + 11 * 60 * 1000))
+
+    expect((await ada.fetch('/auth/github?link=1')).headers.get('location')).toBe('/login?error=stale')
+    expect(await ada.call('reprove', {})).toEqual({ ok: false, error: 'stale' })
+
+    await signInWith(ada, 'discord', '1')
+    await signInWith(ada, 'github', '7', '/auth/github?link=1')
+
+    expect(await store.identities.find('github', '7')).toBeDefined()
+  })
+
+  test('a proof makes an older sign-in fresh again', async () => {
+    providers({ 7: { id: '7', username: 'ada-gh' } })
+    const { browser, store } = setup()
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+    setSystemTime(new Date(Date.now() + 11 * 60 * 1000))
+
+    expect(await ada.call('reprove', { password: 'wrong password!' })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('reprove', { password: 'correct horse battery' })).toEqual({ ok: true })
+
+    await signInWith(ada, 'github', '7', '/auth/github?link=1')
+
+    expect(await store.identities.find('github', '7')).toBeDefined()
   })
 })
 
@@ -292,6 +335,21 @@ describe('provider tokens', () => {
 
     expect(await ada.json('/token')).toBe('token-1')
     expect(await app.browser().json('/token')).toBe('none')
+  })
+
+  test('keeps the tokens through a provider outage', async () => {
+    providers({ 1: { id: '1', username: 'ada' } }, { expiresIn: 60 })
+    const app = setup()
+    const ada = app.browser()
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    withTokenRoute(app)
+    await signInWith(ada, 'discord', '1')
+    providers({ 1: { id: '1', username: 'ada' } }, { tokenStatus: 503 })
+
+    expect(await ada.json('/token')).toBe('none')
+    expect((await app.store.identities.find('discord', '1'))?.accessToken).not.toBeNull()
+    logged.mockRestore()
   })
 
   test('forgets the tokens once the provider refuses a refresh', async () => {

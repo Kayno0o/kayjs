@@ -62,9 +62,12 @@ export async function verifyEmail(state: RequestState, token: string): Promise<L
   if (!spent.ok)
     return spent
 
-  const record = await state.core.store.users.update(spent.record.id, { emailVerifiedAt: new Date() }) ?? spent.record
+  await state.core.store.users.update(spent.record.id, { emailVerifiedAt: new Date() })
 
-  return { ok: true, redirect: await signedInOr(state, record, '/') }
+  // Never signs in: whoever opens the mail may be confirming an account a stranger registered with their address, and must not end up using it.
+  const current = await state.current()
+
+  return { ok: true, redirect: current?.id === spent.record.id ? '/' : state.core.signInPage }
 }
 
 export async function requestPasswordReset(state: RequestState, email: string): Promise<MailRequestResult> {
@@ -86,13 +89,16 @@ export async function resetPassword(state: RequestState, token: string, password
 
   const { store } = state.core
   const record = await store.users.update(spent.record.id, {
+    ...await claim(state.core, spent.record),
     passwordHash: await hashPassword(password),
     // The mail reached that inbox, so the address is proved too.
     emailVerifiedAt: spent.record.emailVerifiedAt ?? new Date(),
     sessionVersion: spent.record.sessionVersion + 1,
   }) ?? spent.record
 
+  // Recovering an account ends every way into it the user did not just prove, devices included.
   await store.tokens.deleteForUser(record.id)
+  await revokeBearerTokens(state.core, record.id)
   await notify(state.core, record, 'password-changed')
 
   return { ok: true, redirect: await state.complete(record, '/') }
@@ -108,7 +114,9 @@ export async function signInWithMagicLink(state: RequestState, token: string): P
   if (!spent.ok)
     return spent
 
-  const record = spent.record.emailVerifiedAt === null ? await state.core.store.users.update(spent.record.id, { emailVerifiedAt: new Date() }) ?? spent.record : spent.record
+  const record = spent.record.emailVerifiedAt === null
+    ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
+    : spent.record
 
   return { ok: true, redirect: await state.complete(record, spent.token.redirect ?? '/') }
 }
@@ -167,18 +175,38 @@ export async function welcome(state: RequestState, record: UserRecord): Promise<
     await issue(state.core, record, 'verify-email', record.email, null)
 }
 
+// Counted by address whether or not an account has it, and mailed off the response's path, so neither the answer nor its time tells which addresses exist.
 async function mailByAddress(state: RequestState, email: string, type: TokenType, redirect: string | null, limit: 'forgot' | 'magicLink'): Promise<MailRequestResult> {
+  const { core } = state
+
+  if (!core.email)
+    return { ok: false, error: 'unavailable' }
+
   const address = normalizeEmail(email)
-  const record = emailProblem(address) ? undefined : await state.core.store.users.findByEmail(address)
 
-  if (!record)
-    return await spend(state.core.store, `${limit}:${state.client}`, state.core.limits[limit]) ? { ok: false, error: 'limited' } : { ok: true }
+  if (await spend(core.store, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.store, `${limit}:${address}`, core.limits[`${limit}Account`]))
+    return { ok: false, error: 'limited' }
 
-  return mailFor(state, record, type, address, redirect, limit)
+  const record = emailProblem(address) ? undefined : await core.store.users.findByEmail(address)
+
+  if (record)
+    void issueQuietly(core, record, type, address, redirect)
+
+  return { ok: true }
+}
+
+// Off the response's path, where no one is left to answer a failure to: logged.
+async function issueQuietly(core: Core, record: UserRecord, type: TokenType, email: string, redirect: string | null): Promise<void> {
+  try {
+    await issue(core, record, type, email, redirect)
+  }
+  catch (error) {
+    console.error(`kay-auth: mailing a ${type} link failed`, error)
+  }
 }
 
 // Counted per client and per account, so neither one sender nor many can flood an inbox.
-async function mailFor(state: RequestState, record: UserRecord, type: TokenType, email: string, redirect: string | null, limit: 'resend' | 'forgot' | 'magicLink' | 'emailChange'): Promise<MailRequestResult> {
+async function mailFor(state: RequestState, record: UserRecord, type: TokenType, email: string, redirect: string | null, limit: 'resend' | 'emailChange'): Promise<MailRequestResult> {
   const { core } = state
 
   if (!core.email)
@@ -219,9 +247,21 @@ async function spendLink(state: RequestState, token: string, type: TokenType) {
   return { ok: true, token: spent, record } as const
 }
 
-// Signs the user in unless this session already is, and answers where to go.
-async function signedInOr(state: RequestState, record: UserRecord, redirect: string): Promise<string> {
-  const current = await state.current()
+// An address proved for the first time by a link its owner asked for: whatever was set on the account before, perhaps by a stranger who registered the address first, is dropped, so the owner gets the account clean.
+async function claim(core: Core, record: UserRecord): Promise<Partial<UserRecord>> {
+  if (record.emailVerifiedAt !== null)
+    return {}
 
-  return current?.id === record.id ? redirect : state.complete(record, redirect)
+  for (const identity of await core.store.identities.listByUser(record.id))
+    await core.store.identities.delete(identity.provider, identity.providerId)
+
+  await core.store.recoveryCodes.replace(record.id, [])
+  await revokeBearerTokens(core, record.id)
+
+  return { passwordHash: null, totpSecret: null, totpEnabledAt: null, sessionVersion: record.sessionVersion + 1 }
+}
+
+export async function revokeBearerTokens(core: Core, userId: string): Promise<void> {
+  for (const token of await core.store.bearerTokens.listByUser(userId))
+    await core.store.bearerTokens.delete(userId, token.id)
 }

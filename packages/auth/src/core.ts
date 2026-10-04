@@ -22,7 +22,7 @@ export interface SignedIn {
   user: string
   // The user's session version when they signed in: raising it signs this session out.
   version: number
-  // When they signed in, in milliseconds since the epoch.
+  // When they signed in or last re-proved who they are, in milliseconds since the epoch.
   at: number
 }
 

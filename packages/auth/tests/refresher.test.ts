@@ -1,6 +1,7 @@
 import type { RefreshStage, StoredCredential } from '../src/oauth/refresher'
 import type { OAuthTokens } from '../src/oauth/types'
 import { describe, expect, test } from 'bun:test'
+import { OAuthExchangeError } from '../src/oauth/client'
 import { createOAuthTokenRefresher, createTokenRefresher } from '../src/oauth/refresher'
 
 const MIN = 60_000
@@ -149,7 +150,7 @@ describe('createOAuthTokenRefresher', () => {
   // The security-relevant default: a credential revoked upstream must not keep granting
   // access until the local session expires.
   test('a rejected refresh clears the stored credential and yields null', async () => {
-    const rejection = new Error('invalid_grant')
+    const rejection = new OAuthExchangeError(400, 'invalid_grant')
     const { refresher, saves, errors } = oauthSetup(EXPIRING, async () => {
       throw rejection
     })
@@ -157,6 +158,18 @@ describe('createOAuthTokenRefresher', () => {
     expect(await refresher.getValidToken({ id: 'u1' })).toBeNull()
     expect(saves).toEqual([null])
     expect(errors).toEqual([[rejection, 'refresh']])
+  })
+
+  test('an outage or a rate limit yields null but keeps the stored credential', async () => {
+    for (const failure of [new OAuthExchangeError(503, 'down'), new OAuthExchangeError(429, 'slow down'), new Error('network down')]) {
+      const { refresher, saves, errors } = oauthSetup(EXPIRING, async () => {
+        throw failure
+      })
+
+      expect(await refresher.getValidToken({ id: 'u1' })).toBeNull()
+      expect(saves).toEqual([])
+      expect(errors).toEqual([[failure, 'refresh']])
+    }
   })
 
   test('a persistence failure after a successful refresh is reported but keeps the valid token', async () => {
@@ -172,7 +185,7 @@ describe('createOAuthTokenRefresher', () => {
   })
 
   test('a failed revoke write is reported and still yields null', async () => {
-    const rejection = new Error('invalid_grant')
+    const rejection = new OAuthExchangeError(400, 'invalid_grant')
     const writeError = new Error('db down')
     const { refresher, errors } = oauthSetup(EXPIRING, async () => {
       throw rejection

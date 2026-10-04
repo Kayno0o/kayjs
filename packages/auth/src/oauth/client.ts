@@ -12,11 +12,7 @@ function redactBody(text: string): string {
   return text.length > 200 ? `${text.slice(0, 200)}...` : text
 }
 
-/**
- * Thrown when the provider rejects the token exchange or user fetch - a bad/expired
- * authorization code, or the provider being down. `status` is the upstream HTTP status,
- * so a caller can answer a client's bad code with a 4xx and a provider outage with a 502.
- */
+/** Thrown when the provider rejects the token exchange or user fetch, a bad or expired authorization code or the provider being down. `status` is the upstream HTTP status, so a caller can answer a client's bad code with a 4xx and a provider outage with a 502. */
 export class OAuthExchangeError extends Error {
   constructor(readonly status: number, message: string) {
     super(message)
@@ -109,5 +105,11 @@ async function postToken(provider: OAuthProvider<any, any>, body: URLSearchParam
   const isJson = provider.tokenAccept === 'json'
     || (provider.tokenAccept !== 'form' && (res.headers.get('content-type') ?? '').includes('json'))
 
-  return isJson ? JSON.parse(text) : Object.fromEntries(new URLSearchParams(text))
+  const parsed = isJson ? JSON.parse(text) : Object.fromEntries(new URLSearchParams(text))
+
+  // GitHub answers a refused grant with a 200 carrying `error`, where the spec answers a 400.
+  if (typeof parsed?.error === 'string')
+    throw new OAuthExchangeError(400, `OAuth token request refused (${provider.name}): ${parsed.error}`)
+
+  return parsed
 }

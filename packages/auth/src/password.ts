@@ -59,10 +59,13 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   const requireVerified = state.core.email?.requireVerified ?? false
 
   // An address registered and never verified, where unverified accounts cannot sign in, holds nothing worth keeping: registering again replaces it, so no one can squat an address they do not own.
-  if (holder && requireVerified && holder.emailVerifiedAt === null && (await store.identities.listByUser(holder.id)).length === 0)
+  if (holder && requireVerified && holder.emailVerifiedAt === null && (await store.identities.listByUser(holder.id)).length === 0) {
     await store.users.delete(holder.id)
-  else if (holder)
+    await state.core.onDelete?.(publicUser(holder))
+  }
+  else if (holder) {
     errors.email = 'taken'
+  }
 
   if (username !== null && !errors.username && await store.users.findByUsername(username))
     errors.username = 'taken'
@@ -75,9 +78,15 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   try {
     await store.users.create(record)
   }
-  // Another request took the email or the name in between.
-  catch {
-    return { ok: false, errors: await store.users.findByEmail(email) ? { email: 'taken' } : { username: 'taken' } }
+  // Another request took the email or the name in between; any other failure is the store's.
+  catch (error) {
+    if (await store.users.findByEmail(email))
+      return { ok: false, errors: { email: 'taken' } }
+
+    if (username !== null && await store.users.findByUsername(username))
+      return { ok: false, errors: { username: 'taken' } }
+
+    throw error
   }
 
   const user = publicUser(record)

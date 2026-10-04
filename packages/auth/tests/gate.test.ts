@@ -88,6 +88,14 @@ describe('createGate', () => {
     expect(calls).toBe(1)
   })
 
+  test('a looser outer gate does not let a route through a stricter inner one', async () => {
+    const inner = new Elysia().use(createGate<User, string>({ ...deps, defaultRequirement: p => p?.id === 2 })).get('/admin', () => 'secret')
+    const app = new Elysia().use(createGate(deps)).use(inner)
+
+    expect((await app.handle(req('/admin'))).status).toBe(401)
+    expect((await app.handle(req('/admin', { authorization: 'Bearer good' }))).status).toBe(403)
+  })
+
   test('a parent that uses an authed plugin keeps its own later routes as they were', async () => {
     const authed = new Elysia().use(createGate(deps)).get('/authed', () => 'ok')
     const app = new Elysia().use(authed).get('/later', () => 'ok').use(new Elysia().get('/later-plugin', () => 'ok'))

@@ -18,7 +18,7 @@ interface GateContext<P, G extends string> extends PolicyContext {
   request: Request
   set: { status?: number | string }
   [REQUIREMENT]?: Requirement<P, G> | false
-  [DECIDED]?: true
+  [DECIDED]?: Set<Requirement<P, G>>
 }
 
 // The macro only stamps the route's requirement; one local beforeHandle enforces it, so routes added through `group`, `guard`, `use`, `route`, `all` or `ws` fall back to `defaultRequirement` too.
@@ -37,8 +37,8 @@ export function createGate<P, G extends string>(deps: GateDeps<P, G>) {
         const ctx = context as unknown as GateContext<P, G>
         const requirement = ctx[REQUIREMENT] ?? deps.defaultRequirement
 
-        // A route nested in two gated instances runs this twice; the first pass already decided.
-        if (requirement === false || ctx[DECIDED])
+        // A route nested in two gated instances runs this once per gate: each holds it to its own requirement, and a requirement already met is not asked again.
+        if (requirement === false || ctx[DECIDED]?.has(requirement))
           return
 
         const user = await deps.principal(ctx)
@@ -46,7 +46,7 @@ export function createGate<P, G extends string>(deps: GateDeps<P, G>) {
         const ok = await deps.authorize(user, requirement, level, { params: ctx.params, body: ctx.body, query: ctx.query })
 
         if (ok) {
-          ctx[DECIDED] = true
+          (ctx[DECIDED] ??= new Set()).add(requirement)
 
           return
         }

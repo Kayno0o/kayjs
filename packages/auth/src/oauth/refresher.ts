@@ -1,5 +1,9 @@
 import type { OAuthTokens } from './types'
 import { MINUTE_MS } from '@kaynooo/utils'
+import { OAuthExchangeError } from './client'
+
+// The answers by which a provider refuses the refresh token itself; anything else, an outage or a rate limit, may pass.
+const REFUSED_STATUSES = new Set([400, 401])
 
 /** The currently-stored credential for a subject; `expiresAt` null/undefined = non-expiring. */
 export interface StoredCredential {
@@ -100,11 +104,7 @@ export interface OAuthTokenRefresherDeps<K, S> {
   key: (subject: S) => K
   /** Reads the subject's stored credential. */
   load: (subject: S) => StoredCredential
-  /**
-   * Persists the outcome. `tokens` is `null` when the provider *rejected* the refresh, meaning
-   * the credential was revoked upstream - write nulls so the stale access token stops being
-   * treated as live. Keep `refreshToken` when a rotation response omits it.
-   */
+  /** Persists the outcome. `tokens` is `null` when the provider refused the refresh token, the credential revoked upstream: write nulls so the stale access token stops being treated as live. Keep `refreshToken` when a rotation response omits it. */
   save: (subject: S, tokens: OAuthTokens | null) => Promise<void>
   /** Notified when a step throws; the refresher itself never rejects. */
   onError?: (error: unknown, stage: RefreshStage) => void
@@ -113,13 +113,10 @@ export interface OAuthTokenRefresherDeps<K, S> {
 }
 
 /**
- * `createTokenRefresher` bound to an OAuth client: refreshes through `oauth.refreshTokens` and
- * persists via `save`, so consumers supply field mapping only.
+ * `createTokenRefresher` bound to an OAuth client: refreshes through `oauth.refreshTokens` and persists via `save`, so consumers supply field mapping only.
  *
- * A rejected refresh calls `save(subject, null)` rather than leaving the old credential in place -
- * otherwise a token revoked at the provider keeps granting access until the local session expires.
- * A `save` failure after a *successful* refresh is reported but not fatal: the token is valid, and
- * the refresher's cache carries it until the next write succeeds.
+ * A refresh the provider refuses (a 400 or a 401) calls `save(subject, null)` rather than leaving the old credential in place, since a token revoked at the provider would otherwise keep granting access. Any other failure yields null for now and keeps the credential.
+ * A `save` failure after a successful refresh is reported but not fatal: the token is valid, and the refresher's cache carries it until the next write succeeds.
  */
 export function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K, S>) {
   return createTokenRefresher<K, S>({
@@ -139,6 +136,10 @@ export function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K,
       }
       catch (error) {
         deps.onError?.(error, 'refresh')
+
+        // Kept through an outage, and through a race another process won with a rotated token: only a refusal forgets them.
+        if (!(error instanceof OAuthExchangeError && REFUSED_STATUSES.has(error.status)))
+          return null
 
         try {
           await deps.save(subject, null)

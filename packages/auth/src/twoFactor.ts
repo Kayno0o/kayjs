@@ -9,7 +9,7 @@ import { notify } from './notify'
 import { generateTotpSecret, otpauthUri, verifyTotp } from './totp'
 
 const CHALLENGE_MAX_AGE_MS = 10 * 60 * 1000
-// How long after signing in an account with neither a password nor a second factor counts as proved.
+// How long a sign-in or a re-proof counts as proved: for an account with neither a password nor a second factor, and for linking a provider.
 const FRESH_SIGN_IN_MS = 10 * 60 * 1000
 const RECOVERY_CODE_COUNT = 10
 // No 0, o, 1 or l, since these get copied by hand.
@@ -98,11 +98,8 @@ export async function reprove(state: RequestState, proof: Proof): Promise<{ ok: 
 
   const twoFactor = record.totpEnabledAt !== null
 
-  if (record.passwordHash === null && !twoFactor) {
-    const signedIn = await state.session.get('auth')
-
-    return signedIn && Date.now() - signedIn.at < FRESH_SIGN_IN_MS ? { ok: true, record } : { ok: false, error: 'stale' }
-  }
+  if (record.passwordHash === null && !twoFactor)
+    return await provedLately(state) ? { ok: true, record } : { ok: false, error: 'stale' }
 
   if (await spend(state.core.store, `reprove:${record.id}`, state.core.limits.reprove))
     return { ok: false, error: 'limited' }
@@ -116,7 +113,19 @@ export async function reprove(state: RequestState, proof: Proof): Promise<{ ok: 
 
   await state.core.store.attempts.reset(`reprove:${record.id}`)
 
+  const signedIn = await state.session.get('auth')
+
+  if (signedIn?.user === record.id)
+    await state.session.set('auth', { ...signedIn, at: Date.now() })
+
   return { ok: true, record }
+}
+
+// Whether this session signed in or re-proved its user in the last ten minutes.
+export async function provedLately(state: RequestState): Promise<boolean> {
+  const signedIn = await state.session.get('auth')
+
+  return signedIn !== undefined && Date.now() - signedIn.at < FRESH_SIGN_IN_MS
 }
 
 // A new secret for the signed-in user's authenticator, active once `enableTwoFactor` gets a code from it.
@@ -138,7 +147,7 @@ export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise
 }
 
 // Turns the second factor on once the authenticator proves it holds the secret; answers the recovery codes, shown this once.
-export async function enableTwoFactor(state: RequestState, code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' }> {
+export async function enableTwoFactor(state: RequestState, code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }> {
   const record = await state.current()
 
   if (!record)
@@ -152,10 +161,16 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
   if (secret === undefined)
     return { ok: false, error: 'not-set-up' }
 
+  // Counted like a sign-in code: a session alone may not guess the pending secret's codes at will.
+  if (await spend(state.core.store, `two-factor:${state.client}`, state.core.limits.twoFactor) || await spend(state.core.store, `enable-two-factor:${record.id}`, state.core.limits.twoFactorAccount))
+    return { ok: false, error: 'limited' }
+
   const step = await verifyTotp(secret, code)
 
   if (step === undefined)
     return { ok: false, error: 'invalid' }
+
+  await state.core.store.attempts.reset(`enable-two-factor:${record.id}`)
 
   const updated = await state.core.store.users.update(record.id, { totpEnabledAt: new Date(), totpLastStep: step })
 
