@@ -3,4 +3,4 @@ node_modules
 *.tsbuildinfo
 .env
 /types
-tests/fixture/.kay
+.kay

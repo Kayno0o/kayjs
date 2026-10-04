@@ -13,5 +13,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src", ".kay/types"]
+  "include": ["src", "tests", ".kay/types"]
 }

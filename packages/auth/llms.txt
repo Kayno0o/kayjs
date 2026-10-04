@@ -258,4 +258,15 @@ Attempts are counted in the store, so every process shares them, per client addr
 
 ## Testing
 
-A test drives the app as a browser does: `new Elysia().use(auth.plugin).use(await pages({ root }))`, each request carrying the cookies the responses set, forms posted to the action URL each page renders. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed.
+kay's `testSite` mounts the plugin before the pages, so a test signs in through the site's own forms and stays signed in:
+
+```ts
+import { testSite } from 'kay/test'
+import { auth } from '../src/auth'
+import { signIn } from '../src/routes/login.kay'
+
+const site = await testSite({ use: [auth.plugin] })
+const page = await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct horse battery' }, { from: '/login' })
+```
+
+Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed.
