@@ -1,3 +1,4 @@
+import type { AnyElysia } from 'elysia'
 import type { Action, Success } from '../runtime/action'
 import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
@@ -13,6 +14,8 @@ import { servePages } from '../server/app'
 import { shutDown } from '../server/lifecycle'
 
 export interface TestOptions extends PagesOptions {
+  // The plugins the server entry uses before the pages, in order, such as `session()`: their derives reach `ctx.locals` and their cookies the next request.
+  use?: AnyElysia[]
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
   locals?: (request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>
 }
@@ -79,7 +82,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const client: ClientBuild = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(root, '.kay', 'client', 'dist') }
   const pages = await servePages(root, config, async () => client)
   const locals = options.locals
-  const app = locals ? new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request)).use(pages) : pages
+  const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
+  const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
   const cookies = new Bun.CookieMap()
 
   const cookieHeader = (headers: Headers) => {

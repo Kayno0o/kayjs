@@ -1,0 +1,27 @@
+--- server
+import type { Session } from 'kay/server'
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const signIn = action(t.Object({ name: t.String() }), async ({ name }, ctx) => {
+  const session = ctx.locals.session as Session<{ name: string }>
+
+  if (name === '')
+    return ctx.fail(400, { error: 'Who are you?' })
+
+  await session.regenerate()
+  await session.set('name', name)
+  ctx.redirect('/')
+})
+
+export const signOut = action(t.Object({}), async (_input, ctx) => {
+  await (ctx.locals.session as Session<{ name: string }>).destroy()
+  ctx.redirect('/')
+})
+
+const name = await (ctx.locals.session as Session<{ name: string }>).get('name')
+const failure = ctx.failed(signIn)
+---
+p {name === undefined ? 'Signed out' : `Signed in as ${name}`}
+if failure?.data as data
+  p.error {data.error}

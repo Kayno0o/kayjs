@@ -4,6 +4,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { ActionError } from '../src/runtime'
 import { readActionResponse } from '../src/runtime/action'
+import { session } from '../src/server/session'
 import { testSite } from '../src/test'
 import { resetTodos } from './fixtures/site/src/data'
 
@@ -33,6 +34,18 @@ describe('kay/test', () => {
     expect(account.html).toContain('<p class="user">ada</p>')
     expect(away).toMatchObject({ url: '/about', status: 200 })
     expect(site.cookies.get('seen')).toBe('admin')
+  })
+
+  it('serves the pages behind the app\'s plugins, so a session signs in, carries over and signs out', async () => {
+    const signed = await testSite({ routes: 'tests/fixtures/session/src/routes', use: [session({ secret: 'a test secret of at least 32 characters' })] })
+    const { signIn, signOut } = await import(join(import.meta.dir, 'fixtures/session/src/routes/index.kay')) as { signIn: Action<{ name: string }, unknown>, signOut: Action<Record<string, never>, unknown> }
+
+    expect((await signed.submit(signIn, { name: '' })).html).toContain('<p class="error">Who are you?</p>')
+    expect((await signed.submit(signIn, { name: 'Ada' })).html).toContain('<p>Signed in as Ada</p>')
+    expect(signed.cookies.has('session')).toBe(true)
+    expect((await signed.visit('/')).html).toContain('<p>Signed in as Ada</p>')
+    expect((await signed.submit(signOut, {})).html).toContain('<p>Signed out</p>')
+    expect(signed.cookies.has('session')).toBe(false)
   })
 
   it('stops at a redirect to another site', async () => {
