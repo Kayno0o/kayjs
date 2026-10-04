@@ -55,6 +55,11 @@ async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<str
   return byRoute
 }
 
+// A browser sends `/p/a@b` where `kay build` names the page `/p/a%40b`: each segment is decoded, then encoded the one way the build does.
+function canonicalPath(pathname: string): string {
+  return pathname.split('/').map(segment => encodeURIComponent(decodePath(segment) ?? segment)).join('/')
+}
+
 // `/about/` redirects to `/about`, so a page has one URL and its relative links resolve one way; leading slashes collapse too, so `//host/` never becomes a redirect off the site.
 function withoutTrailingSlash(url: URL): Response {
   return new Response(null, { status: 308, headers: { location: `/${url.pathname.replace(EDGE_SLASHES, '')}${url.search}` } })
@@ -113,7 +118,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
         return withoutTrailingSlash(url)
 
       // A path `kay build` rendered is served from its file; any other path of the route renders per request.
-      const page = served?.get(url.pathname)
+      const page = served?.get(canonicalPath(url.pathname))
 
       return page ? servePrerendered(route, page, context, client, renderOptions) : renderPage(route, context, client, renderOptions)
     })

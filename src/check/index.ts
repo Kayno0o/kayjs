@@ -39,6 +39,9 @@ export interface ShadowFile {
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
 // An error about the whole run, such as a tsconfig that does not exist.
 const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
+const UNWRITABLE = /[%?#]/
+// What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.
+const NOT_IN_URL = /[^\x21-\x7E]+/g
 // Stylesheets import for their effect, other assets for their URL. TypeScript matches a wildcard module case-sensitively, so both `.png` and `.PNG` are declared; a mixed case such as `.Png` is not.
 const ASSET_TYPES = ['declare module \'*.css\' {}\n', ...ASSET_EXTENSIONS.flatMap(extension => [extension, extension.toUpperCase()]).map(extension => `declare module '*.${extension}' {\n  const url: string\n  export default url\n}\n`)].join('\n')
 
@@ -107,7 +110,7 @@ export function compileShadow(root: string, routesDir: string, file: string, sou
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
 function environment(patterns: string[], files: string[]): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
-  const paths = files.length > 0 ? files.map(file => JSON.stringify(file)).join(' | ') : 'never'
+  const paths = files.length > 0 ? files.flatMap(spellings).map(file => JSON.stringify(file)).join(' | ') : 'never'
 
   return [
     'import type { Action, CheckedHref, FieldName, FunctionProp, IslandProp } from \'kay\'',
@@ -128,9 +131,22 @@ function environment(patterns: string[], files: string[]): string {
 
 // `/todos/:id` becomes `['todos', ':']`, the shape `CheckedHref` matches paths against segment by segment.
 function routeTuple(pattern: string): string {
-  const segments = pattern.split('/').filter(segment => segment !== '').map(segment => segment.startsWith(':') ? ':' : segment)
+  const segments = pattern.split('/').filter(segment => segment !== '').map(segment => segment.startsWith(':') ? [':'] : spellings(segment))
 
-  return `[${segments.map(segment => JSON.stringify(segment)).join(', ')}]`
+  return `[${segments.map(segment => segment.map(spelling => JSON.stringify(spelling)).join(' | ')).join(', ')}]`
+}
+
+// A link may spell a path as written or percent-encoded, `/café` or `/caf%C3%A9`, and the server answers both.
+function spellings(path: string): string[] {
+  let written = path
+
+  try {
+    written = decodeURI(path)
+  }
+  catch {}
+
+  // A written `%`, `?` or `#` would read as an escape, a query or a hash.
+  return [...new Set([path, written.replace(NOT_IN_URL, encodeURI), ...(UNWRITABLE.test(written) ? [] : [written])])]
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

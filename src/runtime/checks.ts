@@ -45,12 +45,13 @@ type PublicFiles = Register extends { files: infer Files extends string } ? File
 // The app registered as `app` keeps its routes, under Elysia 1.4's `~Routes`, as a tree of path segments down to their methods: `/` is the root's own `get`, `:name` a parameter, `*` the rest of the path.
 type AppRoutes = Register extends { app: { '~Routes': infer Routes } } ? Routes : never
 type ServesGet<Tree> = 'get' extends keyof Tree ? true : false
-type TreeMatches<Segments extends readonly string[], Tree> = Segments extends readonly [infer Segment extends string, ...infer Rest extends readonly string[]]
-  ? (Segment extends keyof Tree ? TreeMatches<Rest, Tree[Segment]> : false)
-  | (Segment extends '' ? false : { [Key in keyof Tree & `:${string}`]: TreeMatches<Rest, Tree[Key]> }[keyof Tree & `:${string}`])
+// `/files/*` serves `/files/` too, as a catch-all page does.
+type TreeMatches<Segments extends readonly string[], Tree, Slash extends boolean> = Segments extends readonly [infer Segment extends string, ...infer Rest extends readonly string[]]
+  ? (Segment extends keyof Tree ? TreeMatches<Rest, Tree[Segment], Slash> : false)
+  | (Segment extends '' ? false : { [Key in keyof Tree & `:${string}`]: TreeMatches<Rest, Tree[Key], Slash> }[keyof Tree & `:${string}`])
   | ('*' extends keyof Tree ? ServesGet<Tree['*']> : false)
-  : ServesGet<Tree>
-type ServedByApp<Path extends string> = [AppRoutes] extends [never] ? false : TreeMatches<SegmentsOf<Path>, AppRoutes>
+  : ServesGet<Tree> | (Slash extends true ? '*' extends keyof Tree ? ServesGet<Tree['*']> : false : false)
+type ServedByApp<Path extends string> = [AppRoutes] extends [never] ? false : TreeMatches<SegmentsOf<Path>, AppRoutes, EndsWithSlash<Path>>
 type IsRoute<Path extends string> = [RoutePatterns] extends [never]
   ? true
   : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns, EndsWithSlash<Path>> | (Path extends PublicFiles ? true : false) | ServedByApp<Path> ? true : false

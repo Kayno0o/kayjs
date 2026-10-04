@@ -106,13 +106,13 @@ function isPathPart(catchAll: boolean, value: unknown): boolean {
   return typeof value === 'string' && (catchAll ? value.split('/') : [value]).every(segment => segment !== '' && segment !== '.' && segment !== '..')
 }
 
-// The URL path the params fill in, each segment encoded; a catch-all keeps its slashes.
+// The URL path the params fill in, each segment encoded as the server looks pages up; a catch-all keeps its slashes.
 function pathOf(route: Route, params: Record<string, string>): string {
   return route.pattern.split('/').map((segment) => {
     if (segment === '*')
       return params[route.catchAll!]!.split('/').map(encodeURIComponent).join('/')
 
-    return segment.startsWith(':') ? encodeURIComponent(params[segment.slice(1)]!) : segment
+    return encodeURIComponent(segment.startsWith(':') ? params[segment.slice(1)]! : segment)
   }).join('/')
 }
 

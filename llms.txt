@@ -428,7 +428,7 @@ it('shows why a todo was refused', async () => {
 ## What `kay check` verifies
 
 - Every expression, prop and server name, as TypeScript does.
-- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/` and the GET routes of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a catch-all such as `docs/[...path]` is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
+- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/` and the GET routes of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a path may be spelled as written or percent-encoded, `/café` or `/caf%C3%A9`; a catch-all such as `docs/[...path]`, or an app route such as `/files/*`, is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
 - Island props passed from static components can be serialized: no functions or class instances.
 

@@ -532,7 +532,7 @@ describe('prerendering', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(3)
+      expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(4)
       const file = await Bun.file(join(root, '.kay/client/pages/admin/report.html')).text()
       const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const visit = (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
@@ -571,6 +571,10 @@ describe('prerendering', () => {
       expect(await visit('/docs/guide/intro')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at guide/intro</p>'), etag: expect.any(String) })
       expect(await visit('/docs/a%20b')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a b</p>'), etag: expect.any(String) })
       expect(await visit('/docs/other')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at other</p>'), etag: null })
+
+      // Served from its file however the path is spelled: as a browser sends it, or encoded.
+      for (const spelling of ['/docs/a@b+c/d,e', '/docs/a%40b%2Bc/d%2Ce'])
+        expect(await visit(spelling)).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a@b+c/d,e</p>'), etag: expect.any(String) })
     }
     finally {
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })

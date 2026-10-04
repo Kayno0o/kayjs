@@ -154,6 +154,37 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('accepts a page or public file link spelled as written or percent-encoded, as the server answers both', async () => {
+    const root = await scratchProject({
+      'src/routes/café.kay': 'p café\n',
+      'src/routes/my page.kay': 'p spaced\n',
+      'public/thé.txt': 'tea',
+      'public/c:d.txt': 'colon',
+      'src/routes/index.kay': 'a(href="/café") a\na(href="/caf%C3%A9") b\na(href="/my%20page") c\na(href="/thé.txt") d\na(href="/th%C3%A9.txt") e\na(href="/c%3Ad.txt") f\na(href="/c:d.txt") g\na(href="/caf%C3%A8") h\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message.match(/serves ([^\s;"`]+)/)?.[1]])).toEqual([[7, '/c:d.txt'], [8, '/caf%C3%A8']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts the directory of an app route ending in a wildcard with its trailing slash, as Elysia serves it', async () => {
+    const root = await scratchProject({
+      'src/app.ts': 'import { Elysia } from \'elysia\'\n\nexport const app = new Elysia().get(\'/files/*\', () => \'file\')\n\ndeclare module \'kay\' {\n  interface Register {\n    app: typeof app\n  }\n}\n',
+      'src/routes/index.kay': 'a(href="/files/") a\na(href="/files/a/b") b\na(href="/files") c\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message.match(/serves ([^\s;"`]+)/)?.[1]])).toEqual([[3, '/files']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('lets a link whose start or end is interpolated match any page it may reach', async () => {
     const root = await scratchProject({
       'src/routes/about.kay': 'p about\n',
