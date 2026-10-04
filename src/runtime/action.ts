@@ -1,6 +1,7 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { Locals, Redirect } from './checks'
+import { createSignal } from 'solid-js'
 import { decodeValue, encodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
@@ -70,6 +71,8 @@ export type SuccessOf<Target> = Target extends Action<never, infer Output> ? For
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output> {
   (input: Input): Promise<Success<Output>>
+  // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
+  readonly pending: () => boolean
   readonly url: string
   readonly [ACTION]: true
   readonly [RESULT]?: Output
@@ -117,9 +120,10 @@ export function actionUrl(moduleId: string, name: string): string {
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 export function action<Schema extends TSchema, Output>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>): ServerAction<Schema, Awaited<Output>> {
   const state = { url: '' }
-  const call = async (input: Static<Schema>) => post<Awaited<Output>>(state.url, input)
+  const { call, pending } = callable(() => state.url)
 
   return Object.defineProperties(call, {
+    pending: { value: pending, enumerable: true },
     url: { get: () => state.url, set: (url: string) => void (state.url = url), enumerable: true },
     schema: { value: schema, enumerable: true },
     handler: { value: handler, enumerable: true },
@@ -129,7 +133,10 @@ export function action<Schema extends TSchema, Output>(schema: Schema, handler: 
 
 // What a browser build exports in place of a server action.
 export function actionStub(url: string): Action<unknown, unknown> {
-  return Object.defineProperties(async (input: unknown) => post(url, input), {
+  const { call, pending } = callable(() => url)
+
+  return Object.defineProperties(call, {
+    pending: { value: pending, enumerable: true },
     url: { value: url, enumerable: true },
     [ACTION]: { value: true },
   }) as unknown as Action<unknown, unknown>
@@ -152,6 +159,25 @@ export function formAction(target: string | Action<never, unknown>): string {
 }
 
 export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> : string
+
+// Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes.
+function callable(url: () => string): { call: (input: never) => Promise<unknown>, pending: () => boolean } {
+  const [inFlight, setInFlight] = createSignal(0)
+
+  return {
+    call: async (input: unknown) => {
+      setInFlight(count => count + 1)
+
+      try {
+        return await post(url(), input)
+      }
+      finally {
+        setInFlight(count => count - 1)
+      }
+    },
+    pending: () => inFlight() > 0,
+  }
+}
 
 async function post<Output>(url: string, input: unknown): Promise<Output> {
   return readActionResponse(await fetch(url, { method: 'POST', ...encodeCall(input) }))

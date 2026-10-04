@@ -302,3 +302,36 @@ describe('the live reload script', () => {
     }
   })
 })
+
+describe('actions called from the browser', () => {
+  it('read as pending while a call is in flight', async () => {
+    let respond: (response: Response) => void = () => undefined
+    const fetchStub = spyOn(globalThis, 'fetch').mockImplementation((async () => new Promise<Response>((resolve) => {
+      respond = resolve
+    })) as unknown as typeof fetch)
+    const { root, dispose } = await mountKay({
+      'page.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String() }), ({ title }) => title)\n---\np Page\n',
+      'main.kay': '---\nimport { add } from \'./page.kay\'\n---\nbutton(disabled={add.pending()} onClick={() => void add({ title: \'x\' })}) Add\n',
+    })
+
+    try {
+      const button = root.querySelector('button')!
+
+      await settle()
+      expect(button.disabled).toBe(false)
+
+      button.click()
+      await settle()
+      expect(button.disabled).toBe(true)
+
+      respond(new Response('["x"]'))
+      await settle()
+      await settle()
+      expect(button.disabled).toBe(false)
+    }
+    finally {
+      fetchStub.mockRestore()
+      await dispose()
+    }
+  })
+})
