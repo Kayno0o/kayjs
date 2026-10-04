@@ -87,6 +87,7 @@
     "@solidjs/compiler": "2.0.0-rc.13",
     "@solidjs/web": "2.0.0-rc.13",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "devalue": "^6.0.2",
     "elysia": "^1.4.30",
     "solid-js": "2.0.0-rc.13"
   },

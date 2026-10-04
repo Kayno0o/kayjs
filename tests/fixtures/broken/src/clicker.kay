@@ -1,4 +1,4 @@
 ---
-const { since, format } = props<{ since: Date, format: (count: number) => string }>()
+const { since, format } = props<{ since: Date, formatter: Intl.NumberFormat, format: (count: number) => string }>()
 ---
 button(onClick={() => console.log(since)}) {format(1)}

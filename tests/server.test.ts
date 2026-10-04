@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
@@ -291,12 +292,12 @@ describe('pages', () => {
     const call = (body: unknown) => app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kay-action': '1' },
-      body: JSON.stringify(body),
+      body: stringify(body),
     }))
     const created = await call({ title: 'From fetch' })
 
     expect(created.status).toBe(200)
-    expect(typeof await created.json()).toBe('number')
+    expect(typeof parse(await created.text())).toBe('number')
     expect((await call({ title: '' })).status).toBe(422)
     expect((await call({})).status).toBe(422)
   })
@@ -350,13 +351,13 @@ describe('request context', () => {
     const post = (headers: Record<string, string>) => guarded.handle(new Request(ACCOUNT_ACTION, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...headers },
-      body: JSON.stringify({ theme: 'dark' }),
+      body: stringify({ theme: 'dark' }),
     }))
     const refused = await post({})
     const accepted = await post({ 'x-user': 'ada' })
 
     expect(refused.status).toBe(401)
-    expect(await accepted.json()).toBe('ada')
+    expect(parse(await accepted.text())).toBe('ada')
     expect(accepted.headers.get('set-cookie')).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
   })
 
@@ -391,7 +392,7 @@ describe('guards', () => {
   const promote = (body: unknown, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest(PROMOTE, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...headers },
-    body: JSON.stringify(body),
+    body: stringify(body),
   }))
 
   it('runs before the page, sending its redirect and cookies', async () => {
@@ -428,7 +429,7 @@ describe('guards', () => {
 
     const done = await promote({ name: 'bob' }, { 'x-user': 'ada' })
 
-    expect(await done.json()).toBe('bob is an admin')
+    expect(parse(await done.text())).toBe('bob is an admin')
     expect(done.headers.get('set-cookie')).toStartWith('seen=admin;')
   })
 
@@ -438,11 +439,11 @@ describe('guards', () => {
     const action = await resolved.handle(new NativeRequest(PROMOTE, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-user': 'ada' },
-      body: JSON.stringify({ name: 'bob' }),
+      body: stringify({ name: 'bob' }),
     }))
 
     expect(page.status).toBe(200)
-    expect(await action.json()).toBe('bob is an admin')
+    expect(parse(await action.text())).toBe('bob is an admin')
   })
 
   it('refuses a cross-site post before any guard runs', async () => {
@@ -783,7 +784,7 @@ describe('failed actions', () => {
 
     expect(html).toContain('<input name="title" placeholder="New todo" value="">')
     expect(html).toContain('<p class="error">Write a title</p>')
-    expect(page.headers.get('set-cookie')).toStartWith('kay_failed=;')
+    expect(page.headers.get('set-cookie')).toStartWith('kay_flash=;')
     expect((await get('/')).html).not.toContain('class="error"')
   })
 
@@ -799,14 +800,14 @@ describe('failed actions', () => {
   })
 
   it('answers a call with the failure as JSON', async () => {
-    const call = (title: string) => app.handle(new Request(ADD, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: JSON.stringify({ title }) }))
+    const call = (title: string) => app.handle(new Request(ADD, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({ title }) }))
     const refused = await call('')
     const duplicate = await call('Serve pages')
 
     expect(refused.status).toBe(422)
-    expect(await refused.json()).toEqual({ errors: { title: 'Write a title' }, data: null })
+    expect(parse(await refused.text())).toEqual({ errors: { title: 'Write a title' }, data: undefined })
     expect(duplicate.status).toBe(409)
-    expect(await duplicate.json()).toEqual({ errors: {}, data: { message: 'Already on the list' } })
+    expect(parse(await duplicate.text())).toEqual({ errors: {}, data: { message: 'Already on the list' } })
   })
 
   it('rejects a call from the browser with an ActionError carrying the failure', async () => {
@@ -831,7 +832,7 @@ describe('failed actions', () => {
   })
 
   it('ignores a forged failure cookie', async () => {
-    const page = await app.handle(new Request('http://localhost/', { headers: { cookie: 'kay_failed=not-json' } }))
+    const page = await app.handle(new Request('http://localhost/', { headers: { cookie: 'kay_flash=not-json' } }))
 
     expect(page.status).toBe(200)
     expect(await page.text()).not.toContain('class="error"')
@@ -906,7 +907,7 @@ describe('special pages', () => {
       const response = await app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/boom.kay/explode', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-kay-action': '1' },
-        body: '{}',
+        body: stringify({}),
       }))
 
       expect(response.status).toBe(500)
@@ -930,7 +931,7 @@ describe('special pages', () => {
 
     try {
       expect((await watched.handle(new Request('http://localhost/boom?fail'))).status).toBe(500)
-      expect((await watched.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/boom.kay/explode', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: '{}' }))).status).toBe(500)
+      expect((await watched.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/boom.kay/explode', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({}) }))).status).toBe(500)
       expect(await (await watched.handle(new Request('http://localhost/boom?later'))).text()).not.toContain('Kaboom')
       expect(await (await watched.handle(new Request('http://localhost/boom'))).text()).toContain('<p>Fine</p>')
       expect(reported).toEqual(['/boom?fail: Kaboom', '/_kay/action/tests/fixtures/site/src/routes/boom.kay/explode: Kaboom in an action', '/boom?later: Kaboom later'])
@@ -1020,25 +1021,25 @@ describe('action input', () => {
     const noPhoto = new FormData()
 
     noPhoto.append('photos', new File([], ''))
-    expect(cookiePair(await post('gallery', noPhoto))).toStartWith('kay_failed=')
+    expect(cookiePair(await post('gallery', noPhoto))).toStartWith('kay_flash=')
 
     const refused = await post('answer', new URLSearchParams('tags=a&count=1.5&agree=on&age=old'))
 
     expect(refused.status).toBe(303)
     expect(refused.headers.get('x-answer')).toBeNull()
-    expect(JSON.parse(Buffer.from(cookiePair(refused).slice('kay_failed='.length), 'base64url').toString())).toMatchObject({ status: 422, errors: { count: expect.any(String), age: expect.any(String) } })
+    expect(parse(Buffer.from(cookiePair(refused).slice('kay_flash='.length), 'base64url').toString())).toMatchObject({ status: 422, errors: { count: expect.any(String), age: expect.any(String) } })
   })
 
   it('answers a call returning nothing with an empty body, and a redirect holding a line break with a generic 500', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const call = await post('nothing', '{}', { 'content-type': 'application/json', 'x-kay-action': '1' })
+      const call = await post('nothing', stringify({}), { 'content-type': 'application/json', 'x-kay-action': '1' })
 
       expect(call.status).toBe(200)
       expect(await call.text()).toBe('')
 
-      const away = await post('away', JSON.stringify({ to: '/x\r\nset-cookie: a=b' }), { 'content-type': 'application/json', 'x-kay-action': '1' })
+      const away = await post('away', stringify({ to: '/x\r\nset-cookie: a=b' }), { 'content-type': 'application/json', 'x-kay-action': '1' })
 
       expect(away.status).toBe(500)
       expect(await away.text()).toBe('Internal Server Error')
@@ -1065,12 +1066,12 @@ describe('action input', () => {
 
       const served = await pages({ routes: dir, prebuilt: true })
       const call = async (file: string) => {
-        const response = await served.handle(new Request(`http://localhost/_kay/action/${id}/${file}/leave`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: '{}' }))
+        const response = await served.handle(new Request(`http://localhost/_kay/action/${id}/${file}/leave`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({}) }))
 
         return `${response.status} ${await response.text()}`
       }
 
-      expect(await call('_layout.kay')).toBe('200 "left"')
+      expect(await call('_layout.kay')).toBe('200 ["left"]')
       expect(await call('inner/_layout.kay')).toBe('403 Inner only')
     }
     finally {
@@ -1106,7 +1107,7 @@ describe('action input', () => {
     try {
       writeFlash(cookies, { action: '/_kay/action/x/go', status: 409, values: {}, errors: {}, data: { message: 'x'.repeat(4000) } })
 
-      expect(cookies.has('kay_failed')).toBe(true)
+      expect(cookies.has('kay_flash')).toBe(true)
       expect(warned).toHaveBeenCalledWith(expect.stringContaining('/_kay/action/x/go'))
     }
     finally {

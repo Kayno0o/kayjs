@@ -1,6 +1,7 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { Locals, Redirect } from './checks'
+import { decodeValue, encodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
 const FAILURE = Symbol.for('kay.failure')
@@ -11,9 +12,12 @@ const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 
 // Where a called action sends the browser, in place of `location`.
 export const REDIRECT_HEADER = 'x-kay-redirect'
-// A call whose input holds files goes as multipart: the input as JSON in one part, each file swapped for `{ [FILE_MARK]: n }` and sent as part `FILE_MARK + n`.
+// Marks a failed call's body as the encoded `{ errors, data }`, which a denial or an error answered as text is not.
+export const FAILURE_HEADER = 'x-kay-failure'
+// A call whose input holds files goes as multipart: the encoded input in one part, each file in part `FILE_MARK + n`, where the input holds its index.
 export const INPUT_PART = '$kay'
 export const FILE_MARK = '$kayFile'
+const FILE_TYPE = 'KayFile'
 
 export interface EncodedCall {
   headers: Record<string, string>
@@ -53,6 +57,14 @@ export interface FormFailure<Input, Data> {
 }
 
 export type FailureOf<Target> = Target extends Action<infer Input, infer Output> ? FormFailure<Input, FailureData<Output>> : never
+
+// What a page reads back through `ctx.succeeded(action)` after a plain form post succeeded.
+export interface FormSuccess<Output> {
+  // What the handler returned.
+  data: Output
+}
+
+export type SuccessOf<Target> = Target extends Action<never, infer Output> ? FormSuccess<Success<Output>> : never
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output> {
@@ -140,17 +152,17 @@ async function post<Output>(url: string, input: unknown): Promise<Output> {
   return readActionResponse(await fetch(url, { method: 'POST', ...encodeCall(input) }))
 }
 
-// JSON keeps numbers and booleans typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
+// The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
 export function encodeCall(input: unknown): EncodedCall {
   const files: Blob[] = []
-  const json = JSON.stringify(input, (_key, value: unknown) => value instanceof Blob ? { [FILE_MARK]: files.push(value) - 1 } : value)
+  const text = encodeValue(input, { [FILE_TYPE]: (value: unknown) => value instanceof Blob && [files.push(value) - 1] })
 
   if (files.length === 0)
-    return { headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: json }
+    return { headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: text }
 
   const form = new FormData()
 
-  form.set(INPUT_PART, json)
+  form.set(INPUT_PART, text)
 
   // A browser names a bare Blob `blob`; naming it here does the same everywhere, so the handler always gets a File.
   for (const [index, file] of files.entries())
@@ -159,28 +171,23 @@ export function encodeCall(input: unknown): EncodedCall {
   return { headers: { 'x-kay-action': '1' }, body: form }
 }
 
-// The input `encodeCall` sent, its files back in place; any other body is returned as it is.
+// The input `encodeCall` sent, from the JSON body Elysia parsed or the multipart one carrying its files; throws on anything else.
 export function decodeCall(body: unknown): unknown {
-  if (typeof body !== 'object' || body === null || !(INPUT_PART in body))
-    return body
+  const parts = typeof body === 'object' && body !== null && INPUT_PART in body ? body as Record<string, unknown> : { [INPUT_PART]: body }
+  const revivers = {
+    [FILE_TYPE]: ([index]: [number]) => {
+      const file = parts[`${FILE_MARK}${index}`]
 
-  const parts = body as Record<string, unknown>
-  const restore = (value: unknown): unknown => {
-    if (Array.isArray(value))
-      return value.map(restore)
+      if (!(file instanceof Blob))
+        throw new TypeError(`kay: the call names file ${index}, which it did not send`)
 
-    if (typeof value !== 'object' || value === null)
-      return value
-
-    if (FILE_MARK in value)
-      return parts[`${FILE_MARK}${String((value as Record<string, unknown>)[FILE_MARK])}`]
-
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, restore(item)]))
+      return file
+    },
   }
   const input = parts[INPUT_PART]
 
-  // Elysia may already have parsed the JSON part.
-  return restore(typeof input === 'string' ? JSON.parse(input) as unknown : input)
+  // Elysia may already have parsed the input part as JSON.
+  return typeof input === 'string' ? decodeValue(input, revivers) : unflattenValue(input as number, revivers)
 }
 
 // What a call got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
@@ -200,10 +207,10 @@ export async function readActionResponse<Output>(response: Response): Promise<Ou
   const body = await response.text()
 
   if (!response.ok) {
-    const failed = response.headers.get('content-type')?.startsWith('application/json') ? JSON.parse(body) as { errors?: Record<string, string>, data?: unknown } : {}
+    const failed = response.headers.get(FAILURE_HEADER) === null ? {} : decodeValue(body) as { errors?: Record<string, string>, data?: unknown }
 
     throw new ActionError(response.status, body, failed.errors, failed.data)
   }
 
-  return (body === '' ? undefined : JSON.parse(body)) as Output
+  return (body === '' ? undefined : decodeValue(body)) as Output
 }

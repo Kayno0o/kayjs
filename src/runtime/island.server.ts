@@ -3,6 +3,7 @@ import type { HydrateWhen, IslandComponent } from './checks'
 import { createComponent, escape, Hydration, renderToString, ssr } from '@solidjs/web'
 import { omit } from 'solid-js'
 import { sharedConfig } from 'solid-js/internal'
+import { encodeValue, unsendable } from './wire'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
 let depth = 0
@@ -121,5 +122,15 @@ function serializeProps(id: string, props: object): string {
     plain[key] = value
   }
 
-  return JSON.stringify(plain)
+  try {
+    return encodeValue(plain)
+  }
+  catch (error) {
+    const reason = unsendable(error)
+
+    if (reason === undefined)
+      throw error
+
+    throw new IslandPropsError(`${id} is interactive, so it renders as an island, and its props cannot reach the browser: ${reason}`)
+  }
 }

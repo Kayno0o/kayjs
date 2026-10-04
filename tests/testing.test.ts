@@ -1,18 +1,23 @@
 import type { Action } from '../src/runtime'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { ActionError } from '../src/runtime'
 import { readActionResponse } from '../src/runtime/action'
 import { testSite } from '../src/test'
 import { resetTodos } from './fixtures/site/src/data'
 
 const routes = 'tests/fixtures/site/src/routes'
+const MARKERS = /<!--[$/]-->/g
 // A 1x1 PNG, which Elysia's `t.File({ type: 'image/png' })` recognises from its bytes.
 const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
 const site = await testSite({ routes, publicDir: 'tests/fixtures/site/public', locals: request => ({ user: request.headers.get('x-user') ?? undefined }) })
 // Imported once the site is up, which registers the `.kay` loader this process needs.
 const { add } = await import(join(import.meta.dir, 'fixtures/site/src/routes/index.kay')) as { add: Action<{ title: string }, number> }
+const { schedule, leak } = await import(join(import.meta.dir, 'fixtures/site/src/routes/events.kay')) as {
+  schedule: Action<{ title: string, at: Date | string }, { title: string, at: Date, tags: Set<string>, seats: bigint }>
+  leak: Action<Record<string, never>, unknown>
+}
 
 describe('kay/test', () => {
   afterAll(resetTodos)
@@ -35,7 +40,7 @@ describe('kay/test', () => {
 
     expect(failed.url).toBe('/')
     expect(failed.html).toContain('<p class="error">Write a title</p>')
-    expect(site.cookies.has('kay_failed')).toBe(false)
+    expect(site.cookies.has('kay_flash')).toBe(false)
     expect((await site.submit(add, { title: 'Tested without a server' })).html).toContain('Tested without a server</a></li>')
   })
 
@@ -72,6 +77,39 @@ describe('kay/test', () => {
 
     malformed.set('$kay', '{not json')
     expect((await site.handle(new Request(`http://localhost${upload.url}`, { method: 'POST', headers: { 'x-kay-action': '1' }, body: malformed }))).status).toBe(400)
+  })
+
+  it('carries Dates, Sets and bigints both ways, in results and failure data, to calls and plain forms', async () => {
+    const at = new Date(Date.UTC(2026, 9, 4, 10))
+    const result = await site.call(schedule, { title: 'Launch', at })
+
+    expect(result).toEqual({ title: 'Launch', at, tags: new Set(['new']), seats: 10n })
+    await expect(site.call(schedule, { title: 'Old', at: new Date(0) })).rejects.toMatchObject({ status: 422, data: { earliest: new Date(Date.UTC(2000, 0, 1)) } })
+    expect((await site.submit(schedule, { title: 'Old', at: '1990-01-01T00:00:00Z' }, { from: '/events' })).html.replace(MARKERS, '')).toContain('<p class="error">Not before 2000</p>')
+  })
+
+  it('shows the page what a plain form post that succeeded returned, once', async () => {
+    const page = await site.submit(schedule, { title: 'Launch', at: '2026-10-04T10:00:00Z' }, { from: '/events' })
+
+    expect(page.url).toBe('/events')
+    expect(page.html.replace(MARKERS, '')).toContain('<p class="done">Scheduled Launch on 2026-10-04T10:00:00.000Z, 1 tag, 10 seats</p>')
+    expect((await site.visit('/events')).html).not.toContain('class="done"')
+  })
+
+  it('answers a call whose result cannot reach the browser with a 500 naming what holds it, and still lands a plain form on its page', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      await expect(site.call(leak, {})).rejects.toMatchObject({ status: 500 })
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining(`kay: what ${leak.url} returned cannot reach the browser: Cannot stringify arbitrary non-POJOs at .format`))
+      expect(await site.submit(leak, {}, { from: '/events' })).toMatchObject({ url: '/events', status: 200 })
+      expect(warned).toHaveBeenCalledWith(expect.stringContaining(`kay: what ${leak.url} returned cannot reach the page through its cookie`))
+    }
+    finally {
+      logged.mockRestore()
+      warned.mockRestore()
+    }
   })
 
   it('sends the browser where a called action redirects', async () => {

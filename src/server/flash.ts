@@ -1,7 +1,8 @@
 import type { CookieMap } from 'bun'
+import { decodeValue, encodeValue, unsendable } from '../runtime/wire'
 
-// A failed plain form post goes back to its page through a redirect; this cookie carries why, for that one page render.
-export const FLASH_COOKIE = 'kay_failed'
+// A plain form post goes back to its page through a redirect; this cookie carries how it went, for that one page render.
+export const FLASH_COOKIE = 'kay_flash'
 
 export interface Flash {
   action: string
@@ -9,6 +10,13 @@ export interface Flash {
   values: Record<string, string>
   errors: Record<string, string>
   data?: unknown
+}
+
+// What the handler of a post that succeeded returned.
+export interface SuccessFlash {
+  action: string
+  succeeded: true
+  data: unknown
 }
 
 // Under the 4 KB browsers keep per cookie, the other cookies of the response included.
@@ -23,29 +31,71 @@ const WORD = /[A-Z]?[a-z\d]+|[A-Z]+(?![a-z])/g
 const TRAILING_DIGITS = /\d+$/
 
 export function writeFlash(cookies: CookieMap, flash: Flash): void {
+  const refusals: string[] = []
+
   // The submitted values go first when it would not fit, then the handler's data: the field errors always make it.
-  const candidates = [flash, { ...flash, values: {} }, { ...flash, values: {}, data: undefined }]
-  const encoded = candidates.map(candidate => Buffer.from(JSON.stringify(candidate)).toString('base64url'))
-  const fits = encoded.findIndex(value => value.length <= MAX_LENGTH)
+  for (const candidate of [flash, { ...flash, values: {} }, { ...flash, values: {}, data: undefined }]) {
+    const refusal = setFlash(cookies, candidate)
 
-  if (fits === candidates.length - 1 && flash.data !== undefined)
-    console.warn(`kay: what ${flash.action} passed to ctx.fail is too big for the cookie carrying it back to the page, which reads no data`)
+    if (refusal === undefined)
+      break
 
-  if (fits !== -1)
-    cookies.set(FLASH_COOKIE, encoded[fits]!, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: '/' })
+    refusals.push(refusal)
+  }
+
+  if (refusals.length === 2 && flash.data !== undefined)
+    console.warn(`kay: what ${flash.action} passed to ctx.fail cannot reach the page through its cookie: ${refusals[1]}`)
+}
+
+// The page the browser goes back to reads it through `ctx.succeeded`, unless it cannot be carried there.
+export function writeSuccess(cookies: CookieMap, success: SuccessFlash): void {
+  const refusal = setFlash(cookies, success)
+
+  if (refusal !== undefined)
+    console.warn(`kay: what ${success.action} returned cannot reach the page through its cookie: ${refusal}`)
+}
+
+// Sets the cookie, or says why it cannot: too big, or holding what has no encoding.
+function setFlash(cookies: CookieMap, value: Flash | SuccessFlash): string | undefined {
+  let encoded: string
+
+  try {
+    encoded = Buffer.from(encodeValue(value)).toString('base64url')
+  }
+  catch (error) {
+    const reason = unsendable(error)
+
+    if (reason === undefined)
+      throw error
+
+    return reason
+  }
+
+  if (encoded.length > MAX_LENGTH)
+    return `it takes ${encoded.length} bytes, over the ${MAX_LENGTH} it may`
+
+  cookies.set(FLASH_COOKIE, encoded, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: '/' })
+
+  return undefined
 }
 
 // Anyone can send this cookie, so its shape is checked before a page reads it; a forged one only changes what its own sender sees.
-export function readFlash(cookies: CookieMap): Flash | undefined {
+export function readFlash(cookies: CookieMap): Flash | SuccessFlash | undefined {
   const value = cookies.get(FLASH_COOKIE)
 
   if (!value)
     return undefined
 
   try {
-    const flash = JSON.parse(Buffer.from(value, 'base64url').toString()) as Partial<Flash>
+    const flash = decodeValue(Buffer.from(value, 'base64url').toString()) as Partial<Flash & SuccessFlash> | null
 
-    return typeof flash.action === 'string' && typeof flash.status === 'number' && isTextRecord(flash.values) && isTextRecord(flash.errors) ? flash as Flash : undefined
+    if (typeof flash !== 'object' || flash === null || typeof flash.action !== 'string')
+      return undefined
+
+    if (flash.succeeded === true)
+      return flash as SuccessFlash
+
+    return typeof flash.status === 'number' && isTextRecord(flash.values) && isTextRecord(flash.errors) ? flash as Flash : undefined
   }
   catch {
     return undefined

@@ -1,0 +1,5 @@
+---
+import Rich from './rich.kay'
+---
+main
+  Rich(since={new Date(Date.UTC(2020, 0, 1))} tags={new Set(['a'])} scores={new Map([['x', 3]])} big={10n})

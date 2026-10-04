@@ -1,0 +1,7 @@
+---
+import { signal } from 'kay'
+
+const { since, tags, scores, big } = props<{ since: Date, tags: Set<string>, scores: Map<string, number>, big: bigint }>()
+const n = signal(0)
+---
+button.rich(onClick={() => n.set(c => c + (scores.get('x') ?? 0))}) {since.getUTCFullYear()} {tags.size} {String(big + 1n)} {n()}

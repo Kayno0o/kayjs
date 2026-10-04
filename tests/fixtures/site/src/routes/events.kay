@@ -1,0 +1,30 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+const EARLIEST = new Date(Date.UTC(2000, 0, 1))
+
+export const schedule = action(t.Object({ title: t.String({ minLength: 1 }), at: t.Date() }), ({ title, at }, ctx) => {
+  if (at < EARLIEST)
+    return ctx.fail(422, { earliest: EARLIEST })
+
+  return { title, at, tags: new Set(['new']), seats: 10n }
+})
+
+export const leak = action(t.Object({}), () => ({ format: new Intl.NumberFormat() }))
+
+const scheduled = ctx.succeeded(schedule)
+const failure = ctx.failed(schedule)
+---
+---
+import Since from '../components/since.kay'
+---
+Since(at={EARLIEST} seats={new Map([['front', 2n]])})
+form(action={schedule})
+  input(name="title")
+  input(name="at")
+  button Schedule
+if scheduled as done
+  p.done Scheduled {done.data.title} on {done.data.at.toISOString()}, {done.data.tags.size} tag, {String(done.data.seats)} seats
+if failure?.data as data
+  p.error Not before {data.earliest.getUTCFullYear()}

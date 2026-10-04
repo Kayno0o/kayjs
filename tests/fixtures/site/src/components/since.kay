@@ -1,0 +1,7 @@
+---
+import { signal } from 'kay'
+
+const { at, seats } = props<{ at: Date, seats: Map<string, bigint> }>()
+const open = signal(false)
+---
+button.since(onClick={() => open.set(o => !o)}) {at.getUTCFullYear()} {seats.size}

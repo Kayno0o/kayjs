@@ -6,6 +6,7 @@ import { generateHydrationScript, renderToString, useHead } from '@solidjs/web'
 import { plugin } from 'bun'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
+import { island, IslandPropsError } from '../src/runtime/island.server'
 
 plugin(kay())
 
@@ -38,7 +39,7 @@ describe('islands', () => {
   it('server-renders static markup with the interactive component as an island root', () => {
     expect(pageHtml).toContain('<h1>Static title</h1>')
     expect(pageHtml).toContain('<kay-island data-component="tests/fixtures/islands/counter.kay" data-render-id="k')
-    expect(pageHtml).toContain('data-props="{&quot;start&quot;:2}"')
+    expect(pageHtml).toContain('data-props="[{&quot;start&quot;:1},2]"')
     expect(pageHtml).toContain('Count <!--$-->2<!--/-->')
     expect(pageHtml).toContain('<p>after</p>')
   })
@@ -53,7 +54,16 @@ describe('islands', () => {
   })
 
   it('marks an island hydrating once visible and keeps its hydrate prop out of its props', () => {
-    expect(pageHtml).toContain('data-props="{&quot;start&quot;:5}" data-hydrate="visible">')
+    expect(pageHtml).toContain('data-props="[{&quot;start&quot;:1},5]" data-hydrate="visible">')
+  })
+
+  it('names the prop an island cannot serialize, however deep it sits', () => {
+    class Score {
+      constructor(readonly value: number) {}
+    }
+    const Rich = island('rich.kay', (_props: { scores: Map<string, unknown> }) => null)
+
+    expect(() => renderToString(() => Rich({ scores: new Map([['x', new Score(1)]]) }))).toThrow(new IslandPropsError('rich.kay is interactive, so it renders as an island, and its props cannot reach the browser: Cannot stringify arbitrary non-POJOs at .scores.get("x")'))
   })
 
   it('hydrates the island in place and keeps it reactive, a visible one once it scrolls into view', async () => {
@@ -125,6 +135,7 @@ describe('islands', () => {
   it.each([
     ['a pending await block', 'slowpage.kay', 'button.cancel', 'Cancel 1'],
     ['an await on a plain value', 'plainpage.kay', 'button.hi', 'hi Ada 1'],
+    ['props holding a Date, a Set, a Map and a bigint', 'richpage.kay', 'button.rich', '2020 1 11 3'],
   ])('hydrates %s in an island without a key miss, its handler working at once', async (_name, file, selector, expected) => {
     const issues: string[] = []
     const warn = spyOn(console, 'warn').mockImplementation((...args) => void issues.push(args.join(' ')))

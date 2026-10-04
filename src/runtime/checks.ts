@@ -64,19 +64,26 @@ export type CheckedHref<Href extends string> = string extends Href
 // `ctx.redirect`: a site path is checked like a link, so a redirect cannot point at a page that does not exist.
 export type Redirect = <const Location extends string>(location: Location & CheckedHref<Location>, status?: 301 | 302 | 303 | 307 | 308) => never
 
-type IsSerializable<T> = T extends string | number | boolean | null | undefined
-  ? true
-  : T extends ((...args: never[]) => unknown) | Date | Map<unknown, unknown> | Set<unknown> | RegExp | bigint | symbol
-    ? false
-    : T extends readonly (infer Item)[]
-      ? IsSerializable<Item>
-      : T extends object
-        ? false extends { [Key in keyof T]-?: IsSerializable<T[Key]> }[keyof T] ? false : true
-        : false
+// What crosses to the browser besides plain objects and arrays, as `src/runtime/wire.ts` encodes it.
+type Sendable = string | number | boolean | bigint | null | undefined | Date | RegExp | URL | URLSearchParams
 
-// Props a static parent passes to an island travel as JSON, so they must survive it.
+type IsSerializable<T> = T extends Sendable
+  ? true
+  : T extends ((...args: never[]) => unknown) | symbol
+    ? false
+    : T extends ReadonlyMap<infer Key, infer Value>
+      ? [IsSerializable<Key>, IsSerializable<Value>] extends [true, true] ? true : false
+      : T extends ReadonlySet<infer Item>
+        ? IsSerializable<Item>
+        : T extends readonly (infer Item)[]
+          ? IsSerializable<Item>
+          : T extends object
+            ? false extends { [Key in keyof T]-?: IsSerializable<T[Key]> }[keyof T] ? false : true
+            : false
+
+// Props a static parent passes to an island are serialized for the browser, so they must survive it.
 export type IslandProp<Component, Value> = Component extends { readonly [ISLAND]: true }
-  ? [IsSerializable<Value>] extends [true] ? unknown : { kayError: 'An island receives its props as JSON: no functions, Dates, Maps, Sets or class instances' }
+  ? [IsSerializable<Value>] extends [true] ? unknown : { kayError: 'An island receives its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances' }
   : unknown
 
 declare const DEFERRED: unique symbol

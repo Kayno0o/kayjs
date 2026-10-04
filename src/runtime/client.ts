@@ -1,5 +1,6 @@
 import type { JSX } from '@solidjs/web'
 import { hydrate } from '@solidjs/web'
+import { decodeValue } from './wire'
 
 export type IslandRegistry = Record<string, () => Promise<{ default: (props: object) => JSX.Element }>>
 
@@ -42,7 +43,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   }
 
   const { default: component } = await load()
-  const props = JSON.parse(element.dataset.props ?? '{}') as object
+  const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
 
   // Solid hydrates a page once and renders anything after from scratch; an island hydrating later still claims its server markup.
   const hydration = (globalThis as { _$HY?: { done?: boolean, r?: Record<string, unknown> } })._$HY

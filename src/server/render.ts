@@ -1,8 +1,8 @@
 import type { JSX } from '@solidjs/web'
 import type { KayConfig } from '../config'
-import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError } from '../runtime'
+import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
-import type { Flash } from './flash'
+import type { Flash, SuccessFlash } from './flash'
 import type { ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
 import type { Prefetch } from './speculation'
@@ -181,12 +181,13 @@ export async function renderUnmatched(special: SpecialPages, context: RequestCon
 function createRendering(context: RequestContext, params: Record<string, string>, prerendering = false): Rendering {
   const { request } = context
   const jar = cookieJar(request)
-  let flash: Flash | null | undefined
+  let flash: Flash | SuccessFlash | null | undefined
+  const readOnce = () => flash ??= hasFlash(request) ? readFlash(jar.cookies) ?? null : null
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
   const rendering: Rendering = {
     headers,
     status: 200,
-    // The failure of a form post is for the one page the browser went back to.
+    // How a form post went is for the one page the browser went back to.
     writeCookies: () => {
       if (hasFlash(request))
         jar.cookies.delete(FLASH_COOKIE)
@@ -216,9 +217,14 @@ function createRendering(context: RequestContext, params: Record<string, string>
         throw new Denied(code, message)
       },
       failed: (action) => {
-        flash ??= hasFlash(request) ? readFlash(jar.cookies) ?? null : null
+        const read = readOnce()
 
-        return flash?.action === action.url ? { status: flash.status, values: flash.values, errors: flash.errors, data: flash.data } as FailureOf<typeof action> : undefined
+        return read?.action === action.url && !('succeeded' in read) ? { status: read.status, values: read.values, errors: read.errors, data: read.data } as FailureOf<typeof action> : undefined
+      },
+      succeeded: (action) => {
+        const read = readOnce()
+
+        return read?.action === action.url && 'succeeded' in read ? { data: read.data } as SuccessOf<typeof action> : undefined
       },
     },
   }
@@ -228,6 +234,7 @@ function createRendering(context: RequestContext, params: Record<string, string>
       cookies: { get: needsRequest('ctx.cookies') },
       locals: { get: needsRequest('ctx.locals') },
       failed: { get: needsRequest('ctx.failed') },
+      succeeded: { get: needsRequest('ctx.succeeded') },
     })
   }
 

@@ -1,6 +1,6 @@
 import type { CookieMap } from 'bun'
 import type { Setter, SignalOptions } from 'solid-js'
-import type { Action, FailureOf } from './action'
+import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect } from './checks'
 import { createSignal, getOwner, onCleanup } from 'solid-js'
 
@@ -103,6 +103,8 @@ export interface PageContext<Params extends Record<string, string> = Record<stri
   deny: (status?: number, message?: string) => never
   // Why the last plain form post to `action` failed, when it did; read once, on the page the browser went back to.
   failed: <Target extends Action<never, unknown>>(action: Target) => FailureOf<Target> | undefined
+  // What the last plain form post to `action` returned, when it succeeded; read once, on the page the browser went back to.
+  succeeded: <Target extends Action<never, unknown>>(action: Target) => SuccessOf<Target> | undefined
 }
 
 export interface PageError {
@@ -140,7 +142,7 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
-export type { Action, ActionContext, Failure, FailureOf, FieldName, FormFailure, ServerAction } from './action'
+export type { Action, ActionContext, Failure, FailureOf, FieldName, FormFailure, FormSuccess, ServerAction, SuccessOf } from './action'
 export { action, ActionError, ActionRedirect, actionStub, formAction, isAction, registerActions } from './action'
 export type { AwaitProps, CheckedHref, Deferred, HydrateWhen, IslandComponent, IslandProp, Locals, LocalsOf, Redirect, Register } from './checks'
 export { staticFor } from './static'

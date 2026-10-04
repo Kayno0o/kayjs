@@ -88,8 +88,8 @@ describe('kay build', () => {
       const entry = await Bun.file(join(root, '.kay/client/dist', manifest.entry.slice('/_kay/'.length))).text()
 
       expect(code).toBe(0)
-      expect(errors).toStartWith('built 4 islands, 0 stylesheets and 0 prerendered pages in ')
-      expect(Object.keys(manifest.islands).sort()).toEqual(['counter.kay', 'greeting.kay', 'plain.kay', 'slow.kay'])
+      expect(errors).toStartWith('built 5 islands, 0 stylesheets and 0 prerendered pages in ')
+      expect(Object.keys(manifest.islands).sort()).toEqual(['counter.kay', 'greeting.kay', 'plain.kay', 'rich.kay', 'slow.kay'])
       // Minified: no line of the bundle is indented.
       expect(entry).not.toContain('\n  ')
     }

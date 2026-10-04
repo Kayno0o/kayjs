@@ -7,9 +7,10 @@ import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import { dirname, sep } from 'node:path'
-import { decodeCall, failure, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
+import { decodeCall, failure, FAILURE_HEADER, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
+import { encodeValue, unsendable } from '../runtime/wire'
 import { cookieJar } from './cookies'
-import { submittedValues, writeFlash } from './flash'
+import { submittedValues, writeFlash, writeSuccess } from './flash'
 import { runGuards } from './guards'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
@@ -77,7 +78,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
         transform: (context) => {
           refuseCrossSite(context.request)
 
-          context.body = isCall(context.request) ? callInput(context.request, context.body) : formInput(value.schema, withoutEmptyFiles(context.body))
+          context.body = isCall(context.request) ? callInput(context.body) : formInput(value.schema, withoutEmptyFiles(context.body))
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
         ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => admit(guards, context, options) }),
@@ -161,11 +162,8 @@ function fromText(field: FieldSchema | undefined, value: unknown): unknown {
   return field?.type === 'boolean' ? BOOLEAN_TEXT.get(value) ?? value : value
 }
 
-// A call that carried files comes as multipart, rebuilt into its input; one whose input part is not JSON is answered 400.
-function callInput(request: Request, body: unknown): unknown {
-  if (!request.headers.get('content-type')?.startsWith('multipart/form-data'))
-    return body
-
+// A call's input comes encoded, multipart when it carries files; input that does not decode is answered 400.
+function callInput(body: unknown): unknown {
   try {
     return decodeCall(body)
   }
@@ -293,11 +291,17 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     if (isFailure(result))
       return failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: {}, data: result.data })
 
+    if (!isCall(request))
+      writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result })
+
     jar.writeTo(headers)
 
-    // `undefined` has no JSON; an empty body reads back as it.
-    if (isCall(request))
-      return result === undefined ? new Response(null, { status, headers }) : Response.json(result, { status, headers })
+    // An empty body reads back as `undefined`.
+    if (isCall(request)) {
+      headers.set('content-type', 'application/json')
+
+      return new Response(result === undefined ? null : encodeOrExplain(result, `what ${action.url} returned`), { status, headers })
+    }
 
     headers.set('location', backTo(request))
 
@@ -330,6 +334,18 @@ function stopped(error: unknown, request: Request, { jar, headers }: ActionReque
   return new Response(dev && error instanceof Error ? error.message : 'Internal Server Error', { status: 500, headers: { 'content-type': TEXT } })
 }
 
+// A result holding a function or a class instance is a mistake in the handler, logged with what it returned.
+function encodeOrExplain(value: unknown, what: string): string {
+  try {
+    return encodeValue(value)
+  }
+  catch (error) {
+    const reason = unsendable(error)
+
+    throw reason === undefined ? error : new TypeError(`kay: ${what} cannot reach the browser: ${reason}`)
+  }
+}
+
 // Input the schema refused: a message per field, the schema's own `error` when it has one.
 function refused(action: ServerAction<TSchema, unknown>, error: Readonly<ValidationError>, request: Request): Response {
   const errors: Record<string, string> = {}
@@ -354,8 +370,12 @@ function failed(request: Request, headers: Headers, cookies: CookieMap, flash: F
   for (const cookie of cookies.toSetCookieHeaders())
     headers.append('set-cookie', cookie)
 
-  if (call)
-    return Response.json({ errors: flash.errors, data: flash.data ?? null }, { status: flash.status, headers })
+  if (call) {
+    headers.set('content-type', 'application/json')
+    headers.set(FAILURE_HEADER, '1')
+
+    return new Response(encodeOrExplain({ errors: flash.errors, data: flash.data }, `what ${flash.action} passed to ctx.fail`), { status: flash.status, headers })
+  }
 
   headers.set('location', backTo(request))
 

@@ -195,7 +195,7 @@ The URL, such as `/_kay/assets/logo-2k1v9.png`, is named after the file's conten
 
 A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script imports a value from `kay` or `solid-js`, such as `signal`. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript. Interactive components rendered inside an island are part of it.
 
-Props a static component passes to an island travel as JSON, so `kay check` rejects functions, Dates, Maps, Sets and class instances there. Children cannot cross either: rendering an island with children from a static parent throws.
+Props a static component passes to an island are serialized for the browser: plain objects and arrays, strings, numbers, booleans, `null` and `undefined`, and also Dates, Maps, Sets, bigints, URLs and RegExps, which arrive as themselves, a value referenced twice arriving once. `kay check` rejects functions and class instances there, and rendering throws on a class instance it could not tell apart, naming the prop. Children cannot cross either: rendering an island with children from a static parent throws.
 
 An island hydrates as soon as the page loads, its chunks preloaded. `hydrate="idle"` waits until the browser is idle and `hydrate="visible"` until it scrolls near the viewport, neither preloaded: `Comments(postId={post.id} hydrate="visible")`. Only an island takes `hydrate`, and only from a static parent.
 
@@ -259,7 +259,7 @@ export default defineConfig({
 
 ## Prerendering
 
-A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.locals` or `ctx.failed` fails the build; `ctx.url` is `http://localhost` plus its path. Development renders it per request like any other.
+A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.locals`, `ctx.failed` or `ctx.succeeded` fails the build; `ctx.url` is `http://localhost` plus its path. Development renders it per request like any other.
 
 A route taking params lists the ones to render instead, as an array or a function returning one; any other path renders per request:
 
@@ -343,7 +343,8 @@ form(action={add})
 - `form(action={add})` posts without JavaScript; `kay check` verifies every field `name` against the schema. After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
 - A plain form posts text, read against the schema before it validates: a `t.Number()`, `t.Integer()` or `t.Boolean()` field becomes one (a ticked checkbox posts `on`, read as `true`, and an unticked one nothing, read as `false` when the field is required), a `t.Array()` field takes a single value or none as a list, and a blank optional field other than a plain `t.String()` counts as left out.
 - A post the schema refuses, or whose handler returns `ctx.fail(status, data)`, goes back to the page too. There `ctx.failed(add)` returns `{ status, values, errors, data }`, typed from the action, or `undefined`: `values` is what the form posted (fields named like a password left out), `errors` a message per refused field, the schema's `error` option when set, and `data` what `ctx.fail` received. It is read on that one render only.
-- An island imports the action from the page and calls it: `import { add } from '../routes/index.kay'`, then `const id = await add({ title })`. The call is typed, `ctx.fail` results excluded, and throws `ActionError` with `status`, `errors` and `data` when it fails. When the handler or a guard redirects, the browser goes there and the call never resolves; outside a browser, as in a test, it throws `ActionRedirect` with `location`.
+- A post that succeeds goes back to the page with what the handler returned: `ctx.succeeded(add)` returns `{ data }`, typed from the action, or `undefined`, on that one render only. `data` and `ctx.fail`'s data travel in a cookie, so one too big for it, over about 3.5 KB encoded, is left out with a warning, and `ctx.succeeded` returns `undefined`. A forged cookie only changes what its own sender sees.
+- An island imports the action from the page and calls it: `import { add } from '../routes/index.kay'`, then `const id = await add({ title })`. The call is typed, `ctx.fail` results excluded, and throws `ActionError` with `status`, `errors` and `data` when it fails. Its input, its result and that `data` cross as island props do, Dates, Maps, Sets and bigints included; a result holding a function or a class instance answers 500, logging where it sits. When the handler or a guard redirects, the browser goes there and the call never resolves; outside a browser, as in a test, it throws `ActionRedirect` with `location`.
 - Files: `t.File()` or `t.Files()` in the schema, `input(type="file" name="avatar")` in the form, and the handler gets a `File`. Forms posting to an action are sent as `multipart/form-data` unless they set `enctype`, and a file input left empty counts as no file, so `t.Optional(t.File())` works. An island passes a `File` or `Blob` anywhere in its input, nested ones included: `await upload({ avatar: input.files[0] })`. On a top-level field, `t.File({ type: 'image/png' })` checks the file's bytes, not its name or declared type, and a file it refuses fails like any field, under its name in `errors` with the schema's `error` option when set; a nested file is checked against the type it declares only. Bun caps a request body at 128 MB, changed with `new Elysia({ serve: { maxRequestBodySize } })`.
 - A handler that throws answers 500 with a generic message and logs the error.
 - The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers`, `redirect(location)` and `fail(status, data)`.
@@ -414,7 +415,7 @@ it('shows why a todo was refused', async () => {
 - Every expression, prop and server name, as TypeScript does.
 - `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/` and the GET routes of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions and to a guard's `redirect`; a catch-all such as `docs/[...path]` is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
-- Island props passed from static components are JSON-serializable.
+- Island props passed from static components can be serialized: no functions or class instances.
 
 ## Project setup
 
