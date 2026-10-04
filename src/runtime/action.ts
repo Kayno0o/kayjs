@@ -70,7 +70,7 @@ export interface FormFailure<Input, Data> {
   data?: Data
 }
 
-// Read off the result itself: inferring it through `Action<Input, infer Output>` drops the `undefined` of a handler that ends without returning, as after `ctx.redirect(...)`, and the call signature then no longer matches.
+// Read off the phantom directly: `infer Output` through `Action` drops the `undefined` of a handler ending without a return.
 type ResultOf<Target> = Target extends { readonly [RESULT]?: infer Output } ? Output : never
 
 export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailureData<ResultOf<Target>>> : never

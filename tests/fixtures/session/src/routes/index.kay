@@ -21,7 +21,8 @@ export const signOut = action(t.Object({}), async (_input, ctx) => {
 
 const name = await (ctx.locals.session as Session<{ name: string }>).get('name')
 const failure = ctx.failed(signIn)
+const greeting = ctx.locals.greeting as string
 ---
-p {name === undefined ? 'Signed out' : `Signed in as ${name}`}
+p {greeting}, {name === undefined ? 'signed out' : `signed in as ${name}`}
 if failure?.data as data
   p.error {data.error}

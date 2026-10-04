@@ -37,14 +37,15 @@ describe('kay/test', () => {
   })
 
   it('serves the pages behind the app\'s plugins, so a session signs in, carries over and signs out', async () => {
-    const signed = await testSite({ routes: 'tests/fixtures/session/src/routes', use: [session({ secret: 'a test secret of at least 32 characters' })] })
+    const signed = await testSite({ routes: 'tests/fixtures/session/src/routes', use: [session({ secret: 'a test secret of at least 32 characters' })], locals: () => ({ greeting: 'Hello' }) })
     const { signIn, signOut } = await import(join(import.meta.dir, 'fixtures/session/src/routes/index.kay')) as { signIn: Action<{ name: string }, unknown>, signOut: Action<Record<string, never>, unknown> }
 
     expect((await signed.submit(signIn, { name: '' })).html).toContain('<p class="error">Who are you?</p>')
-    expect((await signed.submit(signIn, { name: 'Ada' })).html).toContain('<p>Signed in as Ada</p>')
+    // `locals` adds to what the plugins derived, after them.
+    expect((await signed.submit(signIn, { name: 'Ada' })).html).toContain('<p>Hello, signed in as Ada</p>')
     expect(signed.cookies.has('session')).toBe(true)
-    expect((await signed.visit('/')).html).toContain('<p>Signed in as Ada</p>')
-    expect((await signed.submit(signOut, {})).html).toContain('<p>Signed out</p>')
+    expect((await signed.visit('/')).html).toContain('<p>Hello, signed in as Ada</p>')
+    expect((await signed.submit(signOut, {})).html).toContain('<p>Hello, signed out</p>')
     expect(signed.cookies.has('session')).toBe(false)
   })
 
