@@ -289,6 +289,10 @@ describe('pages', () => {
     }))
 
     expect((await post({ origin: 'https://evil.example' })).status).toBe(403)
+    // A browser leaving `Origin` out still says where the post comes from.
+    expect((await post({ 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+    expect((await post({ 'sec-fetch-site': 'same-site' })).status).toBe(403)
+    expect((await post({ 'origin': 'https://localhost', 'sec-fetch-site': 'same-origin' })).status).toBe(303)
     expect((await post({ origin: 'https://localhost' })).status).toBe(303)
     expect((await post({ referer: 'https://evil.example/' })).headers.get('location')).toBe('/')
   })
@@ -918,6 +922,18 @@ describe('failed actions', () => {
     expect(error).toMatchObject({ status: 409, errors: {}, data: { message: 'Already on the list' } })
   })
 
+  it('marks the failure cookie Secure when the browser came over https, through a proxy too', async () => {
+    const cookieFrom = async (url: string, headers: Record<string, string> = {}) => (await app.handle(new Request(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+      body: new URLSearchParams({ title: '' }),
+    }))).headers.get('set-cookie')
+
+    expect(await cookieFrom(ADD.replace('http:', 'https:'))).toContain('; Secure')
+    expect(await cookieFrom(ADD, { 'x-forwarded-proto': 'https' })).toContain('; Secure')
+    expect(await cookieFrom(ADD)).not.toContain('Secure')
+  })
+
   it('ignores a forged failure cookie', async () => {
     const page = await app.handle(new Request('http://localhost/', { headers: { cookie: 'kay_flash=not-json' } }))
 
@@ -1140,6 +1156,15 @@ describe('action input', () => {
       expect(await away.text()).toBe('Internal Server Error')
       expect((await bare.handle(new Request(`http://localhost/?next=${encodeURIComponent('/x\r\nset-cookie: a=b')}`))).status).toBe(500)
       expect(logged).toHaveBeenCalledWith(expect.stringContaining('holds a line break'))
+
+      // Nor a NUL, which Bun refuses with its own message, nor a scheme a call would run as script.
+      for (const to of ['/a\0b', 'javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,x']) {
+        const refused = await post('away', stringify({ to }), { 'content-type': 'application/json', 'x-kay-action': '1' })
+
+        expect([refused.status, await refused.text()]).toEqual([500, 'Internal Server Error'])
+      }
+
+      expect((await post('away', stringify({ to: 'https://example.com/x' }), { 'content-type': 'application/json', 'x-kay-action': '1' })).headers.get('x-kay-redirect')).toBe('https://example.com/x')
     }
     finally {
       logged.mockRestore()

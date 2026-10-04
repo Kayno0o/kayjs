@@ -38,6 +38,10 @@ class Refusal {
 // What the guards set on the response, carried to the handler they let through.
 const guarded = new WeakMap<Request, ActionRequest>()
 const TEXT = 'text/plain; charset=utf-8'
+// What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
+const SAME_SITE_FETCH = new Set(['same-origin', 'none'])
+// The first proxy's `X-Forwarded-Proto` saying the browser came over https.
+const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
 
 // A checkbox posts `on` unless it has a value of its own.
 const BOOLEAN_TEXT = new Map([['true', true], ['on', true], ['false', false]])
@@ -221,11 +225,18 @@ function isEmptyFile(value: unknown): boolean {
 }
 
 // Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused before anything else runs.
+// A browser names where a post comes from in `Origin`, and in `Sec-Fetch-Site` too, which it sends even when it leaves `Origin` out.
 function refuseCrossSite(request: Request) {
   const origin = request.headers.get('origin')
+  const site = request.headers.get('sec-fetch-site')
 
-  if (origin !== null && !sameHost(request, origin))
+  if ((origin !== null && !sameHost(request, origin)) || (site !== null && !SAME_SITE_FETCH.has(site)))
     throw new Refusal(new Response('Cross-site action refused', { status: 403 }))
+}
+
+// Over https, the flash cookie never travels in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came.
+function overHttps(request: Request): boolean {
+  return new URL(request.url).protocol === 'https:' || FORWARDED_HTTPS.test(request.headers.get('x-forwarded-proto') ?? '')
 }
 
 // The guards of the action's page, answering for it when one stops the request.
@@ -303,7 +314,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
       return failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: {}, data: result.data })
 
     if (!isCall(request))
-      writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result })
+      writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result }, overHttps(request))
 
     jar.writeTo(headers)
 
@@ -376,7 +387,7 @@ function failed(request: Request, headers: Headers, cookies: CookieMap, flash: F
   const call = isCall(request)
 
   if (!call)
-    writeFlash(cookies, flash)
+    writeFlash(cookies, flash, overHttps(request))
 
   for (const cookie of cookies.toSetCookieHeaders())
     headers.append('set-cookie', cookie)

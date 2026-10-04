@@ -18,6 +18,7 @@ export const FAILURE_HEADER = 'x-kay-failure'
 export const INPUT_PART = '$kay'
 export const FILE_MARK = '$kayFile'
 const FILE_TYPE = 'KayFile'
+const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
 
 export interface EncodedCall {
   headers: Record<string, string>
@@ -201,6 +202,10 @@ export async function readActionResponse<Output>(response: Response): Promise<Ou
   if (target !== null) {
     if (typeof window === 'undefined')
       throw new ActionRedirect(response.status, target)
+
+    // Only a page goes there: a `javascript:` target would run in this one.
+    if (!HTTP_PROTOCOLS.has(new URL(target, window.location.href).protocol))
+      throw new TypeError(`kay: the action redirected to ${JSON.stringify(target)}, which is no page`)
 
     // The page goes away, so whatever awaited the call never resumes.
     window.location.assign(target)

@@ -126,6 +126,8 @@ describe('kay/test', () => {
     try {
       void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }))
       expect(window.location.href).toBe('http://localhost/about')
+      await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': 'javascript:alert(1)' } }))).rejects.toThrow('which is no page')
+      expect(window.location.href).toBe('http://localhost/about')
     }
     finally {
       await GlobalRegistrator.unregister()

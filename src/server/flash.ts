@@ -30,12 +30,12 @@ const WORD = /[A-Z]?[a-z\d]+|[A-Z]+(?![a-z])/g
 // `pin2` is a pin.
 const TRAILING_DIGITS = /\d+$/
 
-export function writeFlash(cookies: CookieMap, flash: Flash): void {
+export function writeFlash(cookies: CookieMap, flash: Flash, secure = false): void {
   const refusals: string[] = []
 
   // The submitted values go first when it would not fit, then the handler's data: the field errors always make it.
   for (const candidate of [flash, { ...flash, values: {} }, { ...flash, values: {}, data: undefined }]) {
-    const refusal = setFlash(cookies, candidate)
+    const refusal = setFlash(cookies, candidate, secure)
 
     if (refusal === undefined)
       break
@@ -48,15 +48,15 @@ export function writeFlash(cookies: CookieMap, flash: Flash): void {
 }
 
 // The page the browser goes back to reads it through `ctx.succeeded`, unless it cannot be carried there.
-export function writeSuccess(cookies: CookieMap, success: SuccessFlash): void {
-  const refusal = setFlash(cookies, success)
+export function writeSuccess(cookies: CookieMap, success: SuccessFlash, secure = false): void {
+  const refusal = setFlash(cookies, success, secure)
 
   if (refusal !== undefined)
     console.warn(`kay: what ${success.action} returned cannot reach the page through its cookie: ${refusal}`)
 }
 
 // Sets the cookie, or says why it cannot: too big, or holding what has no encoding.
-function setFlash(cookies: CookieMap, value: Flash | SuccessFlash): string | undefined {
+function setFlash(cookies: CookieMap, value: Flash | SuccessFlash, secure: boolean): string | undefined {
   let encoded: string
 
   try {
@@ -74,7 +74,7 @@ function setFlash(cookies: CookieMap, value: Flash | SuccessFlash): string | und
   if (encoded.length > MAX_LENGTH)
     return `it takes ${encoded.length} bytes, over the ${MAX_LENGTH} it may`
 
-  cookies.set(FLASH_COOKIE, encoded, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: '/' })
+  cookies.set(FLASH_COOKIE, encoded, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: '/', secure })
 
   return undefined
 }
