@@ -20,7 +20,7 @@ export interface OperationResult {
   samples: number[]
 }
 
-interface Operation {
+export interface Operation {
   name: string
   // Whether 1,000 rows are created before the measured click, and what must hold once it has rendered.
   withRows: boolean
@@ -38,7 +38,7 @@ const MICROTASK_CHECKS = 100
 const ROWS = 'document.querySelector("tbody").rows'
 
 // The js-framework-benchmark's keyed operations, each checked for completion rather than assumed done.
-const OPERATIONS: Operation[] = [
+export const OPERATIONS: Operation[] = [
   { name: 'create 1,000 rows', withRows: false, click: '#run', done: `${ROWS}.length === 1000` },
   { name: 'replace 1,000 rows', withRows: true, click: '#run', done: `${ROWS}.length === 1000 && ${ROWS}[0].cells[0].textContent === '1001'` },
   { name: 'update every 10th row', withRows: true, click: '#update', done: `${ROWS}[990].cells[1].textContent.endsWith(' !!!')` },
@@ -50,9 +50,9 @@ const OPERATIONS: Operation[] = [
   { name: 'clear 1,000 rows', withRows: true, click: '#clear', done: `${ROWS}.length === 0` },
 ]
 
-// Starts an app's server in its own process and returns its URL.
-export async function serve(app: AppName): Promise<{ url: string, stop: () => void }> {
-  const child = Bun.spawn([process.execPath, join(import.meta.dir, 'serve.ts'), app], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, NODE_ENV: 'production' } })
+// Starts an app's server in its own process and returns its URL; `env` adds to the environment it gets.
+export async function serve(app: AppName, env: Record<string, string> = {}): Promise<{ url: string, stop: () => void }> {
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, 'serve.ts'), app], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, NODE_ENV: 'production', ...env } })
   const reader = child.stdout.getReader()
   let output = ''
 
@@ -166,7 +166,7 @@ export async function assertHydrated(browser: Browser, url: string): Promise<voi
 
 // Times one click until its result is in the DOM and laid out: scripting, style and layout, not paint.
 // The result is checked after each microtask first: Chromium may render a frame before the next task, and whether it does depends on where the click falls in the frame, not on the framework.
-async function timeClick(page: Page, operation: Operation): Promise<number> {
+export async function timeClick(page: Page, operation: Operation): Promise<number> {
   return page.evaluate(async ({ click, done, timeout, microtasks }) => {
     // eslint-disable-next-line no-new-func -- the completion check is data, written as an expression over the document
     const finished = new Function(`return ${done}`) as () => boolean
@@ -197,6 +197,20 @@ async function timeClick(page: Page, operation: Operation): Promise<number> {
   }, { ...operation, timeout: OPERATION_TIMEOUT_MS, microtasks: MICROTASK_CHECKS })
 }
 
+// A fresh table page, holding 1,000 rows when the operation starts from them.
+export async function openTable(browser: Browser, url: string, operation: Operation): Promise<Page> {
+  const page = await browser.newPage()
+
+  await page.goto(`${url}/table`, { waitUntil: 'networkidle' })
+
+  if (operation.withRows) {
+    await page.click('#run')
+    await page.waitForFunction(`${ROWS}.length === 1000`, undefined, { timeout: OPERATION_TIMEOUT_MS })
+  }
+
+  return page
+}
+
 // Each sample runs on a freshly loaded page after its preparation clicks, as the js-framework-benchmark does.
 export async function measureOperations(browser: Browser, url: string): Promise<OperationResult[]> {
   const results: OperationResult[] = []
@@ -205,15 +219,7 @@ export async function measureOperations(browser: Browser, url: string): Promise<
     const samples: number[] = []
 
     for (let run = 0; run < WARMUPS + SAMPLES; run++) {
-      const page = await browser.newPage()
-
-      await page.goto(`${url}/table`, { waitUntil: 'networkidle' })
-
-      if (operation.withRows) {
-        await page.click('#run')
-        await page.waitForFunction(`${ROWS}.length === 1000`, undefined, { timeout: OPERATION_TIMEOUT_MS })
-      }
-
+      const page = await openTable(browser, url, operation)
       const time = await timeClick(page, operation)
 
       if (run >= WARMUPS)

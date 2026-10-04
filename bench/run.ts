@@ -5,6 +5,7 @@ import { cpus } from 'node:os'
 import { join } from 'node:path'
 import { APPS } from './apps'
 import { assertHydrated, launch, measureLoad, measureOperations, serve } from './browser'
+import { kilobytes, milliseconds, table } from './format'
 import { clientRows, PATHS, serverMarkup } from './markup'
 
 interface SsrResult {
@@ -54,14 +55,6 @@ async function ssr(app: string): Promise<SsrResult> {
   return JSON.parse(output) as SsrResult
 }
 
-function kilobytes(bytes: number): string {
-  return `${(bytes / 1024).toFixed(1)} KB`
-}
-
-function milliseconds(value: number): string {
-  return value >= 100 ? value.toFixed(0) : value.toFixed(1)
-}
-
 // Each value next to how far it is from the best of the row, the way the js-framework-benchmark prints it.
 function relative(values: number[], format: (value: number) => string, higherIsBetter = false): string[] {
   const best = higherIsBetter ? Math.max(...values) : Math.min(...values)
@@ -72,10 +65,6 @@ function relative(values: number[], format: (value: number) => string, higherIsB
 
     return `${format(value)} (${(higherIsBetter ? best / value : value / best).toFixed(2)}x)`
   })
-}
-
-function table(header: string[], rows: string[][]): string {
-  return [`| ${header.join(' | ')} |`, `| ${header.map(() => '---').join(' | ')} |`, ...rows.map(row => `| ${row.join(' | ')} |`)].join('\n')
 }
 
 function loadRows(apps: AppResult[], page: 'products' | 'table'): string[][] {
