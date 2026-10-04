@@ -1,10 +1,10 @@
 import type { PendingBlock } from '../runtime/await.server'
 import type { RenderedIslands } from '../runtime/island.server'
 import type { ClientBuild } from './client'
-import { generateHydrationScript } from '@solidjs/web'
 import { collectDeferred } from '../runtime/await.server'
 import { child } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
+import { hydrationScript } from './hydration'
 
 // Swaps every streamed block that arrived in for the pending one between its markers, then hydrates the islands they brought; an outer block that settled first may have taken the markers away already.
 // Both scripts are the same on every page, so a Content-Security-Policy allows them by hash.
@@ -48,7 +48,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
         swapShipped = true
 
         if (rendered.islands.count > 0 && !shipped && client.entry !== undefined) {
-          scripts += `${generateHydrationScript()}<script type="module" async src="${client.entry}"></script>`
+          scripts += `${hydrationScript}<script type="module" async src="${client.entry}"></script>`
           shipped = true
         }
 

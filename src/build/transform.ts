@@ -4,7 +4,6 @@ import { mkdir, rename } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { compileKay, formatDiagnostic, withoutTwin } from '../compiler'
-import { transform } from './solid-compiler'
 import { registerSourceMap } from './sourcemap'
 
 export type Target = 'dom' | 'ssr'
@@ -21,9 +20,7 @@ export interface TransformOptions {
 
 interface Compiled {
   code: string
-  tsx: string
   map: SourceMap
-  solidMap?: string
 }
 
 interface CacheEntry<Value> {
@@ -39,7 +36,7 @@ export interface Analysis {
 }
 
 // The packages a compile runs through, their versions part of every cache key.
-const COMPILER_PACKAGES = ['@solidjs/compiler/package.json', '@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json']
+const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json']
 let fingerprint: string | undefined
 
 export interface FileDiagnostic extends Diagnostic {
@@ -55,12 +52,11 @@ export class KayCompileError extends Error {
   }
 }
 
-// .kay source to TypeScript with its JSX compiled by Solid's native compiler; Bun strips the types when it loads the result.
+// .kay source to TypeScript building HTML strings on the server and DOM nodes in the browser; Bun strips the types when it loads the result.
 export function transformKay(source: string, filename: string, options: TransformOptions): string {
-  const { code, tsx, map, solidMap } = compile(source, filename, options)
+  const { code, map } = compile(source, filename, options)
 
-  if (solidMap !== undefined)
-    registerSourceMap(filename, { source, tsx, map, solidMap }, options.target === 'dom')
+  registerSourceMap(filename, { source, tsx: code, map }, options.target === 'dom')
 
   return code
 }
@@ -76,9 +72,9 @@ export async function transformKayCached(source: string, filename: string, optio
 
   if (cached !== undefined) {
     registerSourceMap(filename, () => {
-      const { tsx, map, solidMap } = compile(source, filename, options)
+      const { code, map } = compile(source, filename, options)
 
-      return { source, tsx, map, solidMap: solidMap ?? '{"mappings":""}' }
+      return { source, tsx: code, map }
     }, options.target === 'dom')
 
     return cached
@@ -127,16 +123,12 @@ function compile(source: string, filename: string, options: TransformOptions): C
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, island, diagnostics } = compileKay(source, file, { root: options.root, includeServer: server, staticRender: server && hydratable && !isTwin })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))
 
-  // Only what renders inside an island carries hydration markers; on the server everything else renders once.
-  // Server stacks and island bundles in development are mapped back to the `.kay` source through Solid's map.
-  const output = transform(tsx, { filename: `${file}.tsx`, generate: options.target, hydratable: hydratable && (!server || isTwin || island !== undefined), sourceMap: true })
-
-  return { code: output.code, tsx, map, solidMap: output.map ?? undefined }
+  return { code: tsx, map }
 }
 
 function compilerFingerprint(): string {

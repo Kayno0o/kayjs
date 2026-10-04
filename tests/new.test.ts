@@ -220,7 +220,6 @@ describe('kay build --compile', () => {
         'src/routes/photo.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero)} alt="Hero")\n',
         'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }] })\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
-
       // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
       await Promise.all([
         Bun.write(join(dir, 'src/hero.png'), Bun.file(join(repo, 'tests/fixtures/images/src/hero.png'))),
@@ -257,7 +256,7 @@ describe('kay build --compile', () => {
         expect(about.headers.get('etag')).toEndWith('-br"')
         expect(await about.text()).toContain('<p>About</p>')
         expect(badges.text).toContain('<ul class="badges"><li><i class="dot"></i>OUT</li></ul>')
-        expect(badges.text).toMatch(/<ul _hk=\S+ class="badges"><li _hk=\S+><!--\$--><i _hk=\S+ class="dot"><\/i><!--\/--><!--\$-->IN<!--\/--><\/li>/)
+        expect(badges.text).toContain('<slot data-component="src/components/tally.kay" data-props="[{}]"><!--[--><ul class="badges"><li><!--[--><i class="dot"></i><!--]--><!--[-->IN<!--]--></li></ul><!--]--><button>0</button></slot>')
         expect(parse(await call.text())).toBe('HI')
         expect(await get('/admin')).toEqual({ status: 403, text: 'Admins only' })
         expect((await get('/missing')).text).toContain('<h1>Nothing here</h1>')

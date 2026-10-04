@@ -23,8 +23,12 @@ export interface CompileOptions {
   // Output for type checking: adds the link, form field and island prop assertions.
   check?: boolean
   relocateImport?: (specifier: string) => string | undefined
-  // Server output for rendering outside islands, built as strings with no Solid runtime: a static component renders through its hydratable `?island` twin inside one.
-  staticRender?: boolean
+  // Code to run: `html` builds server markup as strings, `dom` builds the browser's DOM; type-checking output when unset.
+  output?: 'html' | 'dom'
+  // Server output of a build that hydrates: islands carry markers, and a static component renders through its hydratable `?island` twin inside one.
+  hydratable?: boolean
+  // Server output of a static component's `?island` twin, which carries markers like an island.
+  twinBuild?: boolean
 }
 
 export interface CompileResult {
@@ -61,8 +65,9 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   let name = freeName(componentName(filename), fences)
   const island = isInteractive(file, script) ? islandId(filename, options.root) : undefined
-  const twin = options.staticRender && !island && !file.server && !ROUTE_FILES.has(basename(filename)) ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const generateOptions = { island, twin, html: options.staticRender && !island, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
+  const hydratableServer = options.output === 'html' && options.hydratable === true
+  const twin = hydratableServer && !options.twinBuild && !island && !file.server && !ROUTE_FILES.has(basename(filename)) ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
+  const generateOptions = { island, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
   let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name)

@@ -1,28 +1,12 @@
 import type { JSX } from '@solidjs/web'
 import type { AwaitProps } from './checks'
-import { createComponent, createMemo, Errored, Loading } from 'solid-js'
+import { awaited, fragment, markers } from './dom'
 
-// Solid's own async rendering, used in the browser and for islands on the server: a memo holding a promise suspends the nearest `Loading`.
+// Compiled islands bind `await` blocks themselves; this is the component form, for code that builds one by hand.
 export function Await<T>(props: AwaitProps<T>): JSX.Element {
-  const value = createMemo(() => props.value)
-  const loading = () => createComponent(Loading, {
-    get fallback() {
-      return props.pending?.()
-    },
-    get children() {
-      return props.ready(value() as Awaited<T>)
-    },
-  })
+  return fragment((parent) => {
+    const [start, end] = markers(parent)
 
-  if (!props.failed)
-    return loading()
-
-  const failed = props.failed
-
-  return createComponent(Errored, {
-    fallback: (error: () => unknown) => failed(error()),
-    get children() {
-      return loading()
-    },
-  })
+    awaited(null, start, end, () => props.value, props.pending && (() => props.pending!()), value => props.ready(value as Awaited<T>), props.failed && (error => props.failed!(error)))
+  }) as unknown as JSX.Element
 }

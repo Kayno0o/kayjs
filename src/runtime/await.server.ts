@@ -1,7 +1,6 @@
 import type { JSX } from '@solidjs/web'
 import type { AwaitProps } from './checks'
 import type { Html } from './html'
-import { Await as SolidAwait } from './await'
 import { child } from './html'
 import { insideIsland } from './island.server'
 
@@ -37,15 +36,11 @@ export function collectDeferred<T>(render: () => T): { result: T, deferred: Pend
 export function Await<T>(props: AwaitProps<T>): JSX.Element {
   const value = props.value
 
-  // An island builds the same tree as in the browser, which wraps any value in a memo and a boundary.
-  if (insideIsland())
-    return SolidAwait(props)
-
   if (!(value instanceof Promise))
     return props.ready(value as Awaited<T>)
 
-  // Inside a block that is itself streamed, nothing streams: the pending block stays.
-  if (deferred === undefined)
+  // Inside a block that is itself streamed nothing streams, and an island hydrates its pending block and settles it in the browser.
+  if (deferred === undefined || insideIsland())
     return props.pending?.()
 
   const id = (nextId++).toString(36)

@@ -1,25 +1,27 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
-import type { Setter, SignalOptions } from 'solid-js'
 import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect } from './checks'
-import { createSignal, getOwner, onCleanup } from 'solid-js'
+import type { SignalOptions } from './reactive'
+import { createSignal, onCleanup, tracking, untrack } from './reactive'
+
+// Writes a value, or what a function makes of the current one.
+export type Setter<T> = (next: T | ((current: T) => T)) => void
 
 export interface Signal<T> {
   (): T
   set: Setter<T>
 }
 
+// A function passed to `set` is an updater, so a signal holds no functions.
 type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
-
-// Solid reads a function argument as a computation; signal() narrows its input to plain values, so this one overload is all it reaches.
-const createValueSignal = createSignal as unknown as <T>(value: T, options?: SignalOptions<T>) => [read: () => T, set: Setter<T>]
 
 // A signal read as `count()` and written as `count.set(1)` or `count.set(c => c + 1)`.
 export function signal<T>(): Signal<T | undefined>
 export function signal<T>(value: PlainValue<T>, options?: SignalOptions<T>): Signal<T>
 export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | undefined>): Signal<T | undefined> {
-  const [read, set] = createValueSignal<T | undefined>(value, options)
+  const [read, write] = createSignal<T | undefined>(value, options)
+  const set: Setter<T | undefined> = next => write(typeof next === 'function' ? (next as (current: T | undefined) => T | undefined)(untrack(read)) : next)
 
   return Object.assign(read, { set })
 }
@@ -40,7 +42,7 @@ interface Flag {
 // One selected key among many rows: `is(key)` reads a flag of that key's own, so a change re-runs what read the old key and the new one, not every row.
 // Flags are made on first read and dropped once nothing reads them.
 export function selection<Key extends string | number>(initial?: Key): Selection<Key> {
-  const [read, write] = createValueSignal<Key | undefined>(initial)
+  const [read, write] = createSignal<Key | undefined>(initial)
   const flags = new Map<Key, Flag>()
   let current = initial
 
@@ -57,17 +59,17 @@ export function selection<Key extends string | number>(initial?: Key): Selection
       flags.get(key)?.write(true)
 
     current = key
-    write(() => key)
+    write(key)
   }
 
   const is = (key: Key): boolean => {
-    if (!getOwner())
+    if (!tracking())
       return key === current
 
     let flag = flags.get(key)
 
     if (!flag) {
-      const [readFlag, writeFlag] = createValueSignal(key === current)
+      const [readFlag, writeFlag] = createSignal(key === current)
 
       flag = { read: readFlag, write: writeFlag, readers: 0 }
       flags.set(key, flag)
@@ -153,4 +155,6 @@ export type { ActionProtection } from './action'
 export { action, ActionError, ActionRedirect, actionStub, formAction, isAction, registerActions } from './action'
 export type { AwaitProps, CheckedHref, Deferred, FunctionProp, HydrateWhen, IslandBrand, IslandComponent, IslandProp, Locals, LocalsOf, Redirect, Register } from './checks'
 export { loopFor } from './loop'
+export type { SignalOptions } from './reactive'
+export { batch, effect, flush, memo, onCleanup, onMount, root, untrack } from './reactive'
 export { staticFor } from './static'

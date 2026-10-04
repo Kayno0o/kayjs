@@ -1,8 +1,13 @@
-import type { JSX } from '@solidjs/web'
-import { hydrate } from '@solidjs/web'
+import { dispatch, hydrate, render } from './dom'
+import { root } from './reactive'
 import { decodeValue } from './wire'
 
-export type IslandRegistry = Record<string, () => Promise<{ default: (props: object) => JSX.Element }>>
+export type IslandRegistry = Record<string, () => Promise<{ default: (props: object) => unknown }>>
+
+interface IslandElement extends HTMLElement {
+  // Set once hydrated, so the inline hydration script stops queuing its events.
+  _$k?: boolean
+}
 
 // Starts loading a `visible` island this far before it scrolls into view.
 const VISIBLE_MARGIN = '200px'
@@ -46,16 +51,34 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   const { default: component } = await load()
   const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
 
-  // Solid hydrates a page once and renders anything after from scratch; an island hydrating later still claims its server markup.
-  const hydration = (globalThis as { _$HY?: { done?: boolean, r?: Record<string, unknown> } })._$HY
+  root((dispose) => {
+    try {
+      hydrate(() => component(props), element)
+    }
+    catch (error) {
+      // Markup the island would not build, such as one a browser extension changed, can fail anywhere along the way: rendered afresh rather than left dead.
+      // An error of the component itself throws again from the fresh render.
+      console.warn(`[kay] island ${id} did not match its server markup, rendering it again: ${error instanceof Error ? error.message : String(error)}`)
+      dispose()
+      element.textContent = ''
+      render(() => component(props), element)
+    }
+  })
+  ;(element as IslandElement)._$k = true
+  replayEvents(element)
+}
 
-  if (hydration) {
-    hydration.done = false
-    // What the server decided for this island, like a boundary still pending, which the client must take the same way.
-    hydration.r = Object.assign(hydration.r ?? {}, JSON.parse(element.dataset.hydration ?? '{}'))
+// Clicks and inputs the inline hydration script queued while the island waited for its chunk.
+function replayEvents(element: HTMLElement) {
+  const queue = (globalThis as { _$K?: Event[] })._$K
+
+  if (!queue)
+    return
+
+  for (const event of queue.filter(event => element.contains(event.target as Node))) {
+    queue.splice(queue.indexOf(event), 1)
+    dispatch(event)
   }
-
-  hydrate(() => component(props), element, { renderId: element.dataset.renderId })
 }
 
 function whenVisible(element: HTMLElement, run: () => Promise<void>) {

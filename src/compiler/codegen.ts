@@ -1,9 +1,10 @@
 import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
-import { parseExpression } from '@babel/parser'
 import { actionUrl } from '../runtime/action'
 import { actionOf, awaitBlocks, isChildrenSlot, isHead } from './ast'
+import { domHelperImport, DomTemplate } from './dom'
+import { isFunctionExpression } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 
@@ -25,8 +26,10 @@ export interface GenerateOptions {
   special?: boolean
   // Server output without hydration markers for a static component: inside an island it renders through this hydratable build of itself instead.
   twin?: string
-  // Server output outside islands that builds its markup as strings, with no Solid runtime; the analysis pass still generates JSX, which scope analysis reads.
-  html?: boolean
+  // Code to run rather than type-check, built from the template: `html` builds server markup as strings, `dom` builds the browser's DOM. The analysis pass still generates JSX, which scope analysis reads.
+  output?: 'html' | 'dom'
+  // Server markup of an island or a twin, carrying the markers hydration needs.
+  hydratable?: boolean
   // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
   relocateImport?: (specifier: string) => string | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
@@ -54,12 +57,12 @@ const IMPORT_COMMA_AFTER = /^\s*,\s*/
 const IMPORT_COMMA_BEFORE = /,\s*$/
 const DEFAULT_PREFIX = '__default_'
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
-// The one server export that is no action: `kay build` renders the page once when it is `true`.
+// `kay build` renders the page once when it is `true`.
 const PRERENDER = 'prerender'
 // The page's query schema, which types and validates `ctx.query`.
 const QUERY = 'query'
-// The server exports that are no actions.
-const NOT_ACTIONS = new Set([PRERENDER, QUERY])
+// The server exports that are no actions; `sitemap` lists the page in the sitemap.
+const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap'])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
 const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
 // Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a `role`.
@@ -114,14 +117,16 @@ class Generator {
     const kayHelpers = formHelpers(this.file)
     const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
     const staticLoops = this.staticLoops
-    const html = this.htmlOutput
+    const html = this.final('html')
+    const dom = this.final('dom')
+    const runnable = html || dom
     const used = usedHelpers(this.file.template, script)
-    const helpers = html ? [] : used.filter(helper => helper !== 'For')
+    const helpers = runnable ? [] : used.filter(helper => helper !== 'For')
 
     if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
 
-    if (used.includes('For') && !html)
+    if (used.includes('For') && !runnable)
       kayHelpers.push(staticLoops ? 'staticFor' : 'loopFor')
 
     if (kayHelpers.length > 0)
@@ -141,6 +146,9 @@ class Generator {
     if (html)
       b.add(htmlHelperImport())
 
+    if (dom)
+      b.add(domHelperImport())
+
     if (helpers.length > 0)
       b.add(`import { ${helpers.map(helper => `${helper} as ${helperAlias(helper)}`).join(', ')} } from 'solid-js'\n`)
 
@@ -153,15 +161,15 @@ class Generator {
     if (this.options.island && this.genericComponent)
       b.add(`import type { HydrateWhen as KayHydrateWhen, IslandBrand as KayIslandBrand } from 'kay'\n`)
 
-    if (usesAwait(this.file.template))
+    if (usesAwait(this.file.template) && !dom)
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
 
-    if (!html && this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
+    if (!runnable && this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
       b.add(`import { Dynamic as ${DYNAMIC_TAG} } from '@solidjs/web'\n`)
 
     const { head, template } = this.splitHead(this.file.template)
 
-    if (head && !this.options.check && !html)
+    if (head && !this.options.check && !runnable)
       b.add(`import { useHead as KayUseHead } from '@solidjs/web'\n`)
 
     if (includeServer)
@@ -202,17 +210,25 @@ class Generator {
     b.add(') {\n')
     this.emitBody()
 
-    if (head)
+    // An island sets no head, and a static component rendering inside one leaves it to the server.
+    if (head && !dom)
       this.emitHead(head)
 
     b.add('\nreturn ')
 
+    const domTemplate = dom ? new DomTemplate(b, this.src) : undefined
+
     if (html)
-      new HtmlTemplate(b, this.src).value(this.withoutSlots(template))
+      new HtmlTemplate(b, this.src, { hydratable: this.options.hydratable, accessorLoops: !staticLoops }).value(this.withoutSlots(template))
+    else if (domTemplate)
+      domTemplate.block(this.withoutSlots(template))
     else
       this.emitRoot(template)
 
     b.add('\n}\n')
+
+    if (domTemplate)
+      b.add(domTemplate.declarations())
 
     if (this.options.twin !== undefined)
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${this.options.name}(props)) as typeof ${this.options.name}\n`)
@@ -236,8 +252,9 @@ class Generator {
     return span !== undefined
   }
 
-  private get htmlOutput(): boolean {
-    return this.options.html === true && this.options.rewrites !== undefined
+  // The final pass builds what runs; the analysis pass always generates JSX.
+  private final(output: 'html' | 'dom'): boolean {
+    return this.options.output === output && this.options.rewrites !== undefined
   }
 
   private get genericComponent(): boolean {
@@ -447,7 +464,7 @@ class Generator {
       return
     }
 
-    b.add(this.htmlOutput ? 'KayHead([' : 'KayUseHead([')
+    b.add(this.final('html') ? 'KayHead([' : 'KayUseHead([')
     for (const tag of tags) {
       this.emitHeadTag(tag)
       b.add(', ')
@@ -675,7 +692,7 @@ class Generator {
     if (this.options.check || this.options.island)
       return false
 
-    return this.options.html === true || this.options.twin !== undefined || (this.server !== undefined && this.options.includeServer !== false)
+    return this.options.output === 'html' || this.options.twin !== undefined || (this.server !== undefined && this.options.includeServer !== false)
   }
 
   private emitFor(node: ForNode) {
@@ -1399,15 +1416,4 @@ function typeParameterNames(parameters: string): string[] {
   }
 
   return names
-}
-
-function isFunctionExpression(code: string): boolean {
-  try {
-    const expression = parseExpression(code, { plugins: ['typescript'] })
-
-    return expression.type === 'ArrowFunctionExpression' || expression.type === 'FunctionExpression'
-  }
-  catch {
-    return false
-  }
 }

@@ -9,7 +9,6 @@ import type { SeoHead } from './seo'
 import type { Prefetch } from './speculation'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { generateHydrationScript } from '@solidjs/web'
 import { mapStack } from '../build/sourcemap'
 import { collectHead } from '../runtime/head'
 import { importModule } from './bundle'
@@ -18,6 +17,7 @@ import { cookieJar } from './cookies'
 import { LIVE_RELOAD } from './dev'
 import { FLASH_COOKIE, readFlash } from './flash'
 import { runGuards } from './guards'
+import { hydrationScript } from './hydration'
 import { errorPage } from './overlay'
 import { matchesEtag } from './public'
 import { readQuery } from './query'
@@ -421,7 +421,7 @@ function islandScripts(client: ClientBuild, islands: Set<string>, streamed: bool
         chunks.add(chunk)
     }
 
-    html = `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${generateHydrationScript()}${streamed ? '' : `<script type="module" src="${client.entry}"></script>`}`
+    html = `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${hydrationScript}${streamed ? '' : `<script type="module" src="${client.entry}"></script>`}`
     cached.set(key, html)
   }
 

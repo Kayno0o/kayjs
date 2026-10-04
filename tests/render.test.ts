@@ -12,7 +12,7 @@ import { staticFor } from '../src/runtime/static'
 plugin(kay())
 
 // An island's hydratable markup separates dynamic text with comment markers; the assertions read the text alone.
-const MARKERS = /<!--[$/]-->/g
+const MARKERS = /<!--[[\]]-->/g
 
 interface TodoListModule {
   default: (props: { todos: Todo[], title?: string }) => unknown
@@ -239,7 +239,7 @@ describe('stack frames', () => {
     const line = compiled.split('\n').findIndex(text => text.includes('throw new Error'))
     const column = compiled.split('\n')[line]!.indexOf('throw') + 1
 
-    expect(compiled).toContain('_$ssrHydrationKey')
+    expect(compiled).toContain('from \'kay/html\'')
     expect(mapStack(`    at kaboom (${file}?island:${line + 1}:${column})`)).toBe(`    at kaboom (${file}:3:3)`)
     expect(mapStack(`Error at ${file}?island:${line + 1}:${column}`)).toBe(`Error at ${file}:3:3`)
   })
@@ -266,6 +266,13 @@ describe('static server output', () => {
     const html = await renderKay(source, { markup: '<b>x</b>', text: '<i>', choice: 'C' })
 
     expect(html).toBe('<div><b>x</b></div><div>&lt;i></div><textarea>&lt;i></textarea><select value="C"><option value="a">A</option><option value="b">B</option><option selected>C</option></select>')
+  })
+
+  it('renders a bound value as the property it binds, read off its signal', async () => {
+    const source = '---\nimport { signal } from \'kay\'\n\nconst empty = signal(\'\')\nconst on = signal(true)\nconst text = signal(\'<i>\')\nconst choice = signal(\'b\')\n---\ninput(bind:value={empty})\ninput(type="checkbox" bind:checked={on})\ntextarea(bind:value={text})\nselect(bind:value={choice})\n  option(value="a") A\n  option(value="b") B'
+    const html = await renderKay(source)
+
+    expect(html).toEndWith('data-props="[{}]"><input value=""><input type="checkbox" checked><textarea>&lt;i></textarea><select value="b"><option value="a">A</option><option value="b" selected>B</option></select></slot>')
   })
 
   it('leaves script and style text unescaped', async () => {

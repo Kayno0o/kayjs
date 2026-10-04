@@ -8,18 +8,12 @@ import { LIVE_RELOAD } from '../src/server/dev'
 
 interface ClientModule {
   mount: (element: HTMLElement) => () => void
-  selectionRows: (initial?: number) => {
-    selected: { (): number | undefined, set: (key: number | undefined | ((current: number | undefined) => number | undefined)) => void, is: (key: number) => boolean }
-    runs: number[]
-    dispose: () => void
-    flush: () => void
-  }
 }
 
 let outdir: string
 let client: ClientModule
 
-// Lets Solid's staged writes and effects land before the DOM is read.
+// Lets queued effects land before the DOM is read.
 async function settle() {
   await new Promise(resolve => setTimeout(resolve, 0))
 }
@@ -29,7 +23,7 @@ async function mountKay(files: Record<string, string>): Promise<{ root: HTMLElem
   const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
 
   try {
-    await Promise.all(Object.entries({ ...files, 'entry.ts': 'import { render } from \'@solidjs/web\'\nimport Main from \'./main.kay\'\n\nexport function mount(element: HTMLElement) {\n  return render(() => Main({}), element)\n}\n' }).map(async ([name, text]) => Bun.write(join(dir, name), text)))
+    await Promise.all(Object.entries({ ...files, 'entry.ts': 'import { render } from \'kay/dom\'\nimport Main from \'./main.kay\'\n\nexport function mount(element: HTMLElement) {\n  return render(() => Main({}), element)\n}\n' }).map(async ([name, text]) => Bun.write(join(dir, name), text)))
 
     const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: join(dir, 'out'), target: 'browser', plugins: [kay()] })
 
@@ -73,36 +67,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await GlobalRegistrator.unregister()
   await rm(outdir, { recursive: true, force: true })
-})
-
-describe('selection', () => {
-  it('re-runs only the rows a change selects or unselects', () => {
-    const { selected, runs, dispose, flush } = client.selectionRows(3)
-    const ranAgain = (before: number[]) => runs.flatMap((count, row) => count === before[row] ? [] : [row])
-
-    expect(runs.every(count => count === 1)).toBe(true)
-
-    let before = [...runs]
-
-    selected.set(5)
-    flush()
-    expect(ranAgain(before)).toEqual([3, 5])
-
-    before = [...runs]
-    selected.set(current => (current ?? 0) + 2)
-    flush()
-    expect(ranAgain(before)).toEqual([5, 7])
-    expect(selected()).toBe(7)
-
-    before = [...runs]
-    selected.set(7)
-    selected.set(undefined)
-    flush()
-    expect(ranAgain(before)).toEqual([7])
-    // Read outside any tracking scope, as in an event handler.
-    expect(selected.is(7)).toBe(false)
-    dispose()
-  })
 })
 
 describe('client bundle', () => {
@@ -192,6 +156,43 @@ describe('loops', () => {
       await dispose()
     }
   })
+
+  it.each([
+    ['as the only content of their element', 'ul\n  for n, i of list() key={n}\n    li {n}:{i}\n'],
+    ['between other children, several nodes a row', 'ul\n  li.first first\n  for n, i of list() key={n}\n    li {n}:{i}\n    | ,\n  li.last last\n'],
+  ])('move, insert and remove keyed rows %s, keeping the nodes of the rows that stay', async (_name, template) => {
+    const { root, dispose } = await mountKay({
+      'main.kay': `---\nimport { signal } from 'kay'\n\nconst list = signal([1, 2, 3, 4, 5, 6])\n;(globalThis as { setList?: (next: number[]) => void }).setList = next => list.set(next)\n---\n${template}`,
+    })
+    const setList = (globalThis as unknown as { setList: (next: number[]) => void }).setList
+    const items = () => [...root.querySelectorAll('li:not(.first, .last)')]
+    const keyOf = (item: Element) => item.textContent!.slice(0, item.textContent!.indexOf(':'))
+    const byKey = new Map(items().map(item => [keyOf(item), item]))
+
+    try {
+      for (const next of [[1, 5, 3, 4, 2, 6], [1, 5, 4, 2, 6], [1, 5, 9, 4, 2, 6], [6, 2, 4, 9, 5, 1], [7, 6, 2, 4, 9, 5, 1, 8], [8, 1], [], [3, 1, 2]]) {
+        setList(next)
+        await settle()
+        expect(items().map(item => item.textContent)).toEqual(next.map((n, i) => `${n}:${i}`))
+
+        for (const item of items()) {
+          const key = keyOf(item)
+
+          expect(byKey.get(key) ?? item).toBe(item)
+          byKey.set(key, item)
+        }
+
+        if (template.includes('first'))
+          expect(root.querySelector('ul')!.textContent).toBe(`first${next.map((n, i) => `${n}:${i},`).join('')}last`)
+
+        if (next.length === 0)
+          byKey.clear()
+      }
+    }
+    finally {
+      await dispose()
+    }
+  })
 })
 
 describe('slots with parameters', () => {
@@ -219,7 +220,7 @@ describe('bind:value on a number input', () => {
 
     try {
       await Bun.write(join(dir, 'number.kay'), '---\nimport { signal } from \'kay\'\nconst n = signal<number>(5)\n---\ninput#num(type="number" bind:value={n})\ninput#range(type="range" min="0" max="10" bind:value={n})\np#out {n()}\n')
-      await Bun.write(join(dir, 'entry.ts'), 'import { render } from \'@solidjs/web\'\nimport Number from \'./number.kay\'\n\nexport function mount(element: HTMLElement) {\n  return render(() => Number({}), element)\n}\n')
+      await Bun.write(join(dir, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Number from \'./number.kay\'\n\nexport function mount(element: HTMLElement) {\n  return render(() => Number({}), element)\n}\n')
 
       const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: join(dir, 'out'), target: 'browser', plugins: [kay()] })
 

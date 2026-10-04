@@ -1,17 +1,19 @@
 import type { Attribute, AwaitNode, ElementNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
+import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { parseExpression } from '@babel/parser'
-import { actionOf, isChildrenSlot, isHead } from './ast'
+import { actionOf } from './ast'
+import { decodeEntities } from './expression'
+import { childItems, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
 const HTML_HELPERS = ['attribute', 'child', 'className', 'dynamic', 'element', 'head', 'loop', 'merge', 'omit', 'raw', 'selectOptions', 'show', 'style']
 
-const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
-const RAW_ELEMENTS = new Set(['script', 'style'])
+export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
+export const RAW_ELEMENTS = new Set(['script', 'style'])
 // Properties that set an element's content rather than an attribute.
-const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
+export const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
 // Handlers, refs and bindings, which only an island attaches; `open` is the one attribute starting with `on` that is none.
-const BEHAVIOUR = /^(?:on(?!en$)|ref$|bind:|prop:)/
+export const BEHAVIOUR = /^(?:on(?!en$)|ref$|bind:|prop:)/
 const LESS_THAN = /</g
 const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
 const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }
@@ -24,34 +26,25 @@ function htmlAlias(helper: string): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
 }
 
+// Around a dynamic part of an island's markup, so the browser finds where it starts and ends.
+export const START_MARKER = '<!--[-->'
+export const END_MARKER = '<!--]-->'
+
+export interface HtmlOptions {
+  // An island or a twin: dynamic parts carry markers for hydration.
+  hydratable?: boolean
+  // Loop rows read their item, and a keyed row its index, through functions, as the island build of the same template does.
+  accessorLoops?: boolean
+}
+
 // Static text written as markup: `& b` and `&amp;` both stay as written, the way JSX text reaches the server markup.
-function escapeText(text: string): string {
+export function escapeText(text: string): string {
   return text.replace(LESS_THAN, '&lt;')
 }
 
 // A quoted attribute as JSX reads it, an entity standing for its character, then escaped for markup.
-function escapeStaticAttribute(text: string): string {
+export function escapeStaticAttribute(text: string): string {
   return text.replace(STATIC_ATTRIBUTE, char => ATTRIBUTE_ENTITY[char] ?? '&amp;')
-}
-
-// The string a JSX attribute or text spells, its entities decoded, as a component receives it.
-function decodeEntities(text: string): string {
-  if (!text.includes('&'))
-    return text
-
-  try {
-    const expression = parseExpression(`<a b="${text.replaceAll('"', '&quot;')}" />`, { plugins: ['jsx'] })
-
-    if (expression.type === 'JSXElement') {
-      const value = expression.openingElement.attributes[0]
-
-      if (value?.type === 'JSXAttribute' && value.value?.type === 'StringLiteral')
-        return value.value.value
-    }
-  }
-  catch {}
-
-  return text
 }
 
 // Static parts gather into one string literal; each dynamic part is an expression of the markup it renders.
@@ -95,14 +88,14 @@ class Markup {
 
 // A template as code building its markup: what pages, layouts and static components render to outside islands, with no reactive runtime.
 export class HtmlTemplate {
-  constructor(private readonly b: CodeBuilder, private readonly src: string) {}
+  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly options: HtmlOptions = {}) {}
 
-  // The nodes' markup as one string expression.
-  markup(nodes: Node[]): void {
+  // The nodes' markup as one string expression; an element's content lets a lone dynamic part go without markers.
+  markup(nodes: Node[], inElement = false): void {
     const markup = new Markup(this.b)
 
     this.b.add('(')
-    this.children(nodes, markup, false)
+    this.children(nodes, markup, false, inElement)
     markup.end()
     this.b.add(')')
   }
@@ -114,50 +107,57 @@ export class HtmlTemplate {
     this.b.add(' })')
   }
 
-  private children(nodes: Node[], markup: Markup, raw: boolean): void {
-    let previous: Node | undefined
+  private children(nodes: Node[], markup: Markup, raw: boolean, inElement: boolean): void {
+    const items = childItems(nodes)
+    const markers = this.options.hydratable === true && !(inElement && soleDynamic(items))
 
-    for (const node of nodes) {
-      switch (node.kind) {
-        case 'element':
-          this.element(node, markup)
-
-          break
-        case 'text':
-          if (previous?.kind === 'text')
-            markup.text('\n')
-
-          this.text(node, markup, raw)
-
-          break
-        case 'if':
-          markup.dynamic(() => this.b.wrap(node, () => this.if(node, 0)))
-
-          break
-        case 'for':
-          markup.dynamic(() => this.for(node))
-
-          break
-        case 'await':
-          markup.dynamic(() => this.await(node))
-
-          break
-        case 'slot':
-          break
+    for (const item of items) {
+      if (item.kind === 'text') {
+        markup.text(raw ? item.text : escapeText(item.text))
       }
+      else if (item.kind === 'element') {
+        this.element(item.node, markup)
+      }
+      else {
+        if (markers)
+          markup.text(START_MARKER)
 
-      previous = node
+        markup.dynamic(() => this.dynamic(item, raw))
+
+        if (markers)
+          markup.text(END_MARKER)
+      }
     }
   }
 
-  private text(node: TextNode, markup: Markup, raw: boolean): void {
-    for (const part of node.parts) {
-      if (part.kind === 'element')
-        this.element(part, markup)
-      else if (part.kind === 'expression')
-        markup.dynamic(() => this.b.add(`${htmlAlias(raw ? 'raw' : 'child')}((`).addSource(part.expression).add('))'))
-      else
-        markup.text(raw ? part.text : escapeText(part.text))
+  private dynamic(item: DynamicItem, raw: boolean): void {
+    const { b } = this
+
+    switch (item.kind) {
+      case 'expression':
+        b.add(`${htmlAlias(raw ? 'raw' : 'child')}((`).addSource(item.node.expression).add('))')
+
+        break
+      case 'component':
+        b.wrap(item.node, () => this.component(item.node))
+
+        break
+      case 'slot':
+        b.wrap(item.node, () => b.add(`${htmlAlias('child')}(__props.children)`))
+
+        break
+      case 'if':
+        b.wrap(item.node, () => this.if(item.node, 0))
+
+        break
+      case 'for':
+        this.for(item.node)
+
+        break
+      case 'await':
+        this.await(item.node)
+
+        break
     }
   }
 
@@ -218,6 +218,12 @@ export class HtmlTemplate {
         b.add(', () => ')
         this.markup(node.fallback)
       }
+      else if (this.options.accessorLoops) {
+        b.add(', undefined')
+      }
+
+      if (this.options.accessorLoops)
+        b.add(node.index !== undefined && this.source(node.key).trim() === this.source(node.index) ? ', "positional"' : ', "keyed"')
 
       b.add(')')
     })
@@ -258,21 +264,6 @@ export class HtmlTemplate {
   private element(element: ElementNode, markup: Markup): void {
     const { b } = this
 
-    if (isHead(element))
-      return
-
-    if (isChildrenSlot(element)) {
-      markup.dynamic(() => b.wrap(element, () => b.add(`${htmlAlias('child')}(__props.children)`)))
-
-      return
-    }
-
-    if (element.component) {
-      markup.dynamic(() => b.wrap(element, () => this.component(element)))
-
-      return
-    }
-
     if (element.attributes.some(attribute => attribute.kind === 'spread')) {
       markup.dynamic(() => b.wrap(element, () => this.spreadElement(element)))
 
@@ -287,9 +278,12 @@ export class HtmlTemplate {
     const name = element.name
     const classAttribute = this.classAttribute(element)
     const children = element.children.filter(child => child.kind !== 'slot')
-    let content: Span | undefined
+    // What writes the content or the selected value: a bound one reads its signal.
+    let content: (() => void) | undefined
+    let staticContent: string | undefined
     let rawContent = false
-    let selected: Span | undefined
+    let selected: (() => void) | undefined
+    const read = (expression: Span, call: boolean) => () => void b.add('(').addSource(expression).add(call ? ')()' : ')')
 
     markup.text(`<${name}`)
 
@@ -315,6 +309,29 @@ export class HtmlTemplate {
 
       const attributeName = this.source(attribute.name)
 
+      // A bound value renders as the property it binds, read off its signal.
+      if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {
+        const property = attributeName.slice(5)
+        const value = read(attribute.expression, true)
+
+        if (name === 'textarea' && property === 'value') {
+          content = value
+
+          continue
+        }
+
+        if (name === 'select' && property === 'value')
+          selected = value
+
+        markup.dynamic(() => {
+          b.add(`${htmlAlias('attribute')}(${JSON.stringify(property)}, `)
+          value()
+          b.add(')')
+        })
+
+        continue
+      }
+
       if (BEHAVIOUR.test(attributeName))
         continue
 
@@ -325,8 +342,17 @@ export class HtmlTemplate {
       }
 
       if (attribute.kind === 'static') {
-        if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && attributeName === 'value'))
+        if (attributeName === 'innerHTML') {
+          staticContent = attribute.text
+
           continue
+        }
+
+        if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && attributeName === 'value')) {
+          staticContent = escapeText(decodeEntities(attribute.text))
+
+          continue
+        }
 
         markup.text(attribute.text === '' ? ` ${attributeName}` : ` ${attributeName}="${escapeStaticAttribute(decodeEntities(attribute.text))}"`)
 
@@ -336,14 +362,14 @@ export class HtmlTemplate {
       const expression = attribute.expression
 
       if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && (attributeName === 'value' || attributeName === 'defaultValue'))) {
-        content = expression
+        content = read(expression, false)
         rawContent = attributeName === 'innerHTML' || RAW_ELEMENTS.has(name)
 
         continue
       }
 
       if (name === 'select' && attributeName === 'value')
-        selected = expression
+        selected = read(expression, false)
 
       if (attributeName === 'class' || attributeName === 'style') {
         markup.text(` ${attributeName}="`)
@@ -381,16 +407,25 @@ export class HtmlTemplate {
 
     if (children.length > 0 && selected) {
       markup.dynamic(() => {
-        b.add(`${htmlAlias('selectOptions')}((`).addSource(selected).add('), ')
-        this.markup(children)
+        b.add(`${htmlAlias('selectOptions')}(`)
+        selected()
+        b.add(', ')
+        this.markup(children, true)
         b.add(')')
       })
     }
     else if (children.length > 0) {
-      this.children(children, markup, RAW_ELEMENTS.has(name))
+      this.children(children, markup, RAW_ELEMENTS.has(name), true)
+    }
+    else if (staticContent !== undefined) {
+      markup.text(staticContent)
     }
     else if (content) {
-      markup.dynamic(() => b.add(`${htmlAlias(rawContent ? 'raw' : 'child')}((`).addSource(content).add('))'))
+      markup.dynamic(() => {
+        b.add(`${htmlAlias(rawContent ? 'raw' : 'child')}(`)
+        content()
+        b.add(')')
+      })
     }
 
     markup.text(`</${name}>`)
@@ -420,7 +455,7 @@ export class HtmlTemplate {
 
     if (children.length > 0) {
       b.add(', () => ')
-      this.markup(children)
+      this.markup(children, true)
     }
 
     b.add(').t')

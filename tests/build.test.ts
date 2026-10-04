@@ -212,7 +212,7 @@ describe('compile cache', () => {
   it('keeps one entry per target, hydration and root, and the analysis of a file only once it compiles', async () => {
     const cacheDir = await mkdtemp(join(tmpdir(), 'kay-cache-'))
     const file = join(cacheDir, 'counter.kay')
-    const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton.counter(onClick={() => count.set(c => c + 1)}) {count()}\n'
+    const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton.counter(onClick={() => count.set(c => c + 1)}) Count {count()}\n'
 
     try {
       const dom = await transformKayCached(source, file, { target: 'dom', cacheDir, root: cacheDir })
@@ -233,8 +233,11 @@ describe('compile cache', () => {
       finally {
         process.chdir(cwd)
       }
-      expect(await transformKayCached(source, file, { target: 'dom', hydratable: true, cacheDir, root: cacheDir })).not.toBe(dom)
-      expect(await transformKayCached(source, file, { target: 'ssr', cacheDir, root: cacheDir })).not.toBe(dom)
+      const ssr = await transformKayCached(source, file, { target: 'ssr', cacheDir, root: cacheDir })
+
+      expect(ssr).not.toBe(dom)
+      // Server markup of an island carries the markers hydration claims only when the page hydrates.
+      expect(await transformKayCached(source, file, { target: 'ssr', hydratable: true, cacheDir, root: cacheDir })).not.toBe(ssr)
 
       const analysis = await analyzeKayCached(source, file, cacheDir, cacheDir)
 
@@ -242,7 +245,7 @@ describe('compile cache', () => {
       expect(await analyzeKayCached(source, file, cacheDir, cacheDir)).toEqual(analysis)
       expect((await analyzeKayCached('for t of list\n  li x\n', file, cacheDir, cacheDir)).diagnostics).not.toHaveLength(0)
       expect(await analyzeKayCached(source, file, cacheDir, cacheDir)).toEqual(analysis)
-      expect((await readdir(cacheDir)).sort()).toEqual([expect.stringMatching(/-analysis\.json$/), expect.stringMatching(/-dom-hydratable\.json$/), expect.stringMatching(/-dom\.json$/), expect.stringMatching(/-ssr\.json$/)])
+      expect((await readdir(cacheDir)).sort()).toEqual([expect.stringMatching(/-analysis\.json$/), expect.stringMatching(/-dom\.json$/), expect.stringMatching(/-ssr-hydratable\.json$/), expect.stringMatching(/-ssr\.json$/)])
     }
     finally {
       await rm(cacheDir, { recursive: true, force: true })

@@ -24,7 +24,6 @@ import { resetTodos } from './fixtures/site/src/data'
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
 // No _404.kay nor _error.kay: failures answer in plain text.
 const bare = await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true })
-const MARKERS = /<!--[$/]-->/g
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
 const ENTRY = /<script type="module" (?:async )?src="\/_kay\/([^"]+)"><\/script>/
 const BODY = /<body>([\s\S]*)<\/body>/
@@ -61,7 +60,7 @@ function cookiePair(response: Response): string {
 async function get(path: string): Promise<{ status: number, html: string, headers: Headers }> {
   const response = await app.handle(new Request(`http://localhost${path}`))
 
-  return { status: response.status, html: (await response.text()).replace(MARKERS, ''), headers: response.headers }
+  return { status: response.status, html: (await response.text()), headers: response.headers }
 }
 
 afterAll(resetTodos)
@@ -82,9 +81,9 @@ describe('pages', () => {
     const home = await get('/')
 
     expect(home.html).toContain('<slot data-component="tests/fixtures/site/src/components/counter.kay"')
-    expect(home.html).toContain('window._$HY')
-    expect(home.html).toMatch(/<slot [^>]+><button _hk=k\w+-0 class="counter">/)
-    expect(home.html.replace(/<slot[\s\S]*<\/slot>/, '')).not.toContain('_hk=')
+    expect(home.html).toContain('window._$K')
+    expect(home.html).toContain('<slot data-component="tests/fixtures/site/src/components/counter.kay" data-props="[{&quot;start&quot;:1},1]"><button class="counter">Clicked <!--[-->1<!--]--></button></slot>')
+    expect(home.html.replace(/<slot[\s\S]*<\/slot>/, '')).not.toContain('<!--[-->')
     const entry = (/<script type="module" src="(\/_kay\/[^"]+)"><\/script>/).exec(home.html)?.[1]
 
     expect(entry).toBeDefined()
@@ -214,7 +213,6 @@ describe('pages', () => {
 
     try {
       // Solid's bootstrap assigns `_$HY` on globalThis, which outlives happy-dom's window between test files.
-      delete (globalThis as { _$HY?: unknown })._$HY
       // eslint-disable-next-line no-new-func -- runs Solid's inline bootstrap script, which happy-dom does not execute from markup
       new Function(INLINE_SCRIPT.exec(html)![1]!)()
       document.body.innerHTML = BODY.exec(html)![1]!
@@ -319,7 +317,6 @@ describe('pages', () => {
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => app.handle(new NativeRequest(new URL(String(input), 'http://localhost'), init))) as typeof fetch
 
     try {
-      delete (globalThis as { _$HY?: unknown })._$HY
       // eslint-disable-next-line no-new-func -- runs Solid's inline bootstrap script, which happy-dom does not execute from markup
       new Function(INLINE_SCRIPT.exec(html)![1]!)()
       document.body.innerHTML = BODY.exec(html)![1]!
@@ -549,7 +546,6 @@ describe('await blocks', () => {
     GlobalRegistrator.register()
 
     try {
-      delete (globalThis as { _$HY?: unknown })._$HY
       document.body.innerHTML = BODY.exec(html)![1]!
       // Runs the inline scripts in page order, as the browser does while the stream arrives; declarations must land on the global scope.
       for (const [, script] of html.matchAll(INLINE_SCRIPTS))
@@ -612,7 +608,7 @@ describe('prerendering', () => {
       const visit = async (path: string) => {
         const response = await served.handle(new NativeRequest(`http://localhost${path}`))
 
-        return { html: (await response.text()).replace(MARKERS, ''), etag: response.headers.get('etag') }
+        return { html: (await response.text()), etag: response.headers.get('etag') }
       }
 
       expect(await Bun.file(join(root, '.kay/client/pages/docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html)

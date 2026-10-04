@@ -2,16 +2,17 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { generateHydrationScript, renderToString, useHead } from '@solidjs/web'
 import { plugin } from 'bun'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
+import { collectHead, head } from '../src/runtime/head'
+import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
+import { HYDRATION_SCRIPT } from '../src/server/hydration'
 
 plugin(kay())
 
 const fixtures = join(import.meta.dir, 'fixtures/islands')
-const HYDRATION_SCRIPT = /<script>([\s\S]*?)<\/script>/
 
 let outdir: string
 let pageHtml: string
@@ -20,7 +21,7 @@ let Page: () => unknown
 beforeAll(async () => {
   Page = (await import(join(fixtures, 'page.kay')) as { default: () => unknown }).default
 
-  pageHtml = renderToString(() => Page())
+  pageHtml = child(Page())
   outdir = await mkdtemp(join(tmpdir(), 'kay-islands-'))
   const build = await Bun.build({ entrypoints: [join(fixtures, 'client.ts')], outdir, target: 'browser', splitting: true, plugins: [kay()] })
 
@@ -38,19 +39,14 @@ afterAll(async () => {
 describe('islands', () => {
   it('server-renders static markup with the interactive component as an island root', () => {
     expect(pageHtml).toContain('<h1>Static title</h1>')
-    expect(pageHtml).toContain('<slot data-component="tests/fixtures/islands/counter.kay" data-render-id="k')
-    expect(pageHtml).toContain('data-props="[{&quot;start&quot;:1},2]"')
-    expect(pageHtml).toContain('Count <!--$-->2<!--/-->')
+    expect(pageHtml).toContain('<slot data-component="tests/fixtures/islands/counter.kay" data-props="[{&quot;start&quot;:1},2]"><button>Count <!--[-->2<!--]--></button></slot>')
     expect(pageHtml).toContain('<p>after</p>')
   })
 
-  it('keeps the page render context after an island, so head tags registered later still land', () => {
-    let head = ''
+  it('keeps collecting the page head after an island, so head tags registered later still land', () => {
+    const { head: rendered } = collectHead(() => child([Page(), head([{ tag: 'title', props: { children: 'After the island' } }])]))
 
-    renderToString(() => [Page(), useHead({ tag: 'title', props: { children: 'After the island' } })], { noScripts: true, onHead: (html) => {
-      head = html
-    } })
-    expect(head).toContain('After the island</title>')
+    expect(rendered.html).toContain('After the island</title>')
   })
 
   it('marks an island hydrating once visible and keeps its hydrate prop out of its props', () => {
@@ -63,7 +59,7 @@ describe('islands', () => {
     }
     const Rich = island('rich.kay', (_props: { scores: Map<string, unknown> }) => null)
 
-    expect(() => renderToString(() => Rich({ scores: new Map([['x', new Score(1)]]) }))).toThrow(new IslandPropsError('rich.kay is interactive, so it renders as an island, and its props cannot reach the browser: Cannot stringify arbitrary non-POJOs at .scores.get("x")'))
+    expect(() => child(Rich({ scores: new Map([['x', new Score(1)]]) }))).toThrow(new IslandPropsError('rich.kay is interactive, so it renders as an island, and its props cannot reach the browser: Cannot stringify arbitrary non-POJOs at .scores.get("x")'))
   })
 
   it('hydrates the island in place and keeps it reactive, a visible one once its markup scrolls into view', async () => {
@@ -81,11 +77,8 @@ describe('islands', () => {
       }
     } as unknown as typeof IntersectionObserver
 
-    // The inline hydration script sets up the global the client runtime expects before any island hydrates.
-    // Solid's bootstrap assigns `_$HY` on globalThis, which outlives happy-dom's window between test files.
-    delete (globalThis as { _$HY?: unknown })._$HY
-    // eslint-disable-next-line no-new-func -- runs Solid's own bootstrap script, which happy-dom does not execute from markup
-    new Function(HYDRATION_SCRIPT.exec(generateHydrationScript())![1]!)()
+    // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
+    new Function(HYDRATION_SCRIPT)()
     document.body.innerHTML = pageHtml
     const button = document.querySelector('slot button')!
     const { ready } = await import(join(outdir, 'client.js')) as { ready: Promise<void> }
@@ -121,7 +114,7 @@ describe('islands', () => {
   })
 
   it('renders an await block in an island pending on the server, then resolves it in the hydrated island', async () => {
-    expect(pageHtml).toMatch(/<p _hk=\S+ class="wait">Waiting<\/p>/)
+    expect(pageHtml).toContain('<section class="greeting"><!--[--><p class="wait">Waiting</p><!--]-->')
     const section = document.querySelector('section.greeting')!
     const button = section.querySelector('button')!
 
@@ -134,22 +127,59 @@ describe('islands', () => {
     expect(button.textContent).toBe('Clicked 1')
   })
 
+  it('replays a click made before its island hydrated, once it has, and only once', async () => {
+    // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
+    new Function(HYDRATION_SCRIPT)()
+    document.body.innerHTML = pageHtml
+    const button = document.querySelector('slot button')!
+
+    button.dispatchEvent(new Event('click', { bubbles: true }))
+    expect(button.textContent).toBe('Count 2')
+
+    const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+
+    await hydrateAgain()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(document.querySelector('slot button')).toBe(button)
+    expect(button.textContent).toBe('Count 3')
+    expect((globalThis as { _$K?: Event[] })._$K).toEqual([])
+  })
+
+  it('renders an island afresh, with a warning, when its server markup is not what it builds', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    document.body.innerHTML = pageHtml.replace('<button>Count <!--[-->2<!--]--></button>', '<em>changed</em>')
+
+    try {
+      const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+
+      await hydrateAgain()
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[kay] island tests/fixtures/islands/counter.kay did not match its server markup'))
+      const button = document.querySelector('slot button')!
+
+      expect(document.querySelector('slot em')).toBeNull()
+      button.dispatchEvent(new Event('click', { bubbles: true }))
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(button.textContent).toBe('Count 3')
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
   it.each([
     ['a pending await block', 'slowpage.kay', 'button.cancel', 'Cancel 1'],
     ['an await on a plain value', 'plainpage.kay', 'button.hi', 'hi Ada 1'],
     ['props holding a Date, a Set, a Map and a bigint', 'richpage.kay', 'button.rich', '2020 1 11 3'],
     ['a generic island', 'richpage.kay', 'button.picker', 'Ada 4'],
     ['text joining constants and signals with nothing between', 'joinedpage.kay', 'button.joined', '2AdatAda2'],
-  ])('hydrates %s in an island without a key miss, its handler working at once', async (_name, file, selector, expected) => {
+  ])('hydrates %s in an island without a mismatch, its handler working at once', async (_name, file, selector, expected) => {
     const issues: string[] = []
     const warn = spyOn(console, 'warn').mockImplementation((...args) => void issues.push(args.join(' ')))
     const error = spyOn(console, 'error').mockImplementation((...args) => void issues.push(args.join(' ')))
     const { default: Fixture } = await import(join(fixtures, file)) as { default: () => unknown }
 
-    delete (globalThis as { _$HY?: unknown })._$HY
-    // eslint-disable-next-line no-new-func -- runs Solid's own bootstrap script, which happy-dom does not execute from markup
-    new Function(HYDRATION_SCRIPT.exec(generateHydrationScript())![1]!)()
-    document.body.innerHTML = renderToString(() => Fixture())
+    document.body.innerHTML = child(Fixture())
     expect(document.querySelector('script')).toBeNull()
 
     const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
@@ -172,13 +202,10 @@ describe('islands', () => {
     const error = spyOn(console, 'error').mockImplementation((...args) => void issues.push(args.join(' ')))
     const { default: Fixture } = await import(join(fixtures, 'tallypage.kay')) as { default: () => unknown }
 
-    delete (globalThis as { _$HY?: unknown })._$HY
-    // eslint-disable-next-line no-new-func -- runs Solid's own bootstrap script, which happy-dom does not execute from markup
-    new Function(HYDRATION_SCRIPT.exec(generateHydrationScript())![1]!)()
-    const html = renderToString(() => Fixture())
+    const html = child(Fixture())
 
     expect(html).toContain('<main><ul class="badges"><li class="badge">x</li></ul><slot')
-    expect(html).toMatch(/<ul _hk=\S+ class="badges">/)
+    expect(html).toContain('<section class="tally"><!--[--><ul class="badges"><li class="badge">a</li>')
     document.body.innerHTML = html
 
     const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }

@@ -257,14 +257,21 @@ export function show<T>(value: T, render: (value: () => NonNullable<T>) => strin
 }
 
 // A `for`: each row's markup, or the fallback's when there is nothing to list.
-export function loop<T>(each: readonly T[] | null | undefined | false, render: (item: T, index: number) => string, fallback?: () => string): string {
+// In an island a row reads its item, and a keyed row its index, through functions, as the browser build of the same template does.
+export function loop<T>(each: readonly T[] | null | undefined | false, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: () => string, accessors?: 'keyed' | 'positional'): string {
   if (!each || each.length === 0)
     return fallback?.() ?? ''
 
   let markup = ''
 
-  for (let index = 0; index < each.length; index++)
-    markup += render(each[index]!, index)
+  for (let index = 0; index < each.length; index++) {
+    const item = each[index]!
+
+    if (accessors === undefined)
+      markup += render(item, index)
+    else
+      markup += render(() => item, accessors === 'keyed' ? () => index : index)
+  }
 
   return markup
 }
