@@ -114,6 +114,15 @@ describe('signInWithPassword', () => {
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'limited' })
   })
 
+  test('counts each client apart, as kay reads its address', async () => {
+    const { browser } = await registered({ limits: { signIn: { max: 1, window: 900 } } })
+    const from = (address: string) => ({ method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': address }, body: JSON.stringify({ identifier: 'ada@example.com', password: PASSWORD }) })
+
+    expect(await browser().json('/password', from('10.0.0.1'))).toMatchObject({ ok: true })
+    expect(await browser().json('/password', from('10.0.0.1'))).toEqual({ ok: false, error: 'limited' })
+    expect(await browser().json('/password', from('10.0.0.2'))).toMatchObject({ ok: true })
+  })
+
   test('rehashes a bcrypt password with argon2id on sign-in', async () => {
     const { browser, store } = setup()
 

@@ -10,7 +10,7 @@ import type { RequestState } from './state'
 import type { AuthStore, UserRecord } from './store'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { clientKey } from './client'
+import { clientAddress, rateKey } from 'kay/server'
 import { publicUser } from './core'
 import { createGate } from './gate'
 import { deriveKeys } from './keys'
@@ -176,7 +176,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   const plugin = new Elysia({ name: 'kay-auth' })
     .use(options.sessions as unknown as AnyElysia)
-    .derive(({ session, request, server }) => ({ auth: new Auth(session as unknown as Session<AuthSessionData>, core, clientKey(request, server)) }))
+    .derive(({ session, request, server }) => ({ auth: new Auth(session as unknown as Session<AuthSessionData>, core, rateKey(clientAddress(request, server))) }))
     // The session's derive reaches this instance only; lifting both lets them reach the app's routes.
     .as('scoped')
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
