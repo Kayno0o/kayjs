@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { batch, effect, flush, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
 import { renderEffect, renderOnServer } from '../src/runtime/reactive'
 
@@ -161,6 +161,43 @@ describe('effects', () => {
     tracked.set(1)
     flush()
     expect(runs).toBe(2)
+    dispose()
+  })
+
+  it('run again on the next change after a run that threw', () => {
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    const item = signal<{ n: number } | undefined>(undefined)
+    const seen: number[] = []
+    const dispose = root((dispose) => {
+      effect(() => void seen.push(item()!.n))
+
+      return dispose
+    })
+
+    flush()
+    item.set({ n: 1 })
+    flush()
+    errors.mockRestore()
+    expect(seen).toEqual([1])
+    dispose()
+  })
+
+  it('run again when they write what they read, until it settles', () => {
+    const count = signal(0)
+    const seen: number[] = []
+    const dispose = root((dispose) => {
+      effect(() => {
+        seen.push(count())
+
+        if (count() < 3)
+          count.set(count() + 1)
+      })
+
+      return dispose
+    })
+
+    flush()
+    expect(seen).toEqual([0, 1, 2, 3])
     dispose()
   })
 

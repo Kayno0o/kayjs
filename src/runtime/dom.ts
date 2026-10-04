@@ -56,10 +56,6 @@ export function hydrate<T>(render: () => T, container: Node): T {
   }
 }
 
-export function hydrating(): boolean {
-  return claim !== undefined
-}
-
 function claimNode(): Node {
   const node = claim!.next
 
@@ -132,6 +128,12 @@ export function template(html: string): () => Element {
 
       holder.innerHTML = html
       node = holder.content.firstChild as Element
+
+      // An SVG child such as `path` is no HTML element: parsed in an `svg`, it gets the SVG namespace.
+      if (node instanceof HTMLUnknownElement) {
+        holder.innerHTML = `<svg>${html}</svg>`
+        node = holder.content.firstChild!.firstChild as Element
+      }
     }
 
     return node.cloneNode(true) as Element
@@ -367,8 +369,10 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
     if (next.length === current.length && next.every((unit, index) => unit === current[index]))
       return
 
+    const kept = new Set(next)
+
     for (const unit of current) {
-      if (!next.includes(unit))
+      if (!kept.has(unit))
         removeUnit(unit)
     }
 
@@ -759,9 +763,9 @@ function moveRows(parent: Node, kept: Row[], next: Row[], after: Node | null): v
         while (bStart < index)
           insertUnit(parent, b[bStart++]!.unit!, before)
       }
+      // The row out of place stays where it is until its own turn moves it: taking a row of several nodes out would lose all but its first.
       else {
-        insertUnit(parent, b[bStart++]!.unit!, firstOf(a[aStart]!.unit!))
-        removeUnit(a[aStart++]!.unit!)
+        insertUnit(parent, b[bStart++]!.unit!, firstOf(a[aStart++]!.unit!))
       }
     }
   }
@@ -787,7 +791,11 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
       // The pending block and the block replacing it each own what they create, so landing disposes the pending one.
       let dispose: (() => void) | undefined
 
-      onCleanup(() => dispose?.())
+      // Gone before the promise settles, the block never lands.
+      onCleanup(() => {
+        version++
+        dispose?.()
+      })
 
       const block = (render: () => unknown) => root((disposeBlock) => {
         dispose?.()
@@ -841,11 +849,17 @@ export function dynamic(tag: unknown, props: Record<string, unknown>): unknown {
   if (typeof tag !== 'string')
     return null
 
-  const element = claim ? claimNode() as Element : document.createElement(tag)
+  const element = claim ? claimNode() as Element : createElement(tag)
 
   spread(element, () => [props], 'children' in props)
 
   return element
+}
+
+function createElement(tag: string): Element {
+  const element = document.createElement(tag)
+
+  return element instanceof HTMLUnknownElement && !tag.includes('-') ? document.createElementNS('http://www.w3.org/2000/svg', tag) : element
 }
 
 // Props from several objects, later ones winning, each keeping its getters, so a prop stays live and children build only when read.
@@ -880,6 +894,10 @@ export function attribute(element: Element, name: string, value: unknown): void 
 
 // A property where the element has one, such as an input's `value`; an attribute otherwise.
 export function property(element: Element, name: string, value: unknown): void {
+  // The server wrote this value, and what the person typed or ticked since stays for the replayed event to read.
+  if (claim && (name === 'value' || name === 'checked'))
+    return
+
   if (VOID_PROPERTIES.has(name) && name in element)
     (element as ElementRecord)[name] = name === 'value' ? (value ?? '') : value
   else if (CONTENT_PROPERTIES.has(name))
@@ -987,6 +1005,15 @@ export function listen(element: Element, name: string, handler: (event: Event) =
   }
 }
 
+function unlisten(element: Element, name: string, handler: (event: Event) => void): void {
+  const type = name.slice(2).toLowerCase()
+
+  if (DELEGATED.has(type))
+    (element as ElementRecord)[`$$${type}`] = undefined
+  else
+    element.removeEventListener(type, handler)
+}
+
 // Calls the handlers from the event's target up, each seeing its own element as `currentTarget`, until one stops propagation.
 export function dispatch(event: Event): void {
   const key = `$$${event.type}`
@@ -1040,7 +1067,7 @@ export function spread(element: Element, sources: () => readonly object[], conte
 
       set.set(name, value)
 
-      if (name === 'ref' || name.startsWith('prop:'))
+      if (name === 'ref')
         ref(element, value)
       else if (name.startsWith('on') && name !== 'open' && typeof value === 'function')
         listen(element, name, value as (event: Event) => void, previous as ((event: Event) => void) | undefined)
@@ -1052,11 +1079,16 @@ export function spread(element: Element, sources: () => readonly object[], conte
         property(element, name, value)
     }
 
-    for (const name of set.keys()) {
-      if (!seen.has(name)) {
-        set.delete(name)
+    for (const [name, previous] of set) {
+      if (seen.has(name))
+        continue
+
+      set.delete(name)
+
+      if (name.startsWith('on') && name !== 'open' && typeof previous === 'function')
+        unlisten(element, name, previous as (event: Event) => void)
+      else if (name !== 'ref')
         property(element, name, undefined)
-      }
     }
   })
 }

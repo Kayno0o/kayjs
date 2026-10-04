@@ -1,0 +1,10 @@
+---
+import { signal } from 'kay'
+
+const name = signal('')
+const agreed = signal(false)
+---
+form.typed
+  input.name(bind:value={name})
+  input.agree(type="checkbox" bind:checked={agreed})
+  p {name()} {agreed() ? 'yes' : 'no'}

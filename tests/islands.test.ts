@@ -145,6 +145,29 @@ describe('islands', () => {
     expect((globalThis as { _$K?: Event[] })._$K).toEqual([])
   })
 
+  it('keeps what was typed and ticked before its island hydrated, the bound signals taking it', async () => {
+    const { default: Typed } = await import(join(fixtures, 'typed.kay')) as { default: (props: object) => unknown }
+
+    // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
+    new Function(HYDRATION_SCRIPT)()
+    document.body.innerHTML = child(Typed({}))
+    const name = document.querySelector<HTMLInputElement>('input.name')!
+    const agree = document.querySelector<HTMLInputElement>('input.agree')!
+
+    name.value = 'Ada'
+    name.dispatchEvent(new Event('input', { bubbles: true }))
+    agree.checked = true
+    agree.dispatchEvent(new Event('change', { bubbles: true }))
+
+    const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+
+    await hydrateAgain()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(name.value).toBe('Ada')
+    expect(agree.checked).toBe(true)
+    expect(document.querySelector('form.typed p')!.textContent).toBe('Ada yes')
+  })
+
   it('renders an island afresh, with a warning, when its server markup is not what it builds', async () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
 

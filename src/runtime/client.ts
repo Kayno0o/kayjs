@@ -50,6 +50,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
 
   const { default: component } = await load()
   const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
+  const early = takeEvents(element)
 
   root((dispose) => {
     try {
@@ -65,20 +66,35 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     }
   })
   ;(element as IslandElement)._$k = true
-  replayEvents(element)
+
+  // A click or an input reaches the handlers alone, its default action done already; a change, heard on the element itself, fires again. A target an afresh render replaced is gone with its event.
+  for (const event of early) {
+    const target = event.target as Node
+
+    if (!target.isConnected)
+      continue
+
+    try {
+      if (event.type === 'change')
+        target.dispatchEvent(new Event('change', { bubbles: true }))
+      else
+        dispatch(event)
+    }
+    catch (error) {
+      console.error(error)
+    }
+  }
 }
 
-// Clicks and inputs the inline hydration script queued while the island waited for its chunk.
-function replayEvents(element: HTMLElement) {
-  const queue = (globalThis as { _$K?: Event[] })._$K
+// The clicks, inputs and changes the inline hydration script queued on the island while it waited for its chunk.
+function takeEvents(element: HTMLElement): Event[] {
+  const queue = (globalThis as { _$K?: Event[] })._$K ?? []
+  const taken = queue.filter(event => element.contains(event.target as Node))
 
-  if (!queue)
-    return
-
-  for (const event of queue.filter(event => element.contains(event.target as Node))) {
+  for (const event of taken)
     queue.splice(queue.indexOf(event), 1)
-    dispatch(event)
-  }
+
+  return taken
 }
 
 function whenVisible(element: HTMLElement, run: () => Promise<void>) {

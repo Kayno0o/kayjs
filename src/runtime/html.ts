@@ -14,7 +14,7 @@ const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img'
 // Properties that set an element's content rather than an attribute.
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
 // Handlers and refs, which only an island attaches; `open` is the one attribute starting with `on` that is none.
-const BEHAVIOUR = /^(?:on(?!en$)|ref$|prop:)/
+const BEHAVIOUR = /^(?:on(?!en$)|ref$)/
 const OPTION = /<option(?=[\s>])([^>]*)>([\s\S]*?)(?=<\/option>|<option[\s>]|<\/select>|$)/g
 const OPTION_VALUE = /\svalue="([^"]*)"/
 const SELECTED = /\sselected(?=[\s=>]|$)/

@@ -193,6 +193,68 @@ describe('loops', () => {
       await dispose()
     }
   })
+
+  it('keep every node of multi-node rows through random reorders, inserts and removals', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal<number[]>([])\n;(globalThis as { setRows?: (next: number[]) => void }).setRows = next => list.set(next)\n---\np\n  b start\n  for n of list() key={n}\n    i {n}\n    | ;\n  b end\n',
+    })
+    const setRows = (globalThis as unknown as { setRows: (next: number[]) => void }).setRows
+    let seed = 7
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+
+    try {
+      for (let round = 0; round < 300; round++) {
+        const next = Array.from({ length: 12 }, (_, n) => n).filter(() => random() < 0.8).sort(() => random() - 0.5)
+
+        setRows(next)
+        await settle()
+        expect(root.querySelector('p')!.textContent).toBe(`start${next.map(n => `${n};`).join('')}end`)
+      }
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
+describe('blocks', () => {
+  it('decode the entities of their text as the server markup does, and build an SVG child in the SVG namespace', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nsvg(viewBox="0 0 2 2")\n  if n() > 0\n    circle(r="1")\np\n  if n() > 0\n    | Tom &amp; Jerry&nbsp;{n()}\n',
+    })
+
+    try {
+      expect(root.querySelector('p')!.textContent).toBe('Tom & Jerry\u00A01')
+      expect(root.querySelector('circle')!.namespaceURI).toBe('http://www.w3.org/2000/svg')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('drop an await block whose branch went away before its value settled', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    let resolve: (value: string) => void = () => undefined
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst shown = signal(true)\nconst value = new Promise<string>(done => (globalThis as { resolveValue?: (value: string) => void }).resolveValue = done)\n---\nbutton(onClick={() => shown.set(false)}) Hide\ndiv\n  if shown()\n    await value\n      p.wait Waiting\n    then text\n      p.text {text}\n',
+    })
+
+    resolve = (globalThis as unknown as { resolveValue: (value: string) => void }).resolveValue
+
+    try {
+      expect(root.querySelector('p.wait')).not.toBeNull()
+      root.querySelector('button')!.click()
+      await settle()
+      resolve('late')
+      await settle()
+      expect(root.querySelector('div')!.textContent).toBe('')
+      expect(errors).not.toHaveBeenCalled()
+    }
+    finally {
+      errors.mockRestore()
+      await dispose()
+    }
+  })
 })
 
 describe('slots with parameters', () => {

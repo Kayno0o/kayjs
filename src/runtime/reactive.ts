@@ -53,6 +53,7 @@ let scheduled = false
 let batching = 0
 // Set while an island renders on the server, where nothing reacts afterwards: effects there never run.
 let serverRendering = 0
+const MAX_ROUNDS = 100_000
 
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
@@ -175,7 +176,18 @@ export function root<T>(fn: (dispose: () => void) => T): T {
 export function flush(): void {
   scheduled = false
 
+  let rounds = 0
+
   while (renderQueue.length > 0 || userQueue.length > 0) {
+    // An effect writing what it reads, on every run, would never settle.
+    if (++rounds > MAX_ROUNDS) {
+      renderQueue = []
+      userQueue = []
+      console.error(`[kay] effects still writing what they read after ${MAX_ROUNDS} rounds: stopped`)
+
+      return
+    }
+
     const render = renderQueue
     const user = userQueue
 
@@ -306,6 +318,8 @@ function run(node: Computation): void {
 
   owner = node
   listener = node
+  // Clean before it runs, so a write to what it already read marks it to run again, and a run that throws still runs on the next change.
+  node.state = CLEAN
 
   try {
     node.value = node.fn()
@@ -314,8 +328,6 @@ function run(node: Computation): void {
     owner = previousOwner
     listener = previousListener
   }
-
-  node.state = CLEAN
 
   // A memo whose value changed makes what read it run again.
   if (!node.effect && node.observers && (node.equals === false || !(node.equals as (previous: unknown, next: unknown) => boolean)(previous, node.value))) {

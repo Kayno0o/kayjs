@@ -63,7 +63,7 @@ export class DomTemplate {
 
     for (const item of childItems(nodes)) {
       if (item.kind === 'text') {
-        b.add(`KayText(${parent}, ${JSON.stringify(item.text)}); `)
+        b.add(`KayText(${parent}, ${JSON.stringify(decodeEntities(item.text))}); `)
       }
       else if (item.kind === 'element') {
         b.add(`KayAppend(${parent}, `)
