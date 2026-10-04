@@ -2,7 +2,7 @@
 
 - AMD Ryzen 5 7600 6-Core Processor, 12 threads
 - Bun 1.4.2, Chromium 151.0.7922.34 headless
-- kay 5d698a0, solid-js 2.0.0-rc.13, @solidjs/web 2.0.0-rc.13
+- kay 5ef0d9d, solid-js 2.0.0-rc.13, @solidjs/web 2.0.0-rc.13
 - run on 2026-10-04
 
 How much of what kay costs is Solid's, to weigh replacing its runtime and compiler. Solid is solid-js, @solidjs/signals, @solidjs/web and seroval; kay is kay's runtime and the entry it generates; app is the bench app's components as Solid's compiler wrote them and its shared data. Reproduce with `bun run bench:origins`; the cross-framework numbers are in results.md.
@@ -26,13 +26,13 @@ Microseconds per render of the products page, from Bun's CPU profiler over warm 
 
 |  | µs per render |
 | --- | --- |
-| Solid | 283 (61%) |
-| kay | 77 (16%) |
-| app | 87 (19%) |
-| elysia | 14 (3%) |
-| engine | 5 (1%) |
-| devalue | 2 (0%) |
-| **total** | 468 |
+| Solid | 9 (3%) |
+| kay | 175 (65%) |
+| app | 63 (24%) |
+| elysia | 13 (5%) |
+| engine | 7 (3%) |
+| devalue | 2 (1%) |
+| **total** | 268 |
 
 ## Page loads in Chromium
 
@@ -40,15 +40,15 @@ Main-thread milliseconds per fresh load up to network idle, from Chromium's CPU 
 
 |  | products | table |
 | --- | --- | --- |
-| Solid | 2.0 (4%) | 2.3 (18%) |
-| kay | 0.6 (1%) | 0.4 (4%) |
-| app | 0.2 (0%) | 1.0 (8%) |
-| engine | 46.8 (93%) | 8.4 (66%) |
-| bundler | 0.4 (1%) | 0.3 (3%) |
-| devalue | 0.2 (0%) | 0.2 (1%) |
-| GC | 0.1 (0%) | 0.1 (1%) |
+| Solid | 2.2 (4%) | 2.8 (18%) |
+| kay | 0.6 (1%) | 0.6 (4%) |
+| app | 0.2 (0%) | 1.1 (7%) |
+| engine | 49.0 (93%) | 10.1 (66%) |
+| bundler | 0.4 (1%) | 0.4 (2%) |
+| devalue | 0.3 (1%) | 0.2 (1%) |
 | inline scripts | 0.1 (0%) | 0.1 (0%) |
-| **total** | 50.5 | 12.8 |
+| GC | 0.0 (0%) | 0.1 (0%) |
+| **total** | 52.7 | 15.3 |
 
 ## Table operations in Chromium
 
@@ -56,12 +56,12 @@ The operations of results.md, 10 profiled samples each after 2 warmups, means in
 
 | operation | measured (ms) | profiled (ms) | Solid | kay | app | GC | engine | style and layout | other | Solid share |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| create 1,000 rows | 34.1 | 38.5 | 7.8 | 0.5 | 2.0 | 5.0 | 3.9 | 19.3 | 0.0 | **20%** |
-| replace 1,000 rows | 27.9 | 32.0 | 9.2 | 0.2 | 1.0 | 0.1 | 4.0 | 17.6 | 0.0 | **29%** |
-| update every 10th row | 3.8 | 4.3 | 1.1 | 0.1 | 0.1 | 0.0 | 0.4 | 2.7 | 0.0 | **25%** |
-| select row | 0.3 | 0.7 | 0.1 | 0.0 | 0.0 | 0.0 | 0.4 | 0.2 | 0.0 | **20%** |
-| swap rows | 2.8 | 3.5 | 1.0 | 0.0 | 0.0 | 0.0 | 0.5 | 1.9 | 0.0 | **29%** |
-| remove row | 2.7 | 3.2 | 1.0 | 0.0 | 0.1 | 0.0 | 0.4 | 1.8 | 0.0 | **30%** |
-| create 10,000 rows | 262 | 298 | 44.8 | 2.3 | 9.0 | 15.8 | 36.0 | 191 | 0.0 | **15%** |
-| append 1,000 rows | 27.0 | 31.1 | 6.0 | 0.2 | 1.1 | 0.0 | 4.0 | 19.7 | 0.0 | **19%** |
-| clear 1,000 rows | 3.5 | 4.0 | 3.3 | 0.1 | 0.0 | 0.0 | 0.4 | 0.2 | 0.0 | **84%** |
+| create 1,000 rows | 37.6 | 42.7 | 8.4 | 0.5 | 2.0 | 5.3 | 4.5 | 22.0 | 0.0 | **20%** |
+| replace 1,000 rows | 32.2 | 36.9 | 10.5 | 0.4 | 1.1 | 0.0 | 4.6 | 20.3 | 0.0 | **29%** |
+| update every 10th row | 4.1 | 5.4 | 1.3 | 0.0 | 0.1 | 0.0 | 1.2 | 2.8 | 0.0 | **24%** |
+| select row | 0.2 | 0.8 | 0.1 | 0.0 | 0.0 | 0.0 | 0.4 | 0.2 | 0.0 | **17%** |
+| swap rows | 2.9 | 3.7 | 0.9 | 0.0 | 0.0 | 0.0 | 0.6 | 2.1 | 0.0 | **26%** |
+| remove row | 3.1 | 5.1 | 1.1 | 0.0 | 0.1 | 0.0 | 1.8 | 2.1 | 0.0 | **21%** |
+| create 10,000 rows | 271 | 307 | 46.5 | 2.5 | 10.3 | 16.0 | 35.6 | 196 | 0.0 | **15%** |
+| append 1,000 rows | 30.0 | 34.4 | 6.7 | 0.3 | 1.0 | 0.0 | 4.3 | 22.0 | 0.0 | **19%** |
+| clear 1,000 rows | 3.9 | 4.6 | 3.7 | 0.1 | 0.0 | 0.0 | 0.6 | 0.2 | 0.0 | **81%** |
