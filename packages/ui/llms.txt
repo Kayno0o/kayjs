@@ -10,7 +10,7 @@
 - `toast` only shows in the browser, called from an island. The server's copy of the toast list is shared by every request, so it stays empty. Render one `Toaster` and one `TooltipHost` in the root layout.
 - An icon is either a slot name such as `'close'`, which the app's settings map to any icon set, or an icon imported from `~icons/<prefix>/<name>`. The default slots use Tabler, so the app installs `@iconify-json/tabler`.
 - Dialog and FormDialog follow `open`. The parent sets it, then sets it back to false in `onClose`, which runs however the dialog closed. Their content renders only while they are open.
-- FormDialog calls the action from the island as a call, not as a form post. Its input comes from `values(formData)`, where every value is a string, so an action taking numbers, booleans or lists needs a `values` that converts them.
+- FormDialog calls the action with the form's `FormData`. The server reads it as a plain form post, so give each control the `name` of its field in the action's schema: numbers, booleans and lists are coerced from their text, and files and the honeypot come along.
 - Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The only text the library holds is the English wording of its own buttons and titles: `Cancel`, `Delete`, `Deleting…`, `Saving…`, `Loading…` and `Confirm Deletion`.
 
 ## Setup
@@ -215,7 +215,7 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
     input.field-input(name="title" value={title()})
 ```
 
-- FormDialog calls `action` with `values(new FormData(form))`, which by default is the form's fields as strings.
+- FormDialog calls `action` with `new FormData(form)`, read on the server as a plain form post and answered as a call. An action that redirects takes the browser there instead.
 - When the action refuses a field, its message shows on the FormField with that `name`, and the dialog stays open.
 - Any other failure toasts `failure`. A refusal of the whole form, under the empty name, toasts its own message instead.
 - A save hands what the action returned to `onSaved`, then closes the dialog.

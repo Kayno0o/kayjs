@@ -12,11 +12,11 @@ const open = signal(true)
 const pending = signal(false)
 
 // What a page's action is to an island: a call that answers or throws ActionError, its `pending()` and its `url`.
-const rename = Object.assign(async (input: { name: string }) => {
+const rename = Object.assign(async (form: FormData) => {
   pending.set(true)
 
   try {
-    const answer = await save(input)
+    const answer = await save({ name: String(form.get('name')) })
 
     if (typeof answer !== 'string')
       throw new ActionError(422, '', answer.errors)
