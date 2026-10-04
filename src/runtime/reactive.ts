@@ -72,16 +72,21 @@ let reporter: (error: unknown, island?: string) => void = error => console.error
 // While an island renders in development: the signals it creates, in order, and the values an edited version of it takes back.
 let recording: SignalNode<unknown>[] | undefined
 let restoring: unknown[] | undefined
+// Inside a block that may render or not, or once per row: its signals' order says nothing about which is which, so they start afresh.
+let unrecordedDepth = 0
 // Set while an island claims its server markup, with what waits for it to be done.
 let hydrating = 0
 let afterHydration: (() => void)[] = []
 
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
-export function createSignal<T>(value: T, options?: SignalOptions<T>): [read: () => T, write: (next: T) => void] {
-  const node: SignalNode<T> = { value: restored(value), observers: undefined, equals: options?.equals ?? defaultEquals, shared: serverRendering === 0 }
+// `kept` is false for kay's own signals, such as a socket's status, which an edited island never takes back.
+export function createSignal<T>(value: T, options?: SignalOptions<T>, kept = true): [read: () => T, write: (next: T) => void] {
+  const noted = kept && unrecordedDepth === 0
+  const node: SignalNode<T> = { value: noted ? restored(value) : value, observers: undefined, equals: options?.equals ?? defaultEquals, shared: serverRendering === 0 }
 
-  recording?.push(node as SignalNode<unknown>)
+  if (noted)
+    recording?.push(node as SignalNode<unknown>)
 
   const read = () => {
     track(node)
@@ -195,16 +200,29 @@ export function setErrorReporter(report: (error: unknown, island?: string) => vo
 // Renders `fn` noting the signals it creates, the first ones taking `values` back in order; returns what reads their values now, for the next version of the island.
 export function recordSignals<T>(fn: () => T, values?: unknown[]): { result: T, values: () => unknown[] } {
   const nodes: SignalNode<unknown>[] = []
-  const previous = [recording, restoring] as const
+  const previous = [recording, restoring, unrecordedDepth] as const
 
   recording = nodes
   restoring = values && [...values]
+  unrecordedDepth = 0
 
   try {
     return { result: fn(), values: () => nodes.map(node => node.value) }
   }
   finally {
-    [recording, restoring] = previous
+    [recording, restoring, unrecordedDepth] = previous
+  }
+}
+
+// Runs `fn` with what it creates left out of an island's recorded signals.
+export function unrecorded<T>(fn: () => T): T {
+  unrecordedDepth++
+
+  try {
+    return fn()
+  }
+  finally {
+    unrecordedDepth--
   }
 }
 

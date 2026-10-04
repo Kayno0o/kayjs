@@ -96,7 +96,7 @@ interface Listeners<T> {
 }
 
 function listeners<T>(): Listeners<T> {
-  const [last, setLast] = createSignal<T | undefined>(undefined, { equals: false })
+  const [last, setLast] = createSignal<T | undefined>(undefined, { equals: false }, false)
   const all = new Set<(value: T) => void>()
 
   return {
@@ -148,7 +148,7 @@ function backoff(attempt: number): number {
 
 // A websocket that reconnects after a drop, waiting longer each time, until `close()`; `connect` gives none where there is nothing to connect from.
 export function openSocket<Send, Receive>(connect: () => WebSocket | undefined): Socket<Send, Receive> & { start: () => void } {
-  const [status, setStatus] = createSignal<SocketStatus>('connecting')
+  const [status, setStatus] = createSignal<SocketStatus>('connecting', undefined, false)
   const messages = listeners<Receive>()
   const queued: string[] = []
   let current: WebSocket | undefined
@@ -213,7 +213,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
 
 // An event stream read as it arrives, through `request`; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is.
 export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response>, reconnect: boolean): EventReader<T> & { start: () => void } {
-  const [status, setStatus] = createSignal<StreamStatus>('connecting')
+  const [status, setStatus] = createSignal<StreamStatus>('connecting', undefined, false)
   const values = listeners<T>()
   const aborts = new AbortController()
   let started = false

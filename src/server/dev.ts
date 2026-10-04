@@ -1,6 +1,7 @@
+import type { HotSwap } from '../runtime/client'
 import type { ClientBuild } from './client'
 import { statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { KayCompileError } from '../build/transform'
@@ -8,6 +9,7 @@ import { compileErrorPage } from './overlay'
 
 export const DEV_EVENTS = '/_kay/dev/events'
 const BACKSLASH = /\\/g
+const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 
 // One per server process: `kay dev` restarts the process on every change, so a new id means new code.
 const BOOT_ID = crypto.randomUUID()
@@ -17,41 +19,48 @@ const BOOT_ID = crypto.randomUUID()
 // A server restarted for edited islands only also names their new chunks: a page on the code it replaced swaps them in through `$kayHot`, keeping its state, then its stylesheets.
 export const LIVE_RELOAD = `<script>(()=>{let b=${JSON.stringify(BOOT_ID)},v,q=Promise.resolve();new EventSource(${JSON.stringify(DEV_EVENTS)}).addEventListener('boot',e=>q=q.then(async()=>{const d=e.data,s=d.indexOf(' '),t=d.indexOf(' ',s+1),i=d.slice(0,s),c=t<0?d.slice(s+1):d.slice(s+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok)return location.reload();v=c}b=i;try{const r=await fetch(location.href);if(!r.ok||r.redirected)return location.reload();const d=new DOMParser().parseFromString(await r.text(),'text/html'),o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()}catch{location.reload()}}))})()</script>`
 
-// What a page on the code the last server started with swaps in rather than reloading: the chunks of each island changed since, by island, its own first.
-export interface HotSwap {
-  from: number
-  islands: Record<string, string[]>
-  // The new entry, which the page then counts as its own, so a page swapped in later is not taken for another build.
-  entry?: string
-}
-
-// Only islands changed since the last server started: a change to anything else, a page, a module or a startup file, reloads the pages. A file gone since, as an editor's temporary one, changed nothing.
-// Each changed island swaps in with every other island whose chunks hold its code, as one rendering it inside.
+// Only islands changed since the last server started: a change to anything else, a page, a module or a startup file, reloads the pages; so does a list too long to pass on.
+// Each swaps in with every island whose chunks hold its code; a chunk the page never loaded may come too when it holds nothing but edited islands, as Bun moves an island another one embeds into a chunk of its own.
 export function hotSwap(root: string, client: ClientBuild): HotSwap | undefined {
   const from = process.env.KAY_DEV_FROM
-  const changed = process.env.KAY_DEV_CHANGED
+  const changed = changedFiles(process.env.KAY_DEV_CHANGED)
+  const inputs = client.chunkInputs
 
-  if (from === undefined || changed === undefined || !client.islandInputs)
+  if (from === undefined || !changed || !inputs)
     return undefined
 
-  const islands: Record<string, string[]> = {}
+  const edited = new Set<string>()
 
-  for (const file of JSON.parse(changed) as string[]) {
-    if (!statSync(resolve(root, file), { throwIfNoEntry: false })?.isFile())
-      continue
-
+  for (const file of changed) {
     const id = file.replace(BACKSLASH, '/')
 
-    if (!client.islands[id])
-      return undefined
+    if (statSync(resolve(root, file), { throwIfNoEntry: false })?.isFile()) {
+      if (!client.islands[id])
+        return undefined
 
-    for (const [island, inputs] of Object.entries(client.islandInputs)) {
-      if (inputs.includes(id))
-        islands[island] = client.islands[island]!
+      edited.add(id)
+    }
+    // A file gone since: an editor's temporary one changed nothing, a deleted source file changed the pages.
+    else if (SOURCE_FILE.test(id) && !basename(id).startsWith('.')) {
+      return undefined
     }
   }
 
-  return Object.keys(islands).length === 0 ? undefined : { from: Number(from), islands, entry: client.entry }
+  const islands = Object.fromEntries(Object.entries(client.islands).filter(([, chunks]) => chunks.some(chunk => inputs[chunk]?.some(input => edited.has(input)))))
+  const fresh = Object.values(islands).flat().filter(chunk => inputs[chunk]!.length > 0 && inputs[chunk]!.every(input => edited.has(input)))
+
+  return Object.keys(islands).length === 0 ? undefined : { from: Number(from), islands, fresh: [...new Set(fresh)], entry: client.entry }
+}
+
+function changedFiles(text: string | undefined): string[] | undefined {
+  try {
+    const files = text === undefined ? undefined : JSON.parse(text) as unknown
+
+    return Array.isArray(files) && files.every(file => typeof file === 'string') ? files : undefined
+  }
+  catch {
+    return undefined
+  }
 }
 
 // The stream stays open until the process exits; `retry` makes the browser poll quickly for the next one.

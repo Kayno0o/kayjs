@@ -210,7 +210,7 @@ type HoneypotOf<Target> = Target extends { [HONEYPOT]?: (field: infer Field) => 
 
 // Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes.
 function callable(url: () => string): { call: (input: never) => Promise<unknown>, pending: () => boolean } {
-  const [inFlight, setInFlight] = createSignal(0)
+  const [inFlight, setInFlight] = createSignal(0, undefined, false)
   const shift = (by: number) => setInFlight(untrack(inFlight) + by)
 
   return {

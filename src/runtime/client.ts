@@ -27,8 +27,13 @@ const reported = new Set<string>()
 let rendering: (<T>(element: HTMLElement, run: () => T, values?: unknown[]) => T) | undefined
 const signalsOf = new WeakMap<HTMLElement, () => unknown[]>()
 
-interface HotSwap {
+// What a page on the code the last `kay dev` server started with swaps in rather than reloading: the chunks of each island an edit changed, by island, its own first.
+export interface HotSwap {
+  from: number
   islands: Record<string, string[]>
+  // Chunks the page never loaded that may come along, holding nothing but edited islands.
+  fresh: string[]
+  // The new entry, which the page then counts as its own, so a page swapped in later is not taken for another build.
   entry?: string
 }
 
@@ -181,17 +186,35 @@ export function enableHotSwap(registry: IslandRegistry): void {
   ;(globalThis as { $kayHot?: (swap: HotSwap) => Promise<boolean> }).$kayHot = async swap => hotSwap(registry, swap)
 }
 
-// Resolves false when the page must reload instead: a new chunk needing code the page never loaded, as a changed shared module, would run beside its old copy.
+// Resolves false when the page must reload instead: a new chunk holding code the page already runs, as a changed shared module, would run beside its old copy.
 async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean> {
   const loaded = new Set([...document.querySelectorAll<HTMLLinkElement>('link[rel=modulepreload]')].map(link => new URL(link.href).pathname))
+  const fresh = new Set(swap.fresh.map(withBase))
 
   for (const entry of performance.getEntriesByType('resource'))
     loaded.add(new URL(entry.name).pathname)
 
-  if (Object.values(swap.islands).some(chunks => chunks.slice(1).some(chunk => !loaded.has(chunk))))
-    return false
+  const fits = (chunks: string[]) => chunks.slice(1).map(withBase).every(chunk => loaded.has(chunk) || fresh.has(chunk))
+  const shown: [id: string, chunk: string][] = []
 
-  const modules = await Promise.all(Object.entries(swap.islands).map(async ([id, [chunk]]) => [id, chunk!, await import(chunk!) as Awaited<ReturnType<IslandRegistry[string]>>] as const))
+  for (const [id, chunks] of Object.entries(swap.islands)) {
+    const chunk = withBase(chunks[0]!)
+
+    if (!document.querySelector(`${ISLAND}[data-component="${CSS.escape(id)}"]`)) {
+      // Not on this page: a later one rendering it loads the new chunk, unless that would bring code the page runs again.
+      if (fits(chunks))
+        registry[id] = async () => import(chunk)
+
+      continue
+    }
+
+    if (!fits(chunks))
+      return false
+
+    shown.push([id, chunk])
+  }
+
+  const modules = await Promise.all(shown.map(async ([id, chunk]) => [id, chunk, await import(chunk) as Awaited<ReturnType<IslandRegistry[string]>>] as const))
 
   for (const [id, chunk, module] of modules) {
     registry[id] = async () => import(chunk)
@@ -199,9 +222,14 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
     for (const element of document.querySelectorAll<HTMLElement>(`${ISLAND}[data-component="${CSS.escape(id)}"]`)) {
       const dispose = disposers.get(element)
 
-      // Not hydrated yet: it loads the new chunk when it does.
-      if (!dispose)
+      if (!dispose) {
+        // Started without an end to call: still loading, or its last version threw. Only a reload brings it back.
+        if (started.has(element))
+          return false
+
+        // Not hydrated yet: it loads the new chunk when it does.
         continue
+      }
 
       const values = signalsOf.get(element)?.()
       const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
@@ -221,7 +249,7 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
   }
 
   if (swap.entry)
-    document.querySelector('script[type="module"][src]')?.setAttribute('src', swap.entry)
+    document.querySelector('script[type="module"][src]')?.setAttribute('src', withBase(swap.entry))
 
   return true
 }

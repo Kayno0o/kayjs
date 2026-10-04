@@ -247,10 +247,13 @@ describe('kay dev', () => {
 describe('hot swap', () => {
   it('names the new chunks of the edited islands, and of each island holding their code, for pages on the code before', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-hot-'))
-    const client = { islands: { 'src/counter.kay': ['/_kay/counter.js', '/_kay/shared.js'], 'src/panel.kay': ['/_kay/panel.js', '/_kay/shared.js'], 'src/other.kay': ['/_kay/other.js'] }, islandInputs: { 'src/counter.kay': ['src/counter.kay'], 'src/panel.kay': ['src/panel.kay', 'src/counter.kay'], 'src/other.kay': ['src/other.kay'] }, entry: '/_kay/entry.js', entryImports: [], dir: root, styles: new Map(), pages: new Map() }
-    const swapAfter = (changed: string[]) => {
+    // As Bun splits them: the counter, which the panel embeds, moves into a chunk of its own, leaving its island chunk a stub; both reach the runtime.
+    const islands = { 'src/counter.kay': ['/_kay/counter.js', '/_kay/counter-code.js', '/_kay/runtime.js'], 'src/panel.kay': ['/_kay/panel.js', '/_kay/counter-code.js', '/_kay/runtime.js'], 'src/other.kay': ['/_kay/other.js', '/_kay/runtime.js'] }
+    const chunkInputs = { '/_kay/counter.js': [], '/_kay/counter-code.js': ['src/counter.kay'], '/_kay/panel.js': ['src/panel.kay'], '/_kay/other.js': ['src/other.kay'], '/_kay/runtime.js': ['src/runtime/dom.ts'] }
+    const client = { islands, chunkInputs, entry: '/_kay/entry.js', entryImports: [], dir: root, styles: new Map(), pages: new Map() }
+    const swapAfter = (changed: string[] | string) => {
       process.env.KAY_DEV_FROM = '3'
-      process.env.KAY_DEV_CHANGED = JSON.stringify(changed)
+      process.env.KAY_DEV_CHANGED = typeof changed === 'string' ? changed : JSON.stringify(changed)
 
       try {
         return hotSwap(root, client)
@@ -264,9 +267,12 @@ describe('hot swap', () => {
     await Promise.all(['src/counter.kay', 'src/other.kay', 'src/page.kay'].map(async file => Bun.write(join(root, file), 'p x\n')))
 
     try {
-      expect(swapAfter(['src/counter.kay', 'src/.counter.kay.swp'])).toEqual({ from: 3, islands: { 'src/counter.kay': client.islands['src/counter.kay'], 'src/panel.kay': client.islands['src/panel.kay'] }, entry: '/_kay/entry.js' })
+      expect(swapAfter(['src/counter.kay', 'src/.counter.kay.swp', 'src/counter.kay~'])).toEqual({ from: 3, islands: { 'src/counter.kay': islands['src/counter.kay'], 'src/panel.kay': islands['src/panel.kay'] }, fresh: ['/_kay/counter-code.js'], entry: '/_kay/entry.js' })
       expect(swapAfter(['src/counter.kay', 'src/page.kay'])).toBeUndefined()
+      expect(swapAfter(['src/counter.kay', 'src/deleted.ts'])).toBeUndefined()
       expect(swapAfter([])).toBeUndefined()
+      expect(swapAfter('null')).toBeUndefined()
+      expect(swapAfter('["src/counter.ka')).toBeUndefined()
       expect(hotSwap(root, client)).toBeUndefined()
     }
     finally {

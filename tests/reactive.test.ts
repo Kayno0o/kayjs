@@ -1,6 +1,6 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { batch, effect, flush, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
-import { renderEffect, renderOnServer } from '../src/runtime/reactive'
+import { createSignal, recordSignals, renderEffect, renderOnServer, unrecorded } from '../src/runtime/reactive'
 
 describe('signals', () => {
   it('read the last value written, a function written being an updater', () => {
@@ -253,5 +253,26 @@ describe('selection', () => {
     // Read outside any tracking scope, as in an event handler.
     expect(selected.is(7)).toBe(false)
     dispose()
+  })
+})
+
+describe('recordSignals', () => {
+  it('gives an edited version the values of the signals its script made, in order, until one changes kind', () => {
+    const first = recordSignals(() => {
+      createSignal(1)[1](5)
+      unrecorded(() => createSignal('row')[1]('changed row'))
+      createSignal('text')[1]('typed')
+      createSignal(false, undefined, false)[1](true)
+    })
+
+    expect(first.values()).toEqual([5, 'typed'])
+
+    const again = recordSignals(() => [createSignal(0)[0](), createSignal('')[0](), createSignal(false, undefined, false)[0]()], first.values())
+
+    expect(again.result).toEqual([5, 'typed', false])
+
+    const reshaped = recordSignals(() => [createSignal(0)[0](), createSignal(0)[0](), createSignal('')[0]()], first.values())
+
+    expect(reshaped.result).toEqual([5, 0, ''])
   })
 })

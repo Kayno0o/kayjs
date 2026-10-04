@@ -105,7 +105,7 @@ export function selection<Key extends string | number>(initial?: Key): Selection
     let flag = flags.get(key)
 
     if (!flag) {
-      const [readFlag, writeFlag] = createSignal(key === current)
+      const [readFlag, writeFlag] = createSignal(key === current, undefined, false)
 
       flag = { read: readFlag, write: writeFlag, readers: 0 }
       flags.set(key, flag)

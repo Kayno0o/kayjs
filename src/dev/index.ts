@@ -25,6 +25,8 @@ const SPARE = join(import.meta.dir, 'spare.ts')
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
 const STYLESHEET = /\.css$/
+// Past this, as after a checkout, the files changed are not passed on, and open pages reload.
+const MAX_CHANGED_FILES = 200
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
 // Resolves once watching, with a function stopping the watchers and the server.
@@ -55,7 +57,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     child = spare
-    void child.stdin.write(`start ${codeVersion} ${startedAt} ${JSON.stringify([...changedFiles])}\n`)
+    void child.stdin.write(`start ${codeVersion} ${startedAt} ${JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles])}\n`)
     startedAt = codeVersion
     changedFiles = new Set()
     void child.stdin.flush()

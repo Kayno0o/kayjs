@@ -1,7 +1,7 @@
 // What islands run on in the browser: DOM built from templates, kept in step with signals, and the server's markup claimed in place when an island hydrates.
 // A dynamic part sits between `<!--[-->` and `<!--]-->` comments unless it is the only content of its element; hydration walks the server's nodes in the order the generated code asks for them.
 
-import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, untrack } from './reactive'
+import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 
 export { renderEffect as effect } from './reactive'
 
@@ -480,7 +480,7 @@ export function branches(element: Node | null, start: Node | null, end: Node | n
   renderEffect(() => {
     const selected = index()
 
-    current = untrack(() => show(region, current, () => selected < 0 ? null : list[selected]![1](value)))
+    current = untrack(() => unrecorded(() => show(region, current, () => selected < 0 ? null : list[selected]![1](value))))
   })
 }
 
@@ -507,7 +507,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
     disposeFallback?.()
   })
 
-  const makeRow = (item: T, index: number, rowKey: unknown): Row => root((dispose) => {
+  const makeRow = (item: T, index: number, rowKey: unknown): Row => unrecorded(() => root((dispose) => {
     const [readItem, setItem] = createSignal(item)
     let setIndex: ((index: number) => void) | undefined
     let readIndex: (() => number) | number = index
@@ -523,7 +523,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
     const made = units(value)
 
     return { key: rowKey, unit: made.length === 0 ? null : made.length === 1 ? made[0]! : new Range(firstOf(made[0]!), lastOf(made.at(-1)!)), setItem: setItem as (item: unknown) => void, setIndex, dispose }
-  })
+  }))
 
   const showFallback = (on: boolean) => {
     if (on && !fallbackUnits && fallback) {
@@ -819,7 +819,7 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
 
     untrack(() => {
       if (!(settled instanceof Promise)) {
-        current = show(region, current, () => ready(settled))
+        current = unrecorded(() => show(region, current, () => ready(settled)))
 
         return
       }
@@ -838,7 +838,7 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
       const block = (render: () => unknown) => root((disposeBlock) => {
         dispose?.()
         dispose = disposeBlock
-        current = show(region, current, render)
+        current = unrecorded(() => show(region, current, render))
       })
 
       block(() => pending?.())
@@ -903,7 +903,7 @@ export function attempt(element: Node | null, start: Node | null, end: Node | nu
     if (fallback) {
       runWithOwner(parent, () => root((dispose) => {
         disposeFallback = dispose
-        current = fresh(() => show(region, [], () => fallback(error)))
+        current = unrecorded(() => fresh(() => show(region, [], () => fallback(error))))
       }))
     }
   }

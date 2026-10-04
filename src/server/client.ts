@@ -29,8 +29,8 @@ export interface ClientManifest {
   pages?: Record<string, PrerenderedPage>
   // Whether the entry swaps pages in place, which ships it to pages posting forms to actions too.
   navigation?: boolean
-  // In development, the source files each island's chunks hold, by island id and relative to the root: an edited island swaps in everywhere its code runs.
-  islandInputs?: Record<string, string[]>
+  // In development, the source files each chunk of an island holds, by chunk URL and relative to the root: an edited island swaps in everywhere its code runs.
+  chunkInputs?: Record<string, string[]>
 }
 
 export interface PrerenderedPage {
@@ -294,8 +294,10 @@ function islandManifest(root: string, outputs: Outputs, islands: Map<string, str
       manifest.islands[id] = chunks.map(assetUrl)
 
       // Inputs are named relative to the working directory, the root in development.
-      if (hot)
-        (manifest.islandInputs ??= {})[id] = [...new Set(chunks.flatMap(chunk => Object.keys(outputs[chunk]?.inputs ?? {})))].map(input => islandPath(root, input))
+      if (hot) {
+        for (const chunk of chunks)
+          (manifest.chunkInputs ??= {})[assetUrl(chunk)] = Object.keys(outputs[chunk]?.inputs ?? {}).map(input => islandPath(root, input))
+      }
 
       continue
     }
