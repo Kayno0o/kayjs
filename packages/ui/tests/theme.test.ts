@@ -4,7 +4,7 @@ import { compileKay } from 'kay/compiler'
 const ROOT = new URL('..', import.meta.url).pathname
 
 // These list today's families of token names: a class reaching for a new family needs it added here too.
-const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret)-(text|muted|mantle|canvas|surface\d|overlay\d|subtext\d|accent(?:-hi)?|on-accent|error|success|row-hover|fill-hover|fill-danger)\b/g
+const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret)-(text|muted|mantle|canvas|surface\d|overlay\d|subtext\d|accent(?:-hi)?|on-accent|error|success|warning|info|row-hover|fill-hover|fill-danger)\b/g
 const SCALE = /\b(gap|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|text|font|tracking|rounded)-(section|inline|micro|2xs|heading|label|action|card)\b/g
 const DEFINED_TOKEN = /(--[\w-]+):/g
 const DEFINED_CLASS = /\.([a-z][\w-]*)/g

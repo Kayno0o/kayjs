@@ -1,0 +1,19 @@
+---
+import type { JSX } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import Icon from './icon.kay'
+
+const { tone = 'neutral', icon, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
+  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+  icon?: IconSlot | IconProps
+  label?: string | number
+  class?: string
+}>()
+---
+// A label that does nothing: a count, a status, a tag.
+span.badge({...rest} data-tone={tone} class={className})
+  if icon
+    Icon(icon={icon} class="badge-icon")
+  | {label}
+  slot

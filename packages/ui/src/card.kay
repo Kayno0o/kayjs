@@ -1,0 +1,25 @@
+---
+import type { JSX } from 'kay'
+
+const { title, head, bare = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
+  // Engraved along the top, on a rule of its own.
+  title?: string
+  // The rest of the title's line, held at its far end: a count, a control, a link out.
+  head?: JSX.Element
+  // No inset body, for content that runs to the card's edge: a chart, a table, a console.
+  bare?: boolean
+  class?: string
+}>()
+---
+// The frame a page's content is written on; every part of it is optional, so a card with no title is the frame alone.
+section.card({...rest} class={className})
+  if title !== undefined || head
+    .card-head
+      if title !== undefined
+        h3.card-title {title}
+      | {head}
+  if bare
+    slot
+  else
+    .card-body
+      slot

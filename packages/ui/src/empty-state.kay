@@ -1,0 +1,13 @@
+---
+import type { JSX } from 'kay'
+
+const { title, description, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
+  title: string
+  description?: string
+  class?: string
+}>()
+---
+.empty-state({...rest} class={className})
+  p.empty-state-title {title}
+  if description
+    p.empty-state-description {description}

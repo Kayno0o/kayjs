@@ -1,0 +1,17 @@
+---
+import { signal } from 'kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+
+const { onPlanet, onCommit } = props<{ onPlanet: (value: string) => void, onCommit: (value: string) => void }>()
+
+const name = signal('Ada')
+// Kept as the figure the box spells, as a parent parsing what is typed would.
+const amount = signal('2')
+---
+TextInput#name(value={name()} onInput={value => name.set(value)} onChange={onCommit})
+p#echo {name()}
+TextInput#amount(type="number" value={amount()} onInput={value => amount.set(String(Number(value)))})
+p#figure {amount()}
+button#clear(onClick={() => name.set('')}) Clear
+Select#planet(value="mars" loading options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]} onChange={onPlanet})

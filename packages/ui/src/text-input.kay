@@ -1,0 +1,32 @@
+---
+import type { JSX } from 'kay'
+import { effect, untrack } from 'kay'
+
+const { value, onInput, onChange, type = 'text', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange' | 'onBlur'> & {
+  value: string
+  onInput: (value: string) => void
+  // Called once the value is committed, on blur or Enter, after `onInput`.
+  onChange?: (value: string) => void
+  type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number' | 'date' | 'datetime-local' | 'time' | 'month' | 'week'
+  class?: string
+}>()
+
+let box: HTMLInputElement | undefined
+
+// A number box mid-word, `1,` before its last digit, reports the empty string, which would read as a cleared field: nothing is taken off it until it parses.
+const halfTyped = (input: HTMLInputElement) => input.validity.badInput
+
+// Whether the box already reads as `next`: a number box answers `2.` and `2.30` as 2 and 2.3, so a parent writing its own spelling of that figure back writes the same thing, and doing it would take the caret out of the word being typed.
+function reads(input: HTMLInputElement, next: string): boolean {
+  return input.value === next || (input.type === 'number' && (halfTyped(input) || Number(input.value) === Number(next)))
+}
+
+// The attribute fills the box on the server and as it hydrates; afterwards the value lands on it only where it says something the box does not already say.
+effect(() => {
+  const next = value
+
+  if (box && !reads(box, next))
+    box.value = next
+})
+---
+input.field-input({...rest} ref={element => box = element} type={type} value={untrack(() => value)} class={className} onInput={event => halfTyped(event.currentTarget) || onInput(event.currentTarget.value)} onChange={event => halfTyped(event.currentTarget) || onChange?.(event.currentTarget.value)} onBlur={event => event.currentTarget.type === 'number' && (event.currentTarget.value = value)})

@@ -1,0 +1,17 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+---
+main
+  Card#card(title="Moons")
+    @head
+      Badge(tone="success" icon="success" label={3})
+    p Phobos and Deimos
+  Card#bare(bare)
+    p Edge to edge
+  Badge#badge Draft
+  EmptyState#empty(title="No moons" description="Add one to start")
+  form#form
+    Select(name="planet" value="earth" emptyOption="Any" options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]})

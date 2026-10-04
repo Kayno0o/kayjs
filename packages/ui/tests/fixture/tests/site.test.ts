@@ -89,3 +89,25 @@ describe('controls', () => {
     expect(await page('digest')).toContain('<input name="digest" type="checkbox" role="switch" checked class="toggle-input">')
   })
 })
+
+describe('content', () => {
+  const page = async (id: string) => (await element('/content', id)).replaceAll(/<!--[^>]*-->/g, '')
+
+  test('Card titles its frame, holds a head block at the far end, and insets its body unless bare', async () => {
+    const card = await page('card')
+
+    expect(card).toMatch(/^<section id="card" class="card"><div class="card-head"><h3 class="card-title">Moons<\/h3><span data-tone="success" class="badge"><svg[^>]*class="icon badge-icon">.*<\/svg>3<\/span><\/div><div class="card-body"><p>Phobos and Deimos<\/p><\/div><\/section>$/)
+    expect(await page('bare')).toBe('<section id="bare" class="card"><p>Edge to edge</p></section>')
+  })
+
+  test('Badge is neutral unless toned, and EmptyState says why there is nothing', async () => {
+    expect(await page('badge')).toBe('<span id="badge" data-tone="neutral" class="badge">Draft</span>')
+    expect(await page('empty')).toBe('<div id="empty" class="empty-state"><p class="empty-state-title">No moons</p><p class="empty-state-description">Add one to start</p></div>')
+  })
+
+  test('Select marks its value\'s option selected, after the empty one', async () => {
+    const form = await page('form')
+
+    expect([...form.matchAll(/<option value(?:="(\w*)")?( selected)?>(\w*)<\/option>/g)].map(([, value = '', selected, label]) => `${value}${selected ?? ''}:${label}`)).toEqual([':Any', 'mars:Mars', 'earth selected:Earth'])
+  })
+})

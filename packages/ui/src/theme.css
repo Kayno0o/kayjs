@@ -21,6 +21,8 @@
   --color-accent-hi: #f4a79d;
   --color-on-accent: #1a0d0b;
   --color-success: #b4c79b;
+  --color-warning: #d8b27a;
+  --color-info: #8fb8de;
   --color-error: #ec9086;
   --color-fill-hover: #1c1c1c;
   --color-fill-danger: #241615;
@@ -1339,5 +1341,50 @@
     --shell-fill: var(--color-canvas);
     color: var(--color-overlay1);
     cursor: not-allowed;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 border border-surface2 bg-surface0 px-1.5 py-px text-xs whitespace-nowrap text-subtext0;
+
+    &:where([data-tone='accent']) {
+      @apply border-accent text-accent;
+    }
+
+    &:where([data-tone='success']) {
+      @apply border-success text-success;
+    }
+
+    &:where([data-tone='warning']) {
+      @apply border-warning text-warning;
+    }
+
+    &:where([data-tone='danger']) {
+      @apply border-error text-error;
+    }
+
+    &:where([data-tone='info']) {
+      @apply border-info text-info;
+    }
+  }
+
+  .badge-icon {
+    @apply size-3;
+  }
+
+  .card {
+    @apply flex flex-col border border-surface2 bg-surface0;
+  }
+
+  .card-head {
+    @apply flex items-center gap-3 border-b border-surface2 px-3 py-2;
+  }
+
+  /* mr-auto rather than ml-auto on what follows: a head that is all control and no title reads from the left, like the body under it. */
+  .card-title {
+    @apply mr-auto text-2xs font-label tracking-section text-subtext0 uppercase;
+  }
+
+  .card-body {
+    @apply p-card;
   }
 }
