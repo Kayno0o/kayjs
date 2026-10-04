@@ -11,9 +11,11 @@ import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { projectCollections, serveFeeds } from '../content/server'
+import { setBase } from '../runtime/base'
 import { localePath, splitLocale } from '../runtime/i18n'
 import { localeState, runInLocale } from '../runtime/i18n.server'
 import { overHttps, registerActionRoutes } from './actions'
+import { basePath, rebaseRedirects } from './base'
 import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from './compress'
@@ -158,7 +160,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (i18n)
     refuseLocaleClashes(i18n.settings, routes)
 
-  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined) }
+  const base = basePath(options.base)
+  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base }
+
+  setBase(base)
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const security = securityHeaders(options)
 
@@ -182,6 +187,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   if (options.rewrite)
     rewriteRequests(app, options.rewrite, app)
+
+  if (base !== '')
+    rebaseRedirects(app, base)
 
   const lifecycle = { draining: false }
 
@@ -235,10 +243,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     quality: options.images?.quality,
   })
 
-  serveFeeds(app, await projectCollections(root, options.content), options.site === undefined ? undefined : siteOrigin(options.site), options.dev)
+  serveFeeds(app, await projectCollections(root, options.content), options.site === undefined ? undefined : siteOrigin(options.site) + base, options.dev)
 
   if (options.site !== undefined)
-    serveSitemap(app, routes, siteOrigin(options.site), publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
+    serveSitemap(app, routes, siteOrigin(options.site) + base, publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
 
   if (options.favicon !== undefined)
     serveFavicons(app, new Set([...publicUrls, ...servedPaths(routes)]), { source: resolve(root, options.favicon), builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, manifest: options.manifest })

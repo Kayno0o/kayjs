@@ -1,0 +1,6 @@
+--- server
+export const prerender = [{ slug: 'first' }]
+
+const { slug } = ctx.params
+---
+h1 Post {slug}

@@ -1,6 +1,11 @@
 // The widths an image is resized to, the only ones the image route makes: a fixed ladder keeps how many files one image can turn into bounded.
 export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560, 3840] as const
 export const IMAGE_ROUTE = '/_kay/image'
+// Where imported images are served, and the variants `kay build` writes of them.
+const IMPORTED = '/_kay/assets/'
+const VARIANTS = '/_kay/images/'
+const EXTENSION = /\.[^.]+$/
+const QUERY = /\?.*$/
 
 // What `img` takes to load the right size: spread it, `img({...image(hero)} alt="")`.
 export interface ImageProps {
@@ -55,6 +60,19 @@ export function image(src: string, options: ImageOptions = {}): ImageProps {
   return props
 }
 
+// A static export has no image route, so an imported image's variants are linked as the files `kay build` wrote.
+let variantFiles = false
+
+export function linkVariantFiles(): void {
+  variantFiles = true
+}
+
 export function imageUrl(src: string, width: number): string {
+  if (variantFiles && src.startsWith(IMPORTED)) {
+    const name = decodeURIComponent(src.slice(IMPORTED.length).replace(QUERY, ''))
+
+    return `${VARIANTS}${encodeURIComponent(`${name.replace(EXTENSION, '')}-${width}.webp`)}`
+  }
+
   return `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&w=${width}`
 }

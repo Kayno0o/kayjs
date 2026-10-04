@@ -1,0 +1,8 @@
+---
+import '../app.css'
+---
+nav
+  a.home(href="/") Home
+  a.about(href="/about") About
+main
+  slot

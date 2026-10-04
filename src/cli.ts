@@ -1,10 +1,12 @@
 #!/usr/bin/env bun
 import type { ParseArgsOptionsConfig } from 'node:util'
+import type { Template } from './new'
 import { statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { compileServer } from './build/compile'
+import { exportStatic } from './build/static'
 import { KayCompileError } from './build/transform'
 import { check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
@@ -14,7 +16,9 @@ import { ContentError } from './content/validate'
 import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
-import { createProject } from './new'
+import { createProject, TEMPLATES } from './new'
+import { linkVariantFiles } from './runtime/image'
+import { basePath } from './server/base'
 import { buildClient, PRERENDERED_DIR } from './server/client'
 import { compressFiles } from './server/compress'
 import { FAVICON_DIR, writeFavicons } from './server/favicon'
@@ -22,7 +26,7 @@ import { writeImageVariants } from './server/image'
 import { prerenderPages } from './server/prerender'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>]\n       kay dev [entry]\n       kay build [dir] [--compile <executable>] [--entry <file>]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site]\n       kay dev [entry]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -124,17 +128,30 @@ async function runCheck(args: string[]): Promise<number> {
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
-// With `--compile`, also bundles the server and all of it into one executable.
+// With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server.
 async function build(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { compile: { type: 'string' }, entry: { type: 'string' } }, 1)
+  const parsed = parseCommand(args, { compile: { type: 'string' }, entry: { type: 'string' }, static: { type: 'boolean' }, outdir: { type: 'string' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
 
-  const { compile, entry } = parsed.values
+  const { compile, entry, outdir } = parsed.values
+  const exported = parsed.values.static === true
 
   if (typeof entry === 'string' && typeof compile !== 'string') {
     console.error(`kay: --entry names the server an executable runs, so it goes with --compile\n${USAGE}`)
+
+    return 1
+  }
+
+  if (exported && typeof compile === 'string') {
+    console.error(`kay: --static writes files for a host with no server, and --compile a server; pick one\n${USAGE}`)
+
+    return 1
+  }
+
+  if (typeof outdir === 'string' && !exported) {
+    console.error(`kay: --outdir names where --static writes the site, so it goes with --static\n${USAGE}`)
 
     return 1
   }
@@ -148,10 +165,15 @@ async function build(args: string[]): Promise<number> {
   const started = performance.now()
 
   try {
-    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes })
+    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, base: basePath(config.base) })
     // Before prerendering, whose pages read the collections from what it writes.
     const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
-    const prerendered = await prerenderPages(root, config, client)
+
+    // A static host has no image route, so pages link the variant files the build writes.
+    if (exported)
+      linkVariantFiles()
+
+    const prerendered = await prerenderPages(root, config, client, { exportAll: exported })
 
     await writeImageVariants(client.dir, config.images?.quality)
 
@@ -161,6 +183,14 @@ async function build(args: string[]): Promise<number> {
     await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 
     console.error(`built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''} in ${Math.round(performance.now() - started)} ms`)
+
+    if (exported) {
+      const written = performance.now()
+      const target = resolve(typeof outdir === 'string' ? outdir : join(root, 'dist'))
+      const site = await exportStatic(root, config, client, target)
+
+      console.error(`exported ${count(site.pages, 'page')} and ${count(site.files, 'other file')} to ${relative(process.cwd(), target) || '.'} in ${Math.round(performance.now() - written)} ms`)
+    }
 
     if (typeof compile === 'string') {
       const compiled = performance.now()
@@ -195,7 +225,7 @@ function count(amount: number, noun: string): string {
 }
 
 async function scaffold(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { kay: { type: 'string' } }, 1)
+  const parsed = parseCommand(args, { kay: { type: 'string' }, template: { type: 'string' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
@@ -209,7 +239,15 @@ async function scaffold(args: string[]): Promise<number> {
   }
 
   try {
-    const files = await createProject(dir, { kay: typeof parsed.values.kay === 'string' ? parsed.values.kay : undefined })
+    const { template } = parsed.values
+
+    if (template !== undefined && !TEMPLATES.includes(template as Template)) {
+      console.error(`kay new: --template is ${String(template)}, which is none of ${TEMPLATES.join(', ')}`)
+
+      return 1
+    }
+
+    const files = await createProject(dir, { kay: typeof parsed.values.kay === 'string' ? parsed.values.kay : undefined, template: template as Template | undefined })
 
     console.error(`${files.map(file => `created ${join(dir, file)}`).join('\n')}\n\ncd ${shellQuote(dir)} && bun install && bun run dev`)
 

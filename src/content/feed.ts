@@ -40,7 +40,8 @@ export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>
 
     return item ? [item] : []
   }).sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, options.limit ?? DEFAULT_LIMIT)
-  const self = new URL(options.path, origin).href
+  // Joined rather than resolved, so an origin carrying the site's mount point keeps it.
+  const self = origin + options.path
   const updated = items[0]?.date ?? new Date(0)
 
   if (options.format === 'atom') {
@@ -53,7 +54,7 @@ export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>
 <updated>${updated.toISOString()}</updated>
 <author><name>${escape(options.author ?? options.title)}</name></author>
 ${items.map((item) => {
-  const link = new URL(item.path, origin).href
+  const link = origin + item.path
 
   return `<entry><title>${escape(item.title)}</title><link href="${escapeAttribute(link)}"/><id>${escape(link)}</id><updated>${item.date.toISOString()}</updated>${item.description === undefined ? '' : `<summary>${escape(item.description)}</summary>`}${item.author === undefined ? '' : `<author><name>${escape(item.author)}</name></author>`}</entry>`
 }).join('\n')}
@@ -70,7 +71,7 @@ ${items.map((item) => {
 <atom:link href="${escapeAttribute(self)}" rel="self" type="application/rss+xml"/>
 <lastBuildDate>${updated.toUTCString()}</lastBuildDate>
 ${items.map((item) => {
-  const link = new URL(item.path, origin).href
+  const link = origin + item.path
 
   return `<item><title>${escape(item.title)}</title><link>${escape(link)}</link><guid>${escape(link)}</guid><pubDate>${item.date.toUTCString()}</pubDate>${item.description === undefined ? '' : `<description>${escape(item.description)}</description>`}${item.author === undefined ? '' : `<dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">${escape(item.author)}</dc:creator>`}</item>`
 }).join('\n')}

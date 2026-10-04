@@ -92,9 +92,99 @@ button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times
 `,
 }
 
+// A site with no server: `kay build --static` writes it to `dist`, which a Forgejo Pages workflow publishes, or a container serves with nginx.
+const SITE_FILES: Record<string, string> = {
+  'kay.config.ts': `import process from 'node:process'
+import { defineConfig } from 'kay/server'
+
+// The Pages workflow sets both: the host the site is published on, and the path it is published under.
+export default defineConfig({
+  lang: 'en',
+  site: process.env.SITE_URL,
+  base: process.env.SITE_BASE,
+})
+`,
+  '.forgejo/workflows/pages.yml': `name: Publish to Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: debian
+    steps:
+      - name: Install unzip and git
+        run: apt-get update && apt-get install -y unzip git
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the site
+        env:
+          SITE_URL: https://pages.kaynooo.fr
+          SITE_BASE: /\${{ github.repository }}
+        run: bun run build
+
+      - name: Publish to the gitea-pages branch
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gitea-pages
+          force_orphan: true
+`,
+  // The container option: the same files, served by nginx with the compressed copies the build wrote.
+  'Dockerfile': `FROM oven/bun:1 AS build
+WORKDIR /app
+COPY . .
+RUN bun install --frozen-lockfile && bun run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+`,
+  'nginx.conf': `server {
+  listen 80;
+  root /usr/share/nginx/html;
+  gzip_static on;
+
+  location /_kay/ {
+    add_header Cache-Control "public, max-age=31536000, immutable";
+  }
+
+  location / {
+    try_files $uri $uri.html $uri/index.html =404;
+  }
+
+  error_page 404 /404.html;
+}
+`,
+  '.dockerignore': 'node_modules\n.kay\ndist\n',
+  '.gitignore': 'node_modules\n.kay\ndist\n',
+}
+
+export type Template = 'server' | 'site'
+
+export const TEMPLATES: readonly Template[] = ['server', 'site']
+
 export interface NewOptions {
   // The \`kay\` dependency: by default the published kay running this command, or a packed copy of the checkout running it.
   kay?: string
+  // `server` by default, an Elysia app serving the pages; `site`, a static site built to files.
+  template?: Template
 }
 
 // Scaffolds a project that \`kay dev\` runs and \`kay check\` passes as it is; refuses a directory that already holds files.
@@ -110,13 +200,15 @@ export async function createProject(target: string, options: NewOptions = {}): P
   const name = packageName(basename(dir))
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
   const dependency = options.kay ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@^${kay.version}`)
+  const site = options.template === 'site'
   const files: Record<string, string> = {
     ...FILES,
+    ...site && SITE_FILES,
     'package.json': `${JSON.stringify({
       name,
       type: 'module',
       private: true,
-      scripts: { dev: 'kay dev', build: 'kay build', start: 'NODE_ENV=production bun src/server.ts', check: 'kay check', fmt: 'kay fmt', test: 'bun test' },
+      scripts: site ? { dev: 'kay dev', build: 'kay build --static', check: 'kay check', fmt: 'kay fmt', test: 'bun test' } : { dev: 'kay dev', build: 'kay build', start: 'NODE_ENV=production bun src/server.ts', check: 'kay check', fmt: 'kay fmt', test: 'bun test' },
       dependencies: { elysia: kay.dependencies.elysia, kay: dependency },
       devDependencies: { '@types/bun': kay.devDependencies['@types/bun'] },
     }, null, 2)}\n`,
@@ -137,6 +229,10 @@ export async function createProject(target: string, options: NewOptions = {}): P
       include: ['src', 'tests', 'kay.config.ts', '.kay/types'],
     }, null, 2)}\n`,
   }
+
+  // A static site has no server of its own.
+  if (site)
+    delete files['src/server.ts']
 
   await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content.replaceAll('__NAME__', name))))
 

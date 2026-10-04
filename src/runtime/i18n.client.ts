@@ -1,4 +1,5 @@
 import type { Locale, LocaleSettings, Localize, Message, MessageValue, Translate } from './i18n'
+import { withBase, withoutBase } from './base'
 import { formatDate as formatDateIn, formatNumber as formatNumberIn, localePath, splitLocale, translate } from './i18n'
 
 export type { Locale, LocaleSettings, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory } from './i18n'
@@ -55,13 +56,15 @@ export function locale(): Locale {
 export const localize = ((href: string, target?: string) => {
   const { locale: current } = translations()
 
-  return settings ? localePath(settings, href, target ?? current, location.host) : href
+  return withBase(settings ? localePath(settings, href, target ?? current, location.host) : href)
 }) as Localize
 
 export function alternate(target: Locale): string {
   load()
 
-  return settings ? localePath(settings, splitLocale(settings, location.pathname).path, target, location.host) : location.pathname
+  const path = withoutBase(location.pathname)
+
+  return withBase(settings ? localePath(settings, splitLocale(settings, path).path, target, location.host) : path)
 }
 
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {

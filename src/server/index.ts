@@ -5,6 +5,7 @@ import process from 'node:process'
 import { logError } from '../build/sourcemap'
 import { mergeConfig, withConfig } from '../config'
 import { servePages } from './app'
+import { basePath } from './base'
 import { bundled } from './bundle'
 import { buildClient, readClient } from './client'
 import { bootFailure } from './dev'
@@ -73,5 +74,5 @@ async function clientFor(root: string, options: PagesOptions): Promise<ClientBui
     console.warn('kay: no client build in .kay/client, bundling now; run `kay build` before starting in production')
   }
 
-  return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes, sourcemap: options.dev })
+  return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes, sourcemap: options.dev, base: basePath(options.base) })
 }

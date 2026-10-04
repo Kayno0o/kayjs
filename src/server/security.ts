@@ -1,11 +1,13 @@
 import type { SecurityConfig } from '../config'
 import type { Prefetch } from './speculation'
+import { basePath } from './base'
 import { inlineScriptHashes } from './csp'
 
 export interface SecurityOptions {
   security?: SecurityConfig | false
   prefetch?: Prefetch
   dev?: boolean
+  base?: string
 }
 
 // Strict where it costs a site nothing: scripts only from itself plus kay's own inline ones, no plugins, no foreign forms or frames. Images may come from any https host, and inline styles stay allowed, since `style` attributes are everyday template code.
@@ -41,7 +43,7 @@ export function securityHeaders(options: SecurityOptions): Record<string, string
   const csp = options.security?.csp
 
   if (csp !== false)
-    headers['content-security-policy'] = policy(csp ?? {}, inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev }))
+    headers['content-security-policy'] = policy(csp ?? {}, inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base: basePath(options.base) }))
 
   for (const [name, value] of Object.entries(options.security?.headers ?? {})) {
     if (value === false)

@@ -10,6 +10,7 @@ import { kay } from '../build/plugin'
 import { forgetBundleMaps } from '../build/sourcemap'
 import { styleImports, withoutStyles } from '../build/styles'
 import { analyzeKayCached, KayCompileError } from '../build/transform'
+import { rebaseCss } from './base'
 
 // Written beside the bundle as `manifest.json`, so a production server reads it instead of bundling at boot.
 export interface ClientManifest {
@@ -53,6 +54,8 @@ export interface ClientOptions {
   routes?: string
   // Links each island chunk to a map of its `.kay` sources, for the browser's devtools; the server points a map at them as it first serves it.
   sourcemap?: boolean
+  // The site's mount point, which the stylesheets' own paths go under, `url(/bg.png)` included.
+  base?: string
 }
 
 interface MetafileOutput {
@@ -68,6 +71,7 @@ const MANIFEST = 'manifest.json'
 export const PRERENDERED_DIR = 'pages'
 const LEADING_DOT_SLASH = /^\.\//
 const JS_OUTPUT = /\.js$/
+const CSS_OUTPUT = /\.css$/
 
 // Bundles what the browser needs: one entry hydrating the islands, each island in its own chunk, and a stylesheet per page and layout.
 // Every component is compiled first, so all of the project's syntax errors come out together instead of one per bundler run.
@@ -207,6 +211,12 @@ async function buildStyles(root: string, dir: string, pages: string[], options: 
 
   // The code the entries shrank to is only a vehicle for their stylesheets.
   await Promise.all(build.outputs.filter(output => output.kind === 'entry-point' && JS_OUTPUT.test(output.path)).map(async output => rm(output.path)))
+
+  if (options.base) {
+    const base = options.base
+
+    await Promise.all(build.outputs.filter(output => CSS_OUTPUT.test(output.path)).map(async output => Bun.write(output.path, rebaseCss(await Bun.file(output.path).text(), base))))
+  }
 
   return styles
 }

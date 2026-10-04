@@ -155,6 +155,7 @@ export type PageData<Load extends (...args: never[]) => unknown> = Awaited<Retur
 
 export type { Action, ActionContext, ActionProtection, Failure, FailureOf, FieldName, FormFailure, FormSuccess, ServerAction, SuccessOf } from './action'
 export { action, ActionError, ActionRedirect, actionStub, formAction, isAction, registerActions } from './action'
+export { withBase } from './base'
 export type { AwaitProps, CheckedHref, Deferred, FunctionProp, HydrateWhen, IslandBrand, IslandComponent, IslandProp, Locals, LocalsOf, Redirect, Register, TemplateHelpers } from './checks'
 export type { Component, EventHandler, JSX } from './jsx'
 export type { SignalOptions } from './reactive'

@@ -6,7 +6,9 @@ import { join, relative, resolve } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { isCollection } from '../content'
+import { isAction } from '../runtime/action'
 import { runInLocale } from '../runtime/i18n.server'
+import { basePath } from './base'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { loadI18n, localeCopies, stateFor } from './i18n'
 import { registerLoader } from './loader'
@@ -15,8 +17,15 @@ import { renderPage } from './render'
 import { refuseClashes, scanRoutes } from './routes'
 import { configHead } from './seo'
 
+const KAY_PREFIX = /^kay: /
+
+export interface PrerenderOptions {
+  // Every page, for `kay build --static`: one without params prerenders unless it opts out, and a page that cannot is reported rather than left to a server.
+  exportAll?: boolean
+}
+
 // Renders every page whose server fence exports `prerender = true` into `.kay/client/pages`, listing them in the manifest the server boots from.
-export async function prerenderPages(root: string, config: KayConfig, client: ClientBuild): Promise<number> {
+export async function prerenderPages(root: string, config: KayConfig, client: ClientBuild, options: PrerenderOptions = {}): Promise<number> {
   registerLoader(root)
 
   const manifest = await readManifest(root)
@@ -36,17 +45,20 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   const matchers = await loadMatchers(routesDir, routes)
   const i18n = config.i18n ? await loadI18n(root, config.i18n) : undefined
 
-  for (const route of routes) {
-    // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
-    if (!await exportsPrerender(route.file))
-      continue
-
-    const file = relative(root, route.file)
-
-    const module = await import(route.file) as { prerender?: unknown, revalidate?: unknown }
+  async function prerenderRoute(route: Route, file: string): Promise<void> {
+    const module = await import(route.file) as Record<string, unknown>
     const revalidate = revalidatePeriod(file, module.revalidate)
 
-    for (const params of await listedParams(route, file, 'prerender', module.prerender)) {
+    if (options.exportAll)
+      refuseServerOnly(route, module)
+
+    // A static export takes a page without params as it is.
+    const listed = options.exportAll && module.prerender === undefined && route.params.length === 0 ? true : module.prerender
+
+    if (options.exportAll && (listed === undefined || listed === false))
+      throw new Error(listed === false ? 'kay: it exports prerender = false' : `kay: it takes ${route.params.join(', ')}, so \`prerender\` lists the values to export: export const prerender = [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }]`)
+
+    for (const params of await listedParams(route, file, 'prerender', listed)) {
       const path = pathOf(route, params)
       const matched = matchedParams(route, params, matchers)
 
@@ -57,7 +69,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
       for (const copy of localeCopies(i18n?.settings, path)) {
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
-        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head })
+        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head, base: basePath(config.base) })
         const response = await (i18n && copy.locale !== undefined ? runInLocale(stateFor(i18n, copy.locale, path, request), render) : render())
 
         if (response.status >= 500)
@@ -78,10 +90,49 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
     }
   }
 
+  // What keeps a page from a static export, each named, so one build reports them all.
+  const problems: string[] = []
+
+  for (const route of routes) {
+    // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
+    if (!options.exportAll && !await exportsPrerender(route.file))
+      continue
+
+    const file = relative(root, route.file)
+
+    try {
+      await prerenderRoute(route, file)
+    }
+    catch (error) {
+      if (!options.exportAll)
+        throw error
+
+      problems.push(`${file}: ${error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error)}`)
+    }
+  }
+
+  if (problems.length > 0)
+    throw new Error(`kay: ${count(problems.length)} cannot be exported to static files, which no server answers for:\n${problems.map(problem => `  ${problem}`).join('\n')}`)
+
   await writeManifest(root, { ...manifest, pages })
   client.pages = new Map(Object.entries(pages))
 
   return Object.keys(pages).length
+}
+
+// What only a server can do: a guard decides per request, and an action takes a post.
+function refuseServerOnly(route: Route, module: Record<string, unknown>): void {
+  if (route.guards.length > 0)
+    throw new Error('kay: a guard covers it, and only a server can run one per request')
+
+  const action = Object.keys(module).find(name => isAction(module[name]))
+
+  if (action !== undefined)
+    throw new Error(`kay: it exports the action ${action}, which only a server can take`)
+}
+
+function count(problems: number): string {
+  return problems === 1 ? '1 page' : `${problems} pages`
 }
 
 // The headers a prerendered page is served with: the cookies its render set were for no one.

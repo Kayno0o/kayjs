@@ -158,6 +158,35 @@ describe('kay new', () => {
     }
   })
 
+  it('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-site')
+
+    try {
+      const files = await createProject(dir, { kay: '^1.0.0', template: 'site' })
+      const manifest = await Bun.file(join(dir, 'package.json')).json() as { scripts: Record<string, string> }
+
+      expect(files).toContain('.forgejo/workflows/pages.yml')
+      expect(files).toContain('Dockerfile')
+      expect(files).not.toContain('src/server.ts')
+      expect(manifest.scripts.build).toBe('kay build --static')
+      expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toContain('SITE_BASE: /${{ github.repository }}')
+
+      await installKay(dir)
+      expect(await check(dir)).toEqual([])
+
+      const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', '--static'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, SITE_URL: 'https://pages.example', SITE_BASE: '/me/my-site' } })
+      const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+
+      expect(report).toContain('exported 1 page')
+      expect(code).toBe(0)
+      expect(await Bun.file(join(dir, 'dist/index.html')).text()).toContain('<link rel="canonical" href="https://pages.example/me/my-site/">')
+      expect(await Bun.file(join(dir, 'dist/404.html')).exists()).toBe(true)
+    }
+    finally {
+      await rm(join(dir, '..'), { recursive: true, force: true })
+    }
+  })
+
   it('refuses a directory that already holds files', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-new-'))
 

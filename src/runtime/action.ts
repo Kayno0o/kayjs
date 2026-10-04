@@ -2,6 +2,7 @@ import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { Locals, Redirect } from './checks'
 import type { Locale } from './i18n'
+import { withBase } from './base'
 import { createSignal, untrack } from './reactive'
 import { decodeValue, encodeValue, unflattenValue } from './wire'
 
@@ -199,7 +200,7 @@ function callable(url: () => string): { call: (input: never) => Promise<unknown>
 }
 
 async function post<Output>(url: string, input: unknown): Promise<Output> {
-  return readActionResponse(await fetch(url, { method: 'POST', ...encodeCall(input) }))
+  return readActionResponse(await fetch(withBase(url), { method: 'POST', ...encodeCall(input) }))
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.

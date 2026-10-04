@@ -39,6 +39,8 @@ export interface KayConfig {
   redirects?: Redirects
   // The locales pages are served in, each under its prefix or on its own domain, with messages in `src/messages/<locale>.ts`.
   i18n?: I18nConfig
+  // Where the site is mounted when not at its host's root, `/docs`: the links, assets, forms and redirects pages render, the sitemap and the feeds carry it, links stay written without it, and a proxy in front of the server takes it off requests.
+  base?: string
   // Whether a page's URL ends with a slash: `never`, the default, redirects `/about/` to `/about`; `always` the other way; `ignore` serves both.
   trailingSlash?: TrailingSlash
   // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.

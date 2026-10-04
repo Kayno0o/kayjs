@@ -4,6 +4,7 @@ import type { LocaleCopy } from './i18n'
 import { join } from 'node:path'
 import { localeState } from '../runtime/i18n.server'
 import { jsonLd } from '../runtime/seo'
+import { basePath } from './base'
 import { faviconTags } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
 import { localeCopies } from './i18n'
@@ -30,12 +31,13 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   if (config.favicon !== undefined)
     extra.push(...faviconTags(config.manifest))
 
-  return seoHead(config.site, config.seo, extra, config.trailingSlash)
+  return seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base))
 }
 
 // What `site`, `seo` and other settings such as the favicon give every page's head, or undefined when the project sets none and pages keep only their own tags.
-export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = [], trailingSlash?: TrailingSlash): SeoHead | undefined {
-  const origin = site === undefined ? undefined : siteOrigin(site)
+// Every URL it makes absolute goes under `base`, the site's mount point.
+export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = [], trailingSlash?: TrailingSlash, base = ''): SeoHead | undefined {
+  const origin = site === undefined ? undefined : siteOrigin(site) + base
 
   // Fonts or a favicon alone give a page no social card.
   const social = origin !== undefined || Object.keys(seo).length > 0

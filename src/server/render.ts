@@ -13,6 +13,7 @@ import { mapStack } from '../build/sourcemap'
 import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
 import { localeState } from '../runtime/i18n.server'
+import { rebaseHtml } from './base'
 import { importModule } from './bundle'
 import { preferredEncoding } from './compress'
 import { cookieJar } from './cookies'
@@ -56,6 +57,8 @@ export interface RenderOptions {
   onError?: KayConfig['onError']
   // The tags `site` and `seo` give every page.
   head?: SeoHead
+  // The site's mount point, which every path a page renders goes under.
+  base?: string
 }
 
 // What Elysia hands a route handler, derived and resolved values included; pages see it whole as `ctx.locals`.
@@ -68,6 +71,7 @@ interface Rendering {
   headers: Headers
   status: number
   writeCookies: () => void
+  base: string
 }
 
 const CHARSET = '<meta charset="utf-8">'
@@ -200,7 +204,7 @@ export async function renderUnmatched(special: SpecialPages, context: RequestCon
   return renderFailure(new NotFound(), special, createRendering(context, {}, options), new Map(), client, options)
 }
 
-function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG }: RenderOptions): Rendering {
+function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '' }: RenderOptions): Rendering {
   const { request } = context
   const jar = cookieJar(request)
   let flash: Flash | SuccessFlash | null | undefined
@@ -212,6 +216,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
   const rendering: Rendering = {
     headers,
     status: 200,
+    base,
     // How a form post went is for the one page the browser went back to.
     writeCookies: () => {
       if (hasFlash(request))
@@ -284,10 +289,13 @@ function hasFlash(request: Request): boolean {
   return request.headers.get('cookie')?.includes(FLASH_COOKIE) ?? false
 }
 
+// A page under a mount point has its paths put under it as it goes out; a prerendered one had them when it was rendered, and its compressed copies are left as they are.
 function respond(rendering: Rendering, body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>): Response {
   rendering.writeCookies()
 
-  return new Response(body, { status: rendering.status, headers: rendering.headers })
+  const response = new Response(body, { status: rendering.status, headers: rendering.headers })
+
+  return rendering.base !== '' && !(body instanceof Uint8Array) ? rebaseHtml(response, rendering.base) : response
 }
 
 // A redirect goes out as is; anything else renders the nearest special page, falling back to plain text.
@@ -373,7 +381,7 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
   const hasIslands = client.entry !== undefined && islands.count > 0
   const scripts = hasIslands ? islandScripts(client, islands.eager, streamed) : ''
   const locale = localeState()
-  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) : ''}${speculationRules(options.prefetch)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}`
+  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) : ''}${options.base ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${speculationRules(options.prefetch, options.base)}${options.dev ? LIVE_RELOAD : ''}</head><body>${body}`
 
   if (!streamed)
     return `${start}</body></html>`
