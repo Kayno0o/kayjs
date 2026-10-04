@@ -86,6 +86,12 @@ describe('formatKay', () => {
     expect(format(source)).toBe(['---', 'const text = `a  ', '', '', 'b`', '---', 'p {text}', ''].join('\n'))
   })
 
+  it('keeps a `---` line inside a template literal in the fence, as in a markdown front matter', () => {
+    const source = ['--- server', 'const md = `---', 'title: x', '---', 'body`', '---', 'p {md}', ''].join('\n')
+
+    expect(format(source)).toBe(source)
+  })
+
   it('keeps the trailing whitespace of text, which renders, and trims only blank lines', () => {
     expect(format('p Hello \n  b world\n  \n| tail  \n')).toBe('p Hello \n  b world\n\n| tail  \n')
     expect(format('p {\n  a\n} x  \n')).toBe('p {\n  a\n} x  \n')

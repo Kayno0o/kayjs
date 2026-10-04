@@ -173,6 +173,13 @@ describe('elements', () => {
     expect(errors('div\n  @header\n    h2 Title')).toEqual([expect.stringContaining('directly under a component')])
   })
 
+  it('reports a prop a slot passes a second time', () => {
+    expect(errors('Card\n  @a\n    p x\n  @a\n    p y')).toEqual(['`a` is passed twice, by another `@a` and by this `@a`'])
+    expect(errors('Card(a="1")\n  @a\n    p x')).toEqual(['`a` is passed twice, by an attribute and by this `@a`'])
+    expect(errors('Card\n  @children\n    p x\n  p y')).toEqual(['`children` is passed twice, by the lines under the tag and by this `@children`'])
+    expect(errors('Card\n  @a\n    p x\n  @b\n    p y\n  p z')).toEqual([])
+  })
+
   it('quotes static values JSX could not hold', () => {
     expect(jsx('p(title=\'say "hi"\')')).toBe('<p title=\'say "hi"\' />')
   })

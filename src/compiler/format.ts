@@ -33,36 +33,22 @@ export function formatKay(source: string): FormatResult {
   if (file.diagnostics.length > 0)
     return { code: source, diagnostics: file.diagnostics }
 
-  const lines = [...formatFences(normalized.slice(0, file.templateStart)), ...formatTemplate(file)]
+  const lines = [...formatFences(file), ...formatTemplate(file)]
 
   return { code: lines.length === 0 ? '' : `${lines.join('\n')}\n`, diagnostics: [] }
 }
 
 // Fence bodies stay verbatim, since trimming inside a template literal would change the program; only the fence lines and the blank lines around them are normalized.
-function formatFences(text: string): string[] {
+// The bodies are the parser's, which knows a `---` line inside a template literal closes nothing.
+function formatFences(file: KayFile): string[] {
   const out: string[] = []
-  let body: string[] | undefined
+  const bodies = [file.script, file.server].filter(body => body !== undefined).sort((a, b) => a.start - b.start)
 
-  for (const line of text.split('\n')) {
-    if (body === undefined) {
-      const open = FENCE_OPEN.exec(line)
+  for (const body of bodies) {
+    const open = FENCE_OPEN.exec(file.source.slice(file.source.lastIndexOf('\n', body.start - 2) + 1, body.start - 1))
 
-      if (open)
-        out.push(open[1] === undefined && open[2] === undefined ? '---' : `--- ${open[1] ?? open[2]}`)
-
-      body = open ? [] : undefined
-
-      continue
-    }
-
-    if (line.trimEnd() === '---') {
-      out.push(...trimBlankLines(body), '---')
-      body = undefined
-
-      continue
-    }
-
-    body.push(line)
+    out.push(open?.[1] === undefined && open?.[2] === undefined ? '---' : `--- ${open[1] ?? open[2]}`)
+    out.push(...trimBlankLines(file.source.slice(body.start, body.end).split('\n')), '---')
   }
 
   return out

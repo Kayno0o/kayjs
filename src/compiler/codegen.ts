@@ -726,6 +726,12 @@ class Generator {
 
       this.emitAttributes(element)
       const slots = element.children.filter((child): child is SlotNode => child.kind === 'slot')
+      const children = element.children.filter(child => child.kind !== 'slot')
+      // Each prop is passed once: by an attribute, by an `@name` block, or for `children` by the lines under the tag.
+      const passed = new Map<string, string>(element.attributes.flatMap(attribute => attribute.kind === 'spread' ? [] : [[this.text(attribute.name), 'an attribute']]))
+
+      if (children.length > 0)
+        passed.set('children', 'the lines under the tag')
 
       for (const slot of slots) {
         if (!element.component) {
@@ -734,11 +740,18 @@ class Generator {
           continue
         }
 
+        const name = this.text(slot.name)
+        const earlier = passed.get(name)
+
+        if (earlier !== undefined)
+          this.error(slot.name, `\`${name}\` is passed twice, by ${earlier} and by this \`@${name}\``)
+
+        passed.set(name, `another \`@${name}\``)
+
         b.add(' ').addSource(slot.name).add('={')
         this.emitRoot(slot.children)
         b.add('}')
       }
-      const children = element.children.filter(child => child.kind !== 'slot')
 
       if (children.length === 0) {
         b.add(' />')

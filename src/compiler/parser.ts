@@ -3,6 +3,7 @@ import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNod
 // `--- server`, or `--- <T extends Row>` making the component generic, its type parameters in the third group.
 const FENCE = /---(?:([ \t]*)([a-z]+)|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
 const CLOSING_FENCE = /^---[ \t]*$/gm
+const CLOSING_LINE = /---[ \t]*(?=\r?\n|$)/y
 const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
 const TAG_NAME = /[A-Z][\w-]*/iy
 const CLASS_NAME = /[\w\-:/@!]+/y
@@ -61,8 +62,7 @@ export function parseKay(source: string): KayFile {
     const spaced = fence[1] !== ''
     const bodyStart = fence.index + fence[0].length
 
-    CLOSING_FENCE.lastIndex = bodyStart
-    const closing = CLOSING_FENCE.exec(source)
+    const closing = closingFence(source, bodyStart)
     const span = { start: bodyStart, end: closing ? closing.index : source.length }
 
     templateStart = closing ? closing.index + closing[0].length : source.length
@@ -89,11 +89,57 @@ export function parseKay(source: string): KayFile {
   return { source, script: fences.script, server: fences.server, typeParameters, templateStart, template: parser.parseTemplate(), diagnostics }
 }
 
+// The `---` line closing a fence, past any inside a template literal or a comment, such as a markdown front matter the code holds.
+// Code that leaves a template literal open falls back to the first `---` line, so the template still parses.
+function closingFence(source: string, bodyStart: number): RegExpExecArray | null {
+  const scanned = new TemplateParser(source, bodyStart, []).closingLine()
+
+  if (scanned !== undefined) {
+    CLOSING_LINE.lastIndex = scanned
+
+    return CLOSING_LINE.exec(source)
+  }
+
+  CLOSING_FENCE.lastIndex = bodyStart
+
+  return CLOSING_FENCE.exec(source)
+}
+
 class TemplateParser {
   // The element that indented children attach to: the innermost one of a `li: a` block expansion.
   private target: ElementNode | undefined
 
   constructor(private readonly src: string, private pos: number, private readonly diagnostics: Diagnostic[]) {}
+
+  // Where the first `---` line outside strings, template literals and comments starts.
+  closingLine(): number | undefined {
+    const start = this.pos
+    let i = start
+
+    while (i < this.src.length) {
+      CLOSING_LINE.lastIndex = i
+
+      if ((i === start || this.src[i - 1] === '\n') && CLOSING_LINE.test(this.src))
+        return i
+
+      const char = this.src[i]!
+
+      if (char === '"' || char === '\'')
+        i = this.skipString(i, char)
+      else if (char === '`')
+        i = this.skipTemplate(i)
+      else if (char === '/' && this.src[i + 1] === '/')
+        i = this.lineEnd(i)
+      else if (char === '/' && this.src[i + 1] === '*')
+        i = this.skipBlockComment(i)
+      else if (char === '/')
+        i = Math.max(this.skipRegex(start, i), i + 1)
+      else
+        i++
+    }
+
+    return undefined
+  }
 
   parseTemplate(): Node[] {
     const nodes = this.parseBlock(-1)
@@ -772,9 +818,7 @@ class TemplateParser {
       }
 
       if (char === '/' && this.src[i + 1] === '*') {
-        const close = this.src.indexOf('*/', i + 2)
-
-        i = close === -1 ? this.src.length : close + 2
+        i = this.skipBlockComment(i)
 
         continue
       }
@@ -831,6 +875,12 @@ class TemplateParser {
     }
 
     return i + 1
+  }
+
+  private skipBlockComment(open: number): number {
+    const close = this.src.indexOf('*/', open + 2)
+
+    return close === -1 ? this.src.length : close + 2
   }
 
   private skipString(open: number, quote: string): number {

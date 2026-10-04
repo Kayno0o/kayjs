@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { KayCompileError } from '../src/build/transform'
 import { codeFrame } from '../src/compiler/frame'
+import { offsetAt } from '../src/compiler/mapping'
 import { buildClient } from '../src/server/client'
 
 describe('compile errors', () => {
@@ -13,6 +14,13 @@ describe('compile errors', () => {
 
     expect(codeFrame(source, start, start + 3)).toBe('2 | b\n3 | c\n4 | p {user.nam}\n  |         ^^^')
     expect(codeFrame(source, 0, source.length)).toBe('1 | a\n  | ^')
+  })
+
+  it('reads a column past the end of its line as that end, line breaks of either kind', () => {
+    expect(offsetAt('ab\ncd', { line: 1, column: 9 })).toBe(2)
+    expect(offsetAt('ab\r\ncd', { line: 1, column: 9 })).toBe(2)
+    expect(offsetAt('ab\ncd', { line: 2, column: 9 })).toBe(5)
+    expect(offsetAt('ab\ncd', { line: 2, column: 2 })).toBe(4)
   })
 
   it('reports every broken component of a project at once, before bundling anything', async () => {

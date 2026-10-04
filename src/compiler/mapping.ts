@@ -198,6 +198,7 @@ export function positionAt(source: string, offset: number): Position {
   return { line, column: offset - lineStart + 1 }
 }
 
+// A column past the end of its line stops at that end, as LSP positions do, rather than running into the next line.
 export function offsetAt(source: string, position: Position): number {
   let offset = 0
 
@@ -210,5 +211,8 @@ export function offsetAt(source: string, position: Position): number {
     offset = next + 1
   }
 
-  return offset + position.column - 1
+  const newline = source.indexOf('\n', offset)
+  const end = newline === -1 ? source.length : source[newline - 1] === '\r' ? newline - 1 : newline
+
+  return Math.min(offset + position.column - 1, end)
 }

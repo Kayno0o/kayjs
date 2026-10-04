@@ -61,6 +61,16 @@ describe('fence', () => {
     expect(outline(file)).toEqual([{ tag: 'p', children: [['hi']] }])
   })
 
+  it('closes a fence past a `---` line inside a template literal or a comment, and on the first one when a template literal never closes', () => {
+    const markdown = parse('--- server\nconst md = `---\ntitle: x\n---\nbody`\n/*\n---\n*/\n---\np {md}\n')
+    const unclosed = parse('---\nconst s = "`"\nconst bad = `oops\n---\np x\n')
+
+    expect(text(markdown, markdown.server)).toBe('const md = `---\ntitle: x\n---\nbody`\n/*\n---\n*/\n')
+    expect(outline(markdown)).toEqual([{ tag: 'p', children: [['{md}']] }])
+    expect(text(unclosed, unclosed.script)).toBe('const s = "`"\nconst bad = `oops\n')
+    expect(outline(unclosed)).toEqual([{ tag: 'p', children: [['x']] }])
+  })
+
   it('reports an unclosed fence', () => {
     expect(parse('---\nconst a = 1\n').diagnostics[0]?.message).toContain('never closed')
   })
