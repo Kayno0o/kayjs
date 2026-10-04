@@ -24,6 +24,9 @@ export const FILE_MARK = '$kayFile'
 const FILE_TYPE = 'KayFile'
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
 
+// The `x-kay-action` of a call whose input is a form's fields rather than encoded.
+export const FORM_CALL = 'form'
+
 export interface EncodedCall {
   headers: Record<string, string>
   body: string | FormData
@@ -86,6 +89,8 @@ export type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSucc
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output, Honeypot extends string = never> {
   (input: Input): Promise<Success<Output>>
+  // A form's fields, read as a plain form post reads them: `add(new FormData(form))`.
+  (form: FormData): Promise<Success<Output>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
   readonly url: string
@@ -233,6 +238,10 @@ async function post<Output>(url: string, input: unknown): Promise<Output> {
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
 export function encodeCall(input: unknown): EncodedCall {
+  // Sent as the form it is, for the server to read as a form post and answer as a call.
+  if (input instanceof FormData)
+    return { headers: { 'x-kay-action': FORM_CALL }, body: input }
+
   const files: Blob[] = []
   const text = encodeValue(input, { [FILE_TYPE]: (value: unknown) => value instanceof Blob && [files.push(value) - 1] })
 

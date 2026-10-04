@@ -49,6 +49,27 @@ describe('kay/test', () => {
     expect(signed.cookies.has('session')).toBe(false)
   })
 
+  it('calls an action with a form\'s fields, read as a form post reads them and answered as a call', async () => {
+    const signed = await testSite({ routes: 'tests/fixtures/session/src/routes', use: [session({ secret: 'a test secret of at least 32 characters' })], locals: () => ({ greeting: 'Hello' }) })
+    const { profile } = await import(join(import.meta.dir, 'fixtures/session/src/routes/index.kay')) as { profile: Action<{ age: number, admin: boolean, tags: string[], rank?: number }, unknown> }
+    const form = (fields: [string, string][]) => {
+      const data = new FormData()
+
+      for (const [name, value] of fields)
+        data.append(name, value)
+
+      return data
+    }
+
+    // Coerced as a form post's fields are, the blank optional left out.
+    expect(await signed.call(profile, form([['age', '36'], ['admin', 'on'], ['tags', 'a'], ['tags', 'b'], ['rank', '']]))).toEqual({ age: 36, admin: true, tags: ['a', 'b'] })
+
+    await expect(signed.call(profile, form([['age', 'old'], ['admin', 'on']]))).rejects.toBeInstanceOf(ActionError)
+    await expect(signed.call(profile, form([['age', 'old'], ['admin', 'on']]))).rejects.toMatchObject({ status: 422, errors: { age: expect.any(String) } })
+    // The honeypot catches a form's fields however they are sent.
+    await expect(signed.call(profile, form([['age', '1'], ['website', 'spam']]))).rejects.toMatchObject({ status: 422, errors: { website: 'Leave this field empty' } })
+  })
+
   it('stops at a redirect to another site', async () => {
     const bare = await testSite({ routes: 'tests/fixtures/bare/src/routes' })
     const away = await bare.visit(`/?next=${encodeURIComponent('https://example.com/about')}`)

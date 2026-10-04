@@ -8,7 +8,7 @@ import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import { dirname, sep } from 'node:path'
-import { decodeCall, failure, FAILURE_HEADER, isAction, isFailure } from '../runtime/action'
+import { decodeCall, failure, FAILURE_HEADER, FORM_CALL, isAction, isFailure } from '../runtime/action'
 import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/i18n.server'
 import { NAVIGATE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
@@ -80,13 +80,15 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
           refuseCrossSite(context.request)
 
           const call = isCall(context.request)
-          const refusal = protectionRefusal(value, context.request, context.body, !call, context.server)
+          // A call may send a form's fields, read as a plain form post's are.
+          const asForm = !call || context.request.headers.get('x-kay-action') === FORM_CALL
+          const refusal = protectionRefusal(value, context.request, context.body, asForm, context.server)
 
           // Before the schema reads the input: every attempt counts, a valid one or not.
           if (refusal)
             throw new Refusal(failed(context.request, new Headers(refusal.headers), cookieJar(context.request).cookies, { action: value.url, status: refusal.status, values: call ? {} : submittedValues(context.body), errors: { [refusal.field]: refusal.message } }))
 
-          context.body = call ? callInput(context.body) : formInput(value.schema, withoutEmptyFiles(context.body))
+          context.body = asForm ? formInput(value.schema, withoutEmptyFiles(context.body)) : callInput(context.body)
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
         ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, context, options)) }),
@@ -246,7 +248,9 @@ function sameHost(request: Request, url: string | null): url is string {
 
 // A fetch from an island wants a result; a plain form post goes back to the page it came from.
 function isCall(request: Request): boolean {
-  return request.headers.get('x-kay-action') === '1'
+  const header = request.headers.get('x-kay-action')
+
+  return header === '1' || header === FORM_CALL
 }
 
 function backTo(request: Request): string {

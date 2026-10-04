@@ -43,8 +43,8 @@ export interface TestSite {
   visit: (path: string, init?: VisitInit) => Promise<Visit>
   // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser.
   submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot, FormValue | FormValue[]>>, init?: VisitInit & { from?: string }) => Promise<Visit>
-  // The call an island makes: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
-  call: <Input, Output>(action: Action<Input, Output>, input: Input, init?: VisitInit) => Promise<Success<Output>>
+  // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
+  call: <Input, Output>(action: Action<Input, Output>, input: Input | FormData, init?: VisitInit) => Promise<Success<Output>>
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
   fetch: (path: string, init?: Omit<RequestInit, 'headers'> & VisitInit) => Promise<Response>
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
