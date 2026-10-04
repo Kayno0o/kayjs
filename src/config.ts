@@ -15,6 +15,10 @@ export interface KayConfig {
   site?: string
   seo?: SeoConfig
   images?: ImagesConfig
+  // A square image, 512 pixels wide or more, relative to the root: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page.
+  favicon?: string
+  // The web manifest served with the favicon, named after `seo.name`.
+  manifest?: ManifestConfig
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
@@ -38,6 +42,15 @@ export interface SeoConfig {
   locale?: string
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
   jsonLd?: Record<string, unknown>[]
+}
+
+export interface ManifestConfig {
+  // The name under the icon on a home screen; defaults to `seo.name`.
+  shortName?: string
+  // Also every page's `theme-color`.
+  themeColor?: string
+  backgroundColor?: string
+  display?: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser'
 }
 
 export interface ImagesConfig {

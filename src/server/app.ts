@@ -13,6 +13,7 @@ import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents } from './dev'
+import { FAVICON_DIR, faviconTags, serveFavicons } from './favicon'
 import { loadGuards } from './guards'
 import { serveImages } from './image'
 import { registerLoader } from './loader'
@@ -81,7 +82,7 @@ function withoutTrailingSlash(url: URL, route: Route): Response {
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(root: string, options: PagesOptions, loadClient: () => Promise<ClientBuild>) {
   const routesDir = resolve(root, options.routes ?? 'src/routes')
-  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: seoHead(options.site, options.seo) }
+  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: seoHead(options.site, options.seo, options.favicon === undefined ? [] : faviconTags(options.manifest)) }
 
   // An executable carries its routes and modules compiled; anything else finds them on disk and compiles them as they load.
   const bundle = bundled()
@@ -140,6 +141,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   if (options.site !== undefined)
     serveSitemap(app, routes, siteOrigin(options.site), publicUrls, { dev: options.dev, onError: options.onError })
+
+  if (options.favicon !== undefined)
+    serveFavicons(app, new Set([...publicUrls, ...routes.map(route => route.pattern)]), { source: resolve(root, options.favicon), builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, manifest: options.manifest })
 
   const prerendered = await loadPrerendered(client)
 

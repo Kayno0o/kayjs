@@ -4,14 +4,14 @@ import type { HeadOptions, HeadTag } from '../runtime/head'
 // The head options of one response, from its URL and status.
 export type SeoHead = (url: URL, status: number) => HeadOptions
 
-// What `site` and `seo` give every page's head, or undefined when the project sets neither and pages keep only their own tags.
-export function seoHead(site: string | undefined, seo: SeoConfig = {}): SeoHead | undefined {
+// What `site`, `seo` and other settings such as the favicon give every page's head, or undefined when the project sets none and pages keep only their own tags.
+export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = []): SeoHead | undefined {
   const origin = site === undefined ? undefined : siteOrigin(site)
 
-  if (origin === undefined && Object.keys(seo).length === 0)
+  if (origin === undefined && Object.keys(seo).length === 0 && extra.length === 0)
     return undefined
 
-  const tags: HeadTag[] = [meta('property', 'og:type', 'website')]
+  const tags: HeadTag[] = [...extra, meta('property', 'og:type', 'website')]
 
   if (seo.name !== undefined)
     tags.push({ tag: 'title', props: { children: seo.name } }, meta('property', 'og:site_name', seo.name))

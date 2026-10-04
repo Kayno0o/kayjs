@@ -6,6 +6,7 @@ import { join, relative, resolve } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
+import { faviconTags } from './favicon'
 import { registerLoader } from './loader'
 import { renderPage } from './render'
 import { refuseClashes, scanRoutes } from './routes'
@@ -21,7 +22,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
     throw new Error('kay: no client build to add prerendered pages to; run buildClient first')
 
   const dir = join(root, '.kay', 'client', PRERENDERED_DIR)
-  const head = seoHead(config.site, config.seo)
+  const head = seoHead(config.site, config.seo, config.favicon === undefined ? [] : faviconTags(config.manifest))
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
 

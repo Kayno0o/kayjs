@@ -246,6 +246,22 @@ h1 {post.title}
 
 In production the sitemap is built on the first request and kept for an hour; development builds it per request.
 
+### Favicon and web manifest
+
+`favicon` in `kay.config.ts` names a square image, 512 pixels wide or more, relative to the root: `favicon: 'src/favicon.png'`. kay serves it as `/favicon.ico` (16, 32 and 48 pixels), `/apple-touch-icon.png` (180), `/icon-192.png` and `/icon-512.png`, plus `/manifest.webmanifest`, and links them from every page. `kay build` writes them; development makes them from the image on first request. Each path a public file or a page already serves is left to it.
+
+```ts
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  favicon: 'src/favicon.png',
+  seo: { name: 'Example' },
+  manifest: { shortName: 'Ex', themeColor: '#1e1e2e', backgroundColor: '#11111b', display: 'standalone' },
+})
+```
+
+The manifest is named after `seo.name`, `shortName` defaulting to it; `themeColor` is also every page's `theme-color`.
+
 ## Styles
 
 A component script or any `.ts` module imports its stylesheet: `import './card.css'`. Each page links one stylesheet per layout, outermost first, then its own, holding the CSS of every component it renders, islands included. Bun bundles them: `@import`, nesting and relative `url()` assets work, and `url(/logo.png)` is left for a public file.

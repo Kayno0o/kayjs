@@ -15,6 +15,7 @@ import { startServer } from './lsp/server'
 import { createProject } from './new'
 import { buildClient, PRERENDERED_DIR } from './server/client'
 import { compressFiles } from './server/compress'
+import { FAVICON_DIR, writeFavicons } from './server/favicon'
 import { writeImageVariants } from './server/image'
 import { prerenderPages } from './server/prerender'
 
@@ -149,6 +150,9 @@ async function build(args: string[]): Promise<number> {
     const prerendered = await prerenderPages(root, config, client)
 
     await writeImageVariants(client.dir, config.images?.quality)
+
+    if (config.favicon !== undefined)
+      await writeFavicons(resolve(root, config.favicon), join(client.dir, '..', FAVICON_DIR))
 
     await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 
