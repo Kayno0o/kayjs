@@ -20,6 +20,7 @@ import { registerLoader } from './loader'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
 import { decodePath, refuseClashes, scanRoutes, specialPagesOf } from './routes'
+import { securityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
 import { serveSitemap } from './sitemap'
 
@@ -95,6 +96,15 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const routes = await Promise.all(scanned.map(loadGuards))
   const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined) }
   const app = new Elysia({ name: 'kay/pages', seed: root })
+  const security = securityHeaders(options)
+
+  // onRequest runs for every route of the app, its own included; a header the app set before is kept.
+  if (security) {
+    app.onRequest(({ set }) => {
+      for (const [name, value] of Object.entries(security))
+        set.headers[name] ??= value
+    })
+  }
 
   if (options.dev)
     app.get(DEV_EVENTS, () => devEvents())

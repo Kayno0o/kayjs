@@ -22,6 +22,8 @@ export interface KayConfig {
   manifest?: ManifestConfig
   // Self-hosted fonts, declared and preloaded on every page.
   fonts?: FontConfig[]
+  // The security headers every response carries, or `false` for none; a header the app sets itself wins.
+  security?: SecurityConfig | false
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch
   // Bun plugins the browser build runs, such as Tailwind's.
@@ -45,6 +47,13 @@ export interface SeoConfig {
   locale?: string
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
   jsonLd?: JsonLd[]
+}
+
+export interface SecurityConfig {
+  // Directives merged over kay's Content-Security-Policy, `{ 'img-src': ["'self'"] }`, one given `false` left out, or `false` for no policy; `script-src` keeps the hashes of kay's inline scripts.
+  csp?: Record<string, string[] | false> | false
+  // Headers merged over kay's, one given `false` not sent: `{ 'strict-transport-security': 'max-age=63072000; includeSubDomains' }`.
+  headers?: Record<string, string | false>
 }
 
 export interface FontConfig {

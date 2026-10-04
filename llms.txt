@@ -644,25 +644,31 @@ Every page carries speculation rules: Chromium prefetches the page a link points
 }
 ```
 
-## Content-Security-Policy
+## Security headers
 
-Every inline script kay writes is the same on every page: Solid's hydration bootstrap, the speculation rules and the swap of streamed blocks. A policy allows them by hash, with no `'unsafe-inline'` and no nonce:
+Every response the app sends, its own routes included, carries a Content-Security-Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: SAMEORIGIN`. The policy:
 
-```ts
-import { Elysia } from 'elysia'
-import { inlineScriptHashes, pages } from 'kay/server'
-
-const policy = `default-src 'self'; script-src 'self' ${inlineScriptHashes().join(' ')}`
-
-new Elysia()
-  .onRequest(({ set }) => {
-    set.headers['content-security-policy'] = policy
-  })
-  .use(await pages())
-  .listen(3000)
+```text
+default-src 'self'; script-src 'self' <kay's hashes>; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
 ```
 
-`inlineScriptHashes({ prefetch, dev })` takes the project's `prefetch` setting when it is not the default, and `dev: true` adds the live-reload script `kay dev` pages carry.
+Every inline script kay writes is the same on every page: the hydration bootstrap, the speculation rules, the swap of streamed blocks and, in development, live reload. The policy allows them by hash, with no `'unsafe-inline'` and no nonce. `security` in `kay.config.ts` adjusts it:
+
+```ts
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  security: {
+    csp: { 'img-src': ['\'self\'', 'https://images.example.com'], 'frame-ancestors': false },
+    headers: { 'strict-transport-security': 'max-age=63072000; includeSubDomains', 'x-frame-options': false },
+  },
+})
+```
+
+- `csp` merges directives over kay's, one given `false` left out; `script-src` keeps kay's hashes whatever it lists. `csp: false` sends no policy, `security: false` none of these headers.
+- `headers` merges headers over kay's, one given `false` not sent. HSTS is not sent by default: it binds the domain to https for its `max-age`, so it is the app's call.
+- A header the app sets itself, in an Elysia `onRequest` or a handler, wins over kay's.
+- `inlineScriptHashes({ prefetch, dev })` from `kay/server` gives the hashes, for a policy written elsewhere, such as by a proxy.
 
 ## Commands
 
