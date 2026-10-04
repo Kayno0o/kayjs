@@ -7,6 +7,7 @@ import process from 'node:process'
 import { ASSET_PREFIX, clientDir } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { kay } from '../build/plugin'
+import { mapBundleToKay } from '../build/sourcemap'
 import { styleImports, withoutStyles } from '../build/styles'
 import { analyzeKayCached, KayCompileError } from '../build/transform'
 
@@ -46,6 +47,8 @@ export interface ClientOptions {
   plugins?: BunPlugin[]
   // Page directory relative to the root: its pages and layouts are where stylesheets are gathered from.
   routes?: string
+  // Links each island chunk to a map of its `.kay` sources, for the browser's devtools.
+  sourcemap?: boolean
 }
 
 interface MetafileOutput {
@@ -154,6 +157,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     target: 'browser',
     splitting: true,
     minify: options.minify ?? false,
+    sourcemap: options.sourcemap ? 'linked' : 'none',
     metafile: true,
     // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which shipped Solid's dev build.
     define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') },
@@ -163,6 +167,8 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 
   if (!build.success)
     throw new AggregateError(build.logs, 'kay: client build failed')
+
+  await Promise.all(build.outputs.filter(output => output.kind === 'sourcemap').map(async output => mapBundleToKay(output.path)))
 
   return islandManifest(root, build.metafile!.outputs as Outputs, islands)
 }

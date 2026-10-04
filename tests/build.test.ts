@@ -30,6 +30,28 @@ describe('kay build', () => {
     }
   })
 
+  it('maps each island chunk to the lines and text of its .kay source', async () => {
+    const counter = join(root, 'counter.kay')
+    const source = await Bun.file(counter).text()
+
+    try {
+      const client = await buildClient(root, { sourcemap: true })
+      const maps = (await readdir(client.dir)).filter(file => file.endsWith('.js.map'))
+      const bundles = await Promise.all(maps.map(async file => await Bun.file(join(client.dir, file)).json() as { sources: string[], sourcesContent: string[], mappings: string }))
+      const bundle = bundles.find(map => map.sources.some(path => path.endsWith('/counter.kay')))!
+      const index = bundle.sources.findIndex(path => path.endsWith('/counter.kay'))
+      const lines = sourceLines(bundle.mappings, index)
+
+      expect(bundle.sourcesContent[index]).toBe(source)
+      // `button(onClick={() => count.set(c => c + 1)}) Count {count()}` is the template's one line.
+      expect(lines).toContain(source.split('\n').findIndex(line => line.startsWith('button(')))
+      expect(Math.max(...lines)).toBeLessThan(source.split('\n').length)
+    }
+    finally {
+      await rm(join(root, '.kay'), { recursive: true, force: true })
+    }
+  })
+
   it('runs the build plugins of the project on its stylesheets', async () => {
     const site = join(import.meta.dir, 'fixtures/site')
     const plugin: BunPlugin = { name: 'test', setup: build => void build.onLoad({ filter: /theme\.css$/ }, () => ({ contents: '.from-plugin { color: red }', loader: 'css' })) }
@@ -222,3 +244,43 @@ describe('compile cache', () => {
     }
   })
 })
+
+const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+// The 0-based lines of one source a v3 map points at, decoded here rather than by kay so a mistake both ways round cannot pass.
+function sourceLines(mappings: string, source: number): number[] {
+  const fields = [0, 0, 0, 0, 0]
+  const lines: number[] = []
+
+  for (const line of mappings.split(';')) {
+    fields[0] = 0
+
+    for (const segment of line.split(',').filter(text => text !== '')) {
+      const values: number[] = []
+      let value = 0
+      let shift = 0
+
+      for (const char of segment) {
+        const digit = BASE64.indexOf(char)
+
+        value += (digit & 31) << shift
+        shift += 5
+
+        if (digit & 32)
+          continue
+
+        values.push(value & 1 ? -(value >>> 1) : value >>> 1)
+        value = 0
+        shift = 0
+      }
+
+      for (const [index, delta] of values.entries())
+        fields[index]! += delta
+
+      if (values.length > 1 && fields[1] === source)
+        lines.push(fields[2]!)
+    }
+  }
+
+  return lines
+}

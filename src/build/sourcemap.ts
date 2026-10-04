@@ -1,4 +1,5 @@
 import type { SourceMap } from '../compiler'
+import { dirname, resolve } from 'node:path'
 import { withoutTwin } from '../compiler'
 import { offsetAt, positionAt } from '../compiler/mapping'
 
@@ -14,7 +15,17 @@ interface Compiled {
   lines?: Segment[][]
 }
 
-const BASE64_DIGITS = new Map([...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'].map((char, index) => [char, index]))
+// A segment of a bundle's map, fields absolute: generated column, then source, line, column and name when it has them.
+type BundleSegment = number[]
+
+interface BundleMap {
+  sources: string[]
+  sourcesContent?: (string | null)[]
+  mappings: string
+}
+
+const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+const BASE64_DIGITS = new Map([...BASE64].map((char, index) => [char, index]))
 // A stack line is `at fn (path:line:column)` or `at path:line:column`, and the path may hold spaces and parentheses.
 const FRAME_START = /^\s*at\s+/
 const PATH_IN_PARENTHESES = /\s\((?=\/|[A-Z]:[\\/])/i
@@ -28,20 +39,94 @@ const VLQ_VALUE = 31
 // Bun reports positions in the JavaScript a plugin returns and ignores any source map with it, so kay maps `.kay` frames itself.
 // A file the compile cache served compiles again for its maps only when a stack needs them.
 const compiled = new Map<string, Compiled | (() => Compiled)>()
+// A file's browser build differs from its server one, so island bundles read maps of their own.
+const browserCompiled = new Map<string, Compiled | (() => Compiled)>()
 
-export function registerSourceMap(file: string, entry: Omit<Compiled, 'lines'> | (() => Omit<Compiled, 'lines'>)): void {
-  compiled.set(file, entry)
+export function registerSourceMap(file: string, entry: Omit<Compiled, 'lines'> | (() => Omit<Compiled, 'lines'>), browser = false): void {
+  (browser ? browserCompiled : compiled).set(file, entry)
 }
 
-function compiledFor(file: string): Compiled | undefined {
-  let entry = compiled.get(file)
+function compiledFor(file: string, registry = compiled): Compiled | undefined {
+  let entry = registry.get(file)
 
   if (typeof entry === 'function') {
     entry = entry()
-    compiled.set(file, entry)
+    registry.set(file, entry)
   }
 
   return entry
+}
+
+// Bun maps a bundle to the JavaScript a plugin returned and ignores any map that came with it, so the `.kay` sources of an island bundle's map are pointed on at their `.kay` lines and text.
+export async function mapBundleToKay(mapFile: string): Promise<void> {
+  const bundle = await Bun.file(mapFile).json() as BundleMap
+  const entries = bundle.sources.map(source => compiledFor(resolve(dirname(mapFile), source), browserCompiled))
+
+  if (entries.every(entry => entry === undefined))
+    return
+
+  const lines = decodeBundleMappings(bundle.mappings).map(segments => segments.map((segment) => {
+    const entry = segment.length > 1 ? entries[segment[1]!] : undefined
+
+    if (!entry)
+      return segment
+
+    const position = toKay(entry, segment[2]! + 1, segment[3]! + 1)
+
+    // A segment the `.kay` source has no counterpart for keeps its column only.
+    return position ? [segment[0]!, segment[1]!, position.line - 1, position.column - 1, ...segment.slice(4)] : [segment[0]!]
+  }))
+
+  bundle.sourcesContent = bundle.sources.map((_source, index) => entries[index]?.source ?? bundle.sourcesContent?.[index] ?? null)
+  bundle.mappings = encodeBundleMappings(lines)
+  await Bun.write(mapFile, JSON.stringify(bundle))
+}
+
+function decodeBundleMappings(mappings: string): BundleSegment[][] {
+  const fields = [0, 0, 0, 0, 0]
+
+  return mappings.split(';').map((line) => {
+    fields[0] = 0
+
+    return line.split(',').filter(segment => segment !== '').map((segment) => {
+      const values = decodeVlq(segment)
+
+      for (const [index, value] of values.entries())
+        fields[index]! += value
+
+      return fields.slice(0, values.length)
+    })
+  })
+}
+
+function encodeBundleMappings(lines: BundleSegment[][]): string {
+  const fields = [0, 0, 0, 0, 0]
+
+  return lines.map((segments) => {
+    fields[0] = 0
+
+    return segments.map(segment => segment.map((value, index) => {
+      const delta = value - fields[index]!
+
+      fields[index] = value
+
+      return encodeVlq(delta)
+    }).join('')).join(',')
+  }).join(';')
+}
+
+function encodeVlq(value: number): string {
+  let rest = value < 0 ? (-value << 1) | 1 : value << 1
+  let encoded = ''
+
+  do {
+    const digit = rest & VLQ_VALUE
+
+    rest >>>= 5
+    encoded += BASE64[rest > 0 ? digit | VLQ_CONTINUATION : digit]
+  } while (rest > 0)
+
+  return encoded
 }
 
 // Points every `.kay` frame of a stack at the line and column of the `.kay` source; other frames are left as they are.

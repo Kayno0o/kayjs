@@ -60,7 +60,7 @@ export function transformKay(source: string, filename: string, options: Transfor
   const { code, tsx, map, solidMap } = compile(source, filename, options)
 
   if (solidMap !== undefined)
-    registerSourceMap(filename, { source, tsx, map, solidMap })
+    registerSourceMap(filename, { source, tsx, map, solidMap }, options.target === 'dom')
 
   return code
 }
@@ -75,13 +75,11 @@ export async function transformKayCached(source: string, filename: string, optio
   const cached = await readCacheEntry<string>(entry)
 
   if (cached !== undefined) {
-    if (options.target === 'ssr') {
-      registerSourceMap(filename, () => {
-        const { tsx, map, solidMap } = compile(source, filename, options)
+    registerSourceMap(filename, () => {
+      const { tsx, map, solidMap } = compile(source, filename, options)
 
-        return { source, tsx, map, solidMap: solidMap ?? '{"mappings":""}' }
-      })
-    }
+      return { source, tsx, map, solidMap: solidMap ?? '{"mappings":""}' }
+    }, options.target === 'dom')
 
     return cached
   }
@@ -135,10 +133,10 @@ function compile(source: string, filename: string, options: TransformOptions): C
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))
 
   // Only what renders inside an island carries hydration markers; on the server everything else renders once.
-  // Server code is what throws inside loads and renders, so its stacks are the ones mapped back to the `.kay` source.
-  const output = transform(tsx, { filename: `${file}.tsx`, generate: options.target, hydratable: hydratable && (!server || twin || island !== undefined), sourceMap: server })
+  // Server stacks and island bundles in development are mapped back to the `.kay` source through Solid's map.
+  const output = transform(tsx, { filename: `${file}.tsx`, generate: options.target, hydratable: hydratable && (!server || twin || island !== undefined), sourceMap: true })
 
-  return { code: output.code, tsx, map, solidMap: server ? output.map ?? undefined : undefined }
+  return { code: output.code, tsx, map, solidMap: output.map ?? undefined }
 }
 
 function compilerFingerprint(): string {
