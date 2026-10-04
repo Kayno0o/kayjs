@@ -131,20 +131,31 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await writeIfChanged(assetsPath, ASSET_TYPES)
   await writeIfChanged(iconsPath, iconTypes(root))
 
-  // A library's components compile against the app's types; their own compile errors are the library's to report.
+  // A library's components compile against the app's types, and the ones it reaches are reported as its own: `kay build` compiles those.
   const libraries = await findKayLibraries(root)
-  const reached = new Set((await reachableLibraryFiles(root, libraries, own)).map(file => throughNodeModules(libraryOf(libraries, file)!, file)))
+  const reached = new Set((await reachableLibraryFiles(root, libraries, own)).components.map((file) => {
+    const library = libraryOf(libraries, file)
+
+    return library ? throughNodeModules(library, file) : file
+  }))
   const unreached = new Set<string>()
 
   await Promise.all(libraries.flatMap(library => library.files).map(async (file) => {
-    const { shadow } = compileShadow(root, routesDir, file, await Bun.file(file).text())
+    const source = await Bun.file(file).text()
+    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source)
     const path = shadowPath(root, file)
 
     await writeIfChanged(path, shadow.tsx)
     files.set(path, shadow)
 
-    if (!reached.has(file))
+    if (!reached.has(file)) {
       unreached.add(file)
+
+      return
+    }
+
+    for (const diagnostic of compileDiagnostics)
+      diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message, checkOnly: diagnostic.checkOnly })
   }))
 
   await writeIfChanged(packagesPath, packageTypes(root, libraries))

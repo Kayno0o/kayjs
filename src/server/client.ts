@@ -7,7 +7,7 @@ import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { ASSET_PREFIX, clientDir } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
-import { findKayLibraries, reachableLibraryFiles, templateWords } from '../build/libraries'
+import { findKayLibraries, reachableLibraryFiles, sourceWords } from '../build/libraries'
 import { kay } from '../build/plugin'
 import { forgetBundleMaps } from '../build/sourcemap'
 import { styleImports, withoutStyles } from '../build/styles'
@@ -89,8 +89,8 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   // A library's components the app reaches compile with its own.
   const own = await findKayFiles(root, { project: true })
   const libraries = await findKayLibraries(root)
-  const fromLibraries = new Set(await reachableLibraryFiles(root, libraries, own))
-  const files = [...own, ...fromLibraries]
+  const fromLibraries = await reachableLibraryFiles(root, libraries, own)
+  const files = [...own, ...fromLibraries.components]
   const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
   const cacheDir = join(root, '.kay', 'cache')
@@ -108,12 +108,12 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
 
     for (const name of compiled.classes)
       classes.add(name)
+  }
 
-    // Tailwind reads the app's files itself, never a package's, so a library's template words go to it here too.
-    if (fromLibraries.has(file)) {
-      for (const name of templateWords(source))
-        classes.add(name)
-    }
+  // Tailwind reads the app's files itself, never a package's, so the words of the library files the app reaches go to it here: its components, and its scripts holding default classes.
+  for (const source of [...sources.slice(own.length), ...await Promise.all(fromLibraries.scripts.map(async file => Bun.file(file).text()))]) {
+    for (const name of sourceWords(source))
+      classes.add(name)
   }
 
   if (diagnostics.length > 0)

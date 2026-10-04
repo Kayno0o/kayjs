@@ -149,7 +149,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const bundle = bundled()
 
   if (!bundle)
-    registerLoader(root, options.settings)
+    await registerLoader(root, options.settings)
 
   const [scanned, client] = await Promise.all([bundle?.routes ?? scanRoutes(routesDir), loadClient()])
 

@@ -33,7 +33,7 @@ export async function projectCollections(root: string, config?: string): Promise
 
   // Its components are `.kay` files.
   if (!bundle)
-    registerLoader(root)
+    await registerLoader(root)
 
   const module = await importModule<Record<string, unknown>>(file)
 

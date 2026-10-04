@@ -61,7 +61,8 @@ export async function findKayLibraries(root: string): Promise<KayLibrary[]> {
   if (manifest)
     await visit(root, manifest, APP_DEPENDENCIES)
 
-  return [...found.values()]
+  // In the order of their directories, so what is generated from them reads the same from one run to the next.
+  return [...found.values()].sort((a, b) => a.dir.localeCompare(b.dir))
 }
 
 // What the app's `settings` replaces: each library's settings module, by its path under `node_modules` and its real one, and the app's module taking its place.
@@ -77,9 +78,17 @@ export function settingsReplacements(root: string, settings: Record<string, stri
     if (declared === undefined)
       throw new Error(`kay: settings name ${name}, whose package.json declares no "kay": { "settings": ... } module to replace`)
 
-    const defaults = resolve(dir, declared)
+    // Resolved as an import would be, so `./src/settings` names the file the bundler loads.
+    let defaults: string
 
-    return { library: name, defaults, paths: existsSync(defaults) ? [...new Set([defaults, realpathSync(defaults)])] : [defaults], replacement: resolve(root, module) }
+    try {
+      defaults = Bun.resolveSync(declared.startsWith('.') ? declared : `./${declared}`, dir)
+    }
+    catch {
+      throw new Error(`kay: settings name ${name}, whose settings module ${declared} does not exist`)
+    }
+
+    return { library: name, defaults, paths: [...new Set([defaults, realpathSync(defaults)])], replacement: resolve(root, module) }
   })
 }
 
@@ -91,9 +100,15 @@ export interface SettingsReplacement {
   replacement: string
 }
 
-// The library holding `file`, by its path under `node_modules` or its real one.
+// The library holding `file`, by its path under `node_modules` or its real one: the deepest, for a library installed inside another's `node_modules`.
 export function libraryOf(libraries: KayLibrary[], file: string): KayLibrary | undefined {
-  return libraries.find(library => file.startsWith(library.dir + sep) || file.startsWith(library.realDir + sep))
+  const holding = (dir: string) => file.startsWith(dir + sep) ? dir.length : 0
+
+  return libraries.reduce<{ library?: KayLibrary, depth: number }>((best, library) => {
+    const depth = Math.max(holding(library.dir), holding(library.realDir))
+
+    return depth > best.depth ? { library, depth } : best
+  }, { depth: 0 }).library
 }
 
 // A library file as the project reaches it, under its `node_modules`, when it is given by its real path.
@@ -183,15 +198,16 @@ const KAY_FILE = /\.kay$/
 // What separates candidate class names in a template: whitespace, quotes, braces, parentheses, commas and the dots of the shorthand.
 const NOT_IN_CLASS = /[\s'"`{}(),=.]+/
 
-// The library components the project's own files reach through their imports, scripts of both in between: only those ship to the browser, and only their errors are the project's to see.
+// The library files the project's own files reach through their imports, scripts of both in between: only those components ship to the browser, and only their errors are the project's to see.
 // A barrel module re-exporting every component reaches them all.
-export async function reachableLibraryFiles(root: string, libraries: KayLibrary[], entries: string[]): Promise<string[]> {
+export async function reachableLibraryFiles(root: string, libraries: KayLibrary[], entries: string[]): Promise<{ components: string[], scripts: string[] }> {
   if (libraries.length === 0)
-    return []
+    return { components: [], scripts: [] }
 
   const project = root + sep
   const seen = new Set(entries)
-  const reached: string[] = []
+  const components: string[] = []
+  const scripts: string[] = []
   const visit = async (file: string): Promise<void> => {
     const imports = await importsOf(file)
 
@@ -213,8 +229,8 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
 
       seen.add(path)
 
-      if (library && KAY_FILE.test(path))
-        reached.push(path)
+      if (library)
+        (KAY_FILE.test(path) ? components : scripts).push(path)
 
       await visit(path)
     }))
@@ -222,12 +238,12 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
 
   await Promise.all(entries.map(visit))
 
-  return reached.sort()
+  return { components: components.sort(), scripts: scripts.sort() }
 }
 
-// The words of a component's template, as Tailwind would read them off a file of the app: class names among them.
-export function templateWords(source: string): string[] {
-  return source.slice(parseKay(source).templateStart).split(NOT_IN_CLASS).filter(word => word !== '')
+// The words of a file, as Tailwind would read them off a file of the app: class names among them, in a template or a string of a script.
+export function sourceWords(source: string): string[] {
+  return source.split(NOT_IN_CLASS).filter(word => word !== '')
 }
 
 // What a module imports: a component's fences, or a script whole.

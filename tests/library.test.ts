@@ -5,26 +5,31 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 
 const CLI = resolve('src/cli.ts')
 
-// A kay library as it is installed: `.kay` sources, `kay` as a peer, an exports map giving each component a specifier, and default settings the app can replace.
+// A kay library as it is installed: `.kay` sources, `kay` as a peer, an exports map giving each component a specifier, and default settings the app can replace, named without their extension.
 const LIBRARY: Record<string, string> = {
-  'package.json': JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay', '.': './src/index.ts', './settings': './src/settings.ts' }, kay: { settings: './src/settings.ts' } }),
-  'src/settings.ts': 'export interface Settings {\n  tone: string\n  icon: (name: string) => string\n}\n\nconst settings: Settings = { tone: \'text-gray-500\', icon: name => `default:${name}` }\n\nexport default settings\n',
+  'package.json': JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay', '.': './src/index.ts' }, kay: { settings: './src/settings' } }),
+  'src/defaults.ts': 'export interface Settings {\n  tone: string\n  icon: (name: string) => string\n}\n\nconst defaults: Settings = { tone: \'text-gray-500\', icon: name => `default:${name}` }\n\nexport default defaults\n',
+  'src/settings.ts': 'export { default } from \'./defaults\'\n',
   'src/badge.kay': '---\nimport settings from \'./settings\'\n\nconst { label } = props<{ label: string }>()\n---\nspan.badge.lib-badge-class(class={settings.tone}) {label} {settings.icon(label)}\n',
   'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport settings from \'./settings\'\n\nconst { start } = props<{ start: number }>()\nconst count = signal(start)\n---\nbutton.lib-counter-class(onClick={() => count.set(c => c + 1)}) {settings.icon(\'count\')} {count()}\n',
   'src/unused.kay': '---\nimport { signal } from \'kay\'\n\nconst open = signal(false)\n---\nbutton.lib-unused-class(onClick={() => open.set(o => !o)}) never rendered\n',
   'src/broken.kay': '---\nconst { size } = props<{ size: number }>()\n---\np {size.toUpperCase()}\n',
-  'src/index.ts': 'export type { Settings } from \'./settings\'\n',
+  'src/index.ts': 'export type { Settings } from \'./defaults\'\nexport { default as defaults } from \'./defaults\'\n',
 }
 
 const PROJECT: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'kay-lib': '1.0.0' } }),
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
   'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ settings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
-  'src/ui-settings.ts': 'import type { Settings } from \'kay-lib\'\n\nconst settings: Settings = { tone: \'text-red-500\', icon: name => `app:${name}` }\n\nexport default settings\n',
+  // The app extends the defaults, keeping their tone.
+  'src/ui-settings.ts': 'import type { Settings } from \'kay-lib\'\nimport { defaults } from \'kay-lib\'\n\nconst settings: Settings = { ...defaults, icon: name => `app:${name}` }\n\nexport default settings\n',
   'src/routes/index.kay': '---\nimport Badge from \'kay-lib/badge.kay\'\nimport Counter from \'kay-lib/counter.kay\'\n---\nmain\n  Badge(label="hi")\n  Counter(start={2})\n',
+  // A content config registers the `.kay` loader before the pages are prerendered.
+  'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({ title: t.String() }) })\n',
+  'src/content/notes/first.md': '---\ntitle: First\n---\n\nHi\n',
 }
 
-let project: string
+const projects: string[] = []
 
 async function write(dir: string, files: Record<string, string>) {
   await Promise.all(Object.entries(files).map(async ([name, text]) => Bun.write(join(dir, name), text)))
@@ -37,14 +42,18 @@ async function run(...args: string[]): Promise<{ code: number, output: string }>
   return { code, output: `${stdout}${stderr}` }
 }
 
-beforeAll(async () => {
-  project = await mkdtemp(join(import.meta.dir, '.dom-'))
-  await write(project, PROJECT)
-  await write(join(project, 'node_modules/kay-lib'), LIBRARY)
-})
+async function newProject(): Promise<string> {
+  const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+
+  projects.push(dir)
+  await write(dir, PROJECT)
+  await write(join(dir, 'node_modules/kay-lib'), LIBRARY)
+
+  return dir
+}
 
 afterAll(async () => {
-  await rm(project, { recursive: true, force: true })
+  await Promise.all(projects.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
 describe('a linked kay library', () => {
@@ -78,7 +87,8 @@ describe('a linked kay library', () => {
 })
 
 describe('kay libraries', () => {
-  it('builds a site rendering a library\'s components, its island registered and its classes seen', async () => {
+  it('builds a site rendering a library\'s components with the app\'s settings, its island registered and its classes seen', async () => {
+    const project = await newProject()
     const out = join(project, 'out')
     const { code, output } = await run('build', project, '--static', '--outdir', out)
 
@@ -89,16 +99,30 @@ describe('kay libraries', () => {
     const scripts = await Promise.all((await readdir(join(out, '_kay'))).filter(name => name.endsWith('.js')).map(async name => Bun.file(join(out, '_kay', name)).text()))
     const classes = (await Bun.file(join(project, '.kay/classes.txt')).text()).split('\n')
 
-    expect(html).toContain('<span class="badge lib-badge-class text-red-500">hi app:hi</span>')
+    expect(html).toContain('<span class="badge lib-badge-class text-gray-500">hi app:hi</span>')
     expect(html).toContain('data-component="node_modules/kay-lib/src/counter.kay"')
     expect(scripts.join('\n')).toContain('app:')
-    expect(scripts.join('\n')).not.toContain('`default:')
     expect(scripts.join('\n')).not.toContain('never rendered')
-    expect(classes).toEqual(expect.arrayContaining(['badge', 'lib-badge-class', 'lib-counter-class']))
+    // The default tone lives in a script of the library, not in a template.
+    expect(classes).toEqual(expect.arrayContaining(['badge', 'lib-badge-class', 'lib-counter-class', 'text-gray-500']))
     expect(classes).not.toContain('lib-unused-class')
   })
 
+  it('renders with the app\'s settings under kay test, whose preload registers the loader', async () => {
+    const project = await newProject()
+
+    await Bun.write(join(project, 'site.kay-test.ts'), `import { expect, it } from 'bun:test'\nimport { testSite } from ${JSON.stringify(resolve('src/test'))}\n\nit('renders', async () => {\n  expect((await (await testSite()).visit('/')).html).toContain('hi app:hi')\n})\n`)
+
+    const child = Bun.spawn([process.execPath, 'test', '--preload', resolve('src/test/preload.ts'), './site.kay-test.ts'], { cwd: project, stdout: 'pipe', stderr: 'pipe' })
+    const [output, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    expect(output).toContain('1 pass')
+    expect(code).toBe(0)
+  })
+
   it('types a library\'s components in the app, reporting an error inside one the app uses at its own line, and the app\'s settings against the defaults', async () => {
+    const project = await newProject()
+
     await write(project, {
       'src/routes/typed.kay': '---\nimport Badge from \'kay-lib/badge.kay\'\nimport Typo from \'kay-lib/typo.kay\'\n---\nBadge(label={1})\nTypo(size={2})\n',
       'src/ui-settings.ts': 'const settings = { tone: 1, icon: (name: string) => name }\n\nexport default settings\n',

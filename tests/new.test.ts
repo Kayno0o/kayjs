@@ -253,7 +253,14 @@ describe('kay build --compile', () => {
         'src/api/ping.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'pong\')\n',
         'src/api/members/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Members only\'))\n',
         'src/api/members/index.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'secret\')\n',
-        'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }] })\n',
+        // A kay library whose settings the app replaces, on a page the build prerenders and one the executable renders.
+        'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' }, kay: { settings: './src/settings.ts' } }),
+        'node_modules/kay-lib/src/settings.ts': 'export default { icon: (name: string) => `default:${name}` }\n',
+        'node_modules/kay-lib/src/tag.kay': '---\nimport { signal } from \'kay\'\nimport settings from \'./settings\'\n\nconst { label } = props<{ label: string }>()\nconst open = signal(false)\n---\nbutton.tag(onClick={() => open.set(o => !o)}) {settings.icon(label)}\n',
+        'src/ui-settings.ts': 'export default { icon: (name: string) => `app:${name}` }\n',
+        'src/routes/tags.kay': '---\nimport Tag from \'kay-lib/tag.kay\'\n---\n--- server\nexport const prerender = true\n---\nTag(label="kept")\n',
+        'src/routes/live-tags.kay': '---\nimport Tag from \'kay-lib/tag.kay\'\n---\nTag(label="live")\n',
+        'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], settings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
       // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
       await Promise.all([
@@ -261,6 +268,10 @@ describe('kay build --compile', () => {
         Bun.write(join(dir, 'src/favicon.png'), Bun.file(join(repo, 'tests/fixtures/seo/src/favicon.png'))),
         Bun.write(join(dir, 'src/display.woff2'), Bun.file(join(repo, 'tests/fixtures/seo/src/fonts/display.woff2'))),
       ])
+
+      const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
+
+      await Bun.write(join(dir, 'package.json'), JSON.stringify({ ...manifest, dependencies: { ...manifest.dependencies, 'kay-lib': '1.0.0' } }))
 
       const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--compile', 'server'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
       const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
@@ -312,6 +323,8 @@ describe('kay build --compile', () => {
         // Content entries come from what the build compiled, with nothing of src/content beside the executable.
         expect((await get('/notes/first')).text).toContain('<h1>First note</h1><h2 id="read-me"><a href="#read-me">Read me</a></h2>')
         expect((await get('/notes.xml')).text).toContain('<link>https://example.com/notes/first</link>')
+        expect((await get('/tags')).text).toContain('<slot data-component="node_modules/kay-lib/src/tag.kay" data-props="[{&quot;label&quot;:1},&quot;kept&quot;]"><button class="tag">app:kept</button></slot>')
+        expect((await get('/live-tags')).text).toContain('<button class="tag">app:live</button>')
       }
       finally {
         server.kill()

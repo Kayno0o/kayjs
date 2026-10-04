@@ -381,15 +381,15 @@ Publishing one:
 
 - Ship the `.kay` sources, list `kay` under `peerDependencies`, and import from `kay`, so the app's one copy of kay, and its registered types, serve the library too.
 - Give each component a specifier in the exports map, `"exports": { "./*.kay": "./src/*.kay", ".": "./src/index.ts" }`, imported as `import Button from '@kaynooo/kay-ui/button.kay'`. Without an exports map a component is imported by its path in the package.
-- Settings the app may replace, such as theme classes or an icon resolver, live in one module named in package.json, `"kay": { "settings": "./src/settings.ts" }`, which default-exports the defaults and which the library's components import. Export the `Settings` type, and the defaults if apps should extend them, from another module, such as the package's index: the app's settings module takes the place of that one, so importing it from there would import itself.
+- Settings the app may replace, such as theme classes or an icon resolver, live in one module named in package.json, `"kay": { "settings": "./src/settings.ts" }`, which default-exports the settings and which the library's components import. Define the defaults in a module of their own, `./src/defaults.ts`, re-exported by the settings module, `export { default } from './defaults'`, and export the `Settings` type and the defaults from there for apps to extend: the app's module takes the place of the settings module, so anything read through it is the app's.
 
 Using one:
 
 - Install it and import its components; `kay check`, the editor, auto-import and go-to-definition included, types them through `.kay/types/kay-packages.d.ts`, and needs no change to `tsconfig.json`.
 - Only the components the app's imports reach ship: an island of the library the app never imports adds nothing to its bundles, unless a module re-exporting every component, such as a barrel `index.ts`, is imported.
-- Their template classes reach `.kay/classes.txt` with the app's own, so Tailwind builds them with no `@source` line into `node_modules`.
+- The classes in their templates and in the library scripts they import, default theme classes included, reach `.kay/classes.txt` with the app's own, so Tailwind builds them with no `@source` line into `node_modules`.
 - `kay check` reports a type error inside a library component the app uses once, at the component's own line; one the app never imports reports nothing.
-- `settings` in `kay.config.ts` replaces a library's settings module with the app's, by the library's name, on the server and in the browser: `settings: { '@kaynooo/kay-ui': './src/ui-settings.ts' }`, a module default-exporting the library's `Settings`. `kay check` checks it against the defaults it replaces.
+- `settings` in `kay.config.ts` replaces a library's settings module with the app's, by the library's name, on the server and in the browser: `settings: { '@kaynooo/kay-ui': './src/ui-settings.ts' }`, a module default-exporting the library's `Settings`, which may spread the library's defaults to change a few: `export default { ...defaults, tone: 'text-red-500' }`. `kay check` checks it against the defaults it replaces. One process renders with one set of settings: `kay test`, the server and `kay build` all read them from `kay.config.ts`.
 - A library linked rather than installed, `"@kaynooo/kay-ui": "link:../kay-ui"`, works the same.
 
 ## Pages and routing
