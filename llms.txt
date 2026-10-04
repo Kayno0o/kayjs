@@ -713,6 +713,10 @@ Every page carries speculation rules: Chromium prefetches the page a link points
 }
 ```
 
+## Request logs
+
+With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms`, the method, the path without its query string, which may carry tokens, the status, and the milliseconds until the response went out, a streamed one's first bytes. kay's own `/_kay/` routes, assets and the health route included, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration }`, for a log collector; a function receives each `{ method, path, status, duration }` entry instead; `true` logs outside production too, `false` never.
+
 ## Health and shutdown
 
 `/_kay/health` answers `200 ok` while the server takes requests, for a load balancer or a container's health check. `health: { path: '/up', check: async () => await db.ping() }` in kay.config.ts moves it and adds a check: one returning `false` or throwing answers 503, the error logged. `health: false` leaves the route out.

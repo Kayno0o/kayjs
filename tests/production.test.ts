@@ -8,7 +8,7 @@ import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { check } from '../src/check'
-import { inlineScriptHashes, pages } from '../src/server'
+import { inlineScriptHashes, pages, shutDown } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { clientOf } from '../src/server/protection'
@@ -345,4 +345,53 @@ describe('lifecycle', () => {
     expect(await server.exited).toBe(1)
     expect(await slow).toBe('closed')
   }, 20_000)
+})
+
+describe('request logging', () => {
+  const routes = 'tests/fixtures/production/src/routes'
+
+  it('logs one line per request with its status and duration, leaving kay\'s own routes out', async () => {
+    const lines = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      const app = new Elysia().use(await pages({ routes, prebuilt: false, log: true })).get('/api/fail', ({ set }) => {
+        set.status = 418
+
+        return 'teapot'
+      }).listen(0)
+
+      for (const path of ['/contact?token=secret', '/api/fail', '/_kay/health', '/missing'])
+        await (await fetch(`http://localhost:${app.server!.port}${path}`)).text()
+
+      await shutDown(app)
+      expect(lines.mock.calls.map(call => String(call[0]).replace(/\d+ms$/, 'Nms'))).toEqual(['GET /contact 200 Nms', 'GET /api/fail 418 Nms', 'GET /missing 404 Nms'])
+    }
+    finally {
+      lines.mockRestore()
+    }
+  })
+
+  it('writes JSON, or hands each entry to a function', async () => {
+    const lines = spyOn(console, 'log').mockImplementation(() => undefined)
+    const entries: unknown[] = []
+
+    try {
+      const json = await pages({ routes, prebuilt: false, log: 'json' })
+      const custom = await pages({ routes, prebuilt: false, log: entry => entries.push(entry) })
+      const quiet = await pages({ routes, prebuilt: false })
+
+      for (const app of [json, custom, quiet]) {
+        app.listen(0)
+        await (await fetch(`http://localhost:${app.server!.port}/contact`)).text()
+        await shutDown(app)
+      }
+
+      expect(lines.mock.calls).toHaveLength(1)
+      expect(JSON.parse(String(lines.mock.calls[0]![0]))).toEqual({ time: expect.any(String), method: 'GET', path: '/contact', status: 200, duration: expect.any(Number) })
+      expect(entries).toEqual([{ method: 'GET', path: '/contact', status: 200, duration: expect.any(Number) }])
+    }
+    finally {
+      lines.mockRestore()
+    }
+  })
 })

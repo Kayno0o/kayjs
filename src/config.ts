@@ -1,5 +1,6 @@
 import type { BunPlugin } from 'bun'
 import type { JsonLd } from './runtime/seo'
+import type { RequestLogger } from './server/log'
 import type { Prefetch } from './server/speculation'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -28,6 +29,8 @@ export interface KayConfig {
   compress?: boolean
   // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
   health?: HealthConfig | false
+  // One line per request on stdout, on by default when NODE_ENV is production: `'json'` for one JSON object instead, a function to send each entry elsewhere, `false` for none.
+  log?: RequestLogger
   // Seconds a stopping server gives open requests and streams to finish before closing them; 10 by default.
   shutdownTimeout?: number
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.

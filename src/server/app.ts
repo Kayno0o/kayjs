@@ -18,6 +18,7 @@ import { loadGuards } from './guards'
 import { serveImages } from './image'
 import { serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
+import { logRequests } from './log'
 import { servePublic } from './public'
 import { renderPage, renderUnmatched, servePrerendered } from './render'
 import { reportServerError } from './report'
@@ -113,6 +114,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (options.compress) {
     app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue) : undefined)
   }
+
+  const log = options.log ?? process.env.NODE_ENV === 'production'
+
+  if (log)
+    logRequests(app, log)
 
   const lifecycle = { draining: false }
 

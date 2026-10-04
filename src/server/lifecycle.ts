@@ -1,4 +1,4 @@
-import type { Elysia } from 'elysia'
+import type { AnyElysia, Elysia } from 'elysia'
 import type { HealthConfig } from '../config'
 import process from 'node:process'
 import { logError } from '../build/sourcemap'
@@ -70,7 +70,7 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, timeout = DEFAUL
 }
 
 // Stops the server once its open requests finished, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
-export async function shutDown(app: Elysia): Promise<void> {
+export async function shutDown(app: AnyElysia): Promise<void> {
   const server = app.server
 
   if (!server)
