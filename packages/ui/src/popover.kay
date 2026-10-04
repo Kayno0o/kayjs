@@ -1,0 +1,46 @@
+---
+import type { JSX } from 'kay'
+import type { PopoverPlacement, PopoverTriggerProps } from './popover'
+import { effect, signal } from 'kay'
+
+const { id, open = false, placement = 'bottom-start', trigger, onToggle, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle'> & {
+  // Pairs the panel with its trigger, so it is unique on the page.
+  id: string
+  // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own.
+  open?: boolean
+  // Where the panel sits against its trigger, flipped by the browser when there is no room there.
+  placement?: PopoverPlacement
+  // Renders the button that toggles the panel, which spreads the attributes it is handed: `@trigger(attributes)`, then `button({...attributes})`.
+  trigger: (attributes: PopoverTriggerProps) => JSX.Element
+  // Called whenever the panel shows or hides, however it did.
+  onToggle?: (open: boolean) => void
+  class?: string
+}>()
+
+const anchor = `--popover-${id}`
+const shown = signal(open)
+let panel: HTMLDivElement | undefined
+
+// The browser's popover owns showing, light dismiss, Escape and giving focus back; this only follows `open` when the page sets it.
+effect(() => {
+  const wanted = open
+
+  if (!panel)
+    return
+
+  const now = panel.matches(':popover-open')
+
+  if (wanted && !now)
+    panel.showPopover()
+  else if (!wanted && now)
+    panel.hidePopover()
+})
+
+function toggled(event: ToggleEvent) {
+  shown.set(event.newState === 'open')
+  onToggle?.(event.newState === 'open')
+}
+---
+| {trigger({ 'popovertarget': id, 'aria-expanded': shown() ? 'true' : 'false', 'style': `anchor-name: ${anchor}` })}
+.popover({...rest} ref={element => panel = element} id={id} popover="auto" data-placement={placement} style={`position-anchor: ${anchor}`} class={className} onToggle={toggled})
+  slot

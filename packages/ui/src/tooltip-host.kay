@@ -1,0 +1,111 @@
+---
+import { effect, onCleanup, onMount, signal } from 'kay'
+
+// An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default.
+const CARRIER = '[data-tooltip]'
+// The anchor name theme.css's `.tooltip` positions against.
+const ANCHOR = '--tooltip-anchor'
+const SHOW_DELAY_MS = 80
+
+const aimed = signal<{ element: HTMLElement, text: string } | null>(null)
+let at: HTMLElement | null = null
+let timer: ReturnType<typeof setTimeout> | undefined
+let panel: HTMLElement | undefined
+
+// The element carrying a tooltip that an event's target is, or sits inside.
+function found(event: Event): HTMLElement | null {
+  return event.target instanceof Element ? event.target.closest<HTMLElement>(CARRIER) : null
+}
+
+function hide() {
+  clearTimeout(timer)
+  at = null
+  aimed.set(null)
+}
+
+function onto(next: HTMLElement | null) {
+  // Crossing the same element again is the pointer moving within it, not onto a new one.
+  if (next === at)
+    return
+
+  at = next
+  clearTimeout(timer)
+
+  const text = next?.dataset.tooltip
+
+  if (!next || !text) {
+    aimed.set(null)
+
+    return
+  }
+
+  timer = setTimeout(() => aimed.set({ element: next, text }), SHOW_DELAY_MS)
+}
+
+function focused(event: FocusEvent) {
+  const next = found(event)
+
+  // A press has just closed the tooltip on purpose, so only a focus the browser rings, a tab, opens one.
+  if (!next || next.matches(':focus-visible'))
+    onto(next)
+}
+
+function blurred(event: FocusEvent) {
+  if (found(event) === at)
+    hide()
+}
+
+function over(event: PointerEvent) {
+  onto(found(event))
+}
+
+// One set of listeners for every element carrying a tooltip, rather than a set each.
+onMount(() => {
+  document.addEventListener('pointerover', over)
+  document.addEventListener('focusin', focused)
+  document.addEventListener('focusout', blurred)
+  document.addEventListener('pointerdown', hide)
+  window.addEventListener('blur', hide)
+
+  onCleanup(() => {
+    clearTimeout(timer)
+    document.removeEventListener('pointerover', over)
+    document.removeEventListener('focusin', focused)
+    document.removeEventListener('focusout', blurred)
+    document.removeEventListener('pointerdown', hide)
+    window.removeEventListener('blur', hide)
+  })
+})
+
+effect(() => {
+  const target = aimed()
+
+  if (!panel)
+    return
+
+  if (!target) {
+    if (panel.matches(':popover-open'))
+      panel.hidePopover()
+
+    return
+  }
+
+  // The element may already anchor something of its own, such as the popover it opens, so the tooltip adds its name to that list rather than taking the slot and then clearing it.
+  const own = target.element.style.getPropertyValue('anchor-name')
+
+  target.element.style.setProperty('anchor-name', own ? `${own}, ${ANCHOR}` : ANCHOR)
+  panel.style.setProperty('position-area', target.element.dataset.tooltipPlacement ?? 'top')
+
+  if (!panel.matches(':popover-open'))
+    panel.showPopover()
+
+  onCleanup(() => {
+    if (own)
+      target.element.style.setProperty('anchor-name', own)
+    else
+      target.element.style.removeProperty('anchor-name')
+  })
+})
+---
+// Rendered once, in the root layout: it shows the tooltip of whichever element the pointer or a tab lands on.
+.tooltip(ref={element => panel = element} popover="manual" role="tooltip") {aimed()?.text}

@@ -1,0 +1,17 @@
+---
+import { signal } from 'kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Popover from '@kaynooo/kayjs-ui/popover.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+
+const { onToggle } = props<{ onToggle: (open: boolean) => void }>()
+
+const open = signal(false)
+---
+button#show(onClick={() => open.set(true)}) Show
+Popover(id="menu" open={open()} placement="top-end" onToggle={shown => { open.set(shown); onToggle(shown) }})
+  @trigger(attributes)
+    button#trigger({...attributes}) Menu
+  p#inside Inside
+IconButton#delete(icon="delete" label="Delete" data-tooltip-placement="bottom")
+TooltipHost
