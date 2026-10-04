@@ -42,7 +42,7 @@ jobs:
         run: bun run check
 
       - name: Tests
-        run: bun test
+        run: bun run test
 
       - name: Configure npm authentication
         run: |

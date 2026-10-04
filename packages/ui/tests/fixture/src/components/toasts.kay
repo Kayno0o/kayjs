@@ -1,0 +1,7 @@
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+---
+button#saved(onClick={() => toast.success('Saved')}) Save
+button#refused(onClick={() => toast.error('Refused')}) Refuse
+Toaster
