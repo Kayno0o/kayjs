@@ -1,7 +1,7 @@
 import type { Template } from './templates'
 import { randomBytes } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
+import { chmod, readdir } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { TEMPLATE_FILES } from './templates'
@@ -71,6 +71,10 @@ export async function createProject(target: string, options: NewOptions = {}): P
     files['.env'] = `SESSION_SECRET=${randomBytes(32).toString('hex')}\n`
 
   await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content.replaceAll('__NAME__', name))))
+
+  // The session secret is for its owner's eyes only.
+  if (template === 'app')
+    await chmod(join(dir, '.env'), 0o600)
 
   return Object.keys(files).sort()
 }

@@ -267,6 +267,11 @@ describe('static server output', () => {
     expect(await renderKay('---\nconst { code } = props<{ code: string }>()\n---\nscript {code}', { code: 'a < b && c' })).toBe('<script>a < b && c</script>')
   })
 
+  it('keeps a value from closing its script or style element, or opening a comment in it', async () => {
+    expect(await renderKay('---\nconst { css } = props<{ css: string }>()\n---\nstyle {css}', { css: 'a{}</STYLE><img src=x onerror=alert(1)>' })).toBe('<style>a{}<\\/STYLE><img src=x onerror=alert(1)></style>')
+    expect(await renderKay('---\nconst { code } = props<{ code: string }>()\n---\nscript {code}', { code: 'x = "<!--</script>"' })).toBe('<script>x = "<\\!--<\\/script>"</script>')
+  })
+
   it('passes a component its text children and quoted props as JSX would, and renders children only when read', async () => {
     await Bun.write(join(scratch, 'echo.kay'), '---\nconst { label, children } = props<{ label: string, children?: string }>()\n---\nspan(title={children}) {label}\n')
     await Bun.write(join(scratch, 'hidden.kay'), 'p none\n')

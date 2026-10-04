@@ -1,5 +1,5 @@
 import type { Subprocess } from 'bun'
-import { mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -12,6 +12,39 @@ import { buildClient } from '../src/server/client'
 
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/
+const ACCENT_TEST = `import { GlobalRegistrator } from '@happy-dom/global-registrator'
+import { expect, it } from 'bun:test'
+import { mount, settle, testSite } from 'kay/test'
+import { encodeValue } from __WIRE__
+
+const site = await testSite()
+const accentStyle = async (value: string) => (await site.visit('/', { headers: { cookie: \`accent=\${encodeURIComponent(encodeValue(value))}\` } })).html
+
+it('renders the kept accent from the first paint, a known one only', async () => {
+  expect(await accentStyle('mauve')).toContain('<style>:root { --accent: var(--accent-mauve); }</style>')
+  expect(await accentStyle('x); } body { display: none')).toContain('<style>:root { --accent: var(--accent-peach); }</style>')
+})
+
+it('changes the accent on a click', async () => {
+  // A page of a site, whose cookies the document keeps.
+  GlobalRegistrator.register({ url: 'http://localhost/' })
+
+  try {
+    const { root, unmount } = await mount('src/components/accent-picker.kay')
+
+    root.querySelector<HTMLButtonElement>('[aria-label="mauve"]')!.click()
+    await settle()
+
+    expect(root.querySelector('style')!.textContent).toBe(':root { --accent: var(--accent-mauve); }')
+    expect(root.querySelector('[aria-label="mauve"]')!.getAttribute('aria-checked')).toBe('true')
+    expect(document.cookie).toContain('accent=')
+    unmount()
+  }
+  finally {
+    await GlobalRegistrator.unregister()
+  }
+})
+`
 
 // Stands in for `bun install` of a packed kay: its source and the declarations `prepack` emits, beside this checkout's dependencies.
 async function installKay(dir: string) {
@@ -145,11 +178,13 @@ describe('kay new', () => {
       await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, exactOptionalPropertyTypes: true } }))
       expect(await check(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
+      // The accent picker as a visitor meets it: rendered from the cookie, a value it does not know read as the default, and changed by a click.
+      await Bun.write(join(dir, 'tests/accent.test.ts'), ACCENT_TEST.replace('__WIRE__', JSON.stringify(join(repo, 'src/runtime/wire'))))
 
       const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
       const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
-      expect(report).toContain('1 pass')
+      expect(report).toContain('3 pass')
       expect(code).toBe(0)
 
       const client = await buildClient(dir)
@@ -208,7 +243,8 @@ describe('kay new', () => {
     try {
       const files = await createProject(dir, { kay: '^1.0.0', template: 'app' })
 
-      expect(files).toEqual(expect.arrayContaining(['.env', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts']))
+      expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\n$/)
       expect(await Bun.file(join(dir, '.gitignore')).text()).toContain('.env')
       expect(await Bun.file(join(dir, 'compose.prod.yaml')).text()).toContain('SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}')
@@ -217,11 +253,11 @@ describe('kay new', () => {
       expect(await check(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
 
-      // Signs in through the action and lands in the guarded section.
+      // Signs in through the action and lands in the guarded section, and counts the visitors online over the websocket.
       const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
       const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
-      expect(report).toContain('2 pass')
+      expect(report).toContain('3 pass')
       expect(code).toBe(0)
       expect(Object.keys((await buildClient(dir)).islands)).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay', 'src/components/online.kay'])
     }

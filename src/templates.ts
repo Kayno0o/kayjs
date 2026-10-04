@@ -90,21 +90,28 @@ export type Accent = (typeof ACCENTS)[number]
 
 // Kept in a cookie the server reads, so a page it renders shows the chosen accent from the first paint.
 export const accent = signal<Accent>('peach', { persist: 'accent' })
+
+// A cookie's value is not checked against the type, so anything but a known accent reads as the default.
+export function currentAccent(): Accent {
+  const value = accent()
+
+  return ACCENTS.includes(value) ? value : 'peach'
+}
 `,
   'src/components/accent-picker.kay': `---
 import check from '~icons/tabler/check'
 import palette from '~icons/tabler/palette'
-import { accent, ACCENTS } from '../theme'
+import { accent, ACCENTS, currentAccent } from '../theme'
 ---
-style {\`:root { --accent: var(--accent-\${accent()}); }\`}
+style {\`:root { --accent: var(--accent-\${currentAccent()}); }\`}
 details.relative
   summary.flex.cursor-pointer.list-none.items-center.gap-2.text-sm.text-subtext1
     svg({...palette} class="size-5 text-accent")
     | Accent
-  div.absolute.right-0.mt-2.grid.grid-cols-7.gap-1.rounded.border-2.border-overlay0.bg-mantle.p-2.shadow-lg
+  div.absolute.right-0.mt-2.grid.grid-cols-7.gap-1.rounded.border-2.border-overlay0.bg-mantle.p-2.shadow-lg(role="radiogroup" aria-label="Accent colour")
     for name of ACCENTS key={name}
-      button.grid.size-6.place-items-center.rounded.border-2.border-overlay0.p-0(type="button" aria-label={\`Accent \${name}\`} aria-pressed={accent() === name ? 'true' : 'false'} style={\`background-color: var(--accent-\${name})\`} onClick={() => accent.set(name)})
-        if accent() === name
+      button.grid.size-6.place-items-center.rounded.border-2.border-overlay0.p-0(type="button" role="radio" aria-label={name} aria-checked={currentAccent() === name ? 'true' : 'false'} style={\`background-color: var(--accent-\${name})\`} onClick={() => accent.set(name)})
+        if currentAccent() === name
           svg({...check} class="size-4 text-base")
 `,
   'src/routes/_404.kay': `head
@@ -160,7 +167,7 @@ import Counter from '../components/counter.kay'
 head
   title Home
 section.flex.flex-col.items-center.gap-6.py-12
-  svg({...rocket} class="size-16 animate-bounce text-accent")
+  svg({...rocket} class="size-16 text-accent motion-safe:animate-bounce")
   h1.text-3xl.font-bold {greeting}
   Counter(start={0})
 `
@@ -208,10 +215,12 @@ COPY . .
 RUN bun run compile
 
 FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/server ./server
 ENV NODE_ENV=production PORT=3000
 EXPOSE 3000
+USER nobody
 CMD ["./server"]
 `,
   '.dockerignore': 'node_modules\n.kay\nserver\n.env\n',
@@ -236,7 +245,7 @@ declare module 'kay' {
 const SERVER_FILES: Record<string, string> = {
   ...COMMON_FILES,
   ...CONTAINER_FILES,
-  '.gitignore': 'node_modules\n.kay\nserver\n',
+  '.gitignore': 'node_modules\n.kay\n/server\n',
   'kay.config.ts': CONFIG,
   'src/server.ts': SERVER_ENTRY,
   'src/components/header.kay': header('[{ href: \'/\', label: \'Home\' }]'),
@@ -249,7 +258,7 @@ const SERVER_FILES: Record<string, string> = {
 `,
 }
 
-// A site with no server: \`kay build --static\` writes it to \`dist\`, which a Forgejo Pages workflow publishes, or a container serves with nginx.
+// A site with no server: `kay build --static` writes it to `dist`, which a Forgejo Pages workflow publishes, or a container serves with nginx.
 const SITE_FILES: Record<string, string> = {
   ...COMMON_FILES,
   '.gitignore': 'node_modules\n.kay\ndist\n',
@@ -343,7 +352,10 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 // The server template, plus what an app adds: sessions, a sign-in, a guarded section, an API module and a live island over its websocket.
 const APP_FILES: Record<string, string> = {
   ...SERVER_FILES,
-  '.gitignore': 'node_modules\n.kay\nserver\n.env\n',
+  '.gitignore': 'node_modules\n.kay\n/server\n.env\n',
+  '.env.example': 'SESSION_SECRET=at-least-32-characters-kept-out-of-the-repository\n',
+  // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret.
+  '.env.test': 'SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\n',
   'src/env.ts': `import { t } from 'elysia'
 import { defineEnv } from 'kay/server'
 
@@ -388,9 +400,9 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 // Anyone may sign in under any name: swap in real credentials, such as @kaynooo/kayjs-auth's.
-export const signIn = action(t.Object({ name: t.String({ minLength: 1, maxLength: 40 }) }), async ({ name }, ctx) => {
+export const signIn = action(t.Object({ name: t.String({ pattern: '\\\\S', maxLength: 40, error: 'Write a name' }) }), async ({ name }, ctx) => {
   await ctx.locals.session.regenerate()
-  await ctx.locals.session.set('name', name)
+  await ctx.locals.session.set('name', name.trim())
   ctx.redirect('/account')
 })
 
@@ -399,6 +411,7 @@ const failure = ctx.failed(signIn)
 head
   title Sign in
 h1.text-2xl.font-bold Sign in
+p.text-subtext1 A demo: any name signs in. Replace it with real credentials before going live.
 form.mt-4.flex.flex-col.items-start.gap-2(action={signIn})
   label(for="name") Name
   input#name(name="name" autocomplete="username")
@@ -463,16 +476,36 @@ const live = socket(online, '/')
 ---
 p.text-subtext1 {live.status() === 'open' ? \`\${live.last()?.online ?? 1} online now\` : 'Connecting...'}
 `,
-  'tests/account.test.ts': `import { expect, it } from 'bun:test'
+  'tests/account.test.ts': `import { afterAll, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
+import online from '../src/api/online'
 import { signIn } from '../src/routes/login.kay'
 import { sessions } from '../src/session'
 
 const site = await testSite({ use: [sessions] })
 
+afterAll(async () => {
+  await site.close()
+})
+
 it('sends a visitor to sign in, then into their account', async () => {
   expect((await site.visit('/account')).url).toBe('/login')
   expect((await site.submit(signIn, { name: 'Ada' }, { from: '/login' })).html).toContain('Signed in as Ada')
+})
+
+it('tells every visitor how many are online', async () => {
+  const first = site.socket(online, '/')
+
+  expect(await first.next()).toEqual({ online: 1 })
+
+  const second = site.socket(online, '/')
+
+  expect(await second.next()).toEqual({ online: 2 })
+  expect(await first.next()).toEqual({ online: 2 })
+
+  second.close()
+  expect(await first.next()).toEqual({ online: 1 })
+  first.close()
 })
 `,
   'compose.prod.yaml': `services:

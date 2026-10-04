@@ -18,6 +18,8 @@ const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img'
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
 // Handlers and refs, which only an island attaches; `open` is the one attribute starting with `on` that is none.
 const BEHAVIOUR = /^(?:on(?!en$)|ref$)/
+// What ends a `script` or `style` early, or opens a comment that keeps a script running past its end tag.
+const RAW_TEXT_BREAK = /<\/(?=script|style)|<!--/gi
 const OPTION = /<option(?=[\s>])([^>]*)>([\s\S]*?)(?=<\/option>|<option[\s>]|<\/select>|$)/g
 const OPTION_VALUE = /\svalue="([^"]*)"/
 const SELECTED = /\sselected(?=[\s=>]|$)/
@@ -55,11 +57,12 @@ export function child(value: unknown): string {
   }
 }
 
-// Inside `script` and `style`, whose text the browser never decodes.
+// Inside `script` and `style`, whose text the browser never decodes: a value may not close the element or open a comment there.
+// `\/` and `\!` read as `/` and `!` in JavaScript strings and in CSS alike.
 export function raw(value: unknown): string {
   switch (typeof value) {
     case 'string':
-      return value
+      return value.replace(RAW_TEXT_BREAK, match => match === '<!--' ? '<\\!--' : '<\\/')
     case 'number':
     case 'bigint':
       return String(value)
