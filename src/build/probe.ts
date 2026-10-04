@@ -1,6 +1,6 @@
 import type { ScriptAnalysis } from '../compiler/script'
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { dirname, join, sep } from 'node:path'
 import process from 'node:process'
 import { browserGlobalMissing } from '../compiler/browser'
 import { readCacheEntry, writeCacheEntry } from './cache'
@@ -11,8 +11,9 @@ const NOT_A_PACKAGE = String.raw`[./]|[a-z]+:|kay(?![^/'"])|~icons/`
 const PACKAGE_IMPORT = new RegExp(`^(?!${NOT_A_PACKAGE})(@[^/]+/[^/]+|[^/]+)`)
 // A quoted package specifier, read off a component's source before parsing it.
 const QUOTED_PACKAGE = new RegExp(String.raw`\b(?:from|import)\s*['"](?!${NOT_A_PACKAGE})`)
-// Imports the module the environment names and prints what it threw, if anything, as `[name, message]` on its last line.
-const PROBE = 'try { await import(process.env.KAY_PROBE) } catch (error) { console.log(JSON.stringify(error instanceof Error ? [error.name, error.message] : [])) }'
+// Imports the module the environment names, prints what it threw as `[name, message]` after a marker the package's own output cannot be taken for, and exits whatever the package left running.
+const PROBE_MARKER = '\0kay-probe '
+const PROBE = `let thrown = []; try { await import(process.env.KAY_PROBE) } catch (error) { thrown = error instanceof Error ? [error.name, error.message] : [] } console.log(${JSON.stringify(PROBE_MARKER)} + JSON.stringify(thrown)); process.exit(0)`
 const PROBE_TIMEOUT_MS = 10_000
 const probed = new Map<string, Promise<boolean>>()
 
@@ -51,7 +52,10 @@ async function browserOnly(specifier: string, from: string, cacheDir: string | u
     return false
   }
 
-  const key = `${specifier}@${packageVersion(file, PACKAGE_IMPORT.exec(specifier)![1]!)}\0${file}`
+  // An installed package changes with its version; a linked one or the app's own file with its contents. Bun decides the globals and the error's wording.
+  const installed = file.includes(`${sep}node_modules${sep}`)
+  const stamp = installed ? packageVersion(file, PACKAGE_IMPORT.exec(specifier)![1]!) : fileStamp(file)
+  const key = `${specifier}@${stamp}\0${file}\0${Bun.version}`
   // Kept per cache too, so a build with a cache writes the answer a run without one found.
   const remembered = `${cacheDir ?? ''}\0${key}`
   let answer = probed.get(remembered)
@@ -90,22 +94,34 @@ async function probe(file: string, from: string): Promise<boolean | undefined> {
   if (child.signalCode !== null && code !== 0)
     return undefined
 
-  const [name, message] = lastJson(output)
+  const [name, message] = probeResult(output)
 
   return browserGlobalMissing({ name, message }) !== undefined
 }
 
-function lastJson(output: string): unknown[] {
-  const line = output.trimEnd().split('\n').at(-1) ?? ''
+function probeResult(output: string): unknown[] {
+  const at = output.lastIndexOf(PROBE_MARKER)
+
+  if (at === -1)
+    return []
+
+  const line = output.slice(at + PROBE_MARKER.length)
+  const end = line.indexOf('\n')
 
   try {
-    const parsed = JSON.parse(line) as unknown
+    const parsed = JSON.parse(end === -1 ? line : line.slice(0, end)) as unknown
 
     return Array.isArray(parsed) ? parsed : []
   }
   catch {
     return []
   }
+}
+
+function fileStamp(file: string): string {
+  const { mtimeMs, size } = statSync(file)
+
+  return `${mtimeMs}-${size}`
 }
 
 // The version of the installed package `name`, read off the nearest package.json naming it above the file it resolved to.

@@ -137,7 +137,8 @@ async function clientOnlyIsland(source: string, filename: string, cacheDir: stri
 
   const file = parseKay(source)
 
-  if (file.client || !file.script)
+  // A page or layout never switches, so it is not probed.
+  if (file.client || !file.script || file.server)
     return false
 
   const script = analyzeScript(source, file.script)

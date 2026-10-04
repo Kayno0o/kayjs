@@ -247,7 +247,7 @@ export class KayLanguageServer {
   private async configure(project: Project) {
     const config = await projectConfig(project.root)
 
-    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, publicDir: config.publicDir, i18n: config.i18n }
+    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, publicDir: config.publicDir, i18n: config.i18n, api: config.api }
     project.routesDir = resolve(project.root, project.options.routes ?? 'src/routes')
     project.configured = true
   }
@@ -848,16 +848,18 @@ function zeroRange(): Range {
   return { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }
 }
 
-// LSP positions are 0-based, the mapping helpers 1-based; both count UTF-16 code units like JS strings.
-// The fixes kay's own diagnostics carry, for those touching the range the editor asks about.
+// The fixes kay's own diagnostics carry, for those touching the range the editor asks about; two reads in one statement offer its fixes once.
 function kayFixes(document: Document, start: number, end: number): CodeAction[] {
-  return document.diagnostics.filter(diagnostic => diagnostic.start <= end && diagnostic.end >= start).flatMap(diagnostic => (diagnostic.fixes ?? []).map(fix => ({
+  const fixes = document.diagnostics.filter(diagnostic => diagnostic.start <= end && diagnostic.end >= start).flatMap(diagnostic => diagnostic.fixes ?? [])
+
+  return uniqueBy(fixes, fix => JSON.stringify(fix)).map(fix => ({
     title: fix.title,
     kind: QUICK_FIX,
     edit: { changes: { [document.uri]: fix.edits.map(change => ({ range: { start: toPosition(document.source, change.start), end: toPosition(document.source, change.end) }, newText: change.text })) } },
-  })))
+  }))
 }
 
+// LSP positions are 0-based, the mapping helpers 1-based; both count UTF-16 code units like JS strings.
 function toOffset(text: string, position: Position): number {
   return Math.min(offsetAt(text, { line: position.line + 1, column: position.character + 1 }), text.length)
 }

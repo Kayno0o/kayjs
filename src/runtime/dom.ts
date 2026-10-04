@@ -302,13 +302,18 @@ function removeUnit(unit: Unit): void {
   }
 }
 
-// The units `render` claims from the region's server markup; one a client-only component built afresh goes in where the server left its part empty.
+// The units `render` claims from the region's server markup; one a client-only component built afresh goes in where the server left its part empty, before the unit claimed after it.
 function claimUnits(region: Region, render: () => unknown): Unit[] {
   const claimed = region.claim(() => units(render()))
+  let before = region.end
 
-  for (const unit of claimed) {
+  for (let index = claimed.length - 1; index >= 0; index--) {
+    const unit = claimed[index]!
+
     if (firstOf(unit).parentNode !== region.parent)
-      region.insert(unit)
+      region.insert(unit, before)
+
+    before = firstOf(unit)
   }
 
   return claimed

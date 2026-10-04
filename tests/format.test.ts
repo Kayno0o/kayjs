@@ -57,6 +57,11 @@ describe('formatKay', () => {
     expect(formatKay('---<T extends { id: number }>  \nconst { items } = props<{ items: T[] }>()\n---\np {items.length}\n').code).toBe('--- <T extends { id: number }>\nconst { items } = props<{ items: T[] }>()\n---\np {items.length}\n')
   })
 
+  it('keeps `--- client` on its fence line, with the type parameters of a generic one', () => {
+    expect(formatKay('--- client   <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n').code).toBe('--- client <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
+    expect(formatKay('---  client\nconst a = 1\n---\np {a}\n').code).toBe('--- client\nconst a = 1\n---\np {a}\n')
+  })
+
   it('writes attribute lists canonically, inline ones included', () => {
     expect(format('a( href = \'/x\' ,  disabled {...rest} title=\'say "hi"\' onClick={() => go( 1 )} )\np Hi #[b( x=\'1\' ) there]\n'))
       .toBe('a(href="/x" disabled {...rest} title=\'say "hi"\' onClick={() => go( 1 )})\np Hi #[b(x="1") there]\n')

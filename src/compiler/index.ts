@@ -68,10 +68,12 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   // A name a fence uses may clash with the component's own; the template's reads are found once the code is generated.
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   let name = freeName(componentName(filename), fences)
-  const client = file.client !== undefined || options.clientOnly === true
+  // Pages, layouts and special pages render on the server: a package they import never switches them.
+  const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
+  const client = file.client !== undefined || (options.clientOnly === true && !routeFile)
   const island = client || isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
-  const twin = hydratableServer && !options.twinBuild && !island && !file.server && !ROUTE_FILES.has(basename(filename)) ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
+  const twin = hydratableServer && !options.twinBuild && !island && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const generateOptions = { island, client, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
@@ -93,9 +95,9 @@ export function compileKay(source: string, filename: string, options: CompileOpt
 
   // Type checking only, so a page still runs while it is fixed, and fails there in development naming the same fixes.
   if (options.check && !client)
-    diagnostics.push(...browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? []))
+    diagnostics.push(...browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? [], routeFile))
 
-  if (file.client && (file.server || ROUTE_FILES.has(basename(filename))))
+  if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page renders on the server; only a component it renders can be `--- client`' })
 
   // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.

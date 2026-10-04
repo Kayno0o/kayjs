@@ -186,7 +186,7 @@ export function browserOnlyHint(error: unknown, mappedStack: string): string | u
   const at = FIRST_KAY_POSITION.exec(mappedStack)
   const where = at ? `${relative(process.cwd(), at[1]!)}:${at[2]}:${at[3]}` : 'a component'
 
-  return `\`${name}\` exists only in the browser, and ${where} reads it while rendering on the server: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``
+  return `\`${name}\` exists only in the browser, and rendering ${where} on the server read it: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``
 }
 
 function toKay(entry: Compiled, line: number, column: number): { line: number, column: number } | undefined {

@@ -39,15 +39,23 @@
   ],
   "repository": {
     "fence": {
-      "begin": "^(---)(?:[ \\t]+(server)|[ \\t]*(<.*>))?[ \\t]*$",
+      "begin": "^(---)(?:[ \\t]+(server|client)(?:[ \\t]+(<.*>))?|[ \\t]*(<.*>))?[ \\t]*$",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.fence.kay"
         },
         "2": {
-          "name": "keyword.other.server.kay"
+          "name": "keyword.other.fence.kay"
         },
         "3": {
+          "name": "meta.type.parameters.kay",
+          "patterns": [
+            {
+              "include": "source.ts#type-parameters"
+            }
+          ]
+        },
+        "4": {
           "name": "meta.type.parameters.kay",
           "patterns": [
             {

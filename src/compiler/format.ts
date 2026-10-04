@@ -20,7 +20,7 @@ interface AttributeEdit extends Span {
 }
 
 const INDENT = '  '
-const FENCE_OPEN = /^---(?:[ \t]+([a-z]+)|[ \t]*(<.*>))?[ \t]*$/
+const FENCE_OPEN = /^---(?:[ \t]+([a-z]+)(?:[ \t]+(<.*>))?|[ \t]*(<.*>))?[ \t]*$/
 const LEADING_SPACES = /^ */
 const CRLF = /\r\n/g
 const WHITESPACE_END = /\s$/
@@ -47,7 +47,9 @@ function formatFences(file: KayFile): string[] {
   for (const body of bodies) {
     const open = FENCE_OPEN.exec(file.source.slice(file.source.lastIndexOf('\n', body.start - 2) + 1, body.start - 1))
 
-    out.push(open?.[1] === undefined && open?.[2] === undefined ? '---' : `--- ${open[1] ?? open[2]}`)
+    const header = [open?.[1], open?.[2] ?? open?.[3]].filter(part => part !== undefined)
+
+    out.push(header.length === 0 ? '---' : `--- ${header.join(' ')}`)
     out.push(...trimBlankLines(file.source.slice(body.start, body.end).split('\n')), '---')
   }
 

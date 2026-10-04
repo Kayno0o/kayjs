@@ -113,7 +113,7 @@ describe('client-only islands', () => {
       }
     })()
 
-    expect(browserOnlyHint(error, mapStack(error!.stack!))).toBe(`\`window\` exists only in the browser, and ${relative(process.cwd(), join(dir, 'bad.kay'))}:3:15 reads it while rendering on the server: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``)
+    expect(browserOnlyHint(error, mapStack(error!.stack!))).toBe(`\`window\` exists only in the browser, and rendering ${relative(process.cwd(), join(dir, 'bad.kay'))}:3:15 on the server read it: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``)
     expect(browserOnlyHint(new ReferenceError('missing is not defined'), '')).toBeUndefined()
   })
 
@@ -126,6 +126,18 @@ describe('client-only islands', () => {
     expect(await importsBrowserOnly(source, script, join(dir, 'chart.kay'), cacheDir)).toBe(true)
     expect(await importsBrowserOnly(loadable, analyzeScript(loadable, parseKay(loadable).script), join(dir, 'chart.kay'), cacheDir)).toBe(false)
     expect((await readdir(cacheDir)).filter(name => name.endsWith('-browser-only.json'))).toHaveLength(2)
+
+    // A package leaving a timer running, and printing as it loads, answers at once all the same.
+    const lingering = join(dir, 'node_modules/lingering')
+
+    await Bun.write(join(lingering, 'package.json'), JSON.stringify({ name: 'lingering', version: '1.0.0', type: 'module', main: 'index.js' }))
+    await Bun.write(join(lingering, 'index.js'), 'console.log(\'["ReferenceError","window is not defined"]\')\nsetInterval(() => {}, 1000)\nexport const x = 1\n')
+
+    const started = performance.now()
+    const holding = '---\nimport { x } from \'lingering\'\n---\np {x}\n'
+
+    expect(await importsBrowserOnly(holding, analyzeScript(holding, parseKay(holding).script), join(dir, 'chart.kay'), cacheDir)).toBe(false)
+    expect(performance.now() - started).toBeLessThan(5000)
   })
 })
 
@@ -165,6 +177,23 @@ describe('browser-only globals read while rendering', () => {
   it('refuses `--- client` on a layout or a page with a server fence', () => {
     expect(compileKay('--- client\n---\nslot\n', join(process.cwd(), '_layout.kay')).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['A page, layout or special page renders on the server; only a component it renders can be `--- client`'])
     expect(compileKay('--- server\nconst a = 1\n---\n--- client\n---\np {a}\n', join(process.cwd(), 'page.kay')).diagnostics).toHaveLength(1)
+  })
+
+  it('reads past names the template binds over the script\'s, and leaves guarded reads alone', () => {
+    const clash = '---\nimport { signal } from \'kay\'\n\nconst item = 1\nconst name = signal(\'a\')\nfunction x() {}\n---\nfor item of [item] key={item}\n  for x of [name()] key={x}\n    span {x} {item} {innerHeight}\n'
+    const guards = '---\nconst width = typeof window === \'undefined\' ? 0 : window.innerWidth\nlet saved = \'\'\n\nif (typeof localStorage !== \'undefined\')\n  saved = localStorage.getItem(\'x\') ?? \'\'\n\ntry {\n  saved = sessionStorage.getItem(\'y\') ?? saved\n}\ncatch {}\nconst ready = typeof document !== \'undefined\' && document.readyState\n---\np {width} {saved} {String(ready)}\n'
+
+    expect(reads(clash).map(read => read.text)).toEqual(['innerHeight'])
+    expect(reads(guards)).toEqual([])
+  })
+
+  it('offers no `--- client` on a layout or special page, nor switches one for a package it imports', () => {
+    const layout = compileKay('---\nconst title = document.title\n---\nh1 {title}\nslot\n', join(process.cwd(), '_layout.kay'), { check: true })
+    const page = compileKay('--- server\nconst a = 1\n---\n---\nimport { signal } from \'kay\'\n\nconst n = signal(a)\n---\nbutton(onClick={() => n.set(v => v + 1)}) {n()}\n', join(process.cwd(), 'page.kay'), { output: 'html', includeServer: true, hydratable: true, clientOnly: true })
+
+    expect(layout.diagnostics.map(diagnostic => diagnostic.fixes)).toEqual([[]])
+    expect(page.tsx).toContain('export async function load')
+    expect(page.tsx).not.toContain('undefined, [], true')
   })
 
   it('adds a script fence to a component without one, and reports nothing in a `--- client` one', () => {

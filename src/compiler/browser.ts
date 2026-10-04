@@ -36,6 +36,7 @@ const ARRAY_CALLBACKS = new Set(['map', 'flatMap', 'filter', 'find', 'findIndex'
 const TS_EXPRESSIONS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
 const FENCE_OPENING = '---'
 const NOT_DEFINED = /^(\S+) is not defined$/
+const TYPEOF_GLOBAL = /\btypeof\s+([a-z_$][\w$]*)/gi
 
 let globals: Set<string> | undefined
 
@@ -74,8 +75,8 @@ export function browserGlobalMissing(error: unknown): string | undefined {
 
 // Browser-only globals the component reads while it renders, which throws on the server, and `typeof` checks of them, which render differently there and break hydration.
 // Rendering covers the script's top level, the template's values, `memo` and array callbacks, and the script's functions those call; handlers, refs, effects and other callbacks run in the browser only.
-// `serverNames` are what the `--- server` fence hands the template.
-export function browserReads(file: KayFile, island: boolean, serverNames: string[]): Diagnostic[] {
+// `serverNames` are what the `--- server` fence hands the template; a route file renders on the server, so it is offered no `--- client`.
+export function browserReads(file: KayFile, island: boolean, serverNames: string[], routeFile: boolean): Diagnostic[] {
   const names = browserGlobals()
   const { source } = file
   const expressions = templateExpressions(file)
@@ -105,40 +106,50 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   const reads: Read[] = []
   let effectBound = false
 
-  loadTraverse()(ast, {
-    Function(path) {
-      const parent = path.parentPath
+  // A name the template binds twice over the script's, which no block can tell apart, leaves nothing to report rather than failing the check.
+  try {
+    loadTraverse()(ast, {
+      Function(path) {
+        const parent = path.parentPath
 
-      if (parent.isCallExpression() && (parent.node.callee === path.node || rendersCallback(parent.node, path.node)))
-        transparent.add(path.node)
+        if (parent.isCallExpression() && (parent.node.callee === path.node || rendersCallback(parent.node, path.node)))
+          transparent.add(path.node)
 
-      if (path.isFunctionDeclaration() && parent.isProgram() && path.node.id)
-        functions.set(path.node.id.name, path.node)
-      else if (parent.isVariableDeclarator() && parent.node.id.type === 'Identifier' && parent.parentPath.parentPath?.isProgram())
-        functions.set(parent.node.id.name, path.node)
-    },
-    CallExpression(path) {
-      const callee = path.node.callee
+        if (path.isFunctionDeclaration() && parent.isProgram() && path.node.id)
+          functions.set(path.node.id.name, path.node)
+        else if (parent.isVariableDeclarator() && parent.node.id.type === 'Identifier' && parent.parentPath.parentPath?.isProgram())
+          functions.set(parent.node.id.name, path.node)
+      },
+      CallExpression(path) {
+        const callee = path.node.callee
 
-      if (callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.path.isProgram())
-        calls.push({ name: callee.name, chain: functionChain(path) })
-    },
-    Program(path) {
-      effectBound = path.scope.hasBinding('effect', true)
-    },
-    Identifier(path) {
-      const { name } = path.node
+        if (callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.path.isProgram())
+          calls.push({ name: callee.name, chain: functionChain(path) })
+      },
+      Program(path) {
+        effectBound = path.scope.hasBinding('effect', true)
+      },
+      Identifier(path) {
+        const { name } = path.node
 
-      if (!names.has(name) || !path.isReferencedIdentifier() || path.scope.hasBinding(name, true) || inType(path))
-        return
+        if (!names.has(name) || !path.isReferencedIdentifier() || path.scope.hasBinding(name, true) || inType(path))
+          return
 
-      const chain = functionChain(path)
-      const parent = path.parentPath
-      const statement = chain.length === 0 ? path.findParent(ancestor => ancestor.parentPath?.isProgram() === true)?.node as t.Statement | undefined : undefined
+        const typeOf = path.parentPath.isUnaryExpression({ operator: 'typeof' })
 
-      reads.push({ name, at: path.node.start!, chain, typeOf: parent.isUnaryExpression({ operator: 'typeof' }), statement })
-    },
-  })
+        if (!typeOf && guarded(path, program.code, names))
+          return
+
+        const chain = functionChain(path)
+        const statement = chain.length === 0 ? path.findParent(ancestor => ancestor.parentPath?.isProgram() === true)?.node as t.Statement | undefined : undefined
+
+        reads.push({ name, at: path.node.start!, chain, typeOf, statement })
+      },
+    })
+  }
+  catch {
+    return []
+  }
 
   const rendering = new Set(transparent)
   const renders = (chain: t.Node[]) => chain.every(fn => rendering.has(fn))
@@ -158,7 +169,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   }
 
   const diagnostics: Diagnostic[] = []
-  const fixes = (read: Read): Fix[] => [...effectFix(file, program.code, read, effectBound, toSource, ast), ...clientFix(file)]
+  const toClient = routeFile ? [] : clientFix(file)
 
   for (const read of reads) {
     const start = toSource(read.at)
@@ -169,9 +180,9 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
     const span = { start, end: start + read.name.length }
 
     if (!read.typeOf)
-      diagnostics.push({ ...span, message: `\`${read.name}\` exists only in the browser, and this reads it while the component renders on the server too: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``, fixes: fixes(read), checkOnly: true })
+      diagnostics.push({ ...span, message: `\`${read.name}\` exists only in the browser, and this reads it while the component renders on the server too: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``, fixes: [...effectFix(file, program.code, read, effectBound, toSource, ast), ...toClient], checkOnly: true })
     else if (island)
-      diagnostics.push({ ...span, message: `\`typeof ${read.name}\` differs between the server and the browser, so what the island renders from it will not match the server's markup when it hydrates: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``, fixes: clientFix(file), checkOnly: true })
+      diagnostics.push({ ...span, message: `\`typeof ${read.name}\` differs between the server and the browser, so what the island renders from it will not match the server's markup when it hydrates: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``, fixes: toClient, checkOnly: true })
   }
 
   return diagnostics
@@ -188,6 +199,24 @@ function rendersCallback(call: t.CallExpression, fn: t.Node): boolean {
     return RENDER_CALLS.has(callee.name)
 
   return callee.type === 'MemberExpression' && callee.property.type === 'Identifier' && ARRAY_CALLBACKS.has(callee.property.name)
+}
+
+// A read the code already keeps from running on the server: under a `typeof` check of a browser-only global, or inside a `try`.
+function guarded(path: NodePath, code: string, names: ReadonlySet<string>): boolean {
+  const at = path.node.start!
+  const checks = (test: t.Node) => Array.from(code.slice(test.start!, test.end!).matchAll(TYPEOF_GLOBAL), match => match[1]!).some(name => names.has(name))
+
+  return path.findParent((ancestor) => {
+    const node = ancestor.node
+
+    if (node.type === 'TryStatement')
+      return at >= node.block.start! && at < node.block.end!
+
+    if (node.type === 'IfStatement' || node.type === 'ConditionalExpression')
+      return (at < node.test.start! || at >= node.test.end!) && checks(node.test)
+
+    return node.type === 'LogicalExpression' && at >= node.right.start! && checks(node.left)
+  }) !== null
 }
 
 function functionChain(path: NodePath): t.Node[] {
@@ -207,8 +236,10 @@ function inType(path: NodePath): boolean {
 // Names the server fence and the template bind are declared first, so they shadow the globals they are named after.
 function buildProgram(file: KayFile, serverNames: string[], expressions: { span: Span, deferred: boolean }[]): { code: string, segments: Segment[] } {
   const { source } = file
-  const bound = [...serverNames, ...templateNames(file)]
-  let code = bound.length > 0 ? `let ${[...new Set(bound)].join(', ')};\n` : ''
+  const bound = [...new Set([...serverNames, ...templateNames(file)])]
+  // Each template value sits in a block of its own declaring them, so they shadow the script's names rather than clash with them.
+  const declared = bound.length > 0 ? `let ${bound.join(', ')}; ` : ''
+  let code = ''
   const segments: Segment[] = []
   const add = (span: Span, before: string, after: string) => {
     code += before
@@ -220,7 +251,7 @@ function buildProgram(file: KayFile, serverNames: string[], expressions: { span:
     add(file.script, '', '\n')
 
   for (const expression of expressions)
-    add(expression.span, expression.deferred ? ';() => (' : ';(', ');\n')
+    add(expression.span, expression.deferred ? `;() => { ${declared}(` : `;{ ${declared}(`, ') }\n')
 
   return { code, segments }
 }
@@ -343,11 +374,8 @@ function effectFix(file: KayFile, code: string, read: Read, effectBound: boolean
   return [{ title: `Read \`${read.name}\` in an effect, once the component renders in the browser`, edits }]
 }
 
-// `---` becomes `--- client`; a file without a script gets an empty one. Pages, layouts and special pages render on the server, so they have no such fix.
+// `---` becomes `--- client`; a file without a script gets an empty one.
 function clientFix(file: KayFile): Fix[] {
-  if (file.server)
-    return []
-
   const title = 'Render the component in the browser only with `--- client`'
 
   if (!file.script)
