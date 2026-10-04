@@ -9,13 +9,13 @@ import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import { dirname, sep } from 'node:path'
 import { decodeCall, failure, FAILURE_HEADER, isAction, isFailure, REDIRECT_HEADER } from '../runtime/action'
-import { localeState as currentLocale, runInLocale } from '../runtime/i18n.server'
+import { localeState, runInLocale } from '../runtime/i18n.server'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash, writeSuccess } from './flash'
 import { runGuards } from './guards'
-import { localeState, requestLocale } from './i18n'
+import { requestLocale, stateFor } from './i18n'
 import { protectionRefusal } from './protection'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
@@ -260,12 +260,12 @@ function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T 
 
   const locale = requestLocale(options.i18n.settings, request)
 
-  return runInLocale(localeState(options.i18n, locale, new URL(request.url).pathname, request), run)
+  return runInLocale(stateFor(options.i18n, locale, new URL(request.url).pathname, request), run)
 }
 
 // What `ctx.locale` reads: the request's locale, or the site's single language.
 function contextLocale(): string {
-  return currentLocale()?.locale ?? ''
+  return localeState()?.locale ?? ''
 }
 
 // The guards of the action's page, answering for it when one stops the request.

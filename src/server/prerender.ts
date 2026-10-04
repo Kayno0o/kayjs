@@ -8,7 +8,7 @@ import { analyzeServer } from '../compiler/script'
 import { isCollection } from '../content'
 import { runInLocale } from '../runtime/i18n.server'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
-import { loadI18n, localeCopies, localeState } from './i18n'
+import { loadI18n, localeCopies, stateFor } from './i18n'
 import { registerLoader } from './loader'
 import { loadMatchers, matchedParams } from './params'
 import { renderPage } from './render'
@@ -58,7 +58,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head })
-        const response = await (i18n && copy.locale !== undefined ? runInLocale(localeState(i18n, copy.locale, path, request), render) : render())
+        const response = await (i18n && copy.locale !== undefined ? runInLocale(stateFor(i18n, copy.locale, path, request), render) : render())
 
         if (response.status >= 500)
           throw new Error(`kay: prerendering ${copy.path} from ${file} failed with ${response.status}; the error is logged above`)

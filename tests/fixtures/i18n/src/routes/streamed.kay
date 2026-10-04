@@ -1,0 +1,19 @@
+--- server
+import { defer } from 'kay'
+import { t } from 'kay/i18n'
+import Counter from '../components/counter.kay'
+
+async function wait(): Promise<string> {
+  await Bun.sleep(5)
+
+  return 'later'
+}
+
+const later = defer(wait())
+const label = (value: string) => `${t('nav.home')} ${value}`
+---
+await later
+  p Loading
+then value
+  p.later {label(value)}
+  Counter

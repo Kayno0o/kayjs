@@ -517,11 +517,12 @@ export default defineConfig({
 })
 ```
 
-- `prefixDefault: true` puts the default locale under its prefix too, `/fr/about`; a path without one then redirects with a 307 to the visitor's locale: the one they last went to, kept in the `kay-locale` cookie, then the best match of their browser's `Accept-Language`, then the default. Without it the URL alone decides.
+- `prefixDefault: true` puts the default locale under its prefix too, `/fr/about`; a path without one then redirects with a 307 to the visitor's locale: the one they last went to, kept in the `kay-locale` cookie once they follow a link of the site to it, then the best match of their browser's `Accept-Language`, then the default. Without it the URL alone decides.
 - `domains: { fr: 'example.fr', en: 'example.com' }` serves each locale on its own host instead, with no prefixes; a host not listed serves the default locale, and every locale needs a host.
-- A page cannot sit under a locale's prefix itself, `src/routes/en/`: kay serves every page there already.
+- A page cannot sit under a locale's prefix itself, `src/routes/en/`: kay serves every page there already. A root `[slug].kay` with no `index.kay` would take `/en` as a slug, so give the site an index page.
+- `domains` and `prefixDefault` do not go together.
 
-Messages live in `src/messages/<locale>.ts`, one file per locale, `messages` in `i18n` naming another directory. Each exports its messages by default through `defineMessages`, nested as you like; the default locale's file is the reference `kay check` holds the others to, and a key a locale lacks falls back to the default locale's text.
+Messages live in `src/messages/<locale>.ts`, one file per locale, `messages` in `i18n` naming another directory. Each exports its messages by default through `defineMessages`, nested as you like, a group never holding only keys named like plural forms (`one`, `other`...), which would read as one plural message; the default locale's file is the reference `kay check` holds the others to, and a key a locale lacks falls back to the default locale's text.
 
 ```ts
 import { defineMessages } from 'kay/i18n'

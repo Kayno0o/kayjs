@@ -12,7 +12,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { projectCollections, serveFeeds } from '../content/server'
 import { localePath, splitLocale } from '../runtime/i18n'
-import { localeState as currentLocale, runInLocale } from '../runtime/i18n.server'
+import { localeState, runInLocale } from '../runtime/i18n.server'
 import { overHttps, registerActionRoutes } from './actions'
 import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
@@ -20,7 +20,7 @@ import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from 
 import { DEV_EVENTS, devEvents } from './dev'
 import { FAVICON_DIR, serveFavicons } from './favicon'
 import { loadGuards } from './guards'
-import { hostLocale, loadI18n, LOCALE_COOKIE, localeCookie, localeState, preferredLocale, prerenderKey } from './i18n'
+import { cookieLocale, hostLocale, loadI18n, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
 import { serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
@@ -127,9 +127,10 @@ function localeRedirect(settings: LocaleSettings, request: Request, url: URL): R
   return new Response(null, { status: 307, headers: { 'location': `${localePath(settings, url.pathname, preferredLocale(settings, request))}${url.search}`, 'vary': 'cookie, accept-language', 'cache-control': 'private, no-cache' } })
 }
 
-// A visitor who went to another locale than the one they had is taken back to it from an unprefixed path; that response is theirs alone.
+// A visitor who followed a link of the site to another locale than the one they had is taken back to it from an unprefixed path; that response is theirs alone.
+// A first visit, a crawler or a cache filling chose nothing, so their responses stay cacheable.
 function remembered(response: Response, request: Request, locale: string): Response {
-  if (new Bun.CookieMap(request.headers.get('cookie') ?? '').get(LOCALE_COOKIE) === locale)
+  if (response.status !== 200 || request.headers.get('sec-fetch-site') !== 'same-origin' || cookieLocale(request) === locale)
     return response
 
   response.headers.append('set-cookie', localeCookie(locale, overHttps(request)))
@@ -257,16 +258,13 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   async function servePage(route: ServedRoute, params: Record<string, unknown>, context: RequestContext, url: URL): Promise<Response> {
     // A path `kay build` rendered is served from its file; any other path of the route renders per request.
-    const state = currentLocale()
-    const page = prerendered.get(route.pattern)?.get(prerenderKey(i18n?.settings, state?.locale, canonicalPath(withoutSlash(url.pathname))))
+    const page = prerendered.get(route.pattern)?.get(prerenderKey(i18n?.settings, localeState()?.locale, canonicalPath(withoutSlash(url.pathname))))
 
     if (!page)
       return renderPage(route, context, params, client, renderOptions)
 
-    // Rendered as `kay build` renders it: without the request, for whoever its guards let through.
-    const render = async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true })
-
-    revalidateStale(page, async () => state ? runInLocale(state, render) : render(), error => reportServerError(error, context.request, renderOptions.onError))
+    // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
+    revalidateStale(page, async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), error => reportServerError(error, context.request, renderOptions.onError))
 
     return servePrerendered(route, page, context, client, renderOptions)
   }
@@ -322,7 +320,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
         return localeRedirect(settings, context.request, url)
 
       const served = locale ?? hostLocale(settings, context.request)
-      const response = await runInLocale(localeState(i18n, served, url.pathname.slice(prefix.length) || '/', context.request), async () => answer(candidates, context, url))
+      const response = await runInLocale(stateFor(i18n, served, url.pathname.slice(prefix.length) || '/', context.request), async () => answer(candidates, context, url))
 
       return settings.prefixDefault ? remembered(response, context.request, served) : response
     })
@@ -337,9 +335,15 @@ export async function servePages(root: string, options: PagesOptions, loadClient
         return renderUnmatched(fallback, context, client, renderOptions)
 
       const url = new URL(context.request.url)
-      const { locale, path } = splitLocale(i18n.settings, url.pathname)
+      const { settings } = i18n
+      const { locale, path } = splitLocale(settings, url.pathname)
+      const response = await runInLocale(stateFor(i18n, locale ?? (settings.hosts ? hostLocale(settings, context.request) : preferredLocale(settings, context.request)), path, context.request), async () => renderUnmatched(fallback, context, client, renderOptions))
 
-      return runInLocale(localeState(i18n, locale ?? (i18n.settings.hosts ? hostLocale(i18n.settings, context.request) : preferredLocale(i18n.settings, context.request)), path, context.request), async () => renderUnmatched(fallback, context, client, renderOptions))
+      // A path with no locale of its own is answered in the visitor's, which a shared cache must tell apart.
+      if (locale === undefined && !settings.hosts)
+        response.headers.append('vary', 'cookie, accept-language')
+
+      return response
     })
   }
 

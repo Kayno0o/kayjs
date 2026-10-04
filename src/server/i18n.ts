@@ -5,12 +5,12 @@ import { existsSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { flattenMessages, localePath, splitLocale } from '../runtime/i18n'
-import { localeState as currentLocale } from '../runtime/i18n.server'
+import { localeState } from '../runtime/i18n.server'
 import { bundled, importModule } from './bundle'
 
 // Where a visitor's choice of locale is kept, read before their browser's languages.
 export const LOCALE_COOKIE = 'kay-locale'
-export const MESSAGES_DIR = 'src/messages'
+const MESSAGES_DIR = 'src/messages'
 // A year: a choice of language is no session's.
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 const LOCALE_TAG = /^[a-z]{2,3}(?:-[a-z\d]{2,8})*$/i
@@ -43,6 +43,9 @@ export function localeSettings(config: I18nConfig): LocaleSettings {
     if (!config.locales.includes(locale))
       throw new Error(`kay: i18n gives a domain to ${locale}, which is not one of its locales: ${config.locales.join(', ')}`)
   }
+
+  if (config.domains && config.prefixDefault)
+    throw new Error('kay: i18n gives domains or prefixDefault, not both: with domains a locale has no prefix')
 
   const homeless = config.domains && config.locales.find(locale => config.domains![locale] === undefined)
 
@@ -78,7 +81,7 @@ export async function loadI18n(root: string, config: I18nConfig): Promise<I18n> 
 }
 
 // The state a request runs in for that locale, the page's path given without its prefix.
-export function localeState(i18n: I18n, locale: string, path: string, request: Request): LocaleState {
+export function stateFor(i18n: I18n, locale: string, path: string, request: Request): LocaleState {
   return { ...i18n.translations.get(locale)!, settings: i18n.settings, path, host: new URL(request.url).host }
 }
 
@@ -91,15 +94,20 @@ export function hostLocale(settings: LocaleSettings, request: Request): string {
 
 // The locale a visitor wants when the URL does not say: the one they chose, kept in a cookie, then their browser's best match, then the default.
 export function preferredLocale(settings: LocaleSettings, request: Request): string {
-  const chosen = new Bun.CookieMap(request.headers.get('cookie') ?? '').get(LOCALE_COOKIE)
+  const chosen = cookieLocale(request)
 
-  if (chosen !== null && settings.locales.includes(chosen))
+  if (chosen !== undefined && settings.locales.includes(chosen))
     return chosen
 
   return acceptedLocale(settings.locales, request.headers.get('accept-language')) ?? settings.defaultLocale
 }
 
-// The locale an action or an app route runs in: its host's, its page's, as the Referer names it, or the visitor's preferred one.
+// The locale the visitor's cookie keeps, which may name one the site no longer has.
+export function cookieLocale(request: Request): string | undefined {
+  return new Bun.CookieMap(request.headers.get('cookie') ?? '').get(LOCALE_COOKIE) ?? undefined
+}
+
+// The locale an action runs in: its host's, its page's, as the Referer names it, or the visitor's preferred one.
 export function requestLocale(settings: LocaleSettings, request: Request): string {
   if (settings.hosts)
     return hostLocale(settings, request)
@@ -173,7 +181,7 @@ export function prerenderKey(settings: LocaleSettings | undefined, locale: strin
 
 // The messages a page's islands use, with what the browser needs to build links in its locale; nothing outside a request served in one.
 export function messagesScript(keys: Set<string>, first: boolean): string {
-  const state = currentLocale()
+  const state = localeState()
 
   if (!state || (keys.size === 0 && !first))
     return ''

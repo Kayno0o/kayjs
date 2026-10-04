@@ -40,18 +40,19 @@ type KeysOf<Tree, Prefix extends string = ''> = { [Key in keyof Tree & string]: 
 type At<Tree, Key extends string> = Key extends `${infer Head}.${infer Rest}` ? Head extends keyof Tree ? At<Tree[Head], Rest> : never : Key extends keyof Tree ? Tree[Key] : never
 type Placeholders<Text> = Text extends `${string}{${infer Name}}${infer Rest}` ? Name | Placeholders<Rest> : never
 type ParamsOf<Value> = Value extends string ? Placeholders<Value> : 'count' | Placeholders<Value[keyof Value] & string>
-type ParamArgs<Names extends string> = [Names] extends [never] ? [] : [params: { [Name in Names]: Name extends 'count' ? number : MessageValue }]
+// A plural's `count` picks its form, so it is a number; any other placeholder takes text, a number or a date.
+type ParamArgs<Value, Names extends string = ParamsOf<Value>> = [Names] extends [never] ? [] : [params: { [Name in Names]: Name extends 'count' ? Value extends string ? MessageValue : number : MessageValue }]
 
 export type MessageKey = [Messages] extends [never] ? string : KeysOf<Messages>
 // A key of the default locale's messages, then the values its placeholders take; without registered messages, any key and any values.
 export type Translate = [Messages] extends [never]
   ? (key: string, params?: Record<string, MessageValue>) => string
-  : <Key extends KeysOf<Messages>>(key: Key, ...params: ParamArgs<ParamsOf<At<Messages, Key>>>) => string
+  : <Key extends KeysOf<Messages>>(key: Key, ...params: ParamArgs<At<Messages, Key>>) => string
 export type Localize = <const Href extends string>(href: Href & CheckedHref<Href>, locale?: Locale) => string
 
 const PLACEHOLDER = /\{(\w+)\}/g
 
-export const PLURAL_CATEGORIES: ReadonlySet<string> = new Set<PluralCategory>(['zero', 'one', 'two', 'few', 'many', 'other'])
+const PLURAL_CATEGORIES: ReadonlySet<string> = new Set<PluralCategory>(['zero', 'one', 'two', 'few', 'many', 'other'])
 const numberFormats = new Map<string, Intl.NumberFormat>()
 const dateFormats = new Map<string, Intl.DateTimeFormat>()
 const pluralRules = new Map<string, Intl.PluralRules>()
@@ -137,7 +138,8 @@ export function localePath(settings: LocaleSettings, path: string, locale: strin
   if (settings.hosts) {
     const host = settings.hosts[locale]
 
-    return host === undefined || host === currentHost ? path : `https://${host}${path}`
+    // Protocol-relative, so a link to another host keeps the scheme the page came over, plain http in development.
+    return host === undefined || host === currentHost ? path : `//${host}${path}`
   }
 
   if (locale === settings.defaultLocale && !settings.prefixDefault)

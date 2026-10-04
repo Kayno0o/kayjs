@@ -18,10 +18,10 @@ const messages = `${FIXTURE}/src/messages`
 const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages }
 const app = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.example', i18n }))
 
-async function get(path: string, served: { handle: (request: Request) => Promise<Response> } = app, headers: Record<string, string> = {}): Promise<{ status: number, html: string, location: string | null, cookie: string | null }> {
+async function get(path: string, served: { handle: (request: Request) => Promise<Response> } = app, headers: Record<string, string> = {}): Promise<{ status: number, html: string, location: string | null, cookie: string | null, vary: string | null, etag: string | null }> {
   const response = await served.handle(new Request(path.startsWith('http') ? path : `http://localhost${path}`, { headers }))
 
-  return { status: response.status, html: await response.text(), location: response.headers.get('location'), cookie: response.headers.get('set-cookie') }
+  return { status: response.status, html: await response.text(), location: response.headers.get('location'), cookie: response.headers.get('set-cookie'), vary: response.headers.get('vary'), etag: response.headers.get('etag') }
 }
 
 describe('locale prefixes', () => {
@@ -64,6 +64,13 @@ describe('locale prefixes', () => {
     expect(html).toContain('<button><!--[-->Counter<!--]--> <!--[-->0<!--]--></button>')
   })
 
+  it('keep the locale in a streamed block, which brings its islands\' messages', async () => {
+    const { html } = await get('/en/streamed')
+
+    expect(html).toContain('<p class="later">Home later</p>')
+    expect(html).toContain('<script type="application/json" data-kay-i18n>{"locale":"en","settings":{"locales":["fr","en"],"defaultLocale":"fr","prefixDefault":false},"messages":{"counter.label":"Counter"}}</script>')
+  })
+
   it('list every locale\'s copy of a page in the head and the sitemap', async () => {
     const { html } = await get('/en/about')
 
@@ -74,7 +81,7 @@ describe('locale prefixes', () => {
 
     const sitemap = (await get('/sitemap.xml')).html
 
-    expect(sitemap).toContain('<url><loc>https://x.example/en/about</loc><xhtml:link rel="alternate" hreflang="fr" href="https://x.example/about"/><xhtml:link rel="alternate" hreflang="en" href="https://x.example/en/about"/></url>')
+    expect(sitemap).toContain('<url><loc>https://x.example/en/about</loc><xhtml:link rel="alternate" hreflang="fr" href="https://x.example/about"/><xhtml:link rel="alternate" hreflang="en" href="https://x.example/en/about"/><xhtml:link rel="alternate" hreflang="x-default" href="https://x.example/about"/></url>')
     expect(sitemap).toContain('<loc>https://x.example/about</loc>')
   })
 
@@ -91,6 +98,7 @@ describe('locale prefixes', () => {
 
     expect(() => localeSettings({ locales: ['fr'], defaultLocale: 'en' })).toThrow('defaultLocale en is not one of its locales')
     expect(() => localeSettings({ locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr' } })).toThrow('none to en')
+    expect(() => localeSettings({ locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, prefixDefault: true })).toThrow('domains or prefixDefault')
     await expect(pages({ routes, prebuilt: false, i18n: { ...i18n, locales: ['fr', 'de'] } })).rejects.toThrow('so its messages go in')
   })
 })
@@ -102,8 +110,22 @@ describe('the default locale prefixed', () => {
     expect(await get('/about?x=1', prefixed, { 'accept-language': 'en-US,en;q=0.9,fr;q=0.5' })).toMatchObject({ status: 307, location: '/en/about?x=1' })
     expect(await get('/about', prefixed, { 'accept-language': 'en', 'cookie': 'kay-locale=fr' })).toMatchObject({ status: 307, location: '/fr/about' })
     expect(await get('/', prefixed, { 'accept-language': 'de' })).toMatchObject({ status: 307, location: '/fr' })
-    expect((await get('/fr/about', prefixed)).cookie).toBe('kay-locale=fr; Path=/; Max-Age=31536000; SameSite=Lax')
-    expect((await get('/fr/about', prefixed, { cookie: 'kay-locale=fr' })).cookie).toBeNull()
+    // Only a visitor following a link of the site chose a locale; a first visit, a crawler or a cache filling stays cacheable.
+    const same = { 'sec-fetch-site': 'same-origin' }
+
+    expect((await get('/fr/about', prefixed, same)).cookie).toBe('kay-locale=fr; Path=/; Max-Age=31536000; SameSite=Lax')
+    expect((await get('/fr/about', prefixed)).cookie).toBeNull()
+    expect((await get('/fr/about', prefixed, { ...same, cookie: 'kay-locale=fr' })).cookie).toBeNull()
+    expect((await get('/fr/nope', prefixed, same)).cookie).toBeNull()
+  })
+
+  it('answers a path no page serves in the visitor\'s locale, varying on what chose it', async () => {
+    const prefixed = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } }))
+    const missing = await get('/nope', prefixed, { 'accept-language': 'en' })
+
+    expect(missing).toMatchObject({ status: 404, vary: 'cookie, accept-language' })
+    expect(missing.html).toContain('<h1 class="missing">Home</h1>')
+    expect((await get('/fr/nope', prefixed)).html).toContain('<h1 class="missing">Accueil</h1>')
   })
 })
 
@@ -113,10 +135,19 @@ describe('locales by domain', () => {
     const english = await get('http://x.com/about', domains)
 
     expect(english.html).toContain('<h1>About</h1>')
-    expect(english.html).toContain('<a class="fr" href="https://x.fr/about">FR</a>')
+    expect(english.html).toContain('<a class="fr" href="//x.fr/about">FR</a>')
     expect(english.html).toContain('<a class="en" href="/about">EN</a>')
     expect((await get('http://x.fr/about', domains)).html).toContain('<h1>À propos</h1>')
     expect((await get('http://elsewhere.example/about', domains)).html).toContain('<h1>À propos</h1>')
+  })
+
+  it('give each host a sitemap of its own pages, each linking its copies on the other hosts', async () => {
+    const domains = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.fr', i18n: { ...i18n, domains: { fr: 'x.fr', en: 'x.com' } } }))
+    const english = (await get('http://x.com/sitemap.xml', domains)).html
+
+    expect(english).toContain('<url><loc>https://x.com/about</loc><xhtml:link rel="alternate" hreflang="fr" href="https://x.fr/about"/><xhtml:link rel="alternate" hreflang="en" href="https://x.com/about"/><xhtml:link rel="alternate" hreflang="x-default" href="https://x.fr/about"/></url>')
+    expect(english).not.toContain('<loc>https://x.fr/')
+    expect((await get('http://x.fr/sitemap.xml', domains)).html).toContain('<loc>https://x.fr/about</loc>')
   })
 })
 
@@ -147,25 +178,54 @@ describe('locale detection', () => {
 })
 
 describe('prerendering', () => {
-  it('renders a page once per locale', async () => {
+  async function prerendered(config: I18nConfig, check: () => Promise<void>): Promise<void> {
     const root = process.cwd()
     const manifest = (await readManifest(root))!
 
     try {
-      expect(await prerenderPages(root, { routes, i18n }, (await readClient(root))!)).toBe(2)
-      expect(await Bun.file(join(root, '.kay/client/pages/index.html')).text()).toContain('<h1>Bonjour Ada</h1>')
-      expect(await Bun.file(join(root, '.kay/client/pages/en.html')).text()).toContain('<h1>Hello Ada</h1>')
+      expect(await prerenderPages(root, { routes, i18n: config }, (await readClient(root))!)).toBe(2)
+      await check()
     }
     finally {
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
+  }
+
+  it('renders a page once per locale, each served back from its file', async () => {
+    await prerendered(i18n, async () => {
+      expect(await Bun.file(join(process.cwd(), '.kay/client/pages/index.html')).text()).toContain('<h1>Bonjour Ada</h1>')
+      expect(await Bun.file(join(process.cwd(), '.kay/client/pages/en.html')).text()).toContain('<h1>Hello Ada</h1>')
+
+      const built = new Elysia().use(await pages({ routes, prebuilt: true, security: false, i18n }))
+      const english = await get('/en', built)
+
+      expect(english.html).toContain('<h1>Hello Ada</h1>')
+      expect(english.etag).not.toBeNull()
+    })
+  })
+
+  it('keeps each domain\'s copy apart, served to its host', async () => {
+    const domains = { ...i18n, domains: { fr: 'x.fr', en: 'x.com' } }
+
+    await prerendered(domains, async () => {
+      const built = new Elysia().use(await pages({ routes, prebuilt: true, security: false, i18n: domains }))
+      const english = await get('http://x.com/', built)
+      const french = await get('http://x.fr/', built)
+
+      expect(english.html).toContain('<h1>Hello Ada</h1>')
+      expect(french.html).toContain('<h1>Bonjour Ada</h1>')
+      expect(english.etag).not.toBeNull()
+      expect(english.etag).not.toBe(french.etag)
+    })
   })
 })
 
 describe('kay check', () => {
   it('types t() from the default locale\'s messages and reports a locale that strays from them', async () => {
     expect(await check(FIXTURE, { i18n: { ...i18n, messages: undefined } })).toEqual([])
+    // Unprefixed links stay valid with every locale prefixed: the server sends them on to the visitor's.
+    expect(await check(FIXTURE, { i18n: { ...i18n, messages: undefined, prefixDefault: true } })).toEqual([])
 
     const english = join(FIXTURE, 'src/messages/en.ts')
     const page = join(FIXTURE, 'src/routes/typo.kay')
@@ -173,7 +233,7 @@ describe('kay check', () => {
 
     try {
       await Bun.write(english, source.replace('  greeting: \'Hello {name}\',\n', '').replace('Saved on {date}', 'Saved on {day}').replace('counter: { label: \'Counter\', more: \'More\' }', 'counter: { label: \'Counter\', more: \'More\', less: \'Less\' }'))
-      await Bun.write(page, '--- server\nimport { t } from \'kay/i18n\'\n\nconst a = t(\'nav.hom\')\nconst b = t(\'greeting\')\n---\np {a} {b}\n')
+      await Bun.write(page, '--- server\nimport { t } from \'kay/i18n\'\n\nconst a = t(\'nav.hom\')\nconst b = t(\'greeting\')\nconst c = t(\'greeting\', { nom: \'Ada\' })\nconst d = t(\'items\', { count: \'2\' })\n---\np {a} {b} {c} {d}\n')
 
       const diagnostics = (await check(FIXTURE, { i18n: { ...i18n, messages: undefined } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
 
@@ -181,12 +241,18 @@ describe('kay check', () => {
       expect(diagnostics).toContainEqual({ file: english, line: 7, message: 'gives saved without {date}, which src/messages/fr.ts has' })
       expect(diagnostics).toContainEqual({ file: english, line: 7, message: 'gives saved a {day}, which src/messages/fr.ts has not, so nothing fills it' })
       expect(diagnostics).toContainEqual({ file: english, line: 6, message: 'has counter.less, which src/messages/fr.ts lacks, so no `t()` can name it' })
-      expect(diagnostics.filter(diagnostic => diagnostic.file === page).map(diagnostic => diagnostic.line)).toEqual([4, 5])
+      expect(diagnostics.filter(diagnostic => diagnostic.file === page).map(diagnostic => diagnostic.line)).toEqual([4, 5, 6, 7])
     }
     finally {
       await Bun.write(english, source)
       await rm(page, { force: true })
     }
+  })
+
+  it('reports a locale config no request could be served by, at the config', async () => {
+    const diagnostics = await check(FIXTURE, { i18n: { locales: ['fr'], defaultLocale: 'en' } })
+
+    expect(diagnostics.map(({ file, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), message }))).toContainEqual({ file: `${FIXTURE}/kay.config.ts`, message: 'kay: i18n\'s defaultLocale en is not one of its locales: fr' })
   })
 })
 

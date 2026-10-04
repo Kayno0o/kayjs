@@ -1,6 +1,7 @@
 import type { Diagnostic, SourceMap } from '../compiler'
 import type { I18nConfig } from '../config'
 import type { ContentProblem } from '../content/validate'
+import type { LocaleSettings } from '../runtime/i18n'
 import type { Redirects } from '../server/redirects'
 import type { Route } from '../server/routes'
 import { existsSync } from 'node:fs'
@@ -96,12 +97,12 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const [routes, publicPaths] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public'))])
 
   const shapes = routes.flatMap(route => patternShapes(route.pattern))
-  const settings = options.i18n && localeSettings(options.i18n)
-  // A page is reached in every locale, under its prefix where it has one.
+  const settings = options.i18n && i18nSettings(root, options.i18n, diagnostics)
+  // A page is reached in every locale, under its prefix where it has one; an unprefixed path still answers, sending the visitor on to theirs when every locale is prefixed.
   const prefixes = settings && !settings.hosts ? settings.locales.filter(locale => locale !== settings.defaultLocale || settings.prefixDefault) : []
-  const localized = [...settings?.prefixDefault && !settings.hosts ? [] : shapes, ...prefixes.flatMap(locale => shapes.map(shape => `/${locale}${shape === '/' ? '' : shape}`))]
+  const localized = [...shapes, ...prefixes.flatMap(locale => shapes.map(shape => `/${locale}${shape === '/' ? '' : shape}`))]
 
-  await writeIfChanged(environmentPath, environment(localized, publicPaths.map(file => file.url), options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }))
+  await writeIfChanged(environmentPath, environment(localized, publicPaths.map(file => file.url), settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
@@ -121,6 +122,18 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await Promise.all(stale.map(async path => rm(path)))
 
   return { files, diagnostics }
+}
+
+// The locale settings, or undefined with the reason they cannot serve a page reported at the config, as the server would refuse them.
+function i18nSettings(root: string, config: I18nConfig, diagnostics: CheckDiagnostic[]): LocaleSettings | undefined {
+  try {
+    return localeSettings(config)
+  }
+  catch (error) {
+    diagnostics.push({ file: join(root, CONFIG_FILE), line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
+
+    return undefined
+  }
 }
 
 export function shadowPath(root: string, file: string): string {

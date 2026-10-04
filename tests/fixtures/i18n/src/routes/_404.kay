@@ -1,0 +1,6 @@
+--- server
+import { t } from 'kay/i18n'
+
+const home = t('nav.home')
+---
+h1.missing {home}
