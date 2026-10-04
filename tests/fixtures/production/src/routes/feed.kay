@@ -1,0 +1,7 @@
+--- server
+import { cached } from 'kay/cache'
+import { feed } from '../news'
+
+const items = await cached('feed', 300, () => feed.items)
+---
+p.feed {items.join(', ')}
