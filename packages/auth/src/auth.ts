@@ -2,18 +2,23 @@ import type { AnyElysia } from 'elysia'
 import type { Guard } from 'kay'
 import type { Session } from 'kay/server'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
+import type { Limits } from './limits'
 import type { OAuthFailure } from './oauth/flow'
+import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
 import type { RequestState } from './state'
 import type { AuthStore, UserRecord } from './store'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
+import { clientKey } from './client'
 import { publicUser } from './core'
 import { createGate } from './gate'
 import { deriveKeys } from './keys'
+import { DEFAULT_LIMITS } from './limits'
 import { createOAuthClient } from './oauth/client'
 import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow'
 import { createOAuthTokenRefresher } from './oauth/refresher'
+import { register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
@@ -46,6 +51,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string> 
   onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
   roles?: Record<Role, NoInfer<Role>[]>
+  // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
+  limits?: Partial<Limits>
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
   authorize?: (user: User | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>
 }
@@ -55,10 +62,11 @@ export class Auth {
   readonly [STATE]: RequestState
   private resolving?: Promise<UserRecord | null>
 
-  constructor(private readonly session: Session<AuthSessionData>, private readonly core: Core) {
+  constructor(private readonly session: Session<AuthSessionData>, private readonly core: Core, client: string) {
     this[STATE] = {
       core,
       session,
+      client,
       current: () => this.record(),
       complete: async (record, redirect) => {
         await this.signIn(record)
@@ -113,6 +121,16 @@ export class Auth {
     await this.signOut()
   }
 
+  // A new user with an email and a password, signed in on this session; field errors come back as codes.
+  async register(input: RegisterInput): Promise<RegisterResult> {
+    return register(this[STATE], input)
+  }
+
+  // Signs in with an email or a username and a password; a wrong password and an unknown account answer alike.
+  async signInWithPassword(input: PasswordSignInInput): Promise<PasswordSignInResult> {
+    return signInWithPassword(this[STATE], input)
+  }
+
   // A fresh access token for the signed-in user's account at `provider`, refreshed when about to expire; null without one, or once the provider refuses a refresh.
   async providerToken(provider: string): Promise<string | null> {
     return providerToken(this[STATE], provider)
@@ -158,7 +176,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   const plugin = new Elysia({ name: 'kay-auth' })
     .use(options.sessions as unknown as AnyElysia)
-    .derive(({ session }) => ({ auth: new Auth(session as unknown as Session<AuthSessionData>, core) }))
+    .derive(({ session, request, server }) => ({ auth: new Auth(session as unknown as Session<AuthSessionData>, core, clientKey(request, server)) }))
     // The session's derive reaches this instance only; lifting both lets them reach the app's routes.
     .as('scoped')
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
@@ -250,6 +268,7 @@ function createCore<Data extends AuthSessionData, Role extends string>(options: 
     url: options.url,
     prefix,
     signInPage: options.signInPage ?? '/',
+    limits: { ...DEFAULT_LIMITS, ...options.limits },
     oauth,
     refreshers: new Map(),
     allow: options.allow,

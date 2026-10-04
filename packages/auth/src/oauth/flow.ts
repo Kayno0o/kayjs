@@ -4,6 +4,7 @@ import type { IdentityRecord, UserRecord } from '../store'
 import type { OAuthTokens } from './types'
 import { newUserRecord, publicUser, sameText } from '../core'
 import { randomToken } from '../keys'
+import { normalizeEmail, normalizeUsername, usernameProblem } from '../rules'
 import { OAuthExchangeError } from './client'
 import { createPkcePair } from './pkce'
 import { safeRedirect } from './redirect'
@@ -162,9 +163,11 @@ async function saveIdentity(core: Core, identity: IdentityRecord | undefined, us
 
 // A new user from a provider account: its verified email and its name are taken only when no other user has them, so no account is ever merged into another by email.
 async function signUp(core: Core, profile: Profile): Promise<UserRecord> {
-  const email = profile.email?.toLowerCase()
+  const email = profile.email ? normalizeEmail(profile.email) : undefined
+  const name = normalizeUsername(profile.username)
   const freeEmail = email !== undefined && !(await core.store.users.findByEmail(email)) ? email : null
-  const freeName = profile.username && !(await core.store.users.findByUsername(profile.username)) ? profile.username : null
+  // A name these rules refuse is left out too: the user picks one later.
+  const freeName = !usernameProblem(name) && !(await core.store.users.findByUsername(name)) ? name : null
   const record = newUserRecord({ email: freeEmail, emailVerifiedAt: freeEmail === null ? null : new Date(), username: freeName })
 
   await core.store.users.create(record)
@@ -174,7 +177,7 @@ async function signUp(core: Core, profile: Profile): Promise<UserRecord> {
 
 // Gives a user without an email the provider's verified one, when no other user has it.
 async function adoptEmail(core: Core, record: UserRecord, profile: Profile): Promise<UserRecord> {
-  const email = profile.email?.toLowerCase()
+  const email = profile.email ? normalizeEmail(profile.email) : undefined
 
   if (record.email !== null || email === undefined || await core.store.users.findByEmail(email))
     return record

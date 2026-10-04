@@ -1,4 +1,5 @@
 import type { Keys } from './keys'
+import type { Limits } from './limits'
 import type { createOAuthClient } from './oauth/client'
 import type { OAuthFlow } from './oauth/flow'
 import type { createTokenRefresher, StoredCredential } from './oauth/refresher'
@@ -49,6 +50,7 @@ export interface Core {
   url?: string
   prefix: string
   signInPage: string
+  limits: Limits
   oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<any, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: (profile: Profile) => boolean | Promise<boolean>

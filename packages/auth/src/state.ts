@@ -6,6 +6,8 @@ import type { UserRecord } from './store'
 export interface RequestState {
   core: Core
   session: Session<AuthSessionData>
+  // Who is asking, as rate limits count them.
+  client: string
   current: () => Promise<UserRecord | null>
   // Signs `record` in and answers where the browser goes next.
   complete: (record: UserRecord, redirect: string) => Promise<string>

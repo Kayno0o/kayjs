@@ -52,6 +52,13 @@ export interface AuthStore {
     update: (provider: string, providerId: string, patch: Partial<Pick<IdentityRecord, 'accessToken' | 'refreshToken' | 'tokenExpiresAt'>>) => MaybePromise<void>
     delete: (provider: string, providerId: string) => MaybePromise<void>
   }
+  // Attempt counts, shared by every process the store is: a window starts with its first attempt.
+  attempts: {
+    count: (key: string) => MaybePromise<number>
+    // Counts one more attempt against `key`, in a window of `window` seconds when none is open; the count once raised.
+    hit: (key: string, window: number) => MaybePromise<number>
+    reset: (key: string) => MaybePromise<void>
+  }
 }
 
 export type MaybePromise<T> = T | Promise<T>

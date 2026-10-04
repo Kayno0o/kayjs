@@ -36,6 +36,8 @@ export function testApp(options: Partial<Omit<AuthOptions<AuthSessionData, 'admi
 
       return 'ok'
     })
+    .post('/register', async ({ auth, body }) => auth.register(body as Parameters<typeof auth.register>[0]))
+    .post('/password', async ({ auth, body }) => auth.signInWithPassword(body as Parameters<typeof auth.signInWithPassword>[0]))
     .post('/sign-out', async ({ auth }) => {
       await auth.signOut()
 
@@ -73,6 +75,10 @@ export function browser(app: { handle: (request: Request) => Promise<Response> }
       }
 
       return response
+    },
+    // Posts `body` as JSON and reads the answer.
+    async post(path: string, body: unknown): Promise<any> {
+      return this.json(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     },
     async json(path: string, init: RequestInit = {}): Promise<unknown> {
       const response = await this.fetch(path, init)
