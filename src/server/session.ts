@@ -21,6 +21,8 @@ export interface SessionOptions {
   cookie?: string
   // Seconds a session lasts without being used, 30 days by default; one used past half of it is extended.
   maxAge?: number
+  // The parent domain sibling hosts share the session under, `example.com` for `app.example.com` and `auth.example.com`; the cookie is the visited host's only without it.
+  domain?: string
   // Keeps the data server-side, the cookie carrying only an id; without one the data travels sealed in the cookie, about 3.5 KB at most.
   store?: SessionStore
 }
@@ -61,7 +63,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
     throw new Error(`kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
 
   const keys = secrets.map(secret => createHash('sha256').update(secret).digest())
-  const config = { name: options.cookie ?? 'session', maxAge: options.maxAge ?? DEFAULT_MAX_AGE, store: options.store, keys }
+  const config = { name: options.cookie ?? 'session', maxAge: options.maxAge ?? DEFAULT_MAX_AGE, domain: options.domain, store: options.store, keys }
 
   return new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) as Session<Data> }))
@@ -89,6 +91,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 interface SessionConfig {
   name: string
   maxAge: number
+  domain?: string
   store?: SessionStore
   keys: Buffer[]
 }
@@ -215,7 +218,7 @@ class RequestSession<Data extends object> implements Session<Data> {
   }
 
   private cookie(value: string, maxAge: number): string {
-    return new Bun.Cookie(this.config.name, value, { path: '/', httpOnly: true, sameSite: 'lax', secure: overHttps(this.request), maxAge }).serialize()
+    return new Bun.Cookie(this.config.name, value, { path: '/', domain: this.config.domain, httpOnly: true, sameSite: 'lax', secure: overHttps(this.request), maxAge }).serialize()
   }
 }
 

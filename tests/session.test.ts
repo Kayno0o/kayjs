@@ -118,6 +118,14 @@ describe('sessions', () => {
     expect(await (await other.handle(new Request('http://localhost/peek', { headers: { cookie: `admin=${value}` } }))).text()).toBe('none')
   })
 
+  it('shares the cookie with sibling hosts under domain, writing and clearing it there, and keeps it to the host without', async () => {
+    const visit = browser(counter({ domain: 'example.com' }))
+
+    expect((await visit('/count')).set).toMatch(/; Domain=example\.com(;|$)/i)
+    expect((await visit('/out')).set).toMatch(/; Domain=example\.com;.*Max-Age=0/i)
+    expect((await browser(counter())('/count')).set).not.toMatch(/Domain=/i)
+  })
+
   it('forgets a session unused for maxAge, and extends one used past half of it', async () => {
     const visit = browser(counter({ maxAge: 100 }))
 
