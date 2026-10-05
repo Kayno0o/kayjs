@@ -78,7 +78,7 @@ interface MetafileOutput {
   entryPoint?: string
   cssBundle?: string
   imports: { path: string, kind: string }[]
-  inputs?: Record<string, unknown>
+  inputs?: Record<string, { bytesInOutput?: number }>
 }
 
 type Outputs = Record<string, MetafileOutput>

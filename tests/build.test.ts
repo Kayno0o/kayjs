@@ -37,7 +37,21 @@ describe('kay build', () => {
     })
 
     try {
-      expect(async () => buildClient(root)).toThrow(/`process`.*src\/settings\.ts/s)
+      await expect(buildClient(root)).rejects.toThrow(/`process` in counter-[a-z0-9]+\.js, read by src\/settings\.ts/)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('names the island\'s own fence when the read is there, and minifies as the build does', async () => {
+    const root = await scratchProject({
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst own = process.env.OWN\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {own} {n()}\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+    })
+
+    try {
+      await expect(buildClient(root, { minify: true })).rejects.toThrow(/`process` in counter-[a-z0-9]+\.js, read by src\/counter\.kay/)
     }
     finally {
       await rm(root, { recursive: true, force: true })
