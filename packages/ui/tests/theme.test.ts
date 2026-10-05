@@ -14,6 +14,10 @@ const CLASS_EXPRESSION = /\bclass=\{((?:[^{}]|\{[^{}]*\})*)\}/g
 // A class name in an expression: a quoted string, unless a comparison makes it a value, or an object key.
 const CLASS_IN_EXPRESSION = /([!=]==\s*)?'([a-z][\w-]*)'|\b([a-z][\w-]*)(?=\s*:)/g
 const WHITESPACE = /\s+/
+// A quoted class name, as a script or a component's own script writes one: `classList.add('x')`, `{ 'x': on }`.
+const QUOTED = /'([a-z][\w-]*)'/g
+// What chartist draws itself, styled here but written by no source of the library.
+const THIRD_PARTY = /^ct-/
 
 // The theme namespace a scale utility reads, by its prefix.
 const NAMESPACE: Record<string, string> = { text: 'text', font: 'font-weight', tracking: 'tracking', rounded: 'radius' }
@@ -24,6 +28,7 @@ for (const prefix of ['gap', 'p', 'px', 'py', 'pt', 'pb', 'pl', 'pr', 'm', 'mx',
 const theme = await Bun.file(`${ROOT}src/theme.css`).text()
 const paths = await Array.fromAsync(new Bun.Glob('src/**/*.kay').scan({ cwd: ROOT }))
 const components = await Promise.all(paths.map(async path => ({ path, source: await Bun.file(`${ROOT}${path}`).text() })))
+const scripts = await Promise.all((await Array.fromAsync(new Bun.Glob('src/**/*.ts').scan({ cwd: ROOT }))).map(path => Bun.file(`${ROOT}${path}`).text()))
 
 const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => token))
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name]) => name))
@@ -55,6 +60,13 @@ describe('theme.css', () => {
 
     expect(written.size).toBeGreaterThan(0)
     expect([...written].filter(name => !classes.has(name))).toEqual([])
+  })
+
+  test('defines no class that nothing writes', () => {
+    const written = new Set(components.flatMap(({ path, source }) => writtenClasses(path, source)))
+    const quoted = new Set([...components.map(({ source }) => source), ...scripts].flatMap(source => [...source.matchAll(QUOTED)].map(([, name]) => name)))
+
+    expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name))).toEqual([])
   })
 
   test('declares its tokens as defaults, so the app\'s own @theme wins wherever it sits', () => {
