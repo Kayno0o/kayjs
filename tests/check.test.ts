@@ -183,7 +183,7 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('types what ctx.failed and ctx.succeeded read back from an action that ends without returning, as after ctx.redirect', async () => {
+  it('types what ctx.failed and ctx.succeeded read back from an action that ends without returning, as after ctx.redirect, and the form-wide error', async () => {
     const page = [
       '--- server',
       'import { t } from \'elysia\'',
@@ -204,9 +204,10 @@ describe('kay check, edge cases', () => {
       'const failure = ctx.failed(signIn)',
       'const saved: 1 | undefined = ctx.succeeded(save)?.data',
       'const wrong: number | undefined = ctx.failed(save)?.data',
+      'const formWide: string | undefined = failure?.errors[\'\']',
       '---',
       'if failure?.data as data',
-      '  p {data.error} {failure?.values.code} {saved}',
+      '  p {data.error} {failure?.values.code} {saved} {formWide}',
       'p {wrong}',
       '',
     ].join('\n')

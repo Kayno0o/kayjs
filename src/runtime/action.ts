@@ -67,8 +67,8 @@ export interface FormFailure<Input, Data> {
   status: number
   // What the form posted, so its fields can show it again; fields named like a password or a secret are left out.
   values: Partial<Record<Extract<keyof Input, string>, string>>
-  // A message per field the schema refused.
-  errors: Partial<Record<Extract<keyof Input, string>, string>>
+  // A message per field the schema refused, and under '' one for the whole form, as a rate limit's refusal.
+  errors: Partial<Record<Extract<keyof Input, string> | '', string>>
   // What the handler passed to `ctx.fail`; undefined when the schema refused the input.
   data?: Data
 }
