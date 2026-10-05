@@ -1,0 +1,16 @@
+---
+import type { PaletteEntry } from '@kaynooo/kayjs-ui'
+import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
+
+// What the test reads back: each change of the palette's state, and each action run.
+const { onOpenChange, onRecentChange, onAction, recent = [], hotkey } = props<{ onOpenChange: (open: boolean) => void, onRecentChange: (recent: string[]) => void, onAction: (name: string) => void, recent?: string[], hotkey?: string | null }>()
+
+const entries: PaletteEntry[] = [
+  { label: 'Table', group: 'Pages', href: '/table' },
+  { label: 'Content', group: 'Pages', href: '/content', keywords: 'cards badges' },
+  { label: 'Docs', group: 'Links', href: 'https://kaynooo.fr', external: true },
+  { label: 'New moon', group: 'Actions', icon: 'plus', onSelect: () => onAction('new-moon') },
+]
+---
+CommandPalette(entries={entries} groups={['Actions', 'Pages']} recent={recent} hotkey={hotkey} onOpenChange={onOpenChange} onRecentChange={onRecentChange})
+input#outside

@@ -1,0 +1,177 @@
+---
+import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
+import { effect, onCleanup, onMount, signal, uid } from 'kay'
+import Icon from './icon.kay'
+import { isPaletteLink, paletteMatches, paletteSections, withRecent } from './palette'
+
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', label = 'Search', placeholder = 'Search', emptyLabel = 'No results', class: className } = props<{
+  // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  entries: PaletteEntry[]
+  // The order groups are listed in; the rest follow as they come.
+  groups?: string[]
+  // Hrefs of the links followed from it, most recent first, listed on top while the query is empty; `onRecentChange` hands the new list over for the app to keep.
+  recent?: string[]
+  onRecentChange?: (recent: string[]) => void
+  // Ctrl or Cmd and this key opens and closes it from anywhere, unless something handled the key first; `null` leaves opening to the app.
+  hotkey?: string | null
+  label?: string
+  placeholder?: string
+  emptyLabel?: string
+  class?: string
+}>()
+
+// A row of the list, numbered the way the arrow keys walk it.
+interface Row {
+  entry: PaletteEntry
+  index: number
+}
+
+const id = uid()
+const shown = signal(open)
+const followedRecently = signal<string[]>(recent)
+const query = signal('')
+const selected = signal(0)
+let dialog: HTMLDialogElement | undefined
+
+effect(() => shown.set(open))
+effect(() => followedRecently.set(recent))
+
+// Headed groups while the query is empty, one flat ranked list once it is not.
+const sections = () => {
+  let index = 0
+  const numbered = (members: PaletteEntry[]): Row[] => members.map(entry => ({ entry, index: index++ }))
+
+  return query().trim()
+    ? [{ group: null, rows: numbered(paletteMatches(entries, query(), groups)) }]
+    : paletteSections(entries, followedRecently(), groups).map(section => ({ group: section.group as string | null, rows: numbered(section.entries) }))
+}
+
+const rows = () => sections().flatMap(section => section.rows)
+
+const optionId = (index: number) => `${id}-option-${index}`
+
+// The rows a template branch holds, which its `if` does not narrow.
+const linkOf = (entry: PaletteEntry) => entry as PaletteLink
+const actionOf = (entry: PaletteEntry) => entry as PaletteAction
+
+effect(() => {
+  const current = selected()
+
+  if (shown())
+    document.getElementById(optionId(current))?.scrollIntoView?.({ block: 'nearest' })
+})
+
+effect(() => {
+  const wanted = shown()
+
+  if (!dialog)
+    return
+
+  if (wanted && !dialog.open)
+    dialog.showModal()
+  else if (!wanted && dialog.open)
+    dialog.close()
+})
+
+function setShown(next: boolean) {
+  if (next === shown())
+    return
+
+  shown.set(next)
+  onOpenChange?.(next)
+}
+
+// A close event lands a task after the dialog closed, so one the hotkey has already reopened it past is stale.
+function closed() {
+  if (dialog?.open)
+    return
+
+  query.set('')
+  selected.set(0)
+  setShown(false)
+}
+
+function toggle(event: KeyboardEvent) {
+  if (event.defaultPrevented || event.key.toLowerCase() !== hotkey || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey)
+    return
+
+  event.preventDefault()
+  setShown(!(dialog?.open ?? shown()))
+}
+
+onMount(() => {
+  window.addEventListener('keydown', toggle)
+  onCleanup(() => window.removeEventListener('keydown', toggle))
+})
+
+function followed(link: PaletteLink) {
+  const next = withRecent(followedRecently(), link.href)
+
+  followedRecently.set(next)
+  onRecentChange?.(next)
+  dialog?.close()
+}
+
+// Run once the palette has closed, so a dialog the action opens takes focus from the page rather than from a vanished palette.
+function act(action: PaletteAction) {
+  dialog?.close()
+  action.onSelect()
+}
+
+function keyDown(event: KeyboardEvent) {
+  const count = rows().length
+
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault()
+    selected.set(count === 0 ? 0 : (selected() + (event.key === 'ArrowDown' ? 1 : -1) + count) % count)
+
+    return
+  }
+
+  const entry = rows()[selected()]?.entry
+
+  if (event.key !== 'Enter' || !entry)
+    return
+
+  event.preventDefault()
+
+  if (isPaletteLink(entry) && (event.ctrlKey || event.metaKey)) {
+    window.open(entry.href, '_blank', 'noopener')
+    followed(entry)
+
+    return
+  }
+
+  // A real click on the link, so kay's navigation takes it as it takes any other.
+  document.getElementById(optionId(selected()))?.click()
+}
+---
+dialog.command-palette(ref={element => dialog = element} closedby="any" aria-label={label} onClose={closed} class={className})
+  if shown()
+    .command-palette-search
+      Icon(icon="search")
+      input.command-palette-input(value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[selected()] ? optionId(selected()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
+    .command-palette-list(id={`${id}-list`} role="listbox" aria-label={label})
+      for section, sectionIndex of sections() key={section.group ?? ''}
+        div(role="group" aria-labelledby={section.group === null ? undefined : `${id}-group-${sectionIndex}`})
+          if section.group !== null
+            .heading-section.command-palette-heading(id={`${id}-group-${sectionIndex}`}) {section.group}
+          for row of section.rows key={row.index}
+            if isPaletteLink(row.entry)
+              a.command-palette-option(href={linkOf(row.entry).href} target={linkOf(row.entry).external ? '_blank' : undefined} rel={linkOf(row.entry).external ? 'noopener noreferrer' : undefined} id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(linkOf(row.entry))})
+                if row.entry.icon
+                  Icon(icon={row.entry.icon!})
+                span.command-palette-label {row.entry.label}
+                if query().trim()
+                  span.command-palette-group {row.entry.group}
+            else
+              button.command-palette-option(type="button" id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(actionOf(row.entry))})
+                if row.entry.icon
+                  Icon(icon={row.entry.icon!})
+                span.command-palette-label {row.entry.label}
+                if query().trim()
+                  span.command-palette-group {row.entry.group}
+      if rows().length === 0
+        p.command-palette-empty {emptyLabel}
