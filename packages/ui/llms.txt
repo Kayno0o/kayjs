@@ -1,6 +1,6 @@
 # kayjs-ui
 
-> kay components ported from @kaynooo/svelte and @kaynooo/solidjs. They ship as `.kay` sources that the app compiles as its own, and they are styled by the classes of one `theme.css`, which the app restyles from its own stylesheet. The set: buttons and icons, toasts, dialogs and a form dialog that calls a page's action, a sortable table, switches and segmented controls, inputs and selects, cards, badges, popovers and tooltips.
+> kay components ported from @kaynooo/svelte and @kaynooo/solidjs. They ship as `.kay` sources that the app compiles as its own, and they are styled by the classes of one `theme.css`, which the app restyles from its own stylesheet. The set: buttons and icons, toasts, dialogs and a form dialog that calls a page's action, a sortable table, switches, tabs and segmented controls, inputs, selects and pickers, cards, badges, popovers and tooltips, page layouts and panels, a command palette, charts, drag and drop, a markdown editor, media galleries, a cropper, and a carousel, a star rating and a site menu for marketing pages.
 
 ## Rules that are easy to get wrong
 
@@ -12,8 +12,8 @@
 - Dialog and FormDialog follow `open`. The parent sets it, then sets it back to false in `onClose`, which runs however the dialog closed. Their content renders only while they are open. A Popover the page opens through `open` is set back the same way, in `onToggle`.
 - FormDialog calls the action with the form's `FormData`. The server reads it as a plain form post, so give each control the `name` of its field in the action's schema: numbers, booleans and lists are coerced from their text, and files and the honeypot come along.
 - Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library holds English words for its own controls only:
-  - Fixed: `Cancel`, `Delete`, `Deleting…`, `Saving…`, `Confirm Deletion`, MultiSelect's `All`, `None`, `Search`, `No match` and "N selected", and IconPicker's `Search icons…`, `Searching…`, `No icons found.`, `Show more` and `Clear icon selection`.
-  - Replaced through the prop of that name: `loadingLabel` (`Loading…`), `closeLabel` (`Close`), `backLabel` (`Back`), `resizeLabel` (`Resize list`), `empty` (`No data yet.`), `copiedLabel` (`Copied!`), CopyButton's `failure` (`Could not copy to the clipboard`), MarkdownEditor's `uploadFailure` (`Could not upload the image`), Rating's `label` (`N out of M`), Carousel's `label` (`Carousel`), `previousLabel` (`Previous slide`), `nextLabel` (`Next slide`), `slideLabel` (`Slide {n} of {count}`) and `dotLabel` (`Go to slide {n}`), `placeholder` (MultiSelect's `Any`, CommandPalette's `Search`, MarkdownEditor's `Write markdown…`), and CommandPalette's `label` (`Search`) and `emptyLabel` (`No results`).
+  - Fixed: `Cancel`, `Delete`, `Deleting…`, `Saving…`, `Confirm Deletion`, MultiSelect's `All`, `None`, `No match` and "N selected", and IconPicker's `Search icons…`, `Icons`, `Searching…`, `No icons found.`, `Show more` and `Clear icon selection`.
+  - Replaced through the prop of that name: `loadingLabel` (`Loading…`), `closeLabel` (`Close`), `backLabel` (`Back`), `resizeLabel` (`Resize list`), `empty` (`No data yet.`, MediaGallery's `No media.`), `copiedLabel` (`Copied!`), CopyButton's `failure` (`Could not copy to the clipboard`), MarkdownEditor's `uploadFailure` (`Could not upload the image`), Rating's `label` (`N out of M`), Carousel's `label` (`Carousel`), `previousLabel` and `nextLabel` (Carousel's `Previous slide` and `Next slide`, MediaGallery's `Previous` and `Next`), Carousel's `slideLabel` (`Slide {n} of {count}`) and `dotLabel` (`Go to slide {n}`), MediaGallery's `openLabel` (`Open full size`) and `itemLabel` (`Media {n}`), ZoomPane's `zoomInLabel`, `zoomOutLabel` and `fitLabel` (`Zoom in`, `Zoom out`, `Fit`), ImageCropper's `cropLabel` and `cropText` (`{w} by {h} pixels at {x}, {y}`), SiteNav's `menuLabel` (`Menu`), ConfirmDelete's `label` (`Delete`), `placeholder` (MultiSelect's `Any`, CommandPalette's `Search`, MarkdownEditor's `Write markdown…`), MultiSelect's `searchLabel` (`Search`), and CommandPalette's `label` (`Search`) and `emptyLabel` (`No results`).
 
 ## Setup
 
@@ -59,7 +59,7 @@ TooltipHost
 
 ## Settings
 
-The icons the components draw come from slots, each named for what it means: `alert`, `back`, `chevron`, `close`, `delete`, `globe`, `info`, `menu`, `play`, `plus`, `search`, `spinner`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
+The icons the components draw come from slots, each named for what it means: `alert`, `back`, `chevron`, `close`, `delete`, `globe`, `info`, `menu`, `play`, `plus`, `search`, `spinner`, `star`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
 
 ```ts
 // kay.config.ts
@@ -245,7 +245,7 @@ PageSection(title="Moons")
 - `BarList(rows={[{ key: 'fr', label: 'France', value: 120, display: '120 visits' }]})`: a bar per row, each measured against the largest value, reading `display` or else the value. `onSelect(row)` makes each row a button, from an island; `empty` is what it reads with no rows. Its rows are typed `BarListRow`, or any type extending it.
 - `SiteFavicon(src={site.favicon} name={site.name})`: a site's icon, or the `globe` slot in a colour drawn from `name` when `src` is missing or fails to load.
 - `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for two seconds. A copy the browser refuses toasts `failure`.
-- `Rating(value={4.6} max={5} label="4.6 sur 5")`: stars filled to `value`'s share of `max`, part of a star included, kept between none and all. Screen readers read `label`, `4.6 out of 5` by default.
+- `Rating(value={4.6} max={5} label="Rated 4.6 out of 5")`: stars filled to `value`'s share of `max`, part of a star included, kept between none and all. Screen readers read `label`, `4.6 out of 5` by default.
 - BarList, SiteFavicon and CopyButton are islands taking data alone, so a static page passes them their props as it would to any element.
 
 ### RangeInput, MultiSelect, FileDrop, Menu, IconPicker
@@ -284,7 +284,7 @@ CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { l
 
 ### LineChart, ScatterChart, ContributionGraph
 
-- `LineChart(label="Visits" labels={days} series={[{ name: 'Visits', values: visits }]} xLabels)`, drawn by chartist, an optional peer the app installs to use it: `bun add chartist`.
+- `LineChart(label="Visits" labels={days} series={[{ name: 'Visits', values: visits }]} xLabels)`, drawn by chartist, a peer the app installs to use it: `bun add chartist`. No other component reaches it.
   - A series has a `name`, one value per label, `null` for a gap in the line, and an optional CSS `color`; without one it takes the next `--color-kui-chart-1` to `-6` token.
   - `xLabels` draws up to five x-axis labels, and spaces the points by time when every label is a date. `legend` names the series under the chart, by default once there is more than one. `formatValue` formats the y-axis and the tooltip, `toLocaleString` by default; `options` is merged over chartist's settings.
   - Hovering shows a cursor, a dot on each line and a tooltip reading every series at that point, `-` for a gap. `label` describes the chart for screen readers, which cannot read the drawing.
@@ -323,11 +323,11 @@ ul
       button.touch-none(type="button" ref={sortable.handle(habit.id)} aria-label="Move") {habit.name}
 ```
 
-- Controllers from `@kaynooo/kayjs-ui/dnd`, wired to the app's own markup through `ref`, in an island. On Board and DropTargets a mouse or pen drags after a 10px move and a touch after a 250ms hold, so a swipe still scrolls, and Escape cancels; a Sortable handle drags after either. A scroll container scrolls as the pointer nears its edge. The list changes only once the callback has updated the app's data, and no other move starts until a promise it returns settles: wrap it in `attempt`, since a rejection goes unhandled.
+- Controllers from `@kaynooo/kayjs-ui/dnd`, wired to the app's own markup through `ref`, in an island. A mouse or pen drags after a 10px move and a touch after a 250ms hold, so a swipe still scrolls, and Escape cancels. A scroll container scrolls as the pointer nears its edge. The list changes only once the callback has updated the app's data, and no other move starts until a promise it returns settles: wrap it in `attempt`, since a rejection goes unhandled.
 - `Sortable({ onReorder(from, to) })`: a vertical list. `ref={sortable.item(id)}` on each entry and `ref={sortable.handle(id)}` on the part a pointer grabs, which needs `touch-action: none`. A drag slides the other items out of the way; ArrowUp and ArrowDown on a focused handle move its item one place, focus staying on it.
 - `Board({ onMove({ item, from, to, index }) })`: items moving between wrapping containers and within them, for a kanban or a tier list. `ref={board.container(id)}` on each container and `ref={board.item(id, container)}` on each item, grabbed whole. A ghost follows the pointer; `board.dragging()` names the item dragged and `board.drop()` the landing `{ container, index, bar }`, the bar an insertion mark to draw `position: fixed` at `bar.left`, `bar.top` and `bar.height`. ArrowLeft and ArrowRight move a focused item within its container, ArrowUp and ArrowDown into the one before or after.
 - `DropTargets({ onDrop(item, target), accepts, onLinger })`: items dropped onto targets, a move that is not a reorder, such as a note into a folder. `ref={targets.item(id)}` and `ref={targets.target(id)}`; the innermost accepting target under the pointer wins, `targets.over()` naming it and `targets.dragging()` the item. `onLinger(target)` runs once the pointer rests on a target, such as to open a folder. Pointers only: give the keyboard a menu or a dialog for the same move.
-- A drag cancels the browser's own drag of a link or an image inside the item; on Board and DropTargets it also swallows the click its release would send.
+- A drag cancels the browser's own drag of a link or an image inside the item, and swallows the click its release would send.
 
 ### MarkdownEditor
 
@@ -342,7 +342,7 @@ ul
 - `MediaGallery(items={media})`: a stage, a strip of thumbnails and a lightbox.
   - An item, typed `MediaItem`, has a `key`, a `kind` (`image` or `video`), a `thumb` for the strip, a `preview` for the stage or a video's poster, a `full` the lightbox opens an image at, a video's `src` and a `title`.
   - The arrows, Home and End turn it while focus is inside it, wrapping, and so do its buttons and a swipe. `index` is the item to start on, and `onIndexChange(index)` reports each turn. The strip keeps the shown thumbnail centred, and the images either side start loading.
-  - A video plays in place with `preload="none"`. An `.m3u8` playlist plays through `hls.js`, an optional peer imported only once such a video shows, in browsers without native HLS.
+  - A video plays in place with `preload="none"`. An `.m3u8` playlist plays through `hls.js` in browsers without native HLS, fetched only once such a video shows. It is a peer MediaGallery needs installed, `bun add hls.js`, even in an app playing no playlist, since the bundler resolves the import either way; no other component reaches it.
   - An image opens full size in a lightbox, which turns the same way. `ratio` is the stage's `aspect-ratio`, `16 / 9` by default; `empty` is what it reads with no items.
 - `Carousel(slides={[{ src: '/garden.jpg', alt: 'The garden' }]} autoplay={5000} ratio="4 / 3" label="Photos")`: one image at a time sliding in, for a marketing page.
   - The previous and next buttons wrap at either end, and a dot per slide jumps to it. A single slide draws no controls. `index` is the slide to start on, followed when the parent passes another, and `onIndexChange(index)` reports each turn.
@@ -351,7 +351,7 @@ ul
   - It takes data alone, so a static page holds it.
 - `Masonry(items={posts} key={post => post.id} minWidth={256} gap={12})` with a `@tile(item)` block: tiles of any height in as many lanes of at least `minWidth` as fit, each dropped into the shortest lane, the order still reading left to right. The tiles are placed absolutely inside its own box, so padding goes on a wrapper, never on the Masonry; until it has measured, as on the server, they sit in a plain grid of the same lanes.
 - `WhenVisible(onVisible={loadMore})`: the infinite-scroll sentinel. Render it after a list only while there is more to load; `onVisible` runs once it comes within `margin` pixels (600) of the nearest scroll box, and again whenever the list grows and leaves it in view, never again before a promise it returned settles.
-- `ZoomPane(label="Floor plan")` around a picture: pinch, the wheel, a double click, + and -, and the zoom buttons take it in, a drag or the arrows move it, and 0 or the fit button fits it again. A press that does not wander stays a click, so marks standing on the picture remain clickable; `--kui-zoom-scale` lets one keep its own size with `calc(1 / var(--kui-zoom-scale))`. `tools` draws the buttons, on by default; `most` caps the zoom, 8 times fitted.
+- `ZoomPane(label="Floor plan")` around a picture: pinch, Ctrl with the wheel, a double click, + and -, and the zoom buttons take it in, and once in the wheel alone zooms too, while fitted it scrolls the page; Ctrl with + or 0 stays the browser's zoom. A drag or the arrows move it, and 0 or the fit button fits it again. A press that does not wander stays a click, so marks standing on the picture remain clickable; `--kui-zoom-scale` lets one keep its own size with `calc(1 / var(--kui-zoom-scale))`. `tools` draws the buttons, on by default; `most` caps the zoom, 8 times fitted.
 - `ImageCropper(src={photo} ratio={16 / 9} onCrop={crop.set})` with an optional `@footer(reset)` block: a crop of a fixed `ratio` over the image, centred once it loads, moved by a drag or the arrows and resized by its corners or Shift with the arrows, Alt taking bigger steps. `onCrop({ x, y, w, h })` reports it in the image's natural pixels, ready for a canvas draw; `grid` adds a rule-of-thirds overlay and `minSize` the smallest side.
 
 ## Forms

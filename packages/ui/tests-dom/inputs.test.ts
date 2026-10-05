@@ -111,6 +111,28 @@ describe('MultiSelect', () => {
     expect(posted()).toHaveLength(9)
     expect(root.querySelector<HTMLButtonElement>('.kui-multi-select-action')?.disabled).toBe(true)
   })
+
+  test('picks and drops only the options a search shows', async () => {
+    const root = await inputs()
+    const [all, none] = root.querySelectorAll<HTMLButtonElement>('.kui-multi-select-action')
+    const posted = () => [...root.querySelectorAll<HTMLInputElement>('input[type="hidden"][name="planet"]')].map(input => input.value)
+
+    click([...root.querySelectorAll('.kui-multi-select-option')].find(option => option.textContent === 'Venus')!.querySelector('input'))
+    type(root.querySelector('.kui-multi-select-search'), 'ur', 'input')
+    await settle()
+
+    expect(none!.disabled).toBe(true)
+
+    click(all!)
+    await settle()
+
+    expect([posted(), all!.disabled]).toEqual([['mercury', 'venus', 'saturn', 'uranus'], true])
+
+    click(none!)
+    await settle()
+
+    expect(posted()).toEqual(['venus'])
+  })
 })
 
 describe('FileDrop', () => {

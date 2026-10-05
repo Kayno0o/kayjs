@@ -21,8 +21,12 @@ async function tabs() {
   return { root, shown, visible }
 }
 
-function key(name: string) {
-  document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }))
+function key(name: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true, ...init })
+
+  document.activeElement!.dispatchEvent(event)
+
+  return event
 }
 
 test('shows a clicked tab\'s panel alone, keeping what the others hold', async () => {
@@ -72,4 +76,10 @@ test('moves between tabs with the arrows, wrapping, and Home and End, focus goin
 
   expect(shown()).toEqual(['Earth'])
   expect(changes).toEqual(['earth', 'mars', 'earth', 'mars', 'earth'])
+
+  // Alt with an arrow is the browser going back or forward a page.
+  expect(key('ArrowLeft', { altKey: true }).defaultPrevented).toBe(false)
+  await settle()
+
+  expect(shown()).toEqual(['Earth'])
 })

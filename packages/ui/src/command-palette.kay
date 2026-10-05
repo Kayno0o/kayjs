@@ -1,6 +1,7 @@
 ---
 import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
 import { effect, onCleanup, onMount, signal, uid } from 'kay'
+import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import { isPaletteLink, paletteMatches, paletteSections, withRecent } from './palette'
 
@@ -94,7 +95,7 @@ function closed() {
 }
 
 function toggle(event: KeyboardEvent) {
-  if (event.defaultPrevented || event.key.toLowerCase() !== hotkey || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey)
+  if (event.defaultPrevented || event.key.toLowerCase() !== hotkey?.toLowerCase() || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey)
     return
 
   event.preventDefault()
@@ -125,7 +126,7 @@ function keyDown(event: KeyboardEvent) {
 
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault()
-    selected.set(count === 0 ? 0 : (selected() + (event.key === 'ArrowDown' ? 1 : -1) + count) % count)
+    selected.set(stepIndex(selected(), event.key === 'ArrowDown' ? 1 : -1, count))
 
     return
   }

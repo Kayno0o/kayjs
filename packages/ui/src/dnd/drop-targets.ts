@@ -29,7 +29,8 @@ interface Drag<Item> {
 }
 
 // Drags items onto targets, for a move that is not a reorder, such as a note into a folder of a tree: `ref={targets.item(id)}` marks what a pointer grabs, whole, and `ref={targets.target(id)}` each place it can land.
-// The innermost target under the pointer wins, so a row inside a folder's element can stand for that folder or for its own. A mouse or pen drags after a short move and a touch after a short hold; a ghost follows the pointer while `over` names the target it would land on.
+// The innermost target under the pointer wins, so a row inside a folder's element can stand for that folder or for its own.
+// A mouse or pen drags after a short move and a touch after a short hold; a ghost follows the pointer while `over` names the target it would land on.
 // Pointers only: the keyboard has no spatial way to reach a target, so give it a menu or a dialog for the same move.
 export class DropTargets<Item extends Id = Id, Target extends Id = Id> {
   // The item a pointer is dragging, for the page to dim: `targets.dragging()`.

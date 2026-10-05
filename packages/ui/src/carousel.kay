@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import { effect, onCleanup, signal } from 'kay'
 import IconButton from './icon-button.kay'
-import { stepIndex } from './media'
+import { stepIndex } from './cycle'
 
 const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = 'Carousel', previousLabel = 'Previous slide', nextLabel = 'Next slide', slideLabel = 'Slide {n} of {count}', dotLabel = 'Go to slide {n}', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   slides: readonly { src: string, alt: string }[]

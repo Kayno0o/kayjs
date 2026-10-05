@@ -40,4 +40,4 @@ main
         a(href="/form") Edit
       | Mars
   article#site-nav
-    SiteNav(id="main-links" links={[{ href: '/', label: 'Home' }, { href: '/chart', label: 'Chart' }, { href: '/charts', label: 'Charts' }, { href: '/charts/moons', label: 'Moons' }, { href: '/data', label: 'Data' }]} current="/charts/moons" label="Main" menuLabel="Ouvrir le menu")
+    SiteNav(id="main-links" links={[{ href: '/', label: 'Home' }, { href: '/chart', label: 'Chart' }, { href: '/charts', label: 'Charts' }, { href: '/charts/moons', label: 'Moons' }, { href: '/data', label: 'Data' }]} current="/charts/moons/" label="Main" menuLabel="Ouvrir le menu")

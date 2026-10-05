@@ -1,11 +1,12 @@
 --- <Value extends string>
 import type { JSX } from 'kay'
 import { effect, signal, uid } from 'kay'
+import { stepIndex } from './cycle'
 
 // The keys that move between tabs, as the tabs pattern has them: the arrows wrap, Home and End go to either end.
 const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
-  ArrowRight: (index, count) => (index + 1) % count,
-  ArrowLeft: (index, count) => (index - 1 + count) % count,
+  ArrowRight: (index, count) => stepIndex(index, 1, count),
+  ArrowLeft: (index, count) => stepIndex(index, -1, count),
   Home: () => 0,
   End: (_, count) => count - 1,
 }
@@ -41,7 +42,8 @@ function show(next: Value) {
 function keyDown(event: KeyboardEvent) {
   const move = MOVES[event.key]
 
-  if (!move)
+  // A chord is the browser's, such as Alt with an arrow going back a page.
+  if (!move || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
     return
 
   event.preventDefault()

@@ -34,6 +34,13 @@ describe('wrapEdit and linkEdit', () => {
     expect(applied('a **word** b', wrapEdit('a **word** b', 4, 8, '**'))).toBe('a [word] b')
   })
 
+  test('tells italic from bold: a star inside bold wraps, and one around italic or bold italic unwraps', () => {
+    expect(applied('a **word** b', wrapEdit('a **word** b', 4, 8, '*'))).toBe('a ***[word]*** b')
+    expect(applied('a *word* b', wrapEdit('a *word* b', 3, 7, '*'))).toBe('a [word] b')
+    expect(applied('a ***word*** b', wrapEdit('a ***word*** b', 5, 9, '*'))).toBe('a **[word]** b')
+    expect(applied('a ***word*** b', wrapEdit('a ***word*** b', 5, 9, '**'))).toBe('a *[word]* b')
+  })
+
   test('selects the url placeholder of a new link', () => {
     expect(applied('see docs', linkEdit('see docs', 4, 8))).toBe('see [docs]([url])')
   })

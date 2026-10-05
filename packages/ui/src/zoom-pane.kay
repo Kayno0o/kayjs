@@ -126,7 +126,8 @@ const KEYS: Partial<Record<string, () => void>> = {
 function keyDown(event: KeyboardEvent) {
   const action = KEYS[event.key]
 
-  if (!action)
+  // Ctrl with + or 0 is the browser's own zoom, which a focused pane leaves alone.
+  if (!action || event.altKey || event.ctrlKey || event.metaKey)
     return
 
   event.preventDefault()
@@ -134,8 +135,12 @@ function keyDown(event: KeyboardEvent) {
 }
 
 // A wheel listener that may stop the page scrolling under the gesture has to be registered as not passive.
+// Fitted, the wheel alone scrolls the page past the pane, and Ctrl with the wheel, which a trackpad pinch also sends, takes it in; taken in, the wheel alone zooms, out to fitted.
 onMount(() => {
   const spun = (event: WheelEvent) => {
+    if (!event.ctrlKey && !event.metaKey && plate().scale === 1)
+      return
+
     event.preventDefault()
     zoom(wheelZoom(event.deltaY, event.deltaMode), at(event))
   }

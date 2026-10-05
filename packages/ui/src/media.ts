@@ -18,11 +18,6 @@ export function isPlayable(item: MediaItem): item is MediaItem & { src: string }
   return item.kind === 'video' && Boolean(item.src)
 }
 
-// `index` moved by `delta` around a gallery of `count` items, wrapping at both ends.
-export function stepIndex(index: number, delta: number, count: number): number {
-  return count === 0 ? 0 : (((index + delta) % count) + count) % count
-}
-
 // Points a video at `src`, through `hls.js` for a playlist the browser cannot play itself, which is every one but Safari.
 // The player is imported only once such a video is shown, and loads nothing before the first play, as `preload="none"` does.
 // Hands back what stops the player, for the video's cleanup.

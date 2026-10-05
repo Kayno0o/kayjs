@@ -41,7 +41,8 @@ function byDocumentOrder(a: HTMLElement, b: HTMLElement): number {
 }
 
 // Moves items between containers and within them, for layouts that wrap such as a tier list or a kanban: `ref={board.container(id)}` marks each drop area and `ref={board.item(id, container)}` each entry, the whole of which is what a pointer grabs.
-// A mouse or pen drags after a short move and a touch after a short hold, so a swipe over the items still scrolls. A ghost follows the pointer while `drop` names the landing slot and the bar to draw there; the containers change once `onMove` has updated them. On a focused item, ArrowLeft and ArrowRight move it within its container and ArrowUp and ArrowDown into the one before or after.
+// A mouse or pen drags after a short move and a touch after a short hold, so a swipe still scrolls, and a ghost follows the pointer while `drop` names the landing slot; the containers change once `onMove` has updated them.
+// On a focused item, ArrowLeft and ArrowRight move it within its container and ArrowUp and ArrowDown into the one before or after.
 export class Board {
   // The item a pointer is dragging, for the page to dim or describe: `board.dragging()`.
   readonly dragging = signal<Id | null>(null)

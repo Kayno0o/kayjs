@@ -6,7 +6,7 @@ const { value, label, fillClass, class: className, ...rest } = props<Omit<JSX.In
   value: number
   // Names the meter for screen readers.
   label?: string
-  // Classes for the fill alone, such as a colour picked by threshold; the track always looks like `meter`.
+  // Classes for the fill alone, such as a colour picked by threshold; the track always looks like `kui-meter`.
   fillClass?: string
   class?: string
 }>()

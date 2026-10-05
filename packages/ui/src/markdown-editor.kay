@@ -35,9 +35,8 @@ effect(() => {
     area.value = next
 })
 
-// Applies an edit through the browser's own editing, so Ctrl+Z undoes it like typing, which assigning the value would wipe out.
-// Where `execCommand` is gone or refuses, the text is set directly and an `input` event reports it.
-// An edit nobody typed, such as a finished upload, never takes focus back from wherever the user went meanwhile: it only goes through `execCommand` when the field still has focus.
+// Applies an edit through the browser's own editing, so Ctrl+Z undoes it like typing, else sets the text and reports it with an `input` event.
+// An edit nobody typed, such as a finished upload, takes that second way unless the field still has focus, so it never pulls focus back.
 function applyEdit(el: HTMLTextAreaElement, edit: TextEdit, takeFocus = true): void {
   const native = typeof document.execCommand === 'function' && (takeFocus || document.activeElement === el)
 

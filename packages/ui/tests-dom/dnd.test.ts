@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { mount, settle } from 'kay/test'
 import { Board } from '../src/dnd/board'
 import { DropTargets } from '../src/dnd/drop-targets'
+import { ACTIVATION_DELAY_MS } from '../src/dnd/pointer'
 import { Sortable } from '../src/dnd/sortable'
 
 const MODIFIERS: KeyboardEventInit[] = [{ altKey: true }, { ctrlKey: true }, { metaKey: true }, { shiftKey: true }]
@@ -10,7 +11,7 @@ const MODIFIERS: KeyboardEventInit[] = [{ altKey: true }, { ctrlKey: true }, { m
 let mounted: Mounted | undefined
 let staged: HTMLElement[] = []
 
-afterEach(() => {
+afterEach(async () => {
   mounted?.unmount()
   mounted = undefined
 
@@ -18,6 +19,8 @@ afterEach(() => {
     element.remove()
 
   staged = []
+  // A drag's release swallows the next click until a task later, which must not reach the next test.
+  await settle()
 })
 
 function stage(): HTMLElement {
@@ -148,6 +151,145 @@ describe('Sortable, from the keyboard', () => {
     await Bun.sleep(0)
 
     expect(document.activeElement === first).toBe(true)
+  })
+})
+
+// happy-dom lays nothing out, so each element is given the box a browser would have drawn.
+function box(el: HTMLElement, left: number, top: number, width: number, height: number): void {
+  el.getBoundingClientRect = () => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect
+}
+
+function pointer(target: EventTarget, type: string, x: number, y: number, pointerType = 'mouse'): PointerEvent {
+  const event = new PointerEvent(type, { clientX: x, clientY: y, button: 0, pointerType, bubbles: true, cancelable: true })
+
+  target.dispatchEvent(event)
+
+  return event
+}
+
+describe('Sortable, by pointer', () => {
+  // The three entries stacked 40px apart, their handles at the left.
+  function stacked() {
+    const list = listOf()
+    const items = list.handles.map(handle => handle.parentElement!)
+
+    for (const [index, item] of items.entries())
+      box(item, 0, index * 40, 100, 40)
+
+    return { ...list, items }
+  }
+
+  test('drags a handle past its neighbours once it moved, sliding them aside, and reorders on release', () => {
+    const { moves, handles: [first], items } = stacked()
+
+    pointer(first!, 'pointerdown', 5, 20)
+    pointer(document, 'pointermove', 5, 25)
+
+    expect(items[0]!.style.position).toBe('')
+
+    pointer(document, 'pointermove', 5, 105)
+
+    expect([items[0]!.style.transform, items[1]!.style.transform, items[2]!.style.transform]).toEqual(['translateY(85px)', 'translateY(-40px)', 'translateY(-40px)'])
+
+    const native = new Event('dragstart', { bubbles: true, cancelable: true })
+
+    document.dispatchEvent(native)
+    pointer(document, 'pointerup', 5, 105)
+
+    expect([native.defaultPrevented, moves]).toEqual([true, [[0, 2]]])
+    expect(items.map(item => item.style.transform)).toEqual(['', '', ''])
+  })
+
+  test('swallows the click a drag\'s release sends, and drops nothing on Escape or a cancelled pointer', async () => {
+    const { moves, handles: [first, second] } = stacked()
+    let clicks = 0
+
+    first!.addEventListener('click', () => clicks++)
+    pointer(first!, 'pointerdown', 5, 20)
+    pointer(document, 'pointermove', 5, 105)
+    pointer(document, 'pointerup', 5, 105)
+    first!.click()
+    await settle()
+
+    pointer(second!, 'pointerdown', 5, 60)
+    pointer(document, 'pointermove', 5, 105)
+    press(document, 'Escape')
+    pointer(document, 'pointerup', 5, 105)
+
+    pointer(second!, 'pointerdown', 5, 60)
+    pointer(document, 'pointermove', 5, 5)
+    pointer(document, 'pointercancel', 5, 5)
+
+    expect([clicks, moves]).toEqual([0, [[0, 2]]])
+  })
+
+  test('starts a touch drag after a hold, and leaves a touch that moves first to scroll the page', async () => {
+    const { moves, handles: [first], items } = stacked()
+
+    pointer(first!, 'pointerdown', 5, 20, 'touch')
+    pointer(document, 'pointermove', 5, 60, 'touch')
+    await Bun.sleep(ACTIVATION_DELAY_MS + 50)
+
+    expect(items[0]!.style.position).toBe('')
+
+    pointer(document, 'pointerup', 5, 60, 'touch')
+    pointer(first!, 'pointerdown', 5, 20, 'touch')
+    await Bun.sleep(ACTIVATION_DELAY_MS + 50)
+
+    expect(items[0]!.style.position).toBe('relative')
+
+    pointer(document, 'pointermove', 5, 65, 'touch')
+    pointer(document, 'pointerup', 5, 65, 'touch')
+
+    expect(moves).toEqual([[0, 1]])
+  })
+})
+
+describe('Board, by pointer', () => {
+  test('names the container and slot under a dragged card, moves the card there on release, swallowing its click, and moves nothing on Escape', async () => {
+    const moves: unknown[] = []
+    const board = new Board({ onMove: move => void moves.push(move) })
+    const area = stage()
+
+    area.innerHTML = '<div id="todo"><div id="a">A</div><div id="b">B</div></div><div id="done"><div id="c">C</div></div>'
+
+    const at = (id: string) => area.querySelector<HTMLElement>(`#${id}`)!
+
+    board.container('todo')(at('todo'))
+    board.container('done')(at('done'))
+    board.item('a', 'todo')(at('a'))
+    board.item('b', 'todo')(at('b'))
+    board.item('c', 'done')(at('c'))
+    box(at('todo'), 0, 0, 300, 100)
+    box(at('done'), 0, 100, 300, 100)
+    box(at('a'), 0, 10, 100, 40)
+    box(at('b'), 110, 10, 100, 40)
+    box(at('c'), 0, 110, 100, 40)
+
+    pointer(at('a'), 'pointerdown', 50, 30)
+    pointer(document, 'pointermove', 150, 130)
+
+    expect([board.dragging(), board.drop()?.container, board.drop()?.index]).toEqual(['a', 'done', 1])
+    expect(document.body.querySelectorAll('[aria-hidden="true"]')).toHaveLength(1)
+
+    let clicks = 0
+
+    at('a').addEventListener('click', () => clicks++)
+    pointer(document, 'pointerup', 150, 130)
+    at('a').click()
+    await settle()
+
+    expect([moves, clicks]).toEqual([[{ item: 'a', from: 'todo', to: 'done', index: 1 }], 0])
+    expect([board.dragging(), board.drop()]).toEqual([null, null])
+    expect(document.body.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0)
+
+    pointer(at('b'), 'pointerdown', 150, 30)
+    pointer(document, 'pointermove', 150, 130)
+    press(document, 'Escape')
+    pointer(document, 'pointerup', 150, 130)
+    await settle()
+
+    expect(moves).toHaveLength(1)
   })
 })
 

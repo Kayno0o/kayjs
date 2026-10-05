@@ -4,14 +4,15 @@ import type { IconSlot } from './defaults'
 import type { MenuAction, MenuEntry } from './menu'
 import type { PopoverPlacement } from './popover'
 import { uid } from 'kay'
+import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import Popover from './popover.kay'
 
 // The keys that move focus through the entries, as a native menu does.
 const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
-  ArrowDown: (index, count) => (index + 1) % count,
-  ArrowUp: (index, count) => (index - 1 + count) % count,
+  ArrowDown: (index, count) => stepIndex(index, 1, count),
+  ArrowUp: (index, count) => stepIndex(index, -1, count),
   Home: () => 0,
   End: (_, count) => count - 1,
 }

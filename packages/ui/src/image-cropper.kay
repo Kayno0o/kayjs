@@ -12,7 +12,7 @@ const KEY_STEP = 0.01
 const KEY_STEP_LARGE = 0.1
 const DIRECTIONS: Partial<Record<string, [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
 
-const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = 'Crop area: arrows move it, Shift and the arrows resize it', onCrop, onLoad, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = 'Crop area: arrows move it, Shift and the arrows resize it', cropText = '{w} by {h} pixels at {x}, {y}', onCrop, onLoad, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   src: string
   // Width over height the crop is locked to; a change centres the crop again.
   ratio?: number
@@ -23,6 +23,8 @@ const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = 'Crop 
   alt?: string
   // Names the crop area for screen readers, with the keys that move it.
   cropLabel?: string
+  // Reads the crop out as it changes, `{w}`, `{h}`, `{x}` and `{y}` standing for its size and place in natural pixels.
+  cropText?: string
   // The crop in the image's natural pixels, ready for a canvas draw, after every change.
   onCrop?: (crop: CropRect) => void
   // The image's natural size, once it has decoded.
@@ -38,6 +40,8 @@ const crop = signal<CropRect>({ x: 0, y: 0, w: 0, h: 0 })
 let stage: HTMLDivElement | undefined
 let image: HTMLImageElement | undefined
 let drag: { mode: 'move' | CropHandle, pointer: { x: number, y: number }, from: CropRect } | null = null
+
+const described = () => cropText.replace(/\{([whxy])\}/g, (_, key: 'w' | 'h' | 'x' | 'y') => String(Math.round(crop()[key])))
 
 const scale = () => stageWidth() / (size()?.width || 1)
 
@@ -147,7 +151,7 @@ const area = () => {
   .kui-image-cropper-stage(ref={element => stage = element} role="presentation" onPointerMove={move} onPointerUp={end} onPointerCancel={end})
     img.kui-image-cropper-image(ref={element => image = element} src={src} alt={alt} draggable="false" onLoad={loaded})
     if crop().w > 0
-      .kui-image-cropper-crop(role="slider" tabindex="0" aria-label={cropLabel} aria-valuetext={`${Math.round(crop().w)} by ${Math.round(crop().h)} pixels at ${Math.round(crop().x)}, ${Math.round(crop().y)}`} aria-valuenow={Math.round(crop().w)} style={area()} onPointerDown={event => start(event, 'move')} onKeyDown={keyDown})
+      .kui-image-cropper-crop(role="slider" tabindex="0" aria-label={cropLabel} aria-valuetext={described()} aria-valuemin={minSize} aria-valuemax={size()?.width ?? minSize} aria-valuenow={Math.round(crop().w)} style={area()} onPointerDown={event => start(event, 'move')} onKeyDown={keyDown})
         if grid
           span.kui-image-cropper-grid-cols
           span.kui-image-cropper-grid-rows

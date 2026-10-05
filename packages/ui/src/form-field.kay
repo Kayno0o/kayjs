@@ -21,7 +21,7 @@ const { label, name, issue, hint, required = false, group = false, action, class
 const refused = formIssues.use()
 const messages = () => [name === undefined ? undefined : refused?.()[name], issue].filter(message => message !== undefined)
 ---
-// The control, as children, takes the `field-input` look with no class of its own.
+// The control, as children, takes the `kui-field-input` look with no class of its own.
 // The hint and the messages sit outside the label, so the control is named by its label alone; the action too, since a button inside a label would take the label from the control.
 if group
   fieldset.kui-form-field.kui-form-field-group(class={className})

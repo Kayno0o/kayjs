@@ -2,14 +2,15 @@
 import type { JSX } from 'kay'
 import type { MediaItem } from './media'
 import { effect, onCleanup, signal } from 'kay'
+import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
-import { isPlayable, playSource, stepIndex } from './media'
+import { isPlayable, playSource } from './media'
 
 // How far a finger moves sideways before a swipe turns the gallery.
 const SWIPE_PX = 48
 
-const { items, index = 0, onIndexChange, ratio = '16 / 9', empty = 'No media.', previousLabel = 'Previous', nextLabel = 'Next', closeLabel = 'Close', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { items, index = 0, onIndexChange, ratio = '16 / 9', empty = 'No media.', previousLabel = 'Previous', nextLabel = 'Next', closeLabel = 'Close', openLabel = 'Open full size', itemLabel = 'Media {n}', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   items: MediaItem[]
   // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
   index?: number
@@ -21,6 +22,10 @@ const { items, index = 0, onIndexChange, ratio = '16 / 9', empty = 'No media.', 
   previousLabel?: string
   nextLabel?: string
   closeLabel?: string
+  // Names the button opening the lightbox, followed by the item's title when it has one.
+  openLabel?: string
+  // Names an item with no title, `{n}` standing for its number.
+  itemLabel?: string
   class?: string
 }>()
 
@@ -38,6 +43,7 @@ effect(() => shown.set(index))
 const playable = (item: MediaItem) => isPlayable(item) ? item : undefined
 const active = () => Math.min(Math.max(shown(), 0), Math.max(items.length - 1, 0))
 const current = () => items[active()]
+const named = (position: number) => itemLabel.replaceAll('{n}', String(position + 1))
 
 function go(next: number) {
   const target = stepIndex(next, 0, items.length)
@@ -143,7 +149,8 @@ effect(() => {
 })
 ---
 if !current()
-  p.kui-media-gallery-empty {empty}
+  // The app's id and class stay on whichever element shows.
+  p.kui-media-gallery-empty(id={rest.id} class={className}) {empty}
 else
   // Arrows turn the gallery while focus is anywhere inside it, which a keyboard user reaches through its buttons.
   .kui-media-gallery({...rest} class={className} onKeyDown={keyDown})
@@ -153,7 +160,7 @@ else
         if playable(item) as video
           video.kui-media-gallery-frame(ref={element => play(element, video.src)} controls preload="none" poster={video.preview})
         else
-          button.kui-media-gallery-zoom(type="button" aria-label={item.title ? `Open ${item.title}` : 'Open full size'} onClick={() => zoomed.set(true)})
+          button.kui-media-gallery-zoom(type="button" aria-label={item.title ? `${openLabel}: ${item.title}` : openLabel} onClick={() => zoomed.set(true)})
             img.kui-media-gallery-frame(src={item.preview} alt={item.title ?? ''})
       if items.length > 1
         IconButton(icon="chevron" label={previousLabel} variant="ghost" class="kui-media-gallery-step" data-side="previous" onClick={() => step(-1)})
@@ -164,11 +171,11 @@ else
     if items.length > 1
       .kui-media-gallery-strip(ref={element => strip = element})
         for item, position of items key={item.key}
-          button.kui-media-gallery-thumb(type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.title ?? `Media ${position + 1}`} onClick={() => go(position)})
+          button.kui-media-gallery-thumb(type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.title ?? named(position)} onClick={() => go(position)})
             img.kui-media-gallery-thumb-image(src={item.thumb} alt="" loading="lazy" decoding="async")
             if item.kind === 'video'
               Icon(icon="play" class="kui-media-gallery-play")
-    dialog.kui-media-gallery-lightbox(ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? 'Media'} onClose={() => zoomed.set(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
+    dialog.kui-media-gallery-lightbox(ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? named(active())} onClose={() => zoomed.set(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       if zoomed()
         for item of [current()!] key={item.key}
           if playable(item) as video

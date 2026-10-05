@@ -47,10 +47,28 @@ function lineEndOf(value: string, index: number): number {
 }
 
 // Wraps the selection in `marker`, such as `**` for bold, or unwraps it when the marker already surrounds it.
+// A single marker counts the run of its character on both sides, so the italic `*` is found inside `***bold italic***` and not inside `**bold**`, whose two stars are one bold marker.
+function wrapped(value: string, start: number, end: number, marker: string): boolean {
+  const size = marker.length
+
+  if (value.slice(start - size, start) !== marker || value.slice(end, end + size) !== marker)
+    return false
+
+  if (size > 1)
+    return true
+
+  let run = 0
+
+  while (value[start - run - 1] === marker && value[end + run] === marker)
+    run++
+
+  return run % 2 === 1
+}
+
 export function wrapEdit(value: string, start: number, end: number, marker: string): TextEdit {
   const size = marker.length
 
-  if (value.slice(start - size, start) === marker && value.slice(end, end + size) === marker)
+  if (wrapped(value, start, end, marker))
     return { start: start - size, end: end + size, text: value.slice(start, end), selectionStart: start - size, selectionEnd: end - size }
 
   return { start, end, text: `${marker}${value.slice(start, end)}${marker}`, selectionStart: start + size, selectionEnd: end + size }

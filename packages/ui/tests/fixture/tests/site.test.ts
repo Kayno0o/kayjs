@@ -203,9 +203,13 @@ describe('data', () => {
   })
 
   test('Rating reads its value out of its max, filling that share of the stars, kept between none and all', async () => {
-    expect(await page('rating')).toBe('<article id="rating"><span role="img" aria-label="4.6 out of 5" class="kui-rating">★★★★★<span class="kui-rating-fill" style="width: 92%">★★★★★</span></span></article>')
-    expect(await page('rating-out')).toBe('<article id="rating-out"><span role="img" aria-label="Top marks" class="kui-rating">★★★★<span class="kui-rating-fill" style="width: 100%">★★★★</span></span></article>')
+    const stars = (count: number) => `<span class="kui-rating-stars">${'<svg/>'.repeat(count)}</span>`
+
+    expect(await page('rating')).toBe(`<article id="rating"><span role="img" aria-label="4.6 out of 5" class="kui-rating">${stars(5)}<span class="kui-rating-fill" style="width: 92%">${stars(5)}</span></span></article>`)
+    expect(await page('rating-out')).toBe(`<article id="rating-out"><span role="img" aria-label="Top marks" class="kui-rating">${stars(4)}<span class="kui-rating-fill" style="width: 100%">${stars(4)}</span></span></article>`)
     expect(await page('rating-below')).toContain('style="width: 0%"')
+    expect(await page('rating-nan')).toContain('style="width: 0%"')
+    expect(await page('rating-none')).toBe(`<article id="rating-none"><span role="img" aria-label="3 out of 0" class="kui-rating">${stars(0)}<span class="kui-rating-fill" style="width: 0%">${stars(0)}</span></span></article>`)
   })
 
   test('CopyButton is a plain button saying what it copies', async () => {

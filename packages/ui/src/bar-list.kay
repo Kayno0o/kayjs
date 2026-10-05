@@ -1,6 +1,7 @@
 --- <Row extends BarListRow>
 import type { JSX } from 'kay'
 import type { BarListRow } from './plot'
+import { memo } from 'kay'
 
 const { rows, onSelect, empty = 'No data yet.', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
@@ -11,15 +12,14 @@ const { rows, onSelect, empty = 'No data yet.', class: className, ...rest } = pr
   class?: string
 }>()
 
-// Each bar's length against the largest value, so the largest row fills its track.
-const percent = (row: Row) => {
-  const largest = Math.max(0, ...rows.map(item => item.value))
+const largest = memo(() => Math.max(0, ...rows.map(row => row.value)))
 
-  return largest > 0 ? Math.max(0, row.value) / largest * 100 : 0
-}
+// Each bar's length against the largest value, so the largest row fills its track.
+const percent = (row: Row) => largest() > 0 ? Math.max(0, row.value) / largest() * 100 : 0
 ---
 if rows.length === 0
-  p.kui-bar-list-empty {empty}
+  // The app's id and class stay on whichever element shows.
+  p.kui-bar-list-empty(id={rest.id} class={className}) {empty}
 else
   ul.kui-bar-list({...rest} class={className})
     for row of rows key={row.key}

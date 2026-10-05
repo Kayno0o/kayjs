@@ -68,6 +68,15 @@ describe('CommandPalette', () => {
     expect(seen.open).toEqual([true, false])
   })
 
+  test('matches its hotkey whatever its case', async () => {
+    const { dialog } = await palette({ hotkey: 'P' })
+
+    press(window, 'p', { ctrlKey: true })
+    await settle()
+
+    expect(dialog.open).toBe(true)
+  })
+
   test('leaves opening to the app without a hotkey, and puts recently followed links on top', async () => {
     const { dialog } = await palette({ recent: ['/content', '/gone'], hotkey: null })
 

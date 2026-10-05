@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { monthStarts } from '../src/contribution'
-import { isPlayable, stepIndex } from '../src/media'
-import { selectionSummary, toggledValue } from '../src/multi-select'
+import { stepIndex } from '../src/cycle'
+import { isPlayable } from '../src/media'
+import { pickedShown, selectionSummary, toggledValue } from '../src/multi-select'
 import { axisExtent, axisPercent, dotSize } from '../src/plot'
 import { rangeFrom } from '../src/range'
 
@@ -43,6 +44,11 @@ describe('MultiSelect helpers', () => {
     expect(toggledValue(OPTIONS, ['sim'], 'rpg')).toEqual(['rpg', 'sim'])
     expect(toggledValue(OPTIONS, ['rpg', 'sim'], 'rpg')).toEqual(['sim'])
     expect(toggledValue(OPTIONS, ['gone'], 'fps')).toEqual(['fps', 'gone'])
+  })
+
+  test('picks or drops the shown options alone, in the options\' order, keeping values no option names', () => {
+    expect(pickedShown(OPTIONS, ['gone', 'sim'], [OPTIONS[0]!, OPTIONS[1]!], true)).toEqual(['rpg', 'fps', 'sim', 'gone'])
+    expect(pickedShown(OPTIONS, ['rpg', 'sim', 'gone'], [OPTIONS[0]!], false)).toEqual(['sim', 'gone'])
   })
 })
 

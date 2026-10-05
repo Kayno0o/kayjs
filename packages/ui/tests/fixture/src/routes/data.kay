@@ -27,3 +27,7 @@ main
     Rating(value={9} max={4} label="Top marks")
   article#rating-below
     Rating(value={-1})
+  article#rating-nan
+    Rating(value={Number.NaN})
+  article#rating-none
+    Rating(value={3} max={0})

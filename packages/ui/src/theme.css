@@ -568,7 +568,7 @@
   }
 
   .kui-carousel-controls {
-    @apply flex items-center justify-center gap-2;
+    @apply flex items-center justify-center gap-4;
   }
 
   .kui-carousel-step {
@@ -581,17 +581,22 @@
     }
   }
 
+  /* The dot is drawn small, and pressed through a margin around it wide enough for a finger. */
   .kui-carousel-dot {
-    @apply h-2 w-2 bg-kui-overlay0 transition-all hover:bg-kui-subtext0;
+    @apply relative h-2 w-2 bg-kui-overlay0 transition-all after:absolute after:-inset-2 after:content-[''] hover:bg-kui-subtext0;
 
     &[aria-current='true'] {
       @apply w-6 bg-kui-accent;
     }
   }
 
-  /* The empty stars are the element's own text, and the filled ones a copy over them cut to the rating's share. */
+  /* The empty stars, with a copy of them over the top cut to the rating's share. */
   .kui-rating {
-    @apply relative inline-block leading-none whitespace-nowrap text-kui-overlay0;
+    @apply relative inline-flex text-kui-overlay0;
+  }
+
+  .kui-rating-stars {
+    @apply flex w-max gap-0.5;
   }
 
   .kui-rating-fill {

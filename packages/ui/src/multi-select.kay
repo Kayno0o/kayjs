@@ -4,13 +4,13 @@ import type { MultiSelectOption } from './multi-select'
 import type { PopoverPlacement } from './popover'
 import { effect, signal } from 'kay'
 import Icon from './icon.kay'
-import { selectionSummary, toggledValue } from './multi-select'
+import { pickedShown, selectionSummary, toggledValue } from './multi-select'
 import Popover from './popover.kay'
 
 // Past this many options the panel opens on a search box.
 const SEARCH_FROM = 8
 
-const { id, options, value = [], label, placeholder = 'Any', name, search, disabled = false, placement = 'bottom-start', onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange'> & {
+const { id, options, value = [], label, placeholder = 'Any', searchLabel = 'Search', name, search, disabled = false, placement = 'bottom-start', onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange'> & {
   // The panel's id, unique on the page; one is drawn when none is given.
   id?: string
   options: readonly MultiSelectOption[]
@@ -20,6 +20,8 @@ const { id, options, value = [], label, placeholder = 'Any', name, search, disab
   label: string
   // What the trigger reads while nothing is picked.
   placeholder?: string
+  // The search box's placeholder, and with `label` after it, its name for screen readers.
+  searchLabel?: string
   // Submits each picked value under this name, for a control inside a form.
   name?: string
   // Opens on a search box; on by default past eight options.
@@ -64,10 +66,11 @@ function toggled(open: boolean) {
         span.kui-multi-select-summary {selectionSummary(options, picked(), placeholder)}
         Icon(icon="chevron" class="kui-multi-select-chevron")
     if searchable()
-      input.kui-field-input.kui-multi-select-search(type="search" placeholder="Search" aria-label={`Search ${label}`} value={query()} onInput={event => query.set(event.currentTarget.value)})
+      input.kui-field-input.kui-multi-select-search(type="search" placeholder={searchLabel} aria-label={`${searchLabel} ${label}`} value={query()} onInput={event => query.set(event.currentTarget.value)})
     .kui-multi-select-bar
-      button.kui-multi-select-action(type="button" disabled={picked().length === options.length} onClick={() => set(options.map(option => option.value))}) All
-      button.kui-multi-select-action(type="button" disabled={picked().length === 0} onClick={() => set([])}) None
+      // Under a search, All and None pick and drop only the options it shows.
+      button.kui-multi-select-action(type="button" disabled={shown().every(option => picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), true))}) All
+      button.kui-multi-select-action(type="button" disabled={!shown().some(option => picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), false))}) None
     .kui-multi-select-options(role="group" aria-label={label})
       for option of shown() key={option.value}
         label.kui-multi-select-option
@@ -77,4 +80,4 @@ function toggled(open: boolean) {
         p.kui-multi-select-empty No match
   if name
     for entry of picked() key={entry}
-      input(type="hidden" name={name} value={entry})
+      input(type="hidden" name={name} value={entry} disabled={disabled})

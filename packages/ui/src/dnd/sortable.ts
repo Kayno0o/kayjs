@@ -1,5 +1,5 @@
 import { edgeScroll, keyTarget, offsetOf, targetIndex } from './geometry'
-import { ACTIVATION_DELAY_MS, ACTIVATION_DISTANCE_PX, boundsOf, on, scrollerOf } from './pointer'
+import { armPointerDrag, boundsOf, on, scrollerOf, swallowClick } from './pointer'
 
 type Id = number | string
 
@@ -67,44 +67,27 @@ export class Sortable {
     if (event.button !== 0 || this.#drag || this.#moving)
       return
 
-    const originX = event.clientX
-    const originY = event.clientY
-    const timer = setTimeout(() => this.#start(id, originY), ACTIVATION_DELAY_MS)
+    // The items slide under a pointer that would otherwise select their text.
+    const stopSelecting = on(document, 'selectionchange', () => {
+      if (this.#drag)
+        clearSelection()
+    })
 
-    const stops = [
-      on(document, 'pointermove', (move) => {
-        if (!this.#drag && Math.hypot(move.clientX - originX, move.clientY - originY) > ACTIVATION_DISTANCE_PX)
-          this.#start(id, originY)
-
+    armPointerDrag(event, {
+      start: origin => this.#start(id, origin.y),
+      dragging: () => this.#drag !== null,
+      move: (pointer) => {
         if (!this.#drag)
           return
 
-        move.preventDefault()
-        this.#drag.pointerY = move.clientY
+        this.#drag.pointerY = pointer.y
         this.#layout(this.#drag)
-      }),
-      on(document, 'pointerup', () => {
-        disarm()
-        this.#end(true)
-      }),
-      on(document, 'pointercancel', () => {
-        disarm()
-        this.#end(false)
-      }),
-      // A link or an image is natively draggable, and the browser taking the drag over cancels the pointer this one follows.
-      on(document, 'dragstart', native => native.preventDefault()),
-      on(document, 'selectionchange', () => {
-        if (this.#drag)
-          clearSelection()
-      }),
-    ]
-
-    function disarm(): void {
-      clearTimeout(timer)
-
-      for (const stop of stops)
-        stop()
-    }
+      },
+      end: (drop) => {
+        stopSelecting()
+        this.#end(drop)
+      },
+    })
   }
 
   #step(id: Id, event: KeyboardEvent): void {
@@ -223,6 +206,7 @@ export class Sortable {
       Object.assign(el.style, { transition: '', transform: '' })
 
     Object.assign(drag.el.style, { position: '', zIndex: '', opacity: '', pointerEvents: '' })
+    swallowClick()
 
     if (drop && drag.to !== drag.from)
       void this.#move(drag.id, drag.from, drag.to, false)
@@ -241,7 +225,7 @@ export class Sortable {
     if (!refocus)
       return
 
-    // A keyed list can drop focus while it moves the item's node, so focus goes back to the handle, the one now on the page: the list's effects ran before this continuation, so it is already drawn, and a key pressed right after still finds it.
+    // A keyed list can drop focus while it moves the item's node, so focus goes back to the handle now on the page, which the list's effects have already drawn.
     const handle = this.#handles.get(id)
 
     if (handle && (!document.activeElement || document.activeElement === document.body))

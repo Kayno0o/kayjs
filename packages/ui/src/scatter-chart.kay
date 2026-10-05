@@ -1,6 +1,7 @@
 --- <Point extends ScatterPoint>
 import type { JSX } from 'kay'
 import type { ScatterAxis, ScatterPoint } from './plot'
+import { memo } from 'kay'
 import { axisExtent, axisPercent, dotSize } from './plot'
 
 const { points, x = {}, y = {}, quadrant, corners, onSelect, empty = 'No data yet.', label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
@@ -19,20 +20,18 @@ const { points, x = {}, y = {}, quadrant, corners, onSelect, empty = 'No data ye
   class?: string
 }>()
 
-const xExtent = () => axisExtent(points.map(point => point.x), x)
-const yExtent = () => axisExtent(points.map(point => point.y), y)
+const xExtent = memo(() => axisExtent(points.map(point => point.x), x))
+const yExtent = memo(() => axisExtent(points.map(point => point.y), y))
+const heaviest = memo(() => Math.max(...points.map(point => point.weight ?? 1)))
 
 // Where a dot sits and how large it is, its area following its weight against the heaviest point.
-const place = (point: Point) => {
-  const heaviest = Math.max(...points.map(item => item.weight ?? 1))
-
-  return `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --kui-dot-size: ${dotSize(point.weight ?? 1, heaviest)}rem`
-}
+const place = (point: Point) => `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --kui-dot-size: ${dotSize(point.weight ?? 1, heaviest())}rem`
 
 const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => text)
 ---
 if points.length === 0
-  p.kui-scatter-chart-empty {empty}
+  // The app's id and class stay on whichever element shows.
+  p.kui-scatter-chart-empty(id={rest.id} class={className}) {empty}
 else
   figure.kui-scatter-chart({...rest} aria-label={label} class={className})
     if y.label

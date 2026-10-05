@@ -1,5 +1,6 @@
 ---
 import type { JSX } from 'kay'
+import Icon from './icon.kay'
 
 const { value, max = 5, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
   // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star.
@@ -10,9 +11,15 @@ const { value, max = 5, label, class: className, ...rest } = props<Omit<JSX.Intr
   class?: string
 }>()
 
-const stars = () => '★'.repeat(max)
-const filled = () => Math.min(Math.max(value / max, 0), 1) * 100
+// One place per star; a value that is no number fills none.
+const places = () => Array.from({ length: Math.max(Math.floor(max), 0) }, (_, place) => place)
+const filled = () => max > 0 && Number.isFinite(value) ? Math.min(Math.max(value / max, 0), 1) * 100 : 0
 ---
 span.kui-rating({...rest} role="img" aria-label={label ?? `${value} out of ${max}`} class={className})
-  | {stars()}
-  span.kui-rating-fill(style={`width: ${filled()}%`}) {stars()}
+  span.kui-rating-stars
+    for place of places() key={place}
+      Icon(icon="star")
+  span.kui-rating-fill(style={`width: ${filled()}%`})
+    span.kui-rating-stars
+      for place of places() key={place}
+        Icon(icon="star")
