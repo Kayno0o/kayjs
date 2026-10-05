@@ -11,6 +11,11 @@ const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.
 let site: TestSite
 let page: TestPage
 
+// Only the source of a wait's function reaches the page, where this is not defined.
+function elsewhere(): boolean {
+  return location.pathname === '/elsewhere'
+}
+
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
   beforeAll(async () => {
@@ -110,6 +115,11 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
   it('times out naming what it waited for', async () => {
     await expect(page.waitFor('p.nothing', { timeout: 100 })).rejects.toThrow('kay: timed out after 100ms waiting for p.nothing')
     await expect(page.waitFor('h1', { text: 'Nope', timeout: 100 })).rejects.toThrow('waiting for h1 with text "Nope"')
+  })
+
+  it('names why a condition that keeps throwing never held, as one calling a helper of the test does', async () => {
+    await expect(page.waitUntil(() => elsewhere(), { timeout: 100 })).rejects.toThrow(/waiting for the condition to hold, last throwing .*elsewhere is not defined/)
+    await expect(page.waitUntil(() => false, { timeout: 100 })).rejects.toThrow(/to hold$/)
   })
 
   it('says why it opens no page, without a browser build or a browser', async () => {

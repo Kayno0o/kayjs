@@ -42,10 +42,10 @@ export interface TestPage {
   // The first match's form value, or null when nothing matches.
   value: (selector: string) => Promise<string | null>
   count: (selector: string) => Promise<number>
-  // Runs a function in the page, its arguments and result crossing as JSON.
+  // Runs a function in the page, its arguments and result crossing as JSON. Only its source crosses: it sees no variable of the test, only its arguments.
   evaluate: <Args extends unknown[], Result>(run: (...args: Args) => Result | Promise<Result>, ...args: Args) => Promise<Result>
   waitFor: (selector: string, options?: WaitForOptions) => Promise<void>
-  // Waits for a function run in the page to return something truthy.
+  // Waits for a function run in the page, as `evaluate` runs it, to return something truthy.
   waitUntil: <Args extends unknown[]>(condition: (...args: Args) => unknown, options?: WaitOptions, ...args: Args) => Promise<void>
   // Back and forward go through history, swapped pages included, resolving as `goto` does.
   back: () => Promise<void>
@@ -63,6 +63,8 @@ const INSTALLED = [
 ]
 const TIMEOUT_MS = 5000
 const POLL_MS = 25
+// What `within` resolves with when the page did not answer in time.
+const TIMED_OUT = Symbol('timed out')
 // Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
 const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('slot[data-component]:not([data-hydrate=visible]):not([data-hydrate=idle])')].every(island => island._$k)`
 
@@ -129,16 +131,26 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   // Polls the page, reading an error as not yet: the page may be between two documents.
   const poll = async (expression: string, wanted: string, wait = timeout) => {
     const until = Date.now() + wait
+    // Why the last try failed, if it threw: a page swap in flight throws once, a condition naming a test variable every time.
+    let failure: unknown
 
     for (;;) {
       try {
-        if (await within(view.evaluate(expression), until - Date.now()))
-          return
+        const answer = await within(view.evaluate(expression), until - Date.now())
+
+        if (answer !== TIMED_OUT) {
+          if (answer)
+            return
+
+          failure = undefined
+        }
       }
-      catch {}
+      catch (error) {
+        failure = error
+      }
 
       if (Date.now() > until)
-        throw new Error(`kay: timed out after ${wait}ms waiting for ${wanted}`)
+        throw new Error(`kay: timed out after ${wait}ms waiting for ${wanted}${failure === undefined ? '' : `, last throwing ${failure instanceof Error ? failure.message : String(failure)}`}`, { cause: failure })
 
       await Bun.sleep(POLL_MS)
     }
@@ -220,10 +232,10 @@ function script(run: (...args: never[]) => unknown, args: unknown[]): string {
   return `(${run.toString()})(${args.map(arg => arg === undefined ? 'undefined' : JSON.stringify(arg)).join(', ')})`
 }
 
-// Resolves as `promise` does, or with undefined after `ms`: an evaluation a page never answers does not outlast the wait.
-async function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
-  const { promise: timedOut, resolve } = Promise.withResolvers<undefined>()
-  const timer = setTimeout(resolve, Math.max(ms, 0), undefined)
+// Resolves as `promise` does, or with TIMED_OUT after `ms`: an evaluation a page never answers does not outlast the wait.
+async function within<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  const { promise: timedOut, resolve } = Promise.withResolvers<typeof TIMED_OUT>()
+  const timer = setTimeout(resolve, Math.max(ms, 0), TIMED_OUT)
 
   try {
     return await Promise.race([promise, timedOut])
