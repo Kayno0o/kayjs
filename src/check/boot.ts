@@ -2,7 +2,6 @@ import type { CheckDiagnostic, CheckOptions } from '.'
 import type { LocaleSettings } from '../runtime/i18n'
 import { join, resolve } from 'node:path'
 import { islandId } from '../compiler'
-import { NOT_ACTIONS } from '../compiler/codegen'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
@@ -65,15 +64,15 @@ export async function bootProblems(root: string, options: CheckOptions): Promise
 }
 
 // The URL each action of the pages and layouts is served at, as the server registers it, reported where a second file takes one.
+// Only an export declared as an `action(...)` call counts: the server registers actions only, so another export two such files share clashes nowhere.
 async function actionClashes(root: string, files: string[]): Promise<CheckDiagnostic[]> {
   const diagnostics: CheckDiagnostic[] = []
   const served = new Map<string, string>()
 
   for (const file of files) {
     const source = await Bun.file(file).text()
-    const names = analyzeServer(source, parseKay(source).server)?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
 
-    for (const name of names) {
+    for (const name of analyzeServer(source, parseKay(source).server)?.actionNames ?? []) {
       const url = actionUrl(islandId(file, root), name)
       const taken = served.get(url)
 

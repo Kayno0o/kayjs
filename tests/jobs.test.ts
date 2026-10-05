@@ -72,10 +72,11 @@ describe('schedule', () => {
     expect(() => schedule(computed('0 0 30 2 *'), () => undefined)).toThrow('the schedule 0 0 30 2 * never comes')
   })
 
+  // `bun run check` fails on an `@ts-expect-error` with no error under it, so the type check is what these assert.
   it('types a literal schedule, refusing a nickname, a field count or a day its month never has', () => {
     const typed = (_build: () => unknown) => true
 
-    expect(typed(() => [schedule('@hourly', () => undefined), schedule('30  2 * * MON', () => undefined), schedule('0 0 31 */2 *', () => undefined), schedule('0 0 30 2 MON', () => undefined), schedule('0 0 30 jan *', () => undefined)])).toBe(true)
+    expect(typed(() => [schedule('@hourly', () => undefined), schedule('30  2 * * MON', () => undefined), schedule('0 0 31 */2 *', () => undefined), schedule('0 0 30 2 MON', () => undefined), schedule('0 0 30 jan *', () => undefined), schedule('@DAILY', () => undefined), schedule('0\t0\t*\t*\t*', () => undefined)])).toBe(true)
     // @ts-expect-error -- no such nickname
     expect(typed(() => schedule('@minutely', () => undefined))).toBe(true)
     // @ts-expect-error -- six fields

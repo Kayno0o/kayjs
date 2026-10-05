@@ -121,6 +121,8 @@ export interface ServerAnalysis {
   exportNames: string[]
   // Where each of those names is declared.
   exportSpans: Map<string, Span>
+  // The exports declared as `action(...)` calls, the ones `kay check` compares URLs of.
+  actionNames: string[]
   // Statements that run per request, inside `load(ctx)`.
   body: Span[]
   // Names declared at the top of the fence: `load` returns them and the template reads them.
@@ -133,7 +135,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], exportSpans: new Map(), body: [], data: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], exportSpans: new Map(), actionNames: [], body: [], data: [], diagnostics: [] }
   const parsed = parseFence(source, server, analysis.diagnostics)
 
   if (!parsed)
@@ -159,6 +161,13 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
       for (const identifier of declaredIdentifiers(statement.declaration)) {
         analysis.exportNames.push(identifier.name)
         analysis.exportSpans.set(identifier.name, nameSpan(identifier, shift))
+      }
+
+      if (statement.declaration.type === 'VariableDeclaration') {
+        for (const declarator of statement.declaration.declarations) {
+          if (declarator.id.type === 'Identifier' && declarator.init?.type === 'CallExpression' && declarator.init.callee.type === 'Identifier' && declarator.init.callee.name === 'action')
+            analysis.actionNames.push(declarator.id.name)
+        }
       }
     }
     else if (isExport(statement)) {

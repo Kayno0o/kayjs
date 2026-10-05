@@ -23,7 +23,7 @@ import { CONTENT_CONFIG, PROBLEMS_MARKER } from '../content/server'
 import * as builtInMatchers from '../runtime/params'
 import { scanApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
-import { localeSettings, messagesFile } from '../server/i18n'
+import { localePrefixes, localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { matcherFile } from '../server/params'
 import { publicFiles } from '../server/public'
@@ -126,7 +126,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const shapes = routes.flatMap(route => patternShapes(route.pattern))
   const settings = options.i18n && i18nSettings(root, options.i18n, diagnostics)
   // A page is reached in every locale, under its prefix where it has one; an unprefixed path still answers, sending the visitor on to theirs when every locale is prefixed.
-  const prefixes = settings && !settings.hosts ? settings.locales.filter(locale => locale !== settings.defaultLocale || settings.prefixDefault) : []
+  const prefixes = settings ? localePrefixes(settings) : []
   const localized = [...shapes, ...prefixes.flatMap(locale => shapes.map(shape => `/${locale}${shape === '/' ? '' : shape}`))]
 
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: relative(dirname(environmentPath), module.file).replace(TS_EXTENSION, '') }))

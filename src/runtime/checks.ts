@@ -103,6 +103,8 @@ export type ErrorStatus<Status extends number> = number extends Status ? unknown
 export type PositiveSeconds<Seconds extends number> = number extends Seconds ? unknown : `${Seconds}` extends `-${string}` | '0' ? { kayError: `A duration is a positive number of seconds, not ${Seconds}` } : unknown
 
 type CronNickname = 'yearly' | 'annually' | 'monthly' | 'weekly' | 'daily' | 'midnight' | 'hourly'
+// Fields may be apart by tabs as by spaces.
+type Spaced<Cron extends string> = Cron extends `${infer Head}\t${infer Tail}` ? Spaced<`${Head} ${Tail}`> : Cron
 type CronFields<Cron extends string> = Cron extends `${infer Field} ${infer Rest}` ? Field extends '' ? CronFields<Rest> : [Field, ...CronFields<Rest>] : Cron extends '' ? [] : [Cron]
 // A day the month never has, every weekday allowed: `30 2`, `31 APR`.
 type MissingDay<Day, Month extends string, Weekday> = Weekday extends '*'
@@ -113,8 +115,8 @@ type MissingDay<Day, Month extends string, Weekday> = Weekday extends '*'
 export type CronSchedule<Cron extends string> = string extends Cron
   ? unknown
   : Cron extends `@${infer Name}`
-    ? Name extends CronNickname ? unknown : { kayError: `A schedule nickname is @yearly, @monthly, @weekly, @daily or @hourly, not ${Cron}` }
-    : CronFields<Cron> extends [string, string, infer Day, infer Month extends string, infer Weekday]
+    ? Lowercase<Name> extends CronNickname ? unknown : { kayError: `A schedule nickname is @yearly, @monthly, @weekly, @daily or @hourly, not ${Cron}` }
+    : CronFields<Spaced<Cron>> extends [string, string, infer Day, infer Month extends string, infer Weekday]
       ? MissingDay<Day, Month, Weekday> extends true ? { kayError: `The schedule ${Cron} never comes` } : unknown
       : { kayError: `A schedule has five fields, minute hour day month weekday, not ${Cron}` }
 

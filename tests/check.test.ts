@@ -579,6 +579,9 @@ describe('kay check, what the server refuses at boot', () => {
       'src/routes/a b.kay': action,
       'src/routes/a_b.kay': action,
       'src/routes/c.kay': action,
+      // The same name exported by both, but no action: the server registers nothing there.
+      'src/routes/d e.kay': '--- server\nexport const title = \'d\'\n---\np x\n',
+      'src/routes/d_e.kay': '--- server\nexport const title = \'d\'\n---\np x\n',
     })
 
     try {
