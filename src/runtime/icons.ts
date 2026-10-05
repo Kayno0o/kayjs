@@ -7,7 +7,7 @@ export interface IconProps {
   'innerHTML': string
 }
 
-// An iconify set as `@iconify-json/<prefix>/icons.json` holds it: `import tabler from '@iconify-json/tabler/icons.json'`, which a compiled server carries too.
+// An iconify set as `@iconify-json/<prefix>/icons.json` holds it.
 export interface IconSet {
   prefix: string
   icons: Record<string, IconifyIcon>

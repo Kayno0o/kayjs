@@ -72,12 +72,15 @@ describe('icons', () => {
     expect(iconProps(file, 'wide')).toEqual({ 'viewBox': '0 0 32 16', 'width': '2em', 'height': '1em', 'aria-hidden': 'true', 'innerHTML': '<path d="M0 0h32v16"/>' })
     expect(iconProps(file, 'flipped')!.innerHTML).toBe('<g transform="translate(32 0) scale(-1 1)"><path d="M0 0h32v16"/></g>')
     expect(iconProps(file, 'turned')!.innerHTML).toBe('<g transform="rotate(90 16 8)"><path d="M0 0h32v16"/></g>')
+    expect(setIconProps(await Bun.file(file).json() as IconSet, 'turned')).toEqual(iconProps(file, 'turned')!)
     expect(iconProps(file, 'loop')).toBeUndefined()
     expect(iconProps(file, 'nothing')).toBeUndefined()
   })
 
   it('builds the props of an icon picked at runtime from the set the app imports, as an icon import gives them', async () => {
-    const { default: tabler } = await import('@iconify-json/tabler/icons.json') as { default: IconSet }
+    const { default: imported } = await import('@iconify-json/tabler/icons.json')
+    // The JSON as imported is a set, with no cast.
+    const tabler: IconSet = imported
     const file = Bun.resolveSync('@iconify-json/tabler/icons.json', process.cwd())
 
     expect(setIconProps(tabler, 'home')).toEqual(iconProps(file, 'home')!)

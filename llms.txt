@@ -359,12 +359,10 @@ a(href="/")
 An icon known only at runtime, such as one a user picks from a search, is built from the set's JSON the app imports, which a compiled server carries too. `iconProps(set, name)` from `kay/icons` gives the same props an import gives, aliases, flips and rotations applied, or `undefined` for a name the set lacks; `iconNames(set)` lists its icons and aliases:
 
 ```ts
-import type { IconSet } from 'kay/icons'
 import tabler from '@iconify-json/tabler/icons.json'
 import { iconNames, iconProps } from 'kay/icons'
 
-const set = tabler as IconSet
-const found = iconNames(set).filter(name => name.includes('home')).slice(0, 20).map(name => ({ name, icon: iconProps(set, name)! }))
+const found = iconNames(tabler).filter(name => name.includes('home')).slice(0, 20).map(name => ({ name, icon: iconProps(tabler, name)! }))
 ```
 
 - Both are plain functions, so an island can call them too, though a set imported there ships whole to the browser: search on the server and send the props.

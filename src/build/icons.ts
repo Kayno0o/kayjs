@@ -1,7 +1,7 @@
 import type { IconProps, IconSet } from '../runtime/icons'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { iconProps as iconPropsOf, iconNames as namesOf } from '../runtime/icons'
+import * as iconSet from '../runtime/icons'
 
 // `import home from '~icons/tabler/home'`: an icon of a set the project installs as `@iconify-json/<prefix>`.
 export const ICON_IMPORT = /^~icons\/([a-z0-9-]+)\/([a-z0-9-]+)$/
@@ -44,14 +44,14 @@ function readSet(file: string): IconSet | undefined {
 export function iconNames(prefix: string, file: string): string[] {
   const set = readSet(file)
 
-  return set ? namesOf(set).map(name => `${prefix}/${name}`) : []
+  return set ? iconSet.iconNames(set).map(name => `${prefix}/${name}`) : []
 }
 
 // The props an `svg` spreads to draw the icon; undefined when the set has no such icon.
 export function iconProps(file: string, name: string): IconProps | undefined {
   const set = readSet(file)
 
-  return set && iconPropsOf(set, name)
+  return set && iconSet.iconProps(set, name)
 }
 
 // The module an icon import loads, or one throwing on use with what went wrong.
