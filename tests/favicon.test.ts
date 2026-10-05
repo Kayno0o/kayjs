@@ -8,7 +8,7 @@ import { faviconFiles, writeFavicons } from '../src/server/favicon'
 const ROUTES = 'tests/fixtures/seo/src/routes'
 const SOURCE = 'tests/fixtures/seo/src/favicon.png'
 const scratch = await mkdtemp(join(tmpdir(), 'kay-favicon-'))
-const app = await pages({ routes: ROUTES, prebuilt: false, favicon: SOURCE, seo: { name: 'Kay site' }, manifest: { shortName: 'Kay', themeColor: '#1e1e2e', display: 'standalone' } })
+const app = await pages({ routes: ROUTES, prebuilt: false, favicon: SOURCE, seo: { name: 'Kay site', description: 'A site made with kay' }, manifest: { shortName: 'Kay', themeColor: '#1e1e2e', display: 'standalone' } })
 
 afterAll(async () => {
   await rm(scratch, { recursive: true, force: true })
@@ -59,13 +59,14 @@ describe('favicon', () => {
     expect((await get('/manifest.webmanifest', { 'if-none-match': (await get('/manifest.webmanifest')).headers.get('etag')! })).status).toBe(304)
   })
 
-  it('names the app in the manifest and lists its icons', async () => {
+  it('names and describes the app in the manifest and lists its icons', async () => {
     const response = await get('/manifest.webmanifest')
 
     expect(response.headers.get('content-type')).toBe('application/manifest+json')
     expect(await response.json()).toEqual({
       name: 'Kay site',
       short_name: 'Kay',
+      description: 'A site made with kay',
       icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }],
       start_url: '/',
       display: 'standalone',

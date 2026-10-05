@@ -256,7 +256,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     serveSitemap(app, routes, siteOrigin(options.site) + base, publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
 
   if (options.favicon !== undefined)
-    serveFavicons(app, new Set([...publicUrls, ...servedPaths(routes)]), { source: resolve(root, options.favicon), builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, manifest: options.manifest, base })
+    serveFavicons(app, new Set([...publicUrls, ...servedPaths(routes)]), { source: resolve(root, options.favicon), builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
   const matchers = await loadMatchers(routesDir, routes)

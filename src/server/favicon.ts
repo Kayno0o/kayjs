@@ -23,6 +23,7 @@ export interface FaviconOptions {
   // Where `kay build` wrote the files, read instead of the source when there.
   builtDir: string
   name?: string
+  description?: string
   manifest?: ManifestConfig
   // The site's mount point, which the manifest's paths go under.
   base?: string
@@ -94,10 +95,11 @@ export function faviconTags(manifest?: ManifestConfig): HeadTag[] {
 }
 
 // Its icons and start page under the site's mount point.
-export function manifestJson(name: string | undefined, manifest: ManifestConfig = {}, base = ''): string {
+export function manifestJson(name: string | undefined, description: string | undefined, manifest: ManifestConfig = {}, base = ''): string {
   return JSON.stringify({
     name,
     short_name: manifest.shortName ?? name,
+    description,
     icons: [192, 512].map(size => ({ src: `${base}/icon-${size}.png`, sizes: `${size}x${size}`, type: 'image/png' })),
     start_url: `${base}/`,
     display: manifest.display,
@@ -146,7 +148,7 @@ export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconO
   }
 
   if (!taken.has(MANIFEST)) {
-    const manifest = manifestJson(options.name, options.manifest, options.base)
+    const manifest = manifestJson(options.name, options.description, options.manifest, options.base)
 
     app.get(MANIFEST, ({ request }) => respond(request, manifest, 'application/manifest+json'))
   }
