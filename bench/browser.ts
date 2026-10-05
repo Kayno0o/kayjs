@@ -2,6 +2,7 @@ import type { Browser, CDPSession, Page } from 'playwright-core'
 import type { AppName } from './apps'
 import { join } from 'node:path'
 import { chromium } from 'playwright-core'
+import { median } from './format'
 import { visibleRows } from './markup'
 
 export interface LoadResult {
@@ -73,13 +74,6 @@ export async function serve(app: AppName, env: Record<string, string> = {}): Pro
 
 export async function launch(): Promise<Browser> {
   return chromium.launch({ headless: true })
-}
-
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b)
-  const middle = sorted.length >> 1
-
-  return sorted.length % 2 === 0 ? (sorted[middle - 1]! + sorted[middle]!) / 2 : sorted[middle]!
 }
 
 async function responseBody(type: string, body: Promise<Buffer>): Promise<{ type: string, body: Uint8Array<ArrayBuffer> }> {

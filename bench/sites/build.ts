@@ -1,6 +1,7 @@
 import type { Variant } from './sites'
 import { cpSync, existsSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { median } from '../format'
 import { run } from './sites'
 
 export interface BuildTime {
@@ -19,8 +20,6 @@ export interface Footprint {
 
 const BUILDS = 3
 const OUTPUTS = ['dist', '.astro', 'node_modules/.astro', 'node_modules/.vite', '.kay']
-
-const median = (values: number[]) => values.toSorted((a, b) => a - b)[values.length >> 1]!
 
 // `kay build` checks the project as `kay check` does first; `astro build` checks nothing, so kay is timed without the check too.
 export function buildCommands(variant: Variant): string[][] {

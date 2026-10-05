@@ -6,6 +6,10 @@ import { run, VARIANTS, WORK } from './sites'
 
 const NGINX = join(WORK, 'nginx')
 const READY_TIMEOUT_MS = 20_000
+const VM_RSS = /VmRSS:\s+(\d+)/
+const VM_HWM = /VmHWM:\s+(\d+)/
+// Where nginx keeps its dynamic modules: Arch's and Debian's path unless `NGINX_MODULES` says otherwise.
+const MODULES = process.env.NGINX_MODULES ?? '/usr/lib/nginx/modules'
 
 // A variant's server as production runs it: Astro's standalone entry under Bun (its image aliases node to bun), kay's compiled executable.
 export function startServer(variant: Variant): Subprocess {
@@ -40,9 +44,9 @@ export async function waitReady(variant: Variant): Promise<number> {
 // Resident and peak memory of a process, in bytes.
 export function memory(pid: number): { rss: number, peak: number } {
   const status = readFileSync(`/proc/${pid}/status`, 'utf8')
-  const read = (key: string) => Number(new RegExp(`${key}:\\s+(\\d+)`).exec(status)![1]) * 1024
+  const read = (field: RegExp) => Number(field.exec(status)![1]) * 1024
 
-  return { rss: read('VmRSS'), peak: read('VmHWM') }
+  return { rss: read(VM_RSS), peak: read(VM_HWM) }
 }
 
 function upstream(variant: Variant): string {
@@ -74,7 +78,7 @@ export async function startNginx(): Promise<Subprocess> {
     }
   }`).join('\n')
 
-  await Bun.write(join(NGINX, 'nginx.conf'), `load_module /usr/lib/nginx/modules/ngx_http_brotli_filter_module.so;
+  await Bun.write(join(NGINX, 'nginx.conf'), `load_module ${MODULES}/ngx_http_brotli_filter_module.so;
 worker_processes auto;
 daemon off;
 pid ${NGINX}/nginx.pid;
@@ -106,16 +110,21 @@ export async function startAll(): Promise<{ servers: Map<Variant, Subprocess>, n
   const nginx = await startNginx()
   const servers = new Map(VARIANTS.map(variant => [variant, startServer(variant)]))
 
-  for (const variant of VARIANTS)
-    await waitReady(variant)
-
-  return {
-    servers,
-    nginx,
-    stop: () => {
-      for (const server of servers.values())
-        server.kill()
-      nginx.kill()
-    },
+  const stop = () => {
+    for (const server of servers.values())
+      server.kill()
+    nginx.kill()
   }
+
+  try {
+    for (const variant of VARIANTS)
+      await waitReady(variant)
+  }
+  catch (error) {
+    stop()
+
+    throw error
+  }
+
+  return { servers, nginx, stop }
 }

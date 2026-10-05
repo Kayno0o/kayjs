@@ -1,3 +1,4 @@
+import type { Browser } from 'playwright-core'
 import type { Vitals } from './browser'
 import type { BuildTime, Footprint } from './build'
 import type { ColdStart, Load } from './load'
@@ -63,7 +64,16 @@ for (const variant of VARIANTS) {
 }
 
 const lab = await startAll()
-const browser = await chromium.launch({ headless: true })
+let browser: Browser
+
+try {
+  browser = await chromium.launch({ headless: true })
+}
+catch (error) {
+  lab.stop()
+
+  throw error
+}
 
 try {
   for (const variant of VARIANTS) {
@@ -106,7 +116,7 @@ try {
     '',
     ...environment.map(line => `- ${line}`),
     '',
-    'cromignon24 and jb-peinture as they last ran on Astro, then on kay, each built and served as it deploys: Astro\'s standalone server under Bun, kay\'s one executable, both behind an nginx set up as production\'s (HTTP/2 over TLS, brotli and gzip at level 6). Reproduce with `bun run bench:sites`, the site repositories beside this one.',
+    'cromignon24 and jb-peinture as they last ran on Astro, then on kay, each built and served as it deploys: Astro\'s standalone server under Bun, kay\'s one executable, both behind an nginx set up as production\'s (HTTP/2 over TLS, brotli and gzip at level 6). kay is the version each site pins, not this checkout. Reproduce with `bun run bench:sites`, the site repositories beside this one, given nginx with the brotli module (`NGINX_MODULES` if not under /usr/lib/nginx/modules), openssl, playwright-core\'s Chromium, and cloc for the line counts.',
     '',
     '## What a page downloads',
     '',

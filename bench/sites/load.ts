@@ -1,6 +1,7 @@
 import type { Subprocess } from 'bun'
 import type { Variant } from './sites'
 import { readFileSync } from 'node:fs'
+import { median } from '../format'
 import { memory, startServer, waitReady } from './serve'
 
 export interface ColdStart {
@@ -24,8 +25,7 @@ const WARMUP_MS = 1000
 const LOAD_MS = 5000
 // What /proc counts CPU time in, per second.
 const CLOCK_TICKS = 100
-
-const median = (values: number[]) => values.toSorted((a, b) => a - b)[values.length >> 1]!
+const WHITESPACE = /\s+/
 
 // From spawning the server to its first 200 on the home page, and its memory then: median of `COLD_STARTS`.
 export async function coldStart(variant: Variant): Promise<ColdStart> {
@@ -51,7 +51,7 @@ function cpuSeconds(pid: number): number {
 }
 
 function nginxCpuSeconds(nginx: Subprocess): number {
-  const workers = readFileSync(`/proc/${nginx.pid}/task/${nginx.pid}/children`, 'utf8').trim().split(/\s+/).map(Number)
+  const workers = readFileSync(`/proc/${nginx.pid}/task/${nginx.pid}/children`, 'utf8').trim().split(WHITESPACE).map(Number)
 
   return workers.reduce((sum, pid) => sum + cpuSeconds(pid), 0)
 }

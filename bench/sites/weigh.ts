@@ -30,6 +30,8 @@ const BASIC_LATIN = /U\+(?:0+-0*FF\b|\?\?(?![\da-f?]))/i
 const SIZE_ENTRY = /^(?:\((min|max)-width:\s*(\d+(?:\.\d+)?)(px|rem|em)\)\s+)?(\S.*)$/
 const LENGTH = /^(\d+(?:\.\d+)?)(vw|px|rem|em)$/
 const ISLAND_CHUNK = /"([^"]+\.kay)":\(\)=>\(\w+\("[^"]*"\),import\("\.\/([^"]+)"\)\)/g
+const SRCSET_SEPARATOR = /,\s+/
+const WHITESPACE = /\s+/
 const ROOT_FONT_PX = 16
 
 function brotli(body: Uint8Array): number {
@@ -44,7 +46,7 @@ function resolve(url: string, base: string): string {
 }
 
 // The width in CSS pixels a `sizes` list gives the image at this viewport.
-function slotWidth(sizes: string | null, viewport: Viewport): number {
+export function slotWidth(sizes: string | null, viewport: Viewport): number {
   for (const entry of sizes?.split(',').map(part => part.trim()) ?? []) {
     const [, bound, amount, unit, length] = SIZE_ENTRY.exec(entry) ?? []
 
@@ -70,12 +72,12 @@ function slotWidth(sizes: string | null, viewport: Viewport): number {
 }
 
 // The candidate a browser picks: the smallest covering the slot at the device pixel ratio, else the widest.
-function pickImage(src: string | null, srcset: string | null, sizes: string | null, viewport: Viewport): string | null {
+export function pickImage(src: string | null, srcset: string | null, sizes: string | null, viewport: Viewport): string | null {
   if (!srcset)
     return src
 
-  const candidates = srcset.split(/,\s+/).map((candidate) => {
-    const [url, descriptor = '1x'] = candidate.trim().split(/\s+/)
+  const candidates = srcset.split(SRCSET_SEPARATOR).map((candidate) => {
+    const [url, descriptor = '1x'] = candidate.trim().split(WHITESPACE)
 
     return { url: url!, value: Number.parseFloat(descriptor), unit: descriptor.at(-1) }
   }).toSorted((a, b) => a.value - b.value)
@@ -84,7 +86,7 @@ function pickImage(src: string | null, srcset: string | null, sizes: string | nu
   return (candidates.find(candidate => candidate.value >= needed) ?? candidates.at(-1)!).url
 }
 
-function latinFontUrls(css: string, base: string): string[] {
+export function latinFontUrls(css: string, base: string): string[] {
   const urls: string[] = []
 
   for (const [, body] of css.matchAll(FONT_FACE)) {

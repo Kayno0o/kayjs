@@ -1,5 +1,6 @@
 import type { Browser } from 'playwright-core'
 import type { Variant } from './sites'
+import { median } from '../format'
 
 export interface Profile {
   name: string
@@ -60,8 +61,6 @@ const COLLECT = `(async () => {
     bytes: navigation.transferSize + resources.reduce((sum, r) => sum + r.transferSize, 0),
   }
 })()`
-
-const median = (values: number[]) => values.toSorted((a, b) => a - b)[values.length >> 1]!
 
 // `RUNS` cold loads of a page through nginx over HTTP/2, each in a fresh context, medians kept. Google's map frame stays out of both sites.
 export async function vitals(browser: Browser, variant: Variant, path: string, profile: Profile): Promise<Vitals> {

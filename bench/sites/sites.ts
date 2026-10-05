@@ -73,7 +73,15 @@ export function run(cmd: string[], cwd: string, env: Record<string, string> = {}
 function exportCommit(repo: string, ref: string, dir: string) {
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
-  run(['sh', '-c', `git -C ${repo} archive ${ref} | tar -x -C ${dir}`], WORK)
+  const archive = Bun.spawnSync(['git', '-C', repo, 'archive', ref], { stdout: 'pipe', stderr: 'pipe' })
+
+  if (archive.exitCode !== 0)
+    throw new Error(`git archive ${ref} failed in ${repo}:\n${archive.stderr.toString()}`)
+
+  const extract = Bun.spawnSync(['tar', '-x', '-C', dir], { stdin: archive.stdout, stderr: 'pipe' })
+
+  if (extract.exitCode !== 0)
+    throw new Error(`extracting ${repo} at ${ref} failed:\n${extract.stderr.toString()}`)
 }
 
 function buildSolidjs() {
@@ -89,7 +97,7 @@ function buildSolidjs() {
   run(['bun', 'run', 'build'], dir)
 }
 
-// Exports each site at its Astro commit and at its kay ref, installs them, and builds them as they deploy: Astro's standalone server, kay's one executable.
+// Exports each site at its Astro commit and at its kay ref and installs them; build.ts then builds them as they deploy.
 export async function prepare() {
   mkdirSync(WORK, { recursive: true })
   buildSolidjs()
@@ -108,7 +116,6 @@ export async function prepare() {
     }
 
     run(['bun', 'install'], variant.dir)
-    run(variant.kind === 'astro' ? ['bunx', '--bun', 'astro', 'build'] : ['bunx', 'kay', 'build', '--compile', 'server'], variant.dir, variant.site.env)
   }
 }
 
