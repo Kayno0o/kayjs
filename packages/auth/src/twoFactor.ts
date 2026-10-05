@@ -240,7 +240,7 @@ async function issueRecoveryCodes(core: Core, userId: string): Promise<string[]>
   return codes.map(code => code.replace(EVERY_FIVE, '$&-'))
 }
 
-// A TOTP secret sealed as kayjs-auth stores it, for a store whose rows hold plain ones from before: it seals each on read. `secret` is the one `createAuth` takes.
+// A TOTP secret sealed as kayjs-auth stores it, for a store whose rows hold plain ones from before: it seals each on read. `secret` is the value `createAuth` takes, a list included.
 export function sealTotpSecret(secret: string | string[], userId: string, plain: string): string {
   return deriveKeys(secret).encrypt(plain, totpContext(userId))
 }

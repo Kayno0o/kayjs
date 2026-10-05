@@ -64,7 +64,7 @@ export interface AuthStore {
     // Given an address already normalised, as every caller does: a store may match it exactly.
     findByEmail: (email: string) => MaybePromise<UserRecord | undefined>
     findByUsername: (username: string) => MaybePromise<UserRecord | undefined>
-    // Throws when the email or the username is taken. Answers the user as stored when the store picks its own id, such as a serial column's; answering nothing keeps `user.id`.
+    // Throws when the email or the username is taken. Answers the user as stored when the store picks its own id, such as a serial column's: `user` whole with only its `id` changed. Answering nothing keeps `user.id`.
     create: (user: UserRecord) => MaybePromise<UserRecord | void>
     // The user once changed, or undefined when there is none; throws when the change takes an email or a username another user has.
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>

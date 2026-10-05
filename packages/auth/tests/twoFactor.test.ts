@@ -194,6 +194,23 @@ describe('a secret kept plain before kayjs-auth', () => {
     expect(await visitor.json('/me')).toMatchObject({ id: user.id, twoFactor: true })
   })
 
+  test('opens under a rotated secret list, sealed with the old secret or the new', async () => {
+    const OLD = 'an-older-secret-that-is-long-enough-for-kayjs-auth'
+    const { browser, store } = testApp({ secret: [SECRET, OLD] })
+    const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
+
+    for (const [email, sealWith] of [['ada@example.com', [OLD]], ['bob@example.com', [SECRET, OLD]]] as const) {
+      const { user } = await browser().call('register', { email, password: PASSWORD })
+
+      await store.users.update(user.id, { totpSecret: sealTotpSecret([...sealWith], user.id, secret), totpEnabledAt: new Date() })
+      const visitor = browser()
+
+      await visitor.post('/password', { identifier: email, password: PASSWORD })
+
+      expect(await visitor.call('verifyTwoFactor', await totpCode(secret, totpStep()))).toMatchObject({ ok: true })
+    }
+  })
+
   test('is sealed for its own user only', async () => {
     const { browser, store } = testApp()
     const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))

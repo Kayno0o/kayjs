@@ -103,12 +103,12 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
       return { error: 'taken' }
 
     await saveIdentity(core, identity, current.id, profile, tokens)
-    await adoptEmail(core, current, profile)
+    const linked = await adoptEmail(core, current, profile)
 
     if (!identity)
       await notify(core, current, 'provider-linked', provider)
 
-    await core.onProviderProfile?.(publicUser(current), profile)
+    await heardProfile(core, linked, profile)
 
     return { redirect: flow.redirect }
   }
@@ -126,9 +126,19 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     await core.onSignUp?.(publicUser(record), profile)
   }
 
-  await core.onProviderProfile?.(publicUser(record), profile)
+  await heardProfile(core, record, profile)
 
   return { redirect: await state.complete(record, flow.redirect) }
+}
+
+// A failure is logged, not thrown: refreshing what the app keeps from a profile must not fail a sign-in the provider vouched for.
+async function heardProfile(core: Core, record: UserRecord, profile: Profile): Promise<void> {
+  try {
+    await core.onProviderProfile?.(publicUser(record), profile)
+  }
+  catch (error) {
+    console.error(`kayjs-auth: onProviderProfile failed for ${profile.provider}`, error)
+  }
 }
 
 // A fresh access token to call the provider with for the signed-in user, refreshed when it is about to expire; null without one.

@@ -1,6 +1,7 @@
 import type { Profile, User } from '../src/auth'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
+import { totpCode, totpStep } from '../src/totp'
 import { serialStore, testApp, userRecord } from './helpers/app'
 
 const URL_BASE = 'https://site.test'
@@ -142,6 +143,43 @@ describe('coming back from the provider', () => {
     const id = signUps[0]!.user.id
 
     expect(profiles).toEqual([`${id} discord ada`, `${id} discord ada-renamed`, `${id} github ada-gh`])
+  })
+
+  test('hands over the user as the provider left them, its email adopted on a link', async () => {
+    providers({ 1: { id: '1', username: 'ada' }, 7: { id: '7', username: 'ada-gh', email: 'ada@example.com' } })
+    const heard: User[] = []
+    const { browser } = setup({ onProviderProfile: user => void heard.push(user) })
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+    await signInWith(ada, 'github', '7', '/auth/github?link=1')
+
+    expect(heard.at(-1)).toMatchObject({ email: 'ada@example.com', emailVerified: true })
+  })
+
+  test('hands the profile over before the second factor, and signs in whatever the hook throws', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const heard: string[] = []
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const { browser } = setup({ onProviderProfile: (user) => {
+      heard.push(user.id)
+
+      throw new Error('profile store down')
+    } })
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+    expect(await ada.json('/me')).toMatchObject({ id: heard[0] })
+
+    const { setup: { secret } } = await ada.call('setUpTwoFactor', {})
+
+    await ada.call('enableTwoFactor', await totpCode(secret, totpStep()))
+    const visitor = browser()
+
+    expect((await signInWith(visitor, 'discord', '1')).response.headers.get('location')).toBe('/two-factor')
+    expect([heard.length, await visitor.json('/me')]).toEqual([2, 'anonymous'])
+    expect(logged).toHaveBeenCalledTimes(2)
+    logged.mockRestore()
   })
 
   test('refuses a provider account without an id, which would share one account with every other such sign-in', async () => {
