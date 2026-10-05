@@ -644,7 +644,7 @@ export class DomTemplate {
     return { separate, close }
   }
 
-  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, every source merged into one string, as a `class?: string` prop takes it.
+  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, an array of every source, which a component gets merged into one string, as its `class?: string` prop takes it.
   private mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean): void {
     const { b } = this
     const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
@@ -669,14 +669,14 @@ export class DomTemplate {
         items.push(() => b.add('(').addSource(attribute.expression).add(')'))
     }
 
-    b.add(`${domAlias('componentClass')}([`)
+    b.add(element.component ? `${domAlias('componentClass')}([` : '[')
     for (const [index, item] of items.entries()) {
       if (index > 0)
         b.add(', ')
 
       item()
     }
-    b.add('])')
+    b.add(element.component ? '])' : ']')
   }
 
   // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else as a block.

@@ -200,6 +200,8 @@ describe('class shorthand with a spread', () => {
     expect(await tagged('Tagged.a(class={c})')).toBe('<p title="[a z]"></p>')
     expect(await tagged('Tagged({...sp} class={undefined})')).toBe('<p title="[FROM]"></p>')
     expect(await tagged('Tagged({...{}} class={undefined})')).toBe('<p title="[undefined]"></p>')
+    // An element keeps writing what it merges, even empty.
+    expect(await renderKay('---\nconst { sp } = props<{ sp: Record<string, string> }>()\n---\np({...sp} class={undefined})', { sp: { title: 't' } })).toBe('<p title="t" class=""></p>')
   })
 
   it('renders a spread without a class as before', async () => {

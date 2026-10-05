@@ -58,13 +58,14 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     propsByLocal.set(binding.local.start, { binding, index })
 
   // `typeOf` spells the type of the value the name stands for, when `typeof name` cannot read it through the rewritten name.
-  const visitBinding = (scope: Scope, name: string, rewrite: ((reference: NodePath) => Rewrite) | undefined, readOnly: string, typeOf?: string) => {
+  // `rewrite` gives what a read becomes, or nothing to leave it as written.
+  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Rewrite | undefined, readOnly: string, typeOf?: string) => {
     const binding = scope.getBinding(name)
 
     if (!binding)
       return
 
-    for (const reference of rewrite ? binding.referencePaths : []) {
+    for (const reference of binding.referencePaths) {
       const node = reference.node
       const query = typeOf === undefined ? undefined : typeQueryOf(reference)
 
@@ -84,7 +85,10 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       if (source === undefined || tag === 'closing')
         continue
 
-      const found = rewrite!(reference)
+      const found = rewrite(reference)
+
+      if (!found)
+        continue
 
       // Type checking copies a tag as a value too, which must not undo the opening tag's.
       const dynamic = (tag === 'opening' && !isPlainRead(found)) || rewrites.get(source)?.dynamic
@@ -110,7 +114,13 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
         if (param.type !== 'Identifier' || !accessorSites.has(param.start!))
           continue
 
-        visitBinding(path.scope, param.name, values ? undefined : reference => withShorthand(reference, param.name, { after: '()' }), `\`${param.name}\` is read-only here; it tracks the current value`, `ReturnType<typeof ${param.name}>`)
+        const message = `\`${param.name}\` is read-only here; it tracks the current value`
+
+        // Read as a value, a row or an alias is left as written, except as a tag, which still goes through `Dynamic` as a value of any component type may.
+        if (values)
+          visitBinding(path.scope, param.name, reference => tagPosition(reference) === 'opening' ? {} : undefined, message)
+        else
+          visitBinding(path.scope, param.name, reference => withShorthand(reference, param.name, { after: '()' }), message, `ReturnType<typeof ${param.name}>`)
       }
     },
     VariableDeclarator: (path) => {

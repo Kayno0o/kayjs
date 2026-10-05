@@ -370,13 +370,13 @@ describe('imports in both fences', () => {
 })
 
 describe('component names', () => {
-  it('takes a prop, a server value or a loop item as the component tag, opening and closing alike, a loop item read as itself', () => {
+  it('takes a prop, a server value or a loop item as the component tag, opening and closing alike', () => {
     const code = tsx('---\nconst { Icon, Wrap, items } = props<{ Icon: unknown, Wrap: unknown, items: unknown[] }>()\n---\nIcon(n="x")\nWrap\n  p a\nfor Item of items key={Item}\n  Item(x="1")\n    p b')
 
     expect(code).toContain('<__props.Icon n="x" />')
     expect(code).toContain('<__props.Wrap><p>a</p></__props.Wrap>')
-    expect(code).toContain('{(Item) => <Item x="1"><p>b</p></Item>}')
-    expect(code).not.toContain('KayDynamic')
+    expect(code).toContain('{(Item) => <KayDynamic component={Item} x="1"><p>b</p></KayDynamic>}')
+    expect(code).toContain('declare const KayDynamic: KayTemplateHelpers["Dynamic"]')
   })
 
   it('reads a component prop with a default through Dynamic as well', () => {

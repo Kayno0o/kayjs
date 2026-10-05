@@ -154,11 +154,25 @@ describe('kay check, edge cases', () => {
   })
 
   it('narrows a loop\'s row and an if\'s alias in the branches of an if, in an island as in a static component', async () => {
-    const template = 'ul\n  for item, index of items key={index}\n    if item === \'separator\'\n      li.sep\n    else\n      li {item.label}\n  for item of items key={item}\n    if item !== \'separator\'\n      li {item.label}\n  if items[0] as first\n    if typeof first === \'string\'\n      li {first.length}\n    else\n      li {first.label}\n'
+    const template = 'ul\n  for item, index of items key={index}\n    if item === \'separator\'\n      li.sep\n    else if item.label === \'\'\n      li {item.label.length}\n    else\n      li {item.label}\n  for item of items key={item}\n    if item !== \'separator\'\n      li {item.label}\n  if items[0] as first\n    if typeof first === \'string\'\n      li {first.length}\n    else\n      li {first.label}\n'
     const script = '---\ntype Entry = \'separator\' | { label: string }\nconst { items } = props<{ items: Entry[] }>()\n'
     const root = await scratchProject({
       'src/static.kay': `${script}---\n${template}`,
       'src/island.kay': `${script.replace('---\n', '---\nimport { signal } from \'kay\'\n\n')}const open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) x\n${template}`,
+    })
+
+    try {
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('passes a component the class it merges with a spread or a shorthand as one string, which its props type', async () => {
+    const root = await scratchProject({
+      'src/box.kay': '---\nconst { label, class: className } = props<{ label: string, class?: string }>()\n---\np(class={className}) {label}\n',
+      'src/outer.kay': '---\nimport Box from \'./box.kay\'\n\nconst { class: className, ...attributes } = props<{ class?: string, label: string }>()\n---\nBox({...attributes} class={className})\nBox.big(label="a" class={className})\nBox.big({...attributes})\n',
     })
 
     try {
