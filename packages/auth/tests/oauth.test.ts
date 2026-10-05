@@ -21,8 +21,13 @@ describe('safeRedirect', () => {
     for (const path of ['/.//evil.com', '/./\\evil.com', '/%2e//evil.com', '/a/../..//evil.com', '/%2F%2Fevil.com', '/%2fevil.com', '/./%5Cevil.com'])
       expect([path, safeRedirect(path)]).toEqual([path, '/'])
 
+    for (const path of ['/.%2f/evil.com', '/a/..%2f/evil.com', '/%2e%2e%2f%2e%2e%2f/evil.com', '/%252F/evil.com', '/%E0%A4%A'])
+      expect([path, safeRedirect(path)]).toEqual([path, '/'])
+
     expect(safeRedirect('/a/./b/../c?next=//x#top')).toBe('/a/c?next=//x#top')
     expect(safeRedirect('/a/%2F')).toBe('/a/%2F')
+    expect(['/../x', '/a?', '/é?q=é', '/a b'].map(path => safeRedirect(path))).toEqual(['/x', '/a', '/%C3%A9?q=%C3%A9', '/a%20b'])
+    expect(safeRedirect(safeRedirect('/a/./é'))).toBe(safeRedirect('/a/./é'))
   })
 })
 
