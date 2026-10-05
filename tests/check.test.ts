@@ -276,6 +276,24 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('refuses children under an island in a static parent, which an island cannot take, and lets a static component or an island\'s own children have them', async () => {
+    const root = await scratchProject({
+      'src/components/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {count()}\nslot\n',
+      'src/components/frame.kay': 'div\n  slot\n',
+      'src/components/panel.kay': '---\nimport { signal } from \'kay\'\nimport Counter from \'./counter.kay\'\n\nconst open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) Toggle\nCounter\n  p Inside an island\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\nimport Frame from \'../components/frame.kay\'\n---\nFrame\n  p Framed\nCounter\n  p Lost\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.file.slice(root.length + 1), d.line, d.column, d.message.match(/kayError: "([^"]+)"/)?.[1]])).toEqual([
+        ['src/routes/index.kay', 8, 3, 'An island takes no children: pass data as props, or make the parent interactive too'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks without the server\'s environment, as kay build renders pages: the config, the content and the messages may import an env module lacking a variable', async () => {
     const env = 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ KAY_CHECK_UNSET_SECRET: t.String() }))\n'
     const root = await scratchProject({

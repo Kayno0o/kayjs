@@ -51,7 +51,7 @@ const NAMED_IMPORT = /^import \{([^}]*)\} from (['"][^'"]+['"])/
 const RESERVED_CHARACTER = /[!'()*]/g
 const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
-const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Field|Prop|FunctionProp|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
+const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Field|Prop|FunctionProp|Children|PageContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
 const FULL_SYNC = 1
 const ERROR = 1
 const CREATED = 1

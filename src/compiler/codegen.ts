@@ -834,6 +834,14 @@ class Generator {
       this.emitAttributes(element)
       const slots = element.children.filter((child): child is SlotNode => child.kind === 'slot')
       const children = element.children.filter(child => child.kind !== 'slot')
+
+      // A static parent cannot hand an island markup: it renders on the server alone. `0` stands for the lines under the tag.
+      if (children.length > 0 && element.component && this.options.check && !this.options.island && !this.options.insideIsland) {
+        b.add(' {...KayChildren(').addSource(element.tag).add(')(')
+        b.wrap(children[0]!, () => b.add('0'))
+        b.add(')}')
+      }
+
       // Each prop is passed once: by an attribute, by an `@name` block, or for `children` by the lines under the tag.
       const passed = new Map<string, string>(element.attributes.flatMap(attribute => attribute.kind === 'spread' ? [] : [[this.text(attribute.name), 'an attribute']]))
 

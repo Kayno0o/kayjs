@@ -191,7 +191,7 @@ export type PageData<Load extends (...args: never[]) => unknown> = Awaited<Retur
 export type { Action, ActionContext, ActionProtection, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, ServerAction, Success, SuccessOf } from './action'
 export { action, ActionError, ActionRedirect } from './action'
 export { withBase } from './base'
-export type { ApiRoutesOf, AwaitProps, CheckedHref, Deferred, FunctionProp, HydrateWhen, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, TemplateHelpers } from './checks'
+export type { ApiRoutesOf, AwaitProps, CheckedHref, ChildrenProp, Deferred, FunctionProp, HydrateWhen, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, TemplateHelpers } from './checks'
 export type { Component, EventHandler, JSX } from './jsx'
 export type { EventReader, EventStream, Socket, SocketPath, SocketStatus, StreamPath, StreamStatus } from './live'
 export { socket, stream } from './live'
