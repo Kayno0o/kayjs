@@ -113,6 +113,21 @@ describe('the dev watcher', () => {
     }
   })
 
+  it('ignores a root directory the project itself ignores, as a database bind-mounted into it is', async () => {
+    const { root, sees, cleanup } = await watched({ 'src/server.ts': '', '.gitignore': '# data\n/data-dev/\ndata\n*.log\nsrc/generated\n', 'data-dev/postgres/base/1': '', 'data/x': '', 'src/generated/a.ts': '' })
+
+    try {
+      expect(await sees('data-dev/postgres/base/1', async attempt => Bun.write(join(root, 'data-dev/postgres/base/1'), String(attempt)), 300)).toBe(false)
+      expect(await sees('data/x', async attempt => Bun.write(join(root, 'data/x'), String(attempt)), 300)).toBe(false)
+      // A pattern reaching deeper than a root directory is left to the walk, so the source under it is still watched.
+      expect(await sees('src/generated/a.ts', async attempt => Bun.write(join(root, 'src/generated/a.ts'), String(attempt)))).toBe(true)
+      expect(await sees('src/server.ts', async attempt => Bun.write(join(root, 'src/server.ts'), String(attempt)))).toBe(true)
+    }
+    finally {
+      await cleanup()
+    }
+  })
+
   it('starts the server with the .env as it is now, over the values Bun loaded into kay dev itself', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const seen = join(root, 'seen.txt')

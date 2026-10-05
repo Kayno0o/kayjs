@@ -1,6 +1,6 @@
 import type { Subprocess } from 'bun'
 import type { FSWatcher } from 'node:fs'
-import { readdirSync, statSync, watch } from 'node:fs'
+import { readdirSync, readFileSync, statSync, watch } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { IGNORED_DIRS } from '../build/files'
@@ -25,6 +25,11 @@ const SPARE = join(import.meta.dir, 'spare.ts')
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
 const STYLESHEET = /\.css$/
+const NEWLINE = /\r?\n/
+const LEADING_SLASH = /^\//
+const TRAILING_SLASH = /\/$/
+// A pattern naming anything but one plain directory at the root.
+const GLOB_OR_DEEPER = /[*?[\]/]/
 // Past this, as after a checkout, the files changed are not passed on, and open pages reload.
 const MAX_CHANGED_FILES = 200
 
@@ -132,6 +137,29 @@ async function environmentWithoutDotenv(): Promise<Record<string, string | undef
   return Object.fromEntries(Object.entries(process.env).filter(([key, value]) => loaded[key] !== value))
 }
 
+// The root directories the project itself ignores: a service writing its data into the repository, as a bind-mounted database does, must not restart the server on every write.
+// Only the plain names a `.gitignore` holds, which is what such a directory is listed as; a pattern reaching deeper or holding a glob is left to the walk.
+function gitIgnoredNames(root: string): Set<string> {
+  const names = new Set<string>()
+  let lines: string[]
+
+  try {
+    lines = readFileSync(join(root, '.gitignore'), 'utf8').split(NEWLINE)
+  }
+  catch {
+    return names
+  }
+
+  for (const line of lines) {
+    const name = line.trim().replace(LEADING_SLASH, '').replace(TRAILING_SLASH, '')
+
+    if (name !== '' && !name.startsWith('#') && !name.startsWith('!') && !GLOB_OR_DEEPER.test(name))
+      names.add(name)
+  }
+
+  return names
+}
+
 // A directory or file at the project root worth reacting to; dependencies, build output and hidden entries, `.env` files apart, are not.
 function watchedName(name: string): boolean {
   return !IGNORED_DIRS.has(name) && (!name.startsWith('.') || name.startsWith('.env'))
@@ -149,6 +177,8 @@ function isDirectory(path: string): boolean {
 // The root is watched for the entries it gains and loses, each top-level directory recursively, and a directory created again gets a new watcher, the old one staying on the inode that is gone.
 // `onChange` gets the changed path relative to the root; the returned function stops watching.
 export function watchProject(root: string, onChange: (file: string) => void): () => void {
+  const ignored = gitIgnoredNames(root)
+  const watched = (name: string) => watchedName(name) && !ignored.has(name)
   const directories = new Map<string, FSWatcher>()
   const watchDirectory = (name: string) => {
     directories.get(name)?.close()
@@ -169,7 +199,7 @@ export function watchProject(root: string, onChange: (file: string) => void): ()
     }
   }
   const rootWatcher = watch(root, (_event, name) => {
-    if (name === null || !watchedName(name))
+    if (name === null || !watched(name))
       return
 
     watchDirectory(name)
@@ -179,7 +209,7 @@ export function watchProject(root: string, onChange: (file: string) => void): ()
   rootWatcher.on('error', error => console.error(error))
 
   for (const entry of readdirSync(root, { withFileTypes: true })) {
-    if (entry.isDirectory() && watchedName(entry.name))
+    if (entry.isDirectory() && watched(entry.name))
       watchDirectory(entry.name)
   }
 
