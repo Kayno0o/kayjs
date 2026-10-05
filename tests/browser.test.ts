@@ -175,6 +175,25 @@ describe.skipIf(!path && !process.env.CI)('kay dev in a browser', () => {
       expect(await shown.evaluate(() => document.querySelector('kay-problems')!.shadowRoot!.textContent)).toMatch(/^1 kay problemDismissisland tests\/fixtures\/navigation\/src\/components\/mismatch\.kay did not match its server markup, rendering it again: /)
       expect(shown.errors).toHaveLength(1)
 
+      // A problem logged again is listed once, a warning counts, anything not kay's is left to the console.
+      await shown.evaluate(() => {
+        console.warn('[kay] the persisted signal note could not be kept')
+        console.warn('[kay] the persisted signal note could not be kept')
+        console.error('not kay')
+      })
+      await shown.waitUntil(() => document.querySelector('kay-problems')!.shadowRoot!.textContent!.startsWith('2 kay problems'))
+
+      expect(await shown.evaluate(() => [...document.querySelector('kay-problems')!.shadowRoot!.querySelectorAll('pre')].map(pre => pre.textContent!.slice(0, 20)))).toEqual(['island tests/fixture', 'the persisted signal'])
+
+      await shown.evaluate(() => document.querySelector('kay-problems')!.shadowRoot!.querySelector('button')!.click())
+
+      expect(await shown.count('kay-problems')).toBe(0)
+
+      await shown.evaluate(() => console.error('[kay] no locale has the message "late"'))
+      await shown.waitFor('kay-problems')
+
+      expect(await shown.evaluate(() => document.querySelector('kay-problems')!.shadowRoot!.textContent)).toBe('1 kay problemDismissno locale has the message "late"')
+
       await shown.click('a.home')
       await shown.waitFor('h1', { text: 'Home' })
 
