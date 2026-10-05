@@ -113,7 +113,7 @@ describe('kay check', () => {
     expect(await check(FIXTURE, { site: SITE })).toEqual([])
 
     try {
-      await Bun.write(join(posts, 'broken.md'), '---\ntitle: Broken\ndate: someday\n---\n\n<Missing />\n')
+      await Bun.write(join(posts, 'broken.md'), '---\ntitle: Broken\ndate: someday\n---\n\n<Missing />\n\n<Counter start="2" />\n\n<Callout kind="warn">\nText\n</Callout>\n')
       await Bun.write(page, '--- server\nimport { posts } from \'../content.config\'\n\nconst first = (await posts.all())[0]!\n---\np {first.data.titel}\n')
 
       const diagnostics = (await check(FIXTURE, { site: SITE })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
@@ -121,6 +121,9 @@ describe('kay check', () => {
       expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 3, message: expect.stringContaining('date: ') })
       expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 6, message: 'uses <Missing>, which the collection\'s components do not name' })
       expect(diagnostics.some(diagnostic => diagnostic.file === `${FIXTURE}/src/routes/typo.kay` && diagnostic.message.includes('titel'))).toBe(true)
+      // A component's props are typed as a template's would be: a string where it takes a number, a prop it does not take.
+      expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 8, message: expect.stringMatching(/^<Counter> takes other props: Type 'string' is not assignable to type 'number'/) })
+      expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 10, message: expect.stringMatching(/^<Callout> takes other props: Object literal may only specify known properties, and 'kind' does not exist/) })
     }
     finally {
       await rm(join(posts, 'broken.md'), { force: true })

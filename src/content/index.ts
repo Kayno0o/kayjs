@@ -41,11 +41,13 @@ export interface CollectionOptions<Schema extends TSchema> {
   feed?: FeedOptions<Static<Schema>>
 }
 
-export interface Collection<Data> {
+export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>> {
   readonly [COLLECTION]: true
   // The folder, relative to the project root.
   readonly dir: string
   readonly options: CollectionOptions<TSchema>
+  // The components its Markdown entries may use, typed as given, which `kay check` reads their props from.
+  readonly components: Components
   // Every entry, in the collection's order.
   all: () => Promise<Entry<Data>[]>
   // The entry with that slug, or undefined.
@@ -54,7 +56,7 @@ export interface Collection<Data> {
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`.
 // Entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production.
-export function collection<Schema extends TSchema>(dir: string, options: CollectionOptions<Schema>): Collection<Static<Schema>> {
+export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>>(dir: string, options: CollectionOptions<Schema> & { components?: Components }): Collection<Static<Schema>, Components> {
   type Data = Static<Schema>
   let loading: Promise<{ list: Entry<Data>[], bySlug: Map<string, Entry<Data>> }> | undefined
   const components = options.components ?? {}
@@ -88,6 +90,7 @@ export function collection<Schema extends TSchema>(dir: string, options: Collect
     [COLLECTION]: true,
     dir,
     options: options as unknown as CollectionOptions<TSchema>,
+    components: components as Components,
     all: async () => [...(await loaded()).list],
     get: async slug => (await loaded()).bySlug.get(slug),
   }

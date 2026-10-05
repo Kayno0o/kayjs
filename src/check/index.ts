@@ -1,6 +1,7 @@
 import type { KayLibrary, SettingsReplacement } from '../build/libraries'
 import type { Diagnostic, SourceMap } from '../compiler'
 import type { I18nConfig } from '../config'
+import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ApiModule } from '../server/api'
@@ -19,7 +20,7 @@ import { compileKay, componentName } from '../compiler'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
-import { CONTENT_CONFIG, PROBLEMS_MARKER } from '../content/server'
+import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
 import * as builtInMatchers from '../runtime/params'
 import { scanApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
@@ -37,6 +38,7 @@ export const SHADOW_DIR = join('.kay', 'types')
 const KAY_FILE = /\.kay$/
 const SETTINGS_CHECK = 'kay-settings.ts'
 const EXPORTS_CHECK = 'kay-exports.ts'
+const CONTENT_CHECK = 'kay-content.ts'
 const TSX_EXTENSION = /\.tsx$/
 const SCRIPT_EXTENSION = /\.[cm]?[jt]sx?$/
 const CONTENT_PROBLEMS = fileURLToPath(new URL('../content/problems.ts', import.meta.url))
@@ -87,6 +89,8 @@ const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
 const UNWRITABLE = /[%?#]/
 const TS_EXTENSION = /\.ts$/
 const PARAM_SEGMENT = /:([^/]+)/g
+// A prop name TypeScript reads unquoted, so its errors name it as written.
+const IDENTIFIER = /^[a-z_$][\w$]*$/i
 // What kay serves itself, whether or not the project turns it on.
 const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.
@@ -189,7 +193,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))
     .filter(entry => entry.isFile())
     .map(entry => join(entry.parentPath, entry.name))
-    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && path !== packagesPath && path !== settingsPath && path !== exportsPath && !files.has(path))
+    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && path !== packagesPath && path !== settingsPath && path !== exportsPath && path !== join(root, SHADOW_DIR, CONTENT_CHECK) && !files.has(path))
 
   await Promise.all(stale.map(async path => rm(path)))
 
@@ -449,8 +453,15 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const { files, diagnostics, unreached, libraries, settings, exports } = await writeShadowTypes(root, options)
   const settingsFile = join(resolve(root), SHADOW_DIR, SETTINGS_CHECK)
   const exportsFile = join(resolve(root), SHADOW_DIR, EXPORTS_CHECK)
+  const contentFile = join(resolve(root), SHADOW_DIR, CONTENT_CHECK)
+  // The props Markdown entries give their components are typed with the rest, so the collections are read first.
+  const content = await checkContent(root, options.content, options.site !== undefined)
+  const props = contentPropsCheck(resolve(root), resolve(root, options.content ?? CONTENT_CONFIG), content.uses)
+
+  await writeIfChanged(contentFile, props.code)
+
   const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-  const [output, errors, code, content, messages, boot] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkContent(root, options.content, options.site !== undefined), checkMessages(root, options.i18n), bootProblems(resolve(root), options)])
+  const [output, errors, code, messages, boot] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkMessages(root, options.i18n), bootProblems(resolve(root), options)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
@@ -465,16 +476,19 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
     const remapped = remap(diagnostic, files)
     const setting = remapped.file === settingsFile ? settings.get(remapped.line) : undefined
     const exported = remapped.file === exportsFile ? exports.get(remapped.line) : undefined
+    const used = remapped.file === contentFile ? props.lines.get(remapped.line) : undefined
 
     if (setting)
       diagnostics.push({ file: setting.file, line: 1, column: 1, code: remapped.code, message: `The settings for ${setting.library} do not match what it takes: ${remapped.message}` })
     else if (exported)
       diagnostics.push({ file: exported.file, line: 1, column: 1, code: remapped.code, message: `It must export ${exported.wanted}: ${remapped.message}` })
+    else if (used)
+      diagnostics.push({ file: resolve(root, used.file), line: used.line, column: 1, code: remapped.code, message: `<${used.component}> takes other props: ${remapped.message}` })
     else if (!broken.has(remapped.file) && !unreached.has(remapped.file) && !libraryModule(remapped.file))
       diagnostics.push(remapped)
   }
 
-  diagnostics.push(...content, ...messages, ...boot)
+  diagnostics.push(...content.problems, ...messages, ...boot)
 
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && reported.length === 0 && errors.trim() === '')
@@ -505,17 +519,43 @@ function problemsIn(root: string, output: string): CheckDiagnostic[] {
 }
 
 // The collections' entries that fail to compile or to match their schema, read in a process of its own.
-async function checkContent(root: string, config: string | undefined, site: boolean): Promise<CheckDiagnostic[]> {
+async function checkContent(root: string, config: string | undefined, site: boolean): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[] }> {
   if (config === undefined && !existsSync(resolve(root, CONTENT_CONFIG)))
-    return []
+    return { problems: [], uses: [] }
 
   const child = Bun.spawn([process.execPath, CONTENT_PROBLEMS, resolve(root), config ?? '', site ? 'site' : ''], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   if (code !== 0)
-    return [{ file: resolve(root, config ?? CONTENT_CONFIG), line: 1, column: 1, message: errors.trim() || `reading the collections exited with code ${code}` }]
+    return { problems: [{ file: resolve(root, config ?? CONTENT_CONFIG), line: 1, column: 1, message: errors.trim() || `reading the collections exited with code ${code}` }], uses: [] }
 
-  return problemsIn(root, output)
+  const uses = output.split('\n').find(text => text.startsWith(USES_MARKER))?.slice(USES_MARKER.length)
+
+  return { problems: problemsIn(root, output), uses: uses === undefined ? [] : JSON.parse(uses) as ComponentUse[] }
+}
+
+// One line per component a Markdown entry uses, its props assigned to the type the component takes, so one missing, misspelt or of the wrong type is a type error at the entry's line.
+function contentPropsCheck(root: string, configFile: string, uses: ComponentUse[]): { code: string, lines: Map<number, ComponentUse> } {
+  const lines = new Map<number, ComponentUse>()
+
+  if (uses.length === 0)
+    return { code: '', lines }
+
+  const header = [
+    `import type * as kayContent from ${JSON.stringify(relative(join(root, SHADOW_DIR), configFile).replace(SCRIPT_EXTENSION, ''))}`,
+    '',
+    'type KayPropsOf<Component> = Component extends (props: infer Props) => unknown ? Props : never',
+    '',
+  ]
+  const checks = uses.map((use, index) => {
+    const props = [...Object.entries(use.props).map(([name, value]) => `${IDENTIFIER.test(name) ? name : JSON.stringify(name)}: ${JSON.stringify(value)}`), ...use.children ? ['children: undefined as never'] : []]
+
+    lines.set(header.length + 1 + index, use)
+
+    return `export const kayProps${index}: KayPropsOf<(typeof kayContent)[${JSON.stringify(use.collection)}]['components'][${JSON.stringify(use.component)}]> = { ${props.join(', ')} }`
+  })
+
+  return { code: `${[...header, ...checks].join('\n')}\n`, lines }
 }
 
 function parseTscOutput(output: string, config: string, root: string): CheckDiagnostic[] {
