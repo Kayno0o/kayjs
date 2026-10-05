@@ -289,6 +289,8 @@ describe('a prerendered page posted to', () => {
 
       expect(etag).toBeTruthy()
       expect(await built.text()).not.toContain('<p class="joined">')
+      // A cookie whose name merely holds the result cookie's is no result.
+      expect((await visit({ cookie: 'not_kay_flash=1' })).headers.get('etag')).toBe(etag)
 
       const refused = await visit({ 'cookie': await post('nope'), 'if-none-match': etag })
 

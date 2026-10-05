@@ -290,7 +290,10 @@ function needsRequest(name: string): () => never {
 
 // Whether the request carries how a plain form post went, for the page the browser went back to.
 export function hasFlash(request: Request): boolean {
-  return request.headers.get('cookie')?.includes(FLASH_COOKIE) ?? false
+  const cookie = request.headers.get('cookie')
+
+  // The substring first: most requests carry no such cookie, and parsing is for the few that might.
+  return cookie?.includes(FLASH_COOKIE) === true && new Bun.CookieMap(cookie).has(FLASH_COOKIE)
 }
 
 // A page under a mount point has its paths put under it as it goes out; a prerendered one had them when it was rendered, and its compressed copies are left as they are.
