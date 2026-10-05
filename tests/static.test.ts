@@ -16,7 +16,7 @@ let out: string
 let server: ReturnType<typeof Bun.serve>
 
 async function exportSite(outdir: string): Promise<{ code: number, errors: string }> {
-  const child = Bun.spawn([process.execPath, CLI, 'build', FIXTURE, '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, CLI, 'build', FIXTURE, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe' })
   const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
   return { code, errors }

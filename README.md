@@ -27,7 +27,7 @@ The project depends on it as `"kay": "npm:@kaynooo/kayjs@^<version>"`, so import
 ```sh
 bun run check   # kay check: types, templates included
 bun run test    # bun test, pages and actions served in-process by kay/test
-bun run build   # kay build: islands, stylesheets and prerendered pages into .kay/client
+bun run build   # kay build: kay check first, then islands, stylesheets and prerendered pages into .kay/client
 bun run start   # NODE_ENV=production bun src/server.ts
 ```
 
@@ -39,7 +39,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | --- | --- |
 | `kay new <dir> [--template server\|site\|app] [--kay <dependency>]` | scaffold a project that checks, builds and runs: a server run as one executable, a static site, or an app with sessions; `--kay` sets its `kay` dependency |
 | `kay dev [dir] [--entry <file>]` | run the server, restarting on change, errors shown in the browser |
-| `kay build [dir]` | bundle the browser code for production |
+| `kay build [dir] [--no-check]` | check the project as `kay check` does, then bundle the browser code for production; `--no-check` skips the check |
 | `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |
 | `kay build [dir] --static [--outdir dist]` | the same, then the whole site as static files for a host with no server |
 | `kay check [dir] [-p tsconfig.json]` | type-check the project, `.kay` files included, `-p` naming another tsconfig |

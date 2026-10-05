@@ -167,7 +167,7 @@ describe('kay build', () => {
 
   it('bundles the islands for production and writes the manifest a server boots from', async () => {
     try {
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root], { stdout: 'pipe', stderr: 'pipe' })
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
       const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
       const manifest = await Bun.file(join(root, '.kay/client/manifest.json')).json() as { entry: string, islands: Record<string, string[]> }
       const entryFile = join(root, '.kay/client/dist', manifest.entry.slice('/_kay/'.length))
@@ -304,7 +304,7 @@ describe('kay build without the server environment', () => {
       'src/routes/index.kay': '--- server\nexport const prerender = true\n---\np Home\n',
     })
     const build = async () => {
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build'], { cwd: root, env: { PATH: process.env.PATH }, stdout: 'pipe', stderr: 'pipe' })
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', '--no-check'], { cwd: root, env: { PATH: process.env.PATH }, stdout: 'pipe', stderr: 'pipe' })
       const [report, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
       return { report, code }
@@ -320,6 +320,59 @@ describe('kay build without the server environment', () => {
       const refused = await build()
 
       expect(refused.report).toContain('kay: MAIL_TO does not match the environment\'s schema')
+      expect(refused.code).toBe(1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+})
+
+describe('kay build checks the project first', () => {
+  const tsconfig = JSON.stringify({
+    compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+    include: ['src', '.kay/types'],
+  })
+  const build = async (root: string, ...args: string[]) => {
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe' })
+    const [report, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    return { report, code }
+  }
+
+  it('builds nothing from a project kay check refuses, and builds it with --no-check', async () => {
+    const root = await scratchProject({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': 'a(href="/nowhere") Lost\n' })
+
+    try {
+      const refused = await build(root)
+
+      expect(refused.report).toContain('/nowhere')
+      expect(refused.report).toContain('kay build: nothing built, as kay check found the problems above; --no-check builds anyway')
+      expect(refused.code).toBe(1)
+      expect(await Bun.file(join(root, '.kay/client/manifest.json')).exists()).toBe(false)
+
+      const built = await build(root, '--no-check')
+
+      expect(built.report).toStartWith('built 0 islands')
+      expect(built.code).toBe(0)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('checks with the tsconfig -p names, which --no-check does not take', async () => {
+    const root = await scratchProject({ 'tsconfig.app.json': tsconfig, 'src/routes/index.kay': 'p Home\n' })
+
+    try {
+      const built = await build(root, '-p', 'tsconfig.app.json')
+
+      expect(built.report).toStartWith('built 0 islands')
+      expect(built.code).toBe(0)
+
+      const refused = await build(root, '-p', 'tsconfig.app.json', '--no-check')
+
+      expect(refused.report).toContain('kay: -p names the tsconfig the build checks with, so it does not go with --no-check')
       expect(refused.code).toBe(1)
     }
     finally {

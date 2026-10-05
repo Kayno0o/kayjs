@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import type { ParseArgsOptionsConfig } from 'node:util'
+import type { KayConfig } from './config'
 import type { Template } from './new'
 import { existsSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
@@ -27,7 +28,7 @@ import { writeImageVariants } from './server/image'
 import { ExportError, prerenderPages } from './server/prerender'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -115,9 +116,13 @@ async function runCheck(args: string[]): Promise<number> {
   // The checking machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
   buildingWithoutEnv()
 
-  const { routes, publicDir, api, content, redirects, i18n, settings } = await loadConfig(root)
-  const diagnostics = await check(root, { tsconfig, routes, publicDir, api, content, redirects, i18n, settings })
+  return await checkProject(root, await loadConfig(root), tsconfig) > 0 ? 1 : 0
+}
 
+// Prints what `kay check` finds in the project, as it finds it, and answers how many problems that was.
+async function checkProject(root: string, config: KayConfig, tsconfig: string): Promise<number> {
+  const { routes, publicDir, api, content, redirects, i18n, settings } = config
+  const diagnostics = await check(root, { tsconfig, routes, publicDir, api, content, redirects, i18n, settings })
   const sources = new Map<string, string | undefined>()
 
   for (const diagnostic of diagnostics) {
@@ -130,19 +135,27 @@ async function runCheck(args: string[]): Promise<number> {
   if (diagnostics.length > 0)
     console.error(`${diagnostics.length} error${diagnostics.length === 1 ? '' : 's'}`)
 
-  return diagnostics.length > 0 ? 1 : 0
+  return diagnostics.length
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
+// It checks the project as `kay check` does first and builds nothing when that finds a problem, unless `--no-check` says not to.
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server.
 async function build(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { compile: { type: 'string' }, entry: { type: 'string' }, static: { type: 'boolean' }, outdir: { type: 'string' } }, 1)
+  const parsed = parseCommand(args, { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'project': { type: 'string', short: 'p' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
 
-  const { compile, entry, outdir } = parsed.values
+  const { compile, entry, outdir, project } = parsed.values
   const exported = parsed.values.static === true
+  const skipCheck = parsed.values['no-check'] === true
+
+  if (skipCheck && typeof project === 'string') {
+    console.error(`kay: -p names the tsconfig the build checks with, so it does not go with --no-check\n${USAGE}`)
+
+    return 1
+  }
 
   if (typeof entry === 'string' && typeof compile !== 'string') {
     console.error(`kay: --entry names the server an executable runs, so it goes with --compile\n${USAGE}`)
@@ -170,6 +183,13 @@ async function build(args: string[]): Promise<number> {
   buildingWithoutEnv()
 
   const config = await loadConfig(root)
+
+  if (!skipCheck && await checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json') > 0) {
+    console.error('kay build: nothing built, as kay check found the problems above; --no-check builds anyway')
+
+    return 1
+  }
+
   const started = performance.now()
 
   try {
