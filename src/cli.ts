@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import type { ParseArgsOptionsConfig } from 'node:util'
 import type { Template } from './new'
-import { statSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
@@ -279,6 +279,12 @@ async function runDev(args: string[]): Promise<number> {
   const option = parsed.values.entry
   // A directory is the project, as `build` and `check` take it; anything else is the server entry in the current one.
   const inDir = path !== undefined && statSync(path, { throwIfNoEntry: false })?.isDirectory() === true
+
+  if (path !== undefined && !existsSync(path)) {
+    console.error(`kay dev: ${path} is neither a directory nor a file`)
+
+    return 1
+  }
 
   if (path !== undefined && !inDir && typeof option === 'string') {
     console.error(`kay: ${path} is not a directory, and --entry names the server entry already\n${USAGE}`)

@@ -1308,7 +1308,7 @@ function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
 }
 
-// The `kay` helpers the template's forms need: `formAction` when a form posts to an action.
+// The `kay/internal` helpers the template's forms need: `formAction` when a form posts to an action.
 function formHelpers(file: KayFile): KayHelper[] {
   const hasActionForm = (nodes: Node[]): boolean => nodes.some((node) => {
     switch (node.kind) {

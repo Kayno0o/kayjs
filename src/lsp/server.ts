@@ -740,7 +740,7 @@ function sourceEdits(document: ShadowFile, edits: TextEdit[], offset: number): T
   return mapped
 }
 
-// tsgo adds a name to an import generated code already has, such as `kay`'s: the names it adds become an import of their own.
+// tsgo adds a name to an import generated code already has, such as `kay/dom`'s: the names it adds become an import of their own.
 function mergedImport(tsx: string, edit: TextEdit): string | undefined {
   const line = tsx.split('\n')[edit.range.start.line] ?? ''
   const before = NAMED_IMPORT.exec(line)
