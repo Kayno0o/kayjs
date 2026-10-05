@@ -219,7 +219,7 @@ export class KayLanguageServer {
     for (const previous of this.documents.values()) {
       const file = fileURLToPath(previous.uri)
 
-      if (this.projectAt(projectRoot(this.root, file)).islandOnly.has(file) !== previous.insideIsland) {
+      if ((this.projects.get(projectRoot(this.root, file))?.islandOnly.has(file) ?? false) !== previous.insideIsland) {
         const document = this.compile(previous.uri, previous.source, previous.version)
 
         this.server.notify('textDocument/didChange', { textDocument: { uri: document.shadowUri, version: document.version }, contentChanges: [{ text: document.tsx }] })

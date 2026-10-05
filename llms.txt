@@ -156,7 +156,7 @@ Card(title="Todos")
   p Body text
 ```
 
-A block taking parameters is passed as a function the component calls, once per row for instance, and its parameters take their types from the prop. A static parent cannot pass one to an island, since no function reaches the browser.
+A block taking parameters is passed as a function the component calls, once per row for instance, and its parameters take their types from the prop. A static parent cannot pass one to an island, since no function reaches the browser. A static component that only islands render is part of them, so it can.
 
 ```kay
 --- <T extends { id: number }>
@@ -372,7 +372,7 @@ const found = iconNames(tabler).filter(name => name.includes('home')).slice(0, 2
 
 A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script imports a value from `kay`, such as `signal`. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript, except the small script swapping pages in on a page posting a form to an action (see Navigation). Interactive components rendered inside an island are part of it.
 
-Props a static component passes to an island are serialized for the browser: plain objects and arrays, strings, numbers, booleans, `null` and `undefined`, and also Dates, Maps, Sets, bigints, URLs and RegExps, which arrive as themselves, a value referenced twice arriving once. `kay check` rejects functions and class instances there, and rendering throws on a class instance it could not tell apart, naming the prop. Children cannot cross either: rendering an island with children from a static parent throws.
+Props a static component passes to an island are serialized for the browser: plain objects and arrays, strings, numbers, booleans, `null` and `undefined`, and also Dates, Maps, Sets, bigints, URLs and RegExps, which arrive as themselves, a value referenced twice arriving once. `kay check` rejects functions and class instances there, and rendering throws on a class instance it could not tell apart, naming the prop. A static component that only islands render, directly or through other such components, renders inline with them, so it passes its interactive children anything, functions included; once a page, a layout or a script imports it too, its props to them are serialized again. Children cannot cross either: rendering an island with children from a static parent throws.
 
 An island hydrates as soon as the page loads, its chunks preloaded. `hydrate="idle"` waits until the browser is idle and `hydrate="visible"` until it scrolls near the viewport, neither preloaded: `Comments(postId={post.id} hydrate="visible")`. Only an island takes `hydrate`, and only from a static parent.
 

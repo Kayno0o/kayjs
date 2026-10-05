@@ -230,7 +230,7 @@ function exportTargets(exports: unknown): [string, string][] | undefined {
   })
 }
 
-const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
+export const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
 const KAY_FILE = /\.kay$/
 // What separates candidate class names in a template: whitespace, quotes, braces, parentheses, commas and the dots of the shorthand.
 const NOT_IN_CLASS = /[\s'"`{}(),=.]+/
@@ -284,8 +284,8 @@ export function sourceWords(source: string): string[] {
 }
 
 // What a module imports: a component's fences, or a script whole.
-export async function importsOf(file: string): Promise<string[]> {
-  const source = await Bun.file(file).text()
+export async function importsOf(file: string, source?: string): Promise<string[]> {
+  source ??= await Bun.file(file).text()
   const kay = KAY_FILE.test(file)
 
   try {

@@ -925,7 +925,7 @@ class Generator {
       if ((element.classes.length > 0 || merged) && attribute === classAttributes[0])
         continue
 
-      if (element.component && this.options.island && attribute.kind !== 'spread' && ISLAND_OPTIONS.has(this.text(attribute.name)))
+      if (element.component && (this.options.island || this.options.insideIsland) && attribute.kind !== 'spread' && ISLAND_OPTIONS.has(this.text(attribute.name)))
         this.error(attribute.name, `\`${this.text(attribute.name)}\` has no effect inside an island, which hydrates and lives on as a whole`)
 
       b.add(' ')

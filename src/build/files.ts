@@ -11,6 +11,7 @@ export const TSCONFIG = 'tsconfig.json'
 const TYPESCRIPT = /\.[cm]?ts$/
 const TSX = /\.tsx$/
 const JSX = /\.jsx$/
+const KAY_FILE = /\.kay$/
 const transpilers = new Map<Bun.JavaScriptLoader, Bun.Transpiler>()
 
 // One transpiler per loader, shared by everything reading a module's imports.
@@ -44,11 +45,11 @@ export interface FindOptions {
 
 // Every .kay file under `root`, skipping dependencies and generated output without walking into them.
 export async function findKayFiles(root: string, options: FindOptions = {}): Promise<string[]> {
-  return findProjectFiles(root, ['.kay'], options)
+  return findProjectFiles(root, KAY_FILE, options)
 }
 
-// Every file under `root` ending in one of `extensions`, skipping as findKayFiles does.
-export async function findProjectFiles(root: string, extensions: string[], { project = false, ownOnly = false }: FindOptions = {}): Promise<string[]> {
+// Every file under `root` whose name `matches`, skipping as findKayFiles does.
+export async function findProjectFiles(root: string, matches: RegExp, { project = false, ownOnly = false }: FindOptions = {}): Promise<string[]> {
   const files: string[] = []
   const walk = async (dir: string) => {
     const entries = await readdir(dir, { withFileTypes: true })
@@ -63,7 +64,7 @@ export async function findProjectFiles(root: string, extensions: string[], { pro
         if (!ALWAYS_IGNORED.has(entry.name) && !(project && dir === root && ROOT_IGNORED.has(entry.name)))
           await walk(path)
       }
-      else if (extensions.some(extension => entry.name.endsWith(extension))) {
+      else if (matches.test(entry.name)) {
         files.push(path)
       }
     }))

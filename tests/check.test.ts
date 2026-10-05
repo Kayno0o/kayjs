@@ -4,6 +4,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
 import { check, compileShadow } from '../src/check'
+import { islandOnlyComponents } from '../src/check/island-only'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 
@@ -275,6 +276,38 @@ describe('kay check, edge cases', () => {
     }
     finally {
       await Promise.all([islandOnly, alsoStatic].map(async root => rm(root, { recursive: true, force: true })))
+    }
+  })
+
+  it('counts as island-only the static components no page, layout, script or static component outside the set renders', async () => {
+    const component = (imports: string[]) => `---\n${imports.map(name => `import ${name.toUpperCase()} from './${name}.kay'\n`).join('')}---\np ${imports.map(name => name.toUpperCase()).join(' ') || 'leaf'}\n`
+    const root = await scratchProject({
+      'src/c/island.kay': '---\nimport { signal } from \'kay\'\nimport A from \'./a.kay\'\nimport B from \'./b.kay\'\nimport D from \'./d.kay\'\n\nconst n = signal(0)\n---\np {n()}\nA\nB\nD\n',
+      // A chain only the island reaches.
+      'src/c/a.kay': component(['a2']),
+      'src/c/a2.kay': component([]),
+      // Rendered by the layout too, along with what it renders.
+      'src/c/b.kay': component(['b2']),
+      'src/c/b2.kay': component([]),
+      // Rendered by a script too.
+      'src/c/d.kay': component([]),
+      'src/render.ts': 'import D from \'./c/d.kay\'\n\nexport { D }\n',
+      // A cycle nothing else renders.
+      'src/c/e.kay': component(['f']),
+      'src/c/f.kay': component(['e']),
+      'src/routes/index.kay': '---\nimport Island from \'../c/island.kay\'\n---\nIsland\n',
+      'src/routes/_layout.kay': '---\nimport B from \'../c/b.kay\'\n---\nB\nslot\n',
+    })
+
+    try {
+      const files = await findKayFiles(root, { project: true, ownOnly: true })
+      const sources = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
+      const found = await islandOnlyComponents(root, join(root, 'src/routes'), files, sources)
+
+      expect([...found].map(file => relative(root, file)).sort()).toEqual(['src/c/a.kay', 'src/c/a2.kay'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
     }
   })
 

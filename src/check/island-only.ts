@@ -1,22 +1,21 @@
 import { dirname, sep } from 'node:path'
 import { findProjectFiles } from '../build/files'
-import { importsOf } from '../build/libraries'
+import { importsOf, SCRIPT_FILE } from '../build/libraries'
 import { rendersAsIsland } from '../compiler'
 
-const SCRIPT_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs']
-
 // The static components of a project that only islands render, directly or through other such components: their children render inline with the island, so the props they pass are not serialized.
-// A page, a layout or a script importing a component renders it in a static context, as does a static component rendered there; a component nothing imports counts as static too.
+// A page, a layout or a script importing a component renders it in a static context, as does a static component rendered there; a component no island reaches counts as static too.
 export async function islandOnlyComponents(root: string, routesDir: string, files: string[], sources: Map<string, string>): Promise<Set<string>> {
   const known = new Set(files)
   const islands = new Set(files.filter(file => rendersAsIsland(sources.get(file)!)))
   const importers = new Map<string, Set<string>>(files.map(file => [file, new Set()]))
   // Imported from a script, which may render it on the server.
   const fromScript = new Set<string>()
-  const scripts = await findProjectFiles(root, SCRIPT_EXTENSIONS, { project: true, ownOnly: true })
+  const scripts = await findProjectFiles(root, SCRIPT_FILE, { project: true, ownOnly: true })
 
   await Promise.all([...files, ...scripts].map(async (file) => {
-    for (const specifier of await importsOf(file)) {
+    // A component is imported with its extension, so no other specifier can name one.
+    for (const specifier of (await importsOf(file, sources.get(file))).filter(specifier => specifier.endsWith('.kay'))) {
       const target = resolveFrom(specifier, file)
 
       if (target === undefined || !known.has(target))
@@ -43,7 +42,19 @@ export async function islandOnlyComponents(root: string, routesDir: string, file
     }
   }
 
-  return candidates
+  // Candidates only importing one another, a cycle no island reaches, render nowhere inside one.
+  const reached = new Set<string>()
+  const queue = [...candidates].filter(file => [...importers.get(file)!].some(importer => islands.has(importer)))
+
+  for (const file of queue) {
+    if (reached.has(file))
+      continue
+
+    reached.add(file)
+    queue.push(...[...candidates].filter(other => importers.get(other)!.has(file)))
+  }
+
+  return reached
 }
 
 function resolveFrom(specifier: string, file: string): string | undefined {
