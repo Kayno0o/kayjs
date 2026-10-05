@@ -85,7 +85,12 @@ describe('kay build --static', () => {
     const stylesheet = (/<link rel="stylesheet" href="\/repo(\/_kay\/[\w-]+\.css)">/).exec(home)![1]!
     const image = (/<img src="\/repo(\/_kay\/images\/[\w-]+\.webp)"/).exec(home)![1]!
 
-    expect((await get(entry)).status).toBe(200)
+    const script = await get(entry)
+
+    expect(script.status).toBe(200)
+    expect(script.text).toContain('"/repo/_kay/env.js"')
+    expect(home).toContain('<link rel="modulepreload" href="/repo/_kay/env.js">')
+    expect((await get('/_kay/env.js')).text).toBe('export default {"KAY_TEST_STATIC_KEY":"static-key"}\n')
     expect((await get(stylesheet)).text).toContain('url(/repo/humans.txt)')
     expect((await get(image)).status).toBe(200)
     expect(home).toContain('<slot data-component="src/components/counter.kay"')

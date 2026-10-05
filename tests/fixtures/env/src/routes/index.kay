@@ -1,0 +1,4 @@
+---
+import Key from '../components/key.kay'
+---
+Key

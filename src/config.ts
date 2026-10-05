@@ -1,5 +1,6 @@
 import type { BunPlugin } from 'bun'
 import type { JsonLd } from './runtime/seo'
+import type { EnvSchema } from './server/env'
 import type { RequestLogger } from './server/log'
 import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
@@ -61,6 +62,8 @@ export interface KayConfig {
   plugins?: BunPlugin[]
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
   settings?: Record<string, string>
+  // Variables an island may read, as `publicEnv` from `kay`: `t.Object({ MAP_KEY: t.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser.
+  publicEnv?: EnvSchema
   // Receives every error a load, a render, a guard or an action throws, as it is logged: the place to send them to an error tracker.
   onError?: (error: unknown, request: Request) => void | Promise<void>
 }
@@ -149,7 +152,8 @@ export interface I18nConfig {
 
 export const CONFIG_FILE = 'kay.config.ts'
 
-export function defineConfig(config: KayConfig): KayConfig {
+// Gives the config back as written, so `kay check` reads the type of its `publicEnv` off it.
+export function defineConfig<Config extends KayConfig>(config: Config): Config {
   return config
 }
 

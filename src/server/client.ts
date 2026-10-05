@@ -16,6 +16,7 @@ import { analyzeKayCached, KayCompileError } from '../build/transform'
 import { formatDiagnostic } from '../compiler'
 import { apiStubs, scanApi } from './api'
 import { rebaseCss } from './base'
+import { PUBLIC_ENV_PATH } from './env'
 
 // Written beside the bundle as `manifest.json`, so a production server reads it instead of bundling at boot.
 export interface ClientManifest {
@@ -75,6 +76,8 @@ export interface ClientOptions {
   navigation?: boolean
   // Development: an edited island swaps into the open pages rather than reloading them.
   hot?: boolean
+  // The config declares `publicEnv`: the entry imports its values from the server before any island hydrates.
+  publicEnv?: boolean
 }
 
 interface MetafileOutput {
@@ -197,9 +200,13 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
 
   // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`.
+  const publicEnv = options.publicEnv ? `${options.base ?? ''}${PUBLIC_ENV_PATH}` : undefined
+
   await Bun.write(entryFile, [
+    ...publicEnv ? [`import kayPublicEnv from ${JSON.stringify(publicEnv)}`] : [],
     `import { ${[...navigation ? ['disposeIslands'] : [], ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
     '',
+    ...publicEnv ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
     `const islands = {\n${registry}\n}`,
     '',
     ...options.hot ? ['enableHotSwap(islands)', ''] : [],
@@ -222,6 +229,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
     define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') },
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
+    external: publicEnv ? [publicEnv] : [],
     plugins: [withoutStyles(), apiStubs(apiDir, await scanApi(apiDir)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings }), ...options.plugins ?? []],
   })
 
@@ -230,7 +238,13 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 
   await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs as Outputs)
 
-  return { ...islandManifest(root, build.metafile!.outputs as Outputs, islands, entryFile, options.hot === true), navigation }
+  const manifest = islandManifest(root, build.metafile!.outputs as Outputs, islands, entryFile, options.hot === true)
+
+  // Preloaded with the entry's own chunks, as the entry waits for it before hydrating.
+  if (publicEnv)
+    manifest.entryImports.push(PUBLIC_ENV_PATH)
+
+  return { ...manifest, navigation }
 }
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders.

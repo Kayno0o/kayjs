@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
-import { t } from 'elysia'
+import { Elysia, t } from 'elysia'
 import { formInput } from '../src/runtime/form'
 import { defineEnv } from '../src/server'
-import { buildingWithoutEnv } from '../src/server/env'
+import { buildingWithoutEnv, publicEnvModule, servePublicEnv } from '../src/server/env'
 import { readQuery } from '../src/server/query'
 import { Denied } from '../src/server/signals'
 
@@ -81,6 +81,13 @@ describe('defineEnv', () => {
     }
 
     expect(() => defineEnv(schema, {})).toThrow('kay: the environment does not match its schema')
+  })
+})
+
+describe('servePublicEnv', () => {
+  it('stops the boot naming a public variable missing, and serves only the declared ones', async () => {
+    expect(() => servePublicEnv(new Elysia(), t.Object({ KAY_TEST_MISSING: t.String() }))).toThrow('KAY_TEST_MISSING')
+    expect(publicEnvModule({ MAP_KEY: 'a</script>', ZOOM: 3 })).toBe('export default {"MAP_KEY":"a\\u003c/script>","ZOOM":3}\n')
   })
 })
 

@@ -811,3 +811,21 @@ describe('kay check, unused code', () => {
     }
   })
 })
+
+describe('kay check, public environment', () => {
+  it('types publicEnv from what kay.config.ts declares, and nothing else', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'import { t } from \'elysia\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ publicEnv: t.Object({ MAP_KEY: t.String(), ZOOM: t.Optional(t.Number()) }) })\n',
+      'src/map.kay': '---\nimport { publicEnv } from \'kay\'\n\nconst key: string = publicEnv.MAP_KEY\nconst zoom: number | undefined = publicEnv.ZOOM\n---\np {key} {zoom} {publicEnv.DATABASE_URL}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message])).toEqual([
+        [7, 'Property \'DATABASE_URL\' does not exist on type \'Readonly<{ MAP_KEY: string; ZOOM?: number | undefined; }>\'.'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})

@@ -145,7 +145,9 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: relative(dirname(environmentPath), module.file).replace(TS_EXTENSION, '') }))
 
-  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }))
+  const config = existsSync(join(root, CONFIG_FILE)) ? relative(dirname(environmentPath), join(root, CONFIG_FILE)).replace(TS_EXTENSION, '') : undefined
+
+  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }, config))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS]
@@ -368,17 +370,18 @@ function matcherSource(routesDir: string, matcher: string): string | undefined {
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], messages: string }): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], messages: string }, config?: string): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   const paths = files.length > 0 ? files.flatMap(spellings).map(file => JSON.stringify(file)).join(' | ') : 'never'
   const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: typeof import(${importSpecifier(i18n.messages)}).default` : ''
   const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
+  const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
 
   return [
-    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ChildrenProp, FieldName, FunctionProp, IslandProp } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ChildrenProp, FieldName, FunctionProp, IslandProp, PublicEnvOf } from \'kay\'',
     '',
     'declare module \'kay\' {',
-    `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules} }`,
+    `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules}${publicEnv} }`,
     '}',
     '',
     'declare global {',

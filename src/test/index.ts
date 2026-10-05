@@ -94,7 +94,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const root = testRoot(options.root)
   const config = await withConfig(root, options)
   const client: ClientBuild = options.browser
-    ? await buildClient(root, { plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings })
+    ? await buildClient(root, { plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
     : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(root, '.kay', 'client', 'dist') }
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const pages = await servePages(root, config, async () => client)

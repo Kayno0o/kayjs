@@ -21,6 +21,7 @@ import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents, hotSwap } from './dev'
+import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
@@ -185,6 +186,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   if (options.health !== false)
     serveHealth(app, lifecycle, options.health)
+
+  if (options.publicEnv)
+    servePublicEnv(app, options.publicEnv)
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
   if (!options.dev)

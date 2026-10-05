@@ -861,6 +861,19 @@ export const env = defineEnv(t.Object({
 
 A number or boolean is read from its text as a form field is, a variable left out takes its `default`, and any missing or refused stops the boot with an error naming each one. An empty variable, `SMTP_PORT=` or `SMTP_PORT=""` in a `.env` file, counts as left out: it takes the default, satisfies `t.Optional` and fails a required one, rather than an empty string reaching the schema. So an empty string is not a value a variable can carry: a setting that means something when blank is `t.Optional`, read as `undefined`. A value of spaces is kept as it is, since only quoting makes one. `kay build` runs without the server's environment: there a missing or refused variable leaves the module declaring it alone, and reading it throws naming it, which fails only a prerendered page that reads it. The object holds the declared names only. Server code imports it: a `.ts` module, a server fence, the server entry; an island never sees the server's environment.
 
+`publicEnv` in kay.config.ts declares the variables an island may read, such as a map key or an analytics id, which a component reads as `publicEnv` from `kay`, typed from the declaration:
+
+```ts
+import { t } from 'elysia'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({ publicEnv: t.Object({ MAP_KEY: t.String(), ANALYTICS_ID: t.Optional(t.String()) }) })
+```
+
+- They are read from the environment as the server boots, as `defineEnv` reads its own, a missing or refused one stopping it. The browser gets them from `/_kay/env.js`, which the server answers from its environment and the island entry imports before any island hydrates, so an executable, or a page prerendered at build time, carries the values of the environment it runs in; `kay build --static` writes that file with the build's.
+- Only the declared variables leave the server, and nothing else of the environment reaches an island: a module reading `process.env` or `defineEnv`'s values fails the browser build.
+- Reading `publicEnv` when the config declares none throws; a name it does not declare is a type error.
+
 ## Guards
 
 A `_guard.ts` in a routes directory runs before every page and every action in that directory and below, outermost first. It lets the request through unless it redirects or denies:

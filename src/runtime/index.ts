@@ -204,6 +204,8 @@ export type { Action, ActionContext, ActionProtection, Failure, FailureData, Fai
 export { action, ActionError, ActionRedirect } from './action'
 export { localPath, withBase } from './base'
 export type { ApiRoutesOf, AwaitProps, CheckedHref, CheckedHtml, ChildrenProp, Deferred, FunctionProp, HydrateWhen, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, SafeHtml, TemplateHelpers } from './checks'
+export type { PublicEnv, PublicEnvOf } from './env'
+export { publicEnv } from './env'
 export type { Component, EventHandler, JSX } from './jsx'
 export type { EventReader, EventStream, Socket, SocketPath, SocketStatus, StreamPath, StreamStatus } from './live'
 export { socket, stream } from './live'

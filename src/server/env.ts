@@ -1,7 +1,11 @@
-import type { Static, TSchema } from 'elysia'
+import type { Elysia, Static, TSchema } from 'elysia'
 import process from 'node:process'
 import { t } from 'elysia'
+import { PUBLIC_ENV } from '../runtime/env'
 import { readFields } from './query'
+
+// A `t.Object` of the variables, each read on its own.
+export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
 
 // On the global object, so a copy of kay the app loads beside the CLI's sees it too.
 const BUILDING = Symbol.for('kay.building')
@@ -17,7 +21,7 @@ function building(): boolean {
 
 // The environment read once against `schema`, as the server boots: numbers and booleans from their text, defaults filled in, and every variable missing or refused named in the error that stops it.
 // Holds the declared names only, so logging it never shows the rest of the environment.
-export function defineEnv<Schema extends TSchema & { properties: Record<string, TSchema> }>(schema: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> {
+export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> {
   const input: Record<string, string> = {}
 
   for (const name of Object.keys(schema.properties)) {
@@ -53,4 +57,19 @@ export function defineEnv<Schema extends TSchema & { properties: Record<string, 
   }
 
   return env as Static<Schema>
+}
+
+// The module the island entry imports the public variables from, served from the environment the server runs in, so an executable or a prerendered page reads today's values rather than those of the build.
+export const PUBLIC_ENV_PATH = '/_kay/env.js'
+
+// Reads the public variables as `defineEnv` reads the server's, for `publicEnv` on the server and the module the browser loads.
+export function servePublicEnv(app: Elysia, schema: EnvSchema): void {
+  const values = defineEnv(schema) as Record<string, unknown>
+
+  ;(globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV] = values
+  app.get(PUBLIC_ENV_PATH, () => new Response(publicEnvModule(values), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' } }))
+}
+
+export function publicEnvModule(values: Record<string, unknown>): string {
+  return `export default ${JSON.stringify(values).replaceAll('<', '\\u003c')}\n`
 }
