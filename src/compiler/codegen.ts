@@ -18,6 +18,8 @@ export interface GenerateOptions {
   moduleId: string
   // Type-checking output: adds assertions on links, form fields and island props through globals `kay check` declares.
   check?: boolean
+  // Type-checking a static component only islands render: the props it passes its children are not serialized, so they are not asserted.
+  insideIsland?: boolean
   // Browser builds leave the `--- server` fence out entirely; type checking and SSR keep it.
   includeServer?: boolean
   // Route parameters, typing `ctx.params` in `load`.
@@ -854,7 +856,7 @@ class Generator {
         passed.set(name, `another \`@${name}\``)
 
         // `@row(todo)` passes a function the component calls per item, its parameters typed from the prop.
-        if (slot.params && this.options.check && !this.options.island) {
+        if (slot.params && this.options.check && !this.options.island && !this.options.insideIsland) {
           b.add(' ')
           this.emitFunctionPropCheck(element, slot.name)
         }
@@ -1155,7 +1157,7 @@ class Generator {
       return true
     }
 
-    if (!element.component || this.options.island || attribute.kind !== 'expression' || name.startsWith('bind:'))
+    if (!element.component || this.options.island || this.options.insideIsland || attribute.kind !== 'expression' || name.startsWith('bind:'))
       return false
 
     // A function never reaches an island, and left unwrapped it takes its parameter types from a generic component's other props.

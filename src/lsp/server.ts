@@ -29,6 +29,8 @@ interface Project {
   routesDir: string
   shadowTree: string
   shadowFiles: Set<string>
+  // As of the last shadow write: the static components only islands render.
+  islandOnly: Set<string>
   configured: boolean
 }
 
@@ -37,6 +39,8 @@ interface Document extends ShadowFile {
   shadowUri: string
   version: number
   diagnostics: KayDiagnostic[]
+  // Compiled as rendered inline with the islands that alone render it.
+  insideIsland: boolean
 }
 
 const KAY_FILE = /^file:.*\.kay$/
@@ -211,6 +215,16 @@ export class KayLanguageServer {
   // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code; tsgo hears which shadow files came and went, so imports of them resolve again.
   private async saved() {
     this.server.notify('workspace/didChangeWatchedFiles', { changes: await this.writeShadows() })
+    // An open component that came to be rendered only by islands, or stopped being, compiles again as such.
+    for (const previous of this.documents.values()) {
+      const file = fileURLToPath(previous.uri)
+
+      if (this.projectAt(projectRoot(this.root, file)).islandOnly.has(file) !== previous.insideIsland) {
+        const document = this.compile(previous.uri, previous.source, previous.version)
+
+        this.server.notify('textDocument/didChange', { textDocument: { uri: document.shadowUri, version: document.version }, contentChanges: [{ text: document.tsx }] })
+      }
+    }
     this.scheduleDiagnostics()
   }
 
@@ -232,7 +246,8 @@ export class KayLanguageServer {
       if (!project.configured)
         await this.configure(project)
 
-      const files = new Set((await writeShadowTypes(root, project.options)).files.keys())
+      const types = await writeShadowTypes(root, project.options)
+      const files = new Set(types.files.keys())
 
       changes.push(
         ...[...files].map((path): FileEvent => ({ uri: pathToFileURL(path).href, type: project.shadowFiles.has(path) ? CHANGED : CREATED })),
@@ -240,6 +255,7 @@ export class KayLanguageServer {
         { uri: pathToFileURL(join(project.shadowTree, 'kay-env.d.ts')).href, type: CHANGED },
       )
       project.shadowFiles = files
+      project.islandOnly = types.islandOnly
     }))
 
     return changes
@@ -259,7 +275,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: resolve(root, 'src/routes'), shadowTree: `${resolve(root, SHADOW_DIR)}/`, shadowFiles: new Set(), configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: resolve(root, 'src/routes'), shadowTree: `${resolve(root, SHADOW_DIR)}/`, shadowFiles: new Set(), islandOnly: new Set(), configured: false })
 
     return project
   }
@@ -271,8 +287,9 @@ export class KayLanguageServer {
   private compile(uri: string, source: string, version: number): Document {
     const file = fileURLToPath(uri)
     const project = this.projectAt(projectRoot(this.root, file))
-    const { shadow, diagnostics } = compileShadow(project.root, project.routesDir, file, source)
-    const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics }
+    const insideIsland = project.islandOnly.has(file)
+    const { shadow, diagnostics } = compileShadow(project.root, project.routesDir, file, source, insideIsland)
+    const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics, insideIsland }
 
     this.documents.set(uri, document)
 
@@ -633,7 +650,7 @@ export class KayLanguageServer {
     const file = resolve(project.root, path.slice(project.shadowTree.length, -'.tsx'.length))
     const source = Bun.file(file)
 
-    return await source.exists() ? compileShadow(project.root, project.routesDir, file, await source.text()).shadow : undefined
+    return await source.exists() ? compileShadow(project.root, project.routesDir, file, await source.text(), project.islandOnly.has(file)).shadow : undefined
   }
 
   // `offset` is the position in the .kay source.

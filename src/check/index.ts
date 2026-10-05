@@ -30,6 +30,7 @@ import { publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { patternShapes, routeOf, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
+import { islandOnlyComponents } from './island-only'
 
 export const SHADOW_DIR = join('.kay', 'types')
 const KAY_FILE = /\.kay$/
@@ -99,10 +100,12 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const packagesPath = join(root, SHADOW_DIR, 'kay-packages.d.ts')
   const settingsPath = join(root, SHADOW_DIR, SETTINGS_CHECK)
   const own = await findKayFiles(root, { project: true, ownOnly: true })
+  const sources = new Map(await Promise.all(own.map(async file => [file, await Bun.file(file).text()] as const)))
+  const islandOnly = await islandOnlyComponents(root, routesDir, own, sources)
 
   for (const file of own) {
-    const source = await Bun.file(file).text()
-    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source)
+    const source = sources.get(file)!
+    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source, islandOnly.has(file))
     const path = shadowPath(root, file)
 
     await writeIfChanged(path, shadow.tsx)
@@ -173,7 +176,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await Promise.all(stale.map(async path => rm(path)))
 
-  return { files, diagnostics, unreached, libraries, settings: replaced.lines }
+  return { files, diagnostics, unreached, libraries, settings: replaced.lines, islandOnly }
 }
 
 export interface ShadowTypes {
@@ -184,6 +187,8 @@ export interface ShadowTypes {
   libraries: KayLibrary[]
   // The app's settings module each line of the settings check stands for, with the library it sets.
   settings: Map<number, { file: string, library: string }>
+  // The static components only islands render, which compile as rendered inline with them.
+  islandOnly: Set<string>
 }
 
 // A file of the project itself: under its root and outside every `node_modules`.
@@ -267,8 +272,8 @@ export function shadowPath(root: string, file: string): string {
   return join(root, SHADOW_DIR, `${relative(root, file)}.tsx`)
 }
 
-// Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`.
-export function compileShadow(root: string, routesDir: string, file: string, source: string): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
+// Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`; `insideIsland` for a static component only islands render.
+export function compileShadow(root: string, routesDir: string, file: string, source: string, insideIsland = false): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
   const route = file.startsWith(routesDir + sep) ? routeOf(routesDir, file) : undefined
   const shadowDir = dirname(shadowPath(root, file))
   // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
@@ -280,7 +285,7 @@ export function compileShadow(root: string, routesDir: string, file: string, sou
 
     return target.startsWith(root + sep) ? undefined : relative(shadowDir, target)
   }
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, relocateImport })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, insideIsland, relocateImport })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 

@@ -33,6 +33,8 @@ export interface CompileOptions {
   twinBuild?: boolean
   // Renders in the browser only, as `--- client` does: set when a package the component imports cannot load on the server.
   clientOnly?: boolean
+  // Type-checking a static component only islands render: its children render inline with it, so the props it passes them are not serialized.
+  insideIsland?: boolean
 }
 
 export interface CompileResult {
@@ -55,6 +57,14 @@ const BACKSLASH = /\\/g
 
 export const ISLAND_TWIN = '?island'
 
+// Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
+export function rendersAsIsland(source: string): boolean {
+  const file = parseKay(source)
+  const server = analyzeServer(source, file.server)
+
+  return file.client !== undefined || isInteractive(file, analyzeScript(source, file.script, server?.data.map(data => data.name)))
+}
+
 // The `.kay` file a module path names, its `?island` twin included.
 export function withoutTwin(path: string): string {
   return path.endsWith(ISLAND_TWIN) ? path.slice(0, -ISLAND_TWIN.length) : path
@@ -74,7 +84,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const island = client || isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && !island && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const generateOptions = { island, client, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
+  const generateOptions = { island, client, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, insideIsland: options.insideIsland, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.

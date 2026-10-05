@@ -404,6 +404,24 @@ describe('kay lsp following files on disk', () => {
 
     expect(await editor.filesChanged(page, [{ path: 'src/data.ts', type: 2 }])).toEqual([])
   })
+
+  it('lets a static component only islands render pass functions to interactive children, until a page renders it too', async () => {
+    const wrapper = 'src/components/wrapper.kay'
+
+    await Promise.all([
+      Bun.write(join(dir, 'src/components/controls.ts'), 'export interface Controls {\n  pick: (value: string) => void\n}\n'),
+      Bun.write(join(dir, 'src/components/panel.kay'), '---\nimport type { Controls } from \'./controls\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nbutton(type="button" onClick={() => controls.pick("a")}) a\n'),
+      Bun.write(join(dir, wrapper), '---\nimport type { Controls } from \'./controls\'\nimport Panel from \'./panel.kay\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nPanel(controls={controls})\n'),
+      Bun.write(join(dir, 'src/components/board.kay'), '---\nimport { signal } from \'kay\'\nimport Wrapper from \'./wrapper.kay\'\n\nconst picked = signal(\'none\')\n---\np {picked()}\nWrapper(controls={{ pick: value => picked.set(value) }})\n'),
+      Bun.write(join(dir, 'src/routes/board.kay'), '---\nimport Board from \'../components/board.kay\'\n---\nBoard\n'),
+    ])
+    // Opened before the server hears of the files, it compiles as a static component would, until they reach it.
+    await editor.open(wrapper)
+    expect(await editor.filesChanged(wrapper, [{ path: 'src/components/wrapper.kay', type: 1 }])).toEqual([])
+
+    await Bun.write(join(dir, 'src/routes/plain.kay'), '---\nimport Wrapper from \'../components/wrapper.kay\'\n---\nWrapper(controls={{ pick: () => {} }})\n')
+    expect(codes(await editor.filesChanged(wrapper, [{ path: 'src/routes/plain.kay', type: 1 }]))).toEqual([2345])
+  })
 })
 
 // An editor opened on a folder holding several projects, each with its own tsconfig.json, as a monorepo is.

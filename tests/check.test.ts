@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { basename, join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
@@ -254,6 +254,27 @@ describe('kay check, edge cases', () => {
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('lets a static component only islands render pass functions to interactive children, which render inline with the island', async () => {
+    const files = {
+      'src/components/controls.ts': 'export interface Controls {\n  pick: (value: string) => void\n}\n',
+      'src/components/panel.kay': '---\nimport type { Controls } from \'./controls\'\n\nconst { controls, label } = props<{ controls: Controls, label: string }>()\n---\nbutton(type="button" onClick={() => controls.pick(label)}) {label}\n',
+      'src/components/wrapper.kay': '---\nimport type { Controls } from \'./controls\'\nimport Panel from \'./panel.kay\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nPanel(controls={controls} label="a")\nPanel(controls={controls} label="b")\n',
+      'src/components/board.kay': '---\nimport { signal } from \'kay\'\nimport Wrapper from \'./wrapper.kay\'\n\nconst picked = signal(\'none\')\n---\np {picked()}\nWrapper(controls={{ pick: value => picked.set(value) }})\n',
+      'src/routes/index.kay': '---\nimport Board from \'../components/board.kay\'\n---\nBoard\n',
+    }
+    const islandOnly = await scratchProject(files)
+    // Rendered by a page too, the wrapper is static there, and its children are islands again.
+    const alsoStatic = await scratchProject({ ...files, 'src/routes/plain.kay': '---\nimport Wrapper from \'../components/wrapper.kay\'\n---\nWrapper(controls={{ pick: () => {} }})\n' })
+
+    try {
+      expect(await check(islandOnly)).toEqual([])
+      expect((await check(alsoStatic)).map(d => [relative(alsoStatic, d.file), d.line])).toEqual([['src/components/wrapper.kay', 7], ['src/components/wrapper.kay', 8]])
+    }
+    finally {
+      await Promise.all([islandOnly, alsoStatic].map(async root => rm(root, { recursive: true, force: true })))
     }
   })
 

@@ -284,7 +284,7 @@ export function sourceWords(source: string): string[] {
 }
 
 // What a module imports: a component's fences, or a script whole.
-async function importsOf(file: string): Promise<string[]> {
+export async function importsOf(file: string): Promise<string[]> {
   const source = await Bun.file(file).text()
   const kay = KAY_FILE.test(file)
 

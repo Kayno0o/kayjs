@@ -43,7 +43,12 @@ export interface FindOptions {
 }
 
 // Every .kay file under `root`, skipping dependencies and generated output without walking into them.
-export async function findKayFiles(root: string, { project = false, ownOnly = false }: FindOptions = {}): Promise<string[]> {
+export async function findKayFiles(root: string, options: FindOptions = {}): Promise<string[]> {
+  return findProjectFiles(root, ['.kay'], options)
+}
+
+// Every file under `root` ending in one of `extensions`, skipping as findKayFiles does.
+export async function findProjectFiles(root: string, extensions: string[], { project = false, ownOnly = false }: FindOptions = {}): Promise<string[]> {
   const files: string[] = []
   const walk = async (dir: string) => {
     const entries = await readdir(dir, { withFileTypes: true })
@@ -58,7 +63,7 @@ export async function findKayFiles(root: string, { project = false, ownOnly = fa
         if (!ALWAYS_IGNORED.has(entry.name) && !(project && dir === root && ROOT_IGNORED.has(entry.name)))
           await walk(path)
       }
-      else if (entry.name.endsWith('.kay')) {
+      else if (extensions.some(extension => entry.name.endsWith(extension))) {
         files.push(path)
       }
     }))
