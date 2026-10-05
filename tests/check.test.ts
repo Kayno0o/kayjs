@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
@@ -397,6 +397,20 @@ describe('kay check, edge cases', () => {
       expect(await check(root)).toEqual([])
     }
     finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('walks past a directory it cannot read, as a container-owned data directory bind-mounted into the project is', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'data-dev/postgres/keep': '' })
+
+    try {
+      await chmod(join(root, 'data-dev/postgres'), 0o000)
+      expect((await findKayFiles(root, { project: true })).map(file => file.slice(root.length + 1))).toEqual(['src/a.kay'])
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await chmod(join(root, 'data-dev/postgres'), 0o700)
       await rm(root, { recursive: true, force: true })
     }
   })

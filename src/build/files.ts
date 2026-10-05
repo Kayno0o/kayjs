@@ -1,3 +1,4 @@
+import type { Dirent } from 'node:fs'
 import { mkdir, readdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
@@ -52,7 +53,7 @@ export async function findKayFiles(root: string, options: FindOptions = {}): Pro
 export async function findProjectFiles(root: string, matches: RegExp, { project = false, ownOnly = false }: FindOptions = {}): Promise<string[]> {
   const files: string[] = []
   const walk = async (dir: string) => {
-    const entries = await readdir(dir, { withFileTypes: true })
+    const entries = await readable(dir)
 
     if (ownOnly && dir !== root && entries.some(entry => entry.isFile() && entry.name === TSCONFIG))
       return
@@ -73,6 +74,19 @@ export async function findProjectFiles(root: string, matches: RegExp, { project 
   await walk(root)
 
   return files.sort()
+}
+
+// A directory the user cannot read holds nothing the project could compile: a container writes one into a repository when a service bind-mounts its data there.
+async function readable(dir: string): Promise<Dirent[]> {
+  try {
+    return await readdir(dir, { withFileTypes: true })
+  }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EACCES' && (error as NodeJS.ErrnoException).code !== 'EPERM')
+      throw error
+
+    return []
+  }
 }
 
 // Leaves an unchanged file alone, so watchers and editors reading it see no change.
