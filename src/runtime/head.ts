@@ -9,7 +9,7 @@ export interface HeadTag {
 export interface HeadOptions {
   // Tags every page starts from: a tag of the same identity a layout or the page sets replaces one.
   defaults?: HeadTag[]
-  // Wraps a title a layout or the page sets, such as `%s | Site`; a title from the defaults stays as it is.
+  // Wraps a title a layout or the page sets, such as `%s | Site`; a title from the defaults, or one marked `raw`, stays as it is.
   titleTemplate?: string
   // Fills the social tags a page leaves out from the ones it sets, `og:title` from its title for instance, with `/` URLs made absolute against `origin`.
   social?: { origin?: string }
@@ -107,8 +107,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   // A title that comes out empty, from a value the page lacked, shows the site's rather than the template around nothing.
   const useDefault = (options.defaults !== undefined && titleGroup === 0) || (titleTag !== undefined && text(titleTag).trim() === '' && defaultTitle !== undefined)
   const ownTitle = titleTag && text(useDefault && defaultTitle ? defaultTitle : titleTag)
-  // A title marked `raw` reads as it is written, as the home page's often does.
-  const raw = titleTag !== undefined && titleTag.props.raw !== undefined && titleTag.props.raw !== false
+  const raw = Boolean(titleTag?.props.raw)
   const titleText = ownTitle !== undefined && options.titleTemplate && !useDefault && !raw ? options.titleTemplate.replaceAll('%s', () => ownTitle) : ownTitle
 
   // Social cards show the site name on their own, so they take the title without the template.

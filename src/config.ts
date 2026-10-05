@@ -65,7 +65,7 @@ export interface KayConfig {
 export interface SeoConfig {
   // The site's name: the title of a page that sets none, and `og:site_name`.
   name?: string
-  // Wraps the title a layout or the page sets: `%s | Site`.
+  // Wraps the title a layout or the page sets: `%s | Site`; a `title(raw)` stays as it is.
   titleTemplate?: string
   description?: string
   // The social card image, a URL or a path such as an imported asset's.

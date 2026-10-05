@@ -68,6 +68,7 @@ describe('seo head', () => {
     expect(welcome).not.toContain('raw')
     expect((await headOf('/raw')).head).toContain('<title>The raw section</title>')
     expect((await headOf('/raw/plain')).head).toContain('<title>Plain | Kay site</title>')
+    expect((await headOf('/raw/off')).head).toContain('<title>Not raw | Kay site</title>')
   })
 
   it('shows the site name for a title that comes out empty, not the template around nothing', async () => {
