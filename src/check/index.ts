@@ -32,6 +32,7 @@ import { patternShapes, routeOf, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 
 export const SHADOW_DIR = join('.kay', 'types')
+const KAY_FILE = /\.kay$/
 const SETTINGS_CHECK = 'kay-settings.ts'
 const TSX_EXTENSION = /\.tsx$/
 const SCRIPT_EXTENSION = /\.[cm]?[jt]sx?$/
@@ -172,7 +173,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await Promise.all(stale.map(async path => rm(path)))
 
-  return { files, diagnostics, unreached, settings: replaced.lines }
+  return { files, diagnostics, unreached, libraries, settings: replaced.lines }
 }
 
 export interface ShadowTypes {
@@ -180,6 +181,7 @@ export interface ShadowTypes {
   diagnostics: CheckDiagnostic[]
   // Library components the app never imports, whose errors are not its own.
   unreached: Set<string>
+  libraries: KayLibrary[]
   // The app's settings module each line of the settings check stands for, with the library it sets.
   settings: Map<number, { file: string, library: string }>
 }
@@ -384,7 +386,7 @@ function spellings(path: string): string[] {
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
-  const { files, diagnostics, unreached, settings } = await writeShadowTypes(root, options)
+  const { files, diagnostics, unreached, libraries, settings } = await writeShadowTypes(root, options)
   const settingsFile = join(resolve(root), SHADOW_DIR, SETTINGS_CHECK)
   const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code, content, messages] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkContent(root, options.content), checkMessages(root, options.i18n)])
@@ -392,6 +394,8 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
   const broken = new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file))
+  // A library type-checks its own modules, as `skipLibCheck` assumes of a declaration file, such as one importing an optional peer the app has not installed: only its components compile as the app's.
+  const libraryModule = (file: string) => !KAY_FILE.test(file) && libraryOf(libraries, file) !== undefined
 
   if (errors.trim() !== '')
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })
@@ -402,7 +406,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
     if (setting)
       diagnostics.push({ file: setting.file, line: 1, column: 1, code: remapped.code, message: `The settings for ${setting.library} do not match what it takes: ${remapped.message}` })
-    else if (!broken.has(remapped.file) && !unreached.has(remapped.file))
+    else if (!broken.has(remapped.file) && !unreached.has(remapped.file) && !libraryModule(remapped.file))
       diagnostics.push(remapped)
   }
 

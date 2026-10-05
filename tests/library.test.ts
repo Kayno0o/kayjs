@@ -195,6 +195,30 @@ describe('kay libraries', () => {
     expect(code).toBe(0)
   })
 
+  it('leaves errors inside a library\'s own modules to it, a missing optional peer included, and reports the app\'s calls into them', async () => {
+    const project = await newProject()
+
+    await write(join(project, 'node_modules/kay-lib'), {
+      // An optional peer the app has not installed, imported by a component it uses and by one it never imports.
+      'src/media.ts': 'export async function player(): Promise<unknown> {\n  const { default: Player } = await import(\'optional-player\')\n\n  return Player\n}\n\nexport function scale(value: number): number {\n  return value * 2\n}\n',
+      'src/axis.ts': 'import { Axis } from \'optional-chart\'\n\nexport const axis = new Axis()\n',
+      'src/video.kay': '---\nimport { onMount } from \'kay\'\nimport { player } from \'./media\'\n\nonMount(() => void player())\n---\nvideo\n',
+      'src/chart.kay': '---\nimport { axis } from \'./axis\'\n---\np {String(axis)}\n',
+      'src/index.ts': `${LIBRARY['src/index.ts']}export { scale } from './media'\n`,
+    })
+    await write(project, {
+      'src/routes/video.kay': '---\nimport Video from \'kay-lib/video.kay\'\n---\nVideo\n',
+      'src/doubled.ts': 'import { scale } from \'kay-lib\'\n\nexport const doubled = scale(\'two\')\n',
+    })
+
+    const { code, output } = await run('check', project)
+
+    expect(output.split('\n').filter(line => line.includes(' - error '))).toEqual([
+      `${relative(process.cwd(), join(project, 'src/doubled.ts'))}:3:30 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.`,
+    ])
+    expect(code).toBe(1)
+  })
+
   it('types a library\'s components in the app, reporting an error inside one the app uses at its own line, and the app\'s settings against the defaults', async () => {
     const project = await newProject()
 
