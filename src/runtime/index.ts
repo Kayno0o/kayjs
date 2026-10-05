@@ -150,6 +150,18 @@ export interface PageContext<Params extends Record<string, unknown> = Record<str
   succeeded: <Target extends Action<never, unknown>>(action: Target) => SuccessOf<Target> | undefined
 }
 
+// A page `kay build` prerenders renders without a request, so what only a request carries is refused where it is read; a `prerender` computed as a plain `boolean` is checked when it renders.
+// Written out rather than through an alias, which an error would name instead of saying why.
+export type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | undefined]
+  ? Context
+  : boolean extends Flag
+    ? Context
+    : Omit<Context, 'cookies' | 'query' | 'locals'> & {
+      cookies: { kayError: 'A prerendered page renders once, at build time, with no ctx.cookies; drop export const prerender to render it per request' }
+      query: { kayError: 'A prerendered page renders once, at build time, with no ctx.query; drop export const prerender to render it per request' }
+      locals: { kayError: 'A prerendered page renders once, at build time, with no ctx.locals; drop export const prerender to render it per request' }
+    }
+
 export interface PageError {
   status: number
   // The thrown error's message in development; production shows a generic one and logs the real error.

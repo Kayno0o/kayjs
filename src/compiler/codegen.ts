@@ -121,7 +121,7 @@ class Generator {
     const query = this.declaresQuery()
 
     if (server)
-      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${query ? ', QueryOf as KayQueryOf' : ''} } from 'kay'\n`)
+      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${query ? ', QueryOf as KayQueryOf' : ''}${server.exportNames.includes(PRERENDER) ? ', PrerenderedContext as KayPrerenderedContext' : ''} } from 'kay'\n`)
 
     const kayHelpers = formHelpers(this.file)
     const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
@@ -371,7 +371,9 @@ class Generator {
     // An unused parameter would trip `noUnusedParameters` in the user's tsconfig, so it is named `_ctx` when the fence never reads it.
     const ctx = server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'
 
-    b.add(`\nexport async function load(${ctx}: KayPageContext<${params}${query ? `, KayQueryOf<typeof ${QUERY}>` : ''}>) {\n`)
+    const context = `KayPageContext<${params}${query ? `, KayQueryOf<typeof ${QUERY}>` : ''}>`
+
+    b.add(`\nexport async function load(${ctx}: ${server.exportNames.includes(PRERENDER) ? `KayPrerenderedContext<typeof ${PRERENDER}, ${context}>` : context}) {\n`)
     for (const span of server.body)
       b.addSource(span)
     b.add(`\nreturn { ${server.data.map(data => data.name).join(', ')} }\n}\n`)

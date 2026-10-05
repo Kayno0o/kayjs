@@ -294,6 +294,25 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('refuses what only a request carries in a prerendered page, and leaves it to a page rendered per request', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '--- server\nexport const prerender = true\n\nconst theme = ctx.cookies.get(\'theme\')\n---\np {theme}\n',
+      'src/routes/posts/[slug].kay': '--- server\nexport const prerender = () => [{ slug: \'a\' }]\n\nconst page = ctx.query.page\nconst slug = ctx.params.slug\n---\np {slug} {String(page)}\n',
+      'src/routes/live.kay': '--- server\nexport const prerender = false\n\nconst theme = ctx.cookies.get(\'theme\')\n---\np {theme}\n',
+      'src/routes/account.kay': '--- server\nconst who = ctx.locals\n---\np {String(who)}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.file.slice(root.length + 1), d.line, d.message.match(/kayError: "([^"]+)"/)?.[1]])).toEqual([
+        ['src/routes/index.kay', 4, 'A prerendered page renders once, at build time, with no ctx.cookies; drop export const prerender to render it per request'],
+        ['src/routes/posts/[slug].kay', 4, 'A prerendered page renders once, at build time, with no ctx.query; drop export const prerender to render it per request'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks without the server\'s environment, as kay build renders pages: the config, the content and the messages may import an env module lacking a variable', async () => {
     const env = 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ KAY_CHECK_UNSET_SECRET: t.String() }))\n'
     const root = await scratchProject({
