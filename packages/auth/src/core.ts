@@ -66,6 +66,7 @@ export interface Core {
   oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<any, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: (profile: Profile) => boolean | Promise<boolean>
+  defaultRoles: string[]
   onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
   onProviderProfile?: (user: User, profile: Profile) => void | Promise<void>
   onDelete?: (user: User) => void | Promise<void>

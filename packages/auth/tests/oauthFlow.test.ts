@@ -120,6 +120,16 @@ describe('coming back from the provider', () => {
     expect(identity?.accessToken).not.toContain('token-1')
   })
 
+  test('gives a new user the default roles', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser } = setup({ defaultRoles: ['editor'] })
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+
+    expect(await ada.json('/me')).toMatchObject({ roles: ['editor'] })
+  })
+
   test('signs up with the id a store picked itself', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const { browser, signUps, store } = setup({ store: serialStore() })

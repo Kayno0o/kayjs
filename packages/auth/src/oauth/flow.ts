@@ -204,7 +204,7 @@ async function signUp(core: Core, profile: Profile): Promise<UserRecord> {
   const freeEmail = email !== undefined && !(await core.store.users.findByEmail(email)) ? email : null
   // A name these rules refuse is left out too: the user picks one later.
   const freeName = !usernameProblem(name) && !(await core.store.users.findByUsername(name)) ? name : null
-  const record = newUserRecord({ email: freeEmail, emailVerifiedAt: freeEmail === null ? null : new Date(), username: freeName })
+  const record = newUserRecord({ email: freeEmail, emailVerifiedAt: freeEmail === null ? null : new Date(), username: freeName, roles: [...core.defaultRoles] })
 
   return (await core.store.users.create(record)) ?? record
 }

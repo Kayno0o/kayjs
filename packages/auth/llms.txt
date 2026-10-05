@@ -60,7 +60,7 @@ The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(
 - `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
 - `prefix`: where the OAuth routes live, `/auth` by default.
 - `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default.
-- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `authorize`: see Guards and gates. `limits`: see Limits.
+- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `limits`: see Limits.
 
 ## The signed-in user
 
@@ -91,7 +91,7 @@ export default auth.guard({ redirect: '/login', require: 'editor' })
 ```
 
 - An anonymous visitor goes to `redirect`, with where they were going as `?redirect=`, a path to hand to `signInWithPassword` or an OAuth link. Without `redirect`, and for any post, the answer is a 401. A user who does not meet `require` gets a 403.
-- A requirement is a role, a predicate `(user, ctx) => boolean`, or a list of which any one passes. A role includes the roles `roles` lists under it: with `{ admin: ['editor'], editor: [] }`, an admin meets `'editor'`. A user's roles are `UserRecord.roles` in the store.
+- A requirement is a role, a predicate `(user, ctx) => boolean`, or a list of which any one passes. A role includes the roles `roles` lists under it: with `{ admin: ['editor'], editor: [] }`, an admin meets `'editor'`. A user's roles are `UserRecord.roles` in the store. `defaultRoles: ['user']` gives every new user those roles, by password or by provider; a store leaves them to kayjs-auth rather than filling them in itself, so it knows which roles were given on purpose.
 - `auth.hasRole('admin')` is the predicate form, `auth.isGranted('admin', user)` the plain check.
 - `authorize: (user, requirement, level, ctx) => Promise<boolean>` replaces the decision, for grants on single records: `decide(grantStore, user, requirement, level, ctx)` reads a `GrantStore` of the app's. `level` is `'read'` for GET and HEAD, `'write'` otherwise.
 
@@ -203,7 +203,7 @@ if failure
 - A magic link or a reset that proves an address for the first time hands the account over clean: whatever was set on it before, perhaps by someone who registered the address first, is dropped (the password, the second factor and its recovery codes, linked providers, bearer tokens), and every other session ends. A user who registered with a password and never verified the address loses that password this way, and sets another.
 - `changeEmail(proof, email)` mails a link to the new address (`errors.email` `'invalid'`, `'taken'` or `'unchanged'` otherwise); `confirmEmailChange(token)` moves the account to it, ends its other sessions and warns the address it left, when that one was verified.
 - A link works once, even when two requests spend it together: verification for 24 hours, a reset and an email change for one hour, a magic link for 15 minutes. A new link of a kind voids the last one, a link to an address the account has since left opens nothing, and links are stored as digests only. A spent or unknown link answers `'invalid'`.
-- `requireVerified` refuses password sign-in until the address is verified and signs no one in on registering. An address registered and never verified can then be registered again, so no one squats an address they do not own; an account with a role or a linked provider is never replaced this way.
+- `requireVerified` refuses password sign-in until the address is verified and signs no one in on registering. An address registered and never verified can then be registered again, so no one squats an address they do not own; an account with a role beyond `defaultRoles` or a linked provider is never replaced this way.
 
 ## Two-factor
 

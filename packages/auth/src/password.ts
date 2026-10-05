@@ -58,8 +58,8 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   const holder = errors.email ? undefined : await store.users.findByEmail(email)
   const requireVerified = state.core.email?.requireVerified ?? false
 
-  // An address registered and never verified, where unverified accounts cannot sign in, holds nothing worth keeping: registering again replaces it, so no one can squat an address they do not own. An account given roles was set up on purpose, as by an admin inviting someone, and stays.
-  if (holder && requireVerified && holder.emailVerifiedAt === null && holder.roles.length === 0 && (await store.identities.listByUser(holder.id)).length === 0) {
+  // An address registered and never verified, where unverified accounts cannot sign in, holds nothing worth keeping: registering again replaces it, so no one can squat an address they do not own. An account given roles beyond the default ones was set up on purpose, as by an admin inviting someone, and stays.
+  if (holder && requireVerified && holder.emailVerifiedAt === null && holder.roles.every(role => state.core.defaultRoles.includes(role)) && (await store.identities.listByUser(holder.id)).length === 0) {
     await store.users.delete(holder.id)
     await state.core.onDelete?.(publicUser(holder))
   }
@@ -73,7 +73,7 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   if (errors.email || errors.password || errors.username)
     return { ok: false, errors: withoutUndefined(errors) }
 
-  let record = newUserRecord({ email, username, passwordHash: await hashPassword(input.password) })
+  let record = newUserRecord({ email, username, passwordHash: await hashPassword(input.password), roles: [...state.core.defaultRoles] })
 
   try {
     record = (await store.users.create(record)) ?? record

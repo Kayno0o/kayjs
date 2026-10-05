@@ -75,6 +75,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   onEvent?: (event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
   roles?: Record<Role, NoInfer<Role>[]>
+  // The roles every new user starts with, by password or by provider, such as a site's `user`. An unverified account holding only these counts as given none: see `requireVerified`.
+  defaultRoles?: NoInfer<Role>[]
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
   limits?: Partial<Limits>
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
@@ -451,6 +453,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     oauth,
     refreshers: new Map(),
     allow: options.allow,
+    defaultRoles: options.defaultRoles ?? [],
     onSignUp: options.onSignUp,
     onProviderProfile: options.onProviderProfile,
     onDelete: options.onDelete,

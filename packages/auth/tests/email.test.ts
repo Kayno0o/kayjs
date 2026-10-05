@@ -5,9 +5,10 @@ import { testApp, userRecord } from './helpers/app'
 const PASSWORD = 'correct horse battery'
 const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }
 
-function setup(options: { requireVerified?: boolean } = {}) {
+function setup(options: { requireVerified?: boolean, defaultRoles?: ('admin' | 'editor')[] } = {}) {
   const mails: Mail[] = []
   const app = testApp({
+    defaultRoles: options.defaultRoles,
     url: 'https://site.test/',
     site: 'Site',
     email: {
@@ -131,6 +132,16 @@ describe('verifying an email', () => {
 
     expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
     expect(await store.users.get('u1')).toMatchObject({ roles: ['admin'] })
+  })
+
+  test('with `requireVerified`, an unverified account holding only the default roles is replaced, and one holding more is not', async () => {
+    const { browser, store } = setup({ requireVerified: true, defaultRoles: ['editor'] })
+
+    await browser().call('register', { email: 'ada@example.com', password: 'squatter password' })
+    await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com', roles: ['editor', 'admin'] }))
+
+    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true, user: { roles: ['editor'] } })
+    expect(await browser().call('register', { email: 'bob@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
   })
 
   test('resending gives a new link and voids the last', async () => {
