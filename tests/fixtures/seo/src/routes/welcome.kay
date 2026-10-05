@@ -1,0 +1,6 @@
+--- server
+export const sitemap = false
+---
+head
+  title(raw) Kay, a site with its name first
+p Welcome

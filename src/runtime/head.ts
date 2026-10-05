@@ -107,7 +107,9 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   // A title that comes out empty, from a value the page lacked, shows the site's rather than the template around nothing.
   const useDefault = (options.defaults !== undefined && titleGroup === 0) || (titleTag !== undefined && text(titleTag).trim() === '' && defaultTitle !== undefined)
   const ownTitle = titleTag && text(useDefault && defaultTitle ? defaultTitle : titleTag)
-  const titleText = ownTitle !== undefined && options.titleTemplate && !useDefault ? options.titleTemplate.replaceAll('%s', () => ownTitle) : ownTitle
+  // A title marked `raw` reads as it is written, as the home page's often does.
+  const raw = titleTag !== undefined && titleTag.props.raw !== undefined && titleTag.props.raw !== false
+  const titleText = ownTitle !== undefined && options.titleTemplate && !useDefault && !raw ? options.titleTemplate.replaceAll('%s', () => ownTitle) : ownTitle
 
   // Social cards show the site name on their own, so they take the title without the template.
   if (options.social)

@@ -60,6 +60,16 @@ describe('seo head', () => {
     expect(count(head, 'name="description"')).toBe(1)
   })
 
+  it('writes a title marked raw as it is, from the page or a layout, a page\'s plain title still wrapped over it', async () => {
+    const welcome = (await headOf('/welcome')).head
+
+    expect(welcome).toContain('<title>Kay, a site with its name first</title>')
+    expect(welcome).toContain('<meta property="og:title" content="Kay, a site with its name first">')
+    expect(welcome).not.toContain('raw')
+    expect((await headOf('/raw')).head).toContain('<title>The raw section</title>')
+    expect((await headOf('/raw/plain')).head).toContain('<title>Plain | Kay site</title>')
+  })
+
   it('shows the site name for a title that comes out empty, not the template around nothing', async () => {
     expect((await headOf('/blank')).head).toContain('<title>Kay site</title>')
   })

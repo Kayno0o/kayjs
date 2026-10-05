@@ -169,6 +169,17 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('takes raw on a head title only', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': 'head\n  title(raw) Whole\n  meta(raw name="x" content="y")\np Home\n' })
+
+    try {
+      expect((await check(root)).map(diagnostic => [diagnostic.line, firstLine(diagnostic.message)])).toEqual([[3, expect.stringContaining('HtmlAttributes<"meta">')]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('passes a component the class it merges with a spread or a shorthand as one string, which its props type', async () => {
     const root = await scratchProject({
       'src/box.kay': '---\nconst { label, class: className } = props<{ label: string, class?: string }>()\n---\np(class={className}) {label}\n',

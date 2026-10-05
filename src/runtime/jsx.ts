@@ -144,10 +144,16 @@ interface SpelledAttributes {
   output: { for?: AttributeValue }
 }
 
+// kay's own, never written out: a `head` title marked `raw` is left out of `seo.titleTemplate`.
+interface KayAttributes {
+  title: { raw?: boolean }
+}
+
 type HtmlAttributes<Tag extends keyof HTMLElementTagNameMap> = CommonAttributes<HTMLElementTagNameMap[Tag]>
   & Handlers<HTMLElementTagNameMap[Tag], HTMLElementEventMap>
   & OwnAttributes<HTMLElementTagNameMap[Tag]>
   & (Tag extends keyof SpelledAttributes ? SpelledAttributes[Tag] : unknown)
+  & (Tag extends keyof KayAttributes ? KayAttributes[Tag] : unknown)
 
 // SVG attributes are no DOM properties to read them off, so an SVG element takes any.
 type SvgAttributes<Target> = CommonAttributes<Target> & Handlers<Target, SVGElementEventMap> & Record<string, unknown>
