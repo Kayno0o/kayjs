@@ -150,7 +150,7 @@ Table(columns={columns} rows={posts} rowKey="id")
 
 ### Segmented, TabNav, Toggle
 
-- `Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} value="day" label="Period" name="period" onChange={period.set})`: real radios, so arrow keys move between options and the group posts as `name` inside a form. A parent passing another `value` moves the choice. `name` is required for now, until kay gives components a unique id.
+- `Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} value="day" label="Period" name="period" onChange={period.set})`: real radios, so arrow keys move between options and the group posts as `name` inside a form. A parent passing another `value` moves the choice. Without `name`, the group draws one unique on the page, which keeps two groups apart.
 - `TabNav(links={[{ href: '/settings', label: 'Profile' }, { href: '/settings/keys', label: 'Keys' }]} current={ctx.url.pathname} label="Settings")`: tabs as links, one page each. The current tab is marked `aria-current="page"`, and a bar too narrow for every tab scrolls to centre it, without moving the page.
 - `Toggle(label="Public" checked={post.public} name="public" onChange={setPublic})`: a checkbox drawn as a switch, with `role="switch"`, that posts like a checkbox. Without `label`, give it `aria-label`.
 
@@ -173,13 +173,13 @@ Table(columns={columns} rows={posts} rowKey="id")
 ### Popover, TooltipHost
 
 ```kay
-Popover(id="post-menu" placement="bottom-end")
+Popover(placement="bottom-end")
   @trigger(attributes)
     IconButton({...attributes} icon="chevron" label="More")
   Button(label="Duplicate" onClick={duplicate})
 ```
 
-- Popover is the browser's popover. A click on the trigger toggles it, and a click outside or Escape closes it. `id` must be unique on the page, since it pairs the panel with its trigger, and made of letters, digits, `-` and `_`, since it also names the CSS anchor.
+- Popover is the browser's popover. A click on the trigger toggles it, and a click outside or Escape closes it. The panel draws an id unique on the page, pairing it with its trigger; an `id` given instead must be unique too, and made of letters, digits, `-` and `_`, since it also names the CSS anchor.
 - `@trigger(attributes)` renders the trigger, which spreads `attributes`: `popovertarget`, `aria-expanded` and its anchor.
 - `placement` is `bottom-start`, `bottom-end`, `top-start` or `top-end`, and the browser flips it when there is no room.
 - `open` opens or closes it from the page, and `onToggle(open)` runs however it changed: a page driving `open` sets its own value back there, or it could not open the panel again after a click outside closed it.
@@ -228,18 +228,18 @@ PageSection(title="Moons")
 ### RangeInput, MultiSelect, FileDrop, Menu
 
 - `RangeInput(label="Hours" min={0} max={24} unit="h" value={[2, null]} onChange={hours.set})`: two number boxes for a range, each bound open when empty (`null`). `onChange([from, to])` runs once a box is committed, on blur or Enter, and only when the range changed; a reversed pair is put back in order in the boxes too. `rangeFrom(low, high)` reads two strings the same way, for a server reading the posted boxes.
-- `MultiSelect(id="planets" label="Planets" options={planets} value={['mars']} name="planet" onChange={picked.set})`:
+- `MultiSelect(label="Planets" options={planets} value={['mars']} name="planet" onChange={picked.set})`:
   - A trigger summing up what is picked (`placeholder`, `Any` by default, the one label, or "2 selected") opens a popover of checkboxes with All and None.
   - Past eight options, or with `search`, the panel opens on a search box filtering the options, focused; otherwise the first checkbox takes focus.
   - What is picked stays in the options' order. `name` posts each picked value as a hidden field, so the control submits inside a plain form.
 - `FileDrop(accept="image/*" multiple paste onFiles={upload})` with a `@content(zone)` block:
   - Files dropped on the zone, picked through `zone.open()` or, with `paste`, pasted anywhere on the page outside a text field, reach `onFiles(files)`: those `accept` allows, one unless `multiple`, never an empty list.
   - `zone.dragging()` reads whether files hover the zone, which also carries `data-dragging`.
-- `Menu(id="post-actions" label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', danger: true, onSelect: remove }]})`:
+- `Menu(label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', danger: true, onSelect: remove }]})`:
   - An IconButton opening a `role="menu"` popover; `'separator'` draws a rule between groups.
   - Opening focuses the first enabled entry; the arrows, Home and End move between enabled entries, and Tab closes it.
   - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.
-- MultiSelect and Menu need an `id` unique on the page, as Popover does. RangeInput and MultiSelect take data alone, so a static page can hold them; FileDrop and Menu take functions, so they render inside an island.
+- MultiSelect and Menu draw their popover's id as Popover does, or take an `id`. RangeInput and MultiSelect take data alone, so a static page can hold them; FileDrop and Menu take functions, so they render inside an island.
 
 ## Forms
 
@@ -278,7 +278,7 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
 - When the action refuses a field, its message shows on the FormField with that `name`, and the dialog stays open.
 - A refused message no FormField shows is toasted instead, a refusal of the whole form under the empty name included. A failure carrying no message toasts `failure`.
 - A save hands what the action returned to `onSaved`, then closes the dialog.
-- The submit button sits in the footer, paired with the form by `id`. The `id` defaults to one named after the action, so give one when two dialogs on a page call the same action.
+- The submit button sits in the footer, paired with the form by `id`. Without an `id`, it draws one unique on the page.
 - Enter submits from a single-line field, and Ctrl+Enter from a textarea. While the call is under way, the buttons are disabled, and Escape or a click outside leaves the dialog open.
 - `extra` fills the left end of the footer, for a ConfirmDelete with `trigger="button"`.
 

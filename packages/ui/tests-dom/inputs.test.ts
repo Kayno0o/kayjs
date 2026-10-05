@@ -21,7 +21,7 @@ async function inputs(paste = false) {
     onRange: (value: RangeValue) => seen.range.push(value),
     onPlanets: (value: string[]) => seen.planets.push(value),
     onFiles: (names: string[]) => seen.files.push(names),
-    onAction: (name: string) => seen.actions.push([name, document.getElementById('actions')!.matches(':popover-open')]),
+    onAction: (name: string) => seen.actions.push([name, document.querySelector('.menu')!.matches(':popover-open')]),
     paste,
   })
 
@@ -175,10 +175,10 @@ describe('FileDrop', () => {
 describe('Menu', () => {
   test('focuses its first entry on opening, moves past disabled ones with the arrows, and runs an action once closed', async () => {
     const root = await inputs()
-    const menu = root.querySelector<HTMLElement>('#actions')!
+    const menu = root.querySelector<HTMLElement>('.menu')!
     const focused = () => document.activeElement?.textContent
 
-    expect(root.querySelector('[popovertarget="actions"]')?.getAttribute('aria-haspopup')).toBe('menu')
+    expect(root.querySelector(`[popovertarget="${menu.id}"]`)?.getAttribute('aria-haspopup')).toBe('menu')
 
     menu.showPopover()
     await settle()
@@ -200,7 +200,7 @@ describe('Menu', () => {
 
   test('closes on Tab, a menu being one stop', async () => {
     const root = await inputs()
-    const menu = root.querySelector<HTMLElement>('#actions')!
+    const menu = root.querySelector<HTMLElement>('.menu')!
 
     menu.showPopover()
     await settle()

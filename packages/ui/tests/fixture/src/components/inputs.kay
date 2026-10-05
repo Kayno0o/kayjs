@@ -22,5 +22,5 @@ MultiSelect(id="planets" label="Planets" name="planet" options={planets} onChang
 FileDrop#drop(accept="image/*, .svg" paste={paste} onFiles={files => onFiles(files.map(file => file.name))})
   @content(zone)
     button#pick(type="button" onClick={zone.open}) {zone.dragging() ? 'Drop it' : 'Pick'}
-Menu(id="actions" items={items} label="Actions" icon="plus")
+Menu(items={items} label="Actions" icon="plus")
 input#field

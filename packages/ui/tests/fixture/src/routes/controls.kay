@@ -12,3 +12,6 @@ main
     Segmented(label="Range" name="range" options={ranges} value="week")
   #digest
     Toggle(name="digest" label="Daily digest" checked)
+  article#unnamed
+    Segmented(label="Range" options={ranges} value="week")
+    Segmented(label="Range" options={ranges} value="week")

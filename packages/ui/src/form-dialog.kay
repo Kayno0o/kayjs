@@ -1,12 +1,11 @@
 --- <Output>
 import type { Action, Failure, JSX } from 'kay'
-import { ActionError, effect, signal } from 'kay'
+import { ActionError, effect, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import { formIssues } from './forms'
 import { toast } from './toast'
 
-const NOT_WORD = /\W+/g
 
 const { open, title, action, submitLabel, failure, onSaved, onClose, extra, id, class: className } = props<{
   // Shows the dialog; the parent sets it back to false in `onClose`.
@@ -23,12 +22,12 @@ const { open, title, action, submitLabel, failure, onSaved, onClose, extra, id, 
   onClose: () => void
   // The left end of the footer, for a delete button.
   extra?: JSX.Element
-  // Pairs the footer's submit button with the form; by default it is named after the action, so give one when two dialogs on a page call the same action.
+  // Pairs the footer's submit button with the form; one unique on the page is drawn when none is given.
   id?: string
   class?: string
 }>()
 
-const formId = id ?? `form-dialog${action.url.replace(NOT_WORD, '-')}`
+const formId = id ?? uid()
 const issues = signal<Record<string, string>>({})
 let form: HTMLFormElement | undefined
 

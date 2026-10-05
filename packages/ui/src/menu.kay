@@ -3,6 +3,7 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import type { MenuAction, MenuEntry } from './menu'
 import type { PopoverPlacement } from './popover'
+import { uid } from 'kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import Popover from './popover.kay'
@@ -16,8 +17,8 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
 }
 
 const { id, items, label, icon, size = 'md', variant = 'ghost', placement = 'bottom-end' } = props<{
-  // Pairs the menu with its trigger, so it is unique on the page.
-  id: string
+  // The menu's id, unique on the page; one is drawn when none is given.
+  id?: string
   items: MenuEntry[]
   // Names the trigger and the menu it opens.
   label: string
@@ -28,6 +29,7 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', placement = 'bot
   placement?: PopoverPlacement
 }>()
 
+const menuId = id ?? uid()
 let list: HTMLElement | undefined
 
 function entries(): HTMLButtonElement[] {
@@ -36,7 +38,7 @@ function entries(): HTMLButtonElement[] {
 
 // Hidden at once rather than through a signal, so the browser has given focus back to the trigger before an action runs.
 function close() {
-  document.getElementById(id)?.hidePopover()
+  document.getElementById(menuId)?.hidePopover()
 }
 
 function keyDown(event: KeyboardEvent) {
@@ -67,7 +69,7 @@ function select(action: MenuAction) {
   action.onSelect()
 }
 ---
-Popover(id={id} placement={placement} class="menu" onToggle={open => open && entries()[0]?.focus()})
+Popover(id={menuId} placement={placement} class="menu" onToggle={open => open && entries()[0]?.focus()})
   @trigger(attributes)
     IconButton({...attributes} icon={icon} label={label} size={size} variant={variant} aria-haspopup="menu")
   .menu-list(ref={element => list = element} role="menu" aria-label={label} tabindex="-1" onKeyDown={keyDown})

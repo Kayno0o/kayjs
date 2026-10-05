@@ -188,3 +188,20 @@ describe('inputs', () => {
     expect(form).toContain('<input type="hidden" name="planet" value="mars">')
   })
 })
+
+describe('drawn ids', () => {
+  test('Segmented groups given no name each draw one of their own, shared by their radios', async () => {
+    const groups = (await element('/controls', 'unnamed')).split('class="segmented"').slice(1).map(group => [...new Set([...group.matchAll(/type="radio" name="([^"]+)"/g)].map(match => match[1]))])
+
+    expect(groups.map(names => names.length)).toEqual([1, 1])
+    expect(groups[0]![0]).not.toBe(groups[1]![0])
+  })
+
+  test('a MultiSelect given no id pairs its trigger with a panel of a drawn id', async () => {
+    const select = await element('/inputs', 'unnamed')
+    const target = (/popovertarget="([^"]+)"/).exec(select)![1]!
+
+    expect(select).toContain(`id="${target}" popover="auto"`)
+    expect(select).toContain(`anchor-name: --popover-${target}`)
+  })
+})

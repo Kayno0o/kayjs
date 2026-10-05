@@ -6,3 +6,5 @@ main
   form#form
     RangeInput#range(label="Hours" min={0} max={24} unit="h" value={[2, null]})
     MultiSelect(id="planets" label="Planets" name="planet" value={['mars']} options={[{ value: 'mars', label: 'Mars' }, { value: 'venus', label: 'Venus' }]})
+  article#unnamed
+    MultiSelect(label="Moons" options={[{ value: 'phobos', label: 'Phobos' }]})
