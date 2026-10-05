@@ -15,6 +15,18 @@ import { buildClient } from '../src/server/client'
 
 const root = join(import.meta.dir, 'fixtures/islands')
 
+// Under the checkout's node_modules, so the pages it serves resolve their dependencies.
+async function scratchProject(files: Record<string, string>): Promise<string> {
+  const base = join(import.meta.dir, '../node_modules/.cache')
+
+  await mkdir(base, { recursive: true })
+  const root = await mkdtemp(join(base, 'config-'))
+
+  await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+  return root
+}
+
 describe('kay build', () => {
   it('lets Tailwind see the classes written in the .class shorthand', async () => {
     const project = join(import.meta.dir, 'fixtures/tailwind')
@@ -131,18 +143,6 @@ describe('kay build', () => {
 })
 
 describe('kay.config.ts', () => {
-  // Under the checkout's node_modules, so the pages it serves resolve their dependencies.
-  async function scratchProject(files: Record<string, string>): Promise<string> {
-    const base = join(import.meta.dir, '../node_modules/.cache')
-
-    await mkdir(base, { recursive: true })
-    const root = await mkdtemp(join(base, 'config-'))
-
-    await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
-
-    return root
-  }
-
   it('refuses a config without a default export with a message naming the fix', async () => {
     const root = await scratchProject({ 'kay.config.ts': 'export const routes = \'pages\'\n' })
 
@@ -216,6 +216,38 @@ describe('kay.config.ts', () => {
     expect(withoutPlugins('export default { lang: \'en\' }\n')).toBeUndefined()
     expect(withoutPlugins('const base = { plugins: [] }\nexport default { ...base }\n')).toBeUndefined()
   })
+})
+
+describe('kay build without the server environment', () => {
+  it('prerenders a page whose layout declares a variable the build lacks, and fails one reading it, naming it', async () => {
+    const root = await scratchProject({
+      'src/env.ts': 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ MAIL_TO: t.String() }))\n',
+      'src/routes/_layout.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\nimport { env } from \'../env\'\n\nexport const send = action(t.Object({}), () => env.MAIL_TO)\n---\nslot\n',
+      'src/routes/index.kay': '--- server\nexport const prerender = true\n---\np Home\n',
+    })
+    const build = async () => {
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build'], { cwd: root, env: { PATH: process.env.PATH }, stdout: 'pipe', stderr: 'pipe' })
+      const [report, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+      return { report, code }
+    }
+
+    try {
+      const built = await build()
+
+      expect(built.report).toContain('1 prerendered page')
+      expect(built.code).toBe(0)
+
+      await Bun.write(join(root, 'src/routes/mail.kay'), '--- server\nimport { env } from \'../env\'\n\nexport const prerender = true\n\nconst to = env.MAIL_TO\n---\np {to}\n')
+      const refused = await build()
+
+      expect(refused.report).toContain('kay: MAIL_TO does not match the environment\'s schema')
+      expect(refused.code).toBe(1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
 })
 
 describe('compile cache', () => {

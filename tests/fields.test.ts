@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { defineEnv } from '../src/server'
+import { buildingWithoutEnv } from '../src/server/env'
 import { readQuery } from '../src/server/query'
 import { Denied } from '../src/server/signals'
 
@@ -23,6 +24,23 @@ describe('defineEnv', () => {
   it('refuses a required boolean or list left out, unless the schema gives it a default', () => {
     expect(() => defineEnv(t.Object({ DEBUG: t.Boolean(), HOSTS: t.Array(t.String()) }), {})).toThrow('DEBUG: ')
     expect(defineEnv(t.Object({ DEBUG: t.Boolean({ default: true }), HOSTS: t.Array(t.String(), { default: ['a'] }) }), {})).toEqual({ DEBUG: true, HOSTS: ['a'] })
+  })
+
+  it('lets kay build go on without a variable, a read of it failing instead', () => {
+    buildingWithoutEnv()
+
+    try {
+      const env = defineEnv(schema, { PORT: '80a', DEBUG: 'true' })
+
+      expect(env.DEBUG).toBe(true)
+      expect(() => env.DATABASE_URL).toThrow('kay: DATABASE_URL does not match the environment\'s schema (Property \'DATABASE_URL\' is missing), and kay build renders pages without the server\'s environment')
+      expect(() => env.PORT).toThrow('kay: PORT does not match')
+    }
+    finally {
+      delete (globalThis as Record<symbol, unknown>)[Symbol.for('kay.building')]
+    }
+
+    expect(() => defineEnv(schema, {})).toThrow('kay: the environment does not match its schema')
   })
 })
 

@@ -21,6 +21,7 @@ import { linkVariantFiles } from './runtime/image'
 import { basePath } from './server/base'
 import { buildClient, PRERENDERED_DIR } from './server/client'
 import { compressFiles } from './server/compress'
+import { buildingWithoutEnv } from './server/env'
 import { FAVICON_DIR, writeFavicons } from './server/favicon'
 import { writeImageVariants } from './server/image'
 import { ExportError, prerenderPages } from './server/prerender'
@@ -160,6 +161,8 @@ async function build(args: string[]): Promise<number> {
 
   if (root === undefined)
     return 1
+
+  buildingWithoutEnv()
 
   const config = await loadConfig(root)
   const started = performance.now()
