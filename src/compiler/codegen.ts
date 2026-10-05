@@ -1167,7 +1167,7 @@ class Generator {
 
     const name = this.text(attribute.name)
 
-    if (!element.component && ((LINK_ELEMENTS.has(element.name) && name === 'href') || (attribute.kind === 'static' && WRITTEN_URLS.get(element.name) === name && !this.isAlternateLink(element)))) {
+    if (!element.component && ((LINK_ELEMENTS.has(element.name) && name === 'href') || (attribute.kind === 'static' && WRITTEN_URLS.get(element.name) === name && !this.servedOtherwise(element)))) {
       b.addSource(attribute.name).add('={KayHref(')
 
       if (attribute.kind === 'static')
@@ -1196,9 +1196,14 @@ class Generator {
     return true
   }
 
-  // A feed or a translation, served by what kay check does not list as pages.
-  private isAlternateLink(element: ElementNode): boolean {
-    const rel = element.attributes.find(attribute => attribute.kind === 'static' && this.text(attribute.name) === 'rel')
+  // A feed or a translation, served by what kay check does not list as pages, or a form posting to a route that may take its method only.
+  private servedOtherwise(element: ElementNode): boolean {
+    const value = (name: string) => element.attributes.find(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === name)
+    const rel = value('rel')
+    const method = value('method')
+
+    if (element.name === 'form')
+      return method !== undefined && (method.kind !== 'static' || method.text.toLowerCase() !== 'get')
 
     return element.name === 'link' && rel?.kind === 'static' && rel.text.split(WHITESPACE).includes('alternate')
   }

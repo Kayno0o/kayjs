@@ -742,7 +742,7 @@ import { t } from 'elysia'
 import { action } from 'kay'
 import { addTodo, listTodos } from '../data'
 
-export const add = action(t.Object({ title: t.String({ minLength: 1, error: 'Write a title' }) }), async ({ title }, ctx) => {
+export const add = action(t.Object({ title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }) }), async ({ title }, ctx) => {
   if ((await listTodos()).some(todo => todo.title === title))
     return ctx.fail(409, { message: 'Already on the list' })
 
@@ -821,7 +821,7 @@ The server entry uses it before the pages: `new Elysia().use(sessions).use(await
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const signIn = action(t.Object({ email: t.String(), password: t.String() }), async (input, ctx) => {
+export const signIn = action(t.Object({ email: t.String({ maxLength: 254 }), password: t.String() }), async (input, ctx) => {
   const user = await verify(input)
 
   if (!user)
@@ -977,13 +977,13 @@ it('counts the clicks', async () => {
 ## What `kay check` verifies
 
 - Every expression, prop and server name, as TypeScript does.
-- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/`, the GET routes of the modules under `src/api/` and those of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions, to a guard's `redirect` and to `navigate()`, and an `img` `src`, a `link` `href` (one with `rel=\"alternate\"` excepted, as feeds are not pages) and a `form` `action` written out as text; kay's own sitemap, robots.txt, favicons and health route count as served; a segment written out where a param checked by a matcher kay ships goes, `/posts/abc` for `posts/[id=integer]`, must be one the matcher takes; a path may be spelled as written or percent-encoded, `/café` or `/caf%C3%A9`; a catch-all such as `docs/[...path]`, or an app route such as `/files/*`, is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
+- `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/`, the GET routes of the modules under `src/api/` and those of the app's Elysia instance once it is registered (see Project setup), as are the paths given to `ctx.redirect` in pages and actions, to a guard's `redirect` and to `navigate()`, and an `img` `src`, a `link` `href` (one with `rel="alternate"` excepted, as feeds are not pages) and a `form` `action` written out as text, unless the form posts with another `method` than GET, which a POST route may serve; paths under `/_kay/`, such as resized images, are not checked; kay's own sitemap, robots.txt, favicons and health route count as served; a segment written out where a param checked by a matcher kay ships goes, `/posts/abc` for `posts/[id=integer]`, must be one the matcher takes; a path may be spelled as written or percent-encoded, `/café` or `/caf%C3%A9`; a catch-all such as `docs/[...path]`, or an app route such as `/files/*`, is reached with a trailing slash, `/docs/`, never as `/docs`; a template literal whose start or end is interpolated may reach any page it fits; a plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
 - Literal values the server would refuse when it runs: a `ctx.fail` status outside 400 to 599, a redirect target with a scheme other than http(s), such as `javascript:`, or with a line break, and a `cached()` ttl that is not positive. A computed one is checked when it runs.
 - Island props passed from static components can be serialized, those of a `{...spread}` included: no functions or class instances, and no children.
 - No component reads a browser-only global while it renders, and no island branches on `typeof window` (see Browser-only components). Reported by `kay check`, the editor, with quick fixes, and `kay build`, not by `kay dev`.
 - No island renders from what the server and the browser compute apart: the clock (`Date.now()`, `new Date()`), `Math.random()`, or `toLocale*String` and `Intl` formats given no locale, or for dates no `timeZone`, while it renders; each would make its markup differ from the server's when it hydrates. Reported by `kay check`, the editor and `kay build`, not by `kay dev`.
-- Every string field of an action's schema has a `maxLength`, secrets such as a password excepted: a refused form post brings its values back to the page in a cookie, and one too long for it brings the form back empty. The quick fix adds `maxLength: 200`.
+- Every string field of an action's schema has a `maxLength`, secrets such as a password excepted: a refused form post brings its values back to the page in a cookie, and one too long for it brings the form back empty. The quick fix adds `maxLength: 200`. Only a schema written inside the `action(...)` call is read, not one held in a variable.
 - Every content collection entry against its schema and the components its collection names, and the props a Markdown entry gives each component against the props it takes, as a template's would be: one missing, misspelt or of another type, reported at the entry's line. `kay check` reads the collections before it type-checks for this; the editor does not report these.
 - With `i18n`, every `t()` key and its placeholders against the default locale's messages, and every other locale's messages against them: a key one lacks or has alone, a placeholder it drops or adds, plural forms where the default has text. Links may carry a locale's prefix.
 - What a page needs to be usable without seeing it: an `img` has `alt` (`alt=""` for decoration), an `iframe` a `title`, an `input(type="image")` an `alt`, and an element with `onClick` is one a keyboard reaches, such as a `button` or an `a`, or has a `role`. An element with a `{...spread}` is not checked. These are reported by `kay check`, the editor and `kay build`, not by `kay dev`: the page still runs there meanwhile.

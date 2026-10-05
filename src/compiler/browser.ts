@@ -125,6 +125,13 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   const varying: Varying[] = []
   let effectBound = false
 
+  const noteVarying = (path: NodePath<t.CallExpression | t.NewExpression>) => {
+    const found = island ? varyingValue(path) : undefined
+
+    if (found)
+      varying.push({ ...found, start: path.node.start!, end: path.node.end!, chain: functionChain(path) })
+  }
+
   // A name the template binds twice over the script's, which no block can tell apart, leaves nothing to report rather than failing the check.
   try {
     loadTraverse()(ast, {
@@ -145,16 +152,10 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
         if (callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.path.isProgram())
           calls.push({ name: callee.name, chain: functionChain(path) })
 
-        const found = island ? varyingValue(path) : undefined
-
-        if (found)
-          varying.push({ ...found, start: path.node.start!, end: path.node.end!, chain: functionChain(path) })
+        noteVarying(path)
       },
       NewExpression(path) {
-        const found = island ? varyingValue(path) : undefined
-
-        if (found)
-          varying.push({ ...found, start: path.node.start!, end: path.node.end!, chain: functionChain(path) })
+        noteVarying(path)
       },
       Program(path) {
         effectBound = path.scope.hasBinding('effect', true)
@@ -230,7 +231,6 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
 function varyingValue(path: NodePath<t.CallExpression | t.NewExpression>): Omit<Varying, 'start' | 'end' | 'chain'> | undefined {
   const { callee, arguments: args } = path.node
   const global = (node: t.Node, name: string) => node.type === 'Identifier' && node.name === name && !path.scope.hasBinding(name, true)
-  const lacks = (options: t.Node | undefined, key: string) => options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type === 'ObjectProperty' && !property.computed && !(property.key.type === 'Identifier' && property.key.name === key) && !(property.key.type === 'StringLiteral' && property.key.value === key)))
   const noLocale = (locale: t.Node | undefined) => locale === undefined || global(locale, 'undefined')
 
   if (global(callee, 'Date'))
@@ -251,7 +251,7 @@ function varyingValue(path: NodePath<t.CallExpression | t.NewExpression>): Omit<
     if (noLocale(args[0]))
       return { label: `Intl.${name}`, ...NO_LOCALE }
 
-    return name === 'DateTimeFormat' && lacks(args[1], 'timeZone') ? { label: 'Intl.DateTimeFormat', ...NO_TIME_ZONE } : undefined
+    return name === 'DateTimeFormat' && lacksOption(args[1], 'timeZone') ? { label: 'Intl.DateTimeFormat', ...NO_TIME_ZONE } : undefined
   }
 
   if (!path.isCallExpression() || !LOCALE_METHODS.has(name))
@@ -261,7 +261,12 @@ function varyingValue(path: NodePath<t.CallExpression | t.NewExpression>): Omit<
     return { label: `${name}()`, ...NO_LOCALE }
 
   // A number's `toLocaleString` has no time zone to take; only the date methods are sure to format one.
-  return name !== 'toLocaleString' && lacks(args[1], 'timeZone') ? { label: `${name}()`, ...NO_TIME_ZONE } : undefined
+  return name !== 'toLocaleString' && lacksOption(args[1], 'timeZone') ? { label: `${name}()`, ...NO_TIME_ZONE } : undefined
+}
+
+// Options written out without the key; computed ones are taken as setting it.
+function lacksOption(options: t.Node | undefined, key: string): boolean {
+  return options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type === 'ObjectProperty' && !property.computed && !(property.key.type === 'Identifier' && property.key.name === key) && !(property.key.type === 'StringLiteral' && property.key.value === key)))
 }
 
 // `memo(() => ...)` and `rows.map(row => ...)` run the function they take before they return.

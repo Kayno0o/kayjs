@@ -547,6 +547,7 @@ function contentPropsCheck(root: string, configFile: string, uses: ComponentUse[
     'type KayPropsOf<Component> = Component extends (props: infer Props) => unknown ? Props : never',
     '',
   ]
+  // What a component wraps reaches it as `children`, which one taking none is then reported for.
   const checks = uses.map((use, index) => {
     const props = [...Object.entries(use.props).map(([name, value]) => `${IDENTIFIER.test(name) ? name : JSON.stringify(name)}: ${JSON.stringify(value)}`), ...use.children ? ['children: undefined as never'] : []]
 

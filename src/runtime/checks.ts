@@ -48,6 +48,7 @@ type Integer<Text extends string> = Text extends `-${infer Rest}` ? Runs<Rest, D
 type Slug<Text extends string> = Text extends `${infer Word}-${infer Rest}` ? Runs<Word, SchemeStart | Digit> extends 0 | -1 ? false : Slug<Rest> : Runs<Text, SchemeStart | Digit> extends 0 | -1 ? false : true
 type Uuid<Text extends string> = Lowercase<Text> extends `${infer A}-${infer B}-${infer C}-${infer D}-${infer E}` ? [Runs<A, HexDigit>, Runs<B, HexDigit>, Runs<C, HexDigit>, Runs<D, HexDigit>, Runs<E, HexDigit>] extends [8, 4, 4, 4, 12] ? true : false : false
 // A segment written out must be one the param's matcher takes, as `src/runtime/params.ts` reads it; one computed, `${number}` or `string`, is checked when the request comes.
+// A computed segment is no single key: a record keyed by it is an index signature, which an empty object satisfies.
 type Accepts<Segment extends string, Matcher extends string> = Record<never, never> extends Record<Segment, 1>
   ? true
   : Matcher extends 'integer' ? Integer<Segment> : Matcher extends 'slug' ? Slug<Segment> : Matcher extends 'uuid' ? Uuid<Segment> : true
@@ -77,10 +78,10 @@ type IsRoute<Path extends string> = [RoutePatterns] extends [never]
 // The route tree of a module under `src/api`, from its default export.
 export type ApiRoutesOf<Module> = Module extends { default: { '~Routes': infer Routes } } ? Routes : Record<never, never>
 
-// A site-relative literal must match a page; opaque strings, relative paths and other schemes are not checked.
+// A site-relative literal must match a page; opaque strings, relative paths, other schemes and what kay serves under `/_kay/`, such as resized images, are not checked.
 export type CheckedHref<Href extends string> = string extends Href
   ? unknown
-  : Href extends `//${string}`
+  : Href extends `//${string}` | `/_kay/${string}`
     ? unknown
     : Href extends `/${string}`
       ? IsRoute<PathOf<Href>> extends true ? unknown : { kayError: `No page, public file or app route serves ${PathOf<Href>}` }

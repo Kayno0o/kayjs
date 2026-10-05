@@ -656,7 +656,7 @@ describe('kay check, string fields an action leaves unbounded', () => {
 })
 
 describe('kay check, URLs written out besides links', () => {
-  it('checks img src, link href, form action and navigate() as links, and a literal segment against the matcher kay ships for its param', async () => {
+  it('checks img src, link href, a form action sent with GET and navigate() as links, and a literal segment against the matcher kay ships for its param', async () => {
     const page = [
       '---',
       'import { navigate } from \'kay\'',
@@ -680,7 +680,10 @@ describe('kay check, URLs written out besides links', () => {
       'link(rel="icon" href="/favicon.ico")',
       'form(action="/nowhere")',
       'form(action="/")',
+      'form(action="/logout" method="post")',
+      'img(src="/_kay/image?src=a.png&w=640" alt="")',
       'button(onClick={go}) {String(fine)}',
+      'form(action="/search" method="GET")',
       '',
     ].join('\n')
     const root = await scratchProject({
@@ -701,6 +704,7 @@ describe('kay check, URLs written out besides links', () => {
         [17, 'No page, public file or app route serves /missing.png'],
         [18, 'No page, public file or app route serves /nope.css'],
         [21, 'No page, public file or app route serves /nowhere'],
+        [26, 'No page, public file or app route serves /search'],
       ])
     }
     finally {
