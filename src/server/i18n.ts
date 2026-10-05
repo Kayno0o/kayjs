@@ -1,6 +1,7 @@
 import type { I18nConfig } from '../config'
 import type { LocaleSettings, Message, MessageTree, Translations } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
+import type { Route } from './routes'
 import { existsSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -53,6 +54,26 @@ export function localeSettings(config: I18nConfig): LocaleSettings {
     throw new Error(`kay: i18n gives domains, but none to ${homeless}, which no request could then reach`)
 
   return { locales: config.locales, defaultLocale: config.defaultLocale, prefixDefault: config.prefixDefault === true, ...config.domains && { hosts: config.domains } }
+}
+
+// The locales served under a prefix: every one but an unprefixed default, none when each has its domain.
+export function localePrefixes(settings: LocaleSettings): string[] {
+  return settings.hosts ? [] : settings.locales.filter(locale => locale !== settings.defaultLocale || settings.prefixDefault)
+}
+
+// A page whose first segment is a locale's prefix would be served twice at one path.
+export function refuseLocaleClashes(settings: LocaleSettings, routes: Pick<Route, 'file' | 'pattern'>[]): void {
+  const prefixes = new Set(localePrefixes(settings))
+  const clash = routes.find(route => prefixes.has(firstSegment(route.pattern)))
+
+  if (clash)
+    throw new Error(`kay: ${clash.file} serves ${clash.pattern}, under the prefix of the locale ${firstSegment(clash.pattern)}; kay serves every page there already`)
+}
+
+function firstSegment(path: string): string {
+  const end = path.indexOf('/', 1)
+
+  return end === -1 ? path.slice(1) : path.slice(1, end)
 }
 
 // Every locale's messages, the default locale's standing in for a key another lacks.

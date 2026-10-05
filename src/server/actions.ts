@@ -74,7 +74,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
         continue
 
       if (taken)
-        throw new Error(`kay: ${taken.file} and ${file} both export an action served at ${value.url}; rename one of the files`)
+        throw actionClash(taken.file, file, value.url)
 
       served.set(value.url, { file, action: value })
       limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: (request, bytes) => tooLarge(value, request, bytes) })
@@ -122,6 +122,11 @@ function tooLarge(action: ServerAction<TSchema, unknown>, request: Request, byte
     return crossSiteRefusal()
 
   return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': `Too large to send; ${sizeText(bytes)} at most` } })
+}
+
+// Two files whose paths differ only where a URL keeps neither, `a b.kay` and `a_b.kay`, serve their actions at one URL.
+export function actionClash(first: string, second: string, url: string): Error {
+  return new Error(`kay: ${first} and ${second} both export an action served at ${url}; rename one of the files`)
 }
 
 // Every page and layout once, with the guards of its own directory and above: a layout's actions are not behind the guards of the pages below it.

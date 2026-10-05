@@ -24,7 +24,7 @@ import { DEV_EVENTS, devEvents, hotSwap } from './dev'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, serveFavicons } from './favicon'
 import { loadGuards } from './guards'
-import { cookieLocale, hostLocale, loadI18n, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
+import { cookieLocale, hostLocale, loadI18n, localeCookie, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
 import { serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
@@ -32,12 +32,12 @@ import { logRequests } from './log'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
 import { trustProxy } from './protection'
 import { servePublic } from './public'
-import { readRedirects, redirectShape, serveRedirects } from './redirects'
+import { readRedirects, refuseRedirectClashes, serveRedirects } from './redirects'
 import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './render'
 import { reportServerError } from './report'
 import { revalidateStale } from './revalidate'
 import { rewriteRequests } from './rewrite'
-import { decodePath, refuseClashes, routerKey, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
+import { decodePath, refuseClashes, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
 import { securityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
 import { serveSitemap } from './sitemap'
@@ -107,24 +107,9 @@ function localeVariants(settings: LocaleSettings | undefined): { prefix: string,
   if (!settings || settings.hosts)
     return [{ prefix: '', locale: undefined }]
 
-  const prefixed = settings.locales.filter(locale => locale !== settings.defaultLocale || settings.prefixDefault).map(locale => ({ prefix: `/${locale}`, locale }))
+  const prefixed = localePrefixes(settings).map(locale => ({ prefix: `/${locale}`, locale }))
 
   return [{ prefix: '', locale: settings.prefixDefault ? undefined : settings.defaultLocale }, ...prefixed]
-}
-
-// A page whose first segment is a locale's prefix would be served twice at one path.
-function refuseLocaleClashes(settings: LocaleSettings, routes: ServedRoute[]): void {
-  const prefixes = new Set(localeVariants(settings).map(variant => variant.prefix.slice(1)).filter(prefix => prefix !== ''))
-  const clash = routes.find(route => prefixes.has(firstSegment(route.pattern)))
-
-  if (clash)
-    throw new Error(`kay: ${clash.file} serves ${clash.pattern}, under the prefix of the locale ${firstSegment(clash.pattern)}; kay serves every page there already`)
-}
-
-function firstSegment(path: string): string {
-  const end = path.indexOf('/', 1)
-
-  return end === -1 ? path.slice(1) : path.slice(1, end)
 }
 
 // A temporary redirect, since another visitor goes elsewhere, which no shared cache may keep.
@@ -266,12 +251,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const matchers = await loadMatchers(routesDir, routes)
   const trailingSlash = options.trailingSlash ?? 'never'
   const redirects = readRedirects(options.redirects ?? {})
-  const pagePaths = new Set([...servedPaths(routes)].map(routerKey))
 
-  for (const redirect of redirects) {
-    if (pagePaths.has(redirectShape(redirect)))
-      throw new Error(`kay: the redirect from ${redirect.path} takes a path a page serves; remove the redirect or the page`)
-  }
+  refuseRedirectClashes(redirects, routes)
 
   serveRedirects(app, redirects)
 

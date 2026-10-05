@@ -2,7 +2,7 @@ import type { Elysia } from 'elysia'
 import type { Collection } from './index'
 import type { ContentProblem } from './validate'
 import { existsSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 import { bundled, importModule } from '../server/bundle'
 import { registerLoader } from '../server/loader'
 import { feedXml } from './feed'
@@ -56,10 +56,14 @@ export async function writeContentManifests(root: string, clientBase: string, co
 }
 
 // Every entry that fails to compile or to match its schema, across the project's collections, for `kay check`.
-export async function contentProblems(root: string, config?: string): Promise<ContentProblem[]> {
+// `site` says whether the config sets the site's URL, which a collection's feed needs.
+export async function contentProblems(root: string, config?: string, site = true): Promise<ContentProblem[]> {
   const problems: ContentProblem[] = []
 
   for (const collection of await projectCollections(root, config)) {
+    if (collection.options.feed && !site)
+      problems.push({ file: relative(root, resolve(root, config ?? CONTENT_CONFIG)), line: 1, message: feedNeedsSite(collection).message })
+
     try {
       decodeEntries(await loadEntries(collection.dir, collection.options.highlight, true), collection.options.schema, collection.options.components ?? {})
     }
@@ -74,6 +78,10 @@ export async function contentProblems(root: string, config?: string): Promise<Co
   return problems
 }
 
+function feedNeedsSite(collection: Collection<unknown>): Error {
+  return new Error(`kay: the collection ${collection.dir} has a feed, whose links need the site's URL: set \`site\` in kay.config.ts`)
+}
+
 // Serves each collection's feed at its path; one stays cached for an hour in production.
 export function serveFeeds(app: Elysia, collections: Collection<unknown>[], origin: string | undefined, dev = false): void {
   for (const collection of collections) {
@@ -83,7 +91,7 @@ export function serveFeeds(app: Elysia, collections: Collection<unknown>[], orig
       continue
 
     if (origin === undefined)
-      throw new Error(`kay: the collection ${collection.dir} has a feed, whose links need the site's URL: set \`site\` in kay.config.ts`)
+      throw feedNeedsSite(collection)
 
     const type = feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'
 

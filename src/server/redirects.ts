@@ -1,4 +1,6 @@
 import type { Elysia } from 'elysia'
+import type { Route } from './routes'
+import { routerKey, servedPaths } from './routes'
 
 // A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise.
 export type Redirects = Record<string, string | { to: string, permanent?: boolean }>
@@ -91,9 +93,14 @@ function reaches(target: string[], slash: boolean, path: string[]): boolean {
   return target.length === path.length || (slash && target.length === path.length - 1 && path.at(-1) === '*')
 }
 
-// The router path a redirect registers, its params unnamed, to compare with what the pages serve.
-export function redirectShape(redirect: Redirect): string {
-  return redirect.path.replaceAll(POSITIONAL, ':')
+// A redirect registered before the pages would hide the page serving its old path.
+export function refuseRedirectClashes(redirects: Redirect[], routes: Route[]): void {
+  const pagePaths = new Set([...servedPaths(routes)].map(routerKey))
+
+  for (const redirect of redirects) {
+    if (pagePaths.has(redirect.path.replaceAll(POSITIONAL, ':')))
+      throw new Error(`kay: the redirect from ${redirect.path} takes a path a page serves; remove the redirect or the page`)
+  }
 }
 
 // Registered before the pages, the query carried over unless the target gives its own.

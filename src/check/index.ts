@@ -30,11 +30,13 @@ import { publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { patternShapes, routeOf, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
+import { bootProblems } from './boot'
 import { islandOnlyComponents } from './island-only'
 
 export const SHADOW_DIR = join('.kay', 'types')
 const KAY_FILE = /\.kay$/
 const SETTINGS_CHECK = 'kay-settings.ts'
+const EXPORTS_CHECK = 'kay-exports.ts'
 const TSX_EXTENSION = /\.tsx$/
 const SCRIPT_EXTENSION = /\.[cm]?[jt]sx?$/
 const CONTENT_PROBLEMS = fileURLToPath(new URL('../content/problems.ts', import.meta.url))
@@ -54,6 +56,10 @@ export interface CheckOptions {
   content?: string
   // The config's redirects, whose targets on the site must be a page or a public file.
   redirects?: Redirects
+  // Where the site is mounted, the origin it is public at and how long a stopping server waits, which the server refuses at boot when it cannot read them.
+  base?: string
+  site?: string
+  shutdownTimeout?: number
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
   i18n?: I18nConfig
 }
@@ -99,6 +105,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const iconsPath = join(root, SHADOW_DIR, 'kay-icons.d.ts')
   const packagesPath = join(root, SHADOW_DIR, 'kay-packages.d.ts')
   const settingsPath = join(root, SHADOW_DIR, SETTINGS_CHECK)
+  const exportsPath = join(root, SHADOW_DIR, EXPORTS_CHECK)
   const own = await findKayFiles(root, { project: true, ownOnly: true })
   const sources = new Map(await Promise.all(own.map(async file => [file, await Bun.file(file).text()] as const)))
   const islandOnly = await islandOnlyComponents(root, routesDir, own, sources)
@@ -165,18 +172,20 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await writeIfChanged(packagesPath, packageTypes(root, libraries))
 
   const replaced = settingsCheck(root, options.settings ?? {}, diagnostics)
+  const exported = exportsCheck(root, routesDir, routes, apiModules)
 
   await writeIfChanged(settingsPath, replaced.code)
+  await writeIfChanged(exportsPath, exported.code)
 
   // Rewriting in place keeps every shadow file present for editors reading the tree meanwhile; only stale ones go.
   const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))
     .filter(entry => entry.isFile())
     .map(entry => join(entry.parentPath, entry.name))
-    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && path !== packagesPath && path !== settingsPath && !files.has(path))
+    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && path !== packagesPath && path !== settingsPath && path !== exportsPath && !files.has(path))
 
   await Promise.all(stale.map(async path => rm(path)))
 
-  return { files, diagnostics, unreached, libraries, settings: replaced.lines, islandOnly }
+  return { files, diagnostics, unreached, libraries, settings: replaced.lines, exports: exported.lines, islandOnly }
 }
 
 export interface ShadowTypes {
@@ -187,6 +196,8 @@ export interface ShadowTypes {
   libraries: KayLibrary[]
   // The app's settings module each line of the settings check stands for, with the library it sets.
   settings: Map<number, { file: string, library: string }>
+  // The guard, API module or matcher each line of the exports check reads the default export of, with what it must be.
+  exports: Map<number, { file: string, wanted: string }>
   // The static components only islands render, which compile as rendered inline with them.
   islandOnly: Set<string>
 }
@@ -242,6 +253,34 @@ function settingsCheck(root: string, settings: Record<string, string>, diagnosti
   }
 
   return { code: `${imports.join('\n')}\n\n${checks.join('\n')}\n`, lines }
+}
+
+// Each default export the server calls, a guard's, an API module's or a matcher's, assigned to the type it is called as, so a wrong one is a type error at its file rather than a refusal at boot.
+function exportsCheck(root: string, routesDir: string, routes: Route[], api: ApiModule[]): { code: string, lines: Map<number, { file: string, wanted: string }> } {
+  const guards = new Set([...routes.flatMap(route => route.guards.map(guard => guard.file)), ...api.flatMap(module => module.guards)])
+  const matchers = new Set(routes.flatMap(route => Object.values(route.matchers ?? {})).map(matcher => matcherSource(routesDir, matcher)).filter((source): source is string => source !== undefined && source !== 'kay'))
+  const entries = [
+    ...[...guards].map(file => ({ file, type: 'Guard', wanted: 'a guard by default: export default guard(ctx => ...)' })),
+    ...api.map(module => ({ file: module.file, type: 'AnyElysia', wanted: 'an Elysia instance by default: export default new Elysia().get(\'/\', () => ...)' })),
+    ...[...matchers].map(file => ({ file, type: '(value: string) => unknown', wanted: 'a matcher by default: export default (value: string) => value or undefined' })),
+  ]
+  const lines = new Map<number, { file: string, wanted: string }>()
+
+  if (entries.length === 0)
+    return { code: '', lines }
+
+  const shadowDir = join(root, SHADOW_DIR)
+  const header = [...guards.size > 0 ? ['import type { Guard } from \'kay\''] : [], ...api.length > 0 ? ['import type { AnyElysia } from \'elysia\''] : []]
+  const imports = entries.map(({ file }, index) => `import kayExport${index} from ${JSON.stringify(relative(shadowDir, file).replace(SCRIPT_EXTENSION, ''))}`)
+  const checks = entries.map(({ type }, index) => `export const kayCheck${index}: ${type} = kayExport${index}`)
+
+  // Lines count from 1: the type imports, the imports, a blank line, then the checks.
+  for (const [index, { file, wanted }] of entries.entries()) {
+    lines.set(header.length + 1 + index, { file, wanted })
+    lines.set(header.length + entries.length + 2 + index, { file, wanted })
+  }
+
+  return { code: `${[...header, ...imports].join('\n')}\n\n${checks.join('\n')}\n`, lines }
 }
 
 // The API modules, or none with the reason the server would refuse them reported at the directory.
@@ -399,10 +438,11 @@ function spellings(path: string): string[] {
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
-  const { files, diagnostics, unreached, libraries, settings } = await writeShadowTypes(root, options)
+  const { files, diagnostics, unreached, libraries, settings, exports } = await writeShadowTypes(root, options)
   const settingsFile = join(resolve(root), SHADOW_DIR, SETTINGS_CHECK)
+  const exportsFile = join(resolve(root), SHADOW_DIR, EXPORTS_CHECK)
   const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-  const [output, errors, code, content, messages] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkContent(root, options.content), checkMessages(root, options.i18n)])
+  const [output, errors, code, content, messages, boot] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkContent(root, options.content, options.site !== undefined), checkMessages(root, options.i18n), bootProblems(resolve(root), options)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
@@ -416,14 +456,17 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   for (const diagnostic of reported) {
     const remapped = remap(diagnostic, files)
     const setting = remapped.file === settingsFile ? settings.get(remapped.line) : undefined
+    const exported = remapped.file === exportsFile ? exports.get(remapped.line) : undefined
 
     if (setting)
       diagnostics.push({ file: setting.file, line: 1, column: 1, code: remapped.code, message: `The settings for ${setting.library} do not match what it takes: ${remapped.message}` })
+    else if (exported)
+      diagnostics.push({ file: exported.file, line: 1, column: 1, code: remapped.code, message: `It must export ${exported.wanted}: ${remapped.message}` })
     else if (!broken.has(remapped.file) && !unreached.has(remapped.file) && !libraryModule(remapped.file))
       diagnostics.push(remapped)
   }
 
-  diagnostics.push(...content, ...messages)
+  diagnostics.push(...content, ...messages, ...boot)
 
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && reported.length === 0 && errors.trim() === '')
@@ -454,11 +497,11 @@ function problemsIn(root: string, output: string): CheckDiagnostic[] {
 }
 
 // The collections' entries that fail to compile or to match their schema, read in a process of its own.
-async function checkContent(root: string, config: string | undefined): Promise<CheckDiagnostic[]> {
+async function checkContent(root: string, config: string | undefined, site: boolean): Promise<CheckDiagnostic[]> {
   if (config === undefined && !existsSync(resolve(root, CONTENT_CONFIG)))
     return []
 
-  const child = Bun.spawn([process.execPath, CONTENT_PROBLEMS, resolve(root), config ?? ''], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, CONTENT_PROBLEMS, resolve(root), config ?? '', site ? 'site' : ''], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   if (code !== 0)

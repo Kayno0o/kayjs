@@ -39,11 +39,15 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, config: HealthCon
   })
 }
 
+export function refuseShutdownTimeout(timeout: number): void {
+  if (!Number.isFinite(timeout) || timeout <= 0)
+    throw new Error(`kay: shutdownTimeout is ${timeout}; it takes a positive number of seconds`)
+}
+
 // On SIGTERM or SIGINT, the server stops taking connections, lets the open requests and streams finish, runs the app's `onStop` hooks, then the process exits.
 // Past `timeout` seconds whatever is still open is closed and the process exits with 1.
 export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, timeout = DEFAULT_SHUTDOWN_TIMEOUT): void {
-  if (!Number.isFinite(timeout) || timeout <= 0)
-    throw new Error(`kay: shutdownTimeout is ${timeout}; it takes a positive number of seconds`)
+  refuseShutdownTimeout(timeout)
 
   let release: (() => void) | undefined
 

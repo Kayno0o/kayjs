@@ -1,3 +1,4 @@
+import type { CronSchedule } from '../runtime/checks'
 import { Elysia } from 'elysia'
 import { logError } from '../build/sourcemap'
 
@@ -8,7 +9,7 @@ export interface ScheduleOptions {
 
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, from when the server starts until it stops: once per process, never two runs at a time.
 // A run that throws is logged and the next one comes as planned; a stopping server waits for the run in progress.
-export function schedule(cron: string, job: () => unknown, options: ScheduleOptions = {}) {
+export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, job: () => unknown, options: ScheduleOptions = {}) {
   // A typo fails the boot rather than never running.
   if (Bun.cron.parse(cron, Date.now(), options) === null)
     throw new Error(`kay: the schedule ${cron} never comes`)

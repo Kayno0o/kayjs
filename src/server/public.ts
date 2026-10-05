@@ -32,6 +32,14 @@ function urlSegment(name: string): string {
   return encodeURIComponent(name).replace(SENT_AS_IS, decodeURIComponent).replace(ROUTER_SYNTAX, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
 }
 
+export function refusePublicClashes(files: { path: string, url: string }[], routes: Route[]): void {
+  const pages = servedPaths(routes)
+  const clash = files.find(file => pages.has(file.url))
+
+  if (clash)
+    throw new Error(`kay: ${relative(process.cwd(), clash.path)} and a page both serve ${clash.url}`)
+}
+
 // Caches and proxies may send several tags, a weak one or `*`; a revalidation compares them weakly.
 export function matchesEtag(header: string | null, etag: string): boolean {
   const tag = etag.replace(WEAK_PREFIX, '')
@@ -50,13 +58,11 @@ export function revalidated(request: Request, etag: string, body: () => BodyInit
 }
 
 export async function servePublic(app: Elysia, dir: string, routes: Route[]): Promise<Set<string>> {
-  const pages = servedPaths(routes)
   const files = await publicFiles(dir)
 
-  for (const { path, url } of files) {
-    if (pages.has(url))
-      throw new Error(`kay: ${relative(process.cwd(), path)} and a page both serve ${url}`)
+  refusePublicClashes(files, routes)
 
+  for (const { path, url } of files) {
     const { size, mtimeMs } = await stat(path)
     const etag = `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
 

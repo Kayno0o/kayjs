@@ -121,8 +121,8 @@ async function runCheck(args: string[]): Promise<number> {
 
 // Prints what `kay check` finds in the project, as it finds it, and answers how many problems that was.
 async function checkProject(root: string, config: KayConfig, tsconfig: string): Promise<number> {
-  const { routes, publicDir, api, content, redirects, i18n, settings } = config
-  const diagnostics = await check(root, { tsconfig, routes, publicDir, api, content, redirects, i18n, settings })
+  const { routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout } = config
+  const diagnostics = await check(root, { tsconfig, routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout })
   const sources = new Map<string, string | undefined>()
 
   for (const diagnostic of diagnostics) {

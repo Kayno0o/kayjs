@@ -138,7 +138,7 @@ export async function scanRoutes(routesDir: string): Promise<Route[]> {
 }
 
 // Two pages serving the same path stop the server, unless all but one check a param with a matcher, which a refused URL falls through; so does a name the router misreads.
-// The server and the build call it; `kay check` and the editor read routes mid-edit and leave it out.
+// The server, the build and `kay check` call it; the editor, reading routes mid-edit, does not.
 export function refuseClashes(routesDir: string, routes: Route[]): void {
   const plainAt = new Map<string, Route>()
 

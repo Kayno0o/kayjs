@@ -102,6 +102,22 @@ export type ErrorStatus<Status extends number> = number extends Status ? unknown
 // A literal duration in seconds is positive; a computed one is checked when it is used.
 export type PositiveSeconds<Seconds extends number> = number extends Seconds ? unknown : `${Seconds}` extends `-${string}` | '0' ? { kayError: `A duration is a positive number of seconds, not ${Seconds}` } : unknown
 
+type CronNickname = 'yearly' | 'annually' | 'monthly' | 'weekly' | 'daily' | 'midnight' | 'hourly'
+type CronFields<Cron extends string> = Cron extends `${infer Field} ${infer Rest}` ? Field extends '' ? CronFields<Rest> : [Field, ...CronFields<Rest>] : Cron extends '' ? [] : [Cron]
+// A day the month never has, every weekday allowed: `30 2`, `31 APR`.
+type MissingDay<Day, Month extends string, Weekday> = Weekday extends '*'
+  ? Day extends '30' | '31' ? Uppercase<Month> extends '2' | '02' | 'FEB' ? true : Day extends '31' ? Uppercase<Month> extends '4' | '04' | '6' | '06' | '9' | '09' | '11' | 'APR' | 'JUN' | 'SEP' | 'NOV' ? true : false : false : false
+  : false
+
+// A literal schedule has five fields or is a nickname, and comes some day; a computed one, or a field this does not read, is checked when the server starts.
+export type CronSchedule<Cron extends string> = string extends Cron
+  ? unknown
+  : Cron extends `@${infer Name}`
+    ? Name extends CronNickname ? unknown : { kayError: `A schedule nickname is @yearly, @monthly, @weekly, @daily or @hourly, not ${Cron}` }
+    : CronFields<Cron> extends [string, string, infer Day, infer Month extends string, infer Weekday]
+      ? MissingDay<Day, Month, Weekday> extends true ? { kayError: `The schedule ${Cron} never comes` } : unknown
+      : { kayError: `A schedule has five fields, minute hour day month weekday, not ${Cron}` }
+
 // What crosses to the browser besides plain objects and arrays, as `src/runtime/wire.ts` encodes it.
 type Sendable = string | number | boolean | bigint | null | undefined | Date | RegExp | URL | URLSearchParams
 

@@ -1,3 +1,4 @@
+import type { CheckOptions } from '../src/check'
 import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import process from 'node:process'
@@ -518,5 +519,114 @@ function firstLine(text: string): string {
 describe('kay check on compiler output', () => {
   it('types annotated server declarations, duplicate imports, prop defaults, script types, component tags and merged classes', async () => {
     expect(await check(join(fixtures, 'compiler'))).toEqual([])
+  })
+})
+
+describe('kay check, what the server refuses at boot', () => {
+  // The problems kay finds itself, as file and message, sorted; TypeScript's own left out.
+  const refusals = async (root: string, options: CheckOptions = {}) => (await check(root, options))
+    .filter(d => d.code === undefined || d.message.startsWith('It must export'))
+    // The server names a public file from where it runs.
+    .map(d => [relative(root, d.file), d.message.replaceAll(`${root}/`, '').replaceAll(`${relative(process.cwd(), root)}/`, '')])
+    .sort((a, b) => `${a[0]}${a[1]}`.localeCompare(`${b[0]}${b[1]}`))
+  const action = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const save = action(t.Object({}), async () => 1)\n---\np x\n'
+
+  it('reports a base, a site or a shutdownTimeout the server cannot read, and redirect syntax it refuses', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n' })
+
+    try {
+      expect(await refusals(root, { base: 'docs', site: 'example.com', shutdownTimeout: 0, redirects: { '/old/:slug': '/:id' } })).toEqual([
+        ['kay.config.ts', 'kay: base is docs, which is no path such as /docs'],
+        ['kay.config.ts', 'kay: shutdownTimeout is 0; it takes a positive number of seconds'],
+        ['kay.config.ts', 'kay: site is the origin the site is public at, such as https://example.com, not "example.com"'],
+        ['kay.config.ts', 'kay: the redirect from /old/:slug goes to /:id, whose :id its path has none of'],
+      ])
+      expect(await refusals(root, { redirects: { old: '/' } })).toEqual([['kay.config.ts', 'kay: the redirect from old needs a path starting with /']])
+      expect(await refusals(root, { redirects: { '/a*b': '/' } })).toEqual([['kay.config.ts', 'kay: the redirect from /a*b has a*b, neither a :param nor a final *']])
+      expect(await refusals(root, { base: '/docs/', site: 'https://example.com', shutdownTimeout: 5, redirects: { '/old/*': '/*' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a redirect from a path a page serves, a page under a locale prefix, and a public file a page serves', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p hi\n',
+      'src/routes/about.kay': 'p about\n',
+      'src/routes/en/team.kay': 'p team\n',
+      'src/messages/fr.ts': 'export default {}\n',
+      'src/messages/en.ts': 'export default {}\n',
+      'public/about': 'text\n',
+    })
+
+    try {
+      expect(await refusals(root, { redirects: { '/about': '/' }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } })).toEqual([
+        ['kay.config.ts', 'kay: src/routes/en/team.kay serves /en/team, under the prefix of the locale en; kay serves every page there already'],
+        ['kay.config.ts', 'kay: the redirect from /about takes a path a page serves; remove the redirect or the page'],
+        ['public', 'kay: public/about and a page both serve /about'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports two pages serving one path, and two files whose actions share a URL, where the second is', async () => {
+    const root = await scratchProject({
+      'src/routes/team.kay': 'p team\n',
+      'src/routes/team/index.kay': 'p team\n',
+      'src/routes/a b.kay': action,
+      'src/routes/a_b.kay': action,
+      'src/routes/c.kay': action,
+    })
+
+    try {
+      expect(await refusals(root)).toEqual([
+        ['src/routes/a_b.kay', 'kay: src/routes/a b.kay and src/routes/a_b.kay both export an action served at /_kay/action/src/routes/a_b.kay/save; rename one of the files'],
+        ['src/routes', 'kay: src/routes/team.kay and src/routes/team/index.kay both serve /team; give one a matcher, [id=integer], for the other to take what it refuses'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a guard, an API module or a matcher whose default export is not what the server calls, at its file', async () => {
+    const root = await scratchProject({
+      'src/routes/_guard.ts': 'export default 42\n',
+      'src/routes/[id=even].kay': 'p {ctx.params.id}\n',
+      'src/params/even.ts': 'export default \'even\'\n',
+      'src/api/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(() => undefined)\n',
+      'src/api/chat.ts': 'export const x = 1\n',
+      'src/api/ok.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'ok\')\n',
+    })
+
+    try {
+      expect((await refusals(root)).map(([file, message]) => [file, message!.slice(0, message!.indexOf(':'))])).toEqual([
+        ['src/api/chat.ts', 'It must export an Elysia instance by default'],
+        ['src/params/even.ts', 'It must export a matcher by default'],
+        ['src/routes/_guard.ts', 'It must export a guard by default'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a feed without the site\'s URL its links need', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p hi\n',
+      'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', {\n  schema: t.Object({ title: t.String() }),\n  feed: { path: \'/notes.xml\', title: \'Notes\', item: note => ({ title: note.data.title, path: `/notes/${note.slug}`, date: new Date(0) }) },\n})\n',
+      'src/content/notes/a.md': '---\ntitle: A\n---\nText\n',
+    })
+
+    try {
+      expect(await refusals(root)).toEqual([['src/content.config.ts', 'kay: the collection content/notes has a feed, whose links need the site\'s URL: set `site` in kay.config.ts']])
+      expect(await refusals(root, { site: 'https://example.com' })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

@@ -65,9 +65,25 @@ describe('schedule', () => {
     }
   })
 
-  it('refuses a schedule it cannot read, or one that never comes, at boot', () => {
-    expect(() => schedule('every hour', () => undefined)).toThrow('Invalid cron expression')
-    expect(() => schedule('0 0 30 2 *', () => undefined)).toThrow('the schedule 0 0 30 2 * never comes')
+  it('refuses a computed schedule it cannot read, or one that never comes, at boot', () => {
+    const computed = (cron: string) => cron
+
+    expect(() => schedule(computed('every hour'), () => undefined)).toThrow('Invalid cron expression')
+    expect(() => schedule(computed('0 0 30 2 *'), () => undefined)).toThrow('the schedule 0 0 30 2 * never comes')
+  })
+
+  it('types a literal schedule, refusing a nickname, a field count or a day its month never has', () => {
+    const typed = (_build: () => unknown) => true
+
+    expect(typed(() => [schedule('@hourly', () => undefined), schedule('30  2 * * MON', () => undefined), schedule('0 0 31 */2 *', () => undefined), schedule('0 0 30 2 MON', () => undefined), schedule('0 0 30 jan *', () => undefined)])).toBe(true)
+    // @ts-expect-error -- no such nickname
+    expect(typed(() => schedule('@minutely', () => undefined))).toBe(true)
+    // @ts-expect-error -- six fields
+    expect(typed(() => schedule('* * * * * *', () => undefined))).toBe(true)
+    // @ts-expect-error -- February has no 30th
+    expect(typed(() => schedule('0 0 30 feb *', () => undefined))).toBe(true)
+    // @ts-expect-error -- April has no 31st
+    expect(typed(() => schedule('0 0 31 04 *', () => undefined))).toBe(true)
   })
 
   it('keeps two schedules apart', () => {

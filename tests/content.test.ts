@@ -18,7 +18,8 @@ import { prerenderPages } from '../src/server/prerender'
 const FIXTURE = 'tests/fixtures/content'
 const routes = `${FIXTURE}/src/routes`
 const content = `${FIXTURE}/src/content.config.ts`
-const app = new Elysia().use(await pages({ routes, content, prebuilt: false, security: false, site: 'https://blog.example' }))
+const SITE = 'https://blog.example'
+const app = new Elysia().use(await pages({ routes, content, prebuilt: false, security: false, site: SITE }))
 
 async function get(path: string): Promise<{ status: number, html: string, type: string | null }> {
   const response = await app.handle(new Request(`http://localhost${path}`))
@@ -109,13 +110,13 @@ describe('kay check', () => {
     const posts = join(FIXTURE, 'src/content/posts')
     const page = join(FIXTURE, 'src/routes/typo.kay')
 
-    expect(await check(FIXTURE)).toEqual([])
+    expect(await check(FIXTURE, { site: SITE })).toEqual([])
 
     try {
       await Bun.write(join(posts, 'broken.md'), '---\ntitle: Broken\ndate: someday\n---\n\n<Missing />\n')
       await Bun.write(page, '--- server\nimport { posts } from \'../content.config\'\n\nconst first = (await posts.all())[0]!\n---\np {first.data.titel}\n')
 
-      const diagnostics = (await check(FIXTURE)).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
+      const diagnostics = (await check(FIXTURE, { site: SITE })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
 
       expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 3, message: expect.stringContaining('date: ') })
       expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 6, message: 'uses <Missing>, which the collection\'s components do not name' })
