@@ -30,7 +30,7 @@ export type Locals = Register extends { locals: infer Values extends object } ? 
 export type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'>> = App['~Singleton']['decorator'] & App['~Singleton']['derive'] & App['~Singleton']['resolve']
   & App['~Ephemeral']['derive'] & App['~Ephemeral']['resolve'] & App['~Volatile']['derive'] & App['~Volatile']['resolve']
 
-// Routes as segment tuples: `[]` is `/`, `':'` a parameter, `'*'` a catch-all.
+// Routes as segment tuples: `[]` is `/`, `':'` a parameter, `':integer'` one a matcher kay ships checks, `'*'` a catch-all.
 type RoutePatterns = Register extends { routes: infer Routes extends readonly string[] } ? Routes : never
 type Split<Path extends string> = Path extends `${infer Head}/${infer Rest}` ? [Head, ...Split<Rest>] : [Path]
 type SegmentsOf<Path extends string> = Path extends '/' ? [] : Path extends `/${infer Rest}` ? Rest extends `${infer Trimmed}/` ? Split<Trimmed> : Split<Rest> : never
@@ -39,9 +39,18 @@ type Matches<Segments extends readonly string[], Pattern extends readonly string
   ? Segments extends readonly [] ? Slash : true
   : Pattern extends readonly [infer Head extends string, ...infer Rest extends readonly string[]]
     ? Segments extends readonly [infer Segment extends string, ...infer Others extends readonly string[]]
-      ? Head extends ':' ? Segment extends '' ? false : Matches<Others, Rest, Slash> : Segment extends Head ? Matches<Others, Rest, Slash> : Head extends Segment ? Matches<Others, Rest, Slash> : false
+      ? Head extends `:${infer Matcher}` ? Segment extends '' ? false : Accepts<Segment, Matcher> extends true ? Matches<Others, Rest, Slash> : false : Segment extends Head ? Matches<Others, Rest, Slash> : Head extends Segment ? Matches<Others, Rest, Slash> : false
       : false
     : Segments extends readonly [] ? true : false
+type HexDigit = Digit | 'a' | 'b' | 'c' | 'd' | 'e' | 'f'
+type Runs<Text extends string, Chars, Count extends unknown[] = []> = Text extends `${infer Char}${infer Rest}` ? Char extends Chars ? Runs<Rest, Chars, [...Count, 0]> : -1 : Count['length']
+type Integer<Text extends string> = Text extends `-${infer Rest}` ? Runs<Rest, Digit> extends 0 | -1 ? false : true : Runs<Text, Digit> extends 0 | -1 ? false : true
+type Slug<Text extends string> = Text extends `${infer Word}-${infer Rest}` ? Runs<Word, SchemeStart | Digit> extends 0 | -1 ? false : Slug<Rest> : Runs<Text, SchemeStart | Digit> extends 0 | -1 ? false : true
+type Uuid<Text extends string> = Lowercase<Text> extends `${infer A}-${infer B}-${infer C}-${infer D}-${infer E}` ? [Runs<A, HexDigit>, Runs<B, HexDigit>, Runs<C, HexDigit>, Runs<D, HexDigit>, Runs<E, HexDigit>] extends [8, 4, 4, 4, 12] ? true : false : false
+// A segment written out must be one the param's matcher takes, as `src/runtime/params.ts` reads it; one computed, `${number}` or `string`, is checked when the request comes.
+type Accepts<Segment extends string, Matcher extends string> = Record<never, never> extends Record<Segment, 1>
+  ? true
+  : Matcher extends 'integer' ? Integer<Segment> : Matcher extends 'slug' ? Slug<Segment> : Matcher extends 'uuid' ? Uuid<Segment> : true
 type AnyMatch<Segments extends readonly string[], Pattern, Slash extends boolean> = Pattern extends readonly string[] ? Matches<Segments, Pattern, Slash> : never
 type WithoutHash<Href extends string> = Href extends `${infer Path}#${string}` ? Path : Href
 type PathOf<Href extends string> = WithoutHash<Href> extends `${infer Path}?${string}` ? Path : WithoutHash<Href>

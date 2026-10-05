@@ -654,3 +654,57 @@ describe('kay check, string fields an action leaves unbounded', () => {
     expect(fields('const options = { maxLength: 9 }\nexport const query = t.Object({ q: t.String() })\nexport const signIn = action(t.Object({ name: t.String({ maxLength: 40 }), password: t.String(), apiKey: t.String(), note: t.String(options), other: t.String({ ...options }) }), () => 1)')).toEqual([])
   })
 })
+
+describe('kay check, URLs written out besides links', () => {
+  it('checks img src, link href, form action and navigate() as links, and a literal segment against the matcher kay ships for its param', async () => {
+    const page = [
+      '---',
+      'import { navigate } from \'kay\'',
+      '',
+      'const n = 3',
+      'const go = () => navigate(\'/nowhere\')',
+      'const fine = () => navigate(\'/posts/3\')',
+      '---',
+      'a(href="/posts/12") ok',
+      'a(href="/posts/abc") bad',
+      'a(href="/tags/hello-world") ok',
+      'a(href="/tags/Hello") bad',
+      'a(href="/files/123E4567-e89b-12d3-a456-426614174000") ok',
+      'a(href="/files/123e4567") bad',
+      'a(href={`/posts/${n}`}) ok',
+      'a(href="/blog/anything") ok',
+      'img(src="/logo.png" alt="")',
+      'img(src="/missing.png" alt="")',
+      'link(rel="stylesheet" href="/nope.css")',
+      'link(rel="alternate" type="application/rss+xml" href="/feed.xml")',
+      'link(rel="icon" href="/favicon.ico")',
+      'form(action="/nowhere")',
+      'form(action="/")',
+      'button(onClick={go}) {String(fine)}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({
+      'src/routes/index.kay': page,
+      'src/routes/posts/[id=integer].kay': 'p post\n',
+      'src/routes/tags/[name=slug].kay': 'p tag\n',
+      'src/routes/files/[id=uuid].kay': 'p file\n',
+      'src/routes/blog/[slug].kay': 'p blog\n',
+      'public/logo.png': '',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1] ?? d.message])).toEqual([
+        [5, 'No page, public file or app route serves /nowhere'],
+        [9, 'No page, public file or app route serves /posts/abc'],
+        [11, 'No page, public file or app route serves /tags/Hello'],
+        [13, 'No page, public file or app route serves /files/123e4567'],
+        [17, 'No page, public file or app route serves /missing.png'],
+        [18, 'No page, public file or app route serves /nope.css'],
+        [21, 'No page, public file or app route serves /nowhere'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})

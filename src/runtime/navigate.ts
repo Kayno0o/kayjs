@@ -1,3 +1,4 @@
+import type { CheckedHref } from './checks'
 import type { FetchedPage } from './swap'
 import { withBase, withoutBase } from './base'
 import { NAVIGATE_HEADER, prefetched, REDIRECT_HEADER } from './swap'
@@ -106,8 +107,8 @@ export function startNavigation(given: NavigationHooks): void {
   }
 }
 
-// Goes to a page as following a link does: one of the app's swapped in place, under the site's mount point as a link is, another site's loaded.
-export async function navigate(href: string, options: NavigateOptions = {}): Promise<void> {
+// Goes to a page as following a link does: one of the app's swapped in place, under the site's mount point as a link is, another site's loaded. A literal path is checked as a link's is.
+export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options: NavigateOptions = {}): Promise<void> {
   if (typeof document === 'undefined')
     return
 

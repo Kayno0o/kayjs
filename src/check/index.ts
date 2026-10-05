@@ -86,6 +86,9 @@ const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
 const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
 const UNWRITABLE = /[%?#]/
 const TS_EXTENSION = /\.ts$/
+const PARAM_SEGMENT = /:([^/]+)/g
+// What kay serves itself, whether or not the project turns it on.
+const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.
 const NOT_IN_URL = /[^\x21-\x7E]+/g
 // Stylesheets import for their effect, other assets for their URL. TypeScript matches a wildcard module case-sensitively, so both `.png` and `.PNG` are declared; a mixed case such as `.Png` is not.
@@ -123,7 +126,12 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   const [routes, publicPaths, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
 
-  const shapes = routes.flatMap(route => patternShapes(route.pattern))
+  // A param a matcher kay ships checks is named after it, `:integer`, so a link filling it with a literal is checked as the matcher would; any other is `:`.
+  const shapes = routes.flatMap(route => patternShapes(route.pattern).map(shape => shape.replace(PARAM_SEGMENT, (_, name: string) => {
+    const matcher = route.matchers?.[name]
+
+    return matcher !== undefined && matcherSource(routesDir, matcher) === 'kay' ? `:${matcher}` : ':'
+  })))
   const settings = options.i18n && i18nSettings(root, options.i18n, diagnostics)
   // A page is reached in every locale, under its prefix where it has one; an unprefixed path still answers, sending the visitor on to theirs when every locale is prefixed.
   const prefixes = settings ? localePrefixes(settings) : []
@@ -131,10 +139,10 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: relative(dirname(environmentPath), module.file).replace(TS_EXTENSION, '') }))
 
-  await writeIfChanged(environmentPath, environment(localized, publicPaths.map(file => file.url), apiMounts, settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }))
+  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
-  const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
+  const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS]
 
   for (const message of redirectProblems(options.redirects ?? {}, served))
     diagnostics.push({ file: join(root, CONFIG_FILE), line: 1, column: 1, message })
@@ -415,9 +423,9 @@ function apiTree(api: { mount: string, module: string }[]): string {
   return render(top)
 }
 
-// `/todos/:id` becomes `['todos', ':']`, the shape `CheckedHref` matches paths against segment by segment.
+// `/todos/:` becomes `['todos', ':']`, `/todos/:integer` `['todos', ':integer']`, the shape `CheckedHref` matches paths against segment by segment.
 function routeTuple(pattern: string): string {
-  const segments = pattern.split('/').filter(segment => segment !== '').map(segment => segment.startsWith(':') ? [':'] : spellings(segment))
+  const segments = pattern.split('/').filter(segment => segment !== '').map(segment => segment.startsWith(':') ? [segment] : spellings(segment))
 
   return `[${segments.map(segment => segment.map(spelling => JSON.stringify(spelling)).join(' | ')).join(', ')}]`
 }

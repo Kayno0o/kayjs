@@ -54,6 +54,9 @@ const BINDABLE = new Set(['input', 'textarea', 'select'])
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 const LINK_ELEMENTS = new Set(['a', 'area'])
+// URLs checked as links are when written out: an expression there may be another kind of value, such as an action a form posts to.
+const WRITTEN_URLS = new Map([['img', 'src'], ['link', 'href'], ['form', 'action']])
+const WHITESPACE = /\s+/
 const CTX_REFERENCE = /\bctx\b/
 const EVENT_HANDLER = /^on[A-Z]/
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
@@ -1164,7 +1167,7 @@ class Generator {
 
     const name = this.text(attribute.name)
 
-    if (!element.component && LINK_ELEMENTS.has(element.name) && name === 'href') {
+    if (!element.component && ((LINK_ELEMENTS.has(element.name) && name === 'href') || (attribute.kind === 'static' && WRITTEN_URLS.get(element.name) === name && !this.isAlternateLink(element)))) {
       b.addSource(attribute.name).add('={KayHref(')
 
       if (attribute.kind === 'static')
@@ -1191,6 +1194,13 @@ class Generator {
     b.addSource(attribute.name).add('={KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
 
     return true
+  }
+
+  // A feed or a translation, served by what kay check does not list as pages.
+  private isAlternateLink(element: ElementNode): boolean {
+    const rel = element.attributes.find(attribute => attribute.kind === 'static' && this.text(attribute.name) === 'rel')
+
+    return element.name === 'link' && rel?.kind === 'static' && rel.text.split(WHITESPACE).includes('alternate')
   }
 
   // Reports a function passed to an island, `0` standing for the prop.
