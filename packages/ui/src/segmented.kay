@@ -1,6 +1,7 @@
 --- <Value extends string>
 import type { JSX } from 'kay'
 import { effect, signal, uid } from 'kay'
+import { changeAccepted } from './change'
 
 const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   options: readonly { value: Value, label: string }[]
@@ -10,24 +11,52 @@ const { options, value, label, name, onChange, class: className, ...rest } = pro
   label: string
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
   name?: string
-  onChange?: (value: Value) => void
+  // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
+  onChange?: (value: Value) => void | PromiseLike<boolean | void>
   class?: string
 }>()
 
 // Held as a string: a signal cannot take a type parameter that might be a function.
 const group = name ?? uid()
 const picked = signal<string>(value)
+const busy = signal(false)
+// How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.
+let synced = 0
 
-effect(() => picked.set(value))
+effect(() => {
+  picked.set(value)
+  synced++
+})
 
-function pick(next: Value) {
+// Checks the radio of `value` again: the binding may never have seen the radio that took the check.
+function check(input: HTMLInputElement, value: string) {
+  for (const radio of input.closest('.kui-segmented')?.querySelectorAll<HTMLInputElement>('.kui-segmented-input') ?? [])
+    radio.checked = radio.value === value
+}
+
+async function pick(input: HTMLInputElement, next: Value) {
+  // A pick while a change is under way takes nothing: the radio checked by the click, a key or a label, is put back.
+  if (busy()) {
+    check(input, picked())
+
+    return
+  }
+
+  const before = picked()
+  const syncedBefore = synced
+
   picked.set(next)
-  onChange?.(next)
+
+  // Put back unless the parent set `value` meanwhile, which has the last word.
+  if (!(await changeAccepted('Segmented', () => onChange?.(next), busy.set)) && synced === syncedBefore) {
+    picked.set(before)
+    check(input, before)
+  }
 }
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
-.kui-segmented({...rest} role="radiogroup" aria-label={label} class={className})
+.kui-segmented({...rest} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
   for option of options key={option.value}
     label.kui-segmented-option
-      input.kui-segmented-input(type="radio" name={group} value={option.value} checked={picked() === option.value} onChange={() => pick(option.value)})
+      input.kui-segmented-input(type="radio" name={group} value={option.value} checked={picked() === option.value} onChange={event => pick(event.currentTarget, option.value)})
       span.kui-segmented-label {option.label}

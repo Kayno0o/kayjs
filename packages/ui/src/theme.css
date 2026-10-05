@@ -1045,6 +1045,10 @@
 
   .kui-segmented {
     @apply inline-flex border border-kui-surface2 bg-kui-surface0;
+
+    &:where([aria-busy='true']) {
+      @apply cursor-progress;
+    }
   }
 
   .kui-segmented-option {

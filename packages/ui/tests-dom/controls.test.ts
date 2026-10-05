@@ -18,13 +18,13 @@ test('Segmented and Toggle submit like the fields they are, and report each chan
   const form = mounted.root.querySelector('form')!
   const fields = () => Object.fromEntries(new FormData(form))
 
-  expect(fields()).toEqual({ range: 'day' })
+  expect(fields()).toEqual({ range: 'day', sharing: 'private' })
 
   click(mounted.root.querySelector('input[value="week"]'))
   click(mounted.root.querySelector('input[name="digest"]'))
   await settle()
 
-  expect(fields()).toEqual({ range: 'week', digest: 'on' })
+  expect(fields()).toEqual({ range: 'week', digest: 'on', sharing: 'private' })
   expect(ranges).toEqual(['week'])
   expect(digests).toEqual([true])
 
@@ -125,4 +125,70 @@ test('a Toggle leaves the switch where its parent set it while a refused change 
   logged.mockRestore()
 
   expect(input.checked).toBe(true)
+})
+
+test('a Segmented group whose change is under way is busy and picks nothing else, and goes back once the change is refused', async () => {
+  const calls: string[] = []
+  const settles: ((answer: boolean | Error | void) => void)[] = []
+  const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+  mounted = await mount('src/components/controls.kay', {
+    onRange: () => undefined,
+    onDigest: () => undefined,
+    onShare: async (value: string) => {
+      calls.push(value)
+
+      return new Promise<boolean | void>((resolve, reject) => settles.push(answer => answer instanceof Error ? reject(answer) : resolve(answer)))
+    },
+  })
+
+  const { root } = mounted
+  const radio = (value: string) => root.querySelector<HTMLInputElement>(`input[name="sharing"][value="${value}"]`)!
+  const state = () => [[...root.querySelectorAll<HTMLInputElement>('input[name="sharing"]')].find(input => input.checked)?.value, root.querySelector('#share')!.getAttribute('aria-busy')]
+
+  try {
+    click(radio('link'))
+    await settle()
+    click(radio('public'))
+    await settle()
+
+    expect([state(), calls]).toEqual([['link', 'true'], ['link']])
+
+    settles.at(-1)!(false)
+    await settle()
+
+    expect(state()).toEqual(['private', null])
+
+    click(radio('public'))
+    await settle()
+    settles.at(-1)!(new Error('refused'))
+    await settle()
+
+    expect(state()).toEqual(['private', null])
+
+    click(radio('public'))
+    await settle()
+    settles.at(-1)!()
+    await settle()
+
+    expect([state(), calls]).toEqual([['public', null], ['link', 'public', 'public']])
+    expect(logged.mock.calls.map(([, error]) => error)).toEqual([new Error('refused')])
+  }
+  finally {
+    logged.mockRestore()
+  }
+})
+
+test('a Segmented group leaves the option its parent picked while a refused change was under way', async () => {
+  const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+  mounted = await mount('src/components/controls.kay', { onRange: () => undefined, onDigest: () => undefined, onShare: async () => Promise.reject(new Error('refused')), mirror: true })
+
+  const link = mounted.root.querySelector<HTMLInputElement>('input[name="sharing"][value="link"]')!
+
+  click(link)
+  await settle()
+  logged.mockRestore()
+
+  expect(link.checked).toBe(true)
 })

@@ -171,6 +171,7 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
 ```
 
 - `Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} value="day" label="Period" name="period" onChange={period.set})`: real radios, so arrow keys move between options and the group posts as `name` inside a form. A parent passing another `value` moves the choice. Without `name`, the group draws one unique on the page, which keeps two groups apart.
+  - `onChange` may return a promise, as Toggle's may: the group is `aria-busy` and takes no other pick until it settles, and goes back to the previous option when it resolves to `false`, rejects or throws (logged), unless the parent set `value` meanwhile.
 - `TabNav(links={[{ href: '/settings', label: 'Profile' }, { href: '/settings/keys', label: 'Keys' }]} current={ctx.url.pathname} label="Settings")`: tabs as links, one page each. The current tab is marked `aria-current="page"`, and a bar too narrow for every tab scrolls to centre it, without moving the page.
 - `SiteNav(links={[{ href: '/', label: 'Home' }, { href: '/rooms', label: 'Rooms' }]} current={ctx.url.pathname} label="Main" menuLabel="Menu")`: a site's main links, in a row from the `lg` breakpoint and folded behind a menu toggle below it.
   - The page on screen is marked `aria-current="page"`, and a link to a section holding it `aria-current="true"`, as `/rooms` for `/rooms/blue`; `/` only marks itself.
