@@ -11,6 +11,10 @@ export function buildingWithoutEnv(): void {
   (globalThis as { [BUILDING]?: boolean })[BUILDING] = true
 }
 
+function building(): boolean {
+  return (globalThis as { [BUILDING]?: boolean })[BUILDING] === true
+}
+
 // The environment read once against `schema`, as the server boots: numbers and booleans from their text, defaults filled in, and every variable missing or refused named in the error that stops it.
 // Holds the declared names only, so logging it never shows the rest of the environment.
 export function defineEnv<Schema extends TSchema & { properties: Record<string, TSchema> }>(schema: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> {
@@ -28,17 +32,21 @@ export function defineEnv<Schema extends TSchema & { properties: Record<string, 
   if (!('refused' in read))
     return read.value as Static<Schema>
 
-  if (!(globalThis as { [BUILDING]?: boolean })[BUILDING])
+  if (!building())
     throw new Error(`kay: the environment does not match its schema\n${[...read.refused].map(([name, message]) => `  ${name}: ${message}`).join('\n')}`)
 
+  // The variables the build has, read on their own; a refusal of the whole object, named '', is left to the server.
   const valid = t.Object(Object.fromEntries(Object.entries(schema.properties).filter(([name]) => !read.refused.has(name))))
   const env = (readFields(valid, input, false) as { value: Record<string, unknown> }).value
 
   for (const [name, message] of read.refused) {
+    if (name === '')
+      continue
+
     Object.defineProperty(env, name, {
       enumerable: true,
       get: () => {
-        throw new Error(`kay: ${name} does not match the environment's schema (${message}), and kay build renders pages without the server's environment; read it once the server runs, such as in an action, or drop \`export const prerender\` from the page reading it`)
+        throw new Error(`kay: ${name} does not match the environment's schema (${message}), and kay build runs without the server's environment; read it where the server runs, such as in an action, or leave the page reading it out of the build`)
       },
     })
   }

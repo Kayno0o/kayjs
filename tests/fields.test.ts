@@ -33,7 +33,8 @@ describe('defineEnv', () => {
       const env = defineEnv(schema, { PORT: '80a', DEBUG: 'true' })
 
       expect(env.DEBUG).toBe(true)
-      expect(() => env.DATABASE_URL).toThrow('kay: DATABASE_URL does not match the environment\'s schema (Property \'DATABASE_URL\' is missing), and kay build renders pages without the server\'s environment')
+      expect(defineEnv(schema, {}).PORT).toBe(3000)
+      expect(() => env.DATABASE_URL).toThrow('kay: DATABASE_URL does not match the environment\'s schema (Property \'DATABASE_URL\' is missing), and kay build runs without the server\'s environment')
       expect(() => env.PORT).toThrow('kay: PORT does not match')
     }
     finally {
