@@ -137,6 +137,7 @@ export class Auth {
   // Signs this session out. A session held in the cookie alone stays valid wherever it was copied until it expires; `signOutEverywhere` ends those too.
   async signOut(): Promise<void> {
     await this.session.unset('auth')
+    await this.session.unset('authRegistered')
     await this.session.regenerate()
     this.source = null
     this.resolving = Promise.resolve(null)

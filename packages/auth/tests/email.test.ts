@@ -182,6 +182,39 @@ describe('verifying an email', () => {
     expect(await elsewhere.json('/me')).toBe('anonymous')
     expect(await elsewhere.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
   })
+
+  test('with `requireVerified`, resending through a proved password is limited per account, and ends with the account', async () => {
+    const { browser } = setup({ requireVerified: true })
+    const ada = browser()
+
+    await browser().call('register', { email: 'ada@example.com', password: 'squatter password' })
+    await ada.post('/password', { identifier: 'ada@example.com', password: 'squatter password' })
+    const answers = [await ada.call('sendVerification'), await ada.call('sendVerification'), await ada.call('sendVerification'), await ada.call('sendVerification')]
+
+    expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
+
+    // The address registered again replaces the account this browser proved the password of.
+    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    expect(await ada.call('sendVerification')).toEqual({ ok: false, error: 'signed-out' })
+  })
+
+  test('with `requireVerified`, a browser that proved a password forgets it on signing out, and serves whoever is signed in first', async () => {
+    const { browser, store } = setup({ requireVerified: true })
+    const ada = browser()
+
+    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+    await ada.post('/sign-out', {})
+
+    expect(await ada.call('sendVerification')).toEqual({ ok: false, error: 'signed-out' })
+
+    await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+    await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com', emailVerifiedAt: new Date() }))
+    await ada.post('/sign-in/u2', {})
+
+    expect(await ada.call('sendVerification')).toEqual({ ok: false, error: 'verified' })
+  })
 })
 
 describe('resetting a password', () => {

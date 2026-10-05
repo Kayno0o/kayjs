@@ -59,7 +59,7 @@ export async function sendVerification(state: RequestState): Promise<MailRequest
   return mailFor(state, record, 'verify-email', record.email, null, 'resend')
 }
 
-// Verifies the address for the browser signed in as the account or the one that registered it; any other must give the account's password, since whoever opens the mail may be confirming an account a stranger registered with their address, which verified would stay the stranger's.
+// Verifies the address for the browser signed in as the account, the one that registered it or the one that proved its password; any other must give the account's password, since whoever opens the mail may be confirming an account a stranger registered with their address, which verified would stay the stranger's.
 // Never signs in. Refused, the link stays usable where it can be confirmed.
 export async function verifyEmail(state: RequestState, token: string, password?: string): Promise<VerifyEmailResult> {
   const spent = await spendLink(state, token, 'verify-email')
