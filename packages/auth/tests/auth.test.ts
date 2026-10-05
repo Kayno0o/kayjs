@@ -35,6 +35,27 @@ describe('createAuth', () => {
     expect(await ada.json('/me')).toEqual({ id: 'u1', email: 'ada@example.com', emailVerified: false, username: null, roles: ['editor'], hasPassword: true, twoFactor: false })
   })
 
+  test('reaches the app\'s routes from inside a plugin of the app\'s own, however deep', async () => {
+    const store = memoryStore()
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store })
+    const locals = new Elysia({ name: 'locals' }).use(new Elysia().use(auth.plugin)).derive(() => ({ site: 'Site' }))
+    const app = new Elysia()
+      .use(locals)
+      .get('/me', async ({ auth }) => (await auth.user()) ?? 'anonymous')
+      .post('/sign-in/:id', async ({ auth, params }) => {
+        await auth.signIn({ id: params.id })
+
+        return 'ok'
+      })
+    const ada = browser(app)
+
+    await ada.fetch('/sign-in/u1', POST)
+
+    expect(await ada.json('/me')).toMatchObject({ id: 'u1' })
+  })
+
   test('signing in changes the session cookie', async () => {
     const { browser } = await seeded()
     const ada = browser()

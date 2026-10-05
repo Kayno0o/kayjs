@@ -350,8 +350,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // Typed as a plain instance: `AnyElysia` would merge `any` routes into the app's, and every link would check.
     .use(options.sessions as unknown as Elysia)
     .derive(ctx => ({ auth: new Auth((ctx as unknown as { session: Session<AuthSessionData> }).session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server))) }))
-    // The session's derive reaches this instance only; lifting both lets them reach the app's routes.
-    .as('scoped')
+    // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
+    .as('global')
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
     // Typed as their literal paths, so `kay check` checks links to them once the app registers its Elysia app.
     .get(`${core.prefix}/:provider` as `${Prefix}/:provider`, async ({ auth, params, query, redirect, status }) => {

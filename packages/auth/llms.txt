@@ -50,7 +50,7 @@ declare module 'kay' {
 }
 ```
 
-The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(await pages())`. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. Registering `app` lets `kay check` check links to those routes. `db.sync()` creates kayjs-auth's tables with the app's.
+The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(await pages())`. It may also sit inside a plugin of the app's own, at any depth: `auth` reaches every route declared after it. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. Registering `app` lets `kay check` check links to those routes. `db.sync()` creates kayjs-auth's tables with the app's.
 
 `createAuth` options:
 
