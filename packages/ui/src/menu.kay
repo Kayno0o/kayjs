@@ -59,9 +59,9 @@ function keyDown(event: KeyboardEvent) {
   buttons[move(buttons.indexOf(document.activeElement as HTMLButtonElement), buttons.length)]?.focus()
 }
 
-// The entry an `else` branch holds, which the template's `if` does not narrow from the separator.
-function actionOf(item: MenuEntry): MenuAction {
-  return item as MenuAction
+// An entry as the action it is, or nothing for a separator, for the template to draw each.
+function actionOf(item: MenuEntry): MenuAction | undefined {
+  return item === 'separator' ? undefined : item
 }
 
 function select(action: MenuAction) {
@@ -74,10 +74,10 @@ Popover(id={menuId} placement={placement} class="menu" onToggle={open => open &&
     IconButton({...attributes} icon={icon} label={label} size={size} variant={variant} aria-haspopup="menu")
   .menu-list(ref={element => list = element} role="menu" aria-label={label} tabindex="-1" onKeyDown={keyDown})
     for item, index of items key={index}
-      if item === 'separator'
-        hr.menu-separator
+      if actionOf(item) as action
+        button.menu-item(type="button" role="menuitem" tabindex="-1" disabled={action.disabled} data-danger={action.danger || undefined} onClick={() => select(action)})
+          if action.icon as icon
+            Icon(icon={icon})
+          | {action.label}
       else
-        button.menu-item(type="button" role="menuitem" tabindex="-1" disabled={actionOf(item).disabled} data-danger={actionOf(item).danger || undefined} onClick={() => select(actionOf(item))})
-          if actionOf(item).icon
-            Icon(icon={actionOf(item).icon!})
-          | {actionOf(item).label}
+        hr.menu-separator

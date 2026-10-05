@@ -52,9 +52,9 @@ const rows = () => sections().flatMap(section => section.rows)
 
 const optionId = (index: number) => `${id}-option-${index}`
 
-// The rows a template branch holds, which its `if` does not narrow.
-const linkOf = (entry: PaletteEntry) => entry as PaletteLink
-const actionOf = (entry: PaletteEntry) => entry as PaletteAction
+// A row's entry as the link or the action it is, for the template to draw each.
+const linkOf = (entry: PaletteEntry) => isPaletteLink(entry) ? entry : undefined
+const actionOf = (entry: PaletteEntry) => isPaletteLink(entry) ? undefined : entry
 
 effect(() => {
   const current = selected()
@@ -159,17 +159,17 @@ dialog.command-palette(ref={element => dialog = element} closedby="any" aria-lab
           if section.group !== null
             .heading-section.command-palette-heading(id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
-            if isPaletteLink(row.entry)
-              a.command-palette-option(href={linkOf(row.entry).href} target={linkOf(row.entry).external ? '_blank' : undefined} rel={linkOf(row.entry).external ? 'noopener noreferrer' : undefined} id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(linkOf(row.entry))})
-                if row.entry.icon
-                  Icon(icon={row.entry.icon!})
+            if linkOf(row.entry) as link
+              a.command-palette-option(href={link.href} target={link.external ? '_blank' : undefined} rel={link.external ? 'noopener noreferrer' : undefined} id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link)})
+                if link.icon as icon
+                  Icon(icon={icon})
                 span.command-palette-label {row.entry.label}
                 if query().trim()
                   span.command-palette-group {row.entry.group}
-            else
-              button.command-palette-option(type="button" id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(actionOf(row.entry))})
-                if row.entry.icon
-                  Icon(icon={row.entry.icon!})
+            else if actionOf(row.entry) as action
+              button.command-palette-option(type="button" id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(action)})
+                if action.icon as icon
+                  Icon(icon={icon})
                 span.command-palette-label {row.entry.label}
                 if query().trim()
                   span.command-palette-group {row.entry.group}
