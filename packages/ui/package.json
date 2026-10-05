@@ -47,7 +47,7 @@
     "@iconify-json/tabler": "^1.2.41",
     "chartist": "^1.5.0",
     "hls.js": "^1.7.0",
-    "kay": "^0.8.1 || ^0.9.0",
+    "kay": "^0.8.1 || ^0.9.0 || ^0.10.0 || ^0.11.0",
     "tailwindcss": "^4.3.3"
   },
   "peerDependenciesMeta": {
@@ -70,7 +70,7 @@
     "chartist": "^1.5.0",
     "elysia": "^1.4.30",
     "hls.js": "^1.7.0",
-    "kay": "npm:@kaynooo/kayjs@^0.9.1",
+    "kay": "npm:@kaynooo/kayjs@^0.11.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }
