@@ -17,7 +17,7 @@
 
 ## Setup
 
-kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay 0.6 or later, Tailwind v4 and `@iconify-json/tabler` are peer dependencies.
+kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay 0.8.1 or later, Tailwind v4 and `@iconify-json/tabler` are peer dependencies.
 
 ```sh
 bun add @kaynooo/kayjs-ui @iconify-json/tabler
