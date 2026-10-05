@@ -293,7 +293,7 @@ CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { l
   - A point has a `key`, a `label`, `x` and `y`, a `weight` its dot's area follows, and a `tooltip`, the label by default.
   - An axis spans its `domain`, or else the points' own extent, along a `linear` or `log` `scale`, with `ticks` of `{ value, label }` and a `label`. `quadrant` draws guides through a point, and `corners` names the four regions they split.
   - `onSelect(point)` makes each dot a button, from an island; `empty` is what it reads with no points.
-- `ContributionGraph(days={days} color="var(--color-kui-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
+- `ContributionGraph(days={days} color="var(--color-kui-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`, typed `ContributionDay`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
 
 ### Drag and drop: Sortable, Board, DropTargets
 
@@ -340,7 +340,7 @@ ul
 ### MediaGallery, Carousel, Masonry, WhenVisible, ZoomPane, ImageCropper
 
 - `MediaGallery(items={media})`: a stage, a strip of thumbnails and a lightbox.
-  - An item has a `key`, a `kind` (`image` or `video`), a `thumb` for the strip, a `preview` for the stage or a video's poster, a `full` the lightbox opens an image at, a video's `src` and a `title`.
+  - An item, typed `MediaItem`, has a `key`, a `kind` (`image` or `video`), a `thumb` for the strip, a `preview` for the stage or a video's poster, a `full` the lightbox opens an image at, a video's `src` and a `title`.
   - The arrows, Home and End turn it while focus is inside it, wrapping, and so do its buttons and a swipe. `index` is the item to start on, and `onIndexChange(index)` reports each turn. The strip keeps the shown thumbnail centred, and the images either side start loading.
   - A video plays in place with `preload="none"`. An `.m3u8` playlist plays through `hls.js`, an optional peer imported only once such a video shows, in browsers without native HLS.
   - An image opens full size in a lightbox, which turns the same way. `ratio` is the stage's `aspect-ratio`, `16 / 9` by default; `empty` is what it reads with no items.
