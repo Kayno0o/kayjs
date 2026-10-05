@@ -124,6 +124,16 @@ describe('sessions', () => {
     expect((await visit('/count')).set).toMatch(/; Domain=example\.com(;|$)/i)
     expect((await visit('/out')).set).toMatch(/; Domain=example\.com;.*Max-Age=0/i)
     expect((await browser(counter())('/count')).set).not.toMatch(/Domain=/i)
+
+    const forged = await counter({ domain: 'example.com' }).handle(new Request('http://localhost/peek', { headers: { cookie: 'session=forged' } }))
+
+    expect(forged.headers.getSetCookie()[0]).toMatch(/; Domain=example\.com;.*Max-Age=0/i)
+  })
+
+  it('takes a domain as a host name in any case or with a leading dot, and refuses anything else as it is built', async () => {
+    expect((await browser(counter({ domain: ' .Example.COM ' }))('/count')).set).toMatch(/; Domain=example\.com;/i)
+    expect(() => counter({ domain: 'https://example.com' })).toThrow('kay: the session domain is "https://example.com", which is no host name such as example.com')
+    expect(() => counter({ domain: 'example.com; path=/' })).toThrow('no host name')
   })
 
   it('forgets a session unused for maxAge, and extends one used past half of it', async () => {

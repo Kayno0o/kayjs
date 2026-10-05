@@ -21,7 +21,7 @@ export interface SessionOptions {
   cookie?: string
   // Seconds a session lasts without being used, 30 days by default; one used past half of it is extended.
   maxAge?: number
-  // The parent domain sibling hosts share the session under, `example.com` for `app.example.com` and `auth.example.com`; the cookie is the visited host's only without it.
+  // The parent domain sibling hosts share the session under, `example.com` for `app.example.com` and `auth.example.com`, the visited host or a parent of it; the cookie is the visited host's only without it.
   domain?: string
   // Keeps the data server-side, the cookie carrying only an id; without one the data travels sealed in the cookie, about 3.5 KB at most.
   store?: SessionStore
@@ -47,6 +47,9 @@ interface Sealed {
 
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 30
 const MIN_SECRET_LENGTH = 32
+// A host name, the form a cookie's Domain takes once trimmed, lowercased and its leading dot dropped.
+const COOKIE_DOMAIN = /^[a-z\d-]+(?:\.[a-z\d-]+)*$/
+const LEADING_DOT = /^\./
 // What a browser keeps of one cookie, name and attributes included, is about 4 KB.
 const MAX_COOKIE_LENGTH = 3800
 const IV_BYTES = 12
@@ -63,7 +66,12 @@ export function session<Data extends object = SessionData>(options: SessionOptio
     throw new Error(`kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
 
   const keys = secrets.map(secret => createHash('sha256').update(secret).digest())
-  const config = { name: options.cookie ?? 'session', maxAge: options.maxAge ?? DEFAULT_MAX_AGE, domain: options.domain, store: options.store, keys }
+  const domain = options.domain?.trim().toLowerCase().replace(LEADING_DOT, '')
+
+  if (domain !== undefined && !COOKIE_DOMAIN.test(domain))
+    throw new Error(`kay: the session domain is ${JSON.stringify(options.domain)}, which is no host name such as example.com`)
+
+  const config = { name: options.cookie ?? 'session', maxAge: options.maxAge ?? DEFAULT_MAX_AGE, domain, store: options.store, keys }
 
   return new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) as Session<Data> }))
