@@ -453,7 +453,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     oauth,
     refreshers: new Map(),
     allow: options.allow,
-    defaultRoles: options.defaultRoles ?? [],
+    defaultRoles: [...(options.defaultRoles ?? [])],
     onSignUp: options.onSignUp,
     onProviderProfile: options.onProviderProfile,
     onDelete: options.onDelete,

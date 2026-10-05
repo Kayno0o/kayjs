@@ -144,6 +144,15 @@ describe('verifying an email', () => {
     expect(await browser().call('register', { email: 'bob@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
   })
 
+  test('with `requireVerified`, an unverified account holding only the default roles and a linked provider is not replaced', async () => {
+    const { browser, store } = setup({ requireVerified: true, defaultRoles: ['editor'] })
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', roles: ['editor'] }))
+    await store.identities.create({ provider: 'discord', providerId: '1', userId: 'u1', accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
+
+    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
+  })
+
   test('resending gives a new link and voids the last', async () => {
     const { browser, tokenOf } = setup()
     const ada = browser()
