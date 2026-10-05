@@ -1,3 +1,4 @@
+import type { IconSet } from '../src/runtime/icons'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -6,6 +7,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { iconProps, iconTypes, installedIconSets } from '../src/build/icons'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
+import { iconNames, iconProps as setIconProps } from '../src/runtime/icons'
 import { pages } from '../src/server'
 
 const FIXTURE = join(import.meta.dir, 'fixtures/icons')
@@ -72,6 +74,17 @@ describe('icons', () => {
     expect(iconProps(file, 'turned')!.innerHTML).toBe('<g transform="rotate(90 16 8)"><path d="M0 0h32v16"/></g>')
     expect(iconProps(file, 'loop')).toBeUndefined()
     expect(iconProps(file, 'nothing')).toBeUndefined()
+  })
+
+  it('builds the props of an icon picked at runtime from the set the app imports, as an icon import gives them', async () => {
+    const { default: tabler } = await import('@iconify-json/tabler/icons.json') as { default: IconSet }
+    const file = Bun.resolveSync('@iconify-json/tabler/icons.json', process.cwd())
+
+    expect(setIconProps(tabler, 'home')).toEqual(iconProps(file, 'home')!)
+    // `123` is an alias of `number-123`.
+    expect(setIconProps(tabler, '123')).toEqual(setIconProps(tabler, 'number-123')!)
+    expect(setIconProps(tabler, 'nothing')).toBeUndefined()
+    expect(iconNames(tabler)).toEqual(expect.arrayContaining(['home', '123']))
   })
 
   it('declares each installed icon as a module, so kay check reports a misspelt one', async () => {
