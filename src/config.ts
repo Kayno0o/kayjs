@@ -95,7 +95,7 @@ export interface SecurityConfig {
   headers?: Record<string, string | false>
 }
 
-// One of the two: trusted only from a proxy on this machine or a private network, so a client reaching the server directly cannot forge it.
+// `hops` or `header`, not both: read only from a request coming from this machine or a private network, so a client reaching the server directly cannot forge it.
 export interface ProxyConfig {
   // The proxies that each append to `X-Forwarded-For`: 1 for nginx or Caddy alone, 2 for Cloudflare then nginx.
   hops?: number

@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import { withoutSlash } from './routes'
 
 export const DEFAULT_BODY_LIMIT = 1024 * 1024
 const KB = 1024
@@ -27,7 +28,8 @@ export function limitBodies(app: Elysia, bytes: number, actions: Map<string, Bod
     if (NO_BODY.has(request.method))
       return undefined
 
-    const path = new URL(request.url).pathname
+    // Elysia serves `/path/` as `/path`, so a trailing slash reaches the same route.
+    const path = withoutSlash(new URL(request.url).pathname)
     const limit = actions.get(path) ?? prefixes.find(([mount]) => path === mount || path.startsWith(`${mount}/`))?.[1]
     const allowed = limit?.bytes ?? bytes
 
@@ -48,15 +50,21 @@ async function exceeds(request: Request, bytes: number): Promise<boolean> {
   const reader = request.clone().body!.getReader()
   let size = 0
 
-  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
-    size += chunk.value.byteLength
+  try {
+    for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+      size += chunk.value.byteLength
 
-    // Not awaited, nor left through `for await`: on Bun 1.4 cancelling a copy of a request's body never settles while the request's own goes unread.
-    if (size > bytes) {
-      void reader.cancel()
+      // Not awaited, nor left through `for await`: on Bun 1.4 cancelling a copy of a request's body never settles while the request's own goes unread.
+      if (size > bytes) {
+        void reader.cancel()
 
-      return true
+        return true
+      }
     }
+  }
+  // A client that went away mid-upload has nothing left to refuse.
+  catch {
+    return false
   }
 
   return false

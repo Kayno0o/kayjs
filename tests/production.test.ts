@@ -226,16 +226,18 @@ describe('request body limits', () => {
   it('answers an island\'s call sending over 1 MB with 413 and a form-wide error, the handler never running', async () => {
     const app = await serve()
     const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
-    const call = async (text: string) => {
+    const call = async (text: string, slash = '') => {
       const body = stringify({ text })
 
-      return app.handle(new Request(`http://localhost${note.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)), 'x-kay-action': '1' }, body }))
+      return app.handle(new Request(`http://localhost${note.url}${slash}`, { method: 'POST', headers: { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)), 'x-kay-action': '1' }, body }))
     }
 
     const refused = await call('a'.repeat(MB))
 
     expect(refused.status).toBe(413)
     expect(parse(await refused.text())).toEqual({ errors: { '': 'Too large to send; 1 MB at most' }, data: undefined })
+    // Elysia serves the path with a trailing slash as the same route.
+    expect((await call('a'.repeat(MB), '/')).status).toBe(413)
     expect(await (await call('a'.repeat(MB - 100))).text()).toBe(stringify(MB - 100))
   })
 
