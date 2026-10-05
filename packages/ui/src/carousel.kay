@@ -1,0 +1,67 @@
+---
+import type { JSX } from 'kay'
+import { effect, onCleanup, signal } from 'kay'
+import IconButton from './icon-button.kay'
+import { stepIndex } from './media'
+
+const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = 'Carousel', previousLabel = 'Previous slide', nextLabel = 'Next slide', slideLabel = 'Slide {n} of {count}', dotLabel = 'Go to slide {n}', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+  slides: readonly { src: string, alt: string }[]
+  // The slide shown first; a carousel whose parent passes another follows it.
+  index?: number
+  onIndexChange?: (index: number) => void
+  // Moves to the next slide every this many milliseconds, held while the pointer or the focus is on the carousel, and never for a visitor asking for reduced motion.
+  autoplay?: number
+  // The slides' aspect ratio, as CSS writes it.
+  ratio?: string
+  // Names the carousel for screen readers.
+  label?: string
+  previousLabel?: string
+  nextLabel?: string
+  // `{n}` stands for the slide's number and `{count}` for how many there are.
+  slideLabel?: string
+  dotLabel?: string
+  class?: string
+}>()
+
+const shown = signal(index)
+// Whether the pointer or the focus is on the carousel, which holds the autoplay.
+const pointed = signal(false)
+const focused = signal(false)
+
+effect(() => shown.set(index))
+
+effect(() => {
+  if (!autoplay || pointed() || focused() || matchMedia('(prefers-reduced-motion: reduce)').matches)
+    return
+
+  const timer = setInterval(() => step(1), autoplay)
+
+  onCleanup(() => clearInterval(timer))
+})
+
+const active = () => stepIndex(shown(), 0, slides.length)
+
+function go(next: number) {
+  shown.set(next)
+  onIndexChange?.(next)
+}
+
+function step(delta: number) {
+  go(stepIndex(active(), delta, slides.length))
+}
+
+function numbered(text: string, position: number) {
+  return text.replaceAll('{n}', String(position + 1)).replaceAll('{count}', String(slides.length))
+}
+---
+section.carousel({...rest} aria-roledescription="carousel" aria-label={label} class={className} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
+  .carousel-viewport(style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
+    for slide, position of slides key={slide.src}
+      .carousel-slide(role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
+        img.carousel-image(src={slide.src} alt={slide.alt} loading={position === 0 ? 'eager' : 'lazy'})
+  if slides.length > 1
+    .carousel-controls
+      IconButton(icon="chevron" label={previousLabel} variant="ghost" class="carousel-step" data-side="previous" onClick={() => step(-1)})
+      for slide, position of slides key={slide.src}
+        button.carousel-dot(type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
+      IconButton(icon="chevron" label={nextLabel} variant="ghost" class="carousel-step" data-side="next" onClick={() => step(1)})

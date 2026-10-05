@@ -1,6 +1,7 @@
 ---
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
+import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 ---
@@ -15,3 +16,7 @@ main
   EmptyState#empty(title="No moons" description="Add one to start")
   form#form
     Select(name="planet" value="earth" emptyOption="Any" options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]})
+  article#carousel
+    Carousel(slides={[{ src: '/a.png', alt: 'Le jardin' }, { src: '/b.png', alt: 'La maison' }]} index={1} ratio="4 / 3" label="Galerie photos" slideLabel="{n} sur {count}" dotLabel="Aller à l'image {n}")
+  article#lone-slide
+    Carousel(slides={[{ src: '/a.png', alt: 'Le jardin' }]})

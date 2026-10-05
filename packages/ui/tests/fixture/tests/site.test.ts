@@ -108,6 +108,21 @@ describe('content', () => {
     expect(await page('bare')).toBe('<section id="bare" class="card"><p>Edge to edge</p></section>')
   })
 
+  test('Carousel shows its slide, hides the rest from the focus and screen readers, and names each in the app\'s words', async () => {
+    const carousel = (await page('carousel')).replaceAll(/<\/?slot[^>]*>/g, '')
+
+    expect(carousel).toContain('<section aria-roledescription="carousel" aria-label="Galerie photos" class="carousel"><div class="carousel-viewport" style="aspect-ratio: 4 / 3" aria-live="polite">')
+    expect([...carousel.matchAll(/aria-label="(\d sur 2)"( aria-hidden="true" inert)? style="transform: translateX\((-?\d+)%\)"/g)].map(([, name, hidden, shift]) => [name, Boolean(hidden), shift])).toEqual([['1 sur 2', true, '-100'], ['2 sur 2', false, '0']])
+    expect([...carousel.matchAll(/class="carousel-dot" type="button" aria-label="([^"]*)"( aria-current="true")?/g)].map(([, name, current]) => [name, Boolean(current)])).toEqual([['Aller à l\'image 1', false], ['Aller à l\'image 2', true]])
+  })
+
+  test('Carousel draws no controls for a single slide', async () => {
+    const lone = await page('lone-slide')
+
+    expect(lone).toContain('aria-label="Slide 1 of 1" style="transform: translateX(0%)"')
+    expect(lone).not.toContain('carousel-controls')
+  })
+
   test('Badge is neutral unless toned, and EmptyState says why there is nothing', async () => {
     expect(await page('badge')).toBe('<span id="badge" data-tone="neutral" class="badge">Draft</span>')
     expect(await page('empty')).toBe('<div id="empty" class="empty-state"><p class="empty-state-title">No moons</p><p class="empty-state-description">Add one to start</p></div>')

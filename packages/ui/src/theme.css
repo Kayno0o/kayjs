@@ -529,6 +529,45 @@
     @apply ml-auto hover:text-text;
   }
 
+  .carousel {
+    @apply flex flex-col gap-3;
+  }
+
+  .carousel-viewport {
+    @apply relative w-full overflow-hidden bg-surface0;
+  }
+
+  /* Every slide sits over the viewport, moved a width aside per place it stands from the one shown. */
+  .carousel-slide {
+    @apply absolute inset-0 transition-transform duration-700 ease-in-out motion-reduce:transition-none;
+  }
+
+  .carousel-image {
+    @apply size-full object-cover;
+  }
+
+  .carousel-controls {
+    @apply flex items-center justify-center gap-2;
+  }
+
+  .carousel-step {
+    &:where([data-side='previous']) {
+      @apply rotate-90;
+    }
+
+    &:where([data-side='next']) {
+      @apply -rotate-90;
+    }
+  }
+
+  .carousel-dot {
+    @apply h-2 w-2 bg-overlay0 transition-all hover:bg-subtext0;
+
+    &[aria-current='true'] {
+      @apply w-6 bg-accent;
+    }
+  }
+
   /* The empty stars are the element's own text, and the filled ones a copy over them cut to the rating's share. */
   .rating {
     @apply relative inline-block leading-none whitespace-nowrap text-overlay0;

@@ -13,7 +13,7 @@
 - FormDialog calls the action with the form's `FormData`. The server reads it as a plain form post, so give each control the `name` of its field in the action's schema: numbers, booleans and lists are coerced from their text, and files and the honeypot come along.
 - Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library holds English words for its own controls only:
   - Fixed: `Cancel`, `Delete`, `Deleting…`, `Saving…`, `Confirm Deletion`, MultiSelect's `All`, `None`, `Search`, `No match` and "N selected", and IconPicker's `Search icons…`, `Searching…`, `No icons found.`, `Show more` and `Clear icon selection`.
-  - Replaced through the prop of that name: `loadingLabel` (`Loading…`), `closeLabel` (`Close`), `backLabel` (`Back`), `resizeLabel` (`Resize list`), `empty` (`No data yet.`), `copiedLabel` (`Copied!`), CopyButton's `failure` (`Could not copy to the clipboard`), MarkdownEditor's `uploadFailure` (`Could not upload the image`), Rating's `label` (`N out of M`), `placeholder` (MultiSelect's `Any`, CommandPalette's `Search`, MarkdownEditor's `Write markdown…`), and CommandPalette's `label` (`Search`) and `emptyLabel` (`No results`).
+  - Replaced through the prop of that name: `loadingLabel` (`Loading…`), `closeLabel` (`Close`), `backLabel` (`Back`), `resizeLabel` (`Resize list`), `empty` (`No data yet.`), `copiedLabel` (`Copied!`), CopyButton's `failure` (`Could not copy to the clipboard`), MarkdownEditor's `uploadFailure` (`Could not upload the image`), Rating's `label` (`N out of M`), Carousel's `label` (`Carousel`), `previousLabel` (`Previous slide`), `nextLabel` (`Next slide`), `slideLabel` (`Slide {n} of {count}`) and `dotLabel` (`Go to slide {n}`), `placeholder` (MultiSelect's `Any`, CommandPalette's `Search`, MarkdownEditor's `Write markdown…`), and CommandPalette's `label` (`Search`) and `emptyLabel` (`No results`).
 
 ## Setup
 
@@ -331,13 +331,18 @@ ul
   - With `onImage(file)`, a pasted or dropped image is embedded behind an `![Uploading …]()` placeholder at once, swapped for `![](url)` once `onImage` resolves with its url, or removed with `uploadFailure` toasted if it throws. Writing goes on meanwhile, and a finished upload never takes focus back; the field is `aria-busy` while one is under way.
   - `onInput(value)` reports the text after every change, typed or applied. A parent passing other text replaces it; passing back what it was given leaves the caret alone.
 
-### MediaGallery, Masonry, WhenVisible, ZoomPane, ImageCropper
+### MediaGallery, Carousel, Masonry, WhenVisible, ZoomPane, ImageCropper
 
 - `MediaGallery(items={media})`: a stage, a strip of thumbnails and a lightbox.
   - An item has a `key`, a `kind` (`image` or `video`), a `thumb` for the strip, a `preview` for the stage or a video's poster, a `full` the lightbox opens an image at, a video's `src` and a `title`.
   - The arrows, Home and End turn it while focus is inside it, wrapping, and so do its buttons and a swipe. `index` is the item to start on, and `onIndexChange(index)` reports each turn. The strip keeps the shown thumbnail centred, and the images either side start loading.
   - A video plays in place with `preload="none"`. An `.m3u8` playlist plays through `hls.js`, an optional peer imported only once such a video shows, in browsers without native HLS.
   - An image opens full size in a lightbox, which turns the same way. `ratio` is the stage's `aspect-ratio`, `16 / 9` by default; `empty` is what it reads with no items.
+- `Carousel(slides={[{ src: '/garden.jpg', alt: 'The garden' }]} autoplay={5000} ratio="4 / 3" label="Photos")`: one image at a time sliding in, for a marketing page.
+  - The previous and next buttons wrap at either end, and a dot per slide jumps to it. A single slide draws no controls. `index` is the slide to start on, followed when the parent passes another, and `onIndexChange(index)` reports each turn.
+  - Each slide is a `role="group"` named by `slideLabel`, where `{n}` and `{count}` stand for its number and how many there are; the hidden ones are `aria-hidden` and `inert`.
+  - `autoplay` turns it every that many milliseconds, held while the pointer or the focus is on it, never for a visitor asking for reduced motion, and stopped once it leaves the page.
+  - It takes data alone, so a static page holds it.
 - `Masonry(items={posts} key={post => post.id} minWidth={256} gap={12})` with a `@tile(item)` block: tiles of any height in as many lanes of at least `minWidth` as fit, each dropped into the shortest lane, the order still reading left to right. The tiles are placed absolutely inside its own box, so padding goes on a wrapper, never on the Masonry; until it has measured, as on the server, they sit in a plain grid of the same lanes.
 - `WhenVisible(onVisible={loadMore})`: the infinite-scroll sentinel. Render it after a list only while there is more to load; `onVisible` runs once it comes within `margin` pixels (600) of the nearest scroll box, and again whenever the list grows and leaves it in view, never again before a promise it returned settles.
 - `ZoomPane(label="Floor plan")` around a picture: pinch, the wheel, a double click, + and -, and the zoom buttons take it in, a drag or the arrows move it, and 0 or the fit button fits it again. A press that does not wander stays a click, so marks standing on the picture remain clickable; `--zoom-scale` lets one keep its own size with `calc(1 / var(--zoom-scale))`. `tools` draws the buttons, on by default; `most` caps the zoom, 8 times fitted.
