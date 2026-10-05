@@ -55,17 +55,46 @@ describe('verifying an email', () => {
     expect(await ada.call('verifyEmail', token)).toEqual({ ok: false, error: 'invalid' })
   })
 
-  test('opening the link in another browser verifies the address without signing in there', async () => {
+  test('another browser verifies the address only given the password, keeping the link until then, and signs no one in', async () => {
     const { browser, tokenOf } = setup()
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
     const elsewhere = browser()
+    const token = tokenOf('verify-email')
 
-    // Whoever opens it may be confirming an account a stranger registered with their address.
-    expect(await elsewhere.call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/' })
+    expect(await elsewhere.call('verifyEmail', token)).toEqual({ ok: false, error: 'confirm' })
+    expect(await elsewhere.call('verifyEmail', token, 'wrong password!')).toEqual({ ok: false, error: 'confirm' })
+    expect(await ada.json('/me')).toMatchObject({ emailVerified: false })
+    expect(await elsewhere.call('verifyEmail', token, PASSWORD)).toMatchObject({ ok: true })
     expect(await elsewhere.json('/me')).toBe('anonymous')
     expect(await ada.json('/me')).toMatchObject({ emailVerified: true })
+  })
+
+  test('the owner opening the mail a stranger triggered by registering their address leaves that account unverified, for them to claim', async () => {
+    const { browser, tokenOf } = setup()
+    const stranger = browser()
+
+    await stranger.call('register', { email: 'ada@example.com', password: 'squatter password' })
+
+    expect(await browser().call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: false, error: 'confirm' })
+    expect(await stranger.json('/me')).toMatchObject({ emailVerified: false })
+  })
+
+  test('a link the stranger asked for before the owner claimed the account dies with the claim', async () => {
+    const { browser, tokenOf } = setup()
+    const stranger = browser()
+
+    await stranger.call('register', { email: 'ada@example.com', password: 'squatter password' })
+    expect(await stranger.call('changeEmail', { password: 'squatter password' }, 'mallory@evil.test')).toEqual({ ok: true })
+    const moving = tokenOf('change-email')
+    const ada = browser()
+
+    await ada.call('requestMagicLink', 'ada@example.com')
+    await ada.call('signInWithMagicLink', tokenOf('magic-link'))
+
+    expect(await stranger.call('confirmEmailChange', moving)).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
   })
 
   test('with `requireVerified`, registering signs no one in, and the password waits for the address', async () => {
@@ -85,14 +114,23 @@ describe('verifying an email', () => {
     const { browser, tokenOf } = setup({ requireVerified: true })
 
     await browser().call('register', { email: 'ada@example.com', password: 'squatter password' })
-    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
 
     const ada = browser()
 
+    expect(await ada.call('register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
     await ada.call('verifyEmail', tokenOf('verify-email'))
 
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'squatter password' })).toEqual({ ok: false, error: 'invalid' })
+  })
+
+  test('with `requireVerified`, an unverified account given roles, as an invited one, is not replaced', async () => {
+    const { browser, store } = setup({ requireVerified: true })
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', roles: ['admin'] }))
+
+    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
+    expect(await store.users.get('u1')).toMatchObject({ roles: ['admin'] })
   })
 
   test('resending gives a new link and voids the last', async () => {
@@ -239,7 +277,7 @@ describe('changing an email', () => {
     expect(await elsewhere.json('/me')).toBe('anonymous')
   })
 
-  test('refuses an address another account has, or the same one', async () => {
+  test('refuses an address another account has, the same one, or a wrong password', async () => {
     const { browser, store } = setup()
     const ada = browser()
 
@@ -248,6 +286,7 @@ describe('changing an email', () => {
 
     expect(await ada.call('changeEmail', { password: PASSWORD }, 'BOB@example.com')).toEqual({ ok: false, errors: { email: 'taken' } })
     expect(await ada.call('changeEmail', { password: PASSWORD }, 'ada@example.com')).toEqual({ ok: false, errors: { email: 'unchanged' } })
+    expect(await ada.call('changeEmail', { password: 'wrong password!' }, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
     expect(await browser().call('changeEmail', { password: PASSWORD }, 'x@example.com')).toEqual({ ok: false, error: 'signed-out' })
   })
 

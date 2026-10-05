@@ -22,7 +22,8 @@ export interface OAuthFlow {
   state: string
   verifier: string
   redirect: string
-  link: boolean
+  // The user adding a provider to their account, null for a sign-in.
+  link: string | null
   expires: number
 }
 
@@ -33,9 +34,11 @@ export async function startOAuth(state: RequestState, provider: string, options:
   if (!entry)
     return undefined
 
+  const current = options.link ? await state.current() : undefined
+
   // A linked provider is a way in that outlives every sign-out, so a stolen session alone may not add one.
   if (options.link) {
-    if (!(await state.current()) || state.via() !== 'session')
+    if (!current || state.via() !== 'session')
       return { error: 'signed-out' }
 
     if (!(await provedLately(state)))
@@ -45,7 +48,7 @@ export async function startOAuth(state: RequestState, provider: string, options:
   const pkce = await createPkcePair()
   const flowState = randomToken()
 
-  await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, redirect: safeRedirect(options.redirect), link: options.link ?? false, expires: Date.now() + FLOW_MAX_AGE_MS })
+  await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, redirect: safeRedirect(options.redirect), link: current?.id ?? null, expires: Date.now() + FLOW_MAX_AGE_MS })
 
   return entry.client.authorizeUrl({ state: flowState, codeChallenge: pkce.challenge })
 }
@@ -92,7 +95,8 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
   if (flow.link) {
     const current = await state.current()
 
-    if (!current)
+    // The provider joins the account that asked for it, never one signed in since in the same browser.
+    if (current?.id !== flow.link)
       return { error: 'signed-out' }
 
     if (identity && identity.userId !== current.id)

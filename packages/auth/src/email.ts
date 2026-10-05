@@ -4,7 +4,7 @@ import type { EmailProblem, PasswordProblem } from './rules'
 import type { RequestState } from './state'
 import type { TokenType, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
-import { hashPassword } from '@kaynooo/utils'
+import { comparePasswords, hashPassword } from '@kaynooo/utils'
 import { digest, randomToken } from './keys'
 import { spend } from './limits'
 import { notify } from './notify'
@@ -39,6 +39,8 @@ export type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | '
 
 export type LinkResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' }
 
+export type VerifyEmailResult = LinkResult | { ok: false, error: 'confirm' }
+
 export type ResetPasswordResult = LinkResult | { ok: false, errors: { password: PasswordProblem } }
 
 export type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
@@ -56,18 +58,42 @@ export async function sendVerification(state: RequestState): Promise<MailRequest
   return mailFor(state, record, 'verify-email', record.email, null, 'resend')
 }
 
-export async function verifyEmail(state: RequestState, token: string): Promise<LinkResult> {
+// Verifies the address for the browser signed in as the account or the one that registered it; any other must give the account's password, since whoever opens the mail may be confirming an account a stranger registered with their address, which verified would stay the stranger's.
+// Never signs in. Refused, the link stays usable where it can be confirmed.
+export async function verifyEmail(state: RequestState, token: string, password?: string): Promise<VerifyEmailResult> {
   const spent = await spendLink(state, token, 'verify-email')
 
   if (!spent.ok)
     return spent
 
-  await state.core.store.users.update(spent.record.id, { emailVerifiedAt: new Date() })
-
-  // Never signs in: whoever opens the mail may be confirming an account a stranger registered with their address, and must not end up using it.
+  const { record } = spent
   const current = await state.current()
+  const ours = current?.id === record.id || await state.session.get('authRegistered') === record.id
 
-  return { ok: true, redirect: current?.id === spent.record.id ? '/' : state.core.signInPage }
+  if (!ours) {
+    const proved = await holdsPassword(state, record, password)
+
+    if (proved !== true) {
+      await state.core.store.tokens.create(spent.token)
+
+      return { ok: false, error: proved }
+    }
+  }
+
+  await state.core.store.users.update(record.id, { emailVerifiedAt: new Date() })
+
+  return { ok: true, redirect: current?.id === record.id ? '/' : state.core.signInPage }
+}
+
+// Counted as a sign-in attempt on the account, since it is one.
+async function holdsPassword(state: RequestState, record: UserRecord, password: string | undefined): Promise<true | 'confirm' | 'limited'> {
+  if (password === undefined || !record.passwordHash)
+    return 'confirm'
+
+  if (await spend(state.core.store, `sign-in-account:${record.id}`, state.core.limits.signInAccount))
+    return 'limited'
+
+  return await comparePasswords(password, record.passwordHash) ? true : 'confirm'
 }
 
 export async function requestPasswordReset(state: RequestState, email: string): Promise<MailRequestResult> {
@@ -257,6 +283,8 @@ async function claim(core: Core, record: UserRecord): Promise<Partial<UserRecord
 
   await core.store.recoveryCodes.replace(record.id, [])
   await revokeBearerTokens(core, record.id)
+  // A link the stranger asked for before, such as moving the account to their own address, would take it back.
+  await core.store.tokens.deleteForUser(record.id)
 
   return { passwordHash: null, totpSecret: null, totpEnabledAt: null, sessionVersion: record.sessionVersion + 1 }
 }

@@ -6,7 +6,7 @@ import { comparePasswords, hashPassword, passwordNeedsRehash } from '@kaynooo/ut
 import { newUserRecord, publicUser } from './core'
 import { welcome } from './email'
 import { randomToken } from './keys'
-import { exhausted, spend } from './limits'
+import { spend } from './limits'
 import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, passwordProblem, usernameProblem } from './rules'
 
@@ -58,8 +58,8 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   const holder = errors.email ? undefined : await store.users.findByEmail(email)
   const requireVerified = state.core.email?.requireVerified ?? false
 
-  // An address registered and never verified, where unverified accounts cannot sign in, holds nothing worth keeping: registering again replaces it, so no one can squat an address they do not own.
-  if (holder && requireVerified && holder.emailVerifiedAt === null && (await store.identities.listByUser(holder.id)).length === 0) {
+  // An address registered and never verified, where unverified accounts cannot sign in, holds nothing worth keeping: registering again replaces it, so no one can squat an address they do not own. An account given roles was set up on purpose, as by an admin inviting someone, and stays.
+  if (holder && requireVerified && holder.emailVerifiedAt === null && holder.roles.length === 0 && (await store.identities.listByUser(holder.id)).length === 0) {
     await store.users.delete(holder.id)
     await state.core.onDelete?.(publicUser(holder))
   }
@@ -92,6 +92,8 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   const user = publicUser(record)
 
   await state.core.onSignUp?.(user, undefined)
+  // This browser may verify the address without signing in, as with `requireVerified` it cannot.
+  await state.session.set('authRegistered', record.id)
   await welcome(state, record)
 
   if (requireVerified)
@@ -106,22 +108,23 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   const { store, limits } = state.core
   const byEmail = input.identifier.includes('@')
   const identifier = byEmail ? normalizeEmail(input.identifier) : normalizeUsername(input.identifier)
-  // Keyed by what was typed, so guessing at an account that does not exist runs out the same way.
-  const accountKey = `sign-in:${identifier}`
 
-  if (await spend(store, `sign-in:${state.client}`, limits.signIn) || await exhausted(store, accountKey, limits.signInAccount))
+  if (await spend(store, `sign-in-client:${state.client}`, limits.signIn))
     return { ok: false, error: 'limited' }
 
   // No password this long was ever accepted, and hashing it would cost the server for nothing.
   const record = input.password.length > PASSWORD_MAX_LENGTH
     ? undefined
     : byEmail ? await store.users.findByEmail(identifier) : await store.users.findByUsername(identifier)
+  // Counted against the account, so its email and every spelling of its name share one count, or against what was typed when none matches, so a guess at a missing account runs out the same way.
+  const accountKey = `sign-in-account:${record?.id ?? identifier.toLowerCase()}`
 
-  if (input.password.length > PASSWORD_MAX_LENGTH || !(await passwordMatches(record, input.password))) {
-    await spend(store, accountKey, limits.signInAccount)
+  // Spent before the password is checked, so a burst of parallel guesses cannot all pass a count that only a failure would raise.
+  if (await spend(store, accountKey, limits.signInAccount))
+    return { ok: false, error: 'limited' }
 
+  if (input.password.length > PASSWORD_MAX_LENGTH || !(await passwordMatches(record, input.password)))
     return { ok: false, error: 'invalid' }
-  }
 
   await store.attempts.reset(accountKey)
 

@@ -61,6 +61,7 @@ export interface TokenRecord {
 export interface AuthStore {
   users: {
     get: (id: string) => MaybePromise<UserRecord | undefined>
+    // Given an address already normalised, as every caller does: a store may match it exactly.
     findByEmail: (email: string) => MaybePromise<UserRecord | undefined>
     findByUsername: (username: string) => MaybePromise<UserRecord | undefined>
     // Throws when the email or the username is taken.

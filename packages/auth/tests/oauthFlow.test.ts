@@ -274,6 +274,23 @@ describe('linking a provider', () => {
     expect((await browser().fetch('/auth/discord?link=1')).headers.get('location')).toBe('/login?error=signed-out')
   })
 
+  test('joins the provider to the account that asked for it, not to one signed in since in the same browser', async () => {
+    providers({ 1: { id: '1', username: 'ada' }, 7: { id: '7', username: 'ada-gh' } })
+    const { browser, store } = setup()
+    const shared = browser()
+
+    await browser().call('register', { email: 'bob@example.com', password: 'correct horse battery' })
+    await signInWith(shared, 'discord', '1')
+
+    const leaving = await shared.fetch('/auth/github?link=1')
+    const state = new URL(leaving.headers.get('location')!).searchParams.get('state')!
+
+    await shared.call('signInWithPassword', { identifier: 'bob@example.com', password: 'correct horse battery' })
+
+    expect((await shared.fetch(`/auth/github/callback?code=code-7&state=${state}`)).headers.get('location')).toBe('/login?error=signed-out')
+    expect(await store.identities.find('github', '7')).toBeUndefined()
+  })
+
   test('needs a sign-in or a proof from the last ten minutes, so a stolen session alone adds no way in', async () => {
     providers({ 1: { id: '1', username: 'ada' }, 7: { id: '7', username: 'ada-gh' } })
     const { browser, store } = setup()
@@ -364,6 +381,27 @@ describe('provider tokens', () => {
     expect(await ada.json('/token')).toBe('none')
     expect((await app.store.identities.find('discord', '1'))?.accessToken).toBeNull()
     expect(logged).toHaveBeenCalled()
+    logged.mockRestore()
+  })
+
+  test('keeps the tokens another process rotated while its own refresh was refused', async () => {
+    providers({ 1: { id: '1', username: 'ada' } }, { expiresIn: 60, refresh: 'refused' })
+    const app = setup()
+    const ada = app.browser()
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const refuse = globalThis.fetch
+
+    withTokenRoute(app)
+    await signInWith(ada, 'discord', '1')
+    // The other process wins the race: its rotated token is saved before this one hears its own refresh refused.
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      await app.store.identities.update('discord', '1', { refreshToken: 'rotated-elsewhere' })
+
+      return refuse(input, init)
+    }) as typeof fetch
+
+    expect(await ada.json('/token')).toBe('none')
+    expect(await app.store.identities.find('discord', '1')).toMatchObject({ accessToken: expect.any(String), refreshToken: 'rotated-elsewhere' })
     logged.mockRestore()
   })
 })

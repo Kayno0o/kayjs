@@ -71,6 +71,19 @@ describe('createGate', () => {
     expect((await app.handle(req('/g/open'))).status).toBe(200)
   })
 
+  test('a websocket route falls back to the default too, refusing the upgrade to an anonymous visitor', async () => {
+    const app = new Elysia().use(createGate(deps)).ws('/socket', { message: () => undefined }).listen(0)
+    const upgrade = { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13' }
+    const status = async (headers: Record<string, string>) => (await fetch(`http://localhost:${app.server!.port}/socket`, { headers: { ...upgrade, ...headers } })).status
+
+    try {
+      expect([await status({}), await status({ authorization: 'Bearer good' })]).toEqual([401, 101])
+    }
+    finally {
+      await app.stop()
+    }
+  })
+
   test('a route under two authed instances is authorized once', async () => {
     let calls = 0
     const counting = createGate<User, string>({

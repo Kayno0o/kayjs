@@ -78,10 +78,11 @@ describe('changes to what protects the account', () => {
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
     await visitor.call('verifyTwoFactor', recoveryCodes[0])
-    await ada.call('regenerateRecoveryCodes', { password: PASSWORD })
-    await ada.call('disableTwoFactor', { password: PASSWORD })
+    const { recoveryCodes: fresh } = await ada.call('regenerateRecoveryCodes', { code: recoveryCodes[1] })
 
-    expect(notices()).toEqual(['two-factor-enabled', 'recovery-code-used', 'recovery-codes-regenerated', 'two-factor-disabled'])
+    await ada.call('disableTwoFactor', { code: fresh[0] })
+
+    expect(notices()).toEqual(['two-factor-enabled', 'recovery-code-used', 'recovery-code-used', 'recovery-codes-regenerated', 'recovery-code-used', 'two-factor-disabled'])
   })
 
   test('a token minted, and the account deleted', async () => {

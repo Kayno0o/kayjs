@@ -180,18 +180,20 @@ describe('signing in with a second factor', () => {
 })
 
 describe('turning the second factor off', () => {
-  test('needs the password, and voids the recovery codes', async () => {
-    const { ada } = await enrolled()
+  test('needs a code even from an account with a password, and voids the recovery codes', async () => {
+    const { ada, recoveryCodes } = await enrolled()
 
     expect(await ada.call('disableTwoFactor', {})).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('disableTwoFactor', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('disableTwoFactor', { password: PASSWORD })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('regenerateRecoveryCodes', { password: PASSWORD })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('disableTwoFactor', { code: recoveryCodes[0] })).toEqual({ ok: true })
     expect(await ada.json('/me')).toMatchObject({ twoFactor: false })
     expect(await ada.call('recoveryCodesLeft')).toBe(0)
   })
 
   test('regenerating the codes voids the old set', async () => {
     const { ada, browser, recoveryCodes } = await enrolled()
-    const fresh = await ada.call('regenerateRecoveryCodes', { password: PASSWORD })
+    const fresh = await ada.call('regenerateRecoveryCodes', { code: recoveryCodes[9] })
     const visitor = browser()
 
     expect(fresh.recoveryCodes).toHaveLength(10)

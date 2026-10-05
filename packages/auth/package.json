@@ -7,10 +7,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://git.kaynooo.fr/kaynooo/kay-auth"
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs-auth"
   },
   "bugs": {
-    "url": "https://git.kaynooo.fr/kaynooo/kay-auth/issues"
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs-auth/issues"
   },
   "publishConfig": {
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/",

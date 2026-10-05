@@ -1,7 +1,7 @@
 export * from './auth'
 export type { BearerToken } from './bearer'
 export * from './decide'
-export type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult } from './email'
+export type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
 export * from './gate'
 export { DEFAULT_LIMITS } from './limits'
 export type { Limit, Limits } from './limits'

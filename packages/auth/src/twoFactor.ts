@@ -90,7 +90,8 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
 }
 
 // The signed-in user, once `proof` re-proves them, so a stolen session alone cannot change what protects the account.
-export async function reprove(state: RequestState, proof: Proof): Promise<{ ok: true, record: UserRecord } | { ok: false, error: ProofFailure }> {
+// With `secondFactor`, an account with 2FA on proves it with a code, password or not, since a password alone must not turn off or replace what stands behind it.
+export async function reprove(state: RequestState, proof: Proof, options: { secondFactor?: boolean } = {}): Promise<{ ok: true, record: UserRecord } | { ok: false, error: ProofFailure }> {
   const record = await state.current()
 
   if (!record)
@@ -104,7 +105,7 @@ export async function reprove(state: RequestState, proof: Proof): Promise<{ ok: 
   if (await spend(state.core.store, `reprove:${record.id}`, state.core.limits.reprove))
     return { ok: false, error: 'limited' }
 
-  const proved = record.passwordHash !== null
+  const proved = record.passwordHash !== null && !(options.secondFactor && twoFactor)
     ? await comparePasswords(proof.password ?? '', record.passwordHash)
     : await spendSecondFactor(state.core, record, proof.code ?? '')
 
@@ -183,7 +184,7 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
 }
 
 export async function disableTwoFactor(state: RequestState, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
-  const proved = await reprove(state, proof)
+  const proved = await reprove(state, proof, { secondFactor: true })
 
   if (!proved.ok)
     return proved
@@ -197,7 +198,7 @@ export async function disableTwoFactor(state: RequestState, proof: Proof): Promi
 
 // A new set of recovery codes, the old ones void.
 export async function regenerateRecoveryCodes(state: RequestState, proof: Proof): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }> {
-  const proved = await reprove(state, proof)
+  const proved = await reprove(state, proof, { secondFactor: true })
 
   if (!proved.ok)
     return proved

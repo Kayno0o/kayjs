@@ -3,6 +3,7 @@ import type { RequestState } from './state'
 import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword } from '@kaynooo/utils'
 import { publicUser } from './core'
+import { revokeBearerTokens } from './email'
 import { notify } from './notify'
 import { passwordProblem } from './rules'
 import { reprove } from './twoFactor'
@@ -24,6 +25,7 @@ export async function changePassword(state: RequestState, proof: Proof, password
   if (updated) {
     // Links mailed before, a reset among them, no longer outrank the password just set.
     await state.core.store.tokens.deleteForUser(updated.id)
+    await revokeBearerTokens(state.core, updated.id)
     await state.renew(updated)
     await notify(state.core, updated, 'password-changed')
   }

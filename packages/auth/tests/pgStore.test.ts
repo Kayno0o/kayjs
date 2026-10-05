@@ -21,6 +21,9 @@ if (reachable) {
     return pgStore(db)
   })
 }
+else if (process.env.KAYJS_AUTH_REQUIRE_DATABASE) {
+  throw new Error(`pgStore: no Postgres at ${URL}, and KAYJS_AUTH_REQUIRE_DATABASE forbids skipping its tests`)
+}
 else {
   console.warn(`pgStore: skipped, no Postgres at ${URL}; start one with \`docker compose up -d\``)
 }

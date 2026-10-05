@@ -16,6 +16,8 @@ export interface AuthSessionData {
   auth?: SignedIn
   authOAuth?: OAuthFlow
   authChallenge?: Challenge
+  // The account this browser registered, whose address it may verify without signing in.
+  authRegistered?: string
 }
 
 export interface SignedIn {

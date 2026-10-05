@@ -3,7 +3,7 @@ import type { Guard } from 'kay'
 import type { Session } from 'kay/server'
 import type { BearerToken } from './bearer'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
-import type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult } from './email'
+import type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
 import type { Limits } from './limits'
 import type { SecurityEvent } from './mail'
 import type { OAuthFailure } from './oauth/flow'
@@ -19,7 +19,7 @@ import { clientAddress, rateKey } from 'kay/server'
 import { changePassword, deleteAccount, unlink } from './account'
 import { bearerUser, createToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { publicUser } from './core'
-import { changeEmail, confirmEmailChange, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithMagicLink, verifyEmail } from './email'
+import { changeEmail, confirmEmailChange, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithMagicLink, verifyEmail } from './email'
 import { createGate } from './gate'
 import { deriveKeys } from './keys'
 import { DEFAULT_LIMITS } from './limits'
@@ -138,7 +138,7 @@ export class Auth {
     this.resolving = Promise.resolve(null)
   }
 
-  // Signs the user out of every session they hold, this one included unless `keepThisOne`, as after a password change.
+  // Signs the user out of every session they hold and revokes their bearer tokens, this session kept only with `keepThisOne`, as after a password change.
   async signOutEverywhere(options: { keepThisOne?: boolean } = {}): Promise<void> {
     const record = await this.record()
 
@@ -146,6 +146,9 @@ export class Auth {
       return
 
     const updated = await this.core.store.users.update(record.id, { sessionVersion: record.sessionVersion + 1 })
+
+    // A device token is a session too, and one minted from a stolen session would outlive it.
+    await revokeBearerTokens(this.core, record.id)
 
     if (updated && options.keepThisOne)
       await this[STATE].renew(updated)
@@ -168,9 +171,9 @@ export class Auth {
     return sendVerification(this[STATE])
   }
 
-  // Spends a verification link's token: the address is verified, and the user signed in.
-  async verifyEmail(token: string): Promise<LinkResult> {
-    return verifyEmail(this[STATE], token)
+  // Spends a verification link's token in the browser signed in as the account or that registered it, or given the account's password: `{ ok: false, error: 'confirm' }` asks for one of them, the link still usable.
+  async verifyEmail(token: string, password?: string): Promise<VerifyEmailResult> {
+    return verifyEmail(this[STATE], token, password)
   }
 
   // Mails a reset link to that address when an account has it; answers alike when none does.
@@ -457,6 +460,10 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
       key: subject => `${name}:${subject.identity.providerId}`,
       load: subject => subject.credential,
       save: async (subject, tokens) => {
+        // A refusal can be a race another process won, its rotated token saved since this one was read: that one stays.
+        if (tokens === null && (await core.store.identities.find(name, subject.identity.providerId))?.refreshToken !== subject.identity.refreshToken)
+          return
+
         const sealed = sealTokens(core, name, subject.identity.providerId, tokens)
 
         // A refresh that rotates no refresh token leaves the one held usable.
