@@ -41,6 +41,12 @@ jobs:
       - name: Check
         run: bun run check
 
+      # The browser suites fail rather than skip under CI without one, as in the Tests workflow.
+      - name: Install Chromium
+        run: |
+          apk add --no-cache chromium ttf-freefont
+          echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
+
       - name: Tests
         run: bun test
 
