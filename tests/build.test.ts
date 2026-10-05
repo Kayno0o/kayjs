@@ -1,13 +1,13 @@
 import type { BunPlugin } from 'bun'
 import type { KayConfig } from '../src/config'
-import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, writeAsset } from '../src/build/assets'
-import { withoutPlugins } from '../src/build/runtime-config'
+import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
@@ -214,7 +214,40 @@ describe('kay.config.ts', () => {
     expect(withoutPlugins(source)).toBe('import shared, { onError } from \'./shared\'\n\nexport default {  onError }\n')
     expect(withoutPlugins('export const plugins = []\nexport default { plugins }\n')).toBe('export const plugins = []\nexport default {  }\n')
     expect(withoutPlugins('export default { lang: \'en\' }\n')).toBeUndefined()
-    expect(withoutPlugins('const base = { plugins: [] }\nexport default { ...base }\n')).toBeUndefined()
+    // A destructuring stays while one of its names is used.
+    expect(withoutPlugins('import { a } from \'x\'\nconst { p, q } = a()\nexport default { plugins: [p], onError: q }\n')).toBe('import { a } from \'x\'\nconst { p, q } = a()\nexport default {  onError: q }\n')
+  })
+
+  it('takes a plugins key however it is written, and gives up on a spread that may carry more', () => {
+    expect(withoutPlugins('import tw from \'tw\'\nexport default { lang: \'en\', plugins: [tw] /* build */, site: \'x\' }\n')).toBe('export default { lang: \'en\',  site: \'x\' }\n')
+    expect(withoutPlugins('import tw from \'tw\'\nexport default { \'plugins\': [tw], lang: \'en\' }\n')).toBe('export default {  lang: \'en\' }\n')
+    expect(withoutPlugins('import tw from \'tw\'\nexport default { plugins() { return [tw] }, lang: \'en\' }\n')).toBe('export default {  lang: \'en\' }\n')
+    expect(withoutPlugins('const base = { plugins: [] }\nexport default { ...base, plugins: [] }\n')).toBeUndefined()
+    expect(withoutPlugins('export default { plugins: [ }\n')).toBeUndefined()
+  })
+
+  it('strips the config Bun loads through a symlinked project', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'import stamp from \'./stamp\'\n\nexport default { plugins: [stamp], lang: \'en\' }\n',
+      'stamp.ts': 'export default \'STAMP\'\n',
+      'entry.ts': 'import config from \'./kay.config\'\n\nconsole.log(config)\n',
+    })
+    const link = `${root}-link`
+
+    await symlink(root, link)
+
+    try {
+      const file = join(link, 'kay.config.ts')
+      const build = await Bun.build({ entrypoints: [join(link, 'entry.ts')], target: 'bun', plugins: [runtimeConfig(file, withoutPlugins(await Bun.file(file).text())!)] })
+      const code = await build.outputs[0]!.text()
+
+      expect(code).not.toContain('STAMP')
+      expect(code).toContain('lang: "en"')
+    }
+    finally {
+      await rm(link, { force: true })
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
 

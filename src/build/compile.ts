@@ -77,8 +77,9 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   const runtime = configSource === undefined ? undefined : withoutPlugins(configSource)
 
   if (runtime === undefined && (config.plugins?.length ?? 0) > 0)
-    console.warn(`kay: the plugins in ${CONFIG_FILE} are not a property of the object it exports by default, so the executable carries them; one loading a native addon, as Tailwind does, fails where the project's node_modules is not`)
+    console.warn(`kay: the plugins in ${CONFIG_FILE} cannot be told apart from the rest of the config, which they can as a property of the object it exports by default with no spread beside them, so the executable carries them; one loading a native addon, as Tailwind does, fails where the project's node_modules is not`)
 
+  const configPlugins = runtime === undefined ? [] : [runtimeConfig(configFile, runtime)]
   const build = await Bun.build({
     entrypoints: [generated],
     target: 'bun',
@@ -86,7 +87,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [...runtime === undefined ? [] : [runtimeConfig(configFile, runtime)], withoutStyles(), kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings: config.settings }), ...config.plugins ?? []],
+    plugins: [...configPlugins, withoutStyles(), kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings: config.settings }), ...config.plugins ?? []],
   })
 
   if (!build.success)

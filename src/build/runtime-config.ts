@@ -1,6 +1,7 @@
 import type { Binding, NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { BunPlugin } from 'bun'
+import { realpathSync } from 'node:fs'
 import { parse } from '@babel/parser'
 import { loadTraverse } from '../compiler/rewrite'
 
@@ -9,23 +10,34 @@ interface Range {
   end: number
 }
 
-const TRAILING_COMMA = /^\s*,/
+interface Token extends Range {
+  type: string | { label: string }
+}
+
+const COMMENTS = new Set(['CommentBlock', 'CommentLine'])
 const TS_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression'])
 
 // `kay.config.ts` as the compiled server loads it: a build plugin and what only it imports never reach the executable, where a native addon such as Tailwind's cannot load.
 export function runtimeConfig(file: string, contents: string): BunPlugin {
+  // Bun loads a module by its real path, a symlinked project's included.
+  const real = realpathSync(file)
+
   return {
     name: 'kay-runtime-config',
     setup(build) {
-      build.onLoad({ filter: new RegExp(`^${RegExp.escape(file)}$`) }, () => ({ contents, loader: 'ts' }))
+      build.onLoad({ filter: new RegExp(`^${RegExp.escape(real)}$`) }, () => ({ contents, loader: 'ts' }))
     },
   }
 }
 
-// The config's source without the `plugins` of the object it exports by default, nor the imports and top-level declarations only they referenced; undefined when it has no such property to find.
+// The config's source without the `plugins` of the object it exports by default, nor the imports and top-level declarations only they referenced; undefined when they cannot be told apart from the rest.
+// A declaration referencing itself, or one a type mentions, stays: what is left must run as it did.
 export function withoutPlugins(source: string): string | undefined {
-  const ast = parse(source, { sourceType: 'module', plugins: ['typescript'] })
+  const ast = parseModule(source, true)
   let program: NodePath<t.Program> | undefined
+
+  if (!ast)
+    return undefined
 
   loadTraverse()(ast, {
     Program(path) {
@@ -35,15 +47,22 @@ export function withoutPlugins(source: string): string | undefined {
   })
 
   const config = program && exportedObject(program)
-  const property = config?.properties.find(entry => entry.type !== 'SpreadElement' && !entry.computed && keyName(entry.key) === 'plugins')
 
-  if (!program || !property)
+  // A spread may carry plugins of its own.
+  if (!program || !config || config.properties.some(entry => entry.type === 'SpreadElement'))
     return undefined
 
-  const removed: Range[] = [withTrailingComma(source, property)]
+  const properties = config.properties.filter(entry => entry.type !== 'SpreadElement' && !entry.computed && keyName(entry.key) === 'plugins')
+
+  if (properties.length === 0)
+    return undefined
+
+  const { scope } = program
+  const tokens = (ast.tokens ?? []) as Token[]
+  const removed: Range[] = properties.map(property => withTrailingComma(tokens, property))
   const inside = (node: t.Node) => removed.some(range => node.start! >= range.start && node.end! <= range.end)
   const unused = (binding: Binding | undefined) => binding !== undefined && binding.referencePaths.every(reference => inside(reference.node))
-  const bindings = Object.values(program.scope.bindings)
+  const bindings = Object.values(scope.bindings)
 
   // Dropping a declaration can leave another referenced only from it, so this runs until nothing more goes.
   for (let changed = true; changed;) {
@@ -55,9 +74,10 @@ export function withoutPlugins(source: string): string | undefined {
       if (!declaration || inside(declaration) || binding.referencePaths.length === 0)
         continue
 
-      const names = declaration.type === 'ImportDeclaration' ? declaration.specifiers.map(specifier => specifier.local.name) : [binding.identifier.name]
+      // Every name the statement declares, a destructuring's included, must go for it to go.
+      const names = declaration.type === 'ImportDeclaration' ? declaration.specifiers.map(specifier => specifier.local.name) : Object.keys(binding.path.getBindingIdentifiers())
 
-      if (names.every(name => unused(program!.scope.getBinding(name)))) {
+      if (names.every(name => unused(scope.getBinding(name)))) {
         removed.push(withLineEnd(source, declaration))
         changed = true
       }
@@ -69,7 +89,17 @@ export function withoutPlugins(source: string): string | undefined {
   for (const { start, end } of removed.toSorted((a, b) => b.start - a.start))
     stripped = stripped.slice(0, start) + stripped.slice(end)
 
-  return stripped
+  return parseModule(stripped, false) ? stripped : undefined
+}
+
+// Undefined for what Babel does not read, though Bun might: the config then goes in as it is.
+function parseModule(source: string, tokens: boolean): ReturnType<typeof parse> | undefined {
+  try {
+    return parse(source, { sourceType: 'module', plugins: ['typescript'], tokens })
+  }
+  catch {
+    return undefined
+  }
 }
 
 // The object literal the module exports by default, through `defineConfig(...)`, a type assertion or a top-level const.
@@ -122,10 +152,12 @@ function topLevelDeclaration(binding: Binding): t.Statement | undefined {
   return node.type === 'FunctionDeclaration' || (node.type === 'VariableDeclaration' && node.declarations.length === 1) ? node : undefined
 }
 
-function withTrailingComma(source: string, node: t.Node): Range {
-  const after = TRAILING_COMMA.exec(source.slice(node.end!))
+// The property and the comma after it, past any comment between them.
+function withTrailingComma(tokens: Token[], node: t.Node): Range {
+  const next = tokens.find(token => token.start >= node.end! && !(typeof token.type === 'string' && COMMENTS.has(token.type)))
+  const comma = typeof next?.type === 'object' && next.type.label === ','
 
-  return { start: node.start!, end: node.end! + (after?.[0].length ?? 0) }
+  return { start: node.start!, end: comma ? next!.end : node.end! }
 }
 
 function withLineEnd(source: string, node: t.Node): Range {
