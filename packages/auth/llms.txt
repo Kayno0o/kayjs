@@ -120,7 +120,7 @@ a(href="/auth/github?link=1&redirect=/account" data-no-prefetch) Link GitHub
 ```
 
 - `discordProvider({ scopes })` (`identify` and `email` by default) and `githubProvider({ scopes })` are presets; any `OAuthProvider` works. A provider's `normalizeUser` reports an `email` only when the provider verified it, as the presets do.
-- The flow keeps its state and PKCE verifier in the session, so a callback works once, in the browser that started it, within ten minutes. `redirect` is kept to a path on the site.
+- The flow keeps its state and PKCE verifier in the session, so a callback works once, in the browser that started it, within ten minutes. `redirect` is kept to a path on the site. `safeRedirect(path, fallback?)`, exported, does that for the app's own redirects: it answers the path normalised, dot segments resolved, and `fallback` for anything that would leave the site once resolved or decoded, such as `/.//evil.com`.
 - A provider account signs into the user it is linked to. A new one signs up a new user, taking its email and its name only when no other user has them: no account is ever merged into another by email. `onSignUp(user, profile)` runs for every new user, to create the app's own records; `profile` is `undefined` for a password sign-up.
 - `onProviderProfile(user, profile)` runs whenever a provider answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar or a display name. A failure in it is logged and the sign-in goes on.
 - `allow(profile)` is asked before any user is touched; false refuses, as an allowlist of provider ids does.
