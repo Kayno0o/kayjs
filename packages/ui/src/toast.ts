@@ -1,4 +1,4 @@
-import { signal, untrack } from 'kay'
+import { ActionError, signal, untrack } from 'kay'
 
 export type ToastType = 'error' | 'success' | 'info'
 
@@ -82,14 +82,22 @@ export const toast = {
   info: (message: string) => push(message, 'info'),
 }
 
-// Runs a change the page waits on, resolving to what `run` returned, or to `undefined` once a refused call has toasted `failure` instead of throwing.
-export async function attempt<T>(run: () => Promise<T>, failure: string): Promise<T | undefined> {
+// Runs a change the page waits on, resolving to what `run` returned, or to `undefined` once a refused call has toasted instead of throwing.
+// What is toasted: the message `refused` reads from the data the action's handler passed to `ctx.fail`, else a refusal of the whole call such as a limit, else `failure`.
+export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string, refused?: (data: Data) => string | undefined): Promise<T | undefined> {
   try {
     return await run()
   }
-  catch {
-    toast.error(failure)
+  catch (error) {
+    toast.error(refusalOf(error, refused) || failure)
 
     return undefined
   }
+}
+
+function refusalOf<Data>(error: unknown, refused: ((data: Data) => string | undefined) | undefined): string | undefined {
+  if (!(error instanceof ActionError))
+    return undefined
+
+  return (error.data === undefined ? undefined : refused?.(error.data as Data)) || error.errors['']
 }

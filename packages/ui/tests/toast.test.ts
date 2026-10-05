@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test'
+import { ActionError } from 'kay'
 import { attempt, dismissToast, holdToasts, toast, toasts } from '../src/toast'
 
 function shown() {
@@ -87,6 +88,18 @@ describe('attempt', () => {
   test('toasts the failure instead of throwing, and resolves to undefined', async () => {
     expect(await attempt(async () => Promise.reject(new Error('refused')), 'Could not save')).toBeUndefined()
     expect(shown()).toEqual([{ message: 'Could not save', type: 'error' }])
+  })
+
+  test('toasts what `refused` reads from the handler\'s refusal, or a refusal of the whole call, before `failure`', async () => {
+    const refused = (data: { error?: string }) => data.error
+    const reject = (error: Error) => async () => Promise.reject(error)
+
+    await attempt(reject(new ActionError(400, '', {}, { error: 'Still referenced' })), 'Could not delete', refused)
+    await attempt(reject(new ActionError(400, '', {}, { error: '' })), 'Could not delete', refused)
+    await attempt(reject(new ActionError(429, '', { '': 'Too many tries' })), 'Could not delete', refused)
+    await attempt(reject(new ActionError(400, '', {}, { error: 'Still referenced' })), 'Could not delete')
+
+    expect(shown().map(({ message }) => message)).toEqual(['Still referenced', 'Could not delete', 'Too many tries', 'Could not delete'])
   })
 
   test('stays quiet when the call goes through, and hands back what it returned', async () => {

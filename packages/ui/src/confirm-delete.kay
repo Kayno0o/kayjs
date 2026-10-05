@@ -1,16 +1,18 @@
----
+--- <Data>
 import { signal } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
 import { attempt } from './toast'
 
-const { message, onConfirm, failure, trigger = 'icon', label = 'Delete', size, variant, class: className } = props<{
+const { message, onConfirm, failure, refused, trigger = 'icon', label = 'Delete', size, variant, class: className } = props<{
   message: string
   // Deletes. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
   onConfirm: () => void | Promise<void>
   // Toasted when `onConfirm` throws, which leaves the dialog open.
   failure: string
+  // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: toasted in place of `failure`, which stays for an answer of undefined or another error.
+  refused?: (data: Data) => string | undefined
   // An icon by default; `button` is a labelled danger button, for a dialog footer.
   trigger?: 'icon' | 'button'
   // What the trigger says, for a delete the reader knows by another name: "Empty trash", "Revoke link".
@@ -32,7 +34,7 @@ async function confirm() {
     await onConfirm()
 
     return true
-  }, failure)
+  }, failure, refused)
 
   pending.set(false)
 

@@ -108,6 +108,17 @@ describe('ConfirmDelete', () => {
     expect(root.querySelector('.kui-toast-message')?.textContent).toBe('Could not delete')
   })
 
+  test('toasts what the handler refused with, through `refused`', async () => {
+    const root = await dialogs()
+
+    click(root.querySelector('.kui-icon-btn[aria-label="Archive"]'))
+    await settle()
+    click(root.querySelectorAll('dialog')[2]!.querySelector('.kui-btn-danger'))
+    await settle()
+
+    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Still referenced')
+  })
+
   test('takes a labelled danger button as its trigger, for a delete known by another name', async () => {
     const root = await dialogs()
     const trigger = root.querySelector('.revoke')!
@@ -117,6 +128,6 @@ describe('ConfirmDelete', () => {
     click(trigger)
     await settle()
 
-    expect(root.querySelectorAll<HTMLDialogElement>('dialog')[2]?.open).toBe(true)
+    expect(root.querySelectorAll<HTMLDialogElement>('dialog')[3]?.open).toBe(true)
   })
 })

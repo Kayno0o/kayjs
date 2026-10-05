@@ -105,7 +105,12 @@ toast.info('Copied')
 
 // Resolves to what the call returned, or to undefined once it threw and `failure` was toasted.
 const post = await attempt(() => publish({ id }), 'Could not publish')
+
+// A refusal of the action's handler, `ctx.fail(409, { error: 'Already published' })`, toasted as it says.
+await attempt(() => publish({ id }), 'Could not publish', (data: { error: string }) => data.error)
 ```
+
+`attempt(run, failure, refused?)` toasts, for a call that throws, the message `refused` reads from the data the action's handler passed to `ctx.fail`; else a refusal of the whole call, such as a limit; else `failure`. An empty or undefined answer from `refused` falls through to the next. Type `refused`'s parameter as the handler's data: `(data: { error: string }) => data.error`.
 
 A toast stays for four seconds, or until its close button is pressed. Its clock stops while the pointer rests on the toasts or focus is inside them, and goes on with the time it had left once both are gone. Toaster is a manual popover in the top layer, so toasts show above an open dialog.
 
@@ -124,6 +129,7 @@ Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
 - `ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})` renders a trigger that opens a dialog asking before deleting:
   - While the promise `onConfirm` returns is pending, the dialog's buttons are disabled.
   - Once it resolves, the dialog closes. If it throws, `failure` is toasted and the dialog stays open.
+  - `refused` reads a refusal of the action's handler, as `attempt` does, and its message is toasted in place of `failure`: `ConfirmDelete(... failure="Could not delete" refused={(data: { error: string }) => data.error})`.
   - `trigger="button"` makes the trigger a labelled danger button rather than an icon. `label` renames the trigger, for "Revoke link" or "Empty trash", and `class` goes on it. `size` and `variant` style the icon trigger only.
 
 ### Table

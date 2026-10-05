@@ -1,5 +1,5 @@
 ---
-import { signal } from 'kay'
+import { ActionError, signal } from 'kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
@@ -8,6 +8,11 @@ import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 const { onClose, onDelete, dirty = false } = props<{ onClose: () => void, onDelete: () => Promise<void>, dirty?: boolean }>()
 
 const open = signal(false)
+
+// An archive the action's handler refuses, as `ctx.fail(409, { error })` reaches an island.
+async function archive() {
+  throw new ActionError(409, '', {}, { error: 'Still referenced' })
+}
 ---
 button#open(onClick={() => open.set(true)}) Open
 Dialog#dialog(open={open()} title="Rename" dirty={dirty} onClose={() => { open.set(false); onClose() }})
@@ -15,5 +20,6 @@ Dialog#dialog(open={open()} title="Rename" dirty={dirty} onClose={() => { open.s
     button#cancel.kui-btn(onClick={() => open.set(false)}) Cancel
   input#name(name="name")
 ConfirmDelete(message="Delete this?" failure="Could not delete" onConfirm={onDelete})
+ConfirmDelete(message="Archive this?" failure="Could not archive" onConfirm={archive} label="Archive" refused={(data: { error?: string }) => data.error})
 ConfirmDelete(message="Revoke this link?" failure="Could not revoke" onConfirm={onDelete} trigger="button" label="Revoke link" class="revoke")
 Toaster
