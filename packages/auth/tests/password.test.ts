@@ -1,6 +1,6 @@
 import type { User } from '../src/auth'
 import { describe, expect, test } from 'bun:test'
-import { testApp, userRecord } from './helpers/app'
+import { serialStore, testApp, userRecord } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
 
@@ -17,6 +17,16 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
 }
 
 describe('register', () => {
+  test('goes on with the id a store picked itself', async () => {
+    const { browser, signUps } = setup({ store: serialStore() })
+    const ada = browser()
+
+    await browser().post('/register', { email: 'bob@example.com', password: PASSWORD })
+    await ada.post('/register', { email: 'ada@example.com', password: PASSWORD })
+
+    expect([await ada.json('/me'), signUps.at(-1)?.id]).toEqual([expect.objectContaining({ id: '2', email: 'ada@example.com' }), '2'])
+  })
+
   test('creates a user with a hashed password and signs them in', async () => {
     const { browser, signUps, store } = setup()
     const ada = browser()

@@ -14,6 +14,7 @@ export type { PasswordSignInInput, PasswordSignInResult, RegisterErrors, Registe
 export * from './roles'
 export * from './rules'
 export * from './store'
+export { sealTotpSecret } from './twoFactor'
 export type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 export * from './types'
 export * from './wsAuth'

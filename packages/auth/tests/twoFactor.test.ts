@@ -1,7 +1,8 @@
 import type { Mail } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { base32Decode, base32Encode, otpauthUri, totpCode, totpStep, verifyTotp } from '../src/totp'
-import { testApp } from './helpers/app'
+import { sealTotpSecret } from '../src/twoFactor'
+import { SECRET, testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
 
@@ -176,6 +177,34 @@ describe('signing in with a second factor', () => {
     expect(await visitor.call('signInWithMagicLink', token)).toEqual({ ok: true, redirect: '/two-factor' })
     expect(await visitor.json('/me')).toBe('anonymous')
     expect(await visitor.call('verifyTwoFactor', await totpCode(setup.secret, totpStep() + 1))).toEqual({ ok: true, redirect: '/account' })
+  })
+})
+
+describe('a secret kept plain before kayjs-auth', () => {
+  test('signs in once the store hands it over sealed', async () => {
+    const { browser, store } = testApp()
+    const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
+    const { user } = await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    await store.users.update(user.id, { totpSecret: sealTotpSecret(SECRET, user.id, secret), totpEnabledAt: new Date() })
+    const visitor = browser()
+
+    expect(await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ redirect: '/two-factor' })
+    expect(await visitor.call('verifyTwoFactor', await totpCode(secret, totpStep()))).toMatchObject({ ok: true })
+    expect(await visitor.json('/me')).toMatchObject({ id: user.id, twoFactor: true })
+  })
+
+  test('is sealed for its own user only', async () => {
+    const { browser, store } = testApp()
+    const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
+    const { user } = await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    await store.users.update(user.id, { totpSecret: sealTotpSecret(SECRET, 'someone-else', secret), totpEnabledAt: new Date() })
+    const visitor = browser()
+
+    await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+
+    expect(await visitor.call('verifyTwoFactor', await totpCode(secret, totpStep()))).toMatchObject({ ok: false })
   })
 })
 

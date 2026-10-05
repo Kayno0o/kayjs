@@ -73,10 +73,10 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   if (errors.email || errors.password || errors.username)
     return { ok: false, errors: withoutUndefined(errors) }
 
-  const record = newUserRecord({ email, username, passwordHash: await hashPassword(input.password) })
+  let record = newUserRecord({ email, username, passwordHash: await hashPassword(input.password) })
 
   try {
-    await store.users.create(record)
+    record = (await store.users.create(record)) ?? record
   }
   // Another request took the email or the name in between; any other failure is the store's.
   catch (error) {

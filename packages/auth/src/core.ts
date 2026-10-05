@@ -67,6 +67,7 @@ export interface Core {
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: (profile: Profile) => boolean | Promise<boolean>
   onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
+  onProviderProfile?: (user: User, profile: Profile) => void | Promise<void>
   onDelete?: (user: User) => void | Promise<void>
   onEvent?: (event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>
 }

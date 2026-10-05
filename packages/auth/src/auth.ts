@@ -67,6 +67,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   allow?: (profile: Profile) => boolean | Promise<boolean>
   // Called once a new user exists, to create the app's own records for them.
   onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
+  // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar.
+  onProviderProfile?: (user: User, profile: Profile) => void | Promise<void>
   // Called once a user is deleted, to delete the app's own records for them.
   onDelete?: (user: User) => void | Promise<void>
   // Called with every change to what protects an account, the ones mailed to the user, for an audit log of the app's own.
@@ -450,6 +452,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     refreshers: new Map(),
     allow: options.allow,
     onSignUp: options.onSignUp,
+    onProviderProfile: options.onProviderProfile,
     onDelete: options.onDelete,
     onEvent: options.onEvent,
   }

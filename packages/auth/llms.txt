@@ -60,7 +60,7 @@ The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(
 - `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
 - `prefix`: where the OAuth routes live, `/auth` by default.
 - `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default.
-- `oauth`, `allow`, `onSignUp`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `authorize`: see Guards and gates. `limits`: see Limits.
+- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `authorize`: see Guards and gates. `limits`: see Limits.
 
 ## The signed-in user
 
@@ -121,6 +121,7 @@ a(href="/auth/github?link=1&redirect=/account" data-no-prefetch) Link GitHub
 - `discordProvider({ scopes })` (`identify` and `email` by default) and `githubProvider({ scopes })` are presets; any `OAuthProvider` works. A provider's `normalizeUser` reports an `email` only when the provider verified it, as the presets do.
 - The flow keeps its state and PKCE verifier in the session, so a callback works once, in the browser that started it, within ten minutes. `redirect` is kept to a path on the site.
 - A provider account signs into the user it is linked to. A new one signs up a new user, taking its email and its name only when no other user has them: no account is ever merged into another by email. `onSignUp(user, profile)` runs for every new user, to create the app's own records; `profile` is `undefined` for a password sign-up.
+- `onProviderProfile(user, profile)` runs whenever a provider answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar or a display name.
 - `allow(profile)` is asked before any user is touched; false refuses, as an allowlist of provider ids does.
 - `?link=1` links the provider account to the signed-in user instead, refused when another user has it linked. A linked provider is a way in that outlives every sign-out, so linking needs a session that signed in or re-proved in the last ten minutes (see Re-proof): past that the link goes to `signInPage?error=stale`, and the page asks for `auth.reprove(proof)` first.
 - A failure goes to `signInPage?error=<code>`: `oauth` (a state or code that did not check out, or a provider account without an id), `cancelled`, `refused`, `taken`, `unavailable` (the provider failed), `signed-out` (a link without a signed-in user), `stale` (a link without a recent proof).
@@ -255,6 +256,7 @@ Attempts are counted in the store, so every process shares them, per client addr
 - `memoryStore()` keeps everything in the process: for tests, and for trying kayjs-auth before a database is wired.
 - `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps it in Postgres through pg-orm, once `authTables` are among the `Database`'s tables: `auth_user`, `auth_identity`, `auth_token`, `auth_recovery_code`, `auth_bearer_token` and `auth_attempt`, the others deleted with their user.
 - Any object with the `AuthStore` methods is a store: `users`, `identities`, `tokens`, `recoveryCodes`, `bearerTokens` and `attempts`, each method sync or async. What must hold is written on each method: emails are looked up exactly, usernames without case; a mailed token, a recovery code and a TOTP step are spent once even by two requests together; deleting a user deletes what kayjs-auth keeps for them.
+- A store over an app's own tables: `users.create(user)` answers the user as stored when the store picks its own id, such as a serial column's, and kayjs-auth goes on with that id (ids are strings, so the store converts); answering nothing keeps the id kayjs-auth picked. TOTP secrets are stored sealed with the auth `secret`: a store whose rows hold plain base32 secrets from before seals each on read with `sealTotpSecret(secret, userId, plain)`, from `@kaynooo/kayjs-auth`. A plain base32 value matches `/^[A-Z2-7]+=*$/`, which a sealed one never does, and what kayjs-auth writes afterwards is sealed already.
 
 ## Testing
 

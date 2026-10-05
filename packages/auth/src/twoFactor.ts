@@ -3,7 +3,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, nanoid } from '@kaynooo/utils'
 import { qrCodeDataUri } from '@kaynooo/utils/tools'
-import { digest } from './keys'
+import { deriveKeys, digest } from './keys'
 import { spend } from './limits'
 import { notify } from './notify'
 import { generateTotpSecret, otpauthUri, verifyTotp } from './totp'
@@ -238,6 +238,11 @@ async function issueRecoveryCodes(core: Core, userId: string): Promise<string[]>
   await core.store.recoveryCodes.replace(userId, codes.map(code => digest(code)))
 
   return codes.map(code => code.replace(EVERY_FIVE, '$&-'))
+}
+
+// A TOTP secret sealed as kayjs-auth stores it, for a store whose rows hold plain ones from before: it seals each on read. `secret` is the one `createAuth` takes.
+export function sealTotpSecret(secret: string | string[], userId: string, plain: string): string {
+  return deriveKeys(secret).encrypt(plain, totpContext(userId))
 }
 
 function totpContext(userId: string): string {

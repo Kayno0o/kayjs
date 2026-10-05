@@ -108,6 +108,8 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     if (!identity)
       await notify(core, current, 'provider-linked', provider)
 
+    await core.onProviderProfile?.(publicUser(current), profile)
+
     return { redirect: flow.redirect }
   }
 
@@ -123,6 +125,8 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     await saveIdentity(core, undefined, record.id, profile, tokens, identity !== undefined)
     await core.onSignUp?.(publicUser(record), profile)
   }
+
+  await core.onProviderProfile?.(publicUser(record), profile)
 
   return { redirect: await state.complete(record, flow.redirect) }
 }
@@ -192,9 +196,7 @@ async function signUp(core: Core, profile: Profile): Promise<UserRecord> {
   const freeName = !usernameProblem(name) && !(await core.store.users.findByUsername(name)) ? name : null
   const record = newUserRecord({ email: freeEmail, emailVerifiedAt: freeEmail === null ? null : new Date(), username: freeName })
 
-  await core.store.users.create(record)
-
-  return record
+  return (await core.store.users.create(record)) ?? record
 }
 
 // Gives a user without an email the provider's verified one, when no other user has it.

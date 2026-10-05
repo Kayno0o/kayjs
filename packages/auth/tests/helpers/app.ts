@@ -24,6 +24,26 @@ export function userRecord(fields: Partial<UserRecord> & Pick<UserRecord, 'id'>)
   }
 }
 
+// A store numbering its users itself, as one over a serial id column does: the id kayjs-auth picks is dropped.
+export function serialStore(): AuthStore {
+  const store = memoryStore()
+  let last = 0
+
+  return {
+    ...store,
+    users: {
+      ...store.users,
+      async create(user) {
+        const stored = { ...user, id: String(++last) }
+
+        await store.users.create(stored)
+
+        return stored
+      },
+    },
+  }
+}
+
 // An Elysia app on kayjs-auth with routes to drive it, and a browser per call that keeps its own cookies.
 export function testApp(options: Partial<Omit<AuthOptions<AuthSessionData, 'admin' | 'editor'>, 'store'>> & { store?: AuthStore } = {}) {
   const store = options.store ?? memoryStore()

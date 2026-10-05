@@ -1,7 +1,7 @@
 import type { Profile, User } from '../src/auth'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
-import { testApp, userRecord } from './helpers/app'
+import { serialStore, testApp, userRecord } from './helpers/app'
 
 const URL_BASE = 'https://site.test'
 const realFetch = globalThis.fetch
@@ -117,6 +117,31 @@ describe('coming back from the provider', () => {
 
     expect(identity?.userId).toBe(signUps[0]!.user.id)
     expect(identity?.accessToken).not.toContain('token-1')
+  })
+
+  test('signs up with the id a store picked itself', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser, signUps, store } = setup({ store: serialStore() })
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+
+    expect([(await ada.json('/me') as User).id, signUps[0]?.user.id, (await store.identities.find('discord', '1'))?.userId]).toEqual(['1', '1', '1'])
+  })
+
+  test('hands the app the provider\'s profile on every sign-in, the first included, and on a link', async () => {
+    providers({ 1: { id: '1', username: 'ada' }, 7: { id: '7', username: 'ada-gh' } })
+    const profiles: string[] = []
+    const { browser, signUps } = setup({ onProviderProfile: (user, profile) => void profiles.push(`${user.id} ${profile.provider} ${profile.username}`) })
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+    providers({ 1: { id: '1', username: 'ada-renamed' }, 7: { id: '7', username: 'ada-gh' } })
+    await signInWith(browser(), 'discord', '1')
+    await signInWith(ada, 'github', '7', '/auth/github?link=1')
+    const id = signUps[0]!.user.id
+
+    expect(profiles).toEqual([`${id} discord ada`, `${id} discord ada-renamed`, `${id} github ada-gh`])
   })
 
   test('refuses a provider account without an id, which would share one account with every other such sign-in', async () => {
