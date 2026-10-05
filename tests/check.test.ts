@@ -233,6 +233,21 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('checks content and messages without the server\'s environment, as kay build renders pages', async () => {
+    const root = await scratchProject({
+      'src/env.ts': 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ KAY_CHECK_UNSET_SECRET: t.String() }))\n',
+      'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\nimport { env } from \'./env\'\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({ title: t.String() }) })\nexport const secret = () => env.KAY_CHECK_UNSET_SECRET\n',
+      'src/content/notes/a.md': '---\ntitle: A\n---\nText\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => firstLine(d.message))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('resolves -p against the directory being checked', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'tsconfig.app.json': tsconfig })
 

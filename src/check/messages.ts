@@ -6,6 +6,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { PROBLEMS_MARKER } from '../content/server'
 import { flattenMessages, isPlural } from '../runtime/i18n'
+import { buildingWithoutEnv } from '../server/env'
 import { messagesFile } from '../server/i18n'
 
 const PLACEHOLDER = /\{(\w+)\}/g
@@ -125,5 +126,7 @@ function lineOf(source: string, key: string): number {
 if (import.meta.main) {
   const [root, config] = process.argv.slice(2)
 
+  // The checking machine lacks the server's environment, as `kay build` does.
+  buildingWithoutEnv()
   console.log(`${PROBLEMS_MARKER}${JSON.stringify(await messageProblems(root!, JSON.parse(config!) as I18nConfig))}`)
 }

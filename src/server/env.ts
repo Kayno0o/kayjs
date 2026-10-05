@@ -6,7 +6,7 @@ import { readFields } from './query'
 // On the global object, so a copy of kay the app loads beside the CLI's sees it too.
 const BUILDING = Symbol.for('kay.building')
 
-// `kay build` renders pages without the server's environment: from then on a variable missing or refused fails the page reading it rather than the module declaring it.
+// `kay build` renders pages, and `kay check` reads content and messages, without the server's environment: from then on a variable missing or refused fails the page reading it rather than the module declaring it.
 export function buildingWithoutEnv(): void {
   (globalThis as { [BUILDING]?: boolean })[BUILDING] = true
 }
