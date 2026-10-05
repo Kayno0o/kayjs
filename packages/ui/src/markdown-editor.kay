@@ -1,0 +1,176 @@
+---
+import type { JSX } from 'kay'
+import type { TextEdit } from './markdown-edit'
+import { entriesFromDataTransfer, htmlToMarkdown } from '@kaynooo/utils/browser/clipboard'
+import { effect, signal, untrack } from 'kay'
+import { enterEdit, indentEdit, linkEdit, wrapEdit } from './markdown-edit'
+import { attempt } from './toast'
+
+const SHORTCUT_MARKERS: Partial<Record<string, string>> = { b: '**', i: '*' }
+
+const { value = '', onInput, onImage, uploadFailure = 'Could not upload the image', placeholder = 'Write markdown…', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+  // The text to start with; an editor whose parent passes other text follows it.
+  value?: string
+  // The text after every change, typed or applied by a shortcut, a paste or an upload.
+  onInput?: (value: string) => void
+  // Uploads a pasted or dropped image and returns the url to embed it by. Without it, images are left to the browser.
+  onImage?: (file: File) => Promise<string>
+  // Toasted when an upload throws.
+  uploadFailure?: string
+  class?: string
+}>()
+
+const uploading = signal(0)
+let area: HTMLTextAreaElement | undefined
+
+function isImage(file: File): boolean {
+  return file.type.startsWith('image/')
+}
+
+// The attribute fills the field on the server and as it hydrates; afterwards the text lands on it only when it differs, since writing it moves the caret to the end.
+effect(() => {
+  const next = value
+
+  if (area && area.value !== next)
+    area.value = next
+})
+
+// Applies an edit through the browser's own editing, so Ctrl+Z undoes it like typing, which assigning the value would wipe out.
+// Where `execCommand` is gone or refuses, the text is set directly and an `input` event reports it.
+// An edit nobody typed, such as a finished upload, never takes focus back from wherever the user went meanwhile: it only goes through `execCommand` when the field still has focus.
+function applyEdit(el: HTMLTextAreaElement, edit: TextEdit, takeFocus = true): void {
+  const native = typeof document.execCommand === 'function' && (takeFocus || document.activeElement === el)
+
+  if (native) {
+    el.focus()
+    el.setSelectionRange(edit.start, edit.end)
+  }
+
+  const done = edit.text === '' ? edit.start === edit.end || (native && document.execCommand('delete')) : native && document.execCommand('insertText', false, edit.text)
+
+  if (!done) {
+    el.setRangeText(edit.text, edit.start, edit.end, 'end')
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  el.setSelectionRange(edit.selectionStart, edit.selectionEnd)
+}
+
+function edit(next: TextEdit | null, event: Event): void {
+  if (!next || !area)
+    return
+
+  event.preventDefault()
+  applyEdit(area, next)
+}
+
+function keyDown(event: KeyboardEvent) {
+  const field = event.currentTarget as HTMLTextAreaElement
+
+  if (event.defaultPrevented || event.isComposing)
+    return
+
+  const { selectionStart: start, selectionEnd: end } = field
+  const text = field.value
+  const key = event.key.toLowerCase()
+
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+    const marker = SHORTCUT_MARKERS[key]
+
+    if (marker)
+      edit(wrapEdit(text, start, end, marker), event)
+    else if (key === 'k')
+      edit(linkEdit(text, start, end), event)
+
+    return
+  }
+
+  if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey)
+    edit(indentEdit(text, start, end, event.shiftKey), event)
+  else if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey)
+    edit(enterEdit(text, start, end), event)
+}
+
+// Swaps a placeholder for what replaces it wherever the text has moved it to, keeping the caret where the user left it.
+function swap(placeholder: string, replacement: string): void {
+  const el = area
+
+  if (!el)
+    return
+
+  const at = el.value.indexOf(placeholder)
+
+  if (at === -1)
+    return
+
+  const { selectionStart, selectionEnd } = el
+  const shift = (index: number) => index >= at + placeholder.length ? index + replacement.length - placeholder.length : Math.min(index, at)
+
+  applyEdit(el, { start: at, end: at + placeholder.length, text: replacement, selectionStart: shift(selectionStart), selectionEnd: shift(selectionEnd) }, false)
+}
+
+// Embeds each image behind a placeholder right away, so writing goes on while it uploads.
+async function upload(files: File[]): Promise<void> {
+  const send = onImage
+  const el = area
+
+  if (!el || !send)
+    return
+
+  await Promise.all(files.map(async (file) => {
+    const placeholder = `![Uploading ${file.name || 'image'}…]()`
+    const { selectionStart, selectionEnd } = el
+    const text = `${placeholder}\n`
+
+    applyEdit(el, { start: selectionStart, end: selectionEnd, text, selectionStart: selectionStart + text.length, selectionEnd: selectionStart + text.length })
+    uploading.set(count => count + 1)
+
+    try {
+      const url = await attempt(async () => send(file), uploadFailure)
+
+      swap(placeholder, url === undefined ? '' : `![](${url})`)
+    }
+    finally {
+      uploading.set(count => count - 1)
+    }
+  }))
+}
+
+function paste(event: ClipboardEvent) {
+  const field = event.currentTarget as HTMLTextAreaElement
+  const data = event.clipboardData
+
+  if (event.defaultPrevented || !data)
+    return
+
+  const images = onImage ? [...data.files].filter(isImage) : []
+
+  if (images.length > 0) {
+    event.preventDefault()
+    void upload(images)
+
+    return
+  }
+
+  const html = entriesFromDataTransfer(data).find(entry => entry.type === 'text/html')?.text
+
+  if (html) {
+    const start = field.selectionStart
+    const text = htmlToMarkdown(html)
+
+    edit({ start, end: field.selectionEnd, text, selectionStart: start + text.length, selectionEnd: start + text.length }, event)
+  }
+}
+
+function drop(event: DragEvent) {
+  const images = onImage ? [...event.dataTransfer?.files ?? []].filter(isImage) : []
+
+  if (event.defaultPrevented || images.length === 0)
+    return
+
+  event.preventDefault()
+  void upload(images)
+}
+---
+// A markdown field that writes like an editor: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
+textarea.field-input.markdown-editor({...rest} ref={element => area = element} value={untrack(() => value)} placeholder={placeholder} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => onInput?.(event.currentTarget.value)} onKeyDown={keyDown} onPaste={paste} onDrop={drop})

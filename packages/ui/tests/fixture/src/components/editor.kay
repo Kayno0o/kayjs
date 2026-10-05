@@ -1,0 +1,10 @@
+---
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+
+// What the test reads back: the text after each change.
+const { value, onInput, onImage } = props<{ value: string, onInput: (value: string) => void, onImage?: (file: File) => Promise<string> }>()
+---
+MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage})
+input#title
+Toaster

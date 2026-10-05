@@ -13,7 +13,7 @@
 - FormDialog calls the action with the form's `FormData`. The server reads it as a plain form post, so give each control the `name` of its field in the action's schema: numbers, booleans and lists are coerced from their text, and files and the honeypot come along.
 - Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library holds English words for its own controls only:
   - Fixed: `Cancel`, `Delete`, `Deleting…`, `Saving…`, `Confirm Deletion`, and MultiSelect's `All`, `None`, `Search`, `No match` and "N selected".
-  - Replaced through the prop of that name: `loadingLabel` (`Loading…`), `closeLabel` (`Close`), `backLabel` (`Back`), `resizeLabel` (`Resize list`), `empty` (`No data yet.`), `copiedLabel` (`Copied!`), CopyButton's `failure` (`Could not copy to the clipboard`), `placeholder` (MultiSelect's `Any`, CommandPalette's `Search`), and CommandPalette's `label` (`Search`) and `emptyLabel` (`No results`).
+  - Replaced through the prop of that name: `loadingLabel` (`Loading…`), `closeLabel` (`Close`), `backLabel` (`Back`), `resizeLabel` (`Resize list`), `empty` (`No data yet.`), `copiedLabel` (`Copied!`), CopyButton's `failure` (`Could not copy to the clipboard`), MarkdownEditor's `uploadFailure` (`Could not upload the image`), `placeholder` (MultiSelect's `Any`, CommandPalette's `Search`, MarkdownEditor's `Write markdown…`), and CommandPalette's `label` (`Search`) and `emptyLabel` (`No results`).
 
 ## Setup
 
@@ -314,6 +314,14 @@ ul
 - `Board({ onMove({ item, from, to, index }) })`: items moving between wrapping containers and within them, for a kanban or a tier list. `ref={board.container(id)}` on each container and `ref={board.item(id, container)}` on each item, grabbed whole. A ghost follows the pointer; `board.dragging()` names the item dragged and `board.drop()` the landing `{ container, index, bar }`, the bar an insertion mark to draw `position: fixed` at `bar.left`, `bar.top` and `bar.height`. ArrowLeft and ArrowRight move a focused item within its container, ArrowUp and ArrowDown into the one before or after.
 - `DropTargets({ onDrop(item, target), accepts, onLinger })`: items dropped onto targets, a move that is not a reorder, such as a note into a folder. `ref={targets.item(id)}` and `ref={targets.target(id)}`; the innermost accepting target under the pointer wins, `targets.over()` naming it and `targets.dragging()` the item. `onLinger(target)` runs once the pointer rests on a target, such as to open a folder. Pointers only: give the keyboard a menu or a dialog for the same move.
 - A drag cancels the browser's own drag of a link or an image inside the item; on Board and DropTargets it also swallows the click its release would send.
+
+### MarkdownEditor
+
+- `MarkdownEditor(value={body()} onInput={body.set} onImage={upload} name="body")`: a markdown `textarea` that writes like an editor, in an island.
+  - Ctrl or Cmd with B, I or K wraps the selection in bold, italics or a link; Enter continues a list, and Tab indents a list item, leaving Tab alone elsewhere so the keyboard can leave the field. These go through the browser's own editing, so Ctrl+Z undoes them like typing.
+  - A page pasted as HTML turns into markdown.
+  - With `onImage(file)`, a pasted or dropped image is embedded behind an `![Uploading …]()` placeholder at once, swapped for `![](url)` once `onImage` resolves with its url, or removed with `uploadFailure` toasted if it throws. Writing goes on meanwhile, and a finished upload never takes focus back; the field is `aria-busy` while one is under way.
+  - `onInput(value)` reports the text after every change, typed or applied. A parent passing other text replaces it; passing back what it was given leaves the caret alone.
 
 ## Forms
 
