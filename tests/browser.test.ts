@@ -140,7 +140,7 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
     await expect(site.open('/', { path: '/nowhere/chrome' })).rejects.toThrow('kay: no browser at /nowhere/chrome')
   })
 
-  it('scrolls to what it clicks, centered past fixed bars, waiting for an island hydrating once visible', async () => {
+  it('scrolls to what it clicks, centered past fixed bars, a click on an island hydrating once visible reaching it', async () => {
     await page.goto('/below')
     await page.click('button.player')
 
@@ -149,5 +149,6 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
     await page.click('a.far')
     await page.waitUntil(() => location.hash === '#far')
     expect(page.errors).toEqual([])
+    await expect(page.click('a.nowhere', { timeout: 100 })).rejects.toThrow('kay: timed out after 100ms waiting for a.nowhere')
   })
 })

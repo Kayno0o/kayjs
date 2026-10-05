@@ -30,7 +30,7 @@ export interface TestPage {
   goto: (path: string) => Promise<void>
   // The current path and query, a swapped page's included.
   path: () => Promise<string>
-  // Scrolls the element to the middle of the view and waits for it to be visible, still and not covered, and for an island hydrating once visible or idle around it to be live, then clicks it as a user does.
+  // Scrolls the element to the middle of the view and waits for it to be visible, still and not covered, then clicks it as a user does.
   click: (selector: string, options?: WaitOptions) => Promise<void>
   // Replaces a field's text with `text`, as typing it does, firing `input`.
   fill: (selector: string, text: string) => Promise<void>
@@ -176,19 +176,18 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }),
     path: async () => serial(async () => view.evaluate<string>('location.pathname + location.search')),
     click: async (selector, wait = {}) => serial(async () => {
-      const until = Date.now() + (wait.timeout ?? timeout)
-      const css = JSON.stringify(selector)
+      const budget = wait.timeout ?? timeout
+      const until = Date.now() + budget
 
-      await poll(`!!document.querySelector(${css})`, selector, until - Date.now())
-      // Centered, so a fixed header or bar does not cover it, and at once, so a smooth scroll does not keep it moving.
-      await view.evaluate(script((target: string) => document.querySelector(target)!.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }), [selector]))
-      // A click landing before such an island hydrated would reach no handler.
+      // Bun's click waits for the element in view without scrolling to it. Centered, so a fixed header or bar does not cover it; at once, so a smooth scroll does not keep it moving. An island not hydrated yet replays the click once it is.
       await poll(script((target: string) => {
-        const island = document.querySelector(target)?.closest('slot[data-hydrate=visible], slot[data-hydrate=idle]')
+        const element = document.querySelector(target)
 
-        return !island || Boolean((island as { _$k?: unknown })._$k)
-      }, [selector]), `the island around ${selector} to hydrate`, until - Date.now())
-      await view.click(selector, { timeout: Math.max(until - Date.now(), 0) })
+        element?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
+
+        return element !== null
+      }, [selector]), selector, budget)
+      await view.click(selector, { timeout: Math.max(until - Date.now(), 1) })
     }),
     fill: async (selector, text) => serial(async () => {
       await poll(`!!document.querySelector(${JSON.stringify(selector)})`, selector)
