@@ -23,7 +23,8 @@ export function defineEnv<Schema extends TSchema & { properties: Record<string, 
   for (const name of Object.keys(schema.properties)) {
     const value = source[name]
 
-    if (value !== undefined)
+    // A variable written with no value is how a `.env` file says it is not set, so the default or `t.Optional` applies rather than `''` failing the schema.
+    if (value !== undefined && value !== '')
       input[name] = value
   }
 

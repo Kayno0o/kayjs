@@ -17,6 +17,12 @@ describe('defineEnv', () => {
     expect(defineEnv(schema, { DATABASE_URL: 'postgres://db', PORT: '8080', DEBUG: '' }).PORT).toBe(8080)
   })
 
+  it('counts a variable written with no value as left out, as a `.env` line with nothing after the `=` means', () => {
+    expect(defineEnv(schema, { DATABASE_URL: 'postgres://db', PORT: '', DEBUG: '' })).toEqual({ DATABASE_URL: 'postgres://db', PORT: 3000 })
+    // Required and written empty is missing, not an empty secret that would pass.
+    expect(() => defineEnv(schema, { DATABASE_URL: '' })).toThrow('DATABASE_URL: Property \'DATABASE_URL\' is missing')
+  })
+
   it('names every variable missing or refused in the error that stops the boot', () => {
     expect(() => defineEnv(schema, { PORT: '80a' })).toThrow(new Error('kay: the environment does not match its schema\n  DATABASE_URL: Property \'DATABASE_URL\' is missing\n  PORT: Property \'PORT\' should be one of: \'integer\', \'integer\''))
   })
