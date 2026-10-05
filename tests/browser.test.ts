@@ -162,3 +162,26 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
     await expect(page.click('a.nowhere', { timeout: 100 })).rejects.toThrow('kay: timed out after 100ms waiting for a.nowhere')
   })
 })
+
+describe.skipIf(!path && !process.env.CI)('kay dev in a browser', () => {
+  it('shows each problem kay recovers from on the page, a page swap leaving them behind', async () => {
+    const dev = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, dev: true, onError: () => undefined })
+
+    try {
+      const shown = await dev.open('/mismatch', { strict: false })
+
+      await shown.waitFor('kay-problems')
+
+      expect(await shown.evaluate(() => document.querySelector('kay-problems')!.shadowRoot!.textContent)).toMatch(/^1 kay problemDismissisland tests\/fixtures\/navigation\/src\/components\/mismatch\.kay did not match its server markup, rendering it again: /)
+      expect(shown.errors).toHaveLength(1)
+
+      await shown.click('a.home')
+      await shown.waitFor('h1', { text: 'Home' })
+
+      expect(await shown.count('kay-problems')).toBe(0)
+    }
+    finally {
+      await dev.close()
+    }
+  }, 60_000)
+})

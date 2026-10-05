@@ -1101,7 +1101,7 @@ describe('special pages', () => {
     }
   })
 
-  it('shows the message and the stack in development, and times each load', async () => {
+  it('shows the message and the stack in development, times each load and shows browser problems on the page, never in production', async () => {
     const dev = await pages({ routes: 'tests/fixtures/site/src/routes', dev: true })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -1113,7 +1113,12 @@ describe('special pages', () => {
       expect(html).toContain('new EventSource("/_kay/dev/events")')
       expect((await dev.handle(new Request('http://localhost/_kay/dev/events'))).headers.get('content-type')).toBe('text/event-stream')
 
-      const timing = (await dev.handle(new Request('http://localhost/'))).headers.get('server-timing')
+      const page = await dev.handle(new Request('http://localhost/'))
+      const timing = page.headers.get('server-timing')
+      const script = (/<script>([^<]*kay-problems[^<]*)<\/script>/).exec(await page.text())![1]!
+
+      expect(inlineScriptHashes({ dev: true })).toContain(`'sha256-${new Bun.CryptoHasher('sha256').update(script).digest('base64')}'`)
+      expect((await get('/')).html).not.toContain('kay-problems')
 
       expect(timing).toMatch(/^load-0;desc="tests\/fixtures\/site\/src\/routes\/_layout\.kay";dur=\d+\.\d, load-1;desc="tests\/fixtures\/site\/src\/routes\/index\.kay";dur=\d+\.\d, render;dur=\d+\.\d$/)
       expect((await get('/')).headers.get('server-timing')).toBeNull()
