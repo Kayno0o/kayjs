@@ -243,7 +243,7 @@ describe('head', () => {
 })
 
 describe('check-only assertions', () => {
-  const source = '---\nimport Island from \'./island.kay\'\n---\na(href=\'/docs\') Docs\nform(action={save})\n  input(name=\'title\')\nIsland(when={today})'
+  const source = '---\nimport Island from \'./island.kay\'\n---\na(href=\'/docs\') Docs\nform(action={save})\n  input(name=\'title\')\nIsland(when={today})\nIsland({...rest})'
 
   it('checks links, form fields and island props in type-checking output', () => {
     const checked = compileKay(source, 'test.kay', { check: true }).tsx
@@ -251,6 +251,7 @@ describe('check-only assertions', () => {
     expect(checked).toContain('<a href={KayHref("/docs")}>')
     expect(checked).toContain('<input name={KayField((save), "title")} />')
     expect(checked).toContain('<Island when={KayProp(Island)((today))} />')
+    expect(checked).toContain('<Island {...KayProp(Island)((rest))} />')
   })
 
   it('keeps them out of the code that ships', () => {
@@ -259,6 +260,7 @@ describe('check-only assertions', () => {
     expect(built).toContain('<a href="/docs">')
     expect(built).toContain('<input name="title" />')
     expect(built).toContain('<Island when={today} />')
+    expect(built).toContain('<Island {...rest} />')
     expect(built).toContain('<form action={KayFormAction((save))} method="post" enctype="multipart/form-data">')
   })
 })

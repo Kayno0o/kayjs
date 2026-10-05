@@ -52,6 +52,7 @@ describe('kay check', () => {
       { file: 'broken/src/routes/links.kay', line: 15, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /api/import') },
       { file: 'broken/src/routes/links.kay', line: 16, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /docs/guide.txt') },
       { file: 'broken/src/routes/links.kay', line: 18, column: 4, code: 'TS2345', message: expect.stringContaining('An island receives its props serialized') },
+      { file: 'broken/src/routes/links.kay', line: 20, column: 13, code: 'TS2345', message: expect.stringContaining('An island receives its props serialized') },
       { file: 'broken/src/routes/redirects.kay', line: 5, column: 78, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /form/extra') },
       { file: 'broken/src/routes/redirects.kay', line: 8, column: 16, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /moved/away') },
       { file: 'broken/src/todo-item.kay', line: 7, column: 14, code: 'TS2551', message: 'Property \'titel\' does not exist on type \'Todo\'. Did you mean \'title\'?' },
@@ -76,7 +77,7 @@ describe('kay check', () => {
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     expect(code).toBe(1)
-    expect(errors).toContain('26 errors')
+    expect(errors).toContain('27 errors')
     expect(errors).toContain('2 | const id = Number(ctx.params.slug)\n  |                              ^')
   })
 

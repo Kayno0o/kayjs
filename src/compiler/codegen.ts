@@ -1139,8 +1139,18 @@ class Generator {
   private emitCheckedAttribute(element: ElementNode, attribute: Attribute): boolean {
     const { b } = this
 
-    if (attribute.kind === 'spread' || attribute.kind === 'boolean')
+    if (attribute.kind === 'boolean')
       return false
+
+    // Spread props reach an island serialized as the others do, so the object is checked as one prop would be.
+    if (attribute.kind === 'spread') {
+      if (!element.component || this.options.island || this.options.insideIsland)
+        return false
+
+      b.add('{...KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
+
+      return true
+    }
 
     const name = this.text(attribute.name)
 

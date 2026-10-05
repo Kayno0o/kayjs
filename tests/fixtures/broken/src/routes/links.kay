@@ -17,3 +17,4 @@ a(href="/docs/guide.txt") No such file
 Tally
   @label(count)
     b {count}
+Clicker({...{ since: new Date(), formatter: new Intl.NumberFormat(), format: (count: number) => `${count} clicks` }})
