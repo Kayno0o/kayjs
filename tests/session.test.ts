@@ -9,6 +9,7 @@ const COOKIE_VALUE = /^session=([^;]*)/
 // Held in variables so tsc leaves them to Bun: the fixture registers locals of its own.
 const ACCOUNT = './fixtures/production/src/routes/account.kay'
 const SESSIONS = './fixtures/production/src/sessions'
+const SIGN_IN = './fixtures/session/src/routes/index.kay'
 
 afterEach(() => {
   setSystemTime()
@@ -206,5 +207,29 @@ describe('sessions', () => {
 
     expect(turnedAway.response.status).toBe(302)
     expect(turnedAway.response.headers.get('location')).toBe('/account')
+  })
+})
+
+describe('a refused form post on a running server', () => {
+  it('renders its page through the whole app, the plugins before the pages included', async () => {
+    const app = new Elysia()
+      .use(session({ secret: SECRET }))
+      .derive({ as: 'global' }, () => ({ greeting: 'Hello' }))
+      .use(await pages({ routes: 'tests/fixtures/session/src/routes', prebuilt: false, security: false }))
+      .listen({ port: 0, hostname: 'localhost' })
+    const { signIn } = await import(SIGN_IN) as { signIn: Action<{ name: string }, unknown> }
+    const origin = `http://localhost:${app.server!.port}`
+
+    try {
+      const response = await fetch(`${origin}${signIn.url}`, { method: 'POST', headers: { origin, referer: `${origin}/` }, body: new URLSearchParams({ name: '' }), redirect: 'manual' })
+      const html = await response.text()
+
+      expect(response.status).toBe(400)
+      expect(html).toContain('<p>Hello, signed out</p>')
+      expect(html).toContain('<p class="error">Who are you?</p>')
+    }
+    finally {
+      await app.stop()
+    }
   })
 })

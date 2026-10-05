@@ -378,7 +378,7 @@ describe('a prerendered page posted to', () => {
   // Held in a variable so tsc leaves the .kay import to Bun.
   const NEWSLETTER = './fixtures/production/src/routes/newsletter.kay'
 
-  it('renders for the request carrying how a form post went, once and kept by no cache, the built file served before and after', async () => {
+  it('renders for the post a form sent, and for the request carrying how it went, kept by no cache, the built file served before and after', async () => {
     const root = process.cwd()
     const manifest = (await readManifest(root))!
 
@@ -387,14 +387,14 @@ describe('a prerendered page posted to', () => {
       const app = await pages({ routes, prebuilt: true, security: false })
       const { join: subscribe } = await import(NEWSLETTER) as { join: Action<{ email: string }, string> }
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/newsletter', { headers }))
-      const post = async (email: string) => {
-        const response = await app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/newsletter' }, body: new URLSearchParams({ email }) }))
+      const post = async (email: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/newsletter' }, body: new URLSearchParams({ email }) }))
+      // What the browser does with the redirect a post that went through answers: back to the page, sending the cookie it was just given.
+      const followed = async (response: Response) => {
+        const cookie = response.headers.get('set-cookie')!
 
         expect(response.headers.get('location')).toBe('http://localhost/newsletter')
 
-        const cookie = response.headers.get('set-cookie')!
-
-        return cookie.slice(0, cookie.indexOf(';'))
+        return visit({ cookie: cookie.slice(0, cookie.indexOf(';')) })
       }
 
       const built = await visit()
@@ -405,20 +405,21 @@ describe('a prerendered page posted to', () => {
       // A cookie whose name merely holds the result cookie's is no result.
       expect((await visit({ cookie: 'not_kay_flash=1' })).headers.get('etag')).toBe(etag)
 
-      const refused = await visit({ 'cookie': await post('nope'), 'if-none-match': etag })
+      const refused = await post('nope')
 
-      expect(refused.status).toBe(200)
+      expect(refused.status).toBe(422)
       expect(refused.headers.get('cache-control')).toBe('private, no-store')
       expect(refused.headers.has('etag')).toBe(false)
-      expect(refused.headers.get('set-cookie')).toContain('kay_flash=;')
 
       const html = await refused.text()
 
       expect(html).toContain('<p class="error">Not an email</p>')
       expect(html).toContain('value="nope"')
 
-      const joined = await visit({ cookie: await post('ada@example.com') })
+      const joined = await followed(await post('ada@example.com'))
 
+      expect(joined.headers.get('cache-control')).toBe('private, no-store')
+      expect(joined.headers.get('set-cookie')).toContain('kay_flash=;')
       expect(await joined.text()).toContain('<p class="joined">Welcome ada</p>')
 
       const after = await visit({ 'if-none-match': etag })

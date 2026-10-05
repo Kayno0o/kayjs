@@ -46,16 +46,24 @@ describe('page swap, on the server', () => {
     expect(await (await bare.handle(new Request('http://localhost/'))).text()).not.toContain('<script type="module"')
   })
 
-  it('tells a form the swap posts where to go in a header, which XMLHttpRequest would not follow', async () => {
-    const form = new FormData()
+  it('tells a form the swap posts where to go in a header, which XMLHttpRequest would not follow, and marks the page a refused one renders', async () => {
+    const post = async (title: string) => {
+      const form = new FormData()
 
-    form.set('title', 'ab')
+      form.set('title', title)
 
-    const response = await app.handle(new Request('http://localhost/_kay/action/tests/fixtures/navigation/src/routes/second.kay/add', { method: 'POST', headers: { 'origin': 'http://localhost', 'referer': 'http://localhost/second', 'x-kay-navigate': '1' }, body: form }))
+      return app.handle(new Request('http://localhost/_kay/action/tests/fixtures/navigation/src/routes/second.kay/add', { method: 'POST', headers: { 'origin': 'http://localhost', 'referer': 'http://localhost/second', 'x-kay-navigate': '1' }, body: form }))
+    }
+    const added = await post('Swapped')
+    const refused = await post('ab')
 
-    expect(response.status).toBe(303)
-    expect(response.headers.get('location')).toBeNull()
-    expect(response.headers.get('x-kay-redirect')).toBe('http://localhost/second')
+    expect(added.status).toBe(303)
+    expect(added.headers.get('location')).toBeNull()
+    expect(added.headers.get('x-kay-redirect')).toBe('http://localhost/second')
+    expect(refused.status).toBe(422)
+    expect(refused.headers.get('x-kay-redirect')).toBeNull()
+    expect(refused.headers.get('x-kay-failure')).toBe('1')
+    expect(await refused.text()).toContain('Too short')
   })
 
   it('renders one state for the islands of a page, kept per request, a persisted one read from the request\'s cookie', async () => {

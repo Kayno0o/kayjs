@@ -144,7 +144,7 @@ export interface PageContext<Params extends Record<string, unknown> = Record<str
   notFound: () => never
   // Ends with that status, 403 unless given, rendering the nearest `_error.kay` with `message`.
   deny: (status?: number, message?: string) => never
-  // Why the last plain form post to `action` failed, when it did; read once, on the page the browser went back to.
+  // Why the plain form post to `action` this page answers was refused, when it was.
   failed: <Target extends Action<never, unknown>>(action: Target) => FailureOf<Target> | undefined
   // What the last plain form post to `action` returned, when it succeeded; read once, on the page the browser went back to.
   succeeded: <Target extends Action<never, unknown>>(action: Target) => SuccessOf<Target> | undefined

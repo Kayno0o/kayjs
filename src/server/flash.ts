@@ -1,7 +1,7 @@
 import type { CookieMap } from 'bun'
 import { decodeValue, encodeValue, unsendable } from '../runtime/wire'
 
-// A plain form post goes back to its page through a redirect; this cookie carries how it went, for that one page render.
+// A plain form post that succeeded goes back to its page through a redirect; this cookie carries what it returned, for that one page render.
 export const FLASH_COOKIE = 'kay_flash'
 
 export interface Flash {
@@ -30,25 +30,24 @@ const WORD = /[A-Z]?[a-z\d]+|[A-Z]+(?![a-z])/g
 // `pin2` is a pin.
 const TRAILING_DIGITS = /\d+$/
 
-export function writeFlash(cookies: CookieMap, flash: Flash, secure = false): void {
-  const refusals: string[] = []
+// A refused plain form post's page renders as a visit through the app; this header names how the post went, kept in memory under an id nobody can guess, for that one render.
+const HANDED_OVER = 'x-kay-refused'
+const handedOver = new Map<string, Flash>()
 
-  // The submitted values go first when it would not fit, then the handler's data: the field errors always make it.
-  for (const candidate of [flash, { ...flash, values: {} }, { ...flash, values: {}, data: undefined }]) {
-    const refusal = setFlash(cookies, candidate, secure)
+// Gives back what forgets it once the page rendered.
+export function handOver(headers: Headers, flash: Flash): () => void {
+  const id = crypto.randomUUID()
 
-    if (refusal === undefined)
-      break
+  handedOver.set(id, flash)
+  headers.set(HANDED_OVER, id)
 
-    refusals.push(refusal)
-  }
+  return () => handedOver.delete(id)
+}
 
-  // Dropping them is the only way to keep the field errors, and the page then comes back with its form empty: nobody finds that out from the app, so it is said here.
-  if (refusals.length > 0 && Object.keys(flash.values).length > 0)
-    console.warn(`kay: what the page posted to ${flash.action} cannot come back to it through its cookie, so its form renders empty: ${refusals[0]}; hold the fields it takes under that, a \`maxLength\` on the longest one for instance`)
+export function handedOverFlash(request: Request): Flash | undefined {
+  const id = request.headers.get(HANDED_OVER)
 
-  if (refusals.length === 2 && flash.data !== undefined)
-    console.warn(`kay: what ${flash.action} passed to ctx.fail cannot reach the page through its cookie: ${refusals[1]}`)
+  return id === null ? undefined : handedOver.get(id)
 }
 
 // The page the browser goes back to reads it through `ctx.succeeded`, unless it cannot be carried there.
@@ -60,7 +59,7 @@ export function writeSuccess(cookies: CookieMap, success: SuccessFlash, secure =
 }
 
 // Sets the cookie, or says why it cannot: too big, or holding what has no encoding.
-function setFlash(cookies: CookieMap, value: Flash | SuccessFlash, secure: boolean): string | undefined {
+function setFlash(cookies: CookieMap, value: SuccessFlash, secure: boolean): string | undefined {
   let encoded: string
 
   try {
@@ -84,22 +83,16 @@ function setFlash(cookies: CookieMap, value: Flash | SuccessFlash, secure: boole
 }
 
 // Anyone can send this cookie, so its shape is checked before a page reads it; a forged one only changes what its own sender sees.
-export function readFlash(cookies: CookieMap): Flash | SuccessFlash | undefined {
+export function readFlash(cookies: CookieMap): SuccessFlash | undefined {
   const value = cookies.get(FLASH_COOKIE)
 
   if (!value)
     return undefined
 
   try {
-    const flash = decodeValue(Buffer.from(value, 'base64url').toString()) as Partial<Flash & SuccessFlash> | null
+    const flash = decodeValue(Buffer.from(value, 'base64url').toString()) as Partial<SuccessFlash> | null
 
-    if (typeof flash !== 'object' || flash === null || typeof flash.action !== 'string')
-      return undefined
-
-    if (flash.succeeded === true)
-      return flash as SuccessFlash
-
-    return typeof flash.status === 'number' && isTextRecord(flash.values) && isTextRecord(flash.errors) ? flash as Flash : undefined
+    return typeof flash === 'object' && flash !== null && typeof flash.action === 'string' && flash.succeeded === true ? flash as SuccessFlash : undefined
   }
   catch {
     return undefined
@@ -124,8 +117,4 @@ export function submittedValues(body: unknown): Record<string, string> {
 // A field never echoed back to the form, as a password is.
 export function isSecret(name: string): boolean {
   return SECRET_PART.test(name) || (name.match(WORD) ?? []).some(word => SECRET_WORDS.has(word.toLowerCase().replace(TRAILING_DIGITS, '')))
-}
-
-function isTextRecord(value: unknown): value is Record<string, string> {
-  return typeof value === 'object' && value !== null && Object.values(value).every(item => typeof item === 'string')
 }

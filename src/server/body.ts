@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import type { Server } from 'elysia/universal'
 import { withoutSlash } from './routes'
 
 export const DEFAULT_BODY_LIMIT = 1024 * 1024
@@ -9,7 +10,7 @@ const NO_BODY = new Set(['GET', 'HEAD', 'OPTIONS'])
 // What an action or an API module lets a request send, the app's limit when it sets none, and its answer to one sending more.
 export interface BodyLimit {
   bytes?: number
-  refuse: (request: Request, bytes: number) => Response
+  refuse: (request: Request, bytes: number, server: Server | null) => Response | Promise<Response>
 }
 
 // Refuses a request to an action or an API route sending more than its limit, before Elysia reads the body: actions by their path, API modules by the path they are mounted at.
@@ -24,7 +25,7 @@ export function limitBodies(app: Elysia, bytes: number, actions: Map<string, Bod
   // Longest first, so `/api/chat` wins over `/api`.
   const prefixes = [...mounts].sort(([a], [b]) => b.length - a.length)
 
-  app.onRequest(async ({ request }) => {
+  app.onRequest(async ({ request, server }) => {
     if (NO_BODY.has(request.method))
       return undefined
 
@@ -33,7 +34,7 @@ export function limitBodies(app: Elysia, bytes: number, actions: Map<string, Bod
     const limit = actions.get(path) ?? prefixes.find(([mount]) => path === mount || path.startsWith(`${mount}/`))?.[1]
     const allowed = limit?.bytes ?? bytes
 
-    return limit && await exceeds(request, allowed) ? limit.refuse(request, allowed) : undefined
+    return limit && await exceeds(request, allowed) ? limit.refuse(request, allowed, server) : undefined
   })
 }
 

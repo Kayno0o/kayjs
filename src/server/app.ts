@@ -23,6 +23,7 @@ import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from 
 import { DEV_EVENTS, devEvents, hotSwap } from './dev'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, serveFavicons } from './favicon'
+import { handedOverFlash } from './flash'
 import { loadGuards } from './guards'
 import { cookieLocale, hostLocale, loadI18n, localeCookie, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
 import { serveImages } from './image'
@@ -225,7 +226,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     return new Response(Bun.file(encodedPath(path, encoding)), { headers: { ...headers, 'content-encoding': encoding, 'content-type': Bun.file(path).type } })
   })
 
-  const actionOptions = { dev: options.dev, onError: options.onError, i18n }
+  const actionOptions = { dev: options.dev, onError: options.onError, i18n, base }
   const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, await serveApi(app, apiModules, actionOptions))
@@ -264,7 +265,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
       return renderPage(route, context, params, client, renderOptions)
 
     // How a form post went is for the visitor who sent it: the page renders for them, no cache keeping it.
-    if (hasFlash(context.request)) {
+    if (hasFlash(context.request) || handedOverFlash(context.request)) {
       const response = await renderPage(route, context, params, client, renderOptions)
 
       response.headers.set('cache-control', 'private, no-store')

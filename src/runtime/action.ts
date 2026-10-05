@@ -4,7 +4,7 @@ import type { ErrorStatus, Locals, Redirect } from './checks'
 import type { Locale } from './i18n'
 import { withBase } from './base'
 import { createSignal, untrack } from './reactive'
-import { prefetched, REDIRECT_HEADER } from './swap'
+import { FAILURE_HEADER, prefetched, REDIRECT_HEADER } from './swap'
 import { decodeValue, encodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
@@ -16,8 +16,6 @@ declare const RESULT: unique symbol
 declare const HONEYPOT: unique symbol
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 
-// Marks a failed call's body as the encoded `{ errors, data }`, which a denial or an error answered as text is not.
-export const FAILURE_HEADER = 'x-kay-failure'
 // A call whose input holds files goes as multipart: the encoded input in one part, each file in part `FILE_MARK + n`, where the input holds its index.
 export const INPUT_PART = '$kay'
 export const FILE_MARK = '$kayFile'
@@ -51,7 +49,7 @@ export interface ActionContext {
   status: (code: number) => void
   headers: Headers
   redirect: Redirect
-  // `return ctx.fail(409, { message: 'Taken' })`: a plain form post goes back to its page, which reads it through `ctx.failed(action)`; a call throws an `ActionError` carrying `data`.
+  // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `ctx.failed(action)`; a call throws an `ActionError` carrying `data`.
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data) => Failure<Data>
 }
 

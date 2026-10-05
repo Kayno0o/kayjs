@@ -13,7 +13,7 @@ import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { compressFiles, preferredEncoding } from '../src/server/compress'
-import { submittedValues, writeFlash } from '../src/server/flash'
+import { submittedValues } from '../src/server/flash'
 import { prerenderPages } from '../src/server/prerender'
 import { renderPage } from '../src/server/render'
 import { refuseClashes, scanRoutes } from '../src/server/routes'
@@ -48,13 +48,6 @@ async function hydrateFrom(html: string): Promise<void> {
 
   await (hydrated ? entry.hydrate() : entry.ready)
   hydrated = true
-}
-
-// `name=value` of the cookie a response sets, without its attributes.
-function cookiePair(response: Response): string {
-  const header = response.headers.get('set-cookie')!
-
-  return header.slice(0, header.indexOf(';'))
 }
 
 async function get(path: string): Promise<{ status: number, html: string, headers: Headers }> {
@@ -282,8 +275,13 @@ describe('pages', () => {
     expect((await post({ 'sec-fetch-site': 'cross-site' })).status).toBe(403)
     expect((await post({ 'sec-fetch-site': 'same-site' })).status).toBe(403)
     expect((await post({ 'origin': 'https://localhost', 'sec-fetch-site': 'same-origin' })).status).toBe(303)
-    expect((await post({ origin: 'https://localhost' })).status).toBe(303)
-    expect((await post({ referer: 'https://evil.example/' })).headers.get('location')).toBe('/')
+    // Let through, then refused by the handler as already on the list, the page rendered in answer.
+    expect((await post({ origin: 'https://localhost' })).status).toBe(409)
+
+    const refused = await post({ referer: 'https://evil.example/' })
+
+    expect(refused.headers.get('location')).toBeNull()
+    expect(await refused.text()).toContain('<base href="http://localhost/">')
   })
 
   it('answers a fetch call with the result and rejects input the schema refuses', async () => {
@@ -875,40 +873,43 @@ describe('route scan', () => {
 
 describe('failed actions', () => {
   const ADD = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add'
-  const postForm = (title: string) => app.handle(new Request(ADD, {
+  const postForm = (title: string, headers: Record<string, string> = {}) => app.handle(new Request(ADD, {
     method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/' },
+    headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/', ...headers },
     body: new URLSearchParams({ title, password: 'hunter2' }),
   }))
-  // What the browser does with the redirect: back to the page, sending the cookie it was just given.
-  const followed = async (response: Response) => {
-    const cookie = cookiePair(response)
 
-    expect(response.status).toBe(303)
-    expect(response.headers.get('location')).toBe('http://localhost/')
-
-    return app.handle(new Request('http://localhost/', { headers: { cookie } }))
-  }
-
-  it('shows a plain form what the schema refused, with the values it posted, once', async () => {
-    const page = await followed(await postForm(''))
+  it('shows a plain form what the schema refused, with the values it posted, rendering its page in answer', async () => {
+    const page = await postForm('')
     const html = await page.text()
 
+    expect(page.status).toBe(422)
+    expect(page.headers.get('location')).toBeNull()
+    expect(page.headers.get('set-cookie')).toBeNull()
+    expect(page.headers.get('cache-control')).toBe('private, no-store')
+    expect(html).toContain('<base href="http://localhost/">')
     expect(html).toContain('<input name="title" placeholder="New todo" value="">')
     expect(html).toContain('<p class="error">Write a title</p>')
-    expect(page.headers.get('set-cookie')).toStartWith('kay_flash=;')
     expect((await get('/')).html).not.toContain('class="error"')
   })
 
   it('shows a plain form what the handler passed to ctx.fail, never echoing a secret field', async () => {
-    const response = await postForm('Serve pages')
-    const pair = cookiePair(response)
-    const flash = pair.slice(pair.indexOf('=') + 1)
-    const html = await (await followed(response)).text()
+    const html = await (await postForm('Serve pages')).text()
 
     expect(html).toContain('value="Serve pages"')
     expect(html).toContain('<p class="error">Already on the list</p>')
-    expect(Buffer.from(flash, 'base64url').toString()).not.toContain('hunter2')
+    expect(html).not.toContain('hunter2')
+  })
+
+  it('brings back a field however long, and leaves the base out of the page the swap shows', async () => {
+    const long = 'é'.repeat(150)
+    const swapped = await postForm(long.repeat(2), { 'x-kay-navigate': '1' })
+    const html = await swapped.text()
+
+    expect(swapped.status).toBe(422)
+    expect(swapped.headers.get('x-kay-failure')).toBe('1')
+    expect(html).toContain(`value="${long.repeat(2)}"`)
+    expect(html).not.toContain('<base')
   })
 
   it('answers a call with the failure as JSON', async () => {
@@ -943,19 +944,31 @@ describe('failed actions', () => {
     expect(error).toMatchObject({ status: 409, errors: {}, data: { message: 'Already on the list' } })
   })
 
-  it('marks the failure cookie Secure when the browser came over https, through a proxy too', async () => {
-    const cookieFrom = async (url: string, headers: Record<string, string> = {}) => (await app.handle(new Request(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
-      body: new URLSearchParams({ title: '' }),
-    }))).headers.get('set-cookie')
+  it('renders the page the post came from under the mount point it is served at', async () => {
+    const mounted = new Elysia().use(await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false, security: false, base: '/repo' }))
+    const page = await mounted.handle(new Request(ADD, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/repo/' }, body: new URLSearchParams({ title: '' }) }))
+    const html = await page.text()
 
-    expect(await cookieFrom(ADD.replace('http:', 'https:'))).toContain('; Secure')
-    expect(await cookieFrom(ADD, { 'x-forwarded-proto': 'https' })).toContain('; Secure')
-    expect(await cookieFrom(ADD)).not.toContain('Secure')
+    expect(page.status).toBe(422)
+    expect(html).toContain('<base href="http://localhost/repo/">')
+    expect(html).toContain('<p class="error">Write a title</p>')
+    expect(html).toContain('<a href="/repo/todos/1">')
   })
 
-  it('ignores a forged failure cookie', async () => {
+  it('marks the success cookie Secure when the browser came over https, through a proxy too', async () => {
+    const NOTHING = 'http://localhost/_kay/action/tests/fixtures/bare/src/routes/survey.kay/nothing'
+    const cookieFrom = async (url: string, headers: Record<string, string> = {}) => (await bare.handle(new Request(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+      body: new URLSearchParams(),
+    }))).headers.get('set-cookie')
+
+    expect(await cookieFrom(NOTHING.replace('http:', 'https:'))).toContain('; Secure')
+    expect(await cookieFrom(NOTHING, { 'x-forwarded-proto': 'https' })).toContain('; Secure')
+    expect(await cookieFrom(NOTHING)).not.toContain('Secure')
+  })
+
+  it('ignores a forged flash cookie', async () => {
     const page = await app.handle(new Request('http://localhost/', { headers: { cookie: 'kay_flash=not-json' } }))
 
     expect(page.status).toBe(200)
@@ -1168,18 +1181,18 @@ describe('action input', () => {
     const noPhoto = new FormData()
 
     noPhoto.append('photos', new File([], ''))
-    expect(cookiePair(await post('gallery', noPhoto))).toStartWith('kay_flash=')
+    expect((await post('gallery', noPhoto)).status).toBe(422)
 
     for (const count of ['0x10', '0b11', '0o7', 'Infinity', '1_000'])
-      expect(await answered(new URLSearchParams(`count=${count}&agree=on`))).toEqual({ status: 303, answer: null })
+      expect(await answered(new URLSearchParams(`count=${count}&agree=on`))).toEqual({ status: 422, answer: null })
 
     expect(await answered(new URLSearchParams('count=1e3&agree=on&age=-.5'))).toEqual({ status: 303, answer: { tags: [], count: 1000, agree: true, age: -0.5 } })
 
     const refused = await post('answer', new URLSearchParams('tags=a&count=1.5&agree=on&age=old'))
 
-    expect(refused.status).toBe(303)
+    expect(refused.status).toBe(422)
     expect(refused.headers.get('x-answer')).toBeNull()
-    expect(parse(Buffer.from(cookiePair(refused).slice('kay_flash='.length), 'base64url').toString())).toMatchObject({ status: 422, errors: { count: expect.any(String), age: expect.any(String) } })
+    expect(await refused.text()).toContain('<p>Survey</p>')
   })
 
   it('answers a call returning nothing with an empty body, and a redirect holding a line break with a generic 500', async () => {
@@ -1282,20 +1295,5 @@ describe('action input', () => {
     const fields = { cvv2: 'x', cardcvc: 'x', userpass: 'x', pin2: 'x', password: 'x', newPassword: 'x', user_passcode: 'x', apiKey: 'x', APIKey: 'x', pin: 'x', cardNumber: 'x', otp: 'x', csrfToken: 'x', passenger: 'Ada', spinner: 's', shipping: 'post', email: 'a@b.c' }
 
     expect(submittedValues(fields)).toEqual({ passenger: 'Ada', spinner: 's', shipping: 'post', email: 'a@b.c' })
-  })
-
-  it('warns when the failure data is too big for the cookie carrying it back', () => {
-    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
-    const cookies = new Bun.CookieMap()
-
-    try {
-      writeFlash(cookies, { action: '/_kay/action/x/go', status: 409, values: {}, errors: {}, data: { message: 'x'.repeat(4000) } })
-
-      expect(cookies.has('kay_flash')).toBe(true)
-      expect(warned).toHaveBeenCalledWith(expect.stringContaining('/_kay/action/x/go'))
-    }
-    finally {
-      warned.mockRestore()
-    }
   })
 })

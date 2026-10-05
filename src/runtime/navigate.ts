@@ -1,7 +1,7 @@
 import type { CheckedHref } from './checks'
 import type { FetchedPage } from './swap'
 import { withBase, withoutBase } from './base'
-import { NAVIGATE_HEADER, prefetched, REDIRECT_HEADER } from './swap'
+import { FAILURE_HEADER, NAVIGATE_HEADER, prefetched, REDIRECT_HEADER } from './swap'
 import { checkForm } from './validate'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
@@ -35,6 +35,8 @@ interface Answer {
   type: string
   text: string
   redirect: string | null
+  // The page the form came from, rendered again with how the post failed.
+  refused: boolean
 }
 
 interface HistoryState {
@@ -764,10 +766,10 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     return
   }
 
-  // An error page is shown as it came; a denial answered as text, as the browser shows text.
+  // A refused post's page replaces this one where it stands, as its redirect back here did; an error page is shown as it came; a denial answered as text, as the browser shows text.
   if (HTML.test(response.type)) {
     try {
-      await show({ url: location.href, type: response.type, html: response.text }, '', { history: 'none', scroll: 'top' })
+      await show({ url: location.href, type: response.type, html: response.text }, '', response.refused ? { history: 'none', scroll: 'keep', focus: focused } : { history: 'none', scroll: 'top' })
     }
     catch (error) {
       console.error(error)
@@ -819,7 +821,7 @@ async function upload(url: URL, body: FormData | URLSearchParams, form: HTMLForm
         bar.value = done
       }
     })
-    request.addEventListener('load', () => resolve({ type: request.getResponseHeader('content-type') ?? '', text: request.responseText, redirect: request.getResponseHeader(REDIRECT_HEADER) }))
+    request.addEventListener('load', () => resolve({ type: request.getResponseHeader('content-type') ?? '', text: request.responseText, redirect: request.getResponseHeader(REDIRECT_HEADER), refused: request.getResponseHeader(FAILURE_HEADER) !== null }))
 
     for (const failure of ['error', 'abort', 'timeout'])
       request.addEventListener(failure, () => reject(new Error('kay: the form could not be sent')))

@@ -1,5 +1,6 @@
 import type { CookieMap } from 'bun'
 import type { Elysia, TSchema, ValidationError } from 'elysia'
+import type { Server } from 'elysia/universal'
 import type { KayConfig } from '../config'
 import type { GuardContext, Locals } from '../runtime'
 import type { ActionContext, ServerAction } from '../runtime/action'
@@ -9,20 +10,22 @@ import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import { dirname, sep } from 'node:path'
-import { decodeCall, failure, FAILURE_HEADER, FORM_CALL, isAction, isFailure } from '../runtime/action'
+import { decodeCall, failure, FORM_CALL, isAction, isFailure } from '../runtime/action'
+import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
-import { NAVIGATE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
+import { FAILURE_HEADER, NAVIGATE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { sizeText } from './body'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
-import { submittedValues, writeFlash, writeSuccess } from './flash'
+import { handOver, submittedValues, writeSuccess } from './flash'
 import { runGuards } from './guards'
 import { requestLocale, stateFor } from './i18n'
 import { protectionRefusal } from './protection'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
+import { visitAs } from './visit'
 
 export interface GuardedRequest {
   jar: CookieJar
@@ -31,7 +34,7 @@ export interface GuardedRequest {
 
 // Thrown before the input is validated, to answer with `response` through the route's error hook.
 class Refusal {
-  constructor(readonly response: Response) {}
+  constructor(readonly response: Response | Promise<Response>) {}
 }
 
 // What the guards set on the response, carried to the handler they let through.
@@ -41,6 +44,11 @@ const TEXT = 'text/plain; charset=utf-8'
 const SAME_SITE_FETCH = new Set(['same-origin', 'none'])
 // The first proxy's `X-Forwarded-Proto` saying the browser came over https.
 const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
+
+// What describes the post's body, or would have the page come back compressed or as a call.
+const POST_HEADERS = ['content-type', 'content-length', 'transfer-encoding', 'accept-encoding', 'x-kay-action', 'origin']
+const HTML = /^text\/html\b/
+const HEAD_START = /<head\b[^>]*>/i
 
 // The top-level field of a validation path such as `/address/street`.
 const FIELD = /^\/([^/]*)/
@@ -53,10 +61,16 @@ export interface ActionOptions {
   onError?: KayConfig['onError']
   // An action runs in the locale of the page it was sent from.
   i18n?: I18n
+  // Where the site is mounted, which the page a refused form post came from is served under.
+  base?: string
 }
+
+// Renders the page a refused plain form post came from, with how it failed, through the app the post reached.
+type Back = (request: Request, headers: Headers, flash: Flash, server: Server | null) => Promise<Response>
 
 // Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path.
 export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], options: ActionOptions = {}): Promise<Map<string, BodyLimit>> {
+  const back: Back = async (request, headers, flash, server) => renderBack(app, options.base ?? '', request, headers, flash, server)
   const served = new Map<string, { file: string, action: ServerAction<TSchema, unknown> }>()
   const limits = new Map<string, BodyLimit>()
 
@@ -77,8 +91,8 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
         throw actionClash(taken.file, file, value.url)
 
       served.set(value.url, { file, action: value })
-      limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: (request, bytes) => tooLarge(value, request, bytes) })
-      app.post(value.url, async context => inLocale(context.request, options, async () => runAction(value, context, options)), {
+      limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })
+      app.post(value.url, async context => inLocale(context.request, options, async () => runAction(value, context, options, back)), {
         body: value.schema,
         transform: (context) => {
           refuseCrossSite(context.request)
@@ -90,21 +104,21 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
 
           // Before the schema reads the input: every attempt counts, a valid one or not.
           if (refusal)
-            throw new Refusal(failed(context.request, new Headers(refusal.headers), cookieJar(context.request).cookies, { action: value.url, status: refusal.status, values: call ? {} : submittedValues(context.body), errors: { [refusal.field]: refusal.message } }))
+            throw new Refusal(failed(context.request, new Headers(refusal.headers), cookieJar(context.request).cookies, { action: value.url, status: refusal.status, values: call ? {} : submittedValues(context.body), errors: { [refusal.field]: refusal.message } }, context.server, back))
 
           context.body = asForm ? formInput(value.schema, withoutEmptyFiles(context.body)) : callInput(context.body)
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
         ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, context, options)) }),
-        error: ({ code, error, request, body }) => {
+        error: async ({ code, error, request, body, server }) => {
           if (code === 'VALIDATION')
-            return refused(value, error, request)
+            return refused(value, error, request, server, back)
 
           // Elysia checks a top-level `t.File({ type })` against the file's bytes once the schema passed.
           if (code === 'INVALID_FILE_TYPE') {
             const field = error.property.replace(BODY_PREFIX, '')
 
-            return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [field]: fieldError(value, field) ?? 'Invalid file type' } })
+            return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [field]: fieldError(value, field) ?? 'Invalid file type' } }, server, back)
           }
 
           return error instanceof Refusal ? error.response : undefined
@@ -117,11 +131,11 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
 }
 
 // A post over the action's body limit, answered as a refused one is, with a message for the whole form; another site's is refused as such.
-function tooLarge(action: ServerAction<TSchema, unknown>, request: Request, bytes: number): Response {
+async function tooLarge(action: ServerAction<TSchema, unknown>, request: Request, bytes: number, server: Server | null, back: Back): Promise<Response> {
   if (isCrossSite(request))
     return crossSiteRefusal()
 
-  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': `Too large to send; ${sizeText(bytes)} at most` } })
+  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': `Too large to send; ${sizeText(bytes)} at most` } }, server, back)
 }
 
 // Two files whose paths differ only where a URL keeps neither, `a b.kay` and `a_b.kay`, serve their actions at one URL.
@@ -285,7 +299,7 @@ function backTo(request: Request): string {
 }
 
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
-async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request }, options: ActionOptions): Promise<Response> {
+async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back): Promise<Response> {
   const { request } = context
   const state = guarded.get(request) ?? { jar: cookieJar(request), headers: new Headers() }
   const { jar, headers } = state
@@ -312,7 +326,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     const result = await action.handler(context.body, ctx)
 
     if (isFailure(result))
-      return failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: {}, data: result.data })
+      return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: {}, data: result.data }, context.server, back)
 
     if (!isCall(request))
       writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result }, overHttps(request))
@@ -369,7 +383,7 @@ function encodeOrExplain(value: unknown, what: string): string {
 }
 
 // Input the schema refused: a message per field, the schema's own `error` when it has one.
-function refused(action: ServerAction<TSchema, unknown>, error: Readonly<ValidationError>, request: Request): Response {
+async function refused(action: ServerAction<TSchema, unknown>, error: Readonly<ValidationError>, request: Request, server: Server | null, back: Back): Promise<Response> {
   const errors: Record<string, string> = {}
 
   for (const issue of error.all) {
@@ -379,29 +393,71 @@ function refused(action: ServerAction<TSchema, unknown>, error: Readonly<Validat
     errors[field] ??= typeof custom === 'string' ? custom : issue.summary ?? 'Invalid value'
   }
 
-  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors })
+  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors }, server, back)
 }
 
-// A call gets the failure as JSON; a plain form post goes back to its page with the failure in a cookie.
-function failed(request: Request, headers: Headers, cookies: CookieMap, flash: Flash): Response {
-  const call = isCall(request)
-
-  if (!call)
-    writeFlash(cookies, flash, overHttps(request))
-
+// A call gets the failure as JSON; a plain form post gets the page it came from, rendered with the failure.
+async function failed(request: Request, headers: Headers, cookies: CookieMap, flash: Flash, server: Server | null, back: Back): Promise<Response> {
   for (const cookie of cookies.toSetCookieHeaders())
     headers.append('set-cookie', cookie)
 
-  if (call) {
-    headers.set('content-type', 'application/json')
-    headers.set(FAILURE_HEADER, '1')
+  if (!isCall(request))
+    return back(request, headers, flash, server)
 
-    return new Response(encodeOrExplain({ errors: flash.errors, data: flash.data }, `what ${flash.action} passed to ctx.fail`), { status: flash.status, headers })
+  headers.set('content-type', 'application/json')
+  headers.set(FAILURE_HEADER, '1')
+
+  return new Response(encodeOrExplain({ errors: flash.errors, data: flash.data }, `what ${flash.action} passed to ctx.fail`), { status: flash.status, headers })
+}
+
+// The page renders as for a visit, through the app, its guards and hooks included, and the failure reaches `ctx.failed` in memory, so all the visitor typed comes back whatever its length.
+// It answers the post itself, with the failure's status: a reload posts again, as after any form a server answers in place, and without the page swap a `base` keeps relative links pointing where they did on the page.
+async function renderBack(app: Elysia, base: string, request: Request, headers: Headers, flash: Flash, server: Server | null): Promise<Response> {
+  const from = new URL(backTo(request), request.url)
+  const path = base !== '' && (from.pathname === base || from.pathname.startsWith(`${base}/`)) ? from.pathname.slice(base.length) || '/' : from.pathname
+  const sent = visitHeaders(request)
+  const forget = handOver(sent, flash)
+  let page: Response
+
+  try {
+    page = await visitAs(request, new Request(new URL(`${path}${from.search}`, request.url), { headers: sent }), server, async visit => app.handle(visit))
+  }
+  finally {
+    forget()
   }
 
-  headers.set(redirectHeader(request), backTo(request))
+  if (!page.ok || !HTML.test(page.headers.get('content-type') ?? '')) {
+    for (const cookie of headers.getSetCookie())
+      page.headers.append('set-cookie', cookie)
 
-  return new Response(null, { status: 303, headers })
+    return page
+  }
+
+  const swapped = request.headers.get(NAVIGATE_HEADER) === '1'
+  const html = await page.text()
+  const answer = new Headers(page.headers)
+
+  for (const [name, value] of headers)
+    answer.append(name, value)
+
+  answer.delete('content-length')
+  answer.delete('etag')
+  answer.set('cache-control', 'private, no-store')
+  answer.set(FAILURE_HEADER, '1')
+
+  return new Response(swapped ? html : html.replace(HEAD_START, tag => `${tag}<base href="${escapeAttribute(from.href)}">`), { status: flash.status, headers: answer })
+}
+
+// What the browser sent that a visit would send too, the post's body aside.
+function visitHeaders(request: Request): Headers {
+  const headers = new Headers(request.headers)
+
+  for (const name of POST_HEADERS)
+    headers.delete(name)
+
+  headers.set('accept', 'text/html')
+
+  return headers
 }
 
 // `fetch` and XMLHttpRequest would follow a `location` and hand the script the next page's HTML; a call, or a form the page swap posts, reads where to go instead.

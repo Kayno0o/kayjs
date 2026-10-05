@@ -14,6 +14,7 @@ import { servePages } from '../server/app'
 import { basePath } from '../server/base'
 import { buildClient } from '../server/client'
 import { shutdown } from '../server/lifecycle'
+import { servedThrough } from '../server/visit'
 import { browse } from './browser'
 import { testRoot } from './root'
 
@@ -111,10 +112,17 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return headers
   }
 
+  // What kay sends through the app on the visitor's behalf, as the page a refused post renders, goes through all of it, as a server would send it.
+  const handle = async (request: Request): Promise<Response> => {
+    servedThrough(request, handle)
+
+    return app.handle(request)
+  }
+
   const send = async (path: string, init: RequestInit & VisitInit): Promise<Response> => {
     const headers = cookieHeader(new Headers(init.headers))
 
-    const response = await app.handle(new Request(new URL(path, ORIGIN), { ...init, headers, redirect: 'manual' }))
+    const response = await handle(new Request(new URL(path, ORIGIN), { ...init, headers, redirect: 'manual' }))
 
     for (const header of response.headers.getSetCookie()) {
       const cookie = Bun.Cookie.parse(header)
@@ -164,7 +172,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
   return {
     cookies,
-    handle: async request => app.handle(request),
+    handle,
     fetch: async (path, init = {}) => send(path, init),
     socket: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])

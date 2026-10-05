@@ -4,6 +4,8 @@
 export const REDIRECT_HEADER = 'x-kay-redirect'
 // Marks a request of the swap: a page it fetches, or a form it posts, which then reads where to go from `REDIRECT_HEADER` as a call does.
 export const NAVIGATE_HEADER = 'x-kay-navigate'
+// Marks a failure: a called action's body as the encoded `{ errors, data }`, which a denial or an error answered as text is not, or the page a refused form post renders in answer.
+export const FAILURE_HEADER = 'x-kay-failure'
 
 export interface FetchedPage {
   url: string

@@ -20,7 +20,7 @@ import { importModule } from './bundle'
 import { preferredEncoding } from './compress'
 import { cookieJar } from './cookies'
 import { DEV_PROBLEMS, LIVE_RELOAD, problemsBlock } from './dev'
-import { FLASH_COOKIE, readFlash } from './flash'
+import { FLASH_COOKIE, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
 import { hydrationScript } from './hydration'
@@ -213,7 +213,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
   const { request } = context
   const jar = cookieJar(request)
   let flash: Flash | SuccessFlash | null | undefined
-  const readOnce = () => flash ??= hasFlash(request) ? readFlash(jar.cookies) ?? null : null
+  const readOnce = () => flash ??= handedOverFlash(request) ?? (hasFlash(request) ? readFlash(jar.cookies) ?? null : null)
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
   const url = new URL(request.url)
   // The search params as text until the page's schema reads them; most pages never look.
@@ -288,7 +288,7 @@ function needsRequest(name: string): () => never {
   }
 }
 
-// Whether the request carries how a plain form post went, for the page the browser went back to.
+// Whether the request carries the cookie a plain form post that went through leaves, for the page the browser went back to.
 export function hasFlash(request: Request): boolean {
   const cookie = request.headers.get('cookie')
 
