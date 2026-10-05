@@ -31,7 +31,7 @@ import { logRequests } from './log'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
 import { servePublic } from './public'
 import { readRedirects, redirectShape, serveRedirects } from './redirects'
-import { renderPage, renderUnmatched, servePrerendered } from './render'
+import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './render'
 import { reportServerError } from './report'
 import { revalidateStale } from './revalidate'
 import { rewriteRequests } from './rewrite'
@@ -277,6 +277,16 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
     if (!page)
       return renderPage(route, context, params, client, renderOptions)
+
+    // How a form post went is for the visitor who sent it: the page renders for them, no cache keeping it.
+    if (hasFlash(context.request)) {
+      const response = await renderPage(route, context, params, client, renderOptions)
+
+      response.headers.set('cache-control', 'private, no-store')
+      response.headers.delete('etag')
+
+      return response
+    }
 
     // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
     revalidateStale(page, async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), error => reportServerError(error, context.request, renderOptions.onError))

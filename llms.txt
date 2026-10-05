@@ -553,7 +553,7 @@ export default defineConfig({
 
 ## Prerendering
 
-A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.query`, `ctx.locals`, `ctx.failed` or `ctx.succeeded` fails the build; `ctx.url` is `http://localhost` plus its path. Development renders it per request like any other.
+A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.query` or `ctx.locals` fails the build, and `ctx.failed` and `ctx.succeeded` return `undefined`; `ctx.url` is `http://localhost` plus its path. The browser coming back to it from a form post gets it rendered for that request instead, with what the post returned, as `Cache-Control: private, no-store` and no ETag; the next request gets the file again. Development renders it per request like any other.
 
 A route taking params lists the ones to render instead, as an array or a function returning one; any other path renders per request:
 

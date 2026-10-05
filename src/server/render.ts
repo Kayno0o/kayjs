@@ -276,8 +276,6 @@ function createRendering(context: RequestContext, params: Record<string, unknown
       cookies: { get: needsRequest('ctx.cookies') },
       query: { get: needsRequest('ctx.query') },
       locals: { get: needsRequest('ctx.locals') },
-      failed: { get: needsRequest('ctx.failed') },
-      succeeded: { get: needsRequest('ctx.succeeded') },
     })
   }
 
@@ -290,7 +288,8 @@ function needsRequest(name: string): () => never {
   }
 }
 
-function hasFlash(request: Request): boolean {
+// Whether the request carries how a plain form post went, for the page the browser went back to.
+export function hasFlash(request: Request): boolean {
   return request.headers.get('cookie')?.includes(FLASH_COOKIE) ?? false
 }
 

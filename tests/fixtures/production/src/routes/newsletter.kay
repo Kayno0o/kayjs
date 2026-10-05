@@ -1,0 +1,18 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const prerender = true
+
+export const join = action(t.Object({ email: t.String({ format: 'email', error: 'Not an email' }) }), ({ email }) => email.split('@')[0])
+
+const failure = ctx.failed(join)
+const joined = ctx.succeeded(join)
+---
+form(action={join})
+  input(name="email" value={failure?.values.email})
+  button Join
+if failure
+  p.error {failure.errors.email}
+if joined
+  p.joined Welcome {joined.data}
