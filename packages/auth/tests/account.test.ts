@@ -81,6 +81,9 @@ describe('changing the username', () => {
     expect(await ada.json('/me')).toMatchObject({ username: 'Ada Lovelace' })
     expect(await browser().post('/password', { identifier: 'ada lovelace', password: PASSWORD })).toMatchObject({ ok: true })
     expect(await ada.call('changeUsername', 'ada lovelace')).toMatchObject({ ok: true, user: { username: 'ada lovelace' } })
+    await ada.call('changeUsername', 'countess')
+
+    expect(await browser().post('/password', { identifier: 'ada lovelace', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
   })
 
   test('refuses a name the rules refuse, one another user has in any case, the same one, and a visitor', async () => {
@@ -95,9 +98,9 @@ describe('changing the username', () => {
     expect(await browser().call('changeUsername', 'carol')).toEqual({ ok: false, error: 'signed-out' })
   })
 
-  test('answers taken for a name another request took in between', async () => {
+  // Each test builds its own store, so the stubs below need no restoring.
+  test('answers taken for a name another request took in between, and lets any other store failure through', async () => {
     const { ada, store } = await registered()
-    const update = store.users.update
 
     store.users.update = async () => {
       await store.users.create(userRecord({ id: 'u2', username: 'Ada' }))
@@ -106,7 +109,20 @@ describe('changing the username', () => {
     }
 
     expect(await ada.call('changeUsername', 'ada')).toEqual({ ok: false, errors: { username: 'taken' } })
-    store.users.update = update
+
+    store.users.update = async () => {
+      throw new Error('connection lost')
+    }
+
+    expect((await ada.fetch('/call/changeUsername', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).status).toBe(500)
+  })
+
+  test('refuses a device\'s bearer token, which is no session', async () => {
+    const { ada, browser } = await registered()
+    const { token } = await ada.call('createToken', { password: PASSWORD }, 'Phone')
+    const device = browser()
+
+    expect(await device.json('/call/changeUsername', { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).toEqual({ ok: false, error: 'signed-out' })
   })
 
   test('shows the new name to the rest of the same request', async () => {

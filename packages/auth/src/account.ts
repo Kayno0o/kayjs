@@ -1,6 +1,7 @@
 import type { User } from './core'
 import type { PasswordProblem, UsernameProblem } from './rules'
 import type { RequestState } from './state'
+import type { UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword } from '@kaynooo/utils'
 import { publicUser } from './core'
@@ -36,11 +37,11 @@ export async function changePassword(state: RequestState, proof: Proof, password
 
 export type ChangeUsernameResult = { ok: true, user: User } | { ok: false, error: 'signed-out' } | { ok: false, errors: { username: UsernameProblem | 'taken' | 'unchanged' } }
 
-// Names the signed-in user, or renames them, under the rules register checks. A name is no credential, so it takes no proof and sends no mail.
+// Names the signed-in user, or renames them, under the rules register checks. A name is no credential, so it takes no proof and sends no mail; a session is needed all the same, so a device's token cannot rename the account it was given for.
 export async function changeUsername(state: RequestState, username: string): Promise<ChangeUsernameResult> {
   const record = await state.current()
 
-  if (!record)
+  if (!record || state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
 
   const name = normalizeUsername(username)
@@ -58,14 +59,16 @@ export async function changeUsername(state: RequestState, username: string): Pro
   if (holder && holder.id !== record.id)
     return { ok: false, errors: { username: 'taken' } }
 
-  let updated
+  let updated: UserRecord | undefined
 
   try {
     updated = await state.core.store.users.update(record.id, { username: name })
   }
   // Another request took the name in between; any other failure is the store's.
   catch (error) {
-    if ((await state.core.store.users.findByUsername(name))?.id !== record.id)
+    const taker = await state.core.store.users.findByUsername(name)
+
+    if (taker && taker.id !== record.id)
       return { ok: false, errors: { username: 'taken' } }
 
     throw error
