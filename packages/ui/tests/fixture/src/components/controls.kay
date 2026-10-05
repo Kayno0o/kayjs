@@ -15,14 +15,14 @@ function publish(checked: boolean) {
   if (mirror)
     published.set(checked)
 
-  return onPublish?.(checked) as Promise<boolean | void> | undefined
+  return onPublish?.(checked)
 }
 
 function share(value: 'private' | 'link' | 'public') {
   if (mirror)
     sharing.set(value)
 
-  return onShare?.(value) as Promise<boolean | void> | undefined
+  return onShare?.(value)
 }
 
 const ranges = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }] as const

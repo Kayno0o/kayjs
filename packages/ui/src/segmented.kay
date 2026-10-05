@@ -12,7 +12,8 @@ const { options, value, label, name, onChange, class: className, ...rest } = pro
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
   name?: string
   // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
-  onChange?: (value: Value) => void | PromiseLike<boolean | void>
+  // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
+  onChange?: (value: Value) => unknown
   class?: string
 }>()
 
@@ -28,10 +29,10 @@ effect(() => {
   synced++
 })
 
-// Checks the radio of `value` again: the binding may never have seen the radio that took the check.
-function check(input: HTMLInputElement, value: string) {
+// Checks the radio of `wanted` again, in this group only: the binding may never have seen the radio that took the check.
+function check(input: HTMLInputElement, wanted: string) {
   for (const radio of input.closest('.kui-segmented')?.querySelectorAll<HTMLInputElement>('.kui-segmented-input') ?? [])
-    radio.checked = radio.value === value
+    radio.checked = radio.value === wanted
 }
 
 async function pick(input: HTMLInputElement, next: Value) {

@@ -173,6 +173,8 @@ test('a Segmented group whose change is under way is busy and picks nothing else
 
     expect([state(), calls]).toEqual([['public', null], ['link', 'public', 'public']])
     expect(logged.mock.calls.map(([, error]) => error)).toEqual([new Error('refused')])
+    // Putting an option back touched this group only.
+    expect(root.querySelector<HTMLInputElement>('input[name="range"][value="day"]')!.checked).toBe(true)
   }
   finally {
     logged.mockRestore()
@@ -191,4 +193,24 @@ test('a Segmented group leaves the option its parent picked while a refused chan
   logged.mockRestore()
 
   expect(link.checked).toBe(true)
+})
+
+test('a Segmented group goes back when onChange throws', async () => {
+  const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+  mounted = await mount('src/components/controls.kay', {
+    onRange: () => undefined,
+    onDigest: () => undefined,
+    onShare: () => {
+      throw new Error('offline')
+    },
+  })
+
+  const link = mounted.root.querySelector<HTMLInputElement>('input[name="sharing"][value="link"]')!
+
+  click(link)
+  await settle()
+  logged.mockRestore()
+
+  expect([link.checked, mounted.root.querySelector<HTMLInputElement>('input[name="sharing"][value="private"]')!.checked]).toEqual([false, true])
 })

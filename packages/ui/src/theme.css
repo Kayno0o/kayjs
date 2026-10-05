@@ -1045,10 +1045,11 @@
 
   .kui-segmented {
     @apply inline-flex border border-kui-surface2 bg-kui-surface0;
+  }
 
-    &:where([aria-busy='true']) {
-      @apply cursor-progress;
-    }
+  /* On the options, whose own pointer cursor would cover the group's. */
+  .kui-segmented:where([aria-busy='true']) .kui-segmented-option {
+    @apply cursor-progress;
   }
 
   .kui-segmented-option {

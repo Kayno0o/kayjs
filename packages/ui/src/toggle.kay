@@ -9,7 +9,8 @@ const { checked = false, label, onChange, class: className, ...rest } = props<Om
   // Shown next to the switch; omit it and pass `aria-label` instead to keep the switch label-only for screen readers.
   label?: string
   // A promise holds the switch busy until it settles, and puts it back where it was when it rejects (logged) or resolves to false: a refused change never shows as made.
-  onChange?: (checked: boolean) => void | PromiseLike<boolean | void>
+  // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
+  onChange?: (checked: boolean) => unknown
   class?: string
 }>()
 
