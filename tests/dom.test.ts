@@ -125,6 +125,25 @@ describe('component class', () => {
   })
 })
 
+describe('bound URLs', () => {
+  it('neutralise one that would run script, set or spread, as it changes', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst url = signal(\'/home\')\n---\na(href={url()}) x\nimg(alt="" {...{ src: url() }})\nbutton(onClick={() => url.set(\' javascript:alert(1)\')}) x\n',
+    })
+
+    try {
+      expect(root.querySelector('a')!.getAttribute('href')).toBe('/home')
+      root.querySelector('button')!.click()
+      await settle()
+      expect(root.querySelector('a')!.getAttribute('href')).toBe('unsafe: javascript:alert(1)')
+      expect(root.querySelector('img')!.getAttribute('src')).toBe('unsafe: javascript:alert(1)')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('event handlers', () => {
   it('runs the handler a signal, a prop or a loop item holds when the event fires, not when it attached', async () => {
     const { root, dispose } = await mountKay({

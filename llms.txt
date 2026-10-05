@@ -1158,6 +1158,7 @@ export default defineConfig({
 - `headers` merges headers over kay's, one given `false` not sent. HSTS is not sent by default: it binds the domain to https for its `max-age`, so it is the app's call.
 - A header the app sets itself, in an Elysia `onRequest` or a handler, wins over kay's.
 - `inlineScriptHashes({ prefetch, dev })` from `kay/server` gives the hashes, for a policy written elsewhere, such as by a proxy.
+- Whatever the policy, a `javascript:`, `vbscript:` or `data:text/html` URL bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data`, as a user-supplied link would be, goes out prefixed with `unsafe:`, on the server and in islands, so following it does nothing. One written out as text in the template is left as it is.
 
 ## Compression
 

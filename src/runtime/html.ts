@@ -5,6 +5,7 @@ import { flattenClasses } from './classes'
 import { escape, escapeAttribute } from './escape'
 import { currentServerScope, scope } from './reactive'
 import { failedIds, idMark } from './uid'
+import { safeUrl } from './url'
 
 export { componentClass } from './classes'
 export { escape, escapeAttribute } from './escape'
@@ -101,7 +102,7 @@ export function attribute(name: string, value: unknown): string {
   if (value == null || value === false)
     return ''
 
-  return value === true ? ` ${name}` : ` ${name}="${escapeAttribute(String(value))}"`
+  return value === true ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, String(value)))}"`
 }
 
 // A `class` value: a string, or an array or object of classes, an object's keys kept when their value is truthy.

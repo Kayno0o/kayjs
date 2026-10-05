@@ -4,6 +4,7 @@
 import { flattenClasses } from './classes'
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { freshPrefix, withIds } from './uid'
+import { safeUrl } from './url'
 
 export { componentClass } from './classes'
 export { renderEffect as effect } from './reactive'
@@ -994,7 +995,7 @@ export function attribute(element: Element, name: string, value: unknown): void 
   if (value == null || value === false)
     element.removeAttribute(name)
   else
-    element.setAttribute(name, value === true ? '' : String(value))
+    element.setAttribute(name, value === true ? '' : safeUrl(name, String(value)))
 }
 
 // A property where the element has one, such as an input's `value`; an attribute otherwise.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { collectHead } from '../src/runtime/head'
-import { child, element, head, loop, merge, omit, selectOptions } from '../src/runtime/html'
+import { attribute, child, element, head, loop, merge, omit, selectOptions } from '../src/runtime/html'
 
 describe('child values', () => {
   it('escape text, keep numbers and rendered markup, and drop null, undefined and booleans', () => {
@@ -23,6 +23,19 @@ describe('element', () => {
   it('leaves out handlers, refs and empty values', () => {
     expect(element('button', [{ onClick: Number, ref: String, disabled: true, hidden: false, title: null, value: '' }]).t).toBe('<button disabled value></button>')
     expect(element('details', [{ open: true, ontoggle: 'x()' }]).t).toBe('<details open></details>')
+  })
+})
+
+describe('bound URLs', () => {
+  it('neutralise one that would run script, as a browser reads it, and leave every other alone', () => {
+    expect(attribute('href', 'javascript:alert(1)')).toBe(' href="unsafe:javascript:alert(1)"')
+    expect(attribute('href', ' \tJava\nScript:alert(1)')).toBe(' href="unsafe: \tJava\nScript:alert(1)"')
+    expect(attribute('formaction', 'VBScript:x')).toBe(' formaction="unsafe:VBScript:x"')
+    expect(attribute('src', 'data: text/html,<p>')).toBe(' src="unsafe:data: text/html,&lt;p>"')
+    expect(element('a', [{ href: 'javascript:x' }]).t).toBe('<a href="unsafe:javascript:x"></a>')
+
+    for (const [name, value] of [['href', 'https://example.com/javascript:x'], ['href', '/javascript:x'], ['title', 'javascript:x'], ['src', 'data:image/png;base64,AA']])
+      expect(attribute(name!, value)).toBe(` ${name}="${value}"`)
   })
 })
 
