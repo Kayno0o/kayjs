@@ -233,15 +233,24 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('checks content and messages without the server\'s environment, as kay build renders pages', async () => {
+  it('checks without the server\'s environment, as kay build renders pages: the config, the content and the messages may import an env module lacking a variable', async () => {
+    const env = 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ KAY_CHECK_UNSET_SECRET: t.String() }))\n'
     const root = await scratchProject({
-      'src/env.ts': 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ KAY_CHECK_UNSET_SECRET: t.String() }))\n',
+      'src/env.ts': env,
+      'kay.config.ts': 'import \'./src/env\'\n\nexport default { i18n: { locales: [\'en\'], defaultLocale: \'en\' } }\n',
       'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\nimport { env } from \'./env\'\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({ title: t.String() }) })\nexport const secret = () => env.KAY_CHECK_UNSET_SECRET\n',
       'src/content/notes/a.md': '---\ntitle: A\n---\nText\n',
+      'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\nimport \'../env\'\n\nexport default defineMessages({ hello: \'Hello\' })\n',
     })
 
     try {
-      expect((await check(root)).map(d => firstLine(d.message))).toEqual([])
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root], { stdout: 'pipe', stderr: 'pipe' })
+      const output = await new Response(child.stdout).text() + await new Response(child.stderr).text()
+
+      await child.exited
+      // Strict, the config, content or messages probe would stop on the variable; kay's own sources typed against this scratch project may still report, which is not at stake here.
+      expect(output).not.toContain('KAY_CHECK_UNSET_SECRET')
+      expect(output).not.toContain('failed')
     }
     finally {
       await rm(root, { recursive: true, force: true })

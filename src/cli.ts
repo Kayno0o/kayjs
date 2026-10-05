@@ -72,6 +72,8 @@ async function main(args: string[]): Promise<number> {
     if (typeof parsed === 'number')
       return parsed
 
+    // An editor's machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
+    buildingWithoutEnv()
     await startServer(Bun.stdin.stream(), data => void process.stdout.write(data))
 
     return 0
@@ -109,6 +111,9 @@ async function runCheck(args: string[]): Promise<number> {
 
   if (root === undefined)
     return 1
+
+  // The checking machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
+  buildingWithoutEnv()
 
   const { routes, publicDir, api, content, redirects, i18n, settings } = await loadConfig(root)
   const diagnostics = await check(root, { tsconfig, routes, publicDir, api, content, redirects, i18n, settings })
