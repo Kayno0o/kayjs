@@ -43,6 +43,10 @@ export function writeFlash(cookies: CookieMap, flash: Flash, secure = false): vo
     refusals.push(refusal)
   }
 
+  // Dropping them is the only way to keep the field errors, and the page then comes back with its form empty: nobody finds that out from the app, so it is said here.
+  if (refusals.length > 0 && Object.keys(flash.values).length > 0)
+    console.warn(`kay: what the page posted to ${flash.action} cannot come back to it through its cookie, so its form renders empty: ${refusals[0]}; hold the fields it takes under that, a \`maxLength\` on the longest one for instance`)
+
   if (refusals.length === 2 && flash.data !== undefined)
     console.warn(`kay: what ${flash.action} passed to ctx.fail cannot reach the page through its cookie: ${refusals[1]}`)
 }

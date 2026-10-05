@@ -160,6 +160,25 @@ describe('kay/test', () => {
     }
   })
 
+  it('says the form will render empty when what the page posted is too big for the cookie to carry back', async () => {
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      // Refused for its date, so the values would come back, and over the 3800 bytes a cookie holds.
+      const page = await site.submit(schedule, { title: 'x'.repeat(4000), at: '1990-01-01T00:00:00Z' }, { from: '/events' })
+
+      expect(page.html.replace(MARKERS, '')).toContain('<p class="error">Not before 2000</p>')
+      expect(warned).toHaveBeenCalledWith(expect.stringContaining(`kay: what the page posted to ${schedule.url} cannot come back to it through its cookie, so its form renders empty`))
+      // A post the cookie carries says nothing.
+      warned.mockClear()
+      await site.submit(schedule, { title: 'Old', at: '1990-01-01T00:00:00Z' }, { from: '/events' })
+      expect(warned).not.toHaveBeenCalled()
+    }
+    finally {
+      warned.mockRestore()
+    }
+  })
+
   it('sends the browser where a called action redirects', async () => {
     GlobalRegistrator.register({ url: 'http://localhost/admin' })
 
