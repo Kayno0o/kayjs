@@ -1,6 +1,7 @@
 import type { AnyElysia } from 'elysia'
 import type { Guard } from 'kay'
 import type { Session } from 'kay/server'
+import type { ChangeUsernameResult } from './account'
 import type { BearerToken } from './bearer'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
 import type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
@@ -16,7 +17,7 @@ import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './two
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { clientAddress, rateKey } from 'kay/server'
-import { changePassword, deleteAccount, unlink } from './account'
+import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { bearerUser, createToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { publicUser } from './core'
 import { changeEmail, confirmEmailChange, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithMagicLink, verifyEmail } from './email'
@@ -269,6 +270,11 @@ export class Auth {
   // Sets the signed-in user's password, or a first one, and ends their other sessions.
   async changePassword(proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem } }> {
     return changePassword(this[STATE], proof, password)
+  }
+
+  // Names the signed-in user, or renames them, under the rules register checks; no proof, a name being no credential.
+  async changeUsername(username: string): Promise<ChangeUsernameResult> {
+    return changeUsername(this[STATE], username)
   }
 
   // Unlinks a provider from the signed-in user, unless it is their last way in.

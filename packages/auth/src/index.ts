@@ -1,3 +1,4 @@
+export type { ChangeUsernameResult } from './account'
 export * from './auth'
 export type { BearerToken } from './bearer'
 export * from './decide'

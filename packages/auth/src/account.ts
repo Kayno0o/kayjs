@@ -1,11 +1,12 @@
-import type { PasswordProblem } from './rules'
+import type { User } from './core'
+import type { PasswordProblem, UsernameProblem } from './rules'
 import type { RequestState } from './state'
 import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword } from '@kaynooo/utils'
 import { publicUser } from './core'
 import { revokeBearerTokens } from './email'
 import { notify } from './notify'
-import { passwordProblem } from './rules'
+import { normalizeUsername, passwordProblem, usernameProblem } from './rules'
 import { reprove } from './twoFactor'
 
 // Sets the signed-in user's password, or a first one, and ends their other sessions.
@@ -31,6 +32,51 @@ export async function changePassword(state: RequestState, proof: Proof, password
   }
 
   return { ok: true }
+}
+
+export type ChangeUsernameResult = { ok: true, user: User } | { ok: false, error: 'signed-out' } | { ok: false, errors: { username: UsernameProblem | 'taken' | 'unchanged' } }
+
+// Names the signed-in user, or renames them, under the rules register checks. A name is no credential, so it takes no proof and sends no mail.
+export async function changeUsername(state: RequestState, username: string): Promise<ChangeUsernameResult> {
+  const record = await state.current()
+
+  if (!record)
+    return { ok: false, error: 'signed-out' }
+
+  const name = normalizeUsername(username)
+  const problem = usernameProblem(name)
+
+  if (problem)
+    return { ok: false, errors: { username: problem } }
+
+  if (name === record.username)
+    return { ok: false, errors: { username: 'unchanged' } }
+
+  const holder = await state.core.store.users.findByUsername(name)
+
+  // The user's own name in another case is theirs to recase.
+  if (holder && holder.id !== record.id)
+    return { ok: false, errors: { username: 'taken' } }
+
+  let updated
+
+  try {
+    updated = await state.core.store.users.update(record.id, { username: name })
+  }
+  // Another request took the name in between; any other failure is the store's.
+  catch (error) {
+    if ((await state.core.store.users.findByUsername(name))?.id !== record.id)
+      return { ok: false, errors: { username: 'taken' } }
+
+    throw error
+  }
+
+  if (!updated)
+    return { ok: false, error: 'signed-out' }
+
+  await state.renew(updated)
+
+  return { ok: true, user: publicUser(updated) }
 }
 
 // Unlinks a provider from the signed-in user, unless it is their last way in.

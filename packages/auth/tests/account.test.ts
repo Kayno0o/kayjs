@@ -73,6 +73,58 @@ describe('an account with neither a password nor a second factor', () => {
   })
 })
 
+describe('changing the username', () => {
+  test('names a user without one, the name then signing in, and lets them recase it', async () => {
+    const { ada, browser } = await registered()
+
+    expect(await ada.call('changeUsername', ' Ada  Lovelace ')).toMatchObject({ ok: true, user: { username: 'Ada Lovelace' } })
+    expect(await ada.json('/me')).toMatchObject({ username: 'Ada Lovelace' })
+    expect(await browser().post('/password', { identifier: 'ada lovelace', password: PASSWORD })).toMatchObject({ ok: true })
+    expect(await ada.call('changeUsername', 'ada lovelace')).toMatchObject({ ok: true, user: { username: 'ada lovelace' } })
+  })
+
+  test('refuses a name the rules refuse, one another user has in any case, the same one, and a visitor', async () => {
+    const { ada, browser, store } = await registered()
+
+    await store.users.create(userRecord({ id: 'u2', username: 'Bob' }))
+    await ada.call('changeUsername', 'ada')
+
+    expect(await ada.call('changeUsername', 'a')).toEqual({ ok: false, errors: { username: 'length' } })
+    expect(await ada.call('changeUsername', 'bob')).toEqual({ ok: false, errors: { username: 'taken' } })
+    expect(await ada.call('changeUsername', 'ada')).toEqual({ ok: false, errors: { username: 'unchanged' } })
+    expect(await browser().call('changeUsername', 'carol')).toEqual({ ok: false, error: 'signed-out' })
+  })
+
+  test('answers taken for a name another request took in between', async () => {
+    const { ada, store } = await registered()
+    const update = store.users.update
+
+    store.users.update = async () => {
+      await store.users.create(userRecord({ id: 'u2', username: 'Ada' }))
+
+      throw new Error('unique violation')
+    }
+
+    expect(await ada.call('changeUsername', 'ada')).toEqual({ ok: false, errors: { username: 'taken' } })
+    store.users.update = update
+  })
+
+  test('shows the new name to the rest of the same request', async () => {
+    const { app, browser } = testApp()
+    const ada = browser()
+
+    // Added before the first request, which compiles the routes.
+    app.post('/rename', async ({ auth }) => {
+      await auth.changeUsername('ada')
+
+      return auth.user()
+    })
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    expect(await (await ada.fetch('/rename', POST)).json()).toMatchObject({ username: 'ada' })
+  })
+})
+
 describe('unlinking a provider', () => {
   test('refuses to unlink the last way in, and allows it once there is a password', async () => {
     const app = testApp()

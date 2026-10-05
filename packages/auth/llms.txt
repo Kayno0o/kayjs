@@ -224,6 +224,7 @@ Changing what protects the account takes a `proof`: `changePassword`, `changeEma
 ## Account
 
 - `changePassword(proof, password)` sets the password, or a first one, ends the user's other sessions and bearer tokens, and voids the links mailed before.
+- `changeUsername(username)` names the signed-in user, or renames them, normalised and checked as `register` does: `{ ok: true, user }`, `errors: { username }` with `'length'`, `'characters'`, `'mixed-scripts'`, `'taken'` or `'unchanged'`, or `'signed-out'`. Recasing one's own name is allowed. It takes no proof and sends no mail, a name being no credential; a page asks a user without one for it, as after an OAuth sign-up whose name was taken.
 - `unlink(provider, proof)` unlinks a provider: `'not-linked'` when it is not, `'last-way-in'` when the user would have no password, no other provider and no verified address to get a magic link at.
 - `deleteAccount(proof)` deletes the user with everything kayjs-auth keeps for them, calls `onDelete(user)` for the app's own records, and signs out. Asking the user to type their name first is the page's job.
 
