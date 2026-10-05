@@ -1,0 +1,53 @@
+---
+import type { JSX } from 'kay'
+import type { RangeValue } from './range'
+import { effect } from 'kay'
+import { rangeFrom } from './range'
+
+const { value = [null, null], min, max, step, label, unit, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+  // The bounds to start with; a pair whose parent passes another follows it.
+  value?: RangeValue
+  // The lowest and highest values allowed, shown as the empty boxes' placeholders.
+  min?: number
+  max?: number
+  step?: number
+  // Names the pair for screen readers, each box adding "from" or "to".
+  label: string
+  // Written after the boxes, such as `h` or `%`.
+  unit?: string
+  // Runs once a box is committed, on blur or Enter, rather than on every keystroke, and only when the range changed.
+  onChange?: (value: RangeValue) => void
+  class?: string
+}>()
+
+let low: HTMLInputElement | undefined
+let high: HTMLInputElement | undefined
+let last: RangeValue = value
+
+effect(() => {
+  last = value
+})
+
+function commit() {
+  if (!low || !high)
+    return
+
+  const next = rangeFrom(low.value, high.value)
+
+  // Written back, so a swapped pair shows in order.
+  low.value = next[0]?.toString() ?? ''
+  high.value = next[1]?.toString() ?? ''
+
+  if (next[0] === last[0] && next[1] === last[1])
+    return
+
+  last = next
+  onChange?.(next)
+}
+---
+.range-input({...rest} role="group" aria-label={label} class={className})
+  input.field-input.range-input-box(ref={element => low = element} type="number" inputmode="decimal" aria-label={`${label} from`} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
+  span.range-input-separator(aria-hidden="true") -
+  input.field-input.range-input-box(ref={element => high = element} type="number" inputmode="decimal" aria-label={`${label} to`} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
+  if unit
+    span.range-input-unit {unit}

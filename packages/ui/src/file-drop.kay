@@ -1,0 +1,94 @@
+---
+import type { JSX } from 'kay'
+import { onCleanup, onMount, signal } from 'kay'
+import { acceptsFile } from './accept'
+
+const { accept, multiple = false, paste = false, disabled = false, onFiles, content, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+  // The files the zone takes, as an `accept` attribute: the picker filters on it, and dropped or pasted files that miss it are ignored.
+  accept?: string
+  multiple?: boolean
+  // Also takes files pasted anywhere on the page, unless the paste lands in a text field.
+  paste?: boolean
+  disabled?: boolean
+  // The files picked, dropped or pasted: one unless `multiple`, and never an empty list.
+  onFiles: (files: File[]) => void
+  // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone.
+  content: (zone: { open: () => void, dragging: () => boolean }) => JSX.Element
+  class?: string
+}>()
+
+const dragging = signal(false)
+let input: HTMLInputElement | undefined
+
+function open() {
+  input?.click()
+}
+
+function take(files: Iterable<File>): boolean {
+  const matching = [...files].filter(file => acceptsFile(accept, file))
+  const taken = multiple ? matching : matching.slice(0, 1)
+
+  if (disabled || taken.length === 0)
+    return false
+
+  onFiles(taken)
+
+  return true
+}
+
+function carriesFiles(event: DragEvent): boolean {
+  return event.dataTransfer?.types.includes('Files') ?? false
+}
+
+function dragOver(event: DragEvent) {
+  if (disabled || !carriesFiles(event))
+    return
+
+  event.preventDefault()
+  dragging.set(true)
+}
+
+// Leaving for a child of the zone is no leaving at all, which is what made the highlight flicker over a zone with content.
+function dragLeave(event: DragEvent) {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null))
+    dragging.set(false)
+}
+
+function drop(event: DragEvent) {
+  const files = event.dataTransfer?.files
+
+  dragging.set(false)
+
+  if (!files?.length)
+    return
+
+  event.preventDefault()
+  take(files)
+}
+
+function picked(event: Event) {
+  const picker = event.currentTarget as HTMLInputElement
+
+  take(picker.files ?? [])
+  // Cleared, so picking the same file again still reports it.
+  picker.value = ''
+}
+
+function pasted(event: ClipboardEvent) {
+  const target = event.target instanceof Element ? event.target : null
+
+  if (!paste || target?.closest('input, textarea, [contenteditable]'))
+    return
+
+  if (take(event.clipboardData?.files ?? []))
+    event.preventDefault()
+}
+
+onMount(() => {
+  window.addEventListener('paste', pasted)
+  onCleanup(() => window.removeEventListener('paste', pasted))
+})
+---
+.file-drop({...rest} role="group" class={className} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
+  input.file-drop-input(ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
+  | {content({ open, dragging })}

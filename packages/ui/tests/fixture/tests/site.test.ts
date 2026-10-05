@@ -176,3 +176,15 @@ describe('data', () => {
     expect(await page('copy')).toBe('<article id="copy"><button type="button" class="btn copy-btn">Copy link</button></article>')
   })
 })
+
+describe('inputs', () => {
+  test('RangeInput names each box and shows its bounds, an open one empty under its limit; MultiSelect posts each value it starts with', async () => {
+    const form = (await element('/inputs', 'form')).replaceAll(/<!--[^>]*-->/g, '')
+
+    expect([...form.matchAll(/aria-label="(Hours \w+)" placeholder="(\d+)" min="0" max="24" value="(\d*)"/g)].map(match => match.slice(1))).toEqual([['Hours from', '0', '2'], ['Hours to', '24', '']])
+    expect(form).toContain('<span class="multi-select-summary">Mars</span>')
+    expect(form).toContain('<input class="multi-select-checkbox" type="checkbox" checked><span class="multi-select-label">Mars</span>')
+    expect(form).not.toContain('multi-select-search')
+    expect(form).toContain('<input type="hidden" name="planet" value="mars">')
+  })
+})

@@ -11,7 +11,7 @@
 - An icon is either a slot name such as `'close'`, which the app's settings map to any icon set, or an icon imported from `~icons/<prefix>/<name>`. The default slots use Tabler, so the app installs `@iconify-json/tabler`.
 - Dialog and FormDialog follow `open`. The parent sets it, then sets it back to false in `onClose`, which runs however the dialog closed. Their content renders only while they are open. A Popover the page opens through `open` is set back the same way, in `onToggle`.
 - FormDialog calls the action with the form's `FormData`. The server reads it as a plain form post, so give each control the `name` of its field in the action's schema: numbers, booleans and lists are coerced from their text, and files and the honeypot come along.
-- Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The only text the library holds is the English wording of its own controls and titles: `Cancel`, `Delete`, `Deleting…`, `Saving…` and `Confirm Deletion`, fixed; and, each replaced through a prop of the same name, `loadingLabel` (`Loading…`), `closeLabel` (`Close`), `backLabel` (`Back`), `resizeLabel` (`Resize list`), `empty` (`No data yet.`), `copiedLabel` (`Copied!`) and `failure` (`Could not copy to the clipboard`).
+- Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The only text the library holds is the English wording of its own controls and titles: `Cancel`, `Delete`, `Deleting…`, `Saving…` and `Confirm Deletion`, fixed; and, each replaced through a prop of the same name, `loadingLabel` (`Loading…`), `closeLabel` (`Close`), `backLabel` (`Back`), `resizeLabel` (`Resize list`), `empty` (`No data yet.`), `copiedLabel` (`Copied!`), `failure` (`Could not copy to the clipboard`) and `placeholder` (`Any`). MultiSelect also holds `All`, `None`, `Search`, `No match` and "N selected".
 
 ## Setup
 
@@ -224,6 +224,22 @@ PageSection(title="Moons")
 - `SiteFavicon(src={site.favicon} name={site.name})`: a site's icon, or the `globe` slot in a colour drawn from `name` when `src` is missing or fails to load.
 - `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for two seconds. A copy the browser refuses toasts `failure`.
 - BarList, SiteFavicon and CopyButton are islands taking data alone, so a static page passes them their props as it would to any element.
+
+### RangeInput, MultiSelect, FileDrop, Menu
+
+- `RangeInput(label="Hours" min={0} max={24} unit="h" value={[2, null]} onChange={hours.set})`: two number boxes for a range, each bound open when empty (`null`). `onChange([from, to])` runs once a box is committed, on blur or Enter, and only when the range changed; a reversed pair is put back in order in the boxes too. `rangeFrom(low, high)` reads two strings the same way, for a server reading the posted boxes.
+- `MultiSelect(id="planets" label="Planets" options={planets} value={['mars']} name="planet" onChange={picked.set})`:
+  - A trigger summing up what is picked (`placeholder`, `Any` by default, the one label, or "2 selected") opens a popover of checkboxes with All and None.
+  - Past eight options, or with `search`, the panel opens on a search box filtering the options, focused; otherwise the first checkbox takes focus.
+  - What is picked stays in the options' order. `name` posts each picked value as a hidden field, so the control submits inside a plain form.
+- `FileDrop(accept="image/*" multiple paste onFiles={upload})` with a `@content(zone)` block:
+  - Files dropped on the zone, picked through `zone.open()` or, with `paste`, pasted anywhere on the page outside a text field, reach `onFiles(files)`: those `accept` allows, one unless `multiple`, never an empty list.
+  - `zone.dragging()` reads whether files hover the zone, which also carries `data-dragging`.
+- `Menu(id="post-actions" label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', danger: true, onSelect: remove }]})`:
+  - An IconButton opening a `role="menu"` popover; `'separator'` draws a rule between groups.
+  - Opening focuses the first enabled entry; the arrows, Home and End move between enabled entries, and Tab closes it.
+  - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.
+- MultiSelect and Menu need an `id` unique on the page, as Popover does. RangeInput and MultiSelect take data alone, so a static page can hold them; FileDrop and Menu take functions, so they render inside an island.
 
 ## Forms
 

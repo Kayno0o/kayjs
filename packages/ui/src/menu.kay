@@ -1,0 +1,81 @@
+---
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import type { MenuAction, MenuEntry } from './menu'
+import type { PopoverPlacement } from './popover'
+import Icon from './icon.kay'
+import IconButton from './icon-button.kay'
+import Popover from './popover.kay'
+
+// The keys that move focus through the entries, as a native menu does.
+const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
+  ArrowDown: (index, count) => (index + 1) % count,
+  ArrowUp: (index, count) => (index - 1 + count) % count,
+  Home: () => 0,
+  End: (_, count) => count - 1,
+}
+
+const { id, items, label, icon, size = 'md', variant = 'ghost', placement = 'bottom-end' } = props<{
+  // Pairs the menu with its trigger, so it is unique on the page.
+  id: string
+  items: MenuEntry[]
+  // Names the trigger and the menu it opens.
+  label: string
+  // The trigger's icon, such as a row of dots.
+  icon: IconSlot | IconProps
+  size?: 'xs' | 'sm' | 'md' | 'lg'
+  variant?: 'solid' | 'ghost' | 'inline' | 'danger'
+  placement?: PopoverPlacement
+}>()
+
+let list: HTMLElement | undefined
+
+function entries(): HTMLButtonElement[] {
+  return [...list?.querySelectorAll<HTMLButtonElement>('.menu-item:not(:disabled)') ?? []]
+}
+
+// Hidden at once rather than through a signal, so the browser has given focus back to the trigger before an action runs.
+function close() {
+  document.getElementById(id)?.hidePopover()
+}
+
+function keyDown(event: KeyboardEvent) {
+  const move = MOVES[event.key]
+  const buttons = entries()
+
+  // A menu is one stop: Tab leaves it, closed, rather than walking its entries.
+  if (event.key === 'Tab') {
+    close()
+
+    return
+  }
+
+  if (!move || buttons.length === 0)
+    return
+
+  event.preventDefault()
+  buttons[move(buttons.indexOf(document.activeElement as HTMLButtonElement), buttons.length)]?.focus()
+}
+
+// The entry an `else` branch holds, which the template's `if` does not narrow from the separator.
+function actionOf(item: MenuEntry): MenuAction {
+  return item as MenuAction
+}
+
+function select(action: MenuAction) {
+  close()
+  action.onSelect()
+}
+---
+Popover(id={id} placement={placement} class="menu" onToggle={open => open && entries()[0]?.focus()})
+  @trigger(attributes)
+    IconButton({...attributes} icon={icon} label={label} size={size} variant={variant} aria-haspopup="menu")
+  .menu-list(ref={element => list = element} role="menu" aria-label={label} tabindex="-1" onKeyDown={keyDown})
+    for item, index of items key={index}
+      if item === 'separator'
+        hr.menu-separator
+      else
+        button.menu-item(type="button" role="menuitem" tabindex="-1" disabled={actionOf(item).disabled} data-danger={actionOf(item).danger || undefined} onClick={() => select(actionOf(item))})
+          if actionOf(item).icon
+            Icon(icon={actionOf(item).icon!})
+          | {actionOf(item).label}
