@@ -1,0 +1,158 @@
+---
+import type { CropHandle, CropRect } from '@kaynooo/utils/browser/canvas'
+import type { JSX } from 'kay'
+import { createCenteredCrop, moveCrop, pointerToNatural, resizeCrop } from '@kaynooo/utils/browser/canvas'
+import { effect, onCleanup, onMount, signal, untrack } from 'kay'
+
+interface ImageSize { width: number, height: number }
+
+const HANDLES: CropHandle[] = ['nw', 'ne', 'sw', 'se']
+// How far one arrow press moves or grows the crop, as a share of the image's width.
+const KEY_STEP = 0.01
+const KEY_STEP_LARGE = 0.1
+const DIRECTIONS: Partial<Record<string, [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+
+const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = 'Crop area: arrows move it, Shift and the arrows resize it', onCrop, onLoad, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+  src: string
+  // Width over height the crop is locked to; a change centres the crop again.
+  ratio?: number
+  // The smallest side of the crop, in natural pixels.
+  minSize?: number
+  // A rule-of-thirds overlay inside the crop.
+  grid?: boolean
+  alt?: string
+  // Names the crop area for screen readers, with the keys that move it.
+  cropLabel?: string
+  // The crop in the image's natural pixels, ready for a canvas draw, after every change.
+  onCrop?: (crop: CropRect) => void
+  // The image's natural size, once it has decoded.
+  onLoad?: (size: ImageSize) => void
+  // Shown under the image: `@footer(reset)`, where `reset()` centres the crop again.
+  footer?: (reset: () => void) => JSX.Element
+  class?: string
+}>()
+
+const size = signal<ImageSize | undefined>(undefined)
+const stageWidth = signal(0)
+const crop = signal<CropRect>({ x: 0, y: 0, w: 0, h: 0 })
+let stage: HTMLDivElement | undefined
+let image: HTMLImageElement | undefined
+let drag: { mode: 'move' | CropHandle, pointer: { x: number, y: number }, from: CropRect } | null = null
+
+const scale = () => stageWidth() / (size()?.width || 1)
+
+function set(next: CropRect) {
+  crop.set(next)
+  onCrop?.(next)
+}
+
+function reset() {
+  const known = size()
+
+  if (known)
+    set(createCenteredCrop(known.width, known.height, ratio))
+}
+
+// A new image or ratio starts from a centred crop again.
+effect(() => {
+  void size()
+  void ratio
+  untrack(reset)
+})
+
+function loaded() {
+  if (!image?.naturalWidth)
+    return
+
+  const next = { width: image.naturalWidth, height: image.naturalHeight }
+
+  size.set(next)
+  onLoad?.(next)
+}
+
+// An image already decoded, from the cache, fires no load event of its own; the stage's width scales the crop onto the screen.
+onMount(() => {
+  if (image?.complete)
+    loaded()
+
+  const resized = new ResizeObserver(() => stageWidth.set(stage?.clientWidth ?? 0))
+
+  resized.observe(stage!)
+  onCleanup(() => resized.disconnect())
+})
+
+function start(event: PointerEvent, mode: 'move' | CropHandle) {
+  const rect = stage?.getBoundingClientRect()
+  const known = size()
+
+  if (!known || !rect || event.button !== 0)
+    return
+
+  event.preventDefault()
+  event.stopPropagation()
+  drag = { mode, pointer: pointerToNatural(event.clientX, event.clientY, rect, known.width), from: crop() }
+  stage?.setPointerCapture(event.pointerId)
+}
+
+function move(event: PointerEvent) {
+  const rect = stage?.getBoundingClientRect()
+  const known = size()
+
+  if (!drag || !known || !rect)
+    return
+
+  const pointer = pointerToNatural(event.clientX, event.clientY, rect, known.width)
+  const dx = pointer.x - drag.pointer.x
+
+  set(drag.mode === 'move'
+    ? moveCrop(drag.from, dx, pointer.y - drag.pointer.y, known.width, known.height)
+    : resizeCrop(drag.from, dx, ratio, drag.mode, known.width, known.height, minSize))
+}
+
+function end(event: PointerEvent) {
+  if (!drag)
+    return
+
+  drag = null
+  stage?.releasePointerCapture(event.pointerId)
+}
+
+// Arrows move the crop, Shift with the arrows resizes it from its bottom-right corner, and Alt takes bigger steps.
+function keyDown(event: KeyboardEvent) {
+  const direction = DIRECTIONS[event.key]
+  const known = size()
+
+  if (!direction || !known)
+    return
+
+  event.preventDefault()
+
+  const [x, y] = direction
+  const step = Math.max(1, Math.round(known.width * (event.altKey ? KEY_STEP_LARGE : KEY_STEP)))
+
+  set(event.shiftKey
+    ? resizeCrop(crop(), (x + y) * step, ratio, 'se', known.width, known.height, minSize)
+    : moveCrop(crop(), x * step, y * step, known.width, known.height))
+}
+
+const area = () => {
+  const { x, y, w, h } = crop()
+  const factor = scale()
+  const known = size()
+
+  return `left: ${x * factor}px; top: ${y * factor}px; width: ${w * factor}px; height: ${h * factor}px; background-image: url(${JSON.stringify(src)}); background-size: ${(known?.width ?? 0) * factor}px ${(known?.height ?? 0) * factor}px; background-position: ${-x * factor}px ${-y * factor}px`
+}
+---
+.image-cropper({...rest} class={className})
+  .image-cropper-stage(ref={element => stage = element} role="presentation" onPointerMove={move} onPointerUp={end} onPointerCancel={end})
+    img.image-cropper-image(ref={element => image = element} src={src} alt={alt} draggable="false" onLoad={loaded})
+    if crop().w > 0
+      .image-cropper-crop(role="slider" tabindex="0" aria-label={cropLabel} aria-valuetext={`${Math.round(crop().w)} by ${Math.round(crop().h)} pixels at ${Math.round(crop().x)}, ${Math.round(crop().y)}`} aria-valuenow={Math.round(crop().w)} style={area()} onPointerDown={event => start(event, 'move')} onKeyDown={keyDown})
+        if grid
+          span.image-cropper-grid-cols
+          span.image-cropper-grid-rows
+        // Pointer only: the keyboard resizes through the crop area itself.
+        for handle of HANDLES key={handle}
+          span.image-cropper-handle(data-handle={handle} onPointerDown={event => start(event, handle)})
+  if footer
+    | {footer(reset)}

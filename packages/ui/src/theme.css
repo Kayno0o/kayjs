@@ -639,6 +639,11 @@
   }
 
   /* A plain grid of the same lanes until the width is known, then tiles placed by hand. */
+  /* The infinite-scroll sentinel: a line with no height, there only to come into view. */
+  .when-visible {
+    @apply h-px;
+  }
+
   .masonry {
     @apply grid items-start;
     grid-template-columns: repeat(auto-fill, minmax(min(var(--masonry-min), 100%), 1fr));

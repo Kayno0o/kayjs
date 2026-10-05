@@ -1,0 +1,27 @@
+---
+import type { MediaItem } from '@kaynooo/kayjs-ui'
+import ImageCropper from '@kaynooo/kayjs-ui/image-cropper.kay'
+import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
+import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
+import WhenVisible from '@kaynooo/kayjs-ui/when-visible.kay'
+import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
+
+// What the test reads back: each turn of the gallery, each crop, and each call for more rows.
+const { onIndexChange, onCrop, onMore } = props<{ onIndexChange: (index: number) => void, onCrop: (crop: { x: number, y: number, w: number, h: number }) => void, onMore: () => void }>()
+
+const items: MediaItem[] = [
+  { key: 1, kind: 'image', thumb: '/a-thumb.png', preview: '/a.png', full: '/a-full.png', title: 'Mars' },
+  { key: 2, kind: 'video', thumb: '/b-thumb.png', preview: '/b.png', src: '/b.mp4' },
+  { key: 3, kind: 'image', thumb: '/c-thumb.png', preview: '/c.png' },
+]
+---
+MediaGallery#gallery(items={items} onIndexChange={onIndexChange})
+ZoomPane#zoom(label="Map")
+  img(src="/map.png" alt="")
+ImageCropper#cropper(src="/photo.png" ratio={2} onCrop={onCrop})
+  @footer(reset)
+    button#reset(type="button" onClick={reset}) Reset
+Masonry#masonry(items={['a', 'b', 'c']} key={item => item})
+  @tile(item)
+    p {item}
+WhenVisible(onVisible={onMore})

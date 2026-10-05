@@ -1,0 +1,67 @@
+---
+import { onCleanup, onMount } from 'kay'
+
+const SCROLLING = new Set(['auto', 'scroll', 'overlay'])
+
+const { onVisible, margin = 600 } = props<{
+  // Loads the next rows: called once the sentinel comes into view, and again whenever the list around it grows and leaves it there, so a list too short to scroll keeps filling. A call returning a promise is not repeated before it settles.
+  onVisible: () => unknown
+  // How far outside the scroll box counts as in view already, in pixels, so the next rows land before the list runs out.
+  margin?: number
+}>()
+
+let sentinel: HTMLElement | undefined
+
+// The nearest ancestor set to scroll, which is what the sentinel has to come into view in, or the viewport.
+function scrollBoxOf(el: HTMLElement): HTMLElement | null {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    if (SCROLLING.has(getComputedStyle(node).overflowY))
+      return node
+  }
+
+  return null
+}
+
+onMount(() => {
+  const el = sentinel!
+  let visible = false
+  let running = false
+
+  async function run(): Promise<void> {
+    if (running || !visible)
+      return
+
+    running = true
+
+    try {
+      await onVisible()
+    }
+    finally {
+      running = false
+    }
+  }
+
+  const intersection = new IntersectionObserver((entries) => {
+    visible = entries.at(-1)?.isIntersecting ?? false
+    void run()
+  }, { root: scrollBoxOf(el), rootMargin: `${margin}px` })
+
+  // A list that grew under a sentinel still in view fires no new intersection, so observing it afresh reports where it stands now.
+  const growth = new ResizeObserver(() => {
+    intersection.unobserve(el)
+    intersection.observe(el)
+  })
+
+  intersection.observe(el)
+
+  if (el.parentElement)
+    growth.observe(el.parentElement)
+
+  onCleanup(() => {
+    intersection.disconnect()
+    growth.disconnect()
+  })
+})
+---
+// The infinite-scroll sentinel, rendered after a list only while there is more to load, so a list that stops growing is simply left alone.
+.when-visible(ref={element => sentinel = element} aria-hidden="true")

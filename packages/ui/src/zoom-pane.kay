@@ -1,0 +1,156 @@
+---
+import type { JSX } from 'kay'
+import type { Plate } from './zoom'
+import { onCleanup, onMount, signal } from 'kay'
+import IconButton from './icon-button.kay'
+import { fitted, held, MOST, movedBy, NOTCH_ZOOM, wheelZoom, zoomedAt } from './zoom'
+
+// How far a press may wander before it is a drag rather than a click, so what stands on the plate stays clickable.
+const SLOP = 3
+// How far one arrow press moves the plate, in pixels.
+const KEY_STEP = 40
+
+const { label, most = MOST, tools = true, zoomInLabel = 'Zoom in', zoomOutLabel = 'Zoom out', fitLabel = 'Fit', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex'> & {
+  // Names the view for screen readers, since what it holds is a picture rather than words.
+  label: string
+  // How far in it may be taken, as a multiple of fitted.
+  most?: number
+  // Whether the buttons are drawn. The gestures work either way.
+  tools?: boolean
+  zoomInLabel?: string
+  zoomOutLabel?: string
+  fitLabel?: string
+  class?: string
+}>()
+
+const plate = signal<Plate>(fitted())
+const dragging = signal(false)
+const points = new Map<number, { x: number, y: number }>()
+let pane: HTMLDivElement | undefined
+let wandered = 0
+
+const frame = () => ({ width: pane?.clientWidth ?? 0, height: pane?.clientHeight ?? 0 })
+
+// Where a screen point falls on the pane, which is what every gesture is measured against.
+function at(point: { clientX: number, clientY: number }): { x: number, y: number } {
+  const rect = pane?.getBoundingClientRect()
+
+  return { x: point.clientX - (rect?.left ?? 0), y: point.clientY - (rect?.top ?? 0) }
+}
+
+function take(next: Plate) {
+  plate.set(held(next, frame()))
+}
+
+function zoom(by: number, around = { x: frame().width / 2, y: frame().height / 2 }) {
+  take(zoomedAt(plate(), around, by, most))
+}
+
+function middle(): { x: number, y: number } {
+  let x = 0
+  let y = 0
+
+  for (const one of points.values()) {
+    x += one.x
+    y += one.y
+  }
+
+  return { x: x / points.size, y: y / points.size }
+}
+
+function spread(): number {
+  const [one, other] = [...points.values()]
+
+  return one && other ? Math.hypot(one.x - other.x, one.y - other.y) : 0
+}
+
+function grab(event: PointerEvent) {
+  if (event.button !== 0)
+    return
+
+  points.set(event.pointerId, at(event))
+  wandered = 0
+}
+
+function move(event: PointerEvent) {
+  if (!points.has(event.pointerId))
+    return
+
+  const from = middle()
+  const was = spread()
+
+  points.set(event.pointerId, at(event))
+
+  const to = middle()
+  const now = spread()
+
+  wandered += Math.hypot(to.x - from.x, to.y - from.y)
+
+  // A press is only a drag once it has wandered, and only then is the pointer captured: capturing it straight away would retarget the click and nothing standing on the plate could be pressed.
+  if (!dragging() && wandered < SLOP && now === 0)
+    return
+
+  if (!dragging()) {
+    dragging.set(true)
+    pane?.setPointerCapture(event.pointerId)
+  }
+
+  if (was > 0 && now > 0)
+    take(zoomedAt(plate(), to, now / was, most))
+
+  take(movedBy(plate(), to.x - from.x, to.y - from.y))
+}
+
+function drop(event: PointerEvent) {
+  if (!points.delete(event.pointerId))
+    return
+
+  if (pane?.hasPointerCapture(event.pointerId))
+    pane.releasePointerCapture(event.pointerId)
+
+  if (points.size === 0)
+    dragging.set(false)
+}
+
+const KEYS: Partial<Record<string, () => void>> = {
+  '+': () => zoom(NOTCH_ZOOM),
+  '=': () => zoom(NOTCH_ZOOM),
+  '-': () => zoom(1 / NOTCH_ZOOM),
+  '0': () => plate.set(fitted()),
+  'ArrowLeft': () => take(movedBy(plate(), KEY_STEP, 0)),
+  'ArrowRight': () => take(movedBy(plate(), -KEY_STEP, 0)),
+  'ArrowUp': () => take(movedBy(plate(), 0, KEY_STEP)),
+  'ArrowDown': () => take(movedBy(plate(), 0, -KEY_STEP)),
+}
+
+function keyDown(event: KeyboardEvent) {
+  const action = KEYS[event.key]
+
+  if (!action)
+    return
+
+  event.preventDefault()
+  action()
+}
+
+// A wheel listener that may stop the page scrolling under the gesture has to be registered as not passive.
+onMount(() => {
+  const spun = (event: WheelEvent) => {
+    event.preventDefault()
+    zoom(wheelZoom(event.deltaY, event.deltaMode), at(event))
+  }
+
+  pane!.addEventListener('wheel', spun, { passive: false })
+  onCleanup(() => pane?.removeEventListener('wheel', spun))
+})
+---
+// Fitted, the page still scrolls over it on a touch screen; taken in, the gestures are the pane's own. The group is focusable on purpose: the arrows and +/- are its own, and the buttons say the same for everyone else.
+.zoom-pane({...rest} ref={element => pane = element} role="group" aria-label={label} tabindex="0" data-dragging={dragging() || undefined} class={className} style={`touch-action: ${plate().scale > 1 ? 'none' : 'pan-y'}`} onPointerDown={grab} onPointerMove={move} onPointerUp={drop} onPointerCancel={drop} onDblClick={event => zoom(NOTCH_ZOOM ** 3, at(event))} onDragStart={event => event.preventDefault()} onKeyDown={keyDown})
+  // The scale is published too, so a mark standing on the plate can hold its own size with `calc(1 / var(--zoom-scale))`.
+  .zoom-plate(style={`--zoom-scale: ${plate().scale}; transform: translate(${plate().x}px, ${plate().y}px) scale(${plate().scale})`})
+    slot
+  if tools
+    .zoom-tools
+      IconButton(icon="zoomIn" label={zoomInLabel} size="sm" onClick={() => zoom(NOTCH_ZOOM ** 2)})
+      IconButton(icon="zoomOut" label={zoomOutLabel} size="sm" onClick={() => zoom(1 / NOTCH_ZOOM ** 2)})
+      IconButton(icon="zoomFit" label={fitLabel} size="sm" disabled={plate().scale === 1} onClick={() => plate.set(fitted())})

@@ -323,6 +323,18 @@ ul
   - With `onImage(file)`, a pasted or dropped image is embedded behind an `![Uploading …]()` placeholder at once, swapped for `![](url)` once `onImage` resolves with its url, or removed with `uploadFailure` toasted if it throws. Writing goes on meanwhile, and a finished upload never takes focus back; the field is `aria-busy` while one is under way.
   - `onInput(value)` reports the text after every change, typed or applied. A parent passing other text replaces it; passing back what it was given leaves the caret alone.
 
+### MediaGallery, Masonry, WhenVisible, ZoomPane, ImageCropper
+
+- `MediaGallery(items={media})`: a stage, a strip of thumbnails and a lightbox.
+  - An item has a `key`, a `kind` (`image` or `video`), a `thumb` for the strip, a `preview` for the stage or a video's poster, a `full` the lightbox opens an image at, a video's `src` and a `title`.
+  - The arrows, Home and End turn it while focus is inside it, wrapping, and so do its buttons and a swipe. `index` is the item to start on, and `onIndexChange(index)` reports each turn. The strip keeps the shown thumbnail centred, and the images either side start loading.
+  - A video plays in place with `preload="none"`. An `.m3u8` playlist plays through `hls.js`, an optional peer imported only once such a video shows, in browsers without native HLS.
+  - An image opens full size in a lightbox, which turns the same way. `ratio` is the stage's `aspect-ratio`, `16 / 9` by default; `empty` is what it reads with no items.
+- `Masonry(items={posts} key={post => post.id} minWidth={256} gap={12})` with a `@tile(item)` block: tiles of any height in as many lanes of at least `minWidth` as fit, each dropped into the shortest lane, the order still reading left to right. The tiles are placed absolutely inside its own box, so padding goes on a wrapper, never on the Masonry; until it has measured, as on the server, they sit in a plain grid of the same lanes.
+- `WhenVisible(onVisible={loadMore})`: the infinite-scroll sentinel. Render it after a list only while there is more to load; `onVisible` runs once it comes within `margin` pixels (600) of the nearest scroll box, and again whenever the list grows and leaves it in view, never again before a promise it returned settles.
+- `ZoomPane(label="Floor plan")` around a picture: pinch, the wheel, a double click, + and -, and the zoom buttons take it in, a drag or the arrows move it, and 0 or the fit button fits it again. A press that does not wander stays a click, so marks standing on the picture remain clickable; `--zoom-scale` lets one keep its own size with `calc(1 / var(--zoom-scale))`. `tools` draws the buttons, on by default; `most` caps the zoom, 8 times fitted.
+- `ImageCropper(src={photo} ratio={16 / 9} onCrop={crop.set})` with an optional `@footer(reset)` block: a crop of a fixed `ratio` over the image, centred once it loads, moved by a drag or the arrows and resized by its corners or Shift with the arrows, Alt taking bigger steps. `onCrop({ x, y, w, h })` reports it in the image's natural pixels, ready for a canvas draw; `grid` adds a rule-of-thirds overlay and `minSize` the smallest side.
+
 ## Forms
 
 FormField frames a control with its label, hint and messages. FormDialog calls a page's action from a dialog and shows the message of each refused field on its FormField.

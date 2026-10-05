@@ -46,11 +46,15 @@
   "peerDependencies": {
     "@iconify-json/tabler": "^1.2.41",
     "chartist": "^1.5.0",
+    "hls.js": "^1.7.0",
     "kay": "^0.4.0",
     "tailwindcss": "^4.3.3"
   },
   "peerDependenciesMeta": {
     "chartist": {
+      "optional": true
+    },
+    "hls.js": {
       "optional": true
     }
   },
@@ -65,6 +69,7 @@
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "chartist": "^1.5.0",
     "elysia": "^1.4.30",
+    "hls.js": "^1.7.0",
     "kay": "npm:@kaynooo/kayjs@^0.4.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { monthStarts } from '../src/contribution'
+import { isPlayable, stepIndex } from '../src/media'
 import { selectionSummary, toggledValue } from '../src/multi-select'
 import { axisExtent, axisPercent, dotSize } from '../src/plot'
 import { rangeFrom } from '../src/range'
@@ -60,5 +61,22 @@ describe('monthStarts', () => {
   test('labels the column each month starts in, dropping one too close to the next', () => {
     expect(monthStarts(weeks('2026-01-26', 10)).map(start => start.column)).toEqual([0, 4, 9])
     expect(monthStarts(weeks('2026-01-05', 10)).map(start => start.column)).toEqual([0, 3, 7])
+  })
+})
+
+describe('media', () => {
+  test('wraps a step around both ends', () => {
+    expect(stepIndex(0, -1, 3)).toBe(2)
+    expect(stepIndex(2, 1, 3)).toBe(0)
+    expect(stepIndex(1, 0, 3)).toBe(1)
+    expect(stepIndex(4, 0, 0)).toBe(0)
+  })
+
+  test('plays only a video that has a source', () => {
+    const item = { key: 1, thumb: 't', preview: 'p' }
+
+    expect(isPlayable({ ...item, kind: 'video', src: 'a.m3u8' })).toBe(true)
+    expect(isPlayable({ ...item, kind: 'video' })).toBe(false)
+    expect(isPlayable({ ...item, kind: 'image', src: 'a.jpg' })).toBe(false)
   })
 })

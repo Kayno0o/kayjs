@@ -1,0 +1,183 @@
+---
+import type { JSX } from 'kay'
+import type { MediaItem } from './media'
+import { effect, onCleanup, signal } from 'kay'
+import Icon from './icon.kay'
+import IconButton from './icon-button.kay'
+import { isPlayable, playSource, stepIndex } from './media'
+
+// How far a finger moves sideways before a swipe turns the gallery.
+const SWIPE_PX = 48
+
+const { items, index = 0, onIndexChange, ratio = '16 / 9', empty = 'No media.', previousLabel = 'Previous', nextLabel = 'Next', closeLabel = 'Close', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+  items: MediaItem[]
+  // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
+  index?: number
+  onIndexChange?: (index: number) => void
+  // The stage's CSS `aspect-ratio`.
+  ratio?: string
+  // What the gallery reads with no items.
+  empty?: string
+  previousLabel?: string
+  nextLabel?: string
+  closeLabel?: string
+  class?: string
+}>()
+
+const shown = signal(index)
+const zoomed = signal(false)
+// Each video's player, stopped once its element leaves the page.
+const players = new Map<HTMLVideoElement, () => void>()
+let strip: HTMLElement | undefined
+let lightbox: HTMLDialogElement | undefined
+let swipeFrom: { x: number, y: number } | null = null
+
+effect(() => shown.set(index))
+
+// An item as the video it plays, or nothing for an image, for the template to draw each.
+const playable = (item: MediaItem) => isPlayable(item) ? item : undefined
+const active = () => Math.min(Math.max(shown(), 0), Math.max(items.length - 1, 0))
+const current = () => items[active()]
+
+function go(next: number) {
+  const target = stepIndex(next, 0, items.length)
+
+  shown.set(target)
+  onIndexChange?.(target)
+}
+
+function step(delta: number) {
+  go(stepIndex(active(), delta, items.length))
+}
+
+function sweep() {
+  for (const [video, stop] of players) {
+    if (!video.isConnected) {
+      stop()
+      players.delete(video)
+    }
+  }
+}
+
+function play(video: HTMLVideoElement, src: string) {
+  sweep()
+  players.set(video, playSource(video, src))
+}
+
+onCleanup(() => {
+  for (const stop of players.values())
+    stop()
+})
+
+function keyDown(event: KeyboardEvent) {
+  const target = event.target as HTMLElement
+
+  // A video's own controls and a text box keep their arrows.
+  if (items.length < 2 || event.altKey || event.ctrlKey || event.metaKey || target.closest('video, input, textarea'))
+    return
+
+  const moves: Partial<Record<string, () => void>> = { ArrowLeft: () => step(-1), ArrowRight: () => step(1), Home: () => go(0), End: () => go(items.length - 1) }
+  const move = moves[event.key]
+
+  if (!move)
+    return
+
+  event.preventDefault()
+  move()
+}
+
+function swipeStart(event: PointerEvent) {
+  if (event.pointerType === 'mouse') {
+    swipeFrom = null
+
+    return
+  }
+
+  const surface = event.currentTarget as HTMLElement
+
+  swipeFrom = { x: event.clientX, y: event.clientY }
+  // A finger lifted past the stage's edge still ends the swipe here.
+  surface.setPointerCapture(event.pointerId)
+}
+
+function swipeEnd(event: PointerEvent) {
+  const from = swipeFrom
+
+  swipeFrom = null
+
+  if (!from)
+    return
+
+  const dx = event.clientX - from.x
+
+  if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(event.clientY - from.y))
+    step(dx < 0 ? 1 : -1)
+}
+
+effect(() => {
+  const wanted = zoomed()
+
+  if (!lightbox)
+    return
+
+  if (wanted && !lightbox.open)
+    lightbox.showModal()
+  else if (!wanted && lightbox.open)
+    lightbox.close()
+})
+
+// The thumbnail on stage is scrolled into the middle of the strip, the images either side start loading, and the players of videos no longer shown stop.
+effect(() => {
+  const at = active()
+  const thumb = strip?.children[at] as HTMLElement | undefined
+
+  sweep()
+  strip?.scrollTo?.({ left: (thumb?.offsetLeft ?? 0) - (strip.clientWidth - (thumb?.offsetWidth ?? 0)) / 2, behavior: 'smooth' })
+
+  for (const delta of items.length > 1 ? [1, -1] : []) {
+    const neighbour = items[stepIndex(at, delta, items.length)]
+
+    if (neighbour && !isPlayable(neighbour))
+      new Image().src = zoomed() ? neighbour.full ?? neighbour.preview : neighbour.preview
+  }
+})
+---
+if !current()
+  p.media-gallery-empty {empty}
+else
+  // Arrows turn the gallery while focus is anywhere inside it, which a keyboard user reaches through its buttons.
+  .media-gallery({...rest} class={className} onKeyDown={keyDown})
+    .media-gallery-stage(style={`aspect-ratio: ${ratio}`} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
+      // Keyed on the item, so a video and its player are made afresh for each.
+      for item of [current()!] key={item.key}
+        if playable(item) as video
+          video.media-gallery-frame(ref={element => play(element, video.src)} controls preload="none" poster={video.preview})
+        else
+          button.media-gallery-zoom(type="button" aria-label={item.title ? `Open ${item.title}` : 'Open full size'} onClick={() => zoomed.set(true)})
+            img.media-gallery-frame(src={item.preview} alt={item.title ?? ''})
+      if items.length > 1
+        IconButton(icon="chevron" label={previousLabel} variant="ghost" class="media-gallery-step" data-side="previous" onClick={() => step(-1)})
+        IconButton(icon="chevron" label={nextLabel} variant="ghost" class="media-gallery-step" data-side="next" onClick={() => step(1)})
+        span.media-gallery-counter {active() + 1} / {items.length}
+      if current()!.title
+        span.media-gallery-caption {current()!.title}
+    if items.length > 1
+      .media-gallery-strip(ref={element => strip = element})
+        for item, position of items key={item.key}
+          button.media-gallery-thumb(type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.title ?? `Media ${position + 1}`} onClick={() => go(position)})
+            img.media-gallery-thumb-image(src={item.thumb} alt="" loading="lazy" decoding="async")
+            if item.kind === 'video'
+              Icon(icon="play" class="media-gallery-play")
+    dialog.media-gallery-lightbox(ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? 'Media'} onClose={() => zoomed.set(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
+      if zoomed()
+        for item of [current()!] key={item.key}
+          if playable(item) as video
+            video.media-gallery-full(ref={element => play(element, video.src)} controls preload="none" poster={video.preview})
+          else
+            img.media-gallery-full(src={item.full ?? item.preview} alt={item.title ?? ''})
+        if items.length > 1
+          IconButton(icon="chevron" label={previousLabel} variant="ghost" class="media-gallery-step" data-side="previous" onClick={() => step(-1)})
+          IconButton(icon="chevron" label={nextLabel} variant="ghost" class="media-gallery-step" data-side="next" onClick={() => step(1)})
+        if current()!.title
+          span.media-gallery-caption {current()!.title}
+        IconButton(icon="close" label={closeLabel} variant="ghost" class="media-gallery-close" onClick={() => zoomed.set(false)})

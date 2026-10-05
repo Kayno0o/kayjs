@@ -1,0 +1,71 @@
+--- <Item>
+import type { JSX } from 'kay'
+import { onCleanup, onMount, signal } from 'kay'
+import { laneCount, masonryLayout } from './masonry'
+
+type Key = string | number
+
+const { items, key, minWidth = 256, gap = 12, tile, class: className, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
+  items: readonly Item[]
+  // Names an item across updates, so its tile keeps its place and its measured height.
+  key: (item: Item) => Key
+  // The narrowest a lane may get, in pixels: as many lanes as fit at that width share the row.
+  minWidth?: number
+  // Between two lanes and between two tiles of a lane, in pixels.
+  gap?: number
+  // Draws each tile: `@tile(item)`.
+  tile: (item: Item) => JSX.Element
+  class?: string
+  style?: string
+}>()
+
+const width = signal(0)
+// A height stays known once the tile leaves, so an item coming back is placed at once.
+const heights = signal<ReadonlyMap<Key, number>>(new Map())
+const keys = new WeakMap<Element, Key>()
+let root: HTMLElement | undefined
+let observer: ResizeObserver | undefined
+
+const lanes = () => laneCount(width(), minWidth, gap)
+// Until the width is known, as on the server, the tiles stay in a plain grid of the same lanes.
+const layout = () => width() > 0 ? masonryLayout(items.map(item => heights().get(key(item))), lanes(), gap) : null
+
+const place = (index: number) => layout()?.places[index]
+
+// One observer for the layout's width and every tile's height.
+onMount(() => {
+  observer = new ResizeObserver((entries) => {
+    const next = new Map(heights())
+
+    for (const entry of entries) {
+      const id = keys.get(entry.target)
+
+      if (id === undefined)
+        width.set(entry.contentRect.width)
+      else
+        next.set(id, entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight)
+    }
+
+    heights.set(next)
+  })
+  observer.observe(root!)
+
+  for (const [index, node] of [...root!.children].entries()) {
+    keys.set(node, key(items[index]!))
+    observer.observe(node)
+  }
+
+  onCleanup(() => observer?.disconnect())
+})
+
+// A tile rendered after mounting is measured from then on.
+function measure(node: HTMLElement, id: Key) {
+  keys.set(node, id)
+  observer?.observe(node)
+}
+---
+// Tiles placed absolutely inside the layout's own box, so padding goes on a wrapper, never on the Masonry.
+.masonry({...rest} ref={element => root = element} class={className} style={`--masonry-min: ${minWidth}px; --masonry-gap: ${gap}px; --masonry-lanes: ${lanes()};${layout() ? ` height: ${layout()!.height}px;` : ''}${style ? ` ${style}` : ''}`} data-laid-out={layout() ? '' : undefined})
+  for item, index of items key={key(item)}
+    .masonry-item(ref={element => measure(element, key(item))} style={place(index) ? `--masonry-lane: ${place(index)!.lane}; --masonry-top: ${place(index)!.top}px;` : undefined} data-placed={place(index) ? '' : undefined} data-pending={place(index) && !heights().has(key(item)) ? '' : undefined})
+      | {tile(item)}

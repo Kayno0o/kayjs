@@ -15,15 +15,20 @@
         "@typescript/native-preview": "^7.0.0-dev.20260707.2",
         "chartist": "^1.5.0",
         "elysia": "^1.4.30",
+        "hls.js": "^1.7.0",
         "kay": "npm:@kaynooo/kayjs@^0.4.0",
         "tailwindcss": "^4.3.3",
         "typescript": "^6.0.3",
       },
       "peerDependencies": {
         "@iconify-json/tabler": "^1.2.41",
+        "chartist": "^1.5.0",
         "kay": "^0.4.0",
         "tailwindcss": "^4.3.3",
       },
+      "optionalPeers": [
+        "chartist",
+      ],
     },
   },
   "packages": {
@@ -562,6 +567,8 @@
     "hashery": ["hashery@1.5.1", "", { "dependencies": { "hookified": "^1.15.0" } }, "sha512-iZyKG96/JwPz1N55vj2Ie2vXbhu440zfUfJvSwEqEbeLluk7NnapfGqa7LH0mOsnDxTF85Mx8/dyR6HfqcbmbQ=="],
 
     "hasown": ["hasown@2.0.4", "", { "dependencies": { "function-bind": "^1.1.2" } }, "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="],
+
+    "hls.js": ["hls.js@1.7.3", "", {}, "sha512-MsPlx6yVW4Qv4C7mEVou4/gk/5cN2dVxOTnrNjPSmyH2f0Ln+/UkG10Ax1PE6OvrmTVPKgQYozTtBaPOuCzq7A=="],
 
     "hookified": ["hookified@1.15.1", "", {}, "sha512-MvG/clsADq1GPM2KGo2nyfaWVyn9naPiXrqIe4jYjXNZQt238kWyOGrsyc/DmRAQ+Re6yeo6yX/yoNCG5KAEVg=="],
 
