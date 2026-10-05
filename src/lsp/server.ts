@@ -8,7 +8,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { findKayFiles, TSCONFIG } from '../build/files'
-import { compileShadow, SHADOW_DIR, shadowPath, TSGO, writeShadowTypes } from '../check'
+import { compileShadow, SHADOW_DIR, shadowPath, TSGO, UNUSED_CODES, writeShadowTypes } from '../check'
 import { formatKay } from '../compiler/format'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
@@ -53,7 +53,7 @@ const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
 const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|Prop|FunctionProp|Children|PageContext|PrerenderedContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
 const FULL_SYNC = 1
-const ERROR = 1
+const ERROR = 1 as const
 const CREATED = 1
 const CHANGED = 2
 const DELETED = 3
@@ -319,8 +319,16 @@ export class KayLanguageServer {
     if (this.documents.get(document.uri) !== document)
       return
 
-    // Related information points into the shadow TSX, a file the user never sees.
-    const typeErrors = (report?.items ?? []).map(({ relatedInformation: _related, ...diagnostic }) => ({ ...diagnostic, range: toSourceRange(document, diagnostic.range, true) ?? zeroRange() }))
+    // Related information points into the shadow TSX, a file the user never sees. Unused code, a hint to TypeScript without `noUnusedLocals`, is an error in a .kay file, as `kay check` reports it.
+    const typeErrors = (report?.items ?? []).flatMap(({ relatedInformation: _related, ...diagnostic }) => {
+      const range = toSourceRange(document, diagnostic.range, true)
+
+      if (!UNUSED_CODES.has(Number(diagnostic.code)))
+        return [{ ...diagnostic, range: range ?? zeroRange() }]
+
+      // A name kay generated is no unused code of the user's.
+      return range ? [{ ...diagnostic, severity: ERROR, range }] : []
+    })
 
     this.client.notify('textDocument/publishDiagnostics', { uri: document.uri, version: document.version, diagnostics: [...compileErrors, ...typeErrors] })
   }

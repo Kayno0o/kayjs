@@ -771,3 +771,43 @@ describe('kay check, markup', () => {
     }
   })
 })
+
+describe('kay check, unused code', () => {
+  it('reports what a .kay file declares and never reads, and leaves .ts files to the tsconfig', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': [
+        '--- server',
+        'import { defer } from \'kay\'',
+        '',
+        'const shown = 1',
+        'const hidden = 2',
+        'const base = 3',
+        'const total = base + 1',
+        'const _later = 4',
+        '---',
+        '---',
+        'import { signal } from \'kay\'',
+        '',
+        'const idle = signal(0)',
+        '---',
+        'p {shown} {total}',
+        '',
+      ].join('\n'),
+      'src/card.kay': '---\nconst { title, subtitle, _note } = props<{ title: string, subtitle?: string, _note?: string }>()\n---\np {title}\n',
+      'src/wrap.kay': '---\nconst { title, ...rest } = props<{ title: string, id: string }>()\n---\np({...rest})\n',
+      'src/util.ts': 'const unused = 1\n\nexport const used = 2\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [relative(root, d.file), d.line, d.message])).toEqual([
+        ['src/card.kay', 2, 'The prop `subtitle` is never read'],
+        ['src/routes/index.kay', 5, '`hidden` is never read'],
+        ['src/routes/index.kay', 2, '\'defer\' is declared but its value is never read.'],
+        ['src/routes/index.kay', 13, '\'idle\' is declared but its value is never read.'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})

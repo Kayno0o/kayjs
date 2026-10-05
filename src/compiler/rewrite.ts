@@ -34,6 +34,10 @@ export interface FoundRewrites {
   syntaxError?: Diagnostic
   // True when the component function's name is read as a value somewhere in it, so a global of that name is shadowed.
   shadowsName: boolean
+  // Where the bindings nothing in the component reads are declared, by source offset.
+  unread: Set<number>
+  // The server data the fence itself reads, besides handing it to the template.
+  serverReads: Set<string>
 }
 
 // Reads the analysis-pass TSX with real scope resolution, so shadowed names are left alone, and returns the rewrites to apply in the final pass.
@@ -42,13 +46,15 @@ export interface FoundRewrites {
 export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, bindings: PropsBinding[], componentName: string, values: boolean): FoundRewrites {
   const rewrites: Rewrites = new Map()
   const diagnostics: Diagnostic[] = []
+  const unread = new Set<number>()
+  const serverReads = new Set<string>()
   let ast: t.File
 
   try {
     ast = parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'] })
   }
   catch (error) {
-    return { rewrites, diagnostics, syntaxError: syntaxError(error, map), shadowsName: false }
+    return { rewrites, diagnostics, syntaxError: syntaxError(error, map), shadowsName: false, unread, serverReads }
   }
 
   const propsByLocal = new Map<number, { binding: PropsBinding, index: number }>()
@@ -142,11 +148,26 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
         const name = property.value.name
 
         visitBinding(path.scope, name, reference => withShorthand(reference, name, propRead(prop.binding, prop.index, name)), `\`${name}\` is a prop, and props are read-only; copy it into a signal to change it locally`, propType(prop.binding))
+
+        if (path.scope.getBinding(name)?.referencePaths.length === 0)
+          unread.add(source!)
+      }
+    },
+    // `load` ends handing the fence's names to the template; any other read of one is the fence's own.
+    FunctionDeclaration: (path) => {
+      if (path.node.id?.name !== 'load' || !path.parentPath.isExportNamedDeclaration())
+        return
+
+      const handOver = path.node.body.body.at(-1)
+
+      for (const binding of bindings) {
+        if (path.scope.getBinding(binding.key)?.referencePaths.some(reference => reference.parentPath?.parentPath?.parentPath?.node !== handOver))
+          serverReads.add(binding.key)
       }
     },
   })
 
-  return { rewrites, diagnostics, shadowsName }
+  return { rewrites, diagnostics, shadowsName, unread, serverReads }
 }
 
 // Babel's message ends in the position within the generated code, which means nothing to the user; the error lands on the source it was generated from.

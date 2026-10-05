@@ -359,6 +359,20 @@ describe('kay lsp imports', () => {
       { title: 'Render the component in the browser only with `--- client`', text: source.replace('---', '--- client') },
     ])
   })
+
+  it('reports unused imports, declarations, props and server values as errors, a prop with its fix', async () => {
+    const source = '---\nimport { effect, signal } from \'kay\'\n\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\nconst count = signal(0)\nconst idle = 1\n---\np {title} {count()}\n'
+    const diagnostics = await editor.change(page, source, 7)
+
+    const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range: diagnostics[0]!.range, context: { diagnostics } })
+
+    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.severity, diagnostic.message])).toEqual([
+      [3, 1, 'The prop `subtitle` is never read'],
+      [1, 1, '\'effect\' is declared but its value is never read.'],
+      [5, 1, '\'idle\' is declared but its value is never read.'],
+    ])
+    expect(actions.map(action => ({ title: action.title, text: applyEdits(source, action.edit!.changes![editor.uri(page)]!) }))).toContainEqual({ title: 'Remove `subtitle`', text: source.replace('title, subtitle }', 'title }') })
+  })
 })
 
 describe('kay lsp following files on disk', () => {

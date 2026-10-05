@@ -1,4 +1,6 @@
-import type { Diagnostic, Node } from './ast'
+import type { Diagnostic, Node, Span } from './ast'
+import type { FoundRewrites } from './rewrite'
+import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { awaitBlocks, tryBlocks } from './ast'
@@ -110,7 +112,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     diagnostics.push(...browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? [], routeFile))
 
   if (options.check)
-    diagnostics.push(...unboundedFields(source, file.server))
+    diagnostics.push(...unboundedFields(source, file.server), ...unreadNames(source, script, server, found))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page renders on the server; only a component it renders can be `--- client`' })
@@ -126,6 +128,24 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     classes: shorthandClasses(file.template, source),
     diagnostics: diagnostics.sort((a, b) => a.start - b.start),
   }
+}
+
+// Props and server data nothing reads: a prop beside a `...rest` is left out of it on purpose, and a name starting with `_` is unused on purpose, as TypeScript takes it.
+function unreadNames(source: string, script: ScriptAnalysis, server: ServerAnalysis | undefined, found: FoundRewrites): Diagnostic[] {
+  const unread: Diagnostic[] = []
+  const unused = (span: Span) => found.unread.has(span.start) && !source.startsWith('_', span.start)
+
+  for (const binding of script.props?.rest ? [] : script.props?.bindings ?? []) {
+    if (unused(binding.local))
+      unread.push({ ...binding.local, checkOnly: true, message: `The prop \`${binding.key}\` is never read`, fixes: binding.removal && [{ title: `Remove \`${binding.key}\``, edits: [{ ...binding.removal, text: '' }] }] })
+  }
+
+  for (const data of server?.data ?? []) {
+    if (unused(data.local) && !found.serverReads.has(data.name))
+      unread.push({ ...data.local, checkOnly: true, message: `\`${data.name}\` is never read` })
+  }
+
+  return unread
 }
 
 function shorthandClasses(nodes: Node[], source: string, found: string[] = []): string[] {

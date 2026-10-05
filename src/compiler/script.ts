@@ -15,6 +15,8 @@ export interface PropsBinding {
   local: Span
   key: string
   fallback?: Span
+  // What leaves the destructuring without it, separator included, when another name stays.
+  removal?: Span
 }
 
 export interface PropsDeclaration {
@@ -705,7 +707,9 @@ function propsDeclaration(statement: t.Statement, shift: (node: t.Node) => Span,
     return declaration
   }
 
-  for (const property of declarator.id.properties) {
+  const properties = declarator.id.properties
+
+  for (const [index, property] of properties.entries()) {
     if (property.type === 'RestElement') {
       declaration.rest = shift(property.argument)
 
@@ -722,7 +726,11 @@ function propsDeclaration(statement: t.Statement, shift: (node: t.Node) => Span,
       continue
     }
 
-    declaration.bindings.push({ local: shift(local), key, fallback: value.type === 'AssignmentPattern' ? shift(value.right) : undefined })
+    const next = properties[index + 1]
+    const previous = properties[index - 1]
+    const removal = next ? { start: shift(property).start, end: shift(next).start } : previous ? { start: shift(previous).end, end: shift(property).end } : undefined
+
+    declaration.bindings.push({ local: shift(local), key, fallback: value.type === 'AssignmentPattern' ? shift(value.right) : undefined, removal })
   }
 
   return declaration

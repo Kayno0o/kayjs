@@ -83,6 +83,8 @@ export interface ShadowFile {
   map: SourceMap
 }
 
+// What `noUnusedLocals` reports: `kay check` turns it on for .kay files, and leaves other files to the project's tsconfig.
+export const UNUSED_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205])
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
 // An error about the whole run, such as a tsconfig that does not exist.
 const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
@@ -461,8 +463,8 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
   await writeIfChanged(contentFile, props.code)
 
-  const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-  const [output, errors, code, messages, boot] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkMessages(root, options.i18n), bootProblems(resolve(root), options)])
+  const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '--noUnusedLocals', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const [output, errors, code, messages, boot, reportsUnused] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkMessages(root, options.i18n), bootProblems(resolve(root), options), projectReportsUnused(root, tsconfig)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
@@ -474,6 +476,9 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })
 
   for (const diagnostic of reported) {
+    if (diagnostic.code !== undefined && UNUSED_CODES.has(Number(diagnostic.code.slice(2))) && (files.has(diagnostic.file) ? generatedOnly(diagnostic, files) : !reportsUnused))
+      continue
+
     const remapped = remap(diagnostic, files)
     const setting = remapped.file === settingsFile ? settings.get(remapped.line) : undefined
     const exported = remapped.file === exportsFile ? exports.get(remapped.line) : undefined
@@ -587,6 +592,26 @@ function parseTscOutput(output: string, config: string, root: string): CheckDiag
   }
 
   return diagnostics
+}
+
+// Whether the project's own tsconfig asks for unused code to be reported, in its .ts files too.
+async function projectReportsUnused(root: string, tsconfig: string): Promise<boolean> {
+  const child = Bun.spawn([process.execPath, TSGO, '--showConfig', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'ignore' })
+  const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+
+  if (code !== 0)
+    return false
+
+  const { compilerOptions } = JSON.parse(output) as { compilerOptions?: { noUnusedLocals?: boolean, noUnusedParameters?: boolean } }
+
+  return compilerOptions?.noUnusedLocals === true || compilerOptions?.noUnusedParameters === true
+}
+
+// A name kay generated, which the template reads in a way it does not spell out, rather than one the .kay file wrote.
+function generatedOnly(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): boolean {
+  const shadow = files.get(diagnostic.file)!
+
+  return !shadow.map.isExact(offsetAt(shadow.tsx, diagnostic))
 }
 
 function remap(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): CheckDiagnostic {
