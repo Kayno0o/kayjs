@@ -186,6 +186,13 @@ export interface ShadowTypes {
   settings: Map<number, { file: string, library: string }>
 }
 
+// A file of the project itself: under its root and outside every `node_modules`.
+function ownFile(root: string, file: string): boolean {
+  const path = relative(resolve(root), file)
+
+  return !path.startsWith('..') && !path.split(sep).includes('node_modules')
+}
+
 // Each component a library exports, typed as the module its specifier names: rootDirs merges relative imports only, so a package's `.kay` files reach the app through these.
 function packageTypes(root: string, libraries: KayLibrary[]): string {
   const shadowDir = join(root, SHADOW_DIR)
@@ -394,8 +401,8 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
   const broken = new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file))
-  // A library type-checks its own modules, as `skipLibCheck` assumes of a declaration file, such as one importing an optional peer the app has not installed: only its components compile as the app's.
-  const libraryModule = (file: string) => !KAY_FILE.test(file) && libraryOf(libraries, file) !== undefined
+  // A library's own modules are its to check, as `skipLibCheck` leaves a declaration file's, a missing optional peer included: only its components compile as the app's. An app inside a linked library's repository keeps its own files.
+  const libraryModule = (file: string) => !KAY_FILE.test(file) && libraryOf(libraries, file) !== undefined && !ownFile(root, file)
 
   if (errors.trim() !== '')
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })

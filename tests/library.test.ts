@@ -195,12 +195,28 @@ describe('kay libraries', () => {
     expect(code).toBe(0)
   })
 
-  it('leaves errors inside a library\'s own modules to it, a missing optional peer included, and reports the app\'s calls into them', async () => {
-    const project = await newProject()
+  // A library linked from its own repository may hold the app checking it, as a playground does: the app's files stay its own.
+  it.each(['installed', 'linked', 'linked around the app'] as const)('leaves errors inside a library\'s own modules to it, a missing optional peer included, and reports the app\'s calls into them, the library %s', async (layout) => {
+    const library = layout === 'installed' ? undefined : await mkdtemp(join(import.meta.dir, '.dom-'))
+    const project = layout === 'linked around the app' ? join(library!, 'playground') : await newProject()
 
-    await write(join(project, 'node_modules/kay-lib'), {
+    if (library) {
+      projects.push(library)
+      await write(library, LIBRARY)
+    }
+
+    if (layout === 'linked around the app')
+      await write(project, PROJECT)
+
+    if (library) {
+      await rm(join(project, 'node_modules/kay-lib'), { recursive: true, force: true })
+      await Bun.write(join(project, 'node_modules/.keep'), '')
+      await symlink(library, join(project, 'node_modules/kay-lib'))
+    }
+
+    await write(library ?? join(project, 'node_modules/kay-lib'), {
       // An optional peer the app has not installed, imported by a component it uses and by one it never imports.
-      'src/media.ts': 'export async function player(): Promise<unknown> {\n  const { default: Player } = await import(\'optional-player\')\n\n  return Player\n}\n\nexport function scale(value: number): number {\n  return value * 2\n}\n',
+      'src/media.ts': 'export async function player(): Promise<unknown> {\n  try {\n    const { default: Player } = await import(\'optional-player\')\n\n    return Player\n  }\n  catch {\n    return undefined\n  }\n}\n\nexport function scale(value: number): number {\n  return value * 2\n}\n',
       'src/axis.ts': 'import { Axis } from \'optional-chart\'\n\nexport const axis = new Axis()\n',
       'src/video.kay': '---\nimport { onMount } from \'kay\'\nimport { player } from \'./media\'\n\nonMount(() => void player())\n---\nvideo\n',
       'src/chart.kay': '---\nimport { axis } from \'./axis\'\n---\np {String(axis)}\n',
