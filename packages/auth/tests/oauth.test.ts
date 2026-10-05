@@ -16,6 +16,14 @@ describe('safeRedirect', () => {
     expect(safeRedirect(null)).toBe('/')
     expect(safeRedirect(undefined, '/home')).toBe('/home')
   })
+
+  test('rejects a path that normalises to another host, and answers the others normalised', () => {
+    for (const path of ['/.//evil.com', '/./\\evil.com', '/%2e//evil.com', '/a/../..//evil.com', '/%2F%2Fevil.com', '/%2fevil.com', '/./%5Cevil.com'])
+      expect([path, safeRedirect(path)]).toEqual([path, '/'])
+
+    expect(safeRedirect('/a/./b/../c?next=//x#top')).toBe('/a/c?next=//x#top')
+    expect(safeRedirect('/a/%2F')).toBe('/a/%2F')
+  })
 })
 
 describe('pkce', () => {
