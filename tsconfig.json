@@ -17,6 +17,6 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "bench/*.ts", "bench/shared", "bench/apps/kay/*.ts"],
+  "include": ["src", "tests", "bench/*.ts", "bench/shared", "bench/sites", "bench/apps/kay/*.ts"],
   "exclude": ["tests/fixtures"]
 }
