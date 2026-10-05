@@ -533,9 +533,6 @@
     @apply flex flex-col gap-2;
   }
 
-  .icon-picker-pending {
-    @apply border border-surface2 bg-mantle py-4 text-center text-xs text-subtext0;
-  }
 
   /* chartist draws the plot; only the rules a line chart needs from its own stylesheet are here, so the app imports none. */
   /* Tailwind emits a theme variable only where something reads it, and a series colour is read from script, so the palette is named here for the app's `--color-chart-*` to survive its build. */

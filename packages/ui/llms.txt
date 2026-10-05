@@ -12,7 +12,7 @@
 - Dialog and FormDialog follow `open`. The parent sets it, then sets it back to false in `onClose`, which runs however the dialog closed. Their content renders only while they are open. A Popover the page opens through `open` is set back the same way, in `onToggle`.
 - FormDialog calls the action with the form's `FormData`. The server reads it as a plain form post, so give each control the `name` of its field in the action's schema: numbers, booleans and lists are coerced from their text, and files and the honeypot come along.
 - Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library holds English words for its own controls only:
-  - Fixed: `Cancel`, `Delete`, `Deleting…`, `Saving…`, `Confirm Deletion`, and MultiSelect's `All`, `None`, `Search`, `No match` and "N selected".
+  - Fixed: `Cancel`, `Delete`, `Deleting…`, `Saving…`, `Confirm Deletion`, MultiSelect's `All`, `None`, `Search`, `No match` and "N selected", and IconPicker's `Search icons…`, `Searching…`, `No icons found.`, `Show more` and `Clear icon selection`.
   - Replaced through the prop of that name: `loadingLabel` (`Loading…`), `closeLabel` (`Close`), `backLabel` (`Back`), `resizeLabel` (`Resize list`), `empty` (`No data yet.`), `copiedLabel` (`Copied!`), CopyButton's `failure` (`Could not copy to the clipboard`), MarkdownEditor's `uploadFailure` (`Could not upload the image`), `placeholder` (MultiSelect's `Any`, CommandPalette's `Search`, MarkdownEditor's `Write markdown…`), and CommandPalette's `label` (`Search`) and `emptyLabel` (`No results`).
 
 ## Setup
@@ -240,7 +240,7 @@ PageSection(title="Moons")
 - `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for two seconds. A copy the browser refuses toasts `failure`.
 - BarList, SiteFavicon and CopyButton are islands taking data alone, so a static page passes them their props as it would to any element.
 
-### RangeInput, MultiSelect, FileDrop, Menu
+### RangeInput, MultiSelect, FileDrop, Menu, IconPicker
 
 - `RangeInput(label="Hours" min={0} max={24} unit="h" value={[2, null]} onChange={hours.set})`: two number boxes for a range, each bound open when empty (`null`). `onChange([from, to])` runs once a box is committed, on blur or Enter, and only when the range changed; a reversed pair is put back in order in the boxes too. `rangeFrom(low, high)` reads two strings the same way, for a server reading the posted boxes.
 - `MultiSelect(label="Planets" options={planets} value={['mars']} name="planet" onChange={picked.set})`:
@@ -254,7 +254,13 @@ PageSection(title="Moons")
   - An IconButton opening a `role="menu"` popover; `'separator'` draws a rule between groups.
   - Opening focuses the first enabled entry; the arrows, Home and End move between enabled entries, and Tab closes it.
   - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.
-- MultiSelect and Menu draw their popover's id as Popover does, or take an `id`. RangeInput and MultiSelect take data alone, so a static page can hold them; FileDrop and Menu take functions, so they render inside an island.
+- `IconPicker(search={findIcons} value={post.icon} name="icon" onChange={icon.set})`:
+  - A search box over a grid of the icons `search(query, limit)` returns as `IconChoice`s, `{ name, icon }` with `icon` the IconProps to draw: typically an action, since a whole icon set is too large to ship, as `search={(query, limit) => findIcons({ query, limit })}`. The app's action builds each from its iconify set, as `{ viewBox: \`0 0 ${set.width} ${set.height}\`, width: '1em', height: '1em', 'aria-hidden': 'true', innerHTML: set.icons[name].body }` for a square set such as Tabler.
+  - The search runs 200ms after the typing pauses, from 50 icons; `Show more` asks for 50 more once a page comes back full. The last grid stays while a search is in flight, and a search a later one overtook is dropped.
+  - Picking the chosen icon again, or the selection's clear button, clears it: `onChange` gets the name, or an empty string. The tooltip and label read the name without its `prefix:`.
+  - `name` submits the chosen name as a hidden field, which fires a bubbling `input` event on each pick. Enter in the search box never submits the form.
+  - The selection draws the chosen icon once a search found it; a `value` no search returned yet shows its name alone.
+- MultiSelect and Menu draw their popover's id as Popover does, or take an `id`. RangeInput and MultiSelect take data alone, so a static page can hold them; FileDrop, Menu and IconPicker take functions, so they render inside an island.
 
 ### CommandPalette
 
