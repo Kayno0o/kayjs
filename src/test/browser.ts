@@ -150,7 +150,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       }
 
       if (Date.now() > until)
-        throw new Error(`kay: timed out after ${wait}ms waiting for ${wanted}${failure === undefined ? '' : `, last throwing ${failure instanceof Error ? failure.message : String(failure)}`}`, { cause: failure })
+        throw new Error(`kay: timed out after ${wait}ms waiting for ${wanted}${failure === undefined ? '' : `, last throwing ${failure instanceof Error ? failure.message : String(failure)}`}`, failure === undefined ? undefined : { cause: failure })
 
       await Bun.sleep(POLL_MS)
     }

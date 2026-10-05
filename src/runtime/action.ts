@@ -63,12 +63,12 @@ export type Success<Output> = Exclude<Output, Failure<unknown>>
 export type FailureData<Output> = Output extends Failure<infer Data> ? Data : never
 
 // What a page reads back through `ctx.failed(action)` after a plain form post failed.
-export interface FormFailure<Input, Data> {
+export interface FormFailure<Input, Data, Honeypot extends string = never> {
   status: number
   // What the form posted, so its fields can show it again; fields named like a password or a secret are left out.
   values: Partial<Record<Extract<keyof Input, string>, string>>
-  // A message per field the schema refused, and under '' one for the whole form, as a rate limit's refusal.
-  errors: Partial<Record<Extract<keyof Input, string> | '', string>>
+  // A message per field the schema refused or the honeypot caught, and under '' one for the whole form, as a rate limit's refusal.
+  errors: Partial<Record<Extract<keyof Input, string> | Honeypot | '', string>>
   // What the handler passed to `ctx.fail`; undefined when the schema refused the input.
   data?: Data
 }
@@ -76,7 +76,7 @@ export interface FormFailure<Input, Data> {
 // Read off the phantom directly: `infer Output` through `Action` drops the `undefined` of a handler ending without a return.
 type ResultOf<Target> = Target extends { readonly [RESULT]?: infer Output } ? Output : never
 
-export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailureData<ResultOf<Target>>> : never
+export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailureData<ResultOf<Target>>, Extract<HoneypotOf<Target>, string>> : never
 
 // What a page reads back through `ctx.succeeded(action)` after a plain form post succeeded.
 export interface FormSuccess<Output> {

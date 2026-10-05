@@ -120,6 +120,16 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
   it('names why a condition that keeps throwing never held, as one calling a helper of the test does', async () => {
     await expect(page.waitUntil(() => elsewhere(), { timeout: 100 })).rejects.toThrow(/waiting for the condition to hold, last throwing .*elsewhere is not defined/)
     await expect(page.waitUntil(() => false, { timeout: 100 })).rejects.toThrow(/to hold$/)
+    // Thrown once, as by a page swap in flight, then only false: the error is over.
+    await expect(page.waitUntil(() => {
+      const counted = window as unknown as { polls?: number }
+
+      counted.polls = (counted.polls ?? 0) + 1
+      if (counted.polls === 1)
+        throw new Error('Swapping')
+
+      return false
+    }, { timeout: 200 })).rejects.toThrow(/to hold$/)
   })
 
   it('says why it opens no page, without a browser build or a browser', async () => {

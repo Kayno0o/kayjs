@@ -183,6 +183,8 @@ describe('base on a server', () => {
 
     expect(manifest.start_url).toBe('/repo/')
     expect(manifest.icons[0]!.src).toBe('/repo/icon-192.png')
+    // No seo.description, no description.
+    expect(manifest).not.toHaveProperty('description')
     await expect(pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, base: 'repo' })).rejects.toThrow('base is repo, which is no path such as /docs')
   })
 })

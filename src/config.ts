@@ -23,7 +23,7 @@ export interface KayConfig {
   images?: ImagesConfig
   // A square image, 512 pixels wide or more, relative to the root: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page.
   favicon?: string
-  // The web manifest served with the favicon, named after `seo.name`.
+  // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
   manifest?: ManifestConfig
   // Self-hosted fonts, declared and preloaded on every page.
   fonts?: FontConfig[]

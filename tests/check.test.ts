@@ -183,7 +183,7 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('types what ctx.failed and ctx.succeeded read back from an action that ends without returning, as after ctx.redirect, and the form-wide error', async () => {
+  it('types what ctx.failed and ctx.succeeded read back from an action that ends without returning, as after ctx.redirect, and the form-wide and honeypot errors', async () => {
     const page = [
       '--- server',
       'import { t } from \'elysia\'',
@@ -193,7 +193,7 @@ describe('kay check, edge cases', () => {
       '  if (code === \'x\')',
       '    return ctx.fail(400, { error: \'bad\' })',
       '  ctx.redirect(\'/\')',
-      '})',
+      '}, { honeypot: \'website\' })',
       'export const save = action(t.Object({ code: t.String() }), async ({ code }, ctx) => {',
       '  if (code === \'x\')',
       '    return ctx.fail(400, { error: \'bad\' })',
@@ -205,9 +205,10 @@ describe('kay check, edge cases', () => {
       'const saved: 1 | undefined = ctx.succeeded(save)?.data',
       'const wrong: number | undefined = ctx.failed(save)?.data',
       'const formWide: string | undefined = failure?.errors[\'\']',
+      'const caught: string | undefined = failure?.errors.website',
       '---',
       'if failure?.data as data',
-      '  p {data.error} {failure?.values.code} {saved} {formWide}',
+      '  p {data.error} {failure?.values.code} {saved} {formWide} {caught}',
       'p {wrong}',
       '',
     ].join('\n')
