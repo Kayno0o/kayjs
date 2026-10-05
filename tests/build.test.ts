@@ -28,6 +28,37 @@ async function scratchProject(files: Record<string, string>): Promise<string> {
 }
 
 describe('kay build', () => {
+  it('refuses a client build whose chunk reads a server-only global, naming the module it came from', async () => {
+    const root = await scratchProject({
+      // What every app has: one module holding the settings, read from the environment as it loads.
+      'src/settings.ts': 'export const siteName = process.env.SITE_NAME || \'site\'\n',
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { siteName } from \'./settings\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {siteName} {n()}\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+    })
+
+    try {
+      expect(async () => buildClient(root)).toThrow(/`process`.*src\/settings\.ts/s)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('builds an island reading a server-only global behind a `typeof`, as a module written for both sides does', async () => {
+    const root = await scratchProject({
+      'src/settings.ts': 'export const dev = typeof process !== \'undefined\' && process.env.MODE === \'dev\'\n',
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { dev } from \'./settings\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {dev ? \'dev\' : \'\'} {n()}\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+    })
+
+    try {
+      expect((await buildClient(root)).islands).toBeDefined()
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('lets Tailwind see the classes written in the .class shorthand', async () => {
     const project = join(import.meta.dir, 'fixtures/tailwind')
 

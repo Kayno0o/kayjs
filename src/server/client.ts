@@ -9,6 +9,7 @@ import { ASSET_PREFIX, clientDir } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { findKayLibraries, reachableLibraryFiles, sourceWords } from '../build/libraries'
 import { kay } from '../build/plugin'
+import { refuseServerOnlyReads } from '../build/server-only'
 import { forgetBundleMaps } from '../build/sourcemap'
 import { styleImports, withoutStyles } from '../build/styles'
 import { analyzeKayCached, KayCompileError } from '../build/transform'
@@ -218,6 +219,8 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 
   if (!build.success)
     throw new AggregateError(build.logs, 'kay: client build failed')
+
+  await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs as Outputs)
 
   return { ...islandManifest(root, build.metafile!.outputs as Outputs, islands, entryFile, options.hot === true), navigation }
 }
