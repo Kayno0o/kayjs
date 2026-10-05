@@ -1,6 +1,11 @@
-import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import process from 'node:process'
+import { Database } from 'bun:sqlite'
+import { afterAll, afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { cached, invalidate } from '../src/runtime/cache'
+import { cached, invalidate, sqliteCache } from '../src/runtime/cache'
 import { pages } from '../src/server'
 import { feed } from './fixtures/production/src/news'
 
@@ -100,5 +105,68 @@ describe('cached', () => {
     expect(await visit()).toContain('<p class="feed">one</p>')
     invalidate('feed')
     expect(await visit()).toContain('<p class="feed">two</p>')
+  })
+})
+
+describe('cached with a store', () => {
+  const dirs: string[] = []
+
+  afterAll(async () => {
+    await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
+  })
+
+  async function storePath(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cache-'))
+
+    dirs.push(dir)
+
+    return join(dir, 'cache.sqlite')
+  }
+
+  // A process of its own, as a restart or a second server would be: what `cached` gives it, after its background refresh had time to land.
+  async function inProcess(path: string, edition: number): Promise<{ edition: number, date: boolean }> {
+    const script = `import { cached, sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.ts'))}\nconst value = await cached('reviews', 60, () => ({ edition: ${edition}, at: new Date(0) }), { store: sqliteCache(${JSON.stringify(path)}) })\nawait Bun.sleep(20)\nconsole.log(JSON.stringify({ edition: value.edition, date: value.at instanceof Date }))\n`
+    const child = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'inherit' })
+    const [output] = await Promise.all([new Response(child.stdout).text(), child.exited])
+
+    return JSON.parse(output) as { edition: number, date: boolean }
+  }
+
+  it('keeps a value across processes, as devalue does a date, and refreshes it past its ttl as in memory', async () => {
+    const path = await storePath()
+
+    expect(await inProcess(path, 1)).toEqual({ edition: 1, date: true })
+    expect(await inProcess(path, 2)).toEqual({ edition: 1, date: true })
+
+    const db = new Database(path)
+
+    db.run('UPDATE kay_cache SET fresh_until = 0')
+    db.close()
+    // Stale: given as it is, refreshed in the background for the next process.
+    expect(await inProcess(path, 3)).toEqual({ edition: 1, date: true })
+    expect(await inProcess(path, 4)).toEqual({ edition: 3, date: true })
+  })
+
+  it('drops a key from the store too, and forgets a row it cannot read', async () => {
+    const store = sqliteCache(await storePath())
+    let value = 'old'
+    const load = () => value
+
+    expect(await cached('post:1', 60, load, { store })).toBe('old')
+    value = 'new'
+    invalidate(key => key.startsWith('post:'))
+    expect(store.keys()).toEqual([])
+    expect(await cached('post:1', 60, load, { store })).toBe('new')
+
+    store.set('broken', 'not devalue', Date.now() + 60_000)
+    expect(await cached('broken', 60, () => 'loaded', { store })).toBe('loaded')
+  })
+
+  it('refuses a value the store cannot hold, keeping nothing', async () => {
+    const store = sqliteCache(await storePath())
+
+    await expect(cached('handler', 60, () => ({ run: () => 1 }), { store })).rejects.toThrow('kay: cached(\'handler\') cannot keep its value in a store')
+    expect(store.keys()).toEqual([])
+    expect(await cached('handler', 60, () => 'plain', { store })).toBe('plain')
   })
 })
