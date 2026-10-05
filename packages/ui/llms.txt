@@ -277,7 +277,7 @@ PageSection(title="Moons")
     import tabler from '@iconify-json/tabler/icons.json'
     import { iconNames, iconProps } from 'kay/icons'
 
-    export const findIcons = action(t.Object({ query: t.String(), limit: t.Number() }), async ({ query, limit }) =>
+    export const findIcons = action(t.Object({ query: t.String({ maxLength: 200 }), limit: t.Number() }), async ({ query, limit }) =>
       iconNames(tabler).filter(name => name.includes(query)).slice(0, limit).map(name => ({ name: `tabler:${name}`, icon: iconProps(tabler, name)! })))
     ```
 
@@ -380,7 +380,7 @@ FormField frames a control with its label, hint and messages. FormDialog calls a
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const rename = action(t.Object({ id: t.String(), title: t.String({ minLength: 2, error: 'Two letters at least' }) }), async ({ id, title }) => posts.rename(id, title))
+export const rename = action(t.Object({ id: t.String({ maxLength: 64 }), title: t.String({ minLength: 2, maxLength: 200, error: 'Two letters at least' }) }), async ({ id, title }) => posts.rename(id, title))
 ---
 ```
 
