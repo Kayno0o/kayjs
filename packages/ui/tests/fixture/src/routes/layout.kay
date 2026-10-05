@@ -3,6 +3,7 @@ import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 import Widget from '@kaynooo/kayjs-ui/widget.kay'
 ---
 main
@@ -38,3 +39,5 @@ main
       @actions
         a(href="/form") Edit
       | Mars
+  article#site-nav
+    SiteNav(id="main-links" links={[{ href: '/', label: 'Home' }, { href: '/chart', label: 'Chart' }, { href: '/charts', label: 'Charts' }, { href: '/charts/moons', label: 'Moons' }, { href: '/data', label: 'Data' }]} current="/charts/moons" label="Main" menuLabel="Ouvrir le menu")

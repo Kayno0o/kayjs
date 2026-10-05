@@ -1,0 +1,10 @@
+---
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import { signal } from 'kay'
+
+// `#next` puts another page on screen, as a navigation keeping the island would.
+const current = signal('/')
+const links = [{ href: '/', label: 'Home' }, { href: '/data', label: 'Data' }, { href: '#later', label: 'Later' }]
+---
+SiteNav#nav(links={links} current={current()} label="Main")
+button#next(type="button" onClick={() => current.set('/data')}) Next

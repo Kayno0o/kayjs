@@ -57,7 +57,7 @@ TooltipHost
 
 ## Settings
 
-The icons the components draw come from slots, each named for what it means: `alert`, `back`, `chevron`, `close`, `delete`, `globe`, `info`, `play`, `plus`, `search`, `spinner`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
+The icons the components draw come from slots, each named for what it means: `alert`, `back`, `chevron`, `close`, `delete`, `globe`, `info`, `menu`, `play`, `plus`, `search`, `spinner`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
 
 ```ts
 // kay.config.ts
@@ -151,7 +151,7 @@ Table(columns={columns} rows={posts} rowKey="id")
 - With `sortValue: true`, dates sort by time, booleans as 0 and 1, and a missing value sorts last in either direction.
 - `rowKey` is a field of the row or a function of it, and tells rows apart across a sort.
 
-### Segmented, TabNav, Tabs, Toggle
+### Segmented, TabNav, SiteNav, Tabs, Toggle
 
 ```kay
 Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: 'Reviews' }]} value="details" label="Product")
@@ -164,6 +164,10 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
 
 - `Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} value="day" label="Period" name="period" onChange={period.set})`: real radios, so arrow keys move between options and the group posts as `name` inside a form. A parent passing another `value` moves the choice. Without `name`, the group draws one unique on the page, which keeps two groups apart.
 - `TabNav(links={[{ href: '/settings', label: 'Profile' }, { href: '/settings/keys', label: 'Keys' }]} current={ctx.url.pathname} label="Settings")`: tabs as links, one page each. The current tab is marked `aria-current="page"`, and a bar too narrow for every tab scrolls to centre it, without moving the page.
+- `SiteNav(links={[{ href: '/', label: 'Home' }, { href: '/rooms', label: 'Rooms' }]} current={ctx.url.pathname} label="Main" menuLabel="Menu")`: a site's main links, in a row from the `lg` breakpoint and folded behind a menu toggle below it.
+  - The page on screen is marked `aria-current="page"`, and a link to a section holding it `aria-current="true"`, as `/rooms` for `/rooms/blue`; `/` only marks itself.
+  - The menu closes as a link is followed, on Escape, which hands the focus back to the toggle, and once `current` changes, as for a `persist` island kept from page to page.
+  - It takes data alone, so a static layout holds it, with the logo and any call to action beside it in the app's own header.
 - `Tabs`: panels that switch in place, without navigating, for settings or a product's details; use TabNav when each tab is a page of its own.
   - A `tablist` of buttons, each paired with its `tabpanel` through ids drawn with `uid()`. `@panel(tab)` draws each tab's panel once, hidden while another tab shows, so what a panel holds survives a switch.
   - A click, or the arrows (wrapping), Home and End, show a tab and focus it; only the shown tab is in the page's tab order. `onChange(value)` runs on each switch, and a parent passing another `value` shows that tab.

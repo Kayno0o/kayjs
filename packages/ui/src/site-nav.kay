@@ -1,0 +1,50 @@
+---
+import type { JSX } from 'kay'
+import { effect, signal, uid } from 'kay'
+import IconButton from './icon-button.kay'
+
+const { id, links, current, label, menuLabel = 'Menu', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'id' | 'class' | 'children'> & {
+  // The list's id, unique on the page; one is drawn when none is given.
+  id?: string
+  links: readonly { href: string, label: string }[]
+  // The path of the page on screen: its link is marked as the page, and a link to a section holding it as current.
+  current: string
+  // Names the navigation for screen readers.
+  label: string
+  // Names the button opening the links on a narrow screen.
+  menuLabel?: string
+  class?: string
+}>()
+
+const listId = id ?? uid()
+const open = signal(false)
+let toggle: HTMLElement | undefined
+
+// A page the parent says is now on screen, as for an island kept from page to page, closes the menu.
+effect(() => {
+  void current
+  open.set(false)
+})
+
+// The home page holds every path, so only an exact match marks it.
+function marked(href: string) {
+  if (href === current)
+    return 'page'
+
+  return href !== '/' && current.startsWith(href.endsWith('/') ? href : `${href}/`) ? 'true' : undefined
+}
+
+function escape(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !open())
+    return
+
+  open.set(false)
+  toggle?.focus()
+}
+---
+nav.site-nav({...rest} aria-label={label} data-open={open() || undefined} class={className} onKeyDown={escape})
+  IconButton(icon={open() ? 'close' : 'menu'} label={menuLabel} variant="ghost" class="site-nav-toggle" aria-expanded={String(open())} aria-controls={listId} ref={element => toggle = element} onClick={() => open.set(!open())})
+  ul.site-nav-list(id={listId})
+    for link of links key={link.href}
+      li
+        a.site-nav-link(href={link.href} aria-current={marked(link.href)} onClick={() => open.set(false)}) {link.label}

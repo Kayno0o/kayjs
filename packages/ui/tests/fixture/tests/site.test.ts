@@ -151,6 +151,13 @@ describe('FormField', () => {
 describe('layout', () => {
   const page = async (id: string) => (await element('/layout', id)).replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<svg[^>]*>.*?<\/svg>/g, '<svg/>')
 
+  test('SiteNav marks the page on screen and the section holding it, its links folded behind a closed toggle', async () => {
+    const nav = (await page('site-nav')).replaceAll(/<\/?slot[^>]*>/g, '')
+
+    expect(nav).toContain('<nav aria-label="Main" class="site-nav"><button aria-expanded="false" aria-controls="main-links" type="button" aria-label="Ouvrir le menu"')
+    expect([...nav.matchAll(/<a class="site-nav-link" href="([^"]*)"(?: aria-current="(\w+)")?>/g)].map(([, href, current]) => `${href}${current ? ` ${current}` : ''}`)).toEqual(['/', '/chart', '/charts true', '/charts/moons page', '/data'])
+  })
+
   test('PageSection titles its stretch and holds an actions block at the end of the head line', async () => {
     expect(await page('section')).toBe('<article id="section"><section class="page-section"><div class="page-section-head"><h2 class="heading-section page-section-title">Moons</h2><a href="/table">New</a></div><p>Phobos</p></section></article>')
   })

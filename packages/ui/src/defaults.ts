@@ -5,6 +5,7 @@ import chevron from '~icons/tabler/chevron-down'
 import success from '~icons/tabler/circle-check'
 import info from '~icons/tabler/info-circle'
 import spinner from '~icons/tabler/loader-2'
+import menu from '~icons/tabler/menu-2'
 import play from '~icons/tabler/player-play'
 import plus from '~icons/tabler/plus'
 import search from '~icons/tabler/search'
@@ -16,7 +17,7 @@ import zoomOut from '~icons/tabler/zoom-out'
 import zoomFit from '~icons/tabler/zoom-reset'
 
 // The icons the library's own components ask for, by what they mean rather than by a name in some set.
-export type IconSlot = 'alert' | 'back' | 'chevron' | 'close' | 'delete' | 'globe' | 'info' | 'play' | 'plus' | 'search' | 'spinner' | 'success' | 'zoomFit' | 'zoomIn' | 'zoomOut'
+export type IconSlot = 'alert' | 'back' | 'chevron' | 'close' | 'delete' | 'globe' | 'info' | 'menu' | 'play' | 'plus' | 'search' | 'spinner' | 'success' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 // What an app may replace through `settings` in its kay.config.ts, spreading these defaults to change a few.
 export interface Settings {
@@ -25,7 +26,7 @@ export interface Settings {
 }
 
 const defaults: Settings = {
-  icons: { alert, back, chevron, close, delete: remove, globe, info, play, plus, search, spinner, success, zoomFit, zoomIn, zoomOut },
+  icons: { alert, back, chevron, close, delete: remove, globe, info, menu, play, plus, search, spinner, success, zoomFit, zoomIn, zoomOut },
 }
 
 export default defaults

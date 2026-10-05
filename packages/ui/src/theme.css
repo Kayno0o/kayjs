@@ -1205,6 +1205,31 @@
     @apply text-subtext0;
   }
 
+  /* Below lg the links fold behind the toggle, opening as a panel under it; from lg they sit in a row and the toggle hides. */
+  .site-nav {
+    @apply relative;
+  }
+
+  .site-nav-toggle {
+    @apply lg:hidden;
+  }
+
+  .site-nav-list {
+    @apply hidden items-center gap-1 lg:flex;
+  }
+
+  :where(.site-nav[data-open]) .site-nav-list {
+    @apply absolute top-full right-0 z-30 mt-2 flex min-w-56 flex-col items-stretch border border-surface2 bg-mantle p-2 lg:static lg:mt-0 lg:min-w-0 lg:flex-row lg:items-center lg:border-0 lg:bg-transparent lg:p-0;
+  }
+
+  .site-nav-link {
+    @apply block px-3 py-2 text-sm text-subtext0 transition-colors hover:text-text;
+
+    &:where([aria-current]) {
+      @apply text-accent;
+    }
+  }
+
   .tab-nav {
     @apply flex gap-1 overflow-x-auto border-b border-surface2 pb-px;
   }
