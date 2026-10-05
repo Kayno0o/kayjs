@@ -170,12 +170,12 @@ export class Auth {
     return signInWithPassword(this[STATE], input)
   }
 
-  // Mails the signed-in user a new link verifying their address.
+  // Mails a new link verifying the address to the signed-in user or, with nobody signed in, to the account this browser registered or proved the password of with an 'unverified' answer.
   async sendVerification(): Promise<MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }> {
     return sendVerification(this[STATE])
   }
 
-  // Spends a verification link's token in the browser signed in as the account or that registered it, or given the account's password: `{ ok: false, error: 'confirm' }` asks for one of them, the link still usable.
+  // Spends a verification link's token in the browser signed in as the account, that registered it or that proved its password, or given the account's password: `{ ok: false, error: 'confirm' }` asks for one of them, the link still usable.
   async verifyEmail(token: string, password?: string): Promise<VerifyEmailResult> {
     return verifyEmail(this[STATE], token, password)
   }

@@ -128,8 +128,12 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
 
   await store.attempts.reset(accountKey)
 
-  if (state.core.email?.requireVerified && record!.emailVerifiedAt === null)
+  if (state.core.email?.requireVerified && record!.emailVerifiedAt === null) {
+    // The password is proven: this browser may have the verification link resent, and confirm it, as the one that registered.
+    await state.session.set('authRegistered', record!.id)
+
     return { ok: false, error: 'unverified' }
+  }
 
   // Hashed with weaker settings, or by bcrypt in an older app: rehashed while the password is at hand.
   if (passwordNeedsRehash(record!.passwordHash!))

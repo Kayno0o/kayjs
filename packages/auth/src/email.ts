@@ -45,9 +45,10 @@ export type ResetPasswordResult = LinkResult | { ok: false, errors: { password: 
 
 export type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
 
-// Mails the signed-in user a link verifying their address.
+// Mails a new verification link to the signed-in user or, with nobody signed in, to the account this browser registered or proved the password of.
 export async function sendVerification(state: RequestState): Promise<MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }> {
-  const record = await state.current()
+  const registered = await state.session.get('authRegistered')
+  const record = await state.current() ?? (registered === undefined ? undefined : await state.core.store.users.get(registered))
 
   if (!record?.email)
     return { ok: false, error: 'signed-out' }

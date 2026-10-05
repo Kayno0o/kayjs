@@ -165,6 +165,23 @@ describe('verifying an email', () => {
     expect(await ada.call('verifyEmail', tokenOf('verify-email'))).toMatchObject({ ok: true })
     expect(await ada.call('sendVerification')).toEqual({ ok: false, error: 'verified' })
   })
+
+  test('with `requireVerified`, a browser that proved the password is told the address is unverified, and may have the link resent and confirm it', async () => {
+    const { browser, mails, tokenOf } = setup({ requireVerified: true })
+
+    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    const elsewhere = browser()
+    const guesser = browser()
+
+    expect(await guesser.post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })).toEqual({ ok: false, error: 'invalid' })
+    expect(await guesser.call('sendVerification')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await elsewhere.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'unverified' })
+    expect(await elsewhere.call('sendVerification')).toEqual({ ok: true })
+    expect(mails.filter(mail => mail.kind === 'verify-email')).toHaveLength(2)
+    expect(await elsewhere.call('verifyEmail', tokenOf('verify-email'))).toMatchObject({ ok: true })
+    expect(await elsewhere.json('/me')).toBe('anonymous')
+    expect(await elsewhere.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
+  })
 })
 
 describe('resetting a password', () => {

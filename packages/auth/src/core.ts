@@ -16,7 +16,7 @@ export interface AuthSessionData {
   auth?: SignedIn
   authOAuth?: OAuthFlow
   authChallenge?: Challenge
-  // The account this browser registered, whose address it may verify without signing in.
+  // The account this browser registered, or proved the password of while its address was unverified: it may have the link resent and verify it without signing in.
   authRegistered?: string
 }
 
