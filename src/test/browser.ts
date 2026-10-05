@@ -71,7 +71,7 @@ export function browserPath(path?: string): string | undefined {
   const given = path ?? process.env.BUN_CHROME_PATH
 
   if (given)
-    return existsSync(given) ? given : undefined
+    return existsSync(given) ? given : Bun.which(given) ?? undefined
 
   for (const name of EXECUTABLES) {
     const found = Bun.which(name)
@@ -95,8 +95,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
   const timeout = options.timeout ?? TIMEOUT_MS
   const errors: string[] = []
-  // Chrome refuses to run its sandbox as root, as in a CI container.
-  const argv = process.getuid?.() === 0 ? ['--no-sandbox'] : []
+  // Chrome refuses to run its sandbox as root, as in a CI container, whose small /dev/shm crashes its renderer.
+  const argv = process.getuid?.() === 0 ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
   const view = new Bun.WebView({
     width: options.width,
     height: options.height,
@@ -126,15 +126,13 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }
   }
 
-  const script = (run: (...args: never[]) => unknown, args: unknown[]) => `(${run.toString()})(...${JSON.stringify(args)})`
-
   // Polls the page, reading an error as not yet: the page may be between two documents.
   const poll = async (expression: string, wanted: string, wait = timeout) => {
     const until = Date.now() + wait
 
     for (;;) {
       try {
-        if (await view.evaluate(expression))
+        if (await within(view.evaluate(expression), until - Date.now()))
           return
       }
       catch {}
@@ -215,6 +213,24 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   await page.goto(url)
 
   return page
+}
+
+// A call of `run` in the page, an undefined argument kept as such rather than sent as JSON's null.
+function script(run: (...args: never[]) => unknown, args: unknown[]): string {
+  return `(${run.toString()})(${args.map(arg => arg === undefined ? 'undefined' : JSON.stringify(arg)).join(', ')})`
+}
+
+// Resolves as `promise` does, or with undefined after `ms`: an evaluation a page never answers does not outlast the wait.
+async function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  const { promise: timedOut, resolve } = Promise.withResolvers<undefined>()
+  const timer = setTimeout(resolve, Math.max(ms, 0), undefined)
+
+  try {
+    return await Promise.race([promise, timedOut])
+  }
+  finally {
+    clearTimeout(timer)
+  }
 }
 
 // A console argument as text: an object arrives as DevTools describes it, an error with its stack.

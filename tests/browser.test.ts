@@ -1,5 +1,6 @@
 import type { TestPage, TestSite } from '../src/test'
 import { existsSync } from 'node:fs'
+import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { browserPath, testSite } from '../src/test'
@@ -10,7 +11,8 @@ const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.
 let site: TestSite
 let page: TestPage
 
-describe.skipIf(!path)('kay/test in a browser', () => {
+// CI installs Chromium for these: there, a missing browser fails rather than skipping.
+describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
   beforeAll(async () => {
     // The fixture's islands break on purpose, which the server would log.
     site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, onError: () => undefined })
@@ -92,6 +94,17 @@ describe.skipIf(!path)('kay/test in a browser', () => {
 
     expect(await page.text('button.theme')).toBe('Theme light')
     expect(await page.text('button.note')).toBe('Note none')
+  })
+
+  it('waits for an element to show up or go away, and runs a function with its arguments, undefined ones included', async () => {
+    await page.goto('/')
+    await page.evaluate(() => void setTimeout(() => document.body.append(Object.assign(document.createElement('p'), { className: 'late' })), 200))
+    await page.waitFor('p.late')
+    await page.evaluate(() => void setTimeout(() => document.querySelector('p.late')!.remove(), 200))
+    await page.waitFor('p.late', { gone: true })
+
+    expect(await page.count('p.late')).toBe(0)
+    expect(await page.evaluate((first: string, second?: string) => [first, second === undefined], 'a', undefined)).toEqual(['a', true])
   })
 
   it('times out naming what it waited for', async () => {
