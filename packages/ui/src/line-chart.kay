@@ -1,0 +1,131 @@
+---
+import type { Axis, ChartRect, LineChartOptions } from 'chartist'
+import type { JSX } from 'kay'
+import type { ChartSeries } from './plot'
+import { LineChart } from 'chartist'
+import { effect, onCleanup, onMount, signal } from 'kay'
+import { chartData, indexAt, labelTimes, positionOf, xAxisOptions } from './chart-axis'
+
+const PALETTE = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)']
+
+// Which attribute of each drawn part takes its series' colour.
+const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
+
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), xLabels = false, legend, options, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+  labels: string[]
+  series: ChartSeries[]
+  // Formats the y-axis labels and the tooltip's values.
+  formatValue?: (value: number) => string
+  // Draws the x-axis labels: up to five, spaced by time when every label is a date.
+  xLabels?: boolean
+  // Names each series under the chart; shown by default once there is more than one.
+  legend?: boolean
+  // Merged over the defaults, for what the props do not cover.
+  options?: LineChartOptions
+  // Describes the chart for screen readers, which cannot read the drawing.
+  label: string
+  class?: string
+}>()
+
+const times = () => labelTimes(labels)
+const colors = () => series.map((item, index) => item.color ?? PALETTE[index % PALETTE.length]!)
+
+const settings = (): LineChartOptions => {
+  const padding = typeof options?.chartPadding === 'object' ? options.chartPadding : {}
+
+  return {
+    fullWidth: true,
+    showArea: true,
+    showPoint: false,
+    ...options,
+    chartPadding: { top: 8, right: xLabels ? 24 : 8, bottom: 0, left: 0, ...padding },
+    axisX: { ...xAxisOptions(labels, times(), xLabels), ...options?.axisX },
+    axisY: { showLabel: true, showGrid: true, labelInterpolationFnc: (value: string | number) => formatValue(Number(value)), ...options?.axisY },
+  }
+}
+
+// Where chartist last drew the plot, which the hover cursor and dots are placed against.
+const plot = signal<{ rect: ChartRect, axisY: Axis } | null>(null)
+const hovered = signal<{ index: number, clientX: number, clientY: number } | null>(null)
+let canvas: HTMLDivElement | undefined
+
+const cursor = () => {
+  const drawn = plot()
+  const at = hovered()
+
+  return drawn && at ? drawn.rect.x1 + positionOf(at.index, labels.length, times()) * drawn.rect.width() : null
+}
+
+// The dot of a series at the hovered point, placed on its line, or nothing where it has no reading.
+const dot = (index: number) => {
+  const drawn = plot()
+  const at = hovered()
+  const value = at ? series[index]!.values[at.index] : undefined
+
+  return drawn && typeof value === 'number' ? `left: ${cursor()}px; top: ${drawn.rect.y1 - drawn.axisY.projectValue(value)}px; background-color: ${colors()[index]}` : undefined
+}
+
+const reading = (index: number) => {
+  const at = hovered()
+  const value = at ? series[index]!.values[at.index] : undefined
+
+  return typeof value === 'number' ? formatValue(value) : '-'
+}
+
+// Drawn in the browser alone: chartist measures the box it draws into.
+onMount(() => {
+  const chart = new LineChart(canvas!, { series: [] }, {})
+
+  chart.on('created', (event) => {
+    plot.set({ rect: event.chartRect, axisY: event.axisY })
+  })
+  // Colours go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
+  chart.on('draw', (event) => {
+    const paint = PAINT[event.type]
+
+    if (paint && 'seriesIndex' in event)
+      event.element.attr({ style: `${paint}: ${colors()[event.seriesIndex]}` })
+  })
+
+  effect(() => {
+    chart.update(chartData(labels, series.map(item => item.values), times()), settings(), true)
+  })
+
+  onCleanup(() => chart.detach())
+})
+
+function pointerMove(event: PointerEvent) {
+  const drawn = plot()
+
+  if (!drawn || labels.length === 0)
+    return
+
+  const width = drawn.rect.width()
+  const x = event.clientX - (event.currentTarget as HTMLElement).getBoundingClientRect().left - drawn.rect.x1
+
+  hovered.set({ index: indexAt(width > 0 ? x / width : 0, labels.length, times()), clientX: event.clientX, clientY: event.clientY })
+}
+---
+.line-chart({...rest} role="img" aria-label={label} class={className})
+  .line-chart-frame
+    .line-chart-plot(ref={element => canvas = element})
+    if cursor() !== null
+      .line-chart-cursor(style={`left: ${cursor()}px; top: ${plot()!.rect.y2}px; height: ${plot()!.rect.height()}px`})
+      for item, index of series key={item.name}
+        if dot(index)
+          .line-chart-dot(style={dot(index)})
+    .line-chart-overlay(role="presentation" onPointerMove={pointerMove} onPointerLeave={() => hovered.set(null)})
+  if hovered()
+    .line-chart-tooltip(style={`left: ${hovered()!.clientX}px; top: ${hovered()!.clientY}px`})
+      .line-chart-tooltip-label {labels[hovered()!.index]}
+      for item, index of series key={item.name}
+        .line-chart-tooltip-row
+          span.line-chart-swatch(style={`background-color: ${colors()[index]}`})
+          span.line-chart-tooltip-name {item.name}
+          span.line-chart-tooltip-value {reading(index)}
+  if legend ?? series.length > 1
+    ul.line-chart-legend
+      for item, index of series key={item.name}
+        li.line-chart-legend-item
+          span.line-chart-swatch(style={`background-color: ${colors()[index]}`})
+          | {item.name}

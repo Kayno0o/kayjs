@@ -268,6 +268,19 @@ CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { l
 - A query ranks the matches in one list: a label starting with it, then a label holding it, then its group or keywords, then its characters in order. The arrows walk it, wrapping, and Enter takes the highlighted row.
 - `label` and `placeholder` (`Search`) and `emptyLabel` (`No results`) are its words. It renders inside an island, since actions are functions.
 
+### LineChart, ScatterChart, ContributionGraph
+
+- `LineChart(label="Visits" labels={days} series={[{ name: 'Visits', values: visits }]} xLabels)`, drawn by chartist, an optional peer the app installs to use it: `bun add chartist`.
+  - A series has a `name`, one value per label, `null` for a gap in the line, and an optional CSS `color`; without one it takes the next `--color-chart-1` to `-6` token.
+  - `xLabels` draws up to five x-axis labels, and spaces the points by time when every label is a date. `legend` names the series under the chart, by default once there is more than one. `formatValue` formats the y-axis and the tooltip, `toLocaleString` by default; `options` is merged over chartist's settings.
+  - Hovering shows a cursor, a dot on each line and a tooltip reading every series at that point, `-` for a gap. `label` describes the chart for screen readers, which cannot read the drawing.
+  - The server renders its frame and legend; the drawing happens once the island mounts.
+- `ScatterChart(label="Games" points={games} x={{ label: 'Hours', scale: 'log', ticks }} y={{ label: 'Score', domain: [0, 100] }} quadrant={{ x: 20, y: 80 }} corners={{ topRight: 'Long and loved' }})`:
+  - A point has a `key`, a `label`, `x` and `y`, a `weight` its dot's area follows, and a `tooltip`, the label by default.
+  - An axis spans its `domain`, or else the points' own extent, along a `linear` or `log` `scale`, with `ticks` of `{ value, label }` and a `label`. `quadrant` draws guides through a point, and `corners` names the four regions they split.
+  - `onSelect(point)` makes each dot a button, from an island; `empty` is what it reads with no points.
+- `ContributionGraph(days={days} color="var(--color-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
+
 ## Forms
 
 FormField frames a control with its label, hint and messages. FormDialog calls a page's action from a dialog and shows the message of each refused field on its FormField.

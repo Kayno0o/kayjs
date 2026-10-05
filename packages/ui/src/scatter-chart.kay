@@ -1,0 +1,58 @@
+--- <Point extends ScatterPoint>
+import type { JSX } from 'kay'
+import type { ScatterAxis, ScatterPoint } from './plot'
+import { axisExtent, axisPercent, dotSize } from './plot'
+
+const { points, x = {}, y = {}, quadrant, corners, onSelect, empty = 'No data yet.', label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+  points: Point[]
+  x?: ScatterAxis
+  y?: ScatterAxis
+  // Guides through this point, splitting the plot into four regions that `corners` name.
+  quadrant?: { x: number, y: number }
+  corners?: { topLeft?: string, topRight?: string, bottomLeft?: string, bottomRight?: string }
+  // Makes every dot a button handing back its point.
+  onSelect?: (point: Point) => void
+  // What the chart reads with no points.
+  empty?: string
+  // Describes the chart for screen readers.
+  label: string
+  class?: string
+}>()
+
+const xExtent = () => axisExtent(points.map(point => point.x), x)
+const yExtent = () => axisExtent(points.map(point => point.y), y)
+
+// Where a dot sits and how large it is, its area following its weight against the heaviest point.
+const place = (point: Point) => {
+  const heaviest = Math.max(...points.map(item => item.weight ?? 1))
+
+  return `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --dot-size: ${dotSize(point.weight ?? 1, heaviest)}rem`
+}
+
+const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => text)
+---
+if points.length === 0
+  p.scatter-chart-empty {empty}
+else
+  figure.scatter-chart({...rest} aria-label={label} class={className})
+    if y.label
+      span.scatter-chart-axis-label(data-axis="y") {y.label}
+    .scatter-chart-plot
+      for tick of y.ticks ?? [] key={tick.value}
+        span.scatter-chart-grid(data-axis="y" style={`bottom: ${axisPercent(tick.value, yExtent(), y.scale)}%`})
+          span.scatter-chart-tick {tick.label}
+      for tick of x.ticks ?? [] key={tick.value}
+        span.scatter-chart-grid(data-axis="x" style={`left: ${axisPercent(tick.value, xExtent(), x.scale)}%`})
+          span.scatter-chart-tick {tick.label}
+      if quadrant
+        span.scatter-chart-guide(data-axis="y" style={`bottom: ${axisPercent(quadrant.y, yExtent(), y.scale)}%`})
+        span.scatter-chart-guide(data-axis="x" style={`left: ${axisPercent(quadrant.x, xExtent(), x.scale)}%`})
+      for entry of cornerEntries() key={entry[0]}
+        span.scatter-chart-corner(data-corner={entry[0]}) {entry[1]}
+      for point of points key={point.key}
+        if onSelect
+          button.scatter-chart-dot(type="button" data-interactive aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onClick={() => onSelect?.(point)})
+        else
+          span.scatter-chart-dot(role="img" aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)})
+    if x.label
+      span.scatter-chart-axis-label(data-axis="x") {x.label}

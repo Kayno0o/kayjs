@@ -217,3 +217,36 @@ describe('Tabs', () => {
     expect(new Set(pairs.flatMap(([tab, panel]) => [tab, panel])).size).toBe(6)
   })
 })
+
+describe('charts', () => {
+  const page = async (id: string) => (await element('/charts', id)).replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<\/?slot[^>]*>/g, '')
+
+  test('LineChart renders its frame and legend on the server, leaving the drawing to the browser', async () => {
+    expect(await page('line')).toBe('<article id="line"><div role="img" aria-label="Visits" class="line-chart"><div class="line-chart-frame"><div class="line-chart-plot"></div><div class="line-chart-overlay" role="presentation"></div></div><ul class="line-chart-legend"><li class="line-chart-legend-item"><span class="line-chart-swatch" style="background-color: var(--chart-1)"></span>Visits</li><li class="line-chart-legend-item"><span class="line-chart-swatch" style="background-color: red"></span>Sales</li></ul></div></article>')
+  })
+
+  test('ScatterChart places dots, ticks, guides and corners along its axes, a dot\'s size following its weight', async () => {
+    const scatter = await page('scatter')
+
+    expect([...scatter.matchAll(/aria-label="(\w+)" data-tooltip="([^"]+)" style="([^"]+)"/g)].map(match => match.slice(1))).toEqual([
+      ['Hades', 'Hades', 'left: 25%; bottom: 100%; --dot-size: 1.75rem'],
+      ['Celeste', 'Celeste, 30h', 'left: 75%; bottom: 0%; --dot-size: 1.1875rem'],
+    ])
+    expect(scatter).toContain('<span class="scatter-chart-grid" data-axis="x" style="left: 50%"><span class="scatter-chart-tick">20h</span></span><span class="scatter-chart-guide" data-axis="y" style="bottom: 50%"></span><span class="scatter-chart-guide" data-axis="x" style="left: 50%"></span><span class="scatter-chart-corner" data-corner="topRight">Long and loved</span>')
+    expect(scatter).not.toContain('<button')
+    expect(await page('no-scatter')).toBe('<article id="no-scatter"><p class="scatter-chart-empty">No games</p></article>')
+  })
+
+  test('ContributionGraph shades each day by how full it was, marks today, and names the months over their weeks', async () => {
+    const graph = await page('graph')
+    const cells = [...graph.matchAll(/<span class="contribution-cell" role="img" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])
+
+    expect(cells.slice(0, 3)).toEqual([
+      ['3 commits · 2026-08-31', false, 'grid-row: 2; grid-column: 1'],
+      ['2026-09-01', false, 'background-color: color-mix(in srgb, var(--color-accent) 63%, transparent); grid-row: 3; grid-column: 1'],
+      ['2026-09-02', true, 'background-color: color-mix(in srgb, var(--color-accent) 100%, transparent); grid-row: 4; grid-column: 1'],
+    ])
+    expect(cells.at(-1)?.[2]).toContain('grid-row: 8; grid-column: 3')
+    expect(graph).toMatch(/^<article id="graph"><div class="contribution-graph contribution-graph-months"><span class="contribution-month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="contribution-cell"/)
+  })
+})

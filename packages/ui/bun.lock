@@ -13,6 +13,7 @@
         "@kaynooo/eslint": "^6.0.1",
         "@types/bun": "^1.4.2",
         "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+        "chartist": "^1.5.0",
         "elysia": "^1.4.30",
         "kay": "npm:@kaynooo/kayjs@^0.4.0",
         "tailwindcss": "^4.3.3",
@@ -335,6 +336,8 @@
     "change-case": ["change-case@5.4.4", "", {}, "sha512-HRQyTk2/YPEkt9TnUPbOpr64Uw3KOicFWPVBb+xiHvd6eBx/qPr9xqfBFDT8P2vWsvvz4jbEkfDe71W3VyNu2w=="],
 
     "character-entities": ["character-entities@2.0.2", "", {}, "sha512-shx7oQ0Awen/BRIdkjkvz54PnEEI/EjwXDSIZp86/KKdbafHh1Df/RYGBhn4hbe2+uKC9FnT5UCEdyPz3ai9hQ=="],
+
+    "chartist": ["chartist@1.5.0", "", {}, "sha512-mcCJuWHpNqkJucuWEeHxymQCQEeAOkamGypqCV5+C+uI2NF4I3BOn/tjIuZaowJVNAcrY9BG3janLaCWSNVPDw=="],
 
     "ci-info": ["ci-info@4.4.0", "", {}, "sha512-77PSwercCZU2Fc4sX94eF8k8Pxte6JAwL4/ICZLFjJLqegs7kCuAsqqj/70NQF6TvDpgFjkubQB2FW2ZZddvQg=="],
 

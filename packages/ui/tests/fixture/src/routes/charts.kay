@@ -1,0 +1,16 @@
+---
+import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
+import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
+import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
+
+const days = Array.from({ length: 21 }, (_, index) => ({ day: new Date(Date.UTC(2026, 7, 31 + index)).toISOString().slice(0, 10), intensity: index % 3 / 2, description: index === 0 ? '3 commits' : undefined }))
+---
+main
+  article#line
+    LineChart(label="Visits" labels={['2026-09-01', '2026-09-02', '2026-09-08']} series={[{ name: 'Visits', values: [3, null, 5] }, { name: 'Sales', values: [1, 2, 1], color: 'red' }]})
+  article#scatter
+    ScatterChart(label="Games" points={[{ key: 1, label: 'Hades', x: 10, y: 90, weight: 4 }, { key: 2, label: 'Celeste', x: 30, y: 70, tooltip: 'Celeste, 30h' }]} x={{ label: 'Hours', domain: [0, 40], ticks: [{ value: 20, label: '20h' }] }} y={{ label: 'Score' }} quadrant={{ x: 20, y: 80 }} corners={{ topRight: 'Long and loved' }})
+  article#no-scatter
+    ScatterChart(label="Games" points={[]} empty="No games")
+  article#graph
+    ContributionGraph(days={days} color="var(--color-accent)" today="2026-09-02" months)

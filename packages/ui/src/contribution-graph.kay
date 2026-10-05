@@ -1,0 +1,34 @@
+---
+import type { JSX } from 'kay'
+import type { ContributionDay } from './contribution'
+import { monthStarts } from './contribution'
+import { shade } from './shade'
+
+const { days, color, today, months = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+  // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
+  days: readonly ContributionDay[]
+  // The CSS colour the filled cells shade towards.
+  color: string
+  // The ISO date of today, whose cell is marked.
+  today: string
+  // Names each month above the week it starts in, placing every cell by hand.
+  months?: boolean
+  class?: string
+}>()
+
+const describe = (day: ContributionDay) => day.description ? `${day.description} · ${day.day}` : day.day
+
+const style = (day: ContributionDay, index: number) => {
+  const fill = shade(color, day.intensity)
+  const parts = [fill && `background-color: ${fill}`, months && `grid-row: ${index % 7 + 2}; grid-column: ${Math.floor(index / 7) + 1}`].filter(Boolean)
+
+  return parts.length > 0 ? parts.join('; ') : undefined
+}
+---
+// A year of days as a grid of weeks, each cell shaded by how full its day was.
+.contribution-graph({...rest} class={[{ 'contribution-graph-months': months }, className]})
+  if months
+    for start of monthStarts(days.map(day => day.day)) key={start.column}
+      span.contribution-month(aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
+  for day, index of days key={day.day}
+    span.contribution-cell(role="img" aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)})
