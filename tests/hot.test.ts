@@ -7,7 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { dev } from '../src/dev'
 
-const browserInstalled = existsSync(chromium.executablePath())
+// CI installs Chromium and names it in BUN_CHROME_PATH, where a missing browser fails rather than skipping.
+const executablePath = process.env.BUN_CHROME_PATH || chromium.executablePath()
+const browserInstalled = existsSync(executablePath)
 // Inside the repository, so the project resolves `kay` to it.
 const scratch = join(import.meta.dir, '../node_modules/.cache')
 const todos = (label: string) => `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(list => list.slice(1))}) ${label}\nul.todos\n  for item of items() key={item}\n    li {item}\n`
@@ -32,7 +34,7 @@ async function sameDocument(): Promise<boolean> {
   return page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)
 }
 
-describe.skipIf(!browserInstalled)('kay dev in Chromium', () => {
+describe.skipIf(!browserInstalled && !process.env.CI)('kay dev in Chromium', () => {
   beforeAll(async () => {
     await mkdir(scratch, { recursive: true })
     root = await mkdtemp(join(scratch, 'hot-'))
@@ -55,7 +57,7 @@ describe.skipIf(!browserInstalled)('kay dev in Chromium', () => {
     process.env.KAY_HOT_PORT = String(probe.port)
     probe.stop(true)
     stop = await dev(root)
-    browser = await chromium.launch({ headless: true })
+    browser = await chromium.launch({ headless: true, executablePath })
     page = await browser.newPage()
   }, 60_000)
 

@@ -1,11 +1,13 @@
-import type { Browser, Page } from 'playwright-core'
+import type { Browser, ConsoleMessage, Page } from 'playwright-core'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
 
 const LISTENING = /port (\d+)/
-const browserInstalled = existsSync(chromium.executablePath())
+// CI installs Chromium and names it in BUN_CHROME_PATH, where a missing browser fails rather than skipping.
+const executablePath = process.env.BUN_CHROME_PATH || chromium.executablePath()
+const browserInstalled = existsSync(executablePath)
 
 let server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
 let browser: Browser
@@ -35,11 +37,16 @@ async function sameDocument(): Promise<boolean> {
   return page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)
 }
 
-describe.skipIf(!browserInstalled)('page swap in Chromium', () => {
+// A full Chromium, as CI installs, asks for a favicon the fixture has none of.
+function pageError(message: ConsoleMessage): boolean {
+  return message.type() === 'error' && !message.location().url.endsWith('/favicon.ico')
+}
+
+describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', () => {
   beforeAll(async () => {
     server = Bun.spawn(['bun', 'tests/fixtures/navigation/server.ts'], { env: { ...process.env, NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
     origin = `http://localhost:${await listeningPort(server)}`
-    browser = await chromium.launch({ headless: true })
+    browser = await chromium.launch({ headless: true, executablePath })
     page = await browser.newPage()
   }, 60_000)
 
@@ -54,7 +61,7 @@ describe.skipIf(!browserInstalled)('page swap in Chromium', () => {
 
     page.on('pageerror', error => errors.push(error.message))
     page.on('console', (message) => {
-      if (message.type() === 'error')
+      if (pageError(message))
         errors.push(message.text())
     })
     await page.goto(origin)
@@ -256,7 +263,7 @@ describe.skipIf(!browserInstalled)('page swap in Chromium', () => {
     const warnings: string[] = []
 
     page.on('console', (message) => {
-      if (message.type() === 'warning' || message.type() === 'error')
+      if (message.type() === 'warning' || pageError(message))
         warnings.push(message.text())
     })
     await page.goto(`${origin}/tone`)
@@ -273,7 +280,7 @@ describe.skipIf(!browserInstalled)('page swap in Chromium', () => {
     const warnings: string[] = []
 
     page.on('console', (message) => {
-      if (message.type() === 'warning' || message.type() === 'error')
+      if (message.type() === 'warning' || pageError(message))
         warnings.push(message.text())
     })
     await page.goto(`${origin}/state`)
