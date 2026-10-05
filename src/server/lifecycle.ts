@@ -67,7 +67,7 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, timeout = DEFAUL
         process.exit(1)
       }, timeout * 1000)
 
-      await shutDown(root)
+      await shutdown(root)
       clearTimeout(forced)
       process.exit()
     }
@@ -103,7 +103,7 @@ async function withTimeout(check: unknown): Promise<unknown> {
 }
 
 // Stops the server once its open requests finished, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
-export async function shutDown(app: AnyElysia): Promise<void> {
+export async function shutdown(app: AnyElysia): Promise<void> {
   const server = app.server
 
   if (!server)

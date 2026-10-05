@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { KayConfig } from '../config'
 import { isCrossSite } from './actions'
-import { clientOf, overLimit } from './protection'
+import { clientAddress, overLimit } from './protection'
 import { reportServerError } from './report'
 
 // Where the browser sends the errors islands meet.
@@ -42,7 +42,7 @@ export function serveErrorReports(app: Elysia, onError: KayConfig['onError']): v
     if (Number(request.headers.get('content-length') ?? 0) > MAX_REPORT_BYTES)
       return new Response(null, { status: 413 })
 
-    if (overLimit(REPORTS, clientOf(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined)
+    if (overLimit(REPORTS, clientAddress(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined)
       return new Response(null, { status: 429 })
 
     const text = await readCapped(request)

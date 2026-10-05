@@ -13,7 +13,7 @@ import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { servePages } from '../server/app'
 import { basePath } from '../server/base'
 import { buildClient } from '../server/client'
-import { shutDown } from '../server/lifecycle'
+import { shutdown } from '../server/lifecycle'
 import { browse } from './browser'
 import { testRoot } from './root'
 
@@ -57,7 +57,7 @@ export interface TestSite {
   fetch: (path: string, init?: Omit<RequestInit, 'headers'> & VisitInit) => Promise<Response>
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
   socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => TestSocket<SocketOf<Module, Path>>
-  // A route of a module under `src/api` answering with `events()`, read as an island reads it.
+  // A route of a module under `src/api` answering with `eventStream()`, read as an island reads it.
   stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
   // A page loaded in a headless Chrome over a server the site starts on a free port, once `browser` is set; its cookies are the browser's, not `cookies`.
   open: (path: string, options?: BrowserOptions) => Promise<TestPage>
@@ -216,7 +216,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         page.close()
 
       if (server)
-        await shutDown(app)
+        await shutdown(app)
 
       server = undefined
     },

@@ -134,7 +134,7 @@ class Generator {
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
 
     if (kayHelpers.length > 0)
-      b.add(`import { ${kayHelpers.map(helper => `${helper} as ${kayAlias(helper)}`).join(', ')} } from 'kay'\n`)
+      b.add(`import { ${kayHelpers.map(helper => `${helper} as ${kayAlias(helper)}`).join(', ')} } from 'kay/internal'\n`)
 
     if (server && !includeServer) {
       for (const name of actions)

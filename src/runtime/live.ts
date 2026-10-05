@@ -8,7 +8,7 @@ export const API_MOUNT = Symbol.for('kay.api')
 // Type only: what each value an event stream sends is.
 declare const EVENTS: unique symbol
 
-// What `events()` from `kay/server` answers with: a stream of values `stream()` reads in an island, typed.
+// What `eventStream()` from `kay/server` answers with: a stream of values `stream()` reads in an island, typed.
 export type EventStream<T> = Response & { readonly [EVENTS]: T }
 
 // The event closing a stream that ran to its end, and the one closing a stream whose source threw.
@@ -48,7 +48,7 @@ type SocketRoute<Module, Path> = NodeAt<Module, Path> extends { subscribe: infer
 
 export type StreamMethod<Node> = { [M in keyof Node & Method]: Node[M] extends { response: { 200: EventStream<unknown> } } ? M : never }[keyof Node & Method]
 
-// The routes of a module answering with `events()`.
+// The routes of a module answering with `eventStream()`.
 export type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? [StreamMethod<Node>] extends [never] ? never : Path : never : never
 type StreamRoute<Module, Path, M> = NodeAt<Module, Path> extends infer Node ? M extends keyof Node ? Node[M] : never : never
 type StreamValue<Route> = Route extends { response: { 200: EventStream<infer Value> } } ? Value : never
@@ -438,7 +438,7 @@ export function streamRequest(options: unknown): RequestInit & { method: string,
 export type StreamOf<Module, Path, M> = EventReader<StreamValue<StreamRoute<Module, Path, Chosen<M>>>>
 export type StreamOptions<Module, Path, M> = { method?: M } & UrlOptions<StreamRoute<Module, Path, Chosen<M>>> & Body<StreamRoute<Module, Path, Chosen<M>>>
 
-// Reads a route of a module under `src/api` answering with `events()` from an island, once it is in the page: each value typed as the route sends it, Dates, Maps and Sets included.
+// Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page: each value typed as the route sends it, Dates, Maps and Sets included.
 // A GET stream that drops reconnects; a stream closes with the component that opened it.
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M> {
   const init = streamRequest(options)

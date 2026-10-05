@@ -3,7 +3,7 @@ import { withBase } from './base'
 import { currentServerScope, whenHydrated } from './reactive'
 import { decodeValue, encodeValue } from './wire'
 
-export type Storage = 'cookie' | 'local'
+export type PersistStorage = 'cookie' | 'local'
 
 export interface Persisted<T> {
   read: () => T
@@ -18,7 +18,7 @@ const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 const TRAILING_SLASH = /\/$/
 
 // What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
-export function persisted<T>(key: string, storage: Storage, read: () => T, write: (value: T) => void): Persisted<T> {
+export function persisted<T>(key: string, storage: PersistStorage, read: () => T, write: (value: T) => void): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
     throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; persist under letters, digits and - _ . only`)
 
@@ -56,7 +56,7 @@ export function persisted<T>(key: string, storage: Storage, read: () => T, write
 }
 
 // The server reads the cookie of the request being rendered, once per request, until a render of it writes the signal; localStorage it never sees.
-function serverSide<T>(key: string, storage: Storage, read: () => T): Persisted<T> {
+function serverSide<T>(key: string, storage: PersistStorage, read: () => T): Persisted<T> {
   const fromCookie = new WeakMap<ServerScope, Stored<T>>()
   const written = new WeakSet<ServerScope>()
 

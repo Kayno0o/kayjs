@@ -3,7 +3,7 @@ import type { Static, TSchema } from 'elysia'
 import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect } from './checks'
 import type { Locale } from './i18n'
-import type { Storage } from './persist'
+import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
 import { persisted } from './persist'
 import { createSignal, onCleanup, provideContext, readContext, tracking, untrack } from './reactive'
@@ -23,7 +23,7 @@ export interface SignalSettings<T> extends SignalOptions<T> {
   // Keeps the value across pages and visits under this name.
   persist?: string
   // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated.
-  storage?: Storage
+  storage?: PersistStorage
 }
 
 // A signal read as `count()` and written as `count.set(1)` or `count.set(c => c + 1)`.
@@ -188,8 +188,8 @@ export type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
-export type { Action, ActionContext, ActionProtection, Failure, FailureOf, FieldName, FormFailure, FormSuccess, ServerAction, SuccessOf } from './action'
-export { action, ActionError, ActionRedirect, actionStub, formAction, isAction, registerActions } from './action'
+export type { Action, ActionContext, ActionProtection, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, ServerAction, Success, SuccessOf } from './action'
+export { action, ActionError, ActionRedirect } from './action'
 export { withBase } from './base'
 export type { ApiRoutesOf, AwaitProps, CheckedHref, Deferred, FunctionProp, HydrateWhen, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, TemplateHelpers } from './checks'
 export type { Component, EventHandler, JSX } from './jsx'
@@ -197,7 +197,7 @@ export type { EventReader, EventStream, Socket, SocketPath, SocketStatus, Stream
 export { socket, stream } from './live'
 export type { NavigateOptions } from './navigate'
 export { navigate, refresh } from './navigate'
-export type { Storage } from './persist'
+export type { PersistStorage } from './persist'
 export type { SignalOptions } from './reactive'
 export { batch, effect, flush, memo, onCleanup, onMount, root, untrack } from './reactive'
 export { uid } from './uid'

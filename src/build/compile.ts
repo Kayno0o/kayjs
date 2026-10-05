@@ -53,7 +53,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
 
   await Bun.write(generated, [
     `import { join } from 'node:path'`,
-    `import { registerBundle } from 'kay/server'`,
+    `import { registerBundle } from 'kay/internal/server'`,
     ...modules.map((file, index) => `import * as module${index} from ${JSON.stringify(file)}`),
     existsSync(configFile) ? `import config from ${JSON.stringify(configFile)}` : 'const config = {}',
     '',

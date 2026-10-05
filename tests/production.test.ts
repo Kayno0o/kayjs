@@ -8,10 +8,10 @@ import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { check } from '../src/check'
-import { inlineScriptHashes, pages, shutDown } from '../src/server'
+import { inlineScriptHashes, pages, shutdown } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
-import { clientOf, protectionRefusal, rateKey } from '../src/server/protection'
+import { clientAddress, protectionRefusal, rateKey } from '../src/server/protection'
 import { testSite } from '../src/test'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -146,8 +146,8 @@ describe('action protection', () => {
     const proxy = { requestIP: () => ({ address: '127.0.0.1' }) } as unknown as Server<unknown>
     const direct = { requestIP: () => ({ address: '198.51.100.9' }) } as unknown as Server<unknown>
 
-    expect(clientOf(behind, proxy)).toBe('203.0.113.7')
-    expect(clientOf(behind, direct)).toBe('198.51.100.9')
+    expect(clientAddress(behind, proxy)).toBe('203.0.113.7')
+    expect(clientAddress(behind, direct)).toBe('198.51.100.9')
   })
 
   it('types the honeypot as one of the form\'s fields for kay check, a misspelt one still refused', async () => {
@@ -418,7 +418,7 @@ describe('request logging', () => {
       for (const path of ['/contact?token=secret', '/api/fail', '/_kay/health', '/missing'])
         await (await fetch(`http://localhost:${app.server!.port}${path}`)).text()
 
-      await shutDown(app)
+      await shutdown(app)
       expect(lines.mock.calls.map(call => String(call[0]).replace(/\d+ms$/, 'Nms'))).toEqual(['GET /contact 200 Nms', 'GET /api/fail 418 Nms', 'GET /missing 404 Nms'])
     }
     finally {
@@ -438,7 +438,7 @@ describe('request logging', () => {
       for (const app of [json, custom, quiet]) {
         app.listen(0)
         await (await fetch(`http://localhost:${app.server!.port}/contact`)).text()
-        await shutDown(app)
+        await shutdown(app)
       }
 
       expect(lines.mock.calls).toHaveLength(1)
@@ -481,7 +481,7 @@ describe('rewrites', () => {
       expect(await (await (await pages({ routes, prebuilt: false, rewrite })).handle(new Request('http://shop.localhost/mug'))).text()).toContain('<p class="item">Shop mug in any at /shop/mug</p>')
     }
     finally {
-      await shutDown(app)
+      await shutdown(app)
     }
   })
 

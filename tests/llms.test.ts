@@ -25,4 +25,18 @@ describe('llms.txt', () => {
     expect(await import('kay/server')).toHaveProperty('pages')
     expect(await import('kay/server')).toMatchObject({ clientAddress: expect.any(Function), rateKey: expect.any(Function) })
   })
+
+  it('keeps what generated code and kay\'s own build import off the public entries', async () => {
+    const runtime = await import('kay')
+    const server = await import('kay/server')
+
+    expect(Object.keys(await import('kay/compiler')).sort()).toEqual(['compileKay', 'formatDiagnostic'])
+    expect(Object.keys(await import('kay/image'))).toEqual(['image'])
+    expect(Object.keys(await import('kay/internal')).sort()).toEqual(['actionStub', 'formAction', 'isAction', 'registerActions', 'registerImage'])
+    expect(Object.keys(await import('kay/internal/server'))).toEqual(['registerBundle'])
+    expect(['actionStub', 'formAction', 'isAction', 'registerActions'].filter(name => name in runtime)).toEqual([])
+    expect(['registerBundle', 'shutDown', 'events'].filter(name => name in server)).toEqual([])
+    expect(server).toMatchObject({ shutdown: expect.any(Function), eventStream: expect.any(Function) })
+    expect(Object.keys(await import('kay/i18n')).filter(name => name === 'runInLocale' || name === 'localeState')).toEqual([])
+  })
 })

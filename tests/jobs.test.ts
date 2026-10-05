@@ -1,6 +1,6 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { background, schedule, shutDown } from '../src/server'
+import { background, schedule, shutdown } from '../src/server'
 
 // Bun.cron stood in for, so a test fires the job itself instead of waiting for the minute.
 function fakeCron() {
@@ -36,7 +36,7 @@ describe('schedule', () => {
 
       const run = cron.fired[0]!.handler()
 
-      await shutDown(app)
+      await shutdown(app)
       expect(runs).toEqual(['start', 'end'])
       expect(cron.fired[0]!.stopped).toBe(true)
       await run
@@ -59,7 +59,7 @@ describe('schedule', () => {
       expect(cron.fired[0]!.stopped).toBe(false)
     }
     finally {
-      await shutDown(app)
+      await shutdown(app)
       logged.mockRestore()
       cron.restore()
     }
@@ -77,7 +77,7 @@ describe('schedule', () => {
       const app = new Elysia().use(schedule('@hourly', () => undefined)).use(schedule('@daily', () => undefined)).listen(0)
 
       expect(cron.fired).toHaveLength(2)
-      void shutDown(app)
+      void shutdown(app)
     }
     finally {
       cron.restore()
@@ -98,7 +98,7 @@ describe('background', () => {
     expect(steps).toEqual([])
     app.listen(0)
     expect(steps).toEqual(['started'])
-    await shutDown(app)
+    await shutdown(app)
     expect(steps).toEqual(['started', 'cleaned up'])
   })
 })

@@ -1,6 +1,6 @@
-import { api, events } from 'kay/server'
+import { api, eventStream } from 'kay/server'
 
 export default api()
   .get('/me', ({ user }) => ({ user }))
-  .get('/news', () => events(['private']))
+  .get('/news', () => eventStream(['private']))
   .ws('/feed', { message(ws, message) { ws.send(message) } })

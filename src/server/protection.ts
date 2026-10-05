@@ -39,7 +39,7 @@ export function protectionRefusal(action: ServerAction<TSchema, unknown>, reques
   if (!rateLimit)
     return undefined
 
-  const wait = overLimit(action, clientOf(request, server), rateLimit.max, rateLimit.window * 1000)
+  const wait = overLimit(action, clientAddress(request, server), rateLimit.max, rateLimit.window * 1000)
 
   return wait === undefined ? undefined : { status: 429, field: '', message: `Too many attempts; try again in ${wait} s`, headers: { 'retry-after': String(wait) } }
 }
@@ -105,7 +105,7 @@ export function rateKey(address: string): string {
 }
 
 // The socket's address, unless it is a proxy on this machine or network: then the address that proxy appended last to `X-Forwarded-For`, which a client cannot forge.
-export function clientOf(request: Request, server: Server<unknown> | null | undefined): string {
+export function clientAddress(request: Request, server: Server<unknown> | null | undefined): string {
   const address = rewrittenAddress(request) ?? server?.requestIP(request)?.address
   const forwarded = request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim()
 

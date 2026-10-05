@@ -45,7 +45,7 @@ async function assetModule(path: string, url: string): Promise<string> {
     return `export default ${JSON.stringify(url)}`
   }
 
-  return `import { registerImage } from 'kay/image'
+  return `import { registerImage } from 'kay/internal'
 export default registerImage(${JSON.stringify(url)}, ${size.width}, ${size.height})`
 }
 

@@ -143,7 +143,7 @@ export function api(): Elysia<'', { decorator: Empty, store: Empty, derive: Empt
 
 // Answers with a server-sent event per value `source` gives, which `stream()` reads typed in an island: values cross as island props do, Dates, Maps and Sets included.
 // The source is read one value per value the browser takes, and stopped when it goes away; a source that throws ends the stream as failed, the error logged.
-export function events<T>(source: AsyncIterable<T> | Iterable<T>): EventStream<T> {
+export function eventStream<T>(source: AsyncIterable<T> | Iterable<T>): EventStream<T> {
   let iterator: AsyncIterator<T> | Iterator<T> | undefined
   let heartbeat: ReturnType<typeof setInterval> | undefined
   let cancelled = false

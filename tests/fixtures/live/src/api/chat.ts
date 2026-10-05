@@ -1,5 +1,5 @@
 import { t } from 'elysia'
-import { api, events } from 'kay/server'
+import { api, eventStream } from 'kay/server'
 
 // Each room echoes what it gets, signed by who sent it; `drop` closes the connection as a crashing server would.
 export default api()
@@ -13,12 +13,12 @@ export default api()
       ws.send({ room: ws.data.params.room, from: ws.data.user ?? 'anonymous', text })
     },
   })
-  .get('/ticks', ({ query }) => events((async function* () {
+  .get('/ticks', ({ query }) => eventStream((async function* () {
     for (let tick = 1; tick <= query.count; tick++)
       yield { tick, at: new Date(Date.UTC(2026, 0, tick)) }
   })()), { query: t.Object({ count: t.Integer() }) })
-  .post('/answer', ({ body }) => events(body.prompt.split(' ').map(word => `${word}\n`)), { body: t.Object({ prompt: t.String() }) })
-  .get('/broken', () => events((async function* () {
+  .post('/answer', ({ body }) => eventStream(body.prompt.split(' ').map(word => `${word}\n`)), { body: t.Object({ prompt: t.String() }) })
+  .get('/broken', () => eventStream((async function* () {
     yield 1
 
     throw new Error('the source broke')

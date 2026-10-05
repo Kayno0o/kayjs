@@ -62,8 +62,8 @@
       "default": "./src/runtime/cache.server.ts"
     },
     "./image": {
-      "types": "./types/runtime/image.d.ts",
-      "default": "./src/runtime/image.ts"
+      "types": "./types/runtime/image.public.d.ts",
+      "default": "./src/runtime/image.public.ts"
     },
     "./jsx-runtime": {
       "types": "./types/runtime/jsx-runtime.d.ts",
@@ -78,12 +78,20 @@
       "default": "./src/runtime/client.ts"
     },
     "./compiler": {
-      "types": "./types/compiler/index.d.ts",
-      "default": "./src/compiler/index.ts"
+      "types": "./types/compiler/public.d.ts",
+      "default": "./src/compiler/public.ts"
     },
     "./server": {
       "types": "./types/server/index.d.ts",
       "default": "./src/server/index.ts"
+    },
+    "./internal": {
+      "types": "./types/runtime/internal.d.ts",
+      "default": "./src/runtime/internal.ts"
+    },
+    "./internal/server": {
+      "types": "./types/server/internal.d.ts",
+      "default": "./src/server/internal.ts"
     },
     "./test": {
       "types": "./types/test/index.d.ts",

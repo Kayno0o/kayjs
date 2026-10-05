@@ -37,11 +37,12 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 
 | Command | Does |
 | --- | --- |
-| `kay new <dir> [--template server\|site\|app]` | scaffold a project that checks, builds and runs: a server run as one executable, a static site, or an app with sessions |
-| `kay dev [entry]` | run the server, restarting on change, errors shown in the browser |
+| `kay new <dir> [--template server\|site\|app] [--kay <dependency>]` | scaffold a project that checks, builds and runs: a server run as one executable, a static site, or an app with sessions; `--kay` sets its `kay` dependency |
+| `kay dev [dir] [--entry <file>]` | run the server, restarting on change, errors shown in the browser |
 | `kay build [dir]` | bundle the browser code for production |
-| `kay build [dir] --compile <file>` | the same, plus the server and everything it serves in one executable |
-| `kay check [dir]` | type-check the project, `.kay` files included |
+| `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |
+| `kay build [dir] --static [--outdir dist]` | the same, then the whole site as static files for a host with no server |
+| `kay check [dir] [-p tsconfig.json]` | type-check the project, `.kay` files included, `-p` naming another tsconfig |
 | `kay fmt [paths] [--check]` | format `.kay` files |
 | `kay lsp --stdio` | language server for the editor extension in `editors/vscode` |
 

@@ -166,6 +166,35 @@ describe('kay dev', () => {
     expect(children.at(-1)!.killed).toBe(true)
   })
 
+  it('runs from the command line on the project a directory names, or with the entry --entry names', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const seen = join(root, 'seen.txt')
+    const cli = join(import.meta.dir, '../src/cli.ts')
+    const report = (name: string) => `await Bun.write(${JSON.stringify(seen)}, \`${name}|\${process.cwd()}\`)\nsetInterval(() => undefined, 1000)\n`
+
+    await Bun.write(join(root, 'src/server.ts'), report('server'))
+    await Bun.write(join(root, 'src/other.ts'), report('other'))
+
+    try {
+      for (const [args, expected] of [[[root], `server|${root}`], [[root, '--entry', join(root, 'src/other.ts')], `other|${root}`]] as const) {
+        const child = Bun.spawn(['bun', cli, 'dev', ...args], { stdout: 'ignore', stderr: 'pipe' })
+
+        await until(() => existsSync(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
+        child.kill('SIGTERM')
+        expect(await child.exited).toBe(0)
+        await rm(seen, { force: true })
+      }
+
+      const refused = Bun.spawn(['bun', cli, 'dev', join(root, 'src/server.ts'), '--entry', 'src/other.ts'], { stdout: 'ignore', stderr: 'pipe' })
+
+      expect(await refused.exited).toBe(1)
+      expect(await new Response(refused.stderr).text()).toContain('is not a directory, and --entry names the server entry already')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('runs the entry as the main module, and a changed .env reaches the next server', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const seen = join(root, 'seen.txt')

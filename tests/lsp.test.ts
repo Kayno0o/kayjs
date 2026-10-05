@@ -309,7 +309,7 @@ describe('kay lsp imports', () => {
     expect(applyEdits(source, item.additionalTextEdits ?? [])).toBe('--- server\nimport { listTodos } from \'../data\'\nconst todos = listTo\n---\np {todos.length}\n')
   })
 
-  it('adds a name from a module generated code imports too, as its own import', async () => {
+  it('adds a new import after the fence\'s own and in their style, wherever tsgo puts it', async () => {
     const source = '---\nimport { add } from \'../actions\'\nconst count = signa\n---\nform(action={add})\n  button Add\n'
 
     await editor.change(page, source, 5)

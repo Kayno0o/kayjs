@@ -26,7 +26,7 @@ import { writeImageVariants } from './server/image'
 import { ExportError, prerenderPages } from './server/prerender'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [entry]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -270,13 +270,26 @@ function shellQuote(path: string): string {
 
 // Restarts the server on every change until interrupted.
 async function runDev(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, {}, 1)
+  const parsed = parseCommand(args, { entry: { type: 'string' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
 
-  const { routes, publicDir, api, settings } = await loadConfig(process.cwd())
-  const stop = await dev(process.cwd(), { entry: parsed.positionals[0], routes, publicDir, api, settings })
+  const [path] = parsed.positionals
+  const option = parsed.values.entry
+  // A directory is the project, as `build` and `check` take it; anything else is the server entry in the current one.
+  const inDir = path !== undefined && statSync(path, { throwIfNoEntry: false })?.isDirectory() === true
+
+  if (path !== undefined && !inDir && typeof option === 'string') {
+    console.error(`kay: ${path} is not a directory, and --entry names the server entry already\n${USAGE}`)
+
+    return 1
+  }
+
+  const root = resolve(inDir ? path : '.')
+  const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
+  const { routes, publicDir, api, settings } = await loadConfig(root)
+  const stop = await dev(root, { entry, routes, publicDir, api, settings })
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)

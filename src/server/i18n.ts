@@ -1,11 +1,11 @@
 import type { I18nConfig } from '../config'
 import type { LocaleSettings, Message, MessageTree, Translations } from '../runtime/i18n'
-import type { LocaleState } from '../runtime/i18n.server'
+import type { LocaleState } from '../runtime/locale-state'
 import { existsSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { flattenMessages, localePath, splitLocale } from '../runtime/i18n'
-import { localeState } from '../runtime/i18n.server'
+import { localeState } from '../runtime/locale-state'
 import { bundled, importModule } from './bundle'
 
 // Where a visitor's choice of locale is kept, read before their browser's languages.

@@ -716,14 +716,15 @@ function mapCompletionItem(document: ShadowFile, item: CompletionItem, offset: n
   return mapped
 }
 
-// tsgo's edits of a shadow file as edits of its source, all or none: what was copied maps back, and an import added among the generated ones goes to the fence the code at `offset` belongs to.
+// tsgo's edits of a shadow file as edits of its source, all or none: what was copied maps back, and an added import goes to the fence the code at `offset` belongs to.
 function sourceEdits(document: ShadowFile, edits: TextEdit[], offset: number): TextEdit[] | undefined {
   const mapped: TextEdit[] = []
 
   for (const edit of edits) {
     const range = toSourceRange(document, edit.range)
 
-    if (range) {
+    // A new import goes after the fence's own in its style, even when tsgo puts it among them, styled after generated code.
+    if (range && !IMPORT_DECLARATION.test(edit.newText)) {
       mapped.push({ range, newText: edit.newText })
     }
     else {
