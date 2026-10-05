@@ -103,7 +103,7 @@ toast.success('Saved')
 toast.error('Could not save')
 toast.info('Copied')
 
-// Resolves to what the call returned, or to undefined once it threw and `failure` was toasted.
+// Resolves to what the call returned, or to undefined once it threw and `failure` was toasted, or a refusal of the whole call such as a limit.
 const post = await attempt(() => publish({ id }), 'Could not publish')
 
 // A refusal of the action's handler, `ctx.fail(409, { error: 'Already published' })`, toasted as it says.
@@ -128,7 +128,7 @@ Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
 - Once something has been typed inside, or while `dirty` is set (for example while a request is in flight), Escape and a click outside leave it open: only its own buttons close it.
 - `ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})` renders a trigger that opens a dialog asking before deleting:
   - While the promise `onConfirm` returns is pending, the dialog's buttons are disabled.
-  - Once it resolves, the dialog closes. If it throws, `failure` is toasted and the dialog stays open.
+  - Once it resolves, the dialog closes. If it throws, the dialog stays open and `failure` is toasted, or a refusal of the whole call such as a limit, as `attempt` does.
   - `refused` reads a refusal of the action's handler, as `attempt` does, and its message is toasted in place of `failure`: `ConfirmDelete(... failure="Could not delete" refused={(data: { error: string }) => data.error})`.
   - `trigger="button"` makes the trigger a labelled danger button rather than an icon. `label` renames the trigger, for "Revoke link" or "Empty trash", and `class` goes on it. `size` and `variant` style the icon trigger only.
 
@@ -349,7 +349,7 @@ ul
 - `MarkdownEditor(value={body()} onInput={body.set} onImage={upload} name="body")`: a markdown `textarea` that writes like an editor, in an island.
   - Ctrl or Cmd with B, I or K wraps the selection in bold, italics or a link; Enter continues a list, and Tab indents a list item, leaving Tab alone elsewhere so the keyboard can leave the field. These go through the browser's own editing, so Ctrl+Z undoes them like typing.
   - A page pasted as HTML turns into markdown.
-  - With `onImage(file)`, a pasted or dropped image is embedded behind an `![Uploading …]()` placeholder at once, swapped for `![](url)` once `onImage` resolves with its url, or removed with `uploadFailure` toasted if it throws. Writing goes on meanwhile, and a finished upload never takes focus back; the field is `aria-busy` while one is under way.
+  - With `onImage(file)`, a pasted or dropped image is embedded behind an `![Uploading …]()` placeholder at once, swapped for `![](url)` once `onImage` resolves with its url, or removed with `uploadFailure` toasted if it throws (or a refusal of the whole call such as a limit, as `attempt` does). Writing goes on meanwhile, and a finished upload never takes focus back; the field is `aria-busy` while one is under way.
   - `onInput(value)` reports the text after every change, typed or applied. A parent passing other text replaces it; passing back what it was given leaves the caret alone.
 
 ### MediaGallery, Carousel, Masonry, WhenVisible, ZoomPane, ImageCropper

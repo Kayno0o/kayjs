@@ -98,8 +98,11 @@ describe('attempt', () => {
     await attempt(reject(new ActionError(400, '', {}, { error: '' })), 'Could not delete', refused)
     await attempt(reject(new ActionError(429, '', { '': 'Too many tries' })), 'Could not delete', refused)
     await attempt(reject(new ActionError(400, '', {}, { error: 'Still referenced' })), 'Could not delete')
+    // A schema refusal and a plain error carry no handler data, so `refused` is never asked.
+    await attempt(reject(new ActionError(422, '', { name: 'Required' })), 'Could not delete', refused)
+    await attempt(reject(new Error('offline')), 'Could not delete', refused)
 
-    expect(shown().map(({ message }) => message)).toEqual(['Still referenced', 'Could not delete', 'Too many tries', 'Could not delete'])
+    expect(shown().map(({ message }) => message)).toEqual(['Still referenced', 'Could not delete', 'Too many tries', 'Could not delete', 'Could not delete', 'Could not delete'])
   })
 
   test('stays quiet when the call goes through, and hands back what it returned', async () => {

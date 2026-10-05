@@ -99,5 +99,8 @@ function refusalOf<Data>(error: unknown, refused: ((data: Data) => string | unde
   if (!(error instanceof ActionError))
     return undefined
 
-  return (error.data === undefined ? undefined : refused?.(error.data as Data)) || error.errors['']
+  // A schema refusal carries no handler data for `refused` to read.
+  const said = error.data === undefined ? undefined : refused?.(error.data as Data)
+
+  return said || error.errors['']
 }

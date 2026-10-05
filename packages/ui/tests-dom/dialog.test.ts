@@ -116,7 +116,7 @@ describe('ConfirmDelete', () => {
     click(root.querySelectorAll('dialog')[2]!.querySelector('.kui-btn-danger'))
     await settle()
 
-    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Still referenced')
+    expect([[...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent, root.querySelectorAll('dialog')[2]!.open]).toEqual(['Still referenced', true])
   })
 
   test('takes a labelled danger button as its trigger, for a delete known by another name', async () => {
