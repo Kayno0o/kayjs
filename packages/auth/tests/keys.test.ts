@@ -26,7 +26,13 @@ describe('deriveKeys', () => {
     const keys = deriveKeys(SECRET)
 
     expect(keys.decrypt('', 'c')).toBeUndefined()
-    expect(keys.decrypt(`${keys.encrypt('x', 'c').slice(0, -2)}AA`, 'c')).toBeUndefined()
+    const sealed = keys.encrypt('x', 'c')
+    // The last character may carry padding bits alone, so a whole one before it is changed.
+    const at = sealed.length - 3
+    const forged = `${sealed.slice(0, at)}${sealed[at] === 'A' ? 'B' : 'A'}${sealed.slice(at + 1)}`
+
+    expect(keys.decrypt(forged, 'c')).toBeUndefined()
+    expect(keys.decrypt(sealed.slice(0, -2), 'c')).toBeUndefined()
   })
 
   test('fingerprints depend on the secret', () => {
