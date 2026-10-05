@@ -678,8 +678,12 @@ const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 ```
 
 - A key missing from memory is read from the store before `load` runs, and each load writes it back, so a restart, a deploy or `kay dev` reloading starts from what was kept; a stale one is given and refreshed as above.
-- The processes of one machine share a SQLite store. Each still keeps its copy in memory, so an `invalidate` in one process empties the store at once and reaches the others once their copy is past its ttl.
-- The value goes through devalue, as session data does: dates, maps and sets survive, and a value holding a function or a class instance throws on its first load, keeping nothing.
+- The processes of one machine share a SQLite store. Each still keeps its copy in memory, so an `invalidate` in one process empties the store at once and reaches the others once their copy is past its ttl; a load another process had already started may still write the old value back.
+- `invalidate` empties a `sqliteCache` from the moment it opens, so an action after a restart reaches what it kept; a store of your own, once a `cached` call has named it.
+- A key belongs to one store: once in memory, it is read and written there whatever store a later call names.
+- A store that fails to write, locked or full, is logged and the value kept in memory. Rows are never swept, since a stale one is still served: `invalidate` keys a site stops using, such as those of deleted posts.
+- The value goes through devalue, as session data does: dates, maps and sets survive, and a value holding a function or a class instance throws on its first load, keeping nothing; on a refresh, it is logged and the stale value kept.
+- `sqliteCache` is server-only: in the browser, `kay/cache` has `cached` and `invalidate` alone.
 - `CacheStore` is the shape of a store, synchronous so that `invalidate` is done when it returns: `get(key)` giving `{ text, freshUntil }`, `set(key, text, freshUntil)`, `delete(key)` and `keys()`.
 - In the `server` and `app` templates' image the app runs as `nobody`, so the store's directory is a mounted volume it can write.
 

@@ -57,8 +57,9 @@
       "default": "./src/runtime/params.ts"
     },
     "./cache": {
-      "types": "./types/runtime/cache.d.ts",
-      "default": "./src/runtime/cache.ts"
+      "types": "./types/runtime/cache.server.d.ts",
+      "browser": "./src/runtime/cache.ts",
+      "default": "./src/runtime/cache.server.ts"
     },
     "./image": {
       "types": "./types/runtime/image.d.ts",

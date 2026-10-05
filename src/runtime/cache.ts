@@ -1,7 +1,7 @@
-import { Database } from 'bun:sqlite'
 import { parse, stringify } from 'devalue'
 
 // Where `cached` also keeps a value, so it outlives the process: read when a key is missing from memory, written on each load. Synchronous, so `invalidate` is done when it returns.
+// A key belongs to one store: once in memory, its value is read and written there, whatever store a later call names.
 export interface CacheStore {
   get: (key: string) => { text: string, freshUntil: number } | undefined
   set: (key: string, text: string, freshUntil: number) => void
@@ -41,7 +41,7 @@ export async function cached<T>(key: string, ttl: number, load: () => T | Promis
   let entry = entries.get(key)
 
   if (store)
-    stores.add(store)
+    trackStore(store)
 
   if (!entry && store) {
     const kept = readStored(store, key)
@@ -72,6 +72,11 @@ export async function cached<T>(key: string, ttl: number, load: () => T | Promis
 }
 
 // Drops `key`, or every key the function matches, so the next call loads afresh: for an action that changed what they hold.
+// A store `invalidate` empties too: each one a call names, and a `sqliteCache` as soon as it opens, so an action invalidating after a restart reaches what the store kept before any page asked for it.
+export function trackStore(store: CacheStore): void {
+  stores.add(store)
+}
+
 export function invalidate(key: string | ((key: string) => boolean)): void {
   const matches = typeof key === 'string' ? (name: string) => name === key : key
 
@@ -85,36 +90,6 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
       if (matches(name))
         store.delete(name)
     }
-  }
-}
-
-// Values kept in a SQLite file: they survive restarts and deploys, and the processes on one machine share them. Each process still keeps its own copy in memory, so an `invalidate` in one reaches the others once their copy is past its ttl.
-export function sqliteCache(path: string): CacheStore {
-  const db = new Database(path, { create: true })
-
-  db.run('PRAGMA journal_mode = WAL')
-  db.run('CREATE TABLE IF NOT EXISTS kay_cache (key TEXT PRIMARY KEY, value TEXT NOT NULL, fresh_until INTEGER NOT NULL)')
-
-  const select = db.query<{ value: string, fresh_until: number }, [string]>('SELECT value, fresh_until FROM kay_cache WHERE key = ?')
-  const upsert = db.query('INSERT INTO kay_cache (key, value, fresh_until) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value, fresh_until = excluded.fresh_until')
-  const remove = db.query('DELETE FROM kay_cache WHERE key = ?')
-  const names = db.query<{ key: string }, []>('SELECT key FROM kay_cache')
-
-  return {
-    get(key) {
-      const row = select.get(key)
-
-      return row ? { text: row.value, freshUntil: row.fresh_until } : undefined
-    },
-    set(key, text, freshUntil) {
-      upsert.run(key, text, freshUntil)
-    },
-    delete(key) {
-      remove.run(key)
-    },
-    keys() {
-      return names.all().map(row => row.key)
-    },
   }
 }
 
@@ -157,7 +132,7 @@ async function refresh(key: string, ttl: number, entry: Entry, load: () => unkno
   }
 }
 
-// A loaded value, written to the store first, so one it cannot hold throws before memory keeps it.
+// A loaded value: one the store cannot hold throws before memory keeps it; a store that fails to write, locked or full, is logged and the value kept in memory, rather than fetched again by every caller.
 function keep(key: string, entry: Entry, store: CacheStore | undefined): void {
   if (store) {
     let text: string
@@ -169,7 +144,12 @@ function keep(key: string, entry: Entry, store: CacheStore | undefined): void {
       throw new Error(`kay: cached('${key}') cannot keep its value in a store: ${error instanceof Error ? error.message : String(error)}`)
     }
 
-    store.set(key, text, entry.freshUntil)
+    try {
+      store.set(key, text, entry.freshUntil)
+    }
+    catch (error) {
+      console.error(`kay: cached('${key}') could not write its store; keeping the value in memory`, error)
+    }
   }
 
   remember(key, entry)

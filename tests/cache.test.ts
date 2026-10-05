@@ -5,7 +5,7 @@ import process from 'node:process'
 import { Database } from 'bun:sqlite'
 import { afterAll, afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { cached, invalidate, sqliteCache } from '../src/runtime/cache'
+import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
 import { pages } from '../src/server'
 import { feed } from './fixtures/production/src/news'
 
@@ -123,9 +123,9 @@ describe('cached with a store', () => {
     return join(dir, 'cache.sqlite')
   }
 
-  // A process of its own, as a restart or a second server would be: what `cached` gives it, after its background refresh had time to land.
+  // A process of its own, as a restart or a second server would be: what `cached` gives it, once a background refresh has landed in the store.
   async function inProcess(path: string, edition: number): Promise<{ edition: number, date: boolean }> {
-    const script = `import { cached, sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.ts'))}\nconst value = await cached('reviews', 60, () => ({ edition: ${edition}, at: new Date(0) }), { store: sqliteCache(${JSON.stringify(path)}) })\nawait Bun.sleep(20)\nconsole.log(JSON.stringify({ edition: value.edition, date: value.at instanceof Date }))\n`
+    const script = `import { cached, sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.server.ts'))}\nconst store = sqliteCache(${JSON.stringify(path)})\nconst value = await cached('reviews', 60, () => ({ edition: ${edition}, at: new Date(0) }), { store })\nfor (let wait = 0; store.get('reviews')!.freshUntil < Date.now() && wait < 200; wait++)\n  await Bun.sleep(10)\nconsole.log(JSON.stringify({ edition: value.edition, date: value.at instanceof Date }))\n`
     const child = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'inherit' })
     const [output] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
@@ -145,6 +145,57 @@ describe('cached with a store', () => {
     // Stale: given as it is, refreshed in the background for the next process.
     expect(await inProcess(path, 3)).toEqual({ edition: 1, date: true })
     expect(await inProcess(path, 4)).toEqual({ edition: 3, date: true })
+  })
+
+  it('drops a key a store kept before any call named it, as an action does after a restart', async () => {
+    const path = await storePath()
+
+    sqliteCache(path).set('reviews', '["old"]', Date.now() + 60_000)
+
+    // Another process's store, opened afresh.
+    const store = sqliteCache(path)
+
+    invalidate('reviews')
+    expect(store.keys()).toEqual([])
+    expect(await cached('reviews', 60, () => 'new', { store })).toBe('new')
+  })
+
+  it('keeps the stale value when a refresh gives one the store cannot hold, and a value whose store failed to write', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const store = sqliteCache(await storePath())
+    let value: unknown = 'plain'
+
+    try {
+      expect(await cached('feed', 60, () => value, { store })).toBe('plain')
+      value = () => 1
+      setSystemTime(Date.now() + 61_000)
+      expect(await cached('feed', 60, () => value, { store })).toBe('plain')
+      await Bun.sleep(0)
+      expect(logged.mock.calls[0]![1]).toMatchObject({ message: expect.stringContaining('cannot keep its value in a store') })
+      expect(store.get('feed')!.text).toBe('["plain"]')
+
+      const failing = { ...store, set: () => {
+        throw new Error('SQLITE_FULL')
+      } }
+
+      expect(await cached('full', 60, () => 'kept', { store: failing })).toBe('kept')
+      expect(await cached('full', 60, () => 'again', { store: failing })).toBe('kept')
+      expect(logged).toHaveBeenCalledTimes(2)
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('builds for the browser, where kay/cache leaves SQLite out', async () => {
+    const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+
+    dirs.push(dir)
+    await Bun.write(join(dir, 'entry.ts'), 'import { cached } from \'kay/cache\'\n\nexport const posts = cached(\'posts\', 60, () => [])\n')
+
+    const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], target: 'browser' })
+
+    expect(build.success).toBe(true)
   })
 
   it('drops a key from the store too, and forgets a row it cannot read', async () => {

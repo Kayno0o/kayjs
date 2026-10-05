@@ -294,6 +294,8 @@ export function sqliteStore(path: string): SessionStore {
   const db = new Database(path, { create: true })
 
   db.run('PRAGMA journal_mode = WAL')
+  // Another process writing waits its turn rather than failing the write.
+  db.run('PRAGMA busy_timeout = 5000')
   db.run('CREATE TABLE IF NOT EXISTS kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
 
   const select = db.query<{ data: string }, [string, number]>('SELECT data FROM kay_sessions WHERE id = ? AND expires >= ?')
