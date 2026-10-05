@@ -711,4 +711,29 @@ describe('kay check, URLs written out besides links', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('checks the fallback localPath() takes as a link', async () => {
+    const page = [
+      '--- server',
+      'import { localPath } from \'kay\'',
+      '',
+      'if (ctx.query.next !== undefined)',
+      '  ctx.redirect(localPath(ctx.query.next, \'/nowhere\'))',
+      '',
+      'ctx.redirect(localPath(ctx.query.back, \'/\'))',
+      '---',
+      'p x',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1] ?? d.message])).toEqual([
+        [5, 'No page, public file or app route serves /nowhere'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

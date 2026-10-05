@@ -1,5 +1,10 @@
+import type { CheckedHref } from './checks'
+
 // Where the site is mounted when it is not at the root of its host, `/docs` for `https://example.com/docs/`, as `base` in kay.config.ts sets it; read off the page in the browser.
 let base: string | undefined
+
+// An origin no site has, to tell a path of this one from what a browser would read as another host: `//host`, `/\host`, or either with a tab or line break inside, which browsers drop.
+const NOWHERE = 'http://nowhere.invalid'
 
 const BASE_META = 'meta[name="kay-base"]'
 
@@ -22,4 +27,14 @@ export function withoutBase(path: string): string {
 // A path of the site under `mount`, a route that happens to start like it included; another site's URL or a relative one is left as it is.
 export function joinBase(mount: string, path: string): string {
   return mount === '' || !path.startsWith('/') || path.startsWith('//') ? path : `${mount}${path}`
+}
+
+// `value` when it is a path of this site, as a `?next=` param should be, else `fallback`: `ctx.redirect(localPath(ctx.query.next, '/account'))` never sends anyone to another site. The path comes back as a browser reads it, with no backslash or control character left.
+export function localPath<const Fallback extends string>(value: unknown, fallback: Fallback & CheckedHref<Fallback>): string {
+  if (typeof value !== 'string' || !value.startsWith('/') || !URL.canParse(value, NOWHERE))
+    return fallback
+
+  const url = new URL(value, NOWHERE)
+
+  return url.origin === NOWHERE ? `${url.pathname}${url.search}${url.hash}` : fallback
 }

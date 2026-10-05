@@ -519,6 +519,7 @@ Other files starting with `_` are not routes. Every top-level name the server fe
 - `ctx.locals`, what the app's Elysia `derive`, `resolve` and `decorate` add, such as the signed-in user
 - `ctx.status(404)` and `ctx.headers` set the response
 - `ctx.redirect('/login')`, `ctx.notFound()` and `ctx.deny(403, 'Members only')` stop rendering; `deny` renders `_error.kay` with that status and message
+- `ctx.redirect` goes to any http(s) URL it is given, so a `?next=` param goes through `localPath(value, fallback)` from `kay`, which gives `value` when it is a path of this site and `fallback` otherwise: `ctx.redirect(localPath(ctx.query.next, '/account'))`. `https://evil.example`, `//evil.example`, `/\evil.example` and a value that is no string all fall back; `fallback` is checked as a link.
 
 Layout and page loads run in parallel; when several fail, the outermost one decides the response. In development each response carries a `Server-Timing` header with the time of every load and of the render, shown in the browser's network panel.
 

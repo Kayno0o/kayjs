@@ -4,6 +4,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { check } from '../src/check'
+import { localPath } from '../src/runtime/base'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
@@ -110,6 +111,20 @@ describe('redirects', () => {
     const problems = redirectProblems({ '/a': '/items/9', '/b': '/blog/', '/c': 'https://elsewhere.example/x', '/d': '/nowhere', '/e/*': '/fr/hello?x', '/f': '/docs/', '/g': '/docs', '/h': '/d', '/i': '/robots.txt' }, served)
 
     expect(problems).toEqual(['the redirect from /d goes to /nowhere, which nothing on the site serves', 'the redirect from /g goes to /docs, which nothing on the site serves'])
+  })
+})
+
+describe('localPath', () => {
+  it('keeps a path of the site and falls back for anything a browser would take elsewhere', () => {
+    expect(localPath('/account?tab=keys#top', '/')).toBe('/account?tab=keys#top')
+    expect(localPath('/café', '/')).toBe('/caf%C3%A9')
+
+    for (const next of ['https://evil.example', '//evil.example', '/\\evil.example', '/\t/evil.example', '/\n/evil.example', '\\\\evil.example', 'evil.example', 'javascript:alert(1)', '', undefined, ['/a']])
+      expect(localPath(next, '/home')).toBe('/home')
+  })
+
+  it('leaves no control character a redirect would refuse', () => {
+    expect(localPath('/a\tb', '/')).toBe('/ab')
   })
 })
 
