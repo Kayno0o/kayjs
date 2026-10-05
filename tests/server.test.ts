@@ -1026,6 +1026,21 @@ describe('public files', () => {
   })
 })
 
+describe('problems kay check reports', () => {
+  it('reach the problems panel of every page in development, never in production', async () => {
+    const routes = 'tests/fixtures/problems/src/routes'
+    const dev = new Elysia().use(await pages({ routes, dev: true, security: false }))
+    const block = (/<script type="application\/json" id="kay-check-problems">(.*?)<\/script>/).exec(await (await dev.handle(new Request('http://localhost/'))).text())?.[1]
+
+    expect(block).not.toContain('<')
+    expect(JSON.parse(block!)).toContainEqual(expect.stringMatching(/^tests\/fixtures\/problems\/src\/routes\/index\.kay:1:1 - An `img` needs `alt`/))
+
+    const production = new Elysia().use(await pages({ routes, prebuilt: false, security: false }))
+
+    expect(await (await production.handle(new Request('http://localhost/'))).text()).not.toContain('kay-check-problems')
+  })
+})
+
 describe('special pages', () => {
   it('answers a failing action with a generic 500 and logs its stack at the .kay line', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)

@@ -92,19 +92,19 @@ export async function transformKayCached(source: string, filename: string, given
   return code
 }
 
-// The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept.
-export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string): Promise<Analysis> {
+// The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept. `check` adds the problems only `kay check` reports otherwise, flagged `checkOnly`.
+export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false): Promise<Analysis> {
   // The id the file goes by is part of what it compiles to, and a link may change it.
-  const entry = cacheEntry(cacheDir, filename, 'analysis', `${root}\0${throughLinks(root, filename)}\0${source}`)
+  const entry = cacheEntry(cacheDir, filename, check ? 'analysis-check' : 'analysis', `${root}\0${throughLinks(root, filename)}\0${source}`)
   const cached = await readCacheEntry<Analysis>(entry)
 
   if (cached !== undefined)
     return cached
 
-  const { island, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root })
+  const { island, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check })
   const analysis = { island, classes, diagnostics }
 
-  if (diagnostics.length === 0)
+  if (diagnostics.every(diagnostic => diagnostic.checkOnly))
     await writeCacheEntry(entry, analysis)
 
   return analysis

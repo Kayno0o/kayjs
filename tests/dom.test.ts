@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
-import { LIVE_RELOAD } from '../src/server/dev'
+import { DEV_PROBLEMS, LIVE_RELOAD, problemsBlock } from '../src/server/dev'
 import { settle } from '../src/test'
 
 interface ClientModule {
@@ -347,6 +347,29 @@ describe('bind:value on a number input', () => {
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('the problems panel', () => {
+  it('lists the problems kay check reports that the page carries, once it loads', async () => {
+    const script = (/<script>([\s\S]*)<\/script>/).exec(DEV_PROBLEMS)![1]!
+    const { error, warn } = console
+    const problem = 'src/a.kay:1:1 - An `img` needs `alt`\n1 | img(src="/</script>")'
+
+    document.head.innerHTML = problemsBlock([problem])
+
+    try {
+      // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
+      new Function(script)()
+      document.dispatchEvent(new Event('DOMContentLoaded', { bubbles: true }))
+
+      expect(document.querySelector('kay-problems')!.shadowRoot!.textContent).toBe(`1 kay problemDismiss${problem}`)
+    }
+    finally {
+      Object.assign(console, { error, warn })
+      document.querySelector('kay-problems')?.remove()
+      document.head.innerHTML = ''
     }
   })
 })

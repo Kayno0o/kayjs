@@ -13,6 +13,7 @@ import { refuseServerOnlyReads } from '../build/server-only'
 import { forgetBundleMaps } from '../build/sourcemap'
 import { styleImports, withoutStyles } from '../build/styles'
 import { analyzeKayCached, KayCompileError } from '../build/transform'
+import { formatDiagnostic } from '../compiler'
 import { apiStubs, scanApi } from './api'
 import { rebaseCss } from './base'
 
@@ -50,6 +51,8 @@ export interface PrerenderedPage {
 
 export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {
   dir: string
+  // Development: what `kay check` would report of the project's components without type checking, for the problems panel.
+  problems?: string[]
   // By absolute path.
   styles: Map<string, string>
   pages: Map<string, PrerenderedPage>
@@ -104,14 +107,19 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
   const cacheDir = join(root, '.kay', 'cache')
-  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir)))
+  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot)))
+  const problems: string[] = []
 
   for (const [index, file] of files.entries()) {
     const source = sources[index]!
     const compiled = analyses[index]!
 
-    for (const diagnostic of compiled.diagnostics)
-      diagnostics.push({ ...diagnostic, file, source })
+    for (const diagnostic of compiled.diagnostics) {
+      if (!diagnostic.checkOnly)
+        diagnostics.push({ ...diagnostic, file, source })
+      else if (index < own.length)
+        problems.push(formatDiagnostic(source, relative(root, file), diagnostic))
+    }
 
     if (compiled.island)
       islands.set(compiled.island, file)
@@ -148,7 +156,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
 
   await writeManifest(root, manifest)
 
-  return fromManifest(root, manifest)
+  return options.hot ? { ...fromManifest(root, manifest), problems } : fromManifest(root, manifest)
 }
 
 export async function writeManifest(root: string, manifest: ClientManifest): Promise<void> {
