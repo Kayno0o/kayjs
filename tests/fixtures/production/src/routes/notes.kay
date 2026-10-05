@@ -1,0 +1,17 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const note = action(t.Object({ text: t.String() }), ({ text }) => text.length)
+export const attach = action(t.Object({ text: t.String() }), ({ text }) => text.length, { bodyLimit: 4 * 1024 * 1024 })
+
+const failure = ctx.failed(note)
+const sent = ctx.succeeded(note)
+---
+form(action={note})
+  textarea(name="text")
+  button Send
+if failure
+  p.error {failure.status} {Object.values(failure.errors).join(' ')}
+if sent
+  p.sent Sent {sent.data}

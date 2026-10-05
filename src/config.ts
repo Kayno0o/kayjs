@@ -29,6 +29,10 @@ export interface KayConfig {
   fonts?: FontConfig[]
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
   security?: SecurityConfig | false
+  // The proxies in front of the server, which the client's address that rate limits count is read through. Without it, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
+  proxy?: ProxyConfig
+  // The most bytes a request to an action or an API route may send, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
+  bodyLimit?: number
   // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip: for a server with no proxy in front doing it. Off by default.
   compress?: boolean
   // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
@@ -89,6 +93,14 @@ export interface SecurityConfig {
   csp?: Record<string, string[] | false> | false
   // Headers merged over kay's, one given `false` not sent: `{ 'strict-transport-security': 'max-age=63072000; includeSubDomains' }`.
   headers?: Record<string, string | false>
+}
+
+// One of the two: trusted only from a proxy on this machine or a private network, so a client reaching the server directly cannot forge it.
+export interface ProxyConfig {
+  // The proxies that each append to `X-Forwarded-For`: 1 for nginx or Caddy alone, 2 for Cloudflare then nginx.
+  hops?: number
+  // The header a proxy sets to the client's address, such as `cf-connecting-ip` or `x-real-ip`, read instead of `X-Forwarded-For`.
+  header?: string
 }
 
 export interface FontConfig {

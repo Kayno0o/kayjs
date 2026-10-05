@@ -2,6 +2,7 @@ import type { BunPlugin } from 'bun'
 import type { Locals } from '../runtime'
 import type { EventStream } from '../runtime/live'
 import type { ActionOptions } from './actions'
+import type { BodyLimit } from './body'
 import type { LoadedGuard } from './guards'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
@@ -36,6 +37,9 @@ const HEARTBEAT_MS = 5000
 const HEARTBEAT = new TextEncoder().encode(':\n\n')
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
+const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
+// Where `api({ bodyLimit })` keeps its limit on the instance it makes.
+const BODY_LIMIT = Symbol.for('kay.bodyLimit')
 
 // Where a failing event stream reports its error: logged, and handed to `onError` once the route answering with it is known.
 const streamReporters = new WeakMap<Response, { report: (error: unknown) => void }>()
@@ -80,7 +84,10 @@ function guardsOf(apiDir: string, dir: string): string[] {
 }
 
 // Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused.
-export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<void> {
+// Gives back the body limit of each module by the path it is mounted at.
+export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<Map<string, BodyLimit>> {
+  const limits = new Map<string, BodyLimit>()
+
   for (const module of modules) {
     const instance = (await importModule<{ default?: unknown }>(module.file)).default
 
@@ -88,6 +95,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       throw new TypeError(`kay: ${module.file} must export an Elysia instance by default: export default new Elysia().get('/', () => ...)`)
 
     Object.defineProperty(instance, API_MOUNT, { value: module.mount, configurable: true })
+    limits.set(module.mount, { bytes: (instance as { [BODY_LIMIT]?: number })[BODY_LIMIT], refuse: tooLarge })
 
     const guards = await Promise.all(module.guards.map(async file => loadGuard({ file, special: {} })))
 
@@ -101,6 +109,12 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       })
       .use(instance))
   }
+
+  return limits
+}
+
+function tooLarge(): Response {
+  return new Response('Request body too large', { status: 413, headers: TEXT })
 }
 
 // Guards first, so a request without credentials gets their answer whatever its origin; what they set on the response goes out with the route's.
@@ -136,9 +150,19 @@ async function admit(guards: LoadedGuard[], context: { request: Request, set: { 
 type ApiLocals = { [Key in keyof Locals]: Locals[Key] }
 type Empty = Record<never, never>
 
+export interface ApiOptions {
+  // The most bytes a request to the module's routes may send, in place of the app's `bodyLimit`.
+  bodyLimit?: number
+}
+
 // An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is.
-export function api(): Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }> {
-  return new Elysia() as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
+export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }> {
+  const instance = new Elysia()
+
+  if (options.bodyLimit !== undefined)
+    Object.defineProperty(instance, BODY_LIMIT, { value: options.bodyLimit })
+
+  return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
 }
 
 // Answers with a server-sent event per value `source` gives, which `stream()` reads typed in an island: values cross as island props do, Dates, Maps and Sets included.

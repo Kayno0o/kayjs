@@ -37,6 +37,8 @@ export interface ActionProtection<Honeypot extends string = never> {
   rateLimit?: { max: number, window: number }
   // A field the form renders out of sight, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.
   honeypot?: Honeypot
+  // The most bytes a post may send, files included, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.
+  bodyLimit?: number
 }
 
 export interface ActionContext {

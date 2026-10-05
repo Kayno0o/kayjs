@@ -1,5 +1,6 @@
 import type { Server } from 'bun'
-import type { TSchema } from 'elysia'
+import type { Elysia, TSchema } from 'elysia'
+import type { ProxyConfig } from '../config'
 import type { ServerAction } from '../runtime/action'
 import { rewrittenAddress } from './rewrite'
 
@@ -23,7 +24,11 @@ const windows = new WeakMap<object, Map<string, Window>>()
 const MAX_CLIENTS = 10_000
 const ZONE = /%.*$/
 const LEADING_ZEROS = /^0+(?=.)/
-const LOOPBACK_OR_PRIVATE = /^(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|::1$|fc|fd|::ffff:(?:127|10|192\.168)\.)/i
+// Loopback, private, shared (CGNAT, Tailscale) and link-local ranges, IPv4 ones mapped into IPv6 included: where a proxy in front of the server connects from.
+const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.)|::1$|f[cd]|fe[89ab])/i
+// The proxy settings of the app each request reached, set as it arrives; `null` for an app setting none.
+const proxies = new WeakMap<Request, ProxyConfig | null>()
+let warnedUnconfigured = false
 
 // Why a post must not reach the handler, or undefined when it may.
 export function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined): ProtectionRefusal | undefined {
@@ -104,13 +109,61 @@ export function rateKey(address: string): string {
   return `${groups.slice(0, 4).map(group => group.replace(LEADING_ZEROS, '')).join(':')}::/64`
 }
 
-// The socket's address, unless it is a proxy on this machine or network: then the address that proxy appended last to `X-Forwarded-For`, which a client cannot forge.
-export function clientAddress(request: Request, server: Server<unknown> | null | undefined): string {
+// Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
+export function trustProxy(app: Elysia, proxy: ProxyConfig | undefined): void {
+  if (proxy) {
+    const { hops, header } = proxy
+
+    if ((hops === undefined) === (header === undefined))
+      throw new Error('kay: proxy takes either hops, the number of proxies in front, or header, the one a proxy sets to the client\'s address')
+
+    if (hops !== undefined && (!Number.isInteger(hops) || hops < 1))
+      throw new Error(`kay: proxy.hops is the number of proxies in front, a whole number from 1; got ${hops}`)
+
+    if (header !== undefined && header.trim() === '')
+      throw new Error('kay: proxy.header names the header a proxy sets to the client\'s address, such as cf-connecting-ip')
+  }
+
+  app.onRequest(({ request }) => {
+    proxies.set(request, proxy ?? null)
+  })
+}
+
+// The socket's address, unless it is a proxy on this machine or network the app's `proxy` setting trusts: then the client's address as that proxy passed it on.
+// `proxy` stands in for the app's setting, for a plain Elysia app that `pages()` does not serve.
+export function clientAddress(request: Request, server: Server<unknown> | null | undefined, proxy?: ProxyConfig): string {
   const address = rewrittenAddress(request) ?? server?.requestIP(request)?.address
-  const forwarded = request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim()
+  const trusted = proxy ?? proxies.get(request)
+  // Under `app.handle()`, as in a test, there is no socket: the request came from whatever the test says.
+  const fromProxy = address === undefined || LOOPBACK_OR_PRIVATE.test(address)
 
-  if (address !== undefined && !LOOPBACK_OR_PRIVATE.test(address))
-    return address
+  if (trusted && fromProxy) {
+    const forwarded = forwardedAddress(request, trusted)
 
-  return forwarded || address || 'unknown'
+    if (forwarded)
+      return forwarded
+  }
+
+  if (!trusted && address !== undefined && fromProxy && request.headers.has('x-forwarded-for'))
+    warnUnconfigured()
+
+  return address ?? 'unknown'
+}
+
+// Each proxy appends the address it was reached from to `X-Forwarded-For`, so the client is `hops` entries from the end; with fewer, the request skipped an outer proxy and the first entry is who reached the inner one.
+function forwardedAddress(request: Request, { hops = 1, header }: ProxyConfig): string | undefined {
+  if (header !== undefined)
+    return request.headers.get(header)?.trim() || undefined
+
+  const entries = request.headers.get('x-forwarded-for')?.split(',').map(entry => entry.trim()).filter(entry => entry !== '') ?? []
+
+  return entries[Math.max(0, entries.length - hops)]
+}
+
+function warnUnconfigured(): void {
+  if (warnedUnconfigured)
+    return
+
+  warnedUnconfigured = true
+  console.warn('kay: requests come through a proxy, as their X-Forwarded-For shows, but kay.config.ts sets no proxy, so rate limits count every visitor as the proxy; set proxy: { hops: 1 } for one proxy such as nginx, or proxy: { header } for the header a proxy sets to the client\'s address')
 }

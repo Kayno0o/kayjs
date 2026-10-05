@@ -3,6 +3,7 @@ import type { Elysia, TSchema, ValidationError } from 'elysia'
 import type { KayConfig } from '../config'
 import type { GuardContext, Locals } from '../runtime'
 import type { ActionContext, ServerAction } from '../runtime/action'
+import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
@@ -13,6 +14,7 @@ import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { NAVIGATE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { encodeValue, unsendable } from '../runtime/wire'
+import { sizeText } from './body'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { submittedValues, writeFlash, writeSuccess } from './flash'
@@ -53,9 +55,10 @@ export interface ActionOptions {
   i18n?: I18n
 }
 
-// Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema.
-export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], options: ActionOptions = {}): Promise<void> {
+// Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path.
+export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], options: ActionOptions = {}): Promise<Map<string, BodyLimit>> {
   const served = new Map<string, { file: string, action: ServerAction<TSchema, unknown> }>()
+  const limits = new Map<string, BodyLimit>()
 
   for (const [file, guards] of actionFiles(routes)) {
     const module = await importModule<Record<string, unknown>>(file)
@@ -74,6 +77,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
         throw new Error(`kay: ${taken.file} and ${file} both export an action served at ${value.url}; rename one of the files`)
 
       served.set(value.url, { file, action: value })
+      limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: (request, bytes) => tooLarge(value, request, bytes) })
       app.post(value.url, async context => inLocale(context.request, options, async () => runAction(value, context, options)), {
         body: value.schema,
         transform: (context) => {
@@ -108,6 +112,16 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
       })
     }
   }
+
+  return limits
+}
+
+// A post over the action's body limit, answered as a refused one is, with a message for the whole form; another site's is refused as such.
+function tooLarge(action: ServerAction<TSchema, unknown>, request: Request, bytes: number): Response {
+  if (isCrossSite(request))
+    return crossSiteRefusal()
+
+  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': `Too large to send; ${sizeText(bytes)} at most` } })
 }
 
 // Every page and layout once, with the guards of its own directory and above: a layout's actions are not behind the guards of the pages below it.
@@ -174,7 +188,11 @@ function isEmptyFile(value: unknown): boolean {
 // Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused before anything else runs.
 function refuseCrossSite(request: Request) {
   if (isCrossSite(request))
-    throw new Refusal(new Response('Cross-site action refused', { status: 403 }))
+    throw new Refusal(crossSiteRefusal())
+}
+
+function crossSiteRefusal(): Response {
+  return new Response('Cross-site action refused', { status: 403 })
 }
 
 // A browser names where a request comes from in `Origin`, and in `Sec-Fetch-Site` too, which it sends even when it leaves `Origin` out.

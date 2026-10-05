@@ -16,6 +16,10 @@ import { testSite } from '../src/test'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 
+function socket(address: string): Server<unknown> {
+  return { requestIP: () => ({ address }) } as unknown as Server<unknown>
+}
+
 function directives(policy: string | null): Map<string, string[]> {
   return new Map(policy!.split('; ').map((directive) => {
     const [name, ...sources] = directive.split(' ')
@@ -119,7 +123,7 @@ describe('action protection', () => {
   })
 
   it('lets a client post as often as the limit allows in a window, then answers 429 with when to retry', async () => {
-    const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false })
+    const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: { hops: 1 } })
     const { send } = await import(CONTACT) as { send: Action<{ message: string }, number> }
     const call = async (from: string) => app.handle(new Request(`http://localhost${send.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': from }, body: stringify({ message: 'hi' }) }))
 
@@ -141,13 +145,50 @@ describe('action protection', () => {
     expect(rateKey('::ffff:203.0.113.7')).toBe('::ffff:203.0.113.7')
   })
 
-  it('takes the address a proxy appended last, never one the client wrote before it', () => {
-    const behind = new Request('http://localhost/', { headers: { 'x-forwarded-for': '1.1.1.1, 203.0.113.7' } })
-    const proxy = { requestIP: () => ({ address: '127.0.0.1' }) } as unknown as Server<unknown>
-    const direct = { requestIP: () => ({ address: '198.51.100.9' }) } as unknown as Server<unknown>
+  it('takes the address the trusted proxies passed on, never one the client wrote before them', () => {
+    const behind = new Request('http://localhost/', { headers: { 'x-forwarded-for': '1.1.1.1, 203.0.113.7, 172.70.1.1', 'cf-connecting-ip': '203.0.113.7' } })
+    const skipped = new Request('http://localhost/', { headers: { 'x-forwarded-for': '203.0.113.8' } })
 
-    expect(clientAddress(behind, proxy)).toBe('203.0.113.7')
-    expect(clientAddress(behind, direct)).toBe('198.51.100.9')
+    expect(clientAddress(behind, socket('127.0.0.1'), { hops: 1 })).toBe('172.70.1.1')
+    expect(clientAddress(behind, socket('::ffff:172.18.0.1'), { hops: 2 })).toBe('203.0.113.7')
+    expect(clientAddress(behind, socket('100.101.1.1'), { header: 'cf-connecting-ip' })).toBe('203.0.113.7')
+    // A request that skipped the outer proxy carries what the inner one appended, who reached it.
+    expect(clientAddress(skipped, socket('10.0.0.2'), { hops: 2 })).toBe('203.0.113.8')
+    // A client reaching the server itself forges nothing, whatever the setting.
+    expect(clientAddress(behind, socket('198.51.100.9'), { hops: 2 })).toBe('198.51.100.9')
+  })
+
+  it('counts the socket as the client without a proxy setting, warning once when requests come through one', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const forged = new Request('http://localhost/', { headers: { 'x-forwarded-for': '203.0.113.7' } })
+
+    try {
+      expect(clientAddress(forged, socket('198.51.100.9'))).toBe('198.51.100.9')
+      expect(warn).not.toHaveBeenCalled()
+      expect(clientAddress(forged, socket('192.168.1.20'))).toBe('192.168.1.20')
+      expect(clientAddress(forged, socket('192.168.1.21'))).toBe('192.168.1.21')
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]![0])).toContain('proxy: { hops: 1 }')
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('reads the proxy setting pages() is given for every request it serves, an app route included', async () => {
+    const whoami = async (proxy?: { hops: number }) => {
+      const app = new Elysia().use(await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy })).get('/whoami', ({ request, server }) => clientAddress(request, server))
+
+      return (await app.handle(new Request('http://localhost/whoami', { headers: { 'x-forwarded-for': '203.0.113.7' } }))).text()
+    }
+
+    expect(await whoami({ hops: 1 })).toBe('203.0.113.7')
+    expect(await whoami()).toBe('unknown')
+  })
+
+  it('refuses a proxy setting it cannot read, as the server boots', async () => {
+    for (const proxy of [{}, { hops: 1, header: 'x-real-ip' }, { hops: 0 }, { hops: 1.5 }, { header: ' ' }])
+      await expect(pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy })).rejects.toThrow('kay: proxy')
   })
 
   it('types the honeypot as one of the form\'s fields for kay check, a misspelt one still refused', async () => {
@@ -163,6 +204,76 @@ describe('action protection', () => {
     finally {
       await rm(typo, { force: true })
     }
+  })
+})
+
+describe('request body limits', () => {
+  const FIXTURE = 'tests/fixtures/production'
+  // Held in a variable so tsc leaves the .kay import to Bun.
+  const NOTES = './fixtures/production/src/routes/notes.kay'
+  const MB = 1024 * 1024
+  const serve = async (bodyLimit?: number) => pages({ routes: `${FIXTURE}/src/routes`, api: `${FIXTURE}/src/api`, prebuilt: false, bodyLimit })
+  // Sent in chunks, with no Content-Length to go by.
+  const chunked = (size: number) => new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (let sent = 0; sent < size; sent += 64 * 1024)
+        controller.enqueue(new Uint8Array(Math.min(64 * 1024, size - sent)).fill(97))
+
+      controller.close()
+    },
+  })
+
+  it('answers an island\'s call sending over 1 MB with 413 and a form-wide error, the handler never running', async () => {
+    const app = await serve()
+    const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
+    const call = async (text: string) => {
+      const body = stringify({ text })
+
+      return app.handle(new Request(`http://localhost${note.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)), 'x-kay-action': '1' }, body }))
+    }
+
+    const refused = await call('a'.repeat(MB))
+
+    expect(refused.status).toBe(413)
+    expect(parse(await refused.text())).toEqual({ errors: { '': 'Too large to send; 1 MB at most' }, data: undefined })
+    expect(await (await call('a'.repeat(MB - 100))).text()).toBe(stringify(MB - 100))
+  })
+
+  it('sends a plain form post over the limit back to its page with the error, counting a body sent without Content-Length', async () => {
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false, bodyLimit: 64 * 1024 })
+    const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
+
+    expect((await site.submit(note, { text: 'a'.repeat(65 * 1024) }, { from: '/notes' })).html).toContain('<p class="error">413 Too large to send; 64 KB at most</p>')
+    expect((await site.submit(note, { text: 'hello' }, { from: '/notes' })).html).toContain('<p class="sent">Sent 5</p>')
+  })
+
+  it('lets an action or an API module raise the limit for itself', async () => {
+    const app = await serve()
+    const { attach } = await import(NOTES) as { attach: Action<{ text: string }, number> }
+    const text = 'a'.repeat(2 * MB)
+    const body = stringify({ text })
+
+    const attached = await app.handle(new Request(`http://localhost${attach.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body }))
+    const uploaded = await app.handle(new Request('http://localhost/api/uploads', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: text }))
+    const echoed = await app.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: text }))
+
+    expect(await attached.text()).toBe(stringify(2 * MB))
+    expect(await uploaded.text()).toBe(String(2 * MB))
+    expect(echoed.status).toBe(413)
+    expect(await echoed.text()).toBe('Request body too large')
+  })
+
+  it('refuses a chunked body as soon as it passes the limit, and leaves a smaller one whole for the route', async () => {
+    const app = await serve(MB)
+    const post = async (size: number) => app.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: chunked(size) }))
+
+    expect((await post(2 * MB)).status).toBe(413)
+    expect(await (await post(MB)).text()).toBe(String(MB))
+  })
+
+  it('refuses a limit it cannot read, as the server boots', async () => {
+    for (const bodyLimit of [0, -1, 1.5])
+      await expect(serve(bodyLimit)).rejects.toThrow('kay: bodyLimit')
   })
 })
 

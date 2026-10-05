@@ -16,6 +16,7 @@ import { localeState, runInLocale } from '../runtime/locale-state'
 import { overHttps, registerActionRoutes } from './actions'
 import { scanApi, serveApi } from './api'
 import { basePath, rebaseRedirects } from './base'
+import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { bundled } from './bundle'
 import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from './compress'
@@ -29,6 +30,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
 import { logRequests } from './log'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
+import { trustProxy } from './protection'
 import { servePublic } from './public'
 import { readRedirects, redirectShape, serveRedirects } from './redirects'
 import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './render'
@@ -167,6 +169,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const security = securityHeaders(options)
 
+  trustProxy(app, options.proxy)
+
   // onRequest runs for every route of the app, its own included; a header the app set before is kept.
   if (security) {
     app.onRequest(({ set }) => {
@@ -237,9 +241,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   })
 
   const actionOptions = { dev: options.dev, onError: options.onError, i18n }
-  const [, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
+  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
 
-  await serveApi(app, apiModules, actionOptions)
+  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, await serveApi(app, apiModules, actionOptions))
   serveErrorReports(app, options.onError)
 
   serveImages(app, {

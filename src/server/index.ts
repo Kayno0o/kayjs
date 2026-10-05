@@ -12,7 +12,7 @@ import { bootFailure } from './dev'
 
 export type { KayConfig } from '../config'
 export { defineConfig } from '../config'
-export type { ApiModule } from './api'
+export type { ApiModule, ApiOptions } from './api'
 export { api, eventStream } from './api'
 export type { PagesOptions } from './app'
 export type { ScriptHashOptions } from './csp'
