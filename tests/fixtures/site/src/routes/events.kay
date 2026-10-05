@@ -10,7 +10,7 @@ const hall: Section = { id: 1, name: 'Hall', parent: null, rows: [] }
 
 hall.rows.push({ id: 2, name: 'Front', parent: hall, rows: [] })
 
-export const schedule = action(t.Object({ title: t.String({ minLength: 1 }), at: t.Date() }), ({ title, at }, ctx) => {
+export const schedule = action(t.Object({ title: t.String({ maxLength: 10_000, minLength: 1 }), at: t.Date() }), ({ title, at }, ctx) => {
   if (at < EARLIEST)
     return ctx.fail(422, { earliest: EARLIEST })
 

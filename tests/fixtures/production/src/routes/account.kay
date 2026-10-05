@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const signIn = action(t.Object({ user: t.String() }), async ({ user }, ctx) => {
+export const signIn = action(t.Object({ user: t.String({ maxLength: 200 }) }), async ({ user }, ctx) => {
   await ctx.locals.session.regenerate()
   await ctx.locals.session.set('user', user)
   ctx.redirect('/account')

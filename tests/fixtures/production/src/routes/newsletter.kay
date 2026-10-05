@@ -4,7 +4,7 @@ import { action } from 'kay'
 
 export const prerender = true
 
-export const join = action(t.Object({ email: t.String({ format: 'email', error: 'Not an email' }) }), ({ email }) => email.split('@')[0])
+export const join = action(t.Object({ email: t.String({ maxLength: 200, format: 'email', error: 'Not an email' }) }), ({ email }) => email.split('@')[0])
 
 const failure = ctx.failed(join)
 const joined = ctx.succeeded(join)

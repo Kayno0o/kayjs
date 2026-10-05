@@ -3,6 +3,7 @@ import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import { parse } from '@babel/parser'
+import { isSecret } from '../server/flash'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 const REACTIVE_MODULES = new Set(['kay'])
@@ -504,6 +505,83 @@ function leftmost(name: t.Node): string | undefined {
     return leftmost(name.left)
 
   return name.type === 'Identifier' ? name.name : undefined
+}
+
+// What the quick fix bounds a string field to: room for a title or a name, several of them fitting in the cookie together.
+const SUGGESTED_MAX_LENGTH = 200
+
+// A string field of an action's schema with no `maxLength`: a refused form post brings its values back to the page in a cookie, and one too long for it comes back empty. A secret is never brought back, so it needs none.
+export function unboundedFields(source: string, server: Span | undefined): Diagnostic[] {
+  if (!server || !source.slice(server.start, server.end).includes('String'))
+    return []
+
+  const parsed = parseFence(source, server, [])
+
+  if (!parsed)
+    return []
+
+  const diagnostics: Diagnostic[] = []
+
+  eachNode(parsed.ast.program, (node) => {
+    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'action' || !node.arguments[0])
+      return
+
+    schemaStrings(node.arguments[0], undefined, (call, field) => {
+      const options = call.arguments[0]
+      const known = options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type !== 'SpreadElement'))
+
+      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && propertyKey(property) === 'maxLength')) || (field !== undefined && isSecret(field)))
+        return
+
+      const edit = options === undefined
+        ? { at: call.end! - 1, text: `{ maxLength: ${SUGGESTED_MAX_LENGTH} }` }
+        : options.properties.length === 0 ? { at: options.start! + 1, text: ` maxLength: ${SUGGESTED_MAX_LENGTH} ` } : { at: options.properties[0]!.start!, text: `maxLength: ${SUGGESTED_MAX_LENGTH}, ` }
+      const at = server.start + edit.at
+
+      diagnostics.push({
+        ...parsed.shift(call.callee),
+        message: `${field === undefined ? 'This string field' : `The string field ${field}`} has no maxLength: when the form is refused, its values come back to the page in a cookie, and a value too long for it leaves the form empty; give it one`,
+        fixes: [{ title: `Give it a maxLength of ${SUGGESTED_MAX_LENGTH}`, edits: [{ start: at, end: at, text: edit.text }] }],
+        checkOnly: true,
+      })
+    })
+  })
+
+  return diagnostics
+}
+
+// Every `t.String(...)` call in a schema, with the name of the field it types, the nearest property holding it.
+function schemaStrings(node: t.Node | null | undefined, field: string | undefined, found: (call: t.CallExpression, field: string | undefined) => void): void {
+  if (!node || typeof node.type !== 'string')
+    return
+
+  if (node.type === 'ObjectProperty') {
+    schemaStrings(node.value, propertyKey(node) ?? field, found)
+
+    return
+  }
+
+  if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && node.callee.property.type === 'Identifier' && node.callee.property.name === 'String')
+    found(node, field)
+
+  for (const key of Object.keys(node) as (keyof t.Node)[]) {
+    if (key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments' || key === 'loc')
+      continue
+
+    const value = node[key] as unknown
+
+    for (const child of Array.isArray(value) ? value : [value]) {
+      if (child && typeof child === 'object')
+        schemaStrings(child as t.Node, field, found)
+    }
+  }
+}
+
+function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | undefined {
+  if (property.computed)
+    return undefined
+
+  return property.key.type === 'Identifier' ? property.key.name : property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
 function eachNode(node: t.Node | null | undefined, visit: (node: t.Node) => void) {

@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const rename = action(t.Object({ title: t.String() }), async ({ title }) => title)
+export const rename = action(t.Object({ title: t.String({ maxLength: 200 }) }), async ({ title }) => title)
 
 const failure = ctx.failed(rename)
 ---

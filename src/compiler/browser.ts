@@ -37,6 +37,24 @@ const TS_EXPRESSIONS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNo
 const FENCE_OPENING = '---'
 const NOT_DEFINED = /^(\S+) is not defined$/
 const TYPEOF_GLOBAL = /\btypeof\s+([a-z_$][\w$]*)/gi
+// What may render differently on the server and in the browser, worth a scope analysis in an island.
+const VARYING_HINT = /\b(?:Date|Math|toLocale\w*|Intl)\b/
+const LOCALE_METHODS = new Set(['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString'])
+const MOVED = 'read it in `effect` or `onMount`, or on the server and pass it as a prop'
+const CLOCK = { reason: 'reads the clock, which has moved on by the time the island hydrates', remedy: MOVED }
+const RANDOM = { reason: 'gives another number in the browser', remedy: MOVED }
+const NO_LOCALE = { reason: 'formats in the server\'s default locale there and in the visitor\'s in the browser', remedy: 'pass it a locale' }
+const NO_TIME_ZONE = { reason: 'formats in the server\'s time zone there and in the visitor\'s in the browser', remedy: 'pass it a `timeZone`' }
+
+// A value an island computes as it renders that the server and the browser compute apart.
+interface Varying {
+  label: string
+  reason: string
+  remedy: string
+  start: number
+  end: number
+  chain: t.Node[]
+}
 
 let globals: Set<string> | undefined
 
@@ -82,7 +100,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   const expressions = templateExpressions(file)
   const texts = [file.script ? source.slice(file.script.start, file.script.end) : '', ...expressions.map(expression => source.slice(expression.span.start, expression.span.end))]
 
-  if (!texts.some(text => Array.from(text.matchAll(WORD)).some(match => names.has(match[0]))))
+  if (!texts.some(text => Array.from(text.matchAll(WORD)).some(match => names.has(match[0])) || (island && VARYING_HINT.test(text))))
     return []
 
   const program = buildProgram(file, serverNames, expressions)
@@ -104,6 +122,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   const functions = new Map<string, t.Node>()
   const calls: { name: string, chain: t.Node[] }[] = []
   const reads: Read[] = []
+  const varying: Varying[] = []
   let effectBound = false
 
   // A name the template binds twice over the script's, which no block can tell apart, leaves nothing to report rather than failing the check.
@@ -125,6 +144,17 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
 
         if (callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.path.isProgram())
           calls.push({ name: callee.name, chain: functionChain(path) })
+
+        const found = island ? varyingValue(path) : undefined
+
+        if (found)
+          varying.push({ ...found, start: path.node.start!, end: path.node.end!, chain: functionChain(path) })
+      },
+      NewExpression(path) {
+        const found = island ? varyingValue(path) : undefined
+
+        if (found)
+          varying.push({ ...found, start: path.node.start!, end: path.node.end!, chain: functionChain(path) })
       },
       Program(path) {
         effectBound = path.scope.hasBinding('effect', true)
@@ -185,7 +215,53 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
       diagnostics.push({ ...span, message: `\`typeof ${read.name}\` differs between the server and the browser, so what the island renders from it will not match the server's markup when it hydrates: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``, fixes: toClient, checkOnly: true })
   }
 
+  for (const value of varying) {
+    const start = toSource(value.start)
+    const end = toSource(value.end)
+
+    if (start !== undefined && end !== undefined && renders(value.chain))
+      diagnostics.push({ start, end, message: `\`${value.label}\` ${value.reason}, so what the island renders from it will not match the server's markup when it hydrates: ${value.remedy}`, checkOnly: true })
+  }
+
   return diagnostics
+}
+
+// The clock, a random number, or a locale or time zone left to the platform, as a call or a `new` gives them; options the code computes are taken as setting them.
+function varyingValue(path: NodePath<t.CallExpression | t.NewExpression>): Omit<Varying, 'start' | 'end' | 'chain'> | undefined {
+  const { callee, arguments: args } = path.node
+  const global = (node: t.Node, name: string) => node.type === 'Identifier' && node.name === name && !path.scope.hasBinding(name, true)
+  const lacks = (options: t.Node | undefined, key: string) => options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type === 'ObjectProperty' && !property.computed && !(property.key.type === 'Identifier' && property.key.name === key) && !(property.key.type === 'StringLiteral' && property.key.value === key)))
+  const noLocale = (locale: t.Node | undefined) => locale === undefined || global(locale, 'undefined')
+
+  if (global(callee, 'Date'))
+    return args.length === 0 ? { label: path.isNewExpression() ? 'new Date()' : 'Date()', ...CLOCK } : undefined
+
+  if (callee.type !== 'MemberExpression' || callee.computed || callee.property.type !== 'Identifier')
+    return undefined
+
+  const name = callee.property.name
+
+  if (global(callee.object, 'Date') && name === 'now')
+    return { label: 'Date.now()', ...CLOCK }
+
+  if (global(callee.object, 'Math') && name === 'random')
+    return { label: 'Math.random()', ...RANDOM }
+
+  if (global(callee.object, 'Intl')) {
+    if (noLocale(args[0]))
+      return { label: `Intl.${name}`, ...NO_LOCALE }
+
+    return name === 'DateTimeFormat' && lacks(args[1], 'timeZone') ? { label: 'Intl.DateTimeFormat', ...NO_TIME_ZONE } : undefined
+  }
+
+  if (!path.isCallExpression() || !LOCALE_METHODS.has(name))
+    return undefined
+
+  if (noLocale(args[0]))
+    return { label: `${name}()`, ...NO_LOCALE }
+
+  // A number's `toLocaleString` has no time zone to take; only the date methods are sure to format one.
+  return name !== 'toLocaleString' && lacks(args[1], 'timeZone') ? { label: `${name}()`, ...NO_TIME_ZONE } : undefined
 }
 
 // `memo(() => ...)` and `rows.map(row => ...)` run the function they take before they return.

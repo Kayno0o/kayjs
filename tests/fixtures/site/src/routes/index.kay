@@ -3,7 +3,7 @@ import { t } from 'elysia'
 import { action } from 'kay'
 import { addTodo, listTodos } from '../data'
 
-export const add = action(t.Object({ title: t.String({ minLength: 1, error: 'Write a title' }) }), async ({ title }, ctx) => {
+export const add = action(t.Object({ title: t.String({ maxLength: 200, minLength: 1, error: 'Write a title' }) }), async ({ title }, ctx) => {
   if ((await listTodos()).some(todo => todo.title === title))
     return ctx.fail(409, { message: 'Already on the list' })
 

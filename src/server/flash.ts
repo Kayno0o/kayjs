@@ -121,7 +121,8 @@ export function submittedValues(body: unknown): Record<string, string> {
   return values
 }
 
-function isSecret(name: string): boolean {
+// A field never echoed back to the form, as a password is.
+export function isSecret(name: string): boolean {
   return SECRET_PART.test(name) || (name.match(WORD) ?? []).some(word => SECRET_WORDS.has(word.toLowerCase().replace(TRAILING_DIGITS, '')))
 }
 

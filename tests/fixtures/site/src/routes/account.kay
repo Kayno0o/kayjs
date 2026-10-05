@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const remember = action(t.Object({ theme: t.String() }), ({ theme }, ctx) => {
+export const remember = action(t.Object({ theme: t.String({ maxLength: 200 }) }), ({ theme }, ctx) => {
   ctx.cookies.set('theme', theme, { httpOnly: true })
 
   return ctx.locals.user ?? null

@@ -201,3 +201,33 @@ describe('browser-only globals read while rendering', () => {
     expect(reads('--- client\nconst width = window.innerWidth\n---\np {width}\n')).toEqual([])
   })
 })
+
+describe('values an island renders differently on the server and in the browser', () => {
+  const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [source.slice(diagnostic.start, diagnostic.end), diagnostic.message.slice(0, diagnostic.message.indexOf(', so'))])
+  const island = (script: string, template: string) => `---\nimport { signal } from 'kay'\n\nconst count = signal(0)\n${script}\n---\nbutton(onClick={() => count.set(c => c + 1)}) ${template}\n`
+
+  it('reports the clock, a random number, and a locale or time zone left to the platform while an island renders', () => {
+    const source = island('const now = Date.now()\nconst at = new Date()\nconst pick = Math.random()\nconst price = (1234.5).toLocaleString()\nconst day = at.toLocaleDateString(\'fr\')\nconst money = new Intl.NumberFormat().format(2)\nconst time = new Intl.DateTimeFormat(\'fr\', { hour: \'numeric\' })', '{now} {pick} {price} {day} {money} {time.format(at)} {count()} {Date()}')
+
+    expect(reads(source)).toEqual([
+      ['Date.now()', '`Date.now()` reads the clock, which has moved on by the time the island hydrates'],
+      ['new Date()', '`new Date()` reads the clock, which has moved on by the time the island hydrates'],
+      ['Math.random()', '`Math.random()` gives another number in the browser'],
+      ['(1234.5).toLocaleString()', '`toLocaleString()` formats in the server\'s default locale there and in the visitor\'s in the browser'],
+      ['at.toLocaleDateString(\'fr\')', '`toLocaleDateString()` formats in the server\'s time zone there and in the visitor\'s in the browser'],
+      ['new Intl.NumberFormat()', '`Intl.NumberFormat` formats in the server\'s default locale there and in the visitor\'s in the browser'],
+      ['new Intl.DateTimeFormat(\'fr\', { hour: \'numeric\' })', '`Intl.DateTimeFormat` formats in the server\'s time zone there and in the visitor\'s in the browser'],
+      ['Date()', '`Date()` reads the clock, which has moved on by the time the island hydrates'],
+    ])
+    expect(compileKay(island('const now = Date.now()', '{now}'), join(process.cwd(), 'widget.kay'), { check: true }).diagnostics[0]!.message).toBe('`Date.now()` reads the clock, which has moved on by the time the island hydrates, so what the island renders from it will not match the server\'s markup when it hydrates: read it in `effect` or `onMount`, or on the server and pass it as a prop')
+  })
+
+  it('leaves alone what both sides compute alike, what runs in the browser only, and a static component', () => {
+    const alike = island('const at = new Date(0)\nconst price = (2).toLocaleString(\'fr\')\nconst day = at.toLocaleDateString(\'fr\', { timeZone: \'UTC\' })\nconst time = new Intl.DateTimeFormat(\'fr\', { timeZone: \'Europe/Paris\' })\nconst options = { timeZone: \'UTC\' }\nconst hour = at.toLocaleTimeString(\'fr\', options)\nconst Date = { now: () => 1 }', '{price} {day} {time.format(at)} {hour} {Date.now()} {count()}')
+    const later = '---\nimport { effect, signal } from \'kay\'\n\nconst count = signal(0)\neffect(() => count.set(Date.now()))\n---\nbutton(onClick={() => count.set(Math.random())}) {count()}\n'
+
+    expect(reads(alike)).toEqual([])
+    expect(reads(later)).toEqual([])
+    expect(reads('---\nconst now = Date.now()\n---\np {now}\n')).toEqual([])
+  })
+})

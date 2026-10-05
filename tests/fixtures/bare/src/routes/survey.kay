@@ -4,13 +4,13 @@ import { action } from 'kay'
 
 // Each handler shows what it received in a header, which a plain form post carries back with its redirect.
 export const answer = action(t.Object({
-  tags: t.Array(t.String()),
+  tags: t.Array(t.String({ maxLength: 200 })),
   scores: t.Optional(t.Array(t.Number())),
   age: t.Optional(t.Number()),
   count: t.Integer(),
   agree: t.Boolean(),
-  email: t.Optional(t.String({ format: 'email' })),
-  note: t.Optional(t.String()),
+  email: t.Optional(t.String({ maxLength: 200, format: 'email' })),
+  note: t.Optional(t.String({ maxLength: 200 })),
 }), (input, ctx) => {
   ctx.headers.set('x-answer', JSON.stringify(input))
 })
@@ -21,6 +21,6 @@ export const nothing = action(t.Object({}), () => undefined)
 
 export const fails = action(t.Object({ status: t.Number() }), ({ status }, ctx) => ctx.fail(status, 'Refused'))
 
-export const away = action(t.Object({ to: t.String() }), ({ to }, ctx) => ctx.redirect(to))
+export const away = action(t.Object({ to: t.String({ maxLength: 200 }) }), ({ to }, ctx) => ctx.redirect(to))
 ---
 p Survey

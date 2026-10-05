@@ -39,7 +39,7 @@ describe('page swap, on the server', () => {
 
     expect(plain).toContain('<script type="module" src="/_kay/entry.js">')
     expect(second).toContain('<script type="module" src="/_kay/entry.js">')
-    expect(JSON.parse(FORMS.exec(second)![1]!)).toEqual({ '/_kay/action/tests/fixtures/navigation/src/routes/second.kay/add': { properties: { title: { type: 'string', minLength: 3, error: 'Too short' } }, required: ['title'] } })
+    expect(JSON.parse(FORMS.exec(second)![1]!)).toEqual({ '/_kay/action/tests/fixtures/navigation/src/routes/second.kay/add': { properties: { title: { type: 'string', maxLength: 200, minLength: 3, error: 'Too short' } }, required: ['title'] } })
 
     const bare = await servePages(process.cwd(), { routes: 'tests/fixtures/bare/src/routes', security: false }, async () => client)
 

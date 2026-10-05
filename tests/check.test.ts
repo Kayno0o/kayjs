@@ -6,6 +6,7 @@ import { describe, expect, it } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
 import { check, compileShadow } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
+import { compileKay } from '../src/compiler'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 
@@ -203,12 +204,12 @@ describe('kay check, edge cases', () => {
       'import { t } from \'elysia\'',
       'import { action } from \'kay\'',
       '',
-      'export const signIn = action(t.Object({ code: t.String() }), async ({ code }, ctx) => {',
+      'export const signIn = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
       '  if (code === \'x\')',
       '    return ctx.fail(400, { error: \'bad\' })',
       '  ctx.redirect(\'/\')',
       '}, { honeypot: \'website\' })',
-      'export const save = action(t.Object({ code: t.String() }), async ({ code }, ctx) => {',
+      'export const save = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
       '  if (code === \'x\')',
       '    return ctx.fail(400, { error: \'bad\' })',
       '  if (code === \'y\')',
@@ -243,7 +244,7 @@ describe('kay check, edge cases', () => {
       'import { action } from \'kay\'',
       'import { cached } from \'kay/cache\'',
       '',
-      'export const save = action(t.Object({ code: t.String(), status: t.Number(), next: t.String() }), async ({ code, status, next }, ctx) => {',
+      'export const save = action(t.Object({ code: t.String({ maxLength: 200 }), status: t.Number(), next: t.String({ maxLength: 200 }) }), async ({ code, status, next }, ctx) => {',
       '  if (code === \'a\')',
       '    return ctx.fail(422, { error: \'bad\' })',
       '  if (code === \'b\')',
@@ -631,5 +632,25 @@ describe('kay check, what the server refuses at boot', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('kay check, string fields an action leaves unbounded', () => {
+  const fields = (fence: string) => {
+    const source = `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\n${fence}\n---\np x\n`
+
+    return compileKay(source, join(process.cwd(), 'page.kay'), { check: true }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message.slice(0, diagnostic.message.indexOf(':')), checkOnly: diagnostic.checkOnly, fixed: diagnostic.fixes?.map(fix => fix.edits.reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source).split('\n')[4]) }))
+  }
+
+  it('reports a string field with no maxLength, offering one, nested or optional ones included', () => {
+    expect(fields('export const add = action(t.Object({ title: t.String(), tags: t.Array(t.String({})), email: t.Optional(t.String({ format: \'email\' })) }), () => 1)')).toEqual([
+      { text: 't.String', message: 'The string field title has no maxLength', checkOnly: true, fixed: ['export const add = action(t.Object({ title: t.String({ maxLength: 200 }), tags: t.Array(t.String({})), email: t.Optional(t.String({ format: \'email\' })) }), () => 1)'] },
+      { text: 't.String', message: 'The string field tags has no maxLength', checkOnly: true, fixed: ['export const add = action(t.Object({ title: t.String(), tags: t.Array(t.String({ maxLength: 200 })), email: t.Optional(t.String({ format: \'email\' })) }), () => 1)'] },
+      { text: 't.String', message: 'The string field email has no maxLength', checkOnly: true, fixed: ['export const add = action(t.Object({ title: t.String(), tags: t.Array(t.String({})), email: t.Optional(t.String({ maxLength: 200, format: \'email\' })) }), () => 1)'] },
+    ])
+  })
+
+  it('leaves bounded fields, secrets that never come back, options it cannot read and schemas outside actions alone', () => {
+    expect(fields('const options = { maxLength: 9 }\nexport const query = t.Object({ q: t.String() })\nexport const signIn = action(t.Object({ name: t.String({ maxLength: 40 }), password: t.String(), apiKey: t.String(), note: t.String(options), other: t.String({ ...options }) }), () => 1)')).toEqual([])
   })
 })

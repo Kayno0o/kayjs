@@ -4,7 +4,7 @@ import { action } from 'kay'
 import { uploads } from '../data'
 
 export const upload = action(t.Object({
-  note: t.String(),
+  note: t.String({ maxLength: 200 }),
   file: t.File({ type: 'image/png', error: 'Upload a PNG image' }),
   attachment: t.Optional(t.File()),
   extra: t.Optional(t.Object({ copies: t.Number(), files: t.Files() })),

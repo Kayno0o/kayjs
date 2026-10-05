@@ -8,7 +8,7 @@ import { codeFrame } from './frame'
 import { positionAt, SourceMap } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
-import { analyzeScript, analyzeServer } from './script'
+import { analyzeScript, analyzeServer, unboundedFields } from './script'
 
 export type { Diagnostic } from './ast'
 export { SourceMap } from './mapping'
@@ -108,6 +108,9 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   // Type checking only, so a page still runs while it is fixed, and fails there in development naming the same fixes.
   if (options.check && !client)
     diagnostics.push(...browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? [], routeFile))
+
+  if (options.check)
+    diagnostics.push(...unboundedFields(source, file.server))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page renders on the server; only a component it renders can be `--- client`' })

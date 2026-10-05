@@ -3,7 +3,7 @@ import { t } from 'elysia'
 import { action } from 'kay'
 import { store } from '../state'
 
-export const add = action(t.Object({ title: t.String({ minLength: 3, error: 'Too short' }) }), async ({ title }, ctx) => {
+export const add = action(t.Object({ title: t.String({ maxLength: 200, minLength: 3, error: 'Too short' }) }), async ({ title }, ctx) => {
   await Bun.sleep(200)
 
   if (title === 'taken')
