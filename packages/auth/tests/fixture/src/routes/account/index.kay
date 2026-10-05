@@ -8,7 +8,7 @@ export const setUp = action(t.Object({ password: t.String() }), async ({ passwor
   return result.ok ? result.setup.secret : ctx.fail(400, { error: result.error })
 })
 
-export const enable = action(t.Object({ code: t.String() }), async ({ code }, ctx) => {
+export const enable = action(t.Object({ code: t.String({ maxLength: 32 }) }), async ({ code }, ctx) => {
   const result = await ctx.locals.auth.enableTwoFactor(code)
 
   return result.ok ? result.recoveryCodes.length : ctx.fail(400, { error: result.error })

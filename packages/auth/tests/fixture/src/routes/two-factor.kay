@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const verify = action(t.Object({ code: t.String() }), async ({ code }, ctx) => {
+export const verify = action(t.Object({ code: t.String({ maxLength: 32 }) }), async ({ code }, ctx) => {
   const result = await ctx.locals.auth.verifyTwoFactor(code)
 
   if (!result.ok)

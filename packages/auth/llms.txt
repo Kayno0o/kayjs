@@ -135,7 +135,7 @@ a(href="/auth/github?link=1&redirect=/account" data-no-prefetch) Link GitHub
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const signIn = action(t.Object({ identifier: t.String(), password: t.String() }), async (input, ctx) => {
+export const signIn = action(t.Object({ identifier: t.String({ maxLength: 254 }), password: t.String() }), async (input, ctx) => {
   const result = await ctx.locals.auth.signInWithPassword({ ...input, redirect: ctx.url.searchParams.get('redirect') ?? '/' })
 
   if (!result.ok)
