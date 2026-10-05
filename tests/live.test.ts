@@ -1,11 +1,11 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
-import { root } from '../src/runtime'
-import { readEvents, socket } from '../src/runtime/live'
+import { flush, root, signal } from '../src/runtime'
+import { readEvents, resource, socket } from '../src/runtime/live'
 import { apiStubs, scanApi } from '../src/server/api'
 import { testSite } from '../src/test'
 
@@ -13,7 +13,7 @@ const fixture = join(import.meta.dir, 'fixtures/live')
 const apiDir = join(fixture, 'src/api')
 // Written for this file only: any other test building the repository's root as one project would bundle the island's server imports, missing the fixture's API directory.
 const components = {
-  'src/components/chat.kay': '---\nimport { socket, stream } from \'kay\'\nimport chat from \'../api/chat\'\n\nconst { room } = props<{ room: string }>()\nconst messages = socket(chat, \'/:room\', { params: { room } })\nconst ticks = stream(chat, \'/ticks\', { query: { count: 3 } })\n---\nsection\n  p.status {messages.status()}\n  p.last {messages.last()?.text ?? \'Nothing yet\'}\n  p.tick {ticks.last()?.tick ?? 0}\n  button(onClick={() => messages.send({ text: \'hello\' })}) Send\n',
+  'src/components/chat.kay': '---\nimport { resource, socket, stream } from \'kay\'\nimport chat from \'../api/chat\'\n\nconst { room } = props<{ room: string }>()\nconst messages = socket(chat, \'/:room\', { params: { room } })\nconst ticks = stream(chat, \'/ticks\', { query: { count: 3 } })\nconst rooms = resource(chat, \'/rooms\', () => ({ query: { prefix: room.slice(0, 1) } }))\n---\nsection\n  p.status {messages.status()}\n  p.last {messages.last()?.text ?? \'Nothing yet\'}\n  p.tick {ticks.last()?.tick ?? 0}\n  p.rooms {rooms.status()}: {rooms.value()?.map(found => found.name).join(\', \')}\n  button(onClick={() => messages.send({ text: \'hello\' })}) Send\n',
   'src/routes/index.kay': '---\nimport Chat from \'../components/chat.kay\'\n---\nh1 Live\nChat(room="general")\na(href="/api/chat/ticks") Ticks\n',
 }
 
@@ -136,6 +136,7 @@ describe('API modules', () => {
 
     expect(page.html).toContain('<p class="status">connecting</p>')
     expect(page.html).toContain('<p class="last">Nothing yet</p>')
+    expect(page.html).toMatch(/<p class="rooms">(<!--\[-->)?loading/)
   })
 
   it('makes no URL on the server, where a page prerendering the island imports the module unmounted', () => {
@@ -197,6 +198,109 @@ describe('API modules', () => {
     finally {
       await rm(outdir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('resource()', () => {
+  let served: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>
+
+  // An island's browser, as far as resource() reads it: a page with no mount point, and a fetch the site answers.
+  beforeAll(() => {
+    globalThis.document = { querySelector: () => null } as unknown as Document
+    served = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL, init?: RequestInit) => site.fetch(String(input), init as never)) as typeof fetch)
+  })
+
+  afterAll(() => {
+    served.mockRestore()
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  const until = async (ready: () => boolean) => {
+    for (let tries = 0; !ready() && tries < 100; tries++)
+      await Bun.sleep(5)
+  }
+
+  it('reads a GET route as JSON, its dates as their ISO text', async () => {
+    const rooms = root(() => resource(chat, '/rooms'))
+
+    expect(rooms.status()).toBe('loading')
+    await until(() => rooms.status() !== 'loading')
+
+    expect(rooms.status()).toBe('ready')
+    expect(rooms.value()?.map(room => room.name)).toEqual(['general', 'games', 'news'])
+    expect(rooms.value()?.[0]?.opened).toBe('2026-01-01T00:00:00.000Z')
+    expect(served.mock.calls[0]?.[1]?.headers).toEqual({ accept: 'application/json' })
+  })
+
+  it('asks again when a signal its options read changes, keeping the last value meanwhile', async () => {
+    const prefix = signal('g')
+    const rooms = root(() => resource(chat, '/rooms', () => ({ query: { prefix: prefix() } })))
+
+    await until(() => rooms.status() === 'ready')
+    expect(rooms.value()?.map(room => room.name)).toEqual(['general', 'games'])
+
+    prefix.set('n')
+    flush()
+    expect(rooms.status()).toBe('loading')
+    expect(rooms.value()?.map(room => room.name)).toEqual(['general', 'games'])
+
+    await until(() => rooms.status() === 'ready')
+    expect(rooms.value()?.map(room => room.name)).toEqual(['news'])
+  })
+
+  it('drops an answer a newer request overtook', async () => {
+    const prefix = signal('g')
+    const rooms = root(() => resource(chat, '/rooms', () => ({ query: { prefix: prefix() } })))
+
+    prefix.set('n')
+    await until(() => rooms.status() === 'ready')
+    await Bun.sleep(20)
+
+    expect(rooms.value()?.map(room => room.name)).toEqual(['news'])
+  })
+
+  it('fails with the status and text a route refused with, and reads it again on refresh', async () => {
+    const missing = root(() => resource(chat, '/rooms/:name', { params: { name: 'nowhere' } }))
+
+    await until(() => missing.status() !== 'loading')
+    expect(missing.status()).toBe('failed')
+    expect(missing.error()).toEqual({ status: 404, message: 'No such room' })
+
+    missing.refresh()
+    expect(missing.status()).toBe('loading')
+    await until(() => missing.status() !== 'loading')
+    expect(missing.error()?.status).toBe(404)
+  })
+
+  it('fails with status 0 when no answer came', async () => {
+    served.mockImplementationOnce((async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)
+    const rooms = root(() => resource(chat, '/rooms'))
+
+    await until(() => rooms.status() !== 'loading')
+    expect(rooms.error()).toEqual({ status: 0, message: 'offline' })
+  })
+
+  it('aborts what it asked once its component is gone', () => {
+    const [rooms, dispose] = root(done => [resource(chat, '/rooms'), done] as const)
+
+    flush()
+    dispose()
+
+    expect((served.mock.calls.at(-1)?.[1]?.signal as AbortSignal).aborted).toBe(true)
+    expect(rooms.status()).toBe('loading')
+  })
+
+  it('takes only the GET routes answering a value, with the params they name', () => {
+    const typed = () => {
+      // @ts-expect-error: an event stream is read with stream()
+      resource(chat, '/ticks', { query: { count: 1 } })
+      // @ts-expect-error: the room's name is a param the path names
+      resource(chat, '/rooms/:name')
+      // @ts-expect-error: a value from JSON has no Date
+      resource(chat, '/rooms').value()?.[0]?.opened.getTime()
+    }
+
+    expect(typed).toBeFunction()
   })
 })
 

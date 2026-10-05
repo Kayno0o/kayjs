@@ -1,5 +1,5 @@
 import { withBase } from './base'
-import { createSignal, onCleanup, onMount } from './reactive'
+import { createSignal, effect, onCleanup, onMount } from './reactive'
 import { decodeValue } from './wire'
 
 // Set by the server on every module it mounts under `/api`, and by the browser build on the stub standing in for one: where the module's routes are served.
@@ -365,7 +365,7 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   const mount = (module as { [API_MOUNT]?: string } | undefined)?.[API_MOUNT]
 
   if (mount === undefined)
-    throw new TypeError('kay: socket() and stream() take the default export of a module under src/api')
+    throw new TypeError('kay: socket(), stream() and resource() take the default export of a module under src/api')
 
   const segments = path.split('/').map((segment) => {
     if (segment === '*')
@@ -451,4 +451,100 @@ export function stream<Module, const Path extends StreamPath<Module>, const M ex
   onCleanup(reader.close)
 
   return reader
+}
+
+export type ResourceStatus = 'loading' | 'ready' | 'failed'
+
+export interface ResourceFailure {
+  // The status the route answered with, 0 when no answer came.
+  status: number
+  message: string
+}
+
+export interface Resource<T> {
+  // What the route last answered, kept while it is asked again; undefined before the first answer.
+  value: () => T | undefined
+  // `loading` until the route answers, and again each time it is asked anew.
+  status: () => ResourceStatus
+  error: () => ResourceFailure | undefined
+  // Asks the route again with the same options.
+  refresh: () => void
+}
+
+// What a value is once it crossed as JSON: a Date arrives as its ISO text.
+export type Jsonified<T> = T extends Date ? string : T extends readonly (infer Item)[] ? Jsonified<Item>[] : T extends object ? { [Key in keyof T]: Jsonified<T[Key]> } : T
+
+type GetRoute<Module, Path> = NodeAt<Module, Path> extends { get: infer Route } ? Route : never
+
+// The GET routes of a module that answer a value rather than an event stream.
+export type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: { get: infer Route } } ? Route extends { response: { 200: EventStream<unknown> } } ? never : Path : never : never
+export type ResourceOptions<Module, Path> = UrlOptions<GetRoute<Module, Path>>
+export type ResourceOf<Module, Path> = Resource<GetRoute<Module, Path> extends { response: { 200: infer Value } } ? Jsonified<Value> : unknown>
+
+// An answer as Elysia sends it: JSON for an object, text for anything else.
+async function readAnswer(response: Response): Promise<unknown> {
+  return response.headers.get('content-type')?.startsWith('application/json') ? response.json() : response.text()
+}
+
+// Why a route refused: the text it answered, the message of a JSON error such as a validation failure, else its status text.
+function refusal(answer: unknown, response: Response): string {
+  if (typeof answer === 'string' && answer !== '')
+    return answer
+
+  const message = typeof answer === 'object' && answer !== null && 'message' in answer ? answer.message : undefined
+
+  return typeof message === 'string' ? message : response.statusText
+}
+
+// Reads a GET route of a module under `src/api` from an island, once it is in the page, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
+export function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<ResourceOptions<Module, Path> | (() => ResourceOptions<Module, Path>)>): ResourceOf<Module, Path> {
+  const [value, setValue] = createSignal<unknown>(undefined, { equals: false }, false)
+  const [status, setStatus] = createSignal<ResourceStatus>('loading', undefined, false)
+  const [error, setError] = createSignal<ResourceFailure | undefined>(undefined, undefined, false)
+  let current: AbortController | undefined
+  let asked = ''
+
+  const load = async (url: string) => {
+    const controller = new AbortController()
+
+    current?.abort()
+    current = controller
+    asked = url
+    setStatus('loading')
+
+    try {
+      const response = await fetch(withBase(url), { headers: { accept: 'application/json' }, signal: controller.signal })
+      const answer = await readAnswer(response)
+
+      if (controller.signal.aborted)
+        return
+
+      if (!response.ok) {
+        setError({ status: response.status, message: refusal(answer, response) })
+        setStatus('failed')
+
+        return
+      }
+
+      setValue(answer)
+      setError(undefined)
+      setStatus('ready')
+    }
+    catch (failure) {
+      if (controller.signal.aborted)
+        return
+
+      setError({ status: 0, message: failure instanceof Error ? failure.message : String(failure) })
+      setStatus('failed')
+    }
+  }
+
+  // The server renders the island loading, as the browser does until the answer comes.
+  if (typeof document !== 'undefined') {
+    effect(() => void load(routeUrl(module, path, (typeof options === 'function' ? options() : options) as UrlInput | undefined)))
+  }
+
+  onCleanup(() => current?.abort())
+
+  return { value, status, error, refresh: () => asked === '' ? undefined : void load(asked) } as ResourceOf<Module, Path>
 }
