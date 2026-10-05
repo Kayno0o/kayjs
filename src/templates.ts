@@ -230,7 +230,7 @@ const SERVER_ENTRY = `import process from 'node:process'
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 3000))
+const app = new Elysia().use(await pages()).listen(Number(process.env.PORT || 3000))
 
 console.log(\`Listening on http://localhost:\${app.server?.port}\`)
 
@@ -269,8 +269,8 @@ import { defineConfig } from 'kay/server'
 // The Pages workflow sets both: the host the site is published on, and the path it is published under.
 export default defineConfig({
   lang: 'en',
-  site: process.env.SITE_URL,
-  base: process.env.SITE_BASE,
+  site: process.env.SITE_URL || undefined,
+  base: process.env.SITE_BASE || undefined,
   plugins: [tailwind],
   seo: { name: '__NAME__', titleTemplate: '%s | __NAME__', description: '__NAME__, made with kay' },
 })

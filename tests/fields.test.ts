@@ -17,10 +17,42 @@ describe('defineEnv', () => {
     expect(defineEnv(schema, { DATABASE_URL: 'postgres://db', PORT: '8080', DEBUG: '' }).PORT).toBe(8080)
   })
 
-  it('counts a variable written with no value as left out, as a `.env` line with nothing after the `=` means', () => {
+  it('counts an empty variable as left out, as a `.env` line with nothing after the `=` means', () => {
     expect(defineEnv(schema, { DATABASE_URL: 'postgres://db', PORT: '', DEBUG: '' })).toEqual({ DATABASE_URL: 'postgres://db', PORT: 3000 })
     // Required and written empty is missing, not an empty secret that would pass.
     expect(() => defineEnv(schema, { DATABASE_URL: '' })).toThrow('DATABASE_URL: Property \'DATABASE_URL\' is missing')
+  })
+
+  it('leaves an empty optional out rather than reading it as a blank value, whatever its type', () => {
+    const optional = t.Object({ USER: t.Optional(t.String()), DEBUG: t.Optional(t.Boolean()), HOSTS: t.Optional(t.Array(t.String())) })
+
+    // The case a reader branching on `undefined` depends on: a mailer handed `''` would send an empty user instead of no auth at all.
+    expect(defineEnv(optional, { USER: '', DEBUG: '', HOSTS: '' })).toEqual({})
+    expect(defineEnv(t.Object({ USER: t.Optional(t.String({ default: 'z' })) }), { USER: '' })).toEqual({ USER: 'z' })
+  })
+
+  it('fills an empty variable\'s default and refuses it where the schema gives none, for a boolean and a list too', () => {
+    expect(defineEnv(t.Object({ DEBUG: t.Boolean({ default: true }), HOSTS: t.Array(t.String(), { default: ['a'] }) }), { DEBUG: '', HOSTS: '' })).toEqual({ DEBUG: true, HOSTS: ['a'] })
+    expect(() => defineEnv(t.Object({ DEBUG: t.Boolean() }), { DEBUG: '' })).toThrow('DEBUG: ')
+    expect(() => defineEnv(t.Object({ HOSTS: t.Array(t.String()) }), { HOSTS: '' })).toThrow('HOSTS: ')
+  })
+
+  it('keeps a value of spaces, which only quoting makes', () => {
+    expect(defineEnv(t.Object({ PREFIX: t.String() }), { PREFIX: ' ' })).toEqual({ PREFIX: ' ' })
+  })
+
+  it('leaves kay build alone over an empty required variable, as over a missing one', () => {
+    buildingWithoutEnv()
+
+    try {
+      const env = defineEnv(schema, { DATABASE_URL: '', PORT: '' })
+
+      expect(env.PORT).toBe(3000)
+      expect(() => env.DATABASE_URL).toThrow('kay: DATABASE_URL does not match')
+    }
+    finally {
+      delete (globalThis as Record<symbol, unknown>)[Symbol.for('kay.building')]
+    }
   })
 
   it('names every variable missing or refused in the error that stops the boot', () => {
