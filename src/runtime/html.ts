@@ -1,10 +1,12 @@
 // What pages, layouts and static components render to on the server: markup built as strings, with no reactive runtime.
 // A rendered value is `{ t: markup }`: what a component or an island rendered goes into its parent's markup as it is.
 
+import { flattenClasses } from './classes'
 import { escape, escapeAttribute } from './escape'
 import { currentServerScope, scope } from './reactive'
 import { failedIds, idMark } from './uid'
 
+export { componentClass } from './classes'
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
 
@@ -121,19 +123,6 @@ export function className(value: unknown): string {
       continue
 
     result += result ? ` ${escapeAttribute(key)}` : escapeAttribute(key)
-  }
-
-  return result
-}
-
-function flattenClasses(list: readonly unknown[], result: Record<string, unknown>): Record<string, unknown> {
-  for (const item of list) {
-    if (Array.isArray(item))
-      flattenClasses(item, result)
-    else if (typeof item === 'object' && item !== null)
-      Object.assign(result, item)
-    else if (typeof item !== 'boolean' && (item || item === 0))
-      result[String(item)] = true
   }
 
   return result

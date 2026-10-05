@@ -77,13 +77,15 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const generateOptions = { island, client, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
-  let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name)
+  // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.
+  const values = options.output === undefined
+  let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name, values)
 
   // A `date.kay` declaring `function Date` would break the `new Date()` its template reads.
   while (found.shadowsName) {
     name = `${name}Page`
     analysis = generate(file, script, server, { ...generateOptions, name })
-    found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name)
+    found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name, values)
   }
 
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.rewrites })

@@ -105,14 +105,14 @@ describe('props', () => {
 })
 
 describe('control flow', () => {
-  it('keys a for loop by an expression and reads the item through an accessor', () => {
+  it('keys a for loop by an expression, the type checker reading the item as a value it narrows', () => {
     const out = jsx('ul\n  for todo, i of todos key={todo.id}\n    li(data-i={i}) {todo.title}')
 
-    expect(out).toBe('<ul><KayLoopFor each={todos} keyed={(todo) => (todo.id)}>{(todo, i) => <li data-i={i()}>{todo().title}</li>}</KayLoopFor></ul>')
+    expect(out).toBe('<ul><KayLoopFor each={todos} keyed={(todo) => (todo.id)}>{(todo, i) => <li data-i={i}>{todo.title}</li>}</KayLoopFor></ul>')
   })
 
   it('matches rows by position when the key is the index', () => {
-    expect(jsx('for row, i of rows key={i}\n  p {i}: {row}')).toBe('<><KayLoopFor each={rows} keyed={false}>{(row, i) => <p>{i}: {row()}</p>}</KayLoopFor></>')
+    expect(jsx('for row, i of rows key={i}\n  p {i}: {row}')).toBe('<><KayLoopFor each={rows} keyed={false}>{(row, i) => <p>{i}: {row}</p>}</KayLoopFor></>')
   })
 
   it('hands the rows of a page\'s loops their items, since only islands and browsers update rows', () => {
@@ -142,7 +142,7 @@ describe('control flow', () => {
   })
 
   it('narrows an aliased if through Show', () => {
-    expect(jsx('if user() as u\n  p {u.name}\nelse\n  p anon')).toBe('<>{<KayShow when={user()} fallback={<p>anon</p>}>{(u) => <p>{u().name}</p>}</KayShow>}</>')
+    expect(jsx('if user() as u\n  p {u.name}\nelse\n  p anon')).toBe('<>{<KayShow when={user()} fallback={<p>anon</p>}>{(u) => <p>{u.name}</p>}</KayShow>}</>')
   })
 
   it('rejects writes to loop items', () => {
@@ -370,13 +370,13 @@ describe('imports in both fences', () => {
 })
 
 describe('component names', () => {
-  it('takes a prop, a server value or a loop item as the component tag, opening and closing alike', () => {
+  it('takes a prop, a server value or a loop item as the component tag, opening and closing alike, a loop item read as itself', () => {
     const code = tsx('---\nconst { Icon, Wrap, items } = props<{ Icon: unknown, Wrap: unknown, items: unknown[] }>()\n---\nIcon(n="x")\nWrap\n  p a\nfor Item of items key={Item}\n  Item(x="1")\n    p b')
 
     expect(code).toContain('<__props.Icon n="x" />')
     expect(code).toContain('<__props.Wrap><p>a</p></__props.Wrap>')
-    expect(code).toContain('{(Item) => <KayDynamic component={Item()} x="1"><p>b</p></KayDynamic>}')
-    expect(code).toContain('declare const KayDynamic: KayTemplateHelpers["Dynamic"]')
+    expect(code).toContain('{(Item) => <Item x="1"><p>b</p></Item>}')
+    expect(code).not.toContain('KayDynamic')
   })
 
   it('reads a component prop with a default through Dynamic as well', () => {

@@ -153,6 +153,22 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('narrows a loop\'s row and an if\'s alias in the branches of an if, in an island as in a static component', async () => {
+    const template = 'ul\n  for item, index of items key={index}\n    if item === \'separator\'\n      li.sep\n    else\n      li {item.label}\n  for item of items key={item}\n    if item !== \'separator\'\n      li {item.label}\n  if items[0] as first\n    if typeof first === \'string\'\n      li {first.length}\n    else\n      li {first.label}\n'
+    const script = '---\ntype Entry = \'separator\' | { label: string }\nconst { items } = props<{ items: Entry[] }>()\n'
+    const root = await scratchProject({
+      'src/static.kay': `${script}---\n${template}`,
+      'src/island.kay': `${script.replace('---\n', '---\nimport { signal } from \'kay\'\n\n')}const open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) x\n${template}`,
+    })
+
+    try {
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types what ctx.failed and ctx.succeeded read back from an action that ends without returning, as after ctx.redirect', async () => {
     const page = [
       '--- server',

@@ -6,7 +6,7 @@ import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'dynamic', 'element', 'head', 'loop', 'merge', 'omit', 'raw', 'selectOptions', 'show', 'style']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'dynamic', 'element', 'head', 'loop', 'merge', 'omit', 'raw', 'selectOptions', 'show', 'style']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -618,7 +618,7 @@ export class HtmlTemplate {
     return { separate, close }
   }
 
-  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, an array of every source.
+  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, every source merged into one string, as a `class?: string` prop takes it.
   private mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean): void {
     const { b } = this
     const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
@@ -645,14 +645,14 @@ export class HtmlTemplate {
         items.push(() => b.add('(').addSource(attribute.expression).add(')'))
     }
 
-    b.add('[')
+    b.add(`${htmlAlias('componentClass')}([`)
     for (const [index, item] of items.entries()) {
       if (index > 0)
         b.add(', ')
 
       item()
     }
-    b.add(']')
+    b.add('])')
   }
 
   // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else as rendered markup.

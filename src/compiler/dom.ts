@@ -7,7 +7,7 @@ import { BEHAVIOUR, CONTENT_PROPERTIES, END_MARKER, escapeStaticAttribute, escap
 import { childItems, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'dynamic', 'effect', 'fragment', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'setClass', 'setStyle', 'spread', 'template', 'text']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'setClass', 'setStyle', 'spread', 'template', 'text']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 
 export function domHelperImport(): string {
@@ -644,7 +644,7 @@ export class DomTemplate {
     return { separate, close }
   }
 
-  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, an array of every source.
+  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, every source merged into one string, as a `class?: string` prop takes it.
   private mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean): void {
     const { b } = this
     const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
@@ -669,14 +669,14 @@ export class DomTemplate {
         items.push(() => b.add('(').addSource(attribute.expression).add(')'))
     }
 
-    b.add('[')
+    b.add(`${domAlias('componentClass')}([`)
     for (const [index, item] of items.entries()) {
       if (index > 0)
         b.add(', ')
 
       item()
     }
-    b.add(']')
+    b.add('])')
   }
 
   // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else as a block.

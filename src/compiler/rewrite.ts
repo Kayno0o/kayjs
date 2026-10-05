@@ -38,7 +38,8 @@ export interface FoundRewrites {
 
 // Reads the analysis-pass TSX with real scope resolution, so shadowed names are left alone, and returns the rewrites to apply in the final pass.
 // `bindings` are the names read off `__props`: destructured props first, so their indexes match the generated defaults, then server data.
-export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, bindings: PropsBinding[], componentName: string): FoundRewrites {
+// `values`: code only read by the type checker, where a row or an alias is its value rather than an accessor to it, so TypeScript narrows it; its reads stay as written, its assignments are still reported.
+export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, bindings: PropsBinding[], componentName: string, values: boolean): FoundRewrites {
   const rewrites: Rewrites = new Map()
   const diagnostics: Diagnostic[] = []
   let ast: t.File
@@ -57,13 +58,13 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     propsByLocal.set(binding.local.start, { binding, index })
 
   // `typeOf` spells the type of the value the name stands for, when `typeof name` cannot read it through the rewritten name.
-  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Rewrite, readOnly: string, typeOf?: string) => {
+  const visitBinding = (scope: Scope, name: string, rewrite: ((reference: NodePath) => Rewrite) | undefined, readOnly: string, typeOf?: string) => {
     const binding = scope.getBinding(name)
 
     if (!binding)
       return
 
-    for (const reference of binding.referencePaths) {
+    for (const reference of rewrite ? binding.referencePaths : []) {
       const node = reference.node
       const query = typeOf === undefined ? undefined : typeQueryOf(reference)
 
@@ -83,7 +84,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       if (source === undefined || tag === 'closing')
         continue
 
-      const found = rewrite(reference)
+      const found = rewrite!(reference)
 
       // Type checking copies a tag as a value too, which must not undo the opening tag's.
       const dynamic = (tag === 'opening' && !isPlainRead(found)) || rewrites.get(source)?.dynamic
@@ -109,7 +110,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
         if (param.type !== 'Identifier' || !accessorSites.has(param.start!))
           continue
 
-        visitBinding(path.scope, param.name, reference => withShorthand(reference, param.name, { after: '()' }), `\`${param.name}\` is read-only here; it tracks the current value`, `ReturnType<typeof ${param.name}>`)
+        visitBinding(path.scope, param.name, values ? undefined : reference => withShorthand(reference, param.name, { after: '()' }), `\`${param.name}\` is read-only here; it tracks the current value`, `ReturnType<typeof ${param.name}>`)
       }
     },
     VariableDeclarator: (path) => {

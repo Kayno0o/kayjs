@@ -106,6 +106,25 @@ describe('client bundle', () => {
   })
 })
 
+describe('component class', () => {
+  it('hands a component the merged class as one string, following what it merges', async () => {
+    const { root, dispose } = await mountKay({
+      'tagged.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\np(title={`[${className}]`})\n',
+      'main.kay': '---\nimport { signal } from \'kay\'\nimport Tagged from \'./tagged.kay\'\n\nconst on = signal(false)\nconst sp = { class: \'FROM\' }\n---\nTagged.a({...sp} class={{ on: on() }})\nbutton(onClick={() => on.set(o => !o)}) x\n',
+    })
+
+    try {
+      expect(root.querySelector('p')!.title).toBe('[a FROM]')
+      root.querySelector('button')!.click()
+      await settle()
+      expect(root.querySelector('p')!.title).toBe('[a FROM on]')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('event handlers', () => {
   it('runs the handler a signal, a prop or a loop item holds when the event fires, not when it attached', async () => {
     const { root, dispose } = await mountKay({

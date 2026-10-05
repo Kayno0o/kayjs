@@ -127,7 +127,7 @@ class Generator {
     const html = this.final('html')
     const dom = this.final('dom')
     const runnable = html || dom
-    const used = usedHelpers(this.file.template, script)
+    const used = usedHelpers(this.file.template, script, this.src)
     const helpers = runnable ? [] : used.filter(helper => helper !== 'For')
 
     if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
@@ -987,7 +987,9 @@ class Generator {
     }
 
     if (attribute.kind === 'expression') {
-      b.addSource(attribute.name).add(`={[${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(')]}')
+      const [open, close] = element.component ? [`${helperAlias('componentClass')}([`, '])'] : ['[', ']']
+
+      b.addSource(attribute.name).add(`={${open}${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(`)${close}}`)
 
       return
     }
@@ -1002,7 +1004,7 @@ class Generator {
 
     b.add(' ')
     b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add('class'))
-    b.add('={[')
+    b.add(element.component ? `={${helperAlias('componentClass')}([` : '={[')
 
     if (shorthand)
       b.add(JSON.stringify(element.classes.map(span => this.text(span)).join(' ')))
@@ -1030,7 +1032,7 @@ class Generator {
       separator = ', '
     }
 
-    b.add(']}')
+    b.add(element.component ? '])}' : ']}')
   }
 
   private emitAttribute(element: ElementNode, attribute: Attribute) {
@@ -1332,7 +1334,7 @@ function formHelpers(file: KayFile): KayHelper[] {
   return hasActionForm(file.template) ? ['formAction'] : []
 }
 
-type Helper = 'For' | 'Show' | 'omit'
+type Helper = 'For' | 'Show' | 'omit' | 'componentClass'
 
 // The members of `TemplateHelpers` in src/runtime/checks.ts.
 type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head' | 'Try'
@@ -1410,7 +1412,7 @@ function usesTry(nodes: Node[]): boolean {
   })
 }
 
-function usedHelpers(nodes: Node[], script: ScriptAnalysis): Helper[] {
+function usedHelpers(nodes: Node[], script: ScriptAnalysis, source: string): Helper[] {
   const used = new Set<Helper>()
 
   if (script.props?.rest)
@@ -1432,6 +1434,9 @@ function usedHelpers(nodes: Node[], script: ScriptAnalysis): Helper[] {
         }
       }
       else if (node.kind === 'element' || node.kind === 'slot') {
+        if (node.kind === 'element' && mergesComponentClass(node, source))
+          used.add('componentClass')
+
         visit(node.children)
       }
       else if (node.kind === 'await') {
@@ -1451,6 +1456,19 @@ function usedHelpers(nodes: Node[], script: ScriptAnalysis): Helper[] {
   visit(nodes)
 
   return [...used]
+}
+
+// A component call whose `class` merges several parts, which it gets as one string: a shorthand with a `class` expression, or a spread next to a shorthand or a `class`.
+function mergesComponentClass(element: ElementNode, source: string): boolean {
+  if (!element.component)
+    return false
+
+  const attribute = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'class')
+
+  if (element.attributes.some(attribute => attribute.kind === 'spread'))
+    return element.classes.length > 0 || attribute !== undefined
+
+  return element.classes.length > 0 && attribute?.kind === 'expression'
 }
 
 function capitalize(word: string): string {

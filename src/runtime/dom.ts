@@ -1,9 +1,11 @@
 // What islands run on in the browser: DOM built from templates, kept in step with signals, and the server's markup claimed in place when an island hydrates.
 // A dynamic part sits between `<!--[-->` and `<!--]-->` comments unless it is the only content of its element; hydration walks the server's nodes in the order the generated code asks for them.
 
+import { flattenClasses } from './classes'
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { freshPrefix, withIds } from './uid'
 
+export { componentClass } from './classes'
 export { renderEffect as effect } from './reactive'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.
@@ -1025,19 +1027,6 @@ export function className(value: unknown): string {
   for (const key of Object.keys(classes)) {
     if (key && key !== 'undefined' && classes[key])
       result += result ? ` ${key}` : key
-  }
-
-  return result
-}
-
-function flattenClasses(list: readonly unknown[], result: Record<string, unknown>): Record<string, unknown> {
-  for (const item of list) {
-    if (Array.isArray(item))
-      flattenClasses(item, result)
-    else if (typeof item === 'object' && item !== null)
-      Object.assign(result, item)
-    else if (typeof item !== 'boolean' && (item || item === 0))
-      result[String(item)] = true
   }
 
   return result
