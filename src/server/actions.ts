@@ -418,15 +418,20 @@ async function renderBack(app: Elysia, base: string, request: Request, headers: 
   const sent = visitHeaders(request)
   const forget = handOver(sent, flash)
   let page: Response
+  let html: string | undefined
 
+  // Read through before the failure is forgotten: an `await` block streamed after the shell may read `ctx.failed` too.
   try {
     page = await visitAs(request, new Request(new URL(`${path}${from.search}`, request.url), { headers: sent }), server, async visit => app.handle(visit))
+
+    if (page.ok && HTML.test(page.headers.get('content-type') ?? ''))
+      html = await page.text()
   }
   finally {
     forget()
   }
 
-  if (!page.ok || !HTML.test(page.headers.get('content-type') ?? '')) {
+  if (html === undefined) {
     for (const cookie of headers.getSetCookie())
       page.headers.append('set-cookie', cookie)
 
@@ -434,7 +439,6 @@ async function renderBack(app: Elysia, base: string, request: Request, headers: 
   }
 
   const swapped = request.headers.get(NAVIGATE_HEADER) === '1'
-  const html = await page.text()
   const answer = new Headers(page.headers)
 
   for (const [name, value] of headers)

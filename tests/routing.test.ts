@@ -119,7 +119,7 @@ describe('localPath', () => {
     expect(localPath('/account?tab=keys#top', '/')).toBe('/account?tab=keys#top')
     expect(localPath('/café', '/')).toBe('/caf%C3%A9')
 
-    for (const next of ['https://evil.example', '//evil.example', '/\\evil.example', '/\t/evil.example', '/\n/evil.example', '\\\\evil.example', 'evil.example', 'javascript:alert(1)', '', undefined, ['/a']])
+    for (const next of ['https://evil.example', '//evil.example', '/\\evil.example', '/\t/evil.example', '/\n/evil.example', '/.//evil.example', '/..//evil.example', '/%2e%2e//evil.example', '/a/..//evil.example', '/x/../\\evil.example', '\\\\evil.example', 'evil.example', 'javascript:alert(1)', '', undefined, ['/a']])
       expect(localPath(next, '/home')).toBe('/home')
   })
 

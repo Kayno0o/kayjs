@@ -509,7 +509,7 @@ function leftmost(name: t.Node): string | undefined {
   return name.type === 'Identifier' ? name.name : undefined
 }
 
-// What the quick fix bounds a string field to: room for a title or a name, several of them fitting in the cookie together.
+// What the quick fix bounds a string field to: room for a title or a name.
 const SUGGESTED_MAX_LENGTH = 200
 
 // A string field of an action's schema with no `maxLength` takes whatever a visitor posts into it, up to the request body limit. A secret, such as a password, is checked or hashed rather than kept or shown, so it needs none.
@@ -542,7 +542,7 @@ export function unboundedFields(source: string, server: Span | undefined): Diagn
 
       diagnostics.push({
         ...parsed.shift(call.callee),
-        message: `${field === undefined ? 'This string field' : `The string field ${field}`} has no maxLength: when the form is refused, its values come back to the page in a cookie, and a value too long for it leaves the form empty; give it one`,
+        message: `${field === undefined ? 'This string field' : `The string field ${field}`} has no maxLength: it takes whatever a visitor posts, up to the request body limit; give it one`,
         fixes: [{ title: `Give it a maxLength of ${SUGGESTED_MAX_LENGTH}`, edits: [{ start: at, end: at, text: edit.text }] }],
         checkOnly: true,
       })

@@ -33,6 +33,8 @@ describe('bound URLs', () => {
     expect(attribute('href', ' \tJava\nScript:alert(1)')).toBe(' href="unsafe: \tJava\nScript:alert(1)"')
     expect(attribute('formaction', 'VBScript:x')).toBe(' formaction="unsafe:VBScript:x"')
     expect(attribute('src', 'data: text/html,<p>')).toBe(' src="unsafe:data: text/html,&lt;p>"')
+    expect(attribute('HREF', 'javascript:x')).toBe(' HREF="unsafe:javascript:x"')
+    expect(attribute('formAction', 'javascript:x')).toBe(' formAction="unsafe:javascript:x"')
     expect(element('a', [{ href: 'javascript:x' }]).t).toBe('<a href="unsafe:javascript:x"></a>')
 
     for (const [name, value] of [['href', 'https://example.com/javascript:x'], ['href', '/javascript:x'], ['title', 'javascript:x'], ['src', 'data:image/png;base64,AA']])
@@ -104,9 +106,19 @@ describe('sanitizeHtml', () => {
   it('drops what loads, runs or styles, and links anywhere else, whatever the spelling', () => {
     expect(String(sanitizeHtml('<script>alert(1)</script><style>*{}</style><!-- c --><img src=x onerror=alert(1)><div style="position:fixed">t</div><svg><script>x</script></svg>'))).toBe('t')
     expect(String(sanitizeHtml('<scr<b>ipt>alert(1)</scr</b>ipt>'))).toBe('&lt;scr<b>ipt>alert(1)&lt;/scr</b>ipt>')
+    expect(String(sanitizeHtml('<b>a<!-- c --></b><script>x<style>y</style>z'))).toBe('<b>a</b>xz')
 
     for (const href of ['javascript:alert(1)', 'java&#115;cript:alert(1)', 'javascript&colon;x', '//evil.example', '/\\evil.example', ' javascript:x', 'data:text/html,x'])
       expect(String(sanitizeHtml(`<a href="${href}">x</a>`))).toBe('<a>x</a>')
+  })
+
+  it('reads a megabyte of unclosed tags in one pass', () => {
+    const started = performance.now()
+
+    for (const opener of ['<script>', '<!--', '<style>x</style'])
+      sanitizeHtml(opener.repeat(1_000_000 / opener.length))
+
+    expect(performance.now() - started).toBeLessThan(1000)
   })
 
   it('gives markup it already gave back as it is', () => {

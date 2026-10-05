@@ -36,5 +36,6 @@ export function localPath<const Fallback extends string>(value: unknown, fallbac
 
   const url = new URL(value, NOWHERE)
 
-  return url.origin === NOWHERE ? `${url.pathname}${url.search}${url.hash}` : fallback
+  // A dot segment can leave the path starting `//`, `/.//evil.example` for one, which a browser reads as a host.
+  return url.origin === NOWHERE && !url.pathname.startsWith('//') ? `${url.pathname}${url.search}${url.hash}` : fallback
 }

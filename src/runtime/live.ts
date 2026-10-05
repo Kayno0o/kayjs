@@ -466,8 +466,9 @@ export interface Resource<T> {
   value: () => T | undefined
   // `loading` until the route answers, and again each time it is asked anew.
   status: () => ResourceStatus
+  // Why the last request failed, kept while the route is asked again until it answers.
   error: () => ResourceFailure | undefined
-  // Asks the route again with the same options.
+  // Asks the route again with the same options, until the component that read it is gone.
   refresh: () => void
 }
 
@@ -476,8 +477,11 @@ export type Jsonified<T> = T extends Date ? string : T extends readonly (infer I
 
 type GetRoute<Module, Path> = NodeAt<Module, Path> extends { get: infer Route } ? Route : never
 
-// The GET routes of a module that answer a value rather than an event stream.
-export type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: { get: infer Route } } ? Route extends { response: { 200: EventStream<unknown> } } ? never : Path : never : never
+// Whether a route's answer reads back as it is typed: Elysia sends an object as JSON and a string as text, but a number, a boolean or null as bare text with no type to tell it from a string.
+type Readable<Value> = unknown extends Value ? true : [Value] extends [EventStream<unknown>] ? false : [Value] extends [object | string] ? true : false
+
+// The GET routes of a module that answer an object, an array or a string.
+export type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: { get: infer Route } } ? Route extends { response: { 200: infer Value } } ? Readable<Value> extends true ? Path : never : Path : never : never
 export type ResourceOptions<Module, Path> = UrlOptions<GetRoute<Module, Path>>
 export type ResourceOf<Module, Path> = Resource<GetRoute<Module, Path> extends { response: { 200: infer Value } } ? Jsonified<Value> : unknown>
 
@@ -503,6 +507,7 @@ export function resource<Module, const Path extends ResourcePath<Module>>(module
   const [error, setError] = createSignal<ResourceFailure | undefined>(undefined, undefined, false)
   let current: AbortController | undefined
   let asked = ''
+  let gone = false
 
   const load = async (url: string) => {
     const controller = new AbortController()
@@ -544,7 +549,10 @@ export function resource<Module, const Path extends ResourcePath<Module>>(module
     effect(() => void load(routeUrl(module, path, (typeof options === 'function' ? options() : options) as UrlInput | undefined)))
   }
 
-  onCleanup(() => current?.abort())
+  onCleanup(() => {
+    gone = true
+    current?.abort()
+  })
 
-  return { value, status, error, refresh: () => asked === '' ? undefined : void load(asked) } as ResourceOf<Module, Path>
+  return { value, status, error, refresh: () => asked === '' || gone ? undefined : void load(asked) } as ResourceOf<Module, Path>
 }

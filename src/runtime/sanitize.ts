@@ -4,7 +4,7 @@ import type { SafeHtml } from './checks'
 const KEPT = new Set(['a', 'b', 'blockquote', 'br', 'code', 'del', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'ins', 'li', 'ol', 'p', 'pre', 's', 'small', 'strong', 'sub', 'sup', 'u', 'ul'])
 const VOID = new Set(['br', 'hr'])
 // Elements whose content is code or another document rather than text, dropped whole, and comments.
-const DROPPED = /<(script|style|template|textarea|title|noscript|iframe|object|svg|math)\b[\s\S]*?<\/\1\s*>|<!--[\s\S]*?(?:-->|$)/gi
+const DROPPED = /<(script|style|template|textarea|title|noscript|iframe|object|svg|math)\b|<!--/gi
 const TAG = /<(\/?)([a-z][a-z\d]*)(\s[^<>]*|\/)?>/gi
 const HREF = /\shref\s*=\s*(?:"([^"]*)"|'([^']*)')/i
 // A web or mail link, or a path of the site, with no character that could close the attribute and no entity but `&amp;`.
@@ -23,9 +23,51 @@ function link(attributes: string | undefined): string {
   return href !== undefined && SAFE_URL.test(href.replace(AMPERSAND, '')) ? `<a href="${href}" rel="nofollow ugc">` : '<a>'
 }
 
+// The markup without the elements and comments above, read once through: an element never closed keeps its content as text, and is looked for no further once its closing tag was not found, so no input makes it scan the rest over and over.
+function withoutDropped(markup: string): string {
+  const unclosed = new Set<string>()
+  let result = ''
+  let last = 0
+
+  for (const match of markup.matchAll(DROPPED)) {
+    if (match.index < last)
+      continue
+
+    const name = match[1]?.toLowerCase()
+
+    if (name === undefined) {
+      const end = markup.indexOf('-->', match.index + 4)
+
+      result += markup.slice(last, match.index)
+      last = end === -1 ? markup.length : end + 3
+
+      continue
+    }
+
+    if (unclosed.has(name))
+      continue
+
+    const closing = new RegExp(`</${name}\\s*>`, 'gi')
+
+    closing.lastIndex = match.index
+    const end = closing.exec(markup)
+
+    if (end === null) {
+      unclosed.add(name)
+
+      continue
+    }
+
+    result += markup.slice(last, match.index)
+    last = end.index + end[0].length
+  }
+
+  return result + markup.slice(last)
+}
+
 // Markup from a user, made fit for `innerHTML`: the elements above are kept and balanced, other tags dropped with their text kept, and the result is the same on the server and in an island.
 export function sanitizeHtml(markup: string): SafeHtml {
-  const source = markup.replace(DROPPED, '')
+  const source = withoutDropped(markup)
   const open: string[] = []
   let result = ''
   let last = 0

@@ -249,14 +249,21 @@ describe('resource()', () => {
   })
 
   it('drops an answer a newer request overtook', async () => {
+    const older = Promise.withResolvers<Response>()
     const prefix = signal('g')
+
+    served.mockImplementationOnce((async () => older.promise) as unknown as typeof fetch)
     const rooms = root(() => resource(chat, '/rooms', () => ({ query: { prefix: prefix() } })))
 
+    flush()
     prefix.set('n')
+    flush()
     await until(() => rooms.status() === 'ready')
+    older.resolve(await site.fetch('/api/chat/rooms?prefix=g'))
     await Bun.sleep(20)
 
     expect(rooms.value()?.map(room => room.name)).toEqual(['news'])
+    expect(rooms.status()).toBe('ready')
   })
 
   it('fails with the status and text a route refused with, and reads it again on refresh', async () => {
@@ -286,8 +293,13 @@ describe('resource()', () => {
     flush()
     dispose()
 
+    const calls = served.mock.calls.length
+
     expect((served.mock.calls.at(-1)?.[1]?.signal as AbortSignal).aborted).toBe(true)
     expect(rooms.status()).toBe('loading')
+
+    rooms.refresh()
+    expect(served.mock.calls.length).toBe(calls)
   })
 
   it('takes only the GET routes answering a value, with the params they name', () => {
@@ -296,6 +308,8 @@ describe('resource()', () => {
       resource(chat, '/ticks', { query: { count: 1 } })
       // @ts-expect-error: the room's name is a param the path names
       resource(chat, '/rooms/:name')
+      // @ts-expect-error: a number crosses as bare text, typed nowhere
+      resource(chat, '/count')
       // @ts-expect-error: a value from JSON has no Date
       resource(chat, '/rooms').value()?.[0]?.opened.getTime()
     }

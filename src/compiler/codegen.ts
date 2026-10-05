@@ -54,9 +54,9 @@ const BINDABLE = new Set(['input', 'textarea', 'select'])
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 const LINK_ELEMENTS = new Set(['a', 'area'])
-// URLs checked as links are when written out: an expression there may be another kind of value, such as an action a form posts to.
 // Attributes rendered as markup rather than text.
 const MARKUP_ATTRIBUTES = new Set(['innerHTML', 'srcdoc'])
+// URLs checked as links are when written out: an expression there may be another kind of value, such as an action a form posts to.
 const WRITTEN_URLS = new Map([['img', 'src'], ['link', 'href'], ['form', 'action']])
 const WHITESPACE = /\s+/
 const CTX_REFERENCE = /\bctx\b/

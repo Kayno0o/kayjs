@@ -20,6 +20,7 @@ export default api()
   .post('/answer', ({ body }) => eventStream(body.prompt.split(' ').map(word => `${word}\n`)), { body: t.Object({ prompt: t.String() }) })
   .get('/rooms', ({ query }) => ['general', 'games', 'news'].filter(name => name.startsWith(query.prefix ?? '')).map(name => ({ name, opened: new Date(Date.UTC(2026, 0, 1)) })), { query: t.Object({ prefix: t.Optional(t.String()) }) })
   .get('/rooms/:name', ({ params, status }) => params.name === 'general' ? { name: params.name, members: 3 } : status(404, 'No such room'))
+  .get('/count', () => 3)
   .get('/broken', () => eventStream((async function* () {
     yield 1
 
