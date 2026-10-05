@@ -31,7 +31,7 @@ const components = await Promise.all(paths.map(async path => ({ path, source: aw
 const scripts = await Promise.all((await Array.fromAsync(new Bun.Glob('src/**/*.ts').scan({ cwd: ROOT }))).map(path => Bun.file(`${ROOT}${path}`).text()))
 
 const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => token))
-const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name]) => name))
+const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
 // Every class a component writes: the `.class` shorthand, plain `class` attributes, and the names a `class` expression holds.
 function writtenClasses(path: string, source: string): string[] {
