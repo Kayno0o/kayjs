@@ -1,0 +1,14 @@
+---
+import Player from '../components/player.kay'
+import './below.css'
+---
+head
+  title Below
+h1 Below
+div(style="height: 3000px")
+Player(hydrate="visible")
+div(style="height: 3000px")
+a.far(href="#far") Far
+// Room under the link, as a page leaves above a fixed bar.
+div(style="height: 400px")
+.bar

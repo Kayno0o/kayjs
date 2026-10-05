@@ -1,0 +1,2 @@
+html { scroll-behavior: smooth; }
+.bar { position: fixed; inset: auto 0 0 0; height: 120px; background: #000; }

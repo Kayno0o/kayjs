@@ -139,4 +139,15 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
     await expect(plain.open('/')).rejects.toThrow('testSite({ browser: true })')
     await expect(site.open('/', { path: '/nowhere/chrome' })).rejects.toThrow('kay: no browser at /nowhere/chrome')
   })
+
+  it('scrolls to what it clicks, centered past fixed bars, waiting for an island hydrating once visible', async () => {
+    await page.goto('/below')
+    await page.click('button.player')
+
+    expect(await page.text('button.player')).toBe('Played 1')
+
+    await page.click('a.far')
+    await page.waitUntil(() => location.hash === '#far')
+    expect(page.errors).toEqual([])
+  })
 })
