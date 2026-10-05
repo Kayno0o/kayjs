@@ -1,0 +1,22 @@
+---
+import { Sortable } from '@kaynooo/kayjs-ui/dnd'
+import { signal } from 'kay'
+
+// Rows that really move in a keyed list, so a test sees the order a later key press has to start from.
+const rows = signal([{ id: 1, name: 'Read' }, { id: 2, name: 'Run' }, { id: 3, name: 'Write' }])
+
+const sortable = new Sortable({
+  onReorder: (from, to) => rows.set((list) => {
+    const next = [...list]
+    const [moved] = next.splice(from, 1)
+
+    next.splice(to, 0, moved!)
+
+    return next
+  }),
+})
+---
+ul
+  for row of rows() key={row.id}
+    li(ref={sortable.item(row.id)})
+      button(type="button" ref={sortable.handle(row.id)}) {row.name}

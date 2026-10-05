@@ -4,7 +4,7 @@
 
 ## Rules that are easy to get wrong
 
-- Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`.
+- Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`, and the drag and drop controllers from `@kaynooo/kayjs-ui/dnd`.
 - Components write no Tailwind utility, only the classes of `theme.css`. A rule of the app's on one of those classes restyles every instance; utilities passed through a component's `class` prop restyle one.
 - A static page cannot pass functions, `JSX.Element` props or children to an island. Render Dialog, SidePanel, SplitLayout, Popover, FormDialog, or a Table with a `@cell` or `@empty` block, a function `sortValue` or a function `rowKey` from a component of the app that is an island itself: one with an `on*` handler, a `ref`, a `bind:` or a value import from `'kay'`. The examples below are written as such components.
 - `toast` only shows in the browser, called from an island. The server's copy of the toast list is shared by every request, so it stays empty. Render one `Toaster` and one `TooltipHost` in the root layout.
@@ -280,6 +280,40 @@ CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { l
   - An axis spans its `domain`, or else the points' own extent, along a `linear` or `log` `scale`, with `ticks` of `{ value, label }` and a `label`. `quadrant` draws guides through a point, and `corners` names the four regions they split.
   - `onSelect(point)` makes each dot a button, from an island; `empty` is what it reads with no points.
 - `ContributionGraph(days={days} color="var(--color-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
+
+### Drag and drop: Sortable, Board, DropTargets
+
+```kay
+---
+import { Sortable } from '@kaynooo/kayjs-ui/dnd'
+import { attempt } from '@kaynooo/kayjs-ui'
+import { signal } from 'kay'
+import { reorder } from '../routes/habits.kay'
+
+const { habits } = props<{ habits: Habit[] }>()
+
+const rows = signal(habits)
+const sortable = new Sortable({
+  onReorder: (from, to) => attempt(async () => {
+    const next = [...rows()]
+
+    next.splice(to, 0, ...next.splice(from, 1))
+    await reorder({ ids: next.map(habit => habit.id) })
+    rows.set(next)
+  }, 'Could not reorder'),
+})
+---
+ul
+  for habit of rows() key={habit.id}
+    li(ref={sortable.item(habit.id)})
+      button.touch-none(type="button" ref={sortable.handle(habit.id)} aria-label="Move") {habit.name}
+```
+
+- Controllers from `@kaynooo/kayjs-ui/dnd`, wired to the app's own markup through `ref`, in an island. On Board and DropTargets a mouse or pen drags after a 10px move and a touch after a 250ms hold, so a swipe still scrolls, and Escape cancels; a Sortable handle drags after either. A scroll container scrolls as the pointer nears its edge. The list changes only once the callback has updated the app's data, and no other move starts until a promise it returns settles: wrap it in `attempt`, since a rejection goes unhandled.
+- `Sortable({ onReorder(from, to) })`: a vertical list. `ref={sortable.item(id)}` on each entry and `ref={sortable.handle(id)}` on the part a pointer grabs, which needs `touch-action: none`. A drag slides the other items out of the way; ArrowUp and ArrowDown on a focused handle move its item one place, focus staying on it.
+- `Board({ onMove({ item, from, to, index }) })`: items moving between wrapping containers and within them, for a kanban or a tier list. `ref={board.container(id)}` on each container and `ref={board.item(id, container)}` on each item, grabbed whole. A ghost follows the pointer; `board.dragging()` names the item dragged and `board.drop()` the landing `{ container, index, bar }`, the bar an insertion mark to draw `position: fixed` at `bar.left`, `bar.top` and `bar.height`. ArrowLeft and ArrowRight move a focused item within its container, ArrowUp and ArrowDown into the one before or after.
+- `DropTargets({ onDrop(item, target), accepts, onLinger })`: items dropped onto targets, a move that is not a reorder, such as a note into a folder. `ref={targets.item(id)}` and `ref={targets.target(id)}`; the innermost accepting target under the pointer wins, `targets.over()` naming it and `targets.dragging()` the item. `onLinger(target)` runs once the pointer rests on a target, such as to open a folder. Pointers only: give the keyboard a menu or a dialog for the same move.
+- A drag cancels the browser's own drag of a link or an image inside the item; on Board and DropTargets it also swallows the click its release would send.
 
 ## Forms
 

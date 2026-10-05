@@ -23,6 +23,7 @@
   "exports": {
     "./*.kay": "./src/*.kay",
     "./theme.css": "./src/theme.css",
+    "./dnd": "./src/dnd.ts",
     ".": "./src/index.ts"
   },
   "files": [
