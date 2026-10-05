@@ -39,8 +39,6 @@ let swipeFrom: { x: number, y: number } | null = null
 
 effect(() => shown.set(index))
 
-// An item as the video it plays, or nothing for an image, for the template to draw each.
-const playable = (item: MediaItem) => isPlayable(item) ? item : undefined
 const active = () => Math.min(Math.max(shown(), 0), Math.max(items.length - 1, 0))
 const current = () => items[active()]
 const named = (position: number) => itemLabel.replaceAll('{n}', String(position + 1))
@@ -157,8 +155,8 @@ else
     .kui-media-gallery-stage(style={`aspect-ratio: ${ratio}`} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       // Keyed on the item, so a video and its player are made afresh for each.
       for item of [current()!] key={item.key}
-        if playable(item) as video
-          video.kui-media-gallery-frame(ref={element => play(element, video.src)} controls preload="none" poster={video.preview})
+        if isPlayable(item)
+          video.kui-media-gallery-frame(ref={element => play(element, item.src)} controls preload="none" poster={item.preview})
         else
           button.kui-media-gallery-zoom(type="button" aria-label={item.title ? `${openLabel}: ${item.title}` : openLabel} onClick={() => zoomed.set(true)})
             img.kui-media-gallery-frame(src={item.preview} alt={item.title ?? ''})
@@ -178,8 +176,8 @@ else
     dialog.kui-media-gallery-lightbox(ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? named(active())} onClose={() => zoomed.set(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       if zoomed()
         for item of [current()!] key={item.key}
-          if playable(item) as video
-            video.kui-media-gallery-full(ref={element => play(element, video.src)} controls preload="none" poster={video.preview})
+          if isPlayable(item)
+            video.kui-media-gallery-full(ref={element => play(element, item.src)} controls preload="none" poster={item.preview})
           else
             img.kui-media-gallery-full(src={item.full ?? item.preview} alt={item.title ?? ''})
         if items.length > 1

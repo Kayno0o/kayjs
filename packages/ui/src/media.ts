@@ -18,6 +18,18 @@ export function isPlayable(item: MediaItem): item is MediaItem & { src: string }
   return item.kind === 'video' && Boolean(item.src)
 }
 
+// hls.js, or nothing when the app has not installed it. Caught, the import lets an app without it still build, since a bundler fails on a bare import it cannot resolve but leaves a guarded one to the browser.
+async function loadHls(): Promise<typeof import('hls.js').default | undefined> {
+  try {
+    return (await import('hls.js')).default
+  }
+  catch {
+    console.error('kayjs-ui: MediaGallery plays an .m3u8 playlist through hls.js in browsers without native HLS; install it with `bun add hls.js`')
+
+    return undefined
+  }
+}
+
 // Points a video at `src`, through `hls.js` for a playlist the browser cannot play itself, which is every one but Safari.
 // The player is imported only once such a video is shown, and loads nothing before the first play, as `preload="none"` does.
 // Hands back what stops the player, for the video's cleanup.
@@ -32,12 +44,12 @@ export function playSource(video: HTMLVideoElement, src: string): () => void {
   let disposed = false
 
   void (async () => {
-    const { default: Hls } = await import('hls.js')
+    const Hls = await loadHls()
 
     if (disposed)
       return
 
-    if (!Hls.isSupported()) {
+    if (!Hls?.isSupported()) {
       video.src = src
 
       return

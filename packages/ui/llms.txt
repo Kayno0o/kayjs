@@ -17,7 +17,7 @@
 
 ## Setup
 
-kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay 0.4 or later, Tailwind v4 and `@iconify-json/tabler` are peer dependencies.
+kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay 0.6 or later, Tailwind v4 and `@iconify-json/tabler` are peer dependencies.
 
 ```sh
 bun add @kaynooo/kayjs-ui @iconify-json/tabler
@@ -259,11 +259,20 @@ PageSection(title="Moons")
   - Files dropped on the zone, picked through `zone.open()` or, with `paste`, pasted anywhere on the page outside a text field, reach `onFiles(files)`: those `accept` allows, one unless `multiple`, never an empty list.
   - `zone.dragging()` reads whether files hover the zone, which also carries `data-dragging`.
 - `Menu(label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', danger: true, onSelect: remove }]})`:
-  - An IconButton opening a `role="menu"` popover; `'separator'` draws a rule between groups.
+  - An IconButton opening a `role="menu"` popover; `'separator'` draws a rule between groups, and `class` styles that button.
   - Opening focuses the first enabled entry; the arrows, Home and End move between enabled entries, and Tab closes it.
   - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.
 - `IconPicker(search={findIcons} value={post.icon} name="icon" onChange={icon.set})`:
-  - A search box over a grid of the icons `search(query, limit)` returns as `IconChoice`s, `{ name, icon }` with `icon` the IconProps to draw: typically an action, since a whole icon set is too large to ship, as `search={(query, limit) => findIcons({ query, limit })}`. The app's action builds each from its iconify set, as `{ viewBox: \`0 0 ${set.width} ${set.height}\`, width: '1em', height: '1em', 'aria-hidden': 'true', innerHTML: set.icons[name].body }` for a square set such as Tabler.
+  - A search box over a grid of the icons `search(query, limit)` returns as `IconChoice`s, `{ name, icon }` with `icon` the IconProps to draw: typically an action, since a whole icon set is too large to ship, as `search={(query, limit) => findIcons({ query, limit })}`. The app's action builds them on the server with kay's `iconNames` and `iconProps` over the set's JSON, so the set never ships to the browser:
+
+    ```ts
+    import tabler from '@iconify-json/tabler/icons.json'
+    import { iconNames, iconProps } from 'kay/icons'
+
+    export const findIcons = action(t.Object({ query: t.String(), limit: t.Number() }), async ({ query, limit }) =>
+      iconNames(tabler).filter(name => name.includes(query)).slice(0, limit).map(name => ({ name: `tabler:${name}`, icon: iconProps(tabler, name)! })))
+    ```
+
   - The search runs 200ms after the typing pauses, from 50 icons; `Show more` asks for 50 more once a page comes back full. The last grid stays while a search is in flight, and a search a later one overtook is dropped.
   - Picking the chosen icon again, or the selection's clear button, clears it: `onChange` gets the name, or an empty string. The tooltip and label read the name without its `prefix:`.
   - `name` submits the chosen name as a hidden field, which fires a bubbling `input` event on each pick. Enter in the search box never submits the form.
@@ -342,7 +351,7 @@ ul
 - `MediaGallery(items={media})`: a stage, a strip of thumbnails and a lightbox.
   - An item, typed `MediaItem`, has a `key`, a `kind` (`image` or `video`), a `thumb` for the strip, a `preview` for the stage or a video's poster, a `full` the lightbox opens an image at, a video's `src` and a `title`.
   - The arrows, Home and End turn it while focus is inside it, wrapping, and so do its buttons and a swipe. `index` is the item to start on, and `onIndexChange(index)` reports each turn. The strip keeps the shown thumbnail centred, and the images either side start loading.
-  - A video plays in place with `preload="none"`. An `.m3u8` playlist plays through `hls.js` in browsers without native HLS, fetched only once such a video shows. It is a peer MediaGallery needs installed, `bun add hls.js`, even in an app playing no playlist, since the bundler resolves the import either way; no other component reaches it.
+  - A video plays in place with `preload="none"`. An `.m3u8` playlist plays through `hls.js` in browsers without native HLS, fetched only once such a video shows: an optional peer, `bun add hls.js`. An app without it still builds, and a playlist it cannot play logs that hls.js is missing.
   - An image opens full size in a lightbox, which turns the same way. `ratio` is the stage's `aspect-ratio`, `16 / 9` by default; `empty` is what it reads with no items.
 - `Carousel(slides={[{ src: '/garden.jpg', alt: 'The garden' }]} autoplay={5000} ratio="4 / 3" label="Photos")`: one image at a time sliding in, for a marketing page.
   - The previous and next buttons wrap at either end, and a dot per slide jumps to it. A single slide draws no controls. `index` is the slide to start on, followed when the parent passes another, and `onIndexChange(index)` reports each turn.

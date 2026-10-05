@@ -200,6 +200,7 @@ describe('Menu', () => {
     const menu = root.querySelector<HTMLElement>('.kui-menu')!
     const focused = () => document.activeElement?.textContent
 
+    expect(root.querySelector(`[popovertarget="${menu.id}"]`)?.className).toBe('kui-icon-btn row-actions')
     expect(root.querySelector(`[popovertarget="${menu.id}"]`)?.getAttribute('aria-haspopup')).toBe('menu')
 
     menu.showPopover()
