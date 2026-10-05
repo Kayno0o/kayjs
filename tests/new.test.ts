@@ -169,6 +169,9 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.dependencies.kay).toBe('^1.0.0')
       expect(await Bun.file(join(dir, 'src/components/header.kay')).text()).toContain('(href="/") my-app\n')
+      // As strict as kay itself, and checked and tested on every push.
+      expect(((await Bun.file(join(dir, 'tsconfig.json')).json()) as { compilerOptions: Record<string, unknown> }).compilerOptions).toMatchObject({ strict: true, noFallthroughCasesInSwitch: true, noImplicitOverride: true, noUncheckedIndexedAccess: true })
+      expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain('run: bun run check\n\n      - name: Test\n        run: bun run test\n')
 
       await installKay(dir)
 
@@ -211,6 +214,8 @@ describe('kay new', () => {
       expect(files).not.toContain('src/server.ts')
       expect(manifest.scripts.build).toBe('kay build --static')
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toContain('SITE_BASE: /${{ github.repository }}')
+      // Tested before it builds, which checks it.
+      expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run test\n\n {6}- name: Build the site\n/)
 
       await installKay(dir)
       expect(await check(dir)).toEqual([])

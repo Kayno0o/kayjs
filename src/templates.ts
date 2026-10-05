@@ -242,9 +242,42 @@ declare module 'kay' {
 }
 `
 
+// Every push is checked and tested before anything deploys it; the container build checks again, as `kay build` does.
+const TEST_WORKFLOW = `name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: debian
+    steps:
+      - name: Install unzip and git
+        run: apt-get update && apt-get install -y unzip git
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check
+        run: bun run check
+
+      - name: Test
+        run: bun run test
+`
+
 const SERVER_FILES: Record<string, string> = {
   ...COMMON_FILES,
   ...CONTAINER_FILES,
+  '.forgejo/workflows/test.yml': TEST_WORKFLOW,
   '.gitignore': 'node_modules\n.kay\n/server\n',
   'kay.config.ts': CONFIG,
   'src/server.ts': SERVER_ENTRY,
@@ -303,6 +336,10 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # A failing test publishes nothing; the build checks the project itself.
+      - name: Test
+        run: bun run test
 
       - name: Build the site
         env:
