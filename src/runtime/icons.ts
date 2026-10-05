@@ -1,10 +1,13 @@
+import type { SafeHtml } from './checks'
+import { trustHtml } from './sanitize'
+
 // What `import home from '~icons/tabler/home'` gives: the props an `svg` spreads to draw it, `svg({...home})`, sized to the text around it.
 export interface IconProps {
   'viewBox': string
   'width': string
   'height': string
   'aria-hidden': 'true'
-  'innerHTML': string
+  'innerHTML': SafeHtml
 }
 
 // An iconify set as `@iconify-json/<prefix>/icons.json` holds it.
@@ -63,7 +66,7 @@ export function iconProps(set: IconSet, name: string): IconProps | undefined {
     'width': `${Math.round(width / height * 1000) / 1000}em`,
     'height': '1em',
     'aria-hidden': 'true',
-    'innerHTML': transforms.length > 0 ? `<g transform="${transforms.join(' ')}">${icon.body}</g>` : icon.body,
+    'innerHTML': trustHtml(transforms.length > 0 ? `<g transform="${transforms.join(' ')}">${icon.body}</g>` : icon.body),
   }
 }
 

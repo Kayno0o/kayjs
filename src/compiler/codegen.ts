@@ -55,6 +55,8 @@ const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 const LINK_ELEMENTS = new Set(['a', 'area'])
 // URLs checked as links are when written out: an expression there may be another kind of value, such as an action a form posts to.
+// Attributes rendered as markup rather than text.
+const MARKUP_ATTRIBUTES = new Set(['innerHTML', 'srcdoc'])
 const WRITTEN_URLS = new Map([['img', 'src'], ['link', 'href'], ['form', 'action']])
 const WHITESPACE = /\s+/
 const CTX_REFERENCE = /\bctx\b/
@@ -1148,7 +1150,7 @@ class Generator {
     this.error(attribute.name, `\`${this.text(attribute.name)}\` does not attach a handler: events are written in camelCase, as \`on${capitalize(camel)}\``)
   }
 
-  // Check-only wrappers: a site link must match a page, and a static parent passes an island serializable props only.
+  // Check-only wrappers: a site link must match a page, markup must be made safe or written out, and a static parent passes an island serializable props only.
   private emitCheckedAttribute(element: ElementNode, attribute: Attribute): boolean {
     const { b } = this
 
@@ -1176,6 +1178,12 @@ class Generator {
         b.add('(').addSource(attribute.expression).add(')')
 
       b.add(')}')
+
+      return true
+    }
+
+    if (!element.component && attribute.kind === 'expression' && MARKUP_ATTRIBUTES.has(name)) {
+      b.addSource(attribute.name).add('={KayHtml((').addSource(attribute.expression).add('))}')
 
       return true
     }

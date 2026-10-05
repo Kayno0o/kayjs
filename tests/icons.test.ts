@@ -8,6 +8,7 @@ import { iconProps, iconTypes, installedIconSets } from '../src/build/icons'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { iconNames, iconProps as setIconProps } from '../src/runtime/icons'
+import { trustHtml } from '../src/runtime/sanitize'
 import { pages } from '../src/server'
 
 const FIXTURE = join(import.meta.dir, 'fixtures/icons')
@@ -69,9 +70,9 @@ describe('icons', () => {
       aliases: { flipped: { parent: 'wide', hFlip: true }, turned: { parent: 'flipped', rotate: 1, hFlip: true }, loop: { parent: 'loop' } },
     }))
 
-    expect(iconProps(file, 'wide')).toEqual({ 'viewBox': '0 0 32 16', 'width': '2em', 'height': '1em', 'aria-hidden': 'true', 'innerHTML': '<path d="M0 0h32v16"/>' })
-    expect(iconProps(file, 'flipped')!.innerHTML).toBe('<g transform="translate(32 0) scale(-1 1)"><path d="M0 0h32v16"/></g>')
-    expect(iconProps(file, 'turned')!.innerHTML).toBe('<g transform="rotate(90 16 8)"><path d="M0 0h32v16"/></g>')
+    expect(iconProps(file, 'wide')).toEqual({ 'viewBox': '0 0 32 16', 'width': '2em', 'height': '1em', 'aria-hidden': 'true', 'innerHTML': trustHtml('<path d="M0 0h32v16"/>') })
+    expect(String(iconProps(file, 'flipped')!.innerHTML)).toBe('<g transform="translate(32 0) scale(-1 1)"><path d="M0 0h32v16"/></g>')
+    expect(String(iconProps(file, 'turned')!.innerHTML)).toBe('<g transform="rotate(90 16 8)"><path d="M0 0h32v16"/></g>')
     expect(setIconProps(await Bun.file(file).json() as IconSet, 'turned')).toEqual(iconProps(file, 'turned')!)
     expect(iconProps(file, 'loop')).toBeUndefined()
     expect(iconProps(file, 'nothing')).toBeUndefined()

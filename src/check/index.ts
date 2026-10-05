@@ -373,7 +373,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
 
   return [
-    'import type { Action, ApiRoutesOf, CheckedHref, ChildrenProp, FieldName, FunctionProp, IslandProp } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ChildrenProp, FieldName, FunctionProp, IslandProp } from \'kay\'',
     '',
     'declare module \'kay\' {',
     `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules} }`,
@@ -381,6 +381,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     '',
     'declare global {',
     '  function KayHref<const Href extends string>(href: Href & CheckedHref<Href>): string',
+    '  function KayHtml<const Markup>(markup: Markup & CheckedHtml<Markup>): Markup',
     '  function KayField<Target extends string | Action<never, unknown>>(target: Target, name: FieldName<Target>): string',
     '  function KayProp<Component>(component: Component): <Value>(value: Value & IslandProp<Component, Value>) => Value',
     '  function KayFunctionProp<Component>(component: Component): (attribute: FunctionProp<Component>) => Record<never, never>',

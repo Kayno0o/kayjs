@@ -193,3 +193,13 @@ export interface TemplateHelpers {
   head: (tags: { tag: string, props: Record<string, unknown> }[]) => void
   Try: (props: { block: () => JSX.Element, failed?: (error: unknown) => JSX.Element }) => JSX.Element
 }
+
+declare const SAFE_HTML: unique symbol
+
+// Markup fit for `innerHTML`: what `sanitizeHtml()` kept, or what `trustHtml()` vouches for.
+export type SafeHtml = string & { readonly [SAFE_HTML]: true }
+
+// What innerHTML would render as markup without anyone saying it may: a computed string, a template literal with values in it, as opposed to markup written out or made safe.
+type UnsafeHtml<Markup> = Markup extends SafeHtml | null | undefined ? never : Record<never, never> extends Record<Markup & string, 1> ? Markup : never
+
+export type CheckedHtml<Markup> = [UnsafeHtml<Markup>] extends [never] ? unknown : { kayError: 'This string would render as markup: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made' }
