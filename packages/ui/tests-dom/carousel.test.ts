@@ -20,14 +20,14 @@ async function carousel(autoplay?: number) {
   mounted = await mount('src/components/carousel.kay', { autoplay, onIndexChange: (index: number) => turns.push(index) })
 
   const { root } = mounted
-  const section = root.querySelector<HTMLElement>('.carousel')!
+  const section = root.querySelector<HTMLElement>('.kui-carousel')!
 
   return {
     section,
-    shown: () => [...root.querySelectorAll('.carousel-slide')].filter(slide => !slide.hasAttribute('inert') && !slide.hasAttribute('aria-hidden')).map(slide => slide.getAttribute('aria-label')),
-    current: () => [...root.querySelectorAll('.carousel-dot')].findIndex(dot => dot.getAttribute('aria-current') === 'true'),
-    step: (side: 'previous' | 'next') => click(root.querySelector(`.carousel-step[data-side="${side}"]`)),
-    dot: (index: number) => click(root.querySelectorAll('.carousel-dot')[index]!),
+    shown: () => [...root.querySelectorAll('.kui-carousel-slide')].filter(slide => !slide.hasAttribute('inert') && !slide.hasAttribute('aria-hidden')).map(slide => slide.getAttribute('aria-label')),
+    current: () => [...root.querySelectorAll('.kui-carousel-dot')].findIndex(dot => dot.getAttribute('aria-current') === 'true'),
+    step: (side: 'previous' | 'next') => click(root.querySelector(`.kui-carousel-step[data-side="${side}"]`)),
+    dot: (index: number) => click(root.querySelectorAll('.kui-carousel-dot')[index]!),
     outside: root.querySelector<HTMLButtonElement>('#outside')!,
     jump: () => click(root.querySelector('#jump')),
   }
@@ -76,8 +76,8 @@ test('turns on its own, held while the pointer or the focus is on it, and stops 
   expect(turns).toEqual([])
 
   view.section.dispatchEvent(new PointerEvent('pointerleave'))
-  view.section.querySelector<HTMLButtonElement>('.carousel-dot')!.focus()
-  view.section.querySelectorAll<HTMLButtonElement>('.carousel-dot')[1]!.focus()
+  view.section.querySelector<HTMLButtonElement>('.kui-carousel-dot')!.focus()
+  view.section.querySelectorAll<HTMLButtonElement>('.kui-carousel-dot')[1]!.focus()
   await settle()
   await Bun.sleep(TWO_TURNS_MS)
 

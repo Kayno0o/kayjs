@@ -31,14 +31,14 @@ effect(() => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onClose` is the one place the parent learns of it.
-dialog.side-panel(aria-label={title} {...rest} ref={element => panel = element} closedby="any" onClose={onClose} class={className})
+dialog.kui-side-panel(aria-label={title} {...rest} ref={element => panel = element} closedby="any" onClose={onClose} class={className})
   if open
-    header.side-panel-head
-      h2.side-panel-title {title}
+    header.kui-side-panel-head
+      h2.kui-side-panel-title {title}
       | {actions}
       IconButton(icon="close" label={closeLabel} variant="ghost" onClick={() => panel?.close()})
-    .side-panel-body
+    .kui-side-panel-body
       slot
     if footer
-      .side-panel-footer
+      .kui-side-panel-footer
         | {footer}

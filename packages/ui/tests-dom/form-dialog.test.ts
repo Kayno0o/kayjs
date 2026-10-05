@@ -52,9 +52,9 @@ describe('FormDialog', () => {
     submit(root)
     await settle()
 
-    expect(root.querySelector('.form-field-issue')?.textContent).toBe('Taken')
+    expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('Taken')
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
-    expect(root.querySelector('.toast')).toBeNull()
+    expect(root.querySelector('.kui-toast')).toBeNull()
 
     answer = 'Ada'
     submit(root)
@@ -65,8 +65,8 @@ describe('FormDialog', () => {
     click(root.querySelector('#open'))
     await settle()
 
-    expect(root.querySelector('.form-field')).not.toBeNull()
-    expect(root.querySelector('.form-field-issue')).toBeNull()
+    expect(root.querySelector('.kui-form-field')).not.toBeNull()
+    expect(root.querySelector('.kui-form-field-issue')).toBeNull()
   })
 
   test('toasts a message no FormField shows, the whole form\'s included, and clears every message however it closed', async () => {
@@ -75,16 +75,16 @@ describe('FormDialog', () => {
     submit(root)
     await settle()
 
-    expect(root.querySelector('.form-field-issue')?.textContent).toBe('Taken')
-    expect([...root.querySelectorAll('.toast-message')].map(toast => toast.textContent).slice(-2)).toEqual(['Too long', 'Slow down'])
+    expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('Taken')
+    expect([...root.querySelectorAll('.kui-toast-message')].map(toast => toast.textContent).slice(-2)).toEqual(['Too long', 'Slow down'])
 
     click(root.querySelector('#hide'))
     await settle()
     click(root.querySelector('#open'))
     await settle()
 
-    expect(root.querySelector('.form-field')).not.toBeNull()
-    expect(root.querySelector('.form-field-issue')).toBeNull()
+    expect(root.querySelector('.kui-form-field')).not.toBeNull()
+    expect(root.querySelector('.kui-form-field-issue')).toBeNull()
   })
 
   test('submits on Ctrl+Enter from a textarea, which keeps a plain Enter for new lines', async () => {
@@ -114,12 +114,12 @@ describe('FormDialog', () => {
     submit(root)
     await settle()
 
-    expect([...root.querySelectorAll<HTMLButtonElement>('.form-dialog-actions button')].map(button => [button.textContent, button.disabled])).toEqual([['Cancel', true], ['Saving…', true]])
+    expect([...root.querySelectorAll<HTMLButtonElement>('.kui-form-dialog-actions button')].map(button => [button.textContent, button.disabled])).toEqual([['Cancel', true], ['Saving…', true]])
 
     reject(new Error('offline'))
     await settle()
 
-    expect([...root.querySelectorAll('.toast-message')].at(-1)?.textContent).toBe('Could not rename')
+    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not rename')
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
   })
 })

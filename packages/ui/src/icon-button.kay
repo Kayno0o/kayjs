@@ -17,5 +17,5 @@ const { icon, label, size = 'md', variant = 'solid', type = 'button', class: cla
 // Only the solid and danger variants are framed by the shell's hairline.
 const framed = () => variant === 'solid' || variant === 'danger'
 ---
-button.icon-btn({...rest} type={type} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} class={[{ 'shell': framed(), 'shell-danger': variant === 'danger' }, className]})
+button.kui-icon-btn({...rest} type={type} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} class={[{ 'kui-shell': framed(), 'kui-shell-danger': variant === 'danger' }, className]})
   Icon(icon={icon})

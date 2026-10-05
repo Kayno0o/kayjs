@@ -57,7 +57,7 @@ async function picker(options: { value?: string, hold?: (query: string) => boole
   await settle()
 
   const search = root.querySelector<HTMLInputElement>('input[type="search"]')!
-  const all = () => [...root.querySelectorAll('.icon-grid-option')]
+  const all = () => [...root.querySelectorAll('.kui-icon-grid-option')]
 
   return {
     root,
@@ -66,9 +66,9 @@ async function picker(options: { value?: string, hold?: (query: string) => boole
     option: (name: string) => all().find(option => option.getAttribute('aria-label') === name)!,
     pressed: () => all().filter(option => option.getAttribute('aria-pressed') === 'true').map(option => option.getAttribute('aria-label')),
     hidden: () => root.querySelector<HTMLInputElement>('input[type="hidden"]')!.value,
-    selection: () => root.querySelector('.icon-grid-selection'),
-    more: () => root.querySelector('.icon-grid-more'),
-    empty: () => root.querySelector('.icon-grid-empty')?.textContent,
+    selection: () => root.querySelector('.kui-icon-grid-selection'),
+    more: () => root.querySelector('.kui-icon-grid-more'),
+    empty: () => root.querySelector('.kui-icon-grid-empty')?.textContent,
   }
 }
 
@@ -99,7 +99,7 @@ test('picks an icon into the form, and picking it again or clearing it empties t
 
   click(view.option('home'))
   await settle()
-  click(view.selection()!.querySelector('.icon-grid-clear'))
+  click(view.selection()!.querySelector('.kui-icon-grid-clear'))
   await settle()
 
   expect([view.pressed(), view.hidden(), changes]).toEqual([[], '', ['tabler:house', '', 'tabler:home', '']])
@@ -146,7 +146,7 @@ test('keeps the last grid while a search is in flight, and drops a search a late
   await Bun.sleep(TYPED_MS)
 
   expect(view.names()).toHaveLength(50)
-  expect(view.root.querySelector('.icon-grid')!.getAttribute('aria-busy')).toBe('true')
+  expect(view.root.querySelector('.kui-icon-grid')!.getAttribute('aria-busy')).toBe('true')
   expect(view.names()[0]).toBe('home')
 
   type(view.search, 'home')
@@ -155,13 +155,13 @@ test('keeps the last grid while a search is in flight, and drops a search a late
   await settle()
 
   expect(view.names()).toHaveLength(50)
-  expect(view.root.querySelector('.icon-grid')!.getAttribute('aria-busy')).toBe('true')
+  expect(view.root.querySelector('.kui-icon-grid')!.getAttribute('aria-busy')).toBe('true')
 
   held.shift()!.release()
   await settle()
 
   expect(view.names()).toEqual(['home'])
-  expect(view.root.querySelector('.icon-grid')!.hasAttribute('aria-busy')).toBe(false)
+  expect(view.root.querySelector('.kui-icon-grid')!.hasAttribute('aria-busy')).toBe(false)
 })
 
 test('reads Searching… until the first search lands', async () => {

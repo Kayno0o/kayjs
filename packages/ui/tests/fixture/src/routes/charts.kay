@@ -13,4 +13,4 @@ main
   article#no-scatter
     ScatterChart(label="Games" points={[]} empty="No games")
   article#graph
-    ContributionGraph(days={days} color="var(--color-accent)" today="2026-09-02" months)
+    ContributionGraph(days={days} color="var(--color-kui-accent)" today="2026-09-02" months)

@@ -12,11 +12,11 @@ const { left, right, actions, class: className, ...rest } = props<Omit<JSX.Intri
 }>()
 ---
 // One line of a list drawn as cards: the children are its body, between what leads and what trails.
-.card-row({...rest} class={className})
+.kui-card-row({...rest} class={className})
   | {left}
-  .card-row-body
+  .kui-card-row-body
     slot
   | {right}
   if actions
-    .card-row-actions
+    .kui-card-row-actions
       | {actions}

@@ -54,14 +54,14 @@ function numbered(text: string, position: number) {
   return text.replaceAll('{n}', String(position + 1)).replaceAll('{count}', String(slides.length))
 }
 ---
-section.carousel({...rest} aria-roledescription="carousel" aria-label={label} class={className} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
-  .carousel-viewport(style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
+section.kui-carousel({...rest} aria-roledescription="carousel" aria-label={label} class={className} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
+  .kui-carousel-viewport(style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
     for slide, position of slides key={slide.src}
-      .carousel-slide(role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
-        img.carousel-image(src={slide.src} alt={slide.alt} loading={position === 0 ? 'eager' : 'lazy'})
+      .kui-carousel-slide(role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
+        img.kui-carousel-image(src={slide.src} alt={slide.alt} loading={position === 0 ? 'eager' : 'lazy'})
   if slides.length > 1
-    .carousel-controls
-      IconButton(icon="chevron" label={previousLabel} variant="ghost" class="carousel-step" data-side="previous" onClick={() => step(-1)})
+    .kui-carousel-controls
+      IconButton(icon="chevron" label={previousLabel} variant="ghost" class="kui-carousel-step" data-side="previous" onClick={() => step(-1)})
       for slide, position of slides key={slide.src}
-        button.carousel-dot(type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
-      IconButton(icon="chevron" label={nextLabel} variant="ghost" class="carousel-step" data-side="next" onClick={() => step(1)})
+        button.kui-carousel-dot(type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
+      IconButton(icon="chevron" label={nextLabel} variant="ghost" class="kui-carousel-step" data-side="next" onClick={() => step(1)})

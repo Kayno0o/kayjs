@@ -12,8 +12,8 @@ const { tone = 'neutral', icon, label, class: className, ...rest } = props<Omit<
 }>()
 ---
 // A label that does nothing: a count, a status, a tag.
-span.badge({...rest} data-tone={tone} class={className})
+span.kui-badge({...rest} data-tone={tone} class={className})
   if icon
-    Icon(icon={icon} class="badge-icon")
+    Icon(icon={icon} class="kui-badge-icon")
   | {label}
   slot

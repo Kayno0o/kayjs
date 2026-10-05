@@ -143,41 +143,41 @@ effect(() => {
 })
 ---
 if !current()
-  p.media-gallery-empty {empty}
+  p.kui-media-gallery-empty {empty}
 else
   // Arrows turn the gallery while focus is anywhere inside it, which a keyboard user reaches through its buttons.
-  .media-gallery({...rest} class={className} onKeyDown={keyDown})
-    .media-gallery-stage(style={`aspect-ratio: ${ratio}`} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
+  .kui-media-gallery({...rest} class={className} onKeyDown={keyDown})
+    .kui-media-gallery-stage(style={`aspect-ratio: ${ratio}`} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       // Keyed on the item, so a video and its player are made afresh for each.
       for item of [current()!] key={item.key}
         if playable(item) as video
-          video.media-gallery-frame(ref={element => play(element, video.src)} controls preload="none" poster={video.preview})
+          video.kui-media-gallery-frame(ref={element => play(element, video.src)} controls preload="none" poster={video.preview})
         else
-          button.media-gallery-zoom(type="button" aria-label={item.title ? `Open ${item.title}` : 'Open full size'} onClick={() => zoomed.set(true)})
-            img.media-gallery-frame(src={item.preview} alt={item.title ?? ''})
+          button.kui-media-gallery-zoom(type="button" aria-label={item.title ? `Open ${item.title}` : 'Open full size'} onClick={() => zoomed.set(true)})
+            img.kui-media-gallery-frame(src={item.preview} alt={item.title ?? ''})
       if items.length > 1
-        IconButton(icon="chevron" label={previousLabel} variant="ghost" class="media-gallery-step" data-side="previous" onClick={() => step(-1)})
-        IconButton(icon="chevron" label={nextLabel} variant="ghost" class="media-gallery-step" data-side="next" onClick={() => step(1)})
-        span.media-gallery-counter {active() + 1} / {items.length}
+        IconButton(icon="chevron" label={previousLabel} variant="ghost" class="kui-media-gallery-step" data-side="previous" onClick={() => step(-1)})
+        IconButton(icon="chevron" label={nextLabel} variant="ghost" class="kui-media-gallery-step" data-side="next" onClick={() => step(1)})
+        span.kui-media-gallery-counter {active() + 1} / {items.length}
       if current()!.title
-        span.media-gallery-caption {current()!.title}
+        span.kui-media-gallery-caption {current()!.title}
     if items.length > 1
-      .media-gallery-strip(ref={element => strip = element})
+      .kui-media-gallery-strip(ref={element => strip = element})
         for item, position of items key={item.key}
-          button.media-gallery-thumb(type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.title ?? `Media ${position + 1}`} onClick={() => go(position)})
-            img.media-gallery-thumb-image(src={item.thumb} alt="" loading="lazy" decoding="async")
+          button.kui-media-gallery-thumb(type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.title ?? `Media ${position + 1}`} onClick={() => go(position)})
+            img.kui-media-gallery-thumb-image(src={item.thumb} alt="" loading="lazy" decoding="async")
             if item.kind === 'video'
-              Icon(icon="play" class="media-gallery-play")
-    dialog.media-gallery-lightbox(ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? 'Media'} onClose={() => zoomed.set(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
+              Icon(icon="play" class="kui-media-gallery-play")
+    dialog.kui-media-gallery-lightbox(ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? 'Media'} onClose={() => zoomed.set(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       if zoomed()
         for item of [current()!] key={item.key}
           if playable(item) as video
-            video.media-gallery-full(ref={element => play(element, video.src)} controls preload="none" poster={video.preview})
+            video.kui-media-gallery-full(ref={element => play(element, video.src)} controls preload="none" poster={video.preview})
           else
-            img.media-gallery-full(src={item.full ?? item.preview} alt={item.title ?? ''})
+            img.kui-media-gallery-full(src={item.full ?? item.preview} alt={item.title ?? ''})
         if items.length > 1
-          IconButton(icon="chevron" label={previousLabel} variant="ghost" class="media-gallery-step" data-side="previous" onClick={() => step(-1)})
-          IconButton(icon="chevron" label={nextLabel} variant="ghost" class="media-gallery-step" data-side="next" onClick={() => step(1)})
+          IconButton(icon="chevron" label={previousLabel} variant="ghost" class="kui-media-gallery-step" data-side="previous" onClick={() => step(-1)})
+          IconButton(icon="chevron" label={nextLabel} variant="ghost" class="kui-media-gallery-step" data-side="next" onClick={() => step(1)})
         if current()!.title
-          span.media-gallery-caption {current()!.title}
-        IconButton(icon="close" label={closeLabel} variant="ghost" class="media-gallery-close" onClick={() => zoomed.set(false)})
+          span.kui-media-gallery-caption {current()!.title}
+        IconButton(icon="close" label={closeLabel} variant="ghost" class="kui-media-gallery-close" onClick={() => zoomed.set(false)})

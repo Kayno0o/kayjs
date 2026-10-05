@@ -115,7 +115,7 @@ describe('MarkdownEditor', () => {
     await settle()
 
     expect(state.value).toBe('\n')
-    expect([...state.root.querySelectorAll('.toast-message')].at(-1)?.textContent).toBe('Could not upload the image')
+    expect([...state.root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not upload the image')
   })
 
   test('lets a pasted image through untouched when nothing uploads it', async () => {

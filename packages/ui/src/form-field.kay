@@ -24,35 +24,35 @@ const messages = () => [name === undefined ? undefined : refused?.()[name], issu
 // The control, as children, takes the `field-input` look with no class of its own.
 // The hint and the messages sit outside the label, so the control is named by its label alone; the action too, since a button inside a label would take the label from the control.
 if group
-  fieldset.form-field.form-field-group(class={className})
-    legend.form-field-head
-      span.label-text
+  fieldset.kui-form-field.kui-form-field-group(class={className})
+    legend.kui-form-field-head
+      span.kui-label-text
         | {label}
         if required
-          span.form-field-required(aria-hidden="true") *
+          span.kui-form-field-required(aria-hidden="true") *
     slot
     if action
-      span.form-field-action
+      span.kui-form-field-action
         | {action}
     if hint
-      span.form-field-hint {hint}
-    span.form-field-issues(aria-live="polite" data-field={name})
+      span.kui-form-field-hint {hint}
+    span.kui-form-field-issues(aria-live="polite" data-field={name})
       for message, index of messages() key={index}
-        span.form-field-issue {message}
+        span.kui-form-field-issue {message}
 else
-  .form-field(class={className})
-    label.form-field-label
-      span.form-field-head
-        span.label-text
+  .kui-form-field(class={className})
+    label.kui-form-field-label
+      span.kui-form-field-head
+        span.kui-label-text
           | {label}
           if required
-            span.form-field-required(aria-hidden="true") *
+            span.kui-form-field-required(aria-hidden="true") *
       slot
     if action
-      span.form-field-action
+      span.kui-form-field-action
         | {action}
     if hint
-      span.form-field-hint {hint}
-    span.form-field-issues(aria-live="polite" data-field={name})
+      span.kui-form-field-hint {hint}
+    span.kui-form-field-issues(aria-live="polite" data-field={name})
       for message, index of messages() key={index}
-        span.form-field-issue {message}
+        span.kui-form-field-issue {message}

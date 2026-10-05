@@ -18,7 +18,7 @@ const { id, open = false, placement = 'bottom-start', trigger, onToggle, class: 
 }>()
 
 const panelId = id ?? uid()
-const anchor = `--popover-${panelId}`
+const anchor = `--kui-popover-${panelId}`
 const shown = signal(open)
 let panel: HTMLDivElement | undefined
 
@@ -43,5 +43,5 @@ function toggled(event: ToggleEvent) {
 }
 ---
 | {trigger({ 'popovertarget': panelId, 'aria-expanded': shown() ? 'true' : 'false', 'style': `anchor-name: ${anchor}` })}
-.popover({...rest} ref={element => panel = element} id={panelId} popover="auto" data-placement={placement} style={`position-anchor: ${anchor}`} class={className} onToggle={toggled})
+.kui-popover({...rest} ref={element => panel = element} id={panelId} popover="auto" data-placement={placement} style={`position-anchor: ${anchor}`} class={className} onToggle={toggled})
   slot

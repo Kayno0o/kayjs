@@ -27,6 +27,6 @@ onMount(() => {
 })
 ---
 // Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens.
-nav.tab-nav({...rest} ref={element => nav = element} aria-label={label} class={className})
+nav.kui-tab-nav({...rest} ref={element => nav = element} aria-label={label} class={className})
   for link of links key={link.href}
-    a.tab-nav-link(href={link.href} aria-current={link.href === current ? 'page' : undefined}) {link.label}
+    a.kui-tab-nav-link(href={link.href} aria-current={link.href === current ? 'page' : undefined}) {link.label}

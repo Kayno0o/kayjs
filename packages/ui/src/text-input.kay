@@ -29,4 +29,4 @@ effect(() => {
     box.value = next
 })
 ---
-input.field-input({...rest} ref={element => box = element} type={type} value={untrack(() => value)} class={className} onInput={event => halfTyped(event.currentTarget) || onInput(event.currentTarget.value)} onChange={event => halfTyped(event.currentTarget) || onChange?.(event.currentTarget.value)} onBlur={event => event.currentTarget.type === 'number' && (event.currentTarget.value = value)})
+input.kui-field-input({...rest} ref={element => box = element} type={type} value={untrack(() => value)} class={className} onInput={event => halfTyped(event.currentTarget) || onInput(event.currentTarget.value)} onChange={event => halfTyped(event.currentTarget) || onChange?.(event.currentTarget.value)} onBlur={event => event.currentTarget.type === 'number' && (event.currentTarget.value = value)})

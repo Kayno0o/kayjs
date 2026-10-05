@@ -12,14 +12,14 @@ const { title, head, bare = false, class: className, ...rest } = props<Omit<JSX.
 }>()
 ---
 // The frame a page's content is written on; every part of it is optional, so a card with no title is the frame alone.
-section.card({...rest} class={className})
+section.kui-card({...rest} class={className})
   if title !== undefined || head
-    .card-head
+    .kui-card-head
       if title !== undefined
-        h3.card-title {title}
+        h3.kui-card-title {title}
       | {head}
   if bare
     slot
   else
-    .card-body
+    .kui-card-body
       slot

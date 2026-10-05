@@ -15,15 +15,15 @@ test('a toast shows in the toaster, an error as an alert, and leaves once dismis
   click(mounted.root.querySelector('#refused'))
   await settle()
 
-  const toasts = [...mounted.root.querySelectorAll('.toast')]
+  const toasts = [...mounted.root.querySelectorAll('.kui-toast')]
 
-  expect(toasts.map(item => [item.getAttribute('role'), item.getAttribute('data-type'), item.querySelector('.toast-message')?.textContent])).toEqual([['status', 'success', 'Saved'], ['alert', 'error', 'Refused']])
-  expect(mounted.root.querySelector('.toaster')?.matches(':popover-open')).toBe(true)
+  expect(toasts.map(item => [item.getAttribute('role'), item.getAttribute('data-type'), item.querySelector('.kui-toast-message')?.textContent])).toEqual([['status', 'success', 'Saved'], ['alert', 'error', 'Refused']])
+  expect(mounted.root.querySelector('.kui-toaster')?.matches(':popover-open')).toBe(true)
 
-  click(toasts[0]!.querySelector('.toast-dismiss'))
+  click(toasts[0]!.querySelector('.kui-toast-dismiss'))
   await settle()
 
-  expect([...mounted.root.querySelectorAll('.toast-message')].map(item => item.textContent)).toEqual(['Refused'])
+  expect([...mounted.root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Refused'])
 })
 
 // Runs the timers due within `ms` of fake time, then lets the DOM updates they queued land.
@@ -35,10 +35,10 @@ async function elapse(ms: number) {
 test('the toasts hold while the pointer rests on them, and run out once it leaves', async () => {
   mounted = await mount('src/components/toasts.kay')
   const { root } = mounted
-  const messages = () => [...root.querySelectorAll('.toast-message')].map(item => item.textContent)
+  const messages = () => [...root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)
 
   // The toasts a test before left, on a timer this test's fake clock does not run.
-  for (const dismiss of root.querySelectorAll('.toast-dismiss'))
+  for (const dismiss of root.querySelectorAll('.kui-toast-dismiss'))
     click(dismiss)
 
   jest.useFakeTimers()
@@ -47,7 +47,7 @@ test('the toasts hold while the pointer rests on them, and run out once it leave
     click(root.querySelector('#saved'))
     await elapse(0)
 
-    const toaster = root.querySelector('.toaster')!
+    const toaster = root.querySelector('.kui-toaster')!
 
     toaster.dispatchEvent(new PointerEvent('pointerenter'))
     await elapse(10_000)

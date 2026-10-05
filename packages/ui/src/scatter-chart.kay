@@ -26,33 +26,33 @@ const yExtent = () => axisExtent(points.map(point => point.y), y)
 const place = (point: Point) => {
   const heaviest = Math.max(...points.map(item => item.weight ?? 1))
 
-  return `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --dot-size: ${dotSize(point.weight ?? 1, heaviest)}rem`
+  return `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --kui-dot-size: ${dotSize(point.weight ?? 1, heaviest)}rem`
 }
 
 const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => text)
 ---
 if points.length === 0
-  p.scatter-chart-empty {empty}
+  p.kui-scatter-chart-empty {empty}
 else
-  figure.scatter-chart({...rest} aria-label={label} class={className})
+  figure.kui-scatter-chart({...rest} aria-label={label} class={className})
     if y.label
-      span.scatter-chart-axis-label(data-axis="y") {y.label}
-    .scatter-chart-plot
+      span.kui-scatter-chart-axis-label(data-axis="y") {y.label}
+    .kui-scatter-chart-plot
       for tick of y.ticks ?? [] key={tick.value}
-        span.scatter-chart-grid(data-axis="y" style={`bottom: ${axisPercent(tick.value, yExtent(), y.scale)}%`})
-          span.scatter-chart-tick {tick.label}
+        span.kui-scatter-chart-grid(data-axis="y" style={`bottom: ${axisPercent(tick.value, yExtent(), y.scale)}%`})
+          span.kui-scatter-chart-tick {tick.label}
       for tick of x.ticks ?? [] key={tick.value}
-        span.scatter-chart-grid(data-axis="x" style={`left: ${axisPercent(tick.value, xExtent(), x.scale)}%`})
-          span.scatter-chart-tick {tick.label}
+        span.kui-scatter-chart-grid(data-axis="x" style={`left: ${axisPercent(tick.value, xExtent(), x.scale)}%`})
+          span.kui-scatter-chart-tick {tick.label}
       if quadrant
-        span.scatter-chart-guide(data-axis="y" style={`bottom: ${axisPercent(quadrant.y, yExtent(), y.scale)}%`})
-        span.scatter-chart-guide(data-axis="x" style={`left: ${axisPercent(quadrant.x, xExtent(), x.scale)}%`})
+        span.kui-scatter-chart-guide(data-axis="y" style={`bottom: ${axisPercent(quadrant.y, yExtent(), y.scale)}%`})
+        span.kui-scatter-chart-guide(data-axis="x" style={`left: ${axisPercent(quadrant.x, xExtent(), x.scale)}%`})
       for entry of cornerEntries() key={entry[0]}
-        span.scatter-chart-corner(data-corner={entry[0]}) {entry[1]}
+        span.kui-scatter-chart-corner(data-corner={entry[0]}) {entry[1]}
       for point of points key={point.key}
         if onSelect
-          button.scatter-chart-dot(type="button" data-interactive aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onClick={() => onSelect?.(point)})
+          button.kui-scatter-chart-dot(type="button" data-interactive aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onClick={() => onSelect?.(point)})
         else
-          span.scatter-chart-dot(role="img" aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)})
+          span.kui-scatter-chart-dot(role="img" aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)})
     if x.label
-      span.scatter-chart-axis-label(data-axis="x") {x.label}
+      span.kui-scatter-chart-axis-label(data-axis="x") {x.label}

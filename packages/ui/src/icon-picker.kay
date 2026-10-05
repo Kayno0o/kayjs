@@ -90,23 +90,23 @@ function keepEnter(event: KeyboardEvent) {
     event.preventDefault()
 }
 ---
-.icon-picker({...rest} class={className})
+.kui-icon-picker({...rest} class={className})
   if name
     input(type="hidden" name={name} value={picked()} ref={element => hidden = element})
-  input.field-input(type="search" placeholder="Search icons…" aria-label="Search icons" value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
-  ul.icon-grid(aria-label="Icons" aria-busy={pending() ? 'true' : undefined})
+  input.kui-field-input(type="search" placeholder="Search icons…" aria-label="Search icons" value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
+  ul.kui-icon-grid(aria-label="Icons" aria-busy={pending() ? 'true' : undefined})
     for choice of icons() key={choice.name}
       li
-        button.icon-grid-option(type="button" aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
+        button.kui-icon-grid-option(type="button" aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
           Icon(icon={choice.icon})
     if icons().length === 0
-      li.icon-grid-empty {pending() ? 'Searching…' : 'No icons found.'}
-  .icon-grid-bar
+      li.kui-icon-grid-empty {pending() ? 'Searching…' : 'No icons found.'}
+  .kui-icon-grid-bar
     if picked()
-      span.icon-grid-selection(aria-live="polite")
+      span.kui-icon-grid-selection(aria-live="polite")
         if chosen() as icon
           Icon(icon={icon})
         | {nameOf(picked())}
-        IconButton(icon="close" label="Clear icon selection" size="xs" variant="inline" class="icon-grid-clear" onClick={() => pick('')})
+        IconButton(icon="close" label="Clear icon selection" size="xs" variant="inline" class="kui-icon-grid-clear" onClick={() => pick('')})
     if icons().length >= limit()
-      button.icon-grid-more(type="button" onClick={() => limit.set(limit() + PAGE_SIZE)}) Show more
+      button.kui-icon-grid-more(type="button" onClick={() => limit.set(limit() + PAGE_SIZE)}) Show more

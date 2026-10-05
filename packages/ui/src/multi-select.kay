@@ -52,29 +52,29 @@ function set(next: string[]) {
 // The panel only shows once the browser has opened the popover, so focus moves on its toggle rather than on the click; closing clears the search.
 function toggled(open: boolean) {
   if (open)
-    root?.querySelector<HTMLInputElement>('.multi-select-search, .multi-select-checkbox')?.focus()
+    root?.querySelector<HTMLInputElement>('.kui-multi-select-search, .kui-multi-select-checkbox')?.focus()
   else
     query.set('')
 }
 ---
-.multi-select({...rest} ref={element => root = element} class={className})
-  Popover(id={id} placement={placement} class="multi-select-panel" aria-label={label} onToggle={toggled})
+.kui-multi-select({...rest} ref={element => root = element} class={className})
+  Popover(id={id} placement={placement} class="kui-multi-select-panel" aria-label={label} onToggle={toggled})
     @trigger(attributes)
-      button.field-input.multi-select-trigger({...attributes} type="button" aria-label={label} disabled={disabled} data-empty={picked().length === 0 || undefined})
-        span.multi-select-summary {selectionSummary(options, picked(), placeholder)}
-        Icon(icon="chevron" class="multi-select-chevron")
+      button.kui-field-input.kui-multi-select-trigger({...attributes} type="button" aria-label={label} disabled={disabled} data-empty={picked().length === 0 || undefined})
+        span.kui-multi-select-summary {selectionSummary(options, picked(), placeholder)}
+        Icon(icon="chevron" class="kui-multi-select-chevron")
     if searchable()
-      input.field-input.multi-select-search(type="search" placeholder="Search" aria-label={`Search ${label}`} value={query()} onInput={event => query.set(event.currentTarget.value)})
-    .multi-select-bar
-      button.multi-select-action(type="button" disabled={picked().length === options.length} onClick={() => set(options.map(option => option.value))}) All
-      button.multi-select-action(type="button" disabled={picked().length === 0} onClick={() => set([])}) None
-    .multi-select-options(role="group" aria-label={label})
+      input.kui-field-input.kui-multi-select-search(type="search" placeholder="Search" aria-label={`Search ${label}`} value={query()} onInput={event => query.set(event.currentTarget.value)})
+    .kui-multi-select-bar
+      button.kui-multi-select-action(type="button" disabled={picked().length === options.length} onClick={() => set(options.map(option => option.value))}) All
+      button.kui-multi-select-action(type="button" disabled={picked().length === 0} onClick={() => set([])}) None
+    .kui-multi-select-options(role="group" aria-label={label})
       for option of shown() key={option.value}
-        label.multi-select-option
-          input.multi-select-checkbox(type="checkbox" checked={picked().includes(option.value)} onChange={() => set(toggledValue(options, picked(), option.value))})
-          span.multi-select-label {option.label}
+        label.kui-multi-select-option
+          input.kui-multi-select-checkbox(type="checkbox" checked={picked().includes(option.value)} onChange={() => set(toggledValue(options, picked(), option.value))})
+          span.kui-multi-select-label {option.label}
       if shown().length === 0
-        p.multi-select-empty No match
+        p.kui-multi-select-empty No match
   if name
     for entry of picked() key={entry}
       input(type="hidden" name={name} value={entry})

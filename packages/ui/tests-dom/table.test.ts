@@ -64,7 +64,7 @@ describe('Table', () => {
   test('shows its @empty block when there are no rows', async () => {
     mounted = await mount('src/components/table.kay', { rows: [] })
 
-    expect(mounted.root.querySelector('.table-empty-cell')?.getAttribute('colspan')).toBe('3')
-    expect(mounted.root.querySelector('.table-empty-cell .nothing')?.textContent).toBe('No planets')
+    expect(mounted.root.querySelector('.kui-table-empty-cell')?.getAttribute('colspan')).toBe('3')
+    expect(mounted.root.querySelector('.kui-table-empty-cell .nothing')?.textContent).toBe('No planets')
   })
 })

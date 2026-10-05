@@ -13,13 +13,13 @@ async function nav() {
   mounted = await mount('src/components/site-nav.kay')
 
   const { root } = mounted
-  const toggle = root.querySelector<HTMLButtonElement>('.site-nav-toggle')!
+  const toggle = root.querySelector<HTMLButtonElement>('.kui-site-nav-toggle')!
 
   return {
     root,
     toggle,
-    open: () => [root.querySelector('.site-nav')!.hasAttribute('data-open'), toggle.getAttribute('aria-expanded')],
-    link: (label: string) => [...root.querySelectorAll<HTMLAnchorElement>('.site-nav-link')].find(link => link.textContent === label)!,
+    open: () => [root.querySelector('.kui-site-nav')!.hasAttribute('data-open'), toggle.getAttribute('aria-expanded')],
+    link: (label: string) => [...root.querySelectorAll<HTMLAnchorElement>('.kui-site-nav-link')].find(link => link.textContent === label)!,
   }
 }
 
@@ -31,7 +31,7 @@ test('the toggle opens and closes the links it controls', async () => {
   const view = await nav()
 
   expect(view.open()).toEqual([false, 'false'])
-  expect(view.root.querySelector(`#${view.toggle.getAttribute('aria-controls')}`)!.classList.contains('site-nav-list')).toBe(true)
+  expect(view.root.querySelector(`#${view.toggle.getAttribute('aria-controls')}`)!.classList.contains('kui-site-nav-list')).toBe(true)
 
   click(view.toggle)
   await settle()

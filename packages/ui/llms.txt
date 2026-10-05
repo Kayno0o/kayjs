@@ -5,7 +5,7 @@
 ## Rules that are easy to get wrong
 
 - Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`, and the drag and drop controllers from `@kaynooo/kayjs-ui/dnd`.
-- Components write no Tailwind utility, only the classes of `theme.css`. A rule of the app's on one of those classes restyles every instance; utilities passed through a component's `class` prop restyle one.
+- Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-` as its tokens are, so a site's own `btn`, `card` or `--color-accent` never meets them. A rule of the app's on one of those classes restyles every instance; utilities passed through a component's `class` prop restyle one.
 - A static page cannot pass functions, `JSX.Element` props or children to an island. Render Dialog, SidePanel, SplitLayout, Popover, FormDialog, or a Table with a `@cell` or `@empty` block, a function `sortValue` or a function `rowKey` from a component of the app that is an island itself: one with an `on*` handler, a `ref`, a `bind:` or a value import from `'kay'`. The examples below are written as such components.
 - `toast` only shows in the browser, called from an island. The server's copy of the toast list is shared by every request, so it stays empty. Render one `Toaster` and one `TooltipHost` in the root layout.
 - An icon is either a slot name such as `'close'`, which the app's settings map to any icon set, or an icon imported from `~icons/<prefix>/<name>`. The default slots use Tabler, so the app installs `@iconify-json/tabler`.
@@ -31,18 +31,20 @@ bun add @kaynooo/kayjs-ui @iconify-json/tabler
 @source '../.kay/classes.txt';
 
 @theme {
-  --color-accent: #7aa2f7;
+  --color-kui-accent: light-dark(#3b6fd4, #7aa2f7);
 }
 ```
 
-The theme's tokens are `@theme default`, so the app's `@theme` overrides any of them wherever it sits:
+The theme's tokens are `@theme default`, so the app's `@theme` overrides any of them wherever it sits. Each colour is `--color-kui-<name>`, used as `bg-kui-<name>` and the like, and holds `light-dark(light, dark)`:
 
-- Surfaces, darkest first: `mantle`, `canvas`, `surface0`, `surface1`.
+- Surfaces, deepest first: `mantle`, `canvas`, `surface0`, `surface1`.
 - Hairlines: `surface2` and `overlay0`.
 - Text: `text`, `overlay1` (the faintest), `subtext0` and `muted`.
 - State: `accent`, `accent-hi` (its hover), `on-accent` (text on it), `success`, `warning`, `info` and `error`.
 - Fills: `fill-hover`, `fill-danger` and `row-hover`.
 - Chart series: `chart-1` to `chart-6`.
+
+The theme is dark unless the visitor's system asks for light. `data-theme="light"` or `data-theme="dark"` on `html` wins over both, for a site with its own switch, and on any element it themes what that element holds. A colour the app overrides with a single value stays that value in both.
 
 ```kay
 ---
@@ -83,13 +85,13 @@ Each component spreads the other attributes it is given onto its root element, `
 
 ### Icon, Button, IconButton
 
-- `Icon(icon="close")`: an `svg.icon`. It is decorative unless `label` names it for screen readers. `icon` is a slot or an imported `~icons` icon.
+- `Icon(icon="close")`: an `svg.kui-icon`. It is decorative unless `label` names it for screen readers. `icon` is a slot or an imported `~icons` icon.
 - `Button(label="Save" variant="accent" icon="plus")`:
   - `variant` is `default`, `accent` or `danger`.
   - `busy` shows a spinner in place of the icon and sets `aria-busy`; it does not disable the button.
   - `expanded` sets `aria-expanded`, for a button that opens a panel.
   - `type` defaults to `button`, so a button inside a form never submits it by accident: pass `type="submit"` to submit. Children render after `label`.
-  - `href` makes it a link looking like a button, `a.btn`, taking a link's attributes such as `target` in place of `type`, `expanded` and `disabled`. A site path in `href` is not checked against the pages the way a literal `a(href)` is.
+  - `href` makes it a link looking like a button, `a.kui-btn`, taking a link's attributes such as `target` in place of `type`, `expanded` and `disabled`. A site path in `href` is not checked against the pages the way a literal `a(href)` is.
 - `IconButton(icon="delete" label="Delete")`: an icon alone. `label` names it for screen readers and shows as its tooltip through TooltipHost. `size` is `xs`, `sm`, `md` or `lg`; `variant` is `solid`, `ghost`, `inline` or `danger`.
 
 ### toast and Toaster
@@ -186,7 +188,7 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
 
 ### Card, Badge, EmptyState
 
-- `Card(title="Traffic")`: a `section.card` that frames its children in `.card-body`. `head` sits at the far end of the title's line, for a count or a link. `bare` drops the body's inset, for content that runs to the edge, such as a table.
+- `Card(title="Traffic")`: a `section.kui-card` that frames its children in `.kui-card-body`. `head` sits at the far end of the title's line, for a count or a link. `bare` drops the body's inset, for content that runs to the edge, such as a table.
 - `Badge(label="Draft" tone="warning" icon="info")`: `tone` is `neutral`, `accent`, `success`, `warning`, `danger` or `info`. Children render after `label`.
 - `EmptyState(title="No posts yet" description="Write the first one.")`: what a list shows when it holds nothing.
 
@@ -239,7 +241,7 @@ PageSection(title="Moons")
 ### Stat, Meter, BarList, SiteFavicon, CopyButton, Rating
 
 - `Stat(value={12} label="moons" icon="info")`: a figure read with what it counts.
-- `Meter(value={usage} label="Disk" fillClass="bg-warning")`: a `role="meter"` bar holding `value` between 0 and 100. `fillClass` styles the fill alone, such as a colour picked by threshold.
+- `Meter(value={usage} label="Disk" fillClass="bg-kui-warning")`: a `role="meter"` bar holding `value` between 0 and 100. `fillClass` styles the fill alone, such as a colour picked by threshold.
 - `BarList(rows={[{ key: 'fr', label: 'France', value: 120, display: '120 visits' }]})`: a bar per row, each measured against the largest value, reading `display` or else the value. `onSelect(row)` makes each row a button, from an island; `empty` is what it reads with no rows. Its rows are typed `BarListRow`, or any type extending it.
 - `SiteFavicon(src={site.favicon} name={site.name})`: a site's icon, or the `globe` slot in a colour drawn from `name` when `src` is missing or fails to load.
 - `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for two seconds. A copy the browser refuses toasts `failure`.
@@ -283,7 +285,7 @@ CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { l
 ### LineChart, ScatterChart, ContributionGraph
 
 - `LineChart(label="Visits" labels={days} series={[{ name: 'Visits', values: visits }]} xLabels)`, drawn by chartist, an optional peer the app installs to use it: `bun add chartist`.
-  - A series has a `name`, one value per label, `null` for a gap in the line, and an optional CSS `color`; without one it takes the next `--color-chart-1` to `-6` token.
+  - A series has a `name`, one value per label, `null` for a gap in the line, and an optional CSS `color`; without one it takes the next `--color-kui-chart-1` to `-6` token.
   - `xLabels` draws up to five x-axis labels, and spaces the points by time when every label is a date. `legend` names the series under the chart, by default once there is more than one. `formatValue` formats the y-axis and the tooltip, `toLocaleString` by default; `options` is merged over chartist's settings.
   - Hovering shows a cursor, a dot on each line and a tooltip reading every series at that point, `-` for a gap. `label` describes the chart for screen readers, which cannot read the drawing.
   - The server renders its frame and legend; the drawing happens once the island mounts.
@@ -291,7 +293,7 @@ CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { l
   - A point has a `key`, a `label`, `x` and `y`, a `weight` its dot's area follows, and a `tooltip`, the label by default.
   - An axis spans its `domain`, or else the points' own extent, along a `linear` or `log` `scale`, with `ticks` of `{ value, label }` and a `label`. `quadrant` draws guides through a point, and `corners` names the four regions they split.
   - `onSelect(point)` makes each dot a button, from an island; `empty` is what it reads with no points.
-- `ContributionGraph(days={days} color="var(--color-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
+- `ContributionGraph(days={days} color="var(--color-kui-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
 
 ### Drag and drop: Sortable, Board, DropTargets
 
@@ -349,7 +351,7 @@ ul
   - It takes data alone, so a static page holds it.
 - `Masonry(items={posts} key={post => post.id} minWidth={256} gap={12})` with a `@tile(item)` block: tiles of any height in as many lanes of at least `minWidth` as fit, each dropped into the shortest lane, the order still reading left to right. The tiles are placed absolutely inside its own box, so padding goes on a wrapper, never on the Masonry; until it has measured, as on the server, they sit in a plain grid of the same lanes.
 - `WhenVisible(onVisible={loadMore})`: the infinite-scroll sentinel. Render it after a list only while there is more to load; `onVisible` runs once it comes within `margin` pixels (600) of the nearest scroll box, and again whenever the list grows and leaves it in view, never again before a promise it returned settles.
-- `ZoomPane(label="Floor plan")` around a picture: pinch, the wheel, a double click, + and -, and the zoom buttons take it in, a drag or the arrows move it, and 0 or the fit button fits it again. A press that does not wander stays a click, so marks standing on the picture remain clickable; `--zoom-scale` lets one keep its own size with `calc(1 / var(--zoom-scale))`. `tools` draws the buttons, on by default; `most` caps the zoom, 8 times fitted.
+- `ZoomPane(label="Floor plan")` around a picture: pinch, the wheel, a double click, + and -, and the zoom buttons take it in, a drag or the arrows move it, and 0 or the fit button fits it again. A press that does not wander stays a click, so marks standing on the picture remain clickable; `--kui-zoom-scale` lets one keep its own size with `calc(1 / var(--kui-zoom-scale))`. `tools` draws the buttons, on by default; `most` caps the zoom, 8 times fitted.
 - `ImageCropper(src={photo} ratio={16 / 9} onCrop={crop.set})` with an optional `@footer(reset)` block: a crop of a fixed `ratio` over the image, centred once it loads, moved by a drag or the arrows and resized by its corners or Shift with the arrows, Alt taking bigger steps. `onCrop({ x, y, w, h })` reports it in the image's natural pixels, ready for a canvas draw; `grid` adds a rule-of-thirds overlay and `minSize` the smallest side.
 
 ## Forms

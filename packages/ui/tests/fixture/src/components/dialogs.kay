@@ -12,7 +12,7 @@ const open = signal(false)
 button#open(onClick={() => open.set(true)}) Open
 Dialog#dialog(open={open()} title="Rename" dirty={dirty} onClose={() => { open.set(false); onClose() }})
   @footer
-    button#cancel.btn(onClick={() => open.set(false)}) Cancel
+    button#cancel.kui-btn(onClick={() => open.set(false)}) Cancel
   input#name(name="name")
 ConfirmDelete(message="Delete this?" failure="Could not delete" onConfirm={onDelete})
 ConfirmDelete(message="Revoke this link?" failure="Could not revoke" onConfirm={onDelete} trigger="button" label="Revoke link" class="revoke")

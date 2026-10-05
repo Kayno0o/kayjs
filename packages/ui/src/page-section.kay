@@ -9,8 +9,8 @@ const { title, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicEl
 }>()
 ---
 // A titled stretch of a page, its title one level under the page's own.
-section.page-section({...rest} class={className})
-  .page-section-head
-    h2.heading-section.page-section-title {title}
+section.kui-page-section({...rest} class={className})
+  .kui-page-section-head
+    h2.kui-heading-section.kui-page-section-title {title}
     | {actions}
   slot

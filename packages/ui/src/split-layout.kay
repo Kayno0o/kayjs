@@ -89,24 +89,24 @@ function resizeByKey(event: KeyboardEvent) {
 }
 ---
 // The sidebar is rendered once: from `md` up a column, below it the overlay `data-sidebar-open` shows.
-.split-layout({...rest} class={className} style={`--split-list-width: ${listWidth()}px;${style ? ` ${style}` : ''}`} data-sidebar={sidebar ? '' : undefined} data-sidebar-open={sidebarOpen ? '' : undefined} data-detail-open={detailOpen ? '' : undefined})
+.kui-split-layout({...rest} class={className} style={`--kui-split-list-width: ${listWidth()}px;${style ? ` ${style}` : ''}`} data-sidebar={sidebar ? '' : undefined} data-sidebar-open={sidebarOpen ? '' : undefined} data-detail-open={detailOpen ? '' : undefined})
   if sidebar
-    aside.split-layout-sidebar
-      .split-layout-sidebar-head
+    aside.kui-split-layout-sidebar
+      .kui-split-layout-sidebar-head
         IconButton(icon="back" label={backLabel} variant="ghost" size="lg" onClick={() => onSidebarClose?.()})
-        span.split-layout-sidebar-title {sidebarTitle}
-      .split-layout-sidebar-body
+        span.kui-split-layout-sidebar-title {sidebarTitle}
+      .kui-split-layout-sidebar-body
         | {sidebar}
-  section.split-layout-list
+  section.kui-split-layout-list
     if listHead
-      .split-layout-list-head
+      .kui-split-layout-list-head
         | {listHead}
     | {list}
     if resizableList
       // A focusable separator is a widget, moved with the arrow keys as well as dragged.
-      .split-layout-resizer(role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation="vertical" aria-valuenow={listWidth()} aria-valuemin={WIDTH.min} aria-valuemax={WIDTH.max} onPointerDown={startResize} onKeyDown={resizeByKey})
-  section.split-layout-detail
+      .kui-split-layout-resizer(role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation="vertical" aria-valuenow={listWidth()} aria-valuemin={WIDTH.min} aria-valuemax={WIDTH.max} onPointerDown={startResize} onKeyDown={resizeByKey})
+  section.kui-split-layout-detail
     if detailHead
-      .split-layout-detail-head
+      .kui-split-layout-detail-head
         | {detailHead}
     | {detail}

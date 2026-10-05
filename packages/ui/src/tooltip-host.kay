@@ -3,8 +3,8 @@ import { effect, onCleanup, onMount, signal } from 'kay'
 
 // An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default.
 const CARRIER = '[data-tooltip]'
-// The anchor name theme.css's `.tooltip` positions against.
-const ANCHOR = '--tooltip-anchor'
+// The anchor name theme.css's `.kui-tooltip` positions against.
+const ANCHOR = '--kui-tooltip-anchor'
 const SHOW_DELAY_MS = 80
 
 const aimed = signal<{ element: HTMLElement, text: string } | null>(null)
@@ -108,4 +108,4 @@ effect(() => {
 })
 ---
 // Rendered once, in the root layout: it shows the tooltip of whichever element the pointer or a tab lands on.
-.tooltip(ref={element => panel = element} popover="manual" role="tooltip") {aimed()?.text}
+.kui-tooltip(ref={element => panel = element} popover="manual" role="tooltip") {aimed()?.text}

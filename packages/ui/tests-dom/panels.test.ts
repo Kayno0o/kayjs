@@ -36,11 +36,11 @@ describe('SidePanel', () => {
     expect(panel.open).toBe(true)
     expect(panel.getAttribute('aria-label')).toBe('Mars')
     expect(panel.getAttribute('closedby')).toBe('any')
-    expect([...panel.querySelectorAll('.side-panel-head > *')].map(element => element.textContent || element.getAttribute('aria-label'))).toEqual(['Mars', 'Next', 'Close'])
-    expect(panel.querySelector('.side-panel-body #body')).not.toBeNull()
-    expect(panel.querySelector('.side-panel-footer #save')).not.toBeNull()
+    expect([...panel.querySelectorAll('.kui-side-panel-head > *')].map(element => element.textContent || element.getAttribute('aria-label'))).toEqual(['Mars', 'Next', 'Close'])
+    expect(panel.querySelector('.kui-side-panel-body #body')).not.toBeNull()
+    expect(panel.querySelector('.kui-side-panel-footer #save')).not.toBeNull()
 
-    click(panel.querySelector('.icon-btn[aria-label="Close"]'))
+    click(panel.querySelector('.kui-icon-btn[aria-label="Close"]'))
     await settle()
 
     expect(panel.open).toBe(false)
@@ -65,11 +65,11 @@ describe('SplitLayout', () => {
     const root = await panels()
     const split = root.querySelector('#split')!
 
-    expect([...split.children].map(pane => pane.className)).toEqual(['split-layout-sidebar', 'split-layout-list', 'split-layout-detail'])
+    expect([...split.children].map(pane => pane.className)).toEqual(['kui-split-layout-sidebar', 'kui-split-layout-list', 'kui-split-layout-detail'])
     expect(['data-sidebar', 'data-sidebar-open', 'data-detail-open'].map(name => split.hasAttribute(name))).toEqual([true, true, true])
-    expect(split.querySelector('.split-layout-sidebar-title')?.textContent).toBe('Planets')
+    expect(split.querySelector('.kui-split-layout-sidebar-title')?.textContent).toBe('Planets')
 
-    click(split.querySelector('.split-layout-sidebar-head .icon-btn'))
+    click(split.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
     await settle()
 
     expect(split.hasAttribute('data-sidebar-open')).toBe(false)
@@ -77,8 +77,8 @@ describe('SplitLayout', () => {
 
   test('resizes the list with the arrow keys within its bounds, and keeps the width for the next visit', async () => {
     let root = await panels('planets-width')
-    const resizer = () => root.querySelector('.split-layout-resizer')!
-    const width = () => [root.querySelector<HTMLElement>('#split')!.style.getPropertyValue('--split-list-width'), resizer().getAttribute('aria-valuenow')]
+    const resizer = () => root.querySelector('.kui-split-layout-resizer')!
+    const width = () => [root.querySelector<HTMLElement>('#split')!.style.getPropertyValue('--kui-split-list-width'), resizer().getAttribute('aria-valuenow')]
 
     expect(width()).toEqual(['260px', '260'])
 

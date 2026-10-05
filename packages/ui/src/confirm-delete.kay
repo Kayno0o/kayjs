@@ -48,4 +48,4 @@ Dialog(open={open()} title="Confirm Deletion" dirty={pending()} onClose={() => o
   @footer
     Button(label="Cancel" disabled={pending()} onClick={() => open.set(false)})
     Button(label={pending() ? 'Deleting…' : 'Delete'} variant="danger" busy={pending()} disabled={pending()} onClick={confirm})
-  p.confirm-delete-message {message}
+  p.kui-confirm-delete-message {message}

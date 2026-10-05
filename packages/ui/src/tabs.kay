@@ -52,10 +52,10 @@ function keyDown(event: KeyboardEvent) {
   list?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus()
 }
 ---
-.tabs({...rest} class={className})
-  .tabs-list(ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
+.kui-tabs({...rest} class={className})
+  .kui-tabs-list(ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
     for tab, index of tabs key={tab.value}
-      button.tabs-tab(type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} onClick={() => show(tab.value)}) {tab.label}
+      button.kui-tabs-tab(type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} onClick={() => show(tab.value)}) {tab.label}
   for tab, index of tabs key={tab.value}
-    .tabs-panel(role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex="0" hidden={shown() !== tab.value})
+    .kui-tabs-panel(role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex="0" hidden={shown() !== tab.value})
       | {panel(tab.value)}

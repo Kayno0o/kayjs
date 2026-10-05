@@ -21,7 +21,7 @@ async function inputs(paste = false) {
     onRange: (value: RangeValue) => seen.range.push(value),
     onPlanets: (value: string[]) => seen.planets.push(value),
     onFiles: (names: string[]) => seen.files.push(names),
-    onAction: (name: string) => seen.actions.push([name, document.querySelector('.menu')!.matches(':popover-open')]),
+    onAction: (name: string) => seen.actions.push([name, document.querySelector('.kui-menu')!.matches(':popover-open')]),
     paste,
   })
 
@@ -65,25 +65,25 @@ describe('MultiSelect', () => {
     root.querySelector<HTMLElement>('#planets')!.showPopover()
     await settle()
 
-    const search = root.querySelector('.multi-select-search')
+    const search = root.querySelector('.kui-multi-select-search')
 
     expect(document.activeElement).toBe(search)
 
     type(search, 'ur', 'input')
     await settle()
 
-    expect([...root.querySelectorAll('.multi-select-label')].map(label => label.textContent)).toEqual(['Mercury', 'Saturn', 'Uranus'])
+    expect([...root.querySelectorAll('.kui-multi-select-label')].map(label => label.textContent)).toEqual(['Mercury', 'Saturn', 'Uranus'])
 
     type(search, 'zz', 'input')
     await settle()
 
-    expect(root.querySelector('.multi-select-empty')?.textContent).toBe('No match')
+    expect(root.querySelector('.kui-multi-select-empty')?.textContent).toBe('No match')
   })
 
   test('keeps what is picked in the options\' order, sums it up on the trigger, and posts each value', async () => {
     const root = await inputs()
-    const box = (label: string) => [...root.querySelectorAll('.multi-select-option')].find(option => option.textContent === label)!.querySelector('input')
-    const summary = () => root.querySelector('.multi-select-summary')?.textContent
+    const box = (label: string) => [...root.querySelectorAll('.kui-multi-select-option')].find(option => option.textContent === label)!.querySelector('input')
+    const summary = () => root.querySelector('.kui-multi-select-summary')?.textContent
     const posted = () => [...root.querySelectorAll<HTMLInputElement>('input[type="hidden"][name="planet"]')].map(input => input.value)
 
     expect(summary()).toBe('Any')
@@ -100,16 +100,16 @@ describe('MultiSelect', () => {
     expect(summary()).toBe('2 selected')
     expect(posted()).toEqual(['venus', 'mars'])
 
-    click(root.querySelectorAll('.multi-select-action')[1]!)
+    click(root.querySelectorAll('.kui-multi-select-action')[1]!)
     await settle()
 
     expect(posted()).toEqual([])
 
-    click(root.querySelectorAll('.multi-select-action')[0]!)
+    click(root.querySelectorAll('.kui-multi-select-action')[0]!)
     await settle()
 
     expect(posted()).toHaveLength(9)
-    expect(root.querySelector<HTMLButtonElement>('.multi-select-action')?.disabled).toBe(true)
+    expect(root.querySelector<HTMLButtonElement>('.kui-multi-select-action')?.disabled).toBe(true)
   })
 })
 
@@ -158,7 +158,7 @@ describe('FileDrop', () => {
     const root = await inputs(true)
     let opened = 0
 
-    root.querySelector('.file-drop-input')!.addEventListener('click', () => opened++)
+    root.querySelector('.kui-file-drop-input')!.addEventListener('click', () => opened++)
     click(root.querySelector('#pick'))
 
     expect(opened).toBe(1)
@@ -175,7 +175,7 @@ describe('FileDrop', () => {
 describe('Menu', () => {
   test('focuses its first entry on opening, moves past disabled ones with the arrows, and runs an action once closed', async () => {
     const root = await inputs()
-    const menu = root.querySelector<HTMLElement>('.menu')!
+    const menu = root.querySelector<HTMLElement>('.kui-menu')!
     const focused = () => document.activeElement?.textContent
 
     expect(root.querySelector(`[popovertarget="${menu.id}"]`)?.getAttribute('aria-haspopup')).toBe('menu')
@@ -193,14 +193,14 @@ describe('Menu', () => {
 
     expect(focused()).toBe('Rename')
 
-    click(root.querySelectorAll('.menu-item')[2]!)
+    click(root.querySelectorAll('.kui-menu-item')[2]!)
 
     expect(seen.actions).toEqual([['delete', false]])
   })
 
   test('closes on Tab, a menu being one stop', async () => {
     const root = await inputs()
-    const menu = root.querySelector<HTMLElement>('.menu')!
+    const menu = root.querySelector<HTMLElement>('.kui-menu')!
 
     menu.showPopover()
     await settle()

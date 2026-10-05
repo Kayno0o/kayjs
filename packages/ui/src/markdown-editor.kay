@@ -173,4 +173,4 @@ function drop(event: DragEvent) {
 }
 ---
 // A markdown field that writes like an editor: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
-textarea.field-input.markdown-editor({...rest} ref={element => area = element} value={untrack(() => value)} placeholder={placeholder} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => onInput?.(event.currentTarget.value)} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
+textarea.kui-field-input.kui-markdown-editor({...rest} ref={element => area = element} value={untrack(() => value)} placeholder={placeholder} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => onInput?.(event.currentTarget.value)} onKeyDown={keyDown} onPaste={paste} onDrop={drop})

@@ -17,13 +17,13 @@ const { title, icon, actions, isEmpty = false, empty, class: className, ...rest 
 ---
 // A dashboard tile: a framed body under a head line of icon, title and actions.
 if empty !== undefined || !isEmpty
-  .widget({...rest} class={className})
+  .kui-widget({...rest} class={className})
     if title || icon || actions
-      .widget-head
+      .kui-widget-head
         if icon
           Icon(icon={icon})
         if title
-          h2.heading-section.widget-title {title}
+          h2.kui-heading-section.kui-widget-title {title}
         | {actions}
     if isEmpty
       | {empty}

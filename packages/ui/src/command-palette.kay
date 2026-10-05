@@ -148,30 +148,30 @@ function keyDown(event: KeyboardEvent) {
   document.getElementById(optionId(selected()))?.click()
 }
 ---
-dialog.command-palette(ref={element => dialog = element} closedby="any" aria-label={label} onClose={closed} class={className})
+dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria-label={label} onClose={closed} class={className})
   if shown()
-    .command-palette-search
+    .kui-command-palette-search
       Icon(icon="search")
-      input.command-palette-input(value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[selected()] ? optionId(selected()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
-    .command-palette-list(id={`${id}-list`} role="listbox" aria-label={label})
+      input.kui-command-palette-input(value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[selected()] ? optionId(selected()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
+    .kui-command-palette-list(id={`${id}-list`} role="listbox" aria-label={label})
       for section, sectionIndex of sections() key={section.group ?? ''}
         div(role="group" aria-labelledby={section.group === null ? undefined : `${id}-group-${sectionIndex}`})
           if section.group !== null
-            .heading-section.command-palette-heading(id={`${id}-group-${sectionIndex}`}) {section.group}
+            .kui-heading-section.kui-command-palette-heading(id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
             if linkOf(row.entry) as link
-              a.command-palette-option(href={link.href} target={link.external ? '_blank' : undefined} rel={link.external ? 'noopener noreferrer' : undefined} id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link)})
+              a.kui-command-palette-option(href={link.href} target={link.external ? '_blank' : undefined} rel={link.external ? 'noopener noreferrer' : undefined} id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link)})
                 if link.icon as icon
                   Icon(icon={icon})
-                span.command-palette-label {row.entry.label}
+                span.kui-command-palette-label {row.entry.label}
                 if query().trim()
-                  span.command-palette-group {row.entry.group}
+                  span.kui-command-palette-group {row.entry.group}
             else if actionOf(row.entry) as action
-              button.command-palette-option(type="button" id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(action)})
+              button.kui-command-palette-option(type="button" id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(action)})
                 if action.icon as icon
                   Icon(icon={icon})
-                span.command-palette-label {row.entry.label}
+                span.kui-command-palette-label {row.entry.label}
                 if query().trim()
-                  span.command-palette-group {row.entry.group}
+                  span.kui-command-palette-group {row.entry.group}
       if rows().length === 0
-        p.command-palette-empty {emptyLabel}
+        p.kui-command-palette-empty {emptyLabel}

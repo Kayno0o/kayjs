@@ -20,7 +20,7 @@ async function data(src = '/favicon.png') {
 describe('BarList', () => {
   test('makes each row a button handing back its row once the list takes onSelect', async () => {
     const root = await data()
-    const rows = root.querySelectorAll<HTMLButtonElement>('#bars button.bar-list-row')
+    const rows = root.querySelectorAll<HTMLButtonElement>('#bars button.kui-bar-list-row')
 
     expect([...rows].map(row => row.type)).toEqual(['button', 'button'])
 
@@ -34,11 +34,11 @@ describe('SiteFavicon', () => {
   test('falls back to the globe once the image fails to load', async () => {
     const root = await data()
 
-    root.querySelector('.site-favicon-img')!.dispatchEvent(new Event('error'))
+    root.querySelector('.kui-site-favicon-img')!.dispatchEvent(new Event('error'))
     await settle()
 
-    expect(root.querySelector('.site-favicon-img')).toBeNull()
-    expect(root.querySelector('svg.site-favicon-icon')).not.toBeNull()
+    expect(root.querySelector('.kui-site-favicon-img')).toBeNull()
+    expect(root.querySelector('svg.kui-site-favicon-icon')).not.toBeNull()
   })
 })
 
@@ -86,7 +86,7 @@ describe('CopyButton', () => {
     click(root.querySelector('#copy'))
     await settle()
 
-    expect([...root.querySelectorAll('.toast-message')].at(-1)?.textContent).toBe('Could not copy to the clipboard')
+    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not copy to the clipboard')
     expect(root.querySelector('#copy')?.textContent).toBe('Copy link')
   })
 })

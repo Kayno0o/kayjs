@@ -85,10 +85,10 @@ function submitOnCtrlEnter(event: KeyboardEvent) {
 // Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
 Dialog(open={open} title={title} dirty={action.pending()} class={className} onClose={() => open && onClose()})
   @footer
-    .form-dialog-footer
+    .kui-form-dialog-footer
       | {extra}
-      .form-dialog-actions
+      .kui-form-dialog-actions
         Button(label="Cancel" disabled={action.pending()} onClick={() => onClose()})
         Button(label={action.pending() ? 'Saving…' : submitLabel} type="submit" form={formId} variant="accent" busy={action.pending()} disabled={action.pending()})
-  form.form-grid(id={formId} ref={element => form = element} onSubmit={submit} onKeyDown={submitOnCtrlEnter})
+  form.kui-form-grid(id={formId} ref={element => form = element} onSubmit={submit} onKeyDown={submitOnCtrlEnter})
     slot

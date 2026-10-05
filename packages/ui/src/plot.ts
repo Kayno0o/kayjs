@@ -73,6 +73,6 @@ export interface ChartSeries {
   name: string
   // One reading per label; `null` leaves a gap in the line rather than drawing a zero.
   values: (number | null)[]
-  // Any CSS colour; a series without one takes the next `--color-chart-*` token.
+  // Any CSS colour; a series without one takes the next `--color-kui-chart-*` token.
   color?: string
 }

@@ -19,20 +19,20 @@ const percent = (row: Row) => {
 }
 ---
 if rows.length === 0
-  p.bar-list-empty {empty}
+  p.kui-bar-list-empty {empty}
 else
-  ul.bar-list({...rest} class={className})
+  ul.kui-bar-list({...rest} class={className})
     for row of rows key={row.key}
       li
         if onSelect
-          button.bar-list-row(type="button" data-interactive onClick={() => onSelect?.(row)})
-            span.bar-list-label {row.label}
-            span.bar-list-value {row.display ?? row.value}
-            span.bar-list-track
-              span.bar-list-fill(style={`width: ${percent(row)}%`})
+          button.kui-bar-list-row(type="button" data-interactive onClick={() => onSelect?.(row)})
+            span.kui-bar-list-label {row.label}
+            span.kui-bar-list-value {row.display ?? row.value}
+            span.kui-bar-list-track
+              span.kui-bar-list-fill(style={`width: ${percent(row)}%`})
         else
-          .bar-list-row
-            span.bar-list-label {row.label}
-            span.bar-list-value {row.display ?? row.value}
-            span.bar-list-track
-              span.bar-list-fill(style={`width: ${percent(row)}%`})
+          .kui-bar-list-row
+            span.kui-bar-list-label {row.label}
+            span.kui-bar-list-value {row.display ?? row.value}
+            span.kui-bar-list-track
+              span.kui-bar-list-fill(style={`width: ${percent(row)}%`})

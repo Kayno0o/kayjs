@@ -52,20 +52,20 @@ describe('MediaGallery', () => {
   test('turns with its buttons and the arrows, wrapping, playing a video in place of the stage\'s image', async () => {
     const root = await media()
     const gallery = root.querySelector('#gallery')!
-    const counter = () => gallery.querySelector('.media-gallery-counter')?.textContent
+    const counter = () => gallery.querySelector('.kui-media-gallery-counter')?.textContent
 
     expect(counter()).toBe('1 / 3')
-    expect(gallery.querySelector('.media-gallery-stage img')?.getAttribute('src')).toBe('/a.png')
-    expect(gallery.querySelector('.media-gallery-thumb')?.getAttribute('aria-current')).toBe('true')
+    expect(gallery.querySelector('.kui-media-gallery-stage img')?.getAttribute('src')).toBe('/a.png')
+    expect(gallery.querySelector('.kui-media-gallery-thumb')?.getAttribute('aria-current')).toBe('true')
 
     click(gallery.querySelector('[data-side="next"]'))
     await settle()
 
     expect(counter()).toBe('2 / 3')
-    expect(gallery.querySelector<HTMLVideoElement>('.media-gallery-stage video')?.src).toEndWith('/b.mp4')
+    expect(gallery.querySelector<HTMLVideoElement>('.kui-media-gallery-stage video')?.src).toEndWith('/b.mp4')
 
-    press(gallery.querySelector('.media-gallery-thumb')!, 'ArrowLeft')
-    press(gallery.querySelector('.media-gallery-thumb')!, 'ArrowLeft')
+    press(gallery.querySelector('.kui-media-gallery-thumb')!, 'ArrowLeft')
+    press(gallery.querySelector('.kui-media-gallery-thumb')!, 'ArrowLeft')
     await settle()
 
     expect(counter()).toBe('3 / 3')
@@ -74,15 +74,15 @@ describe('MediaGallery', () => {
 
   test('opens an image full size in a lightbox, closed by its button', async () => {
     const root = await media()
-    const lightbox = root.querySelector<HTMLDialogElement>('.media-gallery-lightbox')!
+    const lightbox = root.querySelector<HTMLDialogElement>('.kui-media-gallery-lightbox')!
 
-    click(root.querySelector('.media-gallery-zoom'))
+    click(root.querySelector('.kui-media-gallery-zoom'))
     await settle()
 
     expect(lightbox.open).toBe(true)
-    expect(lightbox.querySelector('img.media-gallery-full')?.getAttribute('src')).toBe('/a-full.png')
+    expect(lightbox.querySelector('img.kui-media-gallery-full')?.getAttribute('src')).toBe('/a-full.png')
 
-    click(lightbox.querySelector('.media-gallery-close'))
+    click(lightbox.querySelector('.kui-media-gallery-close'))
     await settle()
 
     expect(lightbox.open).toBe(false)
@@ -100,20 +100,20 @@ describe('ZoomPane', () => {
     press(pane, '+')
     await settle()
 
-    expect(pane.querySelector<HTMLElement>('.zoom-plate')?.style.getPropertyValue('--zoom-scale')).toBe('1.15')
+    expect(pane.querySelector<HTMLElement>('.kui-zoom-plate')?.style.getPropertyValue('--kui-zoom-scale')).toBe('1.15')
     expect(fit().disabled).toBe(false)
 
     press(pane, '0')
     await settle()
 
-    expect(pane.querySelector<HTMLElement>('.zoom-plate')?.style.getPropertyValue('--zoom-scale')).toBe('1')
+    expect(pane.querySelector<HTMLElement>('.kui-zoom-plate')?.style.getPropertyValue('--kui-zoom-scale')).toBe('1')
   })
 })
 
 describe('ImageCropper', () => {
   test('centres a crop of its ratio once the image has loaded, moves it with the arrows, and resets it', async () => {
     const root = await media()
-    const image = root.querySelector<HTMLImageElement>('.image-cropper-image')!
+    const image = root.querySelector<HTMLImageElement>('.kui-image-cropper-image')!
 
     Object.defineProperties(image, { naturalWidth: { value: 400 }, naturalHeight: { value: 300 } })
     image.dispatchEvent(new Event('load'))
@@ -121,7 +121,7 @@ describe('ImageCropper', () => {
 
     expect(seen.crops.at(-1)).toEqual({ x: 0, y: 50, w: 400, h: 200 })
 
-    press(root.querySelector('.image-cropper-crop')!, 'ArrowUp')
+    press(root.querySelector('.kui-image-cropper-crop')!, 'ArrowUp')
     await settle()
 
     expect(seen.crops.at(-1)).toEqual({ x: 0, y: 46, w: 400, h: 200 })
@@ -137,21 +137,21 @@ describe('Masonry and WhenVisible', () => {
     const root = await media()
     const masonry = root.querySelector<HTMLElement>('#masonry')!
     const observer = Observer.made.find(made => made.observed.includes(masonry))!
-    const tiles = [...masonry.querySelectorAll<HTMLElement>('.masonry-item')]
+    const tiles = [...masonry.querySelectorAll<HTMLElement>('.kui-masonry-item')]
 
     expect(masonry.hasAttribute('data-laid-out')).toBe(false)
 
     observer.callback([{ target: masonry, contentRect: { width: 524 } }, ...tiles.map((tile, index) => ({ target: tile, borderBoxSize: [{ blockSize: [100, 40, 60][index] }] }))])
     await settle()
 
-    expect(masonry.style.getPropertyValue('--masonry-lanes')).toBe('2')
-    expect(tiles.map(tile => [tile.style.getPropertyValue('--masonry-lane'), tile.style.getPropertyValue('--masonry-top')])).toEqual([['0', '0px'], ['1', '0px'], ['1', '52px']])
+    expect(masonry.style.getPropertyValue('--kui-masonry-lanes')).toBe('2')
+    expect(tiles.map(tile => [tile.style.getPropertyValue('--kui-masonry-lane'), tile.style.getPropertyValue('--kui-masonry-top')])).toEqual([['0', '0px'], ['1', '0px'], ['1', '52px']])
     expect(masonry.style.height).toBe('112px')
   })
 
   test('asks for more once the sentinel comes into view', async () => {
     const root = await media()
-    const sentinel = root.querySelector('.when-visible')!
+    const sentinel = root.querySelector('.kui-when-visible')!
     const observer = Observer.made.find(made => made.observed.includes(sentinel))!
 
     observer.callback([{ isIntersecting: false }])

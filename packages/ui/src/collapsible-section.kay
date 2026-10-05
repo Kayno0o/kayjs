@@ -14,12 +14,12 @@ const { title, open = true, boxed = false, meta, class: className, ...rest } = p
 }>()
 ---
 // A native disclosure, so it folds without script and a static page can hold it.
-details.collapsible-section({...rest} open={open} data-boxed={boxed || undefined} class={className})
-  summary.collapsible-section-summary
-    span.heading-section.collapsible-section-title {title}
+details.kui-collapsible-section({...rest} open={open} data-boxed={boxed || undefined} class={className})
+  summary.kui-collapsible-section-summary
+    span.kui-heading-section.kui-collapsible-section-title {title}
     if meta
-      span.collapsible-section-meta
+      span.kui-collapsible-section-meta
         | {meta}
-    Icon(icon="chevron" class="collapsible-section-chevron")
-  .collapsible-section-body
+    Icon(icon="chevron" class="kui-collapsible-section-chevron")
+  .kui-collapsible-section-body
     slot

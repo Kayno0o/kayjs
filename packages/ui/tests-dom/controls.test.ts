@@ -21,14 +21,14 @@ test('Segmented and Toggle submit like the fields they are, and report each chan
   expect(fields()).toEqual({ range: 'day' })
 
   click(mounted.root.querySelector('input[value="week"]'))
-  click(mounted.root.querySelector('.toggle-input'))
+  click(mounted.root.querySelector('.kui-toggle-input'))
   await settle()
 
   expect(fields()).toEqual({ range: 'week', digest: 'on' })
   expect(ranges).toEqual(['week'])
   expect(digests).toEqual([true])
 
-  click(mounted.root.querySelector('.toggle-input'))
+  click(mounted.root.querySelector('.kui-toggle-input'))
   await settle()
 
   expect(digests).toEqual([true, false])

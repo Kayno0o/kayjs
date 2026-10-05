@@ -26,8 +26,8 @@ function pick(next: Value) {
 }
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
-.segmented({...rest} role="radiogroup" aria-label={label} class={className})
+.kui-segmented({...rest} role="radiogroup" aria-label={label} class={className})
   for option of options key={option.value}
-    label.segmented-option
-      input.segmented-input(type="radio" name={group} value={option.value} checked={picked() === option.value} onChange={() => pick(option.value)})
-      span.segmented-label {option.label}
+    label.kui-segmented-option
+      input.kui-segmented-input(type="radio" name={group} value={option.value} checked={picked() === option.value} onChange={() => pick(option.value)})
+      span.kui-segmented-label {option.label}

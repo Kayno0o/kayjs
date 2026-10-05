@@ -33,7 +33,7 @@ const menuId = id ?? uid()
 let list: HTMLElement | undefined
 
 function entries(): HTMLButtonElement[] {
-  return [...list?.querySelectorAll<HTMLButtonElement>('.menu-item:not(:disabled)') ?? []]
+  return [...list?.querySelectorAll<HTMLButtonElement>('.kui-menu-item:not(:disabled)') ?? []]
 }
 
 // Hidden at once rather than through a signal, so the browser has given focus back to the trigger before an action runs.
@@ -69,15 +69,15 @@ function select(action: MenuAction) {
   action.onSelect()
 }
 ---
-Popover(id={menuId} placement={placement} class="menu" onToggle={open => open && entries()[0]?.focus()})
+Popover(id={menuId} placement={placement} class="kui-menu" onToggle={open => open && entries()[0]?.focus()})
   @trigger(attributes)
     IconButton({...attributes} icon={icon} label={label} size={size} variant={variant} aria-haspopup="menu")
-  .menu-list(ref={element => list = element} role="menu" aria-label={label} tabindex="-1" onKeyDown={keyDown})
+  .kui-menu-list(ref={element => list = element} role="menu" aria-label={label} tabindex="-1" onKeyDown={keyDown})
     for item, index of items key={index}
       if actionOf(item) as action
-        button.menu-item(type="button" role="menuitem" tabindex="-1" disabled={action.disabled} data-danger={action.danger || undefined} onClick={() => select(action)})
+        button.kui-menu-item(type="button" role="menuitem" tabindex="-1" disabled={action.disabled} data-danger={action.danger || undefined} onClick={() => select(action)})
           if action.icon as icon
             Icon(icon={icon})
           | {action.label}
       else
-        hr.menu-separator
+        hr.kui-menu-separator

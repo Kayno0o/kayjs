@@ -36,11 +36,11 @@ function closed(event: Event) {
 }
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog.dialog(aria-label={title} {...rest} ref={element => dialog = element} closedby={dirty || edited() ? 'none' : 'any'} onInput={() => edited.set(true)} onClose={closed} class={className})
+dialog.kui-dialog(aria-label={title} {...rest} ref={element => dialog = element} closedby={dirty || edited() ? 'none' : 'any'} onInput={() => edited.set(true)} onClose={closed} class={className})
   if open
-    h3.dialog-title {title}
-    .dialog-body
+    h3.kui-dialog-title {title}
+    .kui-dialog-body
       slot
     if footer
-      .dialog-footer
+      .kui-dialog-footer
         | {footer}

@@ -31,7 +31,7 @@ const { variant = 'default', icon, busy = false, label, class: className, ...res
 // What the tag takes. A rest taken from a union merges its members, so the union is put back for `href` to tell them apart.
 const attributes = rest as Omit<AsButton, keyof Look> | Omit<AsLink, keyof Look>
 
-const look = () => [{ 'btn-accent': variant === 'accent', 'btn-danger': variant === 'danger' }, className]
+const look = () => [{ 'kui-btn-accent': variant === 'accent', 'kui-btn-danger': variant === 'danger' }, className]
 
 function linkOf() {
   return attributes.href === undefined ? undefined : attributes
@@ -47,17 +47,17 @@ function buttonOf() {
 }
 ---
 if linkOf() as link
-  a.btn({...link} class={look()} aria-busy={busy ? 'true' : undefined})
+  a.kui-btn({...link} class={look()} aria-busy={busy ? 'true' : undefined})
     if busy
-      Icon(icon="spinner" class="spinner")
+      Icon(icon="spinner" class="kui-spinner")
     else if icon
       Icon(icon={icon})
     | {label}
     slot
 else if buttonOf() as button
-  button.btn({...button} class={look()} aria-busy={busy ? 'true' : undefined})
+  button.kui-btn({...button} class={look()} aria-busy={busy ? 'true' : undefined})
     if busy
-      Icon(icon="spinner" class="spinner")
+      Icon(icon="spinner" class="kui-spinner")
     else if icon
       Icon(icon={icon})
     | {label}

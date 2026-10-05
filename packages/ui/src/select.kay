@@ -14,7 +14,7 @@ const { value, options, onChange, emptyOption, loading = false, loadingLabel = '
 }>()
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select.field-input({...rest} class={className} onChange={event => onChange?.(event.currentTarget.value)})
+select.kui-field-input({...rest} class={className} onChange={event => onChange?.(event.currentTarget.value)})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
   if loading

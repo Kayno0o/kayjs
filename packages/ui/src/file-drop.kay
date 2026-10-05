@@ -89,6 +89,6 @@ onMount(() => {
   onCleanup(() => window.removeEventListener('paste', pasted))
 })
 ---
-.file-drop({...rest} role="group" class={className} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
-  input.file-drop-input(ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
+.kui-file-drop({...rest} role="group" class={className} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
+  input.kui-file-drop-input(ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
   | {content({ open, dragging })}

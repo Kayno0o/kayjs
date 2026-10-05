@@ -20,8 +20,8 @@ effect(() => {
 })
 ---
 // A site's icon, or the globe slot in a colour of the site's own when it has none or it fails to load.
-span.site-favicon({...rest} class={className})
+span.kui-site-favicon({...rest} class={className})
   if src && !failed()
-    img.site-favicon-img(src={src} alt="" onError={() => failed.set(true)})
+    img.kui-site-favicon-img(src={src} alt="" onError={() => failed.set(true)})
   else
-    Icon(icon="globe" class="site-favicon-icon" style={`color: ${stringToHexColor(name)}`})
+    Icon(icon="globe" class="kui-site-favicon-icon" style={`color: ${stringToHexColor(name)}`})

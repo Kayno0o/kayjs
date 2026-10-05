@@ -64,4 +64,4 @@ onMount(() => {
 })
 ---
 // The infinite-scroll sentinel, rendered after a list only while there is more to load, so a list that stops growing is simply left alone.
-.when-visible(ref={element => sentinel = element} aria-hidden="true")
+.kui-when-visible(ref={element => sentinel = element} aria-hidden="true")

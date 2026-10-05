@@ -10,7 +10,7 @@ main
   article#stat
     Stat(value={12} label="moons" icon="info")
   article#meter
-    Meter(value={140} label="Disk" fillClass="bg-error")
+    Meter(value={140} label="Disk" fillClass="bg-kui-error")
   article#bars
     BarList(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1, display: 'one' }, { key: 'venus', label: 'Venus', value: 0 }]})
   article#no-bars

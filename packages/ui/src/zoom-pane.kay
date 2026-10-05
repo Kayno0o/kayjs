@@ -145,12 +145,12 @@ onMount(() => {
 })
 ---
 // Fitted, the page still scrolls over it on a touch screen; taken in, the gestures are the pane's own. The group is focusable on purpose: the arrows and +/- are its own, and the buttons say the same for everyone else.
-.zoom-pane({...rest} ref={element => pane = element} role="group" aria-label={label} tabindex="0" data-dragging={dragging() || undefined} class={className} style={`touch-action: ${plate().scale > 1 ? 'none' : 'pan-y'}`} onPointerDown={grab} onPointerMove={move} onPointerUp={drop} onPointerCancel={drop} onDblClick={event => zoom(NOTCH_ZOOM ** 3, at(event))} onDragStart={event => event.preventDefault()} onKeyDown={keyDown})
-  // The scale is published too, so a mark standing on the plate can hold its own size with `calc(1 / var(--zoom-scale))`.
-  .zoom-plate(style={`--zoom-scale: ${plate().scale}; transform: translate(${plate().x}px, ${plate().y}px) scale(${plate().scale})`})
+.kui-zoom-pane({...rest} ref={element => pane = element} role="group" aria-label={label} tabindex="0" data-dragging={dragging() || undefined} class={className} style={`touch-action: ${plate().scale > 1 ? 'none' : 'pan-y'}`} onPointerDown={grab} onPointerMove={move} onPointerUp={drop} onPointerCancel={drop} onDblClick={event => zoom(NOTCH_ZOOM ** 3, at(event))} onDragStart={event => event.preventDefault()} onKeyDown={keyDown})
+  // The scale is published too, so a mark standing on the plate can hold its own size with `calc(1 / var(--kui-zoom-scale))`.
+  .kui-zoom-plate(style={`--kui-zoom-scale: ${plate().scale}; transform: translate(${plate().x}px, ${plate().y}px) scale(${plate().scale})`})
     slot
   if tools
-    .zoom-tools
+    .kui-zoom-tools
       IconButton(icon="zoomIn" label={zoomInLabel} size="sm" onClick={() => zoom(NOTCH_ZOOM ** 2)})
       IconButton(icon="zoomOut" label={zoomOutLabel} size="sm" onClick={() => zoom(1 / NOTCH_ZOOM ** 2)})
       IconButton(icon="zoomFit" label={fitLabel} size="sm" disabled={plate().scale === 1} onClick={() => plate.set(fitted())})

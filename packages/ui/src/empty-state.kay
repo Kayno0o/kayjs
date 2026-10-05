@@ -7,7 +7,7 @@ const { title, description, class: className, ...rest } = props<Omit<JSX.Intrins
   class?: string
 }>()
 ---
-.empty-state({...rest} class={className})
-  p.empty-state-title {title}
+.kui-empty-state({...rest} class={className})
+  p.kui-empty-state-title {title}
   if description
-    p.empty-state-description {description}
+    p.kui-empty-state-description {description}

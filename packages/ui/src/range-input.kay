@@ -45,9 +45,9 @@ function commit() {
   onChange?.(next)
 }
 ---
-.range-input({...rest} role="group" aria-label={label} class={className})
-  input.field-input.range-input-box(ref={element => low = element} type="number" inputmode="decimal" aria-label={`${label} from`} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
-  span.range-input-separator(aria-hidden="true") -
-  input.field-input.range-input-box(ref={element => high = element} type="number" inputmode="decimal" aria-label={`${label} to`} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
+.kui-range-input({...rest} role="group" aria-label={label} class={className})
+  input.kui-field-input.kui-range-input-box(ref={element => low = element} type="number" inputmode="decimal" aria-label={`${label} from`} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
+  span.kui-range-input-separator(aria-hidden="true") -
+  input.kui-field-input.kui-range-input-box(ref={element => high = element} type="number" inputmode="decimal" aria-label={`${label} to`} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
   if unit
-    span.range-input-unit {unit}
+    span.kui-range-input-unit {unit}

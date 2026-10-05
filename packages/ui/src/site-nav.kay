@@ -42,9 +42,9 @@ function escape(event: KeyboardEvent) {
   toggle?.focus()
 }
 ---
-nav.site-nav({...rest} aria-label={label} data-open={open() || undefined} class={className} onKeyDown={escape})
-  IconButton(icon={open() ? 'close' : 'menu'} label={menuLabel} variant="ghost" class="site-nav-toggle" aria-expanded={String(open())} aria-controls={listId} ref={element => toggle = element} onClick={() => open.set(!open())})
-  ul.site-nav-list(id={listId})
+nav.kui-site-nav({...rest} aria-label={label} data-open={open() || undefined} class={className} onKeyDown={escape})
+  IconButton(icon={open() ? 'close' : 'menu'} label={menuLabel} variant="ghost" class="kui-site-nav-toggle" aria-expanded={String(open())} aria-controls={listId} ref={element => toggle = element} onClick={() => open.set(!open())})
+  ul.kui-site-nav-list(id={listId})
     for link of links key={link.href}
       li
-        a.site-nav-link(href={link.href} aria-current={marked(link.href)} onClick={() => open.set(false)}) {link.label}
+        a.kui-site-nav-link(href={link.href} aria-current={marked(link.href)} onClick={() => open.set(false)}) {link.label}

@@ -16,8 +16,8 @@ const on = signal(checked)
 effect(() => on.set(checked))
 ---
 // A real checkbox, so it submits inside a form like any other.
-label.toggle(class={className})
-  input.toggle-input({...rest} type="checkbox" role="switch" checked={on()} onChange={event => { on.set(event.currentTarget.checked); onChange?.(event.currentTarget.checked) }})
-  span.toggle-track
+label.kui-toggle(class={className})
+  input.kui-toggle-input({...rest} type="checkbox" role="switch" checked={on()} onChange={event => { on.set(event.currentTarget.checked); onChange?.(event.currentTarget.checked) }})
+  span.kui-toggle-track
   if label
-    span.toggle-label {label}
+    span.kui-toggle-label {label}

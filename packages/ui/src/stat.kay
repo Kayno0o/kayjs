@@ -12,9 +12,9 @@ const { value, label, icon, class: className, ...rest } = props<Omit<JSX.Intrins
 }>()
 ---
 // A figure and what it counts, read together: "12 moons".
-span.stat-badge({...rest} class={className})
+span.kui-stat-badge({...rest} class={className})
   if icon
     Icon(icon={icon})
-  span.stat-value {value}
+  span.kui-stat-value {value}
   if label
-    span.stat-label {label}
+    span.kui-stat-label {label}

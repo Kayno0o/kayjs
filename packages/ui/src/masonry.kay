@@ -65,7 +65,7 @@ function measure(node: HTMLElement, id: Key) {
 }
 ---
 // Tiles placed absolutely inside the layout's own box, so padding goes on a wrapper, never on the Masonry.
-.masonry({...rest} ref={element => root = element} class={className} style={`--masonry-min: ${minWidth}px; --masonry-gap: ${gap}px; --masonry-lanes: ${lanes()};${layout() ? ` height: ${layout()!.height}px;` : ''}${style ? ` ${style}` : ''}`} data-laid-out={layout() ? '' : undefined})
+.kui-masonry({...rest} ref={element => root = element} class={className} style={`--kui-masonry-min: ${minWidth}px; --kui-masonry-gap: ${gap}px; --kui-masonry-lanes: ${lanes()};${layout() ? ` height: ${layout()!.height}px;` : ''}${style ? ` ${style}` : ''}`} data-laid-out={layout() ? '' : undefined})
   for item, index of items key={key(item)}
-    .masonry-item(ref={element => measure(element, key(item))} style={place(index) ? `--masonry-lane: ${place(index)!.lane}; --masonry-top: ${place(index)!.top}px;` : undefined} data-placed={place(index) ? '' : undefined} data-pending={place(index) && !heights().has(key(item)) ? '' : undefined})
+    .kui-masonry-item(ref={element => measure(element, key(item))} style={place(index) ? `--kui-masonry-lane: ${place(index)!.lane}; --kui-masonry-top: ${place(index)!.top}px;` : undefined} data-placed={place(index) ? '' : undefined} data-pending={place(index) && !heights().has(key(item)) ? '' : undefined})
       | {tile(item)}

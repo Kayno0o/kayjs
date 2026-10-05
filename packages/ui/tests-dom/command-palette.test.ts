@@ -33,9 +33,9 @@ async function palette(props: { recent?: string[], hotkey?: string | null } = {}
 
   const { root } = mounted
   const dialog = root.querySelector<HTMLDialogElement>('dialog')!
-  const input = () => root.querySelector<HTMLInputElement>('.command-palette-input')
-  const labels = () => [...root.querySelectorAll('.command-palette-heading, .command-palette-label')].map(element => element.classList.contains('command-palette-heading') ? `# ${element.textContent}` : element.textContent)
-  const active = () => root.querySelector(`#${input()!.getAttribute('aria-activedescendant')}`)?.querySelector('.command-palette-label')?.textContent
+  const input = () => root.querySelector<HTMLInputElement>('.kui-command-palette-input')
+  const labels = () => [...root.querySelectorAll('.kui-command-palette-heading, .kui-command-palette-label')].map(element => element.classList.contains('kui-command-palette-heading') ? `# ${element.textContent}` : element.textContent)
+  const active = () => root.querySelector(`#${input()!.getAttribute('aria-activedescendant')}`)?.querySelector('.kui-command-palette-label')?.textContent
 
   return { root, dialog, input, labels, active }
 }

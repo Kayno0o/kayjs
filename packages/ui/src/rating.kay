@@ -13,6 +13,6 @@ const { value, max = 5, label, class: className, ...rest } = props<Omit<JSX.Intr
 const stars = () => '★'.repeat(max)
 const filled = () => Math.min(Math.max(value / max, 0), 1) * 100
 ---
-span.rating({...rest} role="img" aria-label={label ?? `${value} out of ${max}`} class={className})
+span.kui-rating({...rest} role="img" aria-label={label ?? `${value} out of ${max}`} class={className})
   | {stars()}
-  span.rating-fill(style={`width: ${filled()}%`}) {stars()}
+  span.kui-rating-fill(style={`width: ${filled()}%`}) {stars()}

@@ -26,9 +26,9 @@ const style = (day: ContributionDay, index: number) => {
 }
 ---
 // A year of days as a grid of weeks, each cell shaded by how full its day was.
-.contribution-graph({...rest} class={[{ 'contribution-graph-months': months }, className]})
+.kui-contribution-graph({...rest} class={[{ 'kui-contribution-graph-months': months }, className]})
   if months
     for start of monthStarts(days.map(day => day.day)) key={start.column}
-      span.contribution-month(aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
+      span.kui-contribution-month(aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
   for day, index of days key={day.day}
-    span.contribution-cell(role="img" aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)})
+    span.kui-contribution-cell(role="img" aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)})

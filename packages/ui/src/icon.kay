@@ -14,4 +14,4 @@ const { icon, label, class: className, ...rest } = props<Omit<JSX.IntrinsicEleme
 
 const drawn = () => typeof icon === 'string' ? settings.icons[icon] : icon
 ---
-svg.icon({...drawn()} {...rest} class={className} role={label === undefined ? undefined : 'img'} aria-label={label} aria-hidden={label === undefined ? 'true' : undefined})
+svg.kui-icon({...drawn()} {...rest} class={className} role={label === undefined ? undefined : 'img'} aria-label={label} aria-hidden={label === undefined ? 'true' : undefined})

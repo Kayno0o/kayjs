@@ -3,9 +3,9 @@ import { compileKay } from 'kay/compiler'
 
 const ROOT = new URL('..', import.meta.url).pathname
 
-// These list today's families of token names: a class reaching for a new family needs it added here too.
-const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret)-(text|muted|mantle|canvas|surface\d|overlay\d|subtext\d|accent(?:-hi)?|on-accent|error|success|warning|info|row-hover|fill-hover|fill-danger)\b/g
-const SCALE = /\b(gap|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|text|font|tracking|rounded)-(section|inline|micro|2xs|heading|label|action|card)\b/g
+// These list today's families of token names, every one under `kui-` so no app's own token meets them: a class reaching for a new family needs it added here too.
+const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret|accent)-(kui-(?:text|muted|mantle|canvas|surface\d|overlay\d|subtext\d|accent(?:-hi)?|on-accent|error|success|warning|info|row-hover|fill-hover|fill-danger|chart-\d))\b/g
+const SCALE = /\b(gap|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|text|font|tracking|rounded)-(kui-(?:section|inline|micro|2xs|heading|label|action|card))\b/g
 const DEFINED_TOKEN = /(--[\w-]+):/g
 const DEFINED_CLASS = /\.([a-z][\w-]*)/g
 // A `class` attribute: a quoted string, or an expression of strings, arrays and `{ name: condition }` objects.
@@ -14,6 +14,11 @@ const CLASS_EXPRESSION = /\bclass=\{((?:[^{}]|\{[^{}]*\})*)\}/g
 // A class name in an expression: a quoted string, unless a comparison makes it a value, or an object key.
 const CLASS_IN_EXPRESSION = /([!=]==\s*)?'([a-z][\w-]*)'|\b([a-z][\w-]*)(?=\s*:)/g
 const WHITESPACE = /\s+/
+const COLOUR_TOKEN = /(--color-kui-[\w-]+): ([^;]+);/g
+// A colour holds a light and a dark value, or names another colour that does.
+const PAIRED = /^light-dark\([^,]+, [^,]+\)$|^var\(--color-kui-[\w-]+\)$/
+// A rule setting color-scheme, with its selector.
+const SCHEME = /([^{}\n]*[^{}\s])\s*\{\s*color-scheme: (\w+);/g
 // A quoted class name, as a script or a component's own script writes one: `classList.add('x')`, `{ 'x': on }`.
 const QUOTED = /'([a-z][\w-]*)'/g
 // What chartist draws itself, styled here but written by no source of the library.
@@ -67,6 +72,20 @@ describe('theme.css', () => {
     const quoted = new Set([...components.map(({ source }) => source), ...scripts].flatMap(source => [...source.matchAll(QUOTED)].map(([, name]) => name)))
 
     expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name))).toEqual([])
+  })
+
+  test('gives every colour a light and a dark value, or names another colour', () => {
+    const colours = [...theme.matchAll(COLOUR_TOKEN)]
+
+    expect(colours.length).toBeGreaterThan(0)
+    expect(colours.filter(([, , value = '']) => !PAIRED.test(value)).map(([, token]) => token)).toEqual([])
+  })
+
+  test('is dark unless the system asks for light, and an explicit data-theme wins over both', () => {
+    const scheme = [...theme.matchAll(SCHEME)].map(([, selector = '', value]) => `${selector.trim()} ${value}`)
+
+    expect(scheme).toEqual([':root dark', ':root light', '[data-theme=\'light\'] light', '[data-theme=\'dark\'] dark'])
+    expect(theme.indexOf('@media (prefers-color-scheme: light)')).toBeLessThan(theme.indexOf('[data-theme=\'light\']'))
   })
 
   test('declares its tokens as defaults, so the app\'s own @theme wins wherever it sits', () => {

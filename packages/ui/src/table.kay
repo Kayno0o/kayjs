@@ -43,24 +43,24 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
   return current()?.direction === 'asc' ? 'ascending' : 'descending'
 }
 ---
-.table-wrap({...rest} class={className})
-  table.table
+.kui-table-wrap({...rest} class={className})
+  table.kui-table
     thead
       tr
         for column of columns key={column.key}
-          th.table-head-cell(scope="col" data-align={column.align ?? 'start'} aria-sort={ariaSort(column)})
+          th.kui-table-head-cell(scope="col" data-align={column.align ?? 'start'} aria-sort={ariaSort(column)})
             if column.sortValue
-              button.table-sort-btn(type="button" data-direction={sorting(column) ? current()?.direction : undefined} onClick={() => toggle(column)})
+              button.kui-table-sort-btn(type="button" data-direction={sorting(column) ? current()?.direction : undefined} onClick={() => toggle(column)})
                 | {column.header}
                 if sorting(column)
-                  Icon(icon="chevron" class="table-sort-icon")
+                  Icon(icon="chevron" class="kui-table-sort-icon")
             else
               | {column.header}
     tbody
       for row of shown() key={rowKeyOf(row, rowKey)}
-        tr.table-row
+        tr.kui-table-row
           for column of columns key={column.key}
-            td.table-cell(data-align={column.align ?? 'start'})
+            td.kui-table-cell(data-align={column.align ?? 'start'})
               if column.cell && cell
                 | {cell(row, column)}
               else
@@ -68,5 +68,5 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
       else
         if empty
           tr
-            td.table-empty-cell(colspan={columns.length})
+            td.kui-table-empty-cell(colspan={columns.length})
               | {empty}
