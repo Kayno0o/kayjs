@@ -14,28 +14,46 @@ const { checked = false, label, onChange, class: className, ...rest } = props<Om
 
 const on = signal(checked)
 const busy = signal(false)
+// How often the parent's `checked` reached the switch, so a change under way knows whether the parent answered it.
+let synced = 0
 
-effect(() => on.set(checked))
+effect(() => {
+  on.set(checked)
+  synced++
+})
 
-async function change(next: boolean) {
+async function change(input: HTMLInputElement) {
+  const next = input.checked
   const before = on()
+  const syncedBefore = synced
+  // Put back unless the parent set `checked` meanwhile, which has the last word.
+  // The box itself too, since a change refused at once never renders `on` as flipped for the binding to undo.
+  const putBack = () => {
+    if (synced !== syncedBefore)
+      return
+
+    on.set(before)
+    input.checked = before
+  }
 
   on.set(next)
-  const answer = onChange?.(next)
 
-  if (!(answer instanceof Promise))
-    return
-
-  busy.set(true)
-
-  try {
-    if (await answer === false)
-      on.set(before)
-  }
   // Logged rather than thrown, an event handler having no one to throw to: the switch going back is what the user sees.
+  try {
+    const answer = onChange?.(next)
+
+    // Any promise-like, not only this window's `Promise`.
+    if (typeof (answer as PromiseLike<unknown> | undefined)?.then !== 'function')
+      return
+
+    busy.set(true)
+
+    if (await answer === false)
+      putBack()
+  }
   catch (error) {
-    on.set(before)
-    console.error('kayjs-ui: a Toggle\'s onChange rejected', error)
+    putBack()
+    console.error('kayjs-ui: a Toggle\'s onChange failed', error)
   }
   finally {
     busy.set(false)
@@ -44,7 +62,7 @@ async function change(next: boolean) {
 ---
 // A real checkbox, so it submits inside a form like any other. A click while a change is under way flips nothing.
 label.kui-toggle(class={className})
-  input.kui-toggle-input({...rest} type="checkbox" role="switch" checked={on()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget.checked)})
+  input.kui-toggle-input({...rest} type="checkbox" role="switch" checked={on()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
   span.kui-toggle-track
   if label
     span.kui-toggle-label {label}

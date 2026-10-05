@@ -181,7 +181,7 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
   - A click, or the arrows (wrapping), Home and End, show a tab and focus it; only the shown tab is in the page's tab order. `onChange(value)` runs on each switch, and a parent passing another `value` shows that tab.
   - It renders inside an island, since its panels come from a block.
 - `Toggle(label="Public" checked={post.public} name="public" onChange={setPublic})`: a checkbox drawn as a switch, with `role="switch"`, that posts like a checkbox. Without `label`, give it `aria-label`.
-  - `onChange` may return a promise: the switch is `aria-busy` and flips no further until it settles, and goes back where it was when it resolves to `false` or rejects (logged). A void answer leaves the switch as clicked. `attempt` resolves to `undefined` on failure, so turn that into `false`: `onChange={async checked => (await attempt(async () => { await setPublic({ id, public: checked }); return true }, 'Could not publish')) ?? false}`.
+  - `onChange` may return a promise: the switch is `aria-busy` and flips no further until it settles, and goes back where it was when it resolves to `false`, rejects or throws (logged), unless the parent set `checked` meanwhile. A void answer leaves the switch as clicked. The switch jumping back is all the user sees, so toast the failure too. `attempt` resolves to `undefined` on failure, so turn that into `false`: `onChange={async checked => (await attempt(async () => { await setPublic({ id, public: checked }); return true }, 'Could not publish')) ?? false}`.
 
 ### TextInput, Select
 

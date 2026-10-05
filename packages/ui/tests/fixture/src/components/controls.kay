@@ -1,13 +1,24 @@
 ---
+import { signal } from 'kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 
 // `onPublish` stands for an action behind the switch, answering once the test settles it.
-const { onRange, onDigest, onPublish } = props<{ onRange: (value: string) => void, onDigest: (checked: boolean) => void, onPublish?: (checked: boolean) => Promise<boolean | void> }>()
+// With `mirror`, the page keeps the switch's value as its own state, set before the change is saved.
+const { onRange, onDigest, onPublish, mirror = false } = props<{ onRange: (value: string) => void, onDigest: (checked: boolean) => void, onPublish?: (checked: boolean) => unknown, mirror?: boolean }>()
+
+const published = signal(false)
+
+function publish(checked: boolean) {
+  if (mirror)
+    published.set(checked)
+
+  return onPublish?.(checked) as Promise<boolean | void> | undefined
+}
 
 const ranges = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }] as const
 ---
 form#form
   Segmented(label="Range" name="range" options={ranges} value="day" onChange={onRange})
   Toggle(name="digest" label="Daily digest" onChange={onDigest})
-  Toggle#publish(name="public" label="Public" onChange={onPublish})
+  Toggle#publish(name="public" label="Public" checked={published()} onChange={publish})

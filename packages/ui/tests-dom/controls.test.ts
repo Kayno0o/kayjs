@@ -18,13 +18,13 @@ test('Segmented and Toggle submit like the fields they are, and report each chan
   const form = mounted.root.querySelector('form')!
   const fields = () => Object.fromEntries(new FormData(form))
 
-  expect(fields()).toMatchObject({ range: 'day' })
+  expect(fields()).toEqual({ range: 'day' })
 
   click(mounted.root.querySelector('input[value="week"]'))
   click(mounted.root.querySelector('input[name="digest"]'))
   await settle()
 
-  expect(fields()).toMatchObject({ range: 'week', digest: 'on' })
+  expect(fields()).toEqual({ range: 'week', digest: 'on' })
   expect(ranges).toEqual(['week'])
   expect(digests).toEqual([true])
 
@@ -83,4 +83,46 @@ test('a Toggle whose change is under way is busy and flips no further, and goes 
   finally {
     logged.mockRestore()
   }
+})
+
+test('a Toggle goes back when onChange throws, and waits on any promise-like it answers', async () => {
+  let answer: () => unknown = () => {
+    throw new Error('offline')
+  }
+  const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+  mounted = await mount('src/components/controls.kay', { onRange: () => undefined, onDigest: () => undefined, onPublish: () => answer() })
+
+  const input = mounted.root.querySelector<HTMLInputElement>('input[name="public"]')!
+
+  try {
+    click(input)
+    await settle()
+
+    expect([input.checked, logged.mock.calls.map(([, error]) => error)]).toEqual([false, [new Error('offline')]])
+
+    // A promise-like of another library, not a \`Promise\`.
+    answer = () => ({ then: (resolve: (value: boolean) => void) => resolve(false) })
+    click(input)
+    await settle()
+
+    expect(input.checked).toBe(false)
+  }
+  finally {
+    logged.mockRestore()
+  }
+})
+
+test('a Toggle leaves the switch where its parent set it while a refused change was under way', async () => {
+  const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+  mounted = await mount('src/components/controls.kay', { onRange: () => undefined, onDigest: () => undefined, onPublish: async () => Promise.reject(new Error('refused')), mirror: true })
+
+  const input = mounted.root.querySelector<HTMLInputElement>('input[name="public"]')!
+
+  click(input)
+  await settle()
+  logged.mockRestore()
+
+  expect(input.checked).toBe(true)
 })

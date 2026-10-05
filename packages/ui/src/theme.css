@@ -1386,6 +1386,10 @@
     &:where(:has(.kui-toggle-input:disabled)) {
       @apply cursor-not-allowed opacity-50;
     }
+
+    &:where(:has(.kui-toggle-input[aria-busy='true'])) {
+      @apply cursor-progress;
+    }
   }
 
   .kui-toggle-input {
