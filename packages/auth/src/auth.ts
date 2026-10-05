@@ -1,6 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { Guard } from 'kay'
-import type { Session } from 'kay/server'
+import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
 import type { BearerToken } from './bearer'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
@@ -80,6 +80,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   defaultRoles?: NoInfer<Role>[]
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
   limits?: Partial<Limits>
+  // The proxies in front, read as kay.config.ts's `proxy` is, for a plain Elysia app that kay's `pages()` does not serve; a kay app sets it in kay.config.ts instead.
+  proxy?: KayConfig['proxy']
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
   authorize?: (user: User | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>
 }
@@ -356,7 +358,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       if (!session)
         throw new Error('kayjs-auth: no session reaches this route. Use the session plugin on the app itself, or leave it to auth.plugin, rather than in a plugin of the app\'s own before auth.plugin')
 
-      return { auth: new Auth(session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server))) }
+      return { auth: new Auth(session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server, options.proxy))) }
     })
     // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
     .as('global')

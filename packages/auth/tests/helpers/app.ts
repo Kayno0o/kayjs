@@ -47,7 +47,7 @@ export function serialStore(): AuthStore {
 // An Elysia app on kayjs-auth with routes to drive it, and a browser per call that keeps its own cookies.
 export function testApp(options: Partial<Omit<AuthOptions<AuthSessionData, 'admin' | 'editor'>, 'store'>> & { store?: AuthStore } = {}) {
   const store = options.store ?? memoryStore()
-  const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, roles: { admin: ['editor'], editor: [] }, ...options, store })
+  const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, roles: { admin: ['editor'], editor: [] }, proxy: { hops: 1 }, ...options, store })
   const app = new Elysia()
     .use(auth.plugin)
     .get('/me', async ({ auth }) => (await auth.user()) ?? 'anonymous')
