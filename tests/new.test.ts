@@ -339,7 +339,11 @@ describe('kay build --compile', () => {
         'src/ui-settings.ts': 'export default { icon: (name: string) => `app:${name}` }\n',
         'src/routes/tags.kay': '---\nimport Tag from \'kay-lib/tag.kay\'\n---\n--- server\nexport const prerender = true\n---\nTag(label="kept")\n',
         'src/routes/live-tags.kay': '---\nimport Tag from \'kay-lib/tag.kay\'\n---\nTag(label="live")\n',
-        'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], settings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
+        // A build plugin reading a file beside it as it loads, as a native binding does: the executable must not load it.
+        'node_modules/build-stamp/package.json': JSON.stringify({ name: 'build-stamp', version: '1.0.0', type: 'module', exports: './index.js' }),
+        'node_modules/build-stamp/index.js': 'import { readFileSync } from \'node:fs\'\nimport { join } from \'node:path\'\n\nconst binding = readFileSync(join(import.meta.dir, \'binding.txt\'), \'utf8\')\n\nexport default () => ({ name: binding, setup() {} })\n',
+        'node_modules/build-stamp/binding.txt': 'stamp',
+        'kay.config.ts': 'import stamp from \'build-stamp\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [stamp()], lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], settings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
       // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
       await Promise.all([
@@ -357,6 +361,7 @@ describe('kay build --compile', () => {
 
       expect(report).toContain('compiled server in ')
       expect(code).toBe(0)
+      await rm(join(dir, 'node_modules/build-stamp'), { recursive: true })
 
       // Run from elsewhere, with nothing of the project to read.
       const server = Bun.spawn([join(dir, 'server')], { cwd: tmpdir(), env: { PATH: process.env.PATH, PORT: '0' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })

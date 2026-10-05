@@ -9,6 +9,7 @@ import { messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
 import { refuseClashes, scanRoutes, specialPagesOf } from '../server/routes'
 import { kay } from './plugin'
+import { runtimeConfig, withoutPlugins } from './runtime-config'
 import { withoutStyles } from './styles'
 
 export interface CompileOptions {
@@ -72,6 +73,12 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     '',
   ].join('\n'))
 
+  const configSource = existsSync(configFile) ? await Bun.file(configFile).text() : undefined
+  const runtime = configSource === undefined ? undefined : withoutPlugins(configSource)
+
+  if (runtime === undefined && (config.plugins?.length ?? 0) > 0)
+    console.warn(`kay: the plugins in ${CONFIG_FILE} are not a property of the object it exports by default, so the executable carries them; one loading a native addon, as Tailwind does, fails where the project's node_modules is not`)
+
   const build = await Bun.build({
     entrypoints: [generated],
     target: 'bun',
@@ -79,7 +86,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [withoutStyles(), kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings: config.settings }), ...config.plugins ?? []],
+    plugins: [...runtime === undefined ? [] : [runtimeConfig(configFile, runtime)], withoutStyles(), kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings: config.settings }), ...config.plugins ?? []],
   })
 
   if (!build.success)

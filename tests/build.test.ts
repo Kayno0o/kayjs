@@ -7,6 +7,7 @@ import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, writeAsset } from '../src/build/assets'
+import { withoutPlugins } from '../src/build/runtime-config'
 import { mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
@@ -181,6 +182,39 @@ describe('kay.config.ts', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it('leaves the build plugins out of the config a compiled server loads, with what only they imported', () => {
+    expect(withoutPlugins([
+      'import tailwind from \'bun-plugin-tailwind\'',
+      'import { defineConfig } from \'kay/server\'',
+      '',
+      'export default defineConfig({',
+      '  lang: \'fr\',',
+      '  plugins: [tailwind],',
+      '  site: \'https://example.com\',',
+      '})',
+      '',
+    ].join('\n'))).toBe('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'fr\',\n  \n  site: \'https://example.com\',\n})\n')
+
+    // A factory, through a const named as the property, with a helper only it calls.
+    expect(withoutPlugins([
+      'import mdx, { options } from \'mdx-plugin\'',
+      'import \'./side-effect\'',
+      'function settings() { return options }',
+      'const plugins = [mdx(settings())]',
+      'const config = { plugins } satisfies object',
+      'export default config',
+    ].join('\n'))).toBe('import \'./side-effect\'\nconst config = {  } satisfies object\nexport default config')
+  })
+
+  it('keeps what the rest of the config uses, and a config without plugins as it is', () => {
+    const source = 'import shared, { onError } from \'./shared\'\n\nexport default { plugins: [shared], onError }\n'
+
+    expect(withoutPlugins(source)).toBe('import shared, { onError } from \'./shared\'\n\nexport default {  onError }\n')
+    expect(withoutPlugins('export const plugins = []\nexport default { plugins }\n')).toBe('export const plugins = []\nexport default {  }\n')
+    expect(withoutPlugins('export default { lang: \'en\' }\n')).toBeUndefined()
+    expect(withoutPlugins('const base = { plugins: [] }\nexport default { ...base }\n')).toBeUndefined()
   })
 })
 
