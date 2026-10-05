@@ -1,0 +1,61 @@
+--- <Value extends string>
+import type { JSX } from 'kay'
+import { effect, signal, uid } from 'kay'
+
+// The keys that move between tabs, as the tabs pattern has them: the arrows wrap, Home and End go to either end.
+const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
+  ArrowRight: (index, count) => (index + 1) % count,
+  ArrowLeft: (index, count) => (index - 1 + count) % count,
+  Home: () => 0,
+  End: (_, count) => count - 1,
+}
+
+const { tabs, value, label, onChange, panel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
+  tabs: readonly { value: Value, label: string }[]
+  // The tab shown to start with; tabs whose parent passes another follow it.
+  value: Value
+  // Names the tab list for screen readers.
+  label: string
+  onChange?: (value: Value) => void
+  // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
+  panel: (value: Value) => JSX.Element
+  class?: string
+}>()
+
+const id = uid()
+// Held as a string: a signal cannot take a type parameter that might be a function.
+const shown = signal<string>(value)
+let list: HTMLElement | undefined
+
+effect(() => shown.set(value))
+
+function show(next: Value) {
+  if (next === shown())
+    return
+
+  shown.set(next)
+  onChange?.(next)
+}
+
+// Moving with the keys shows the tab it lands on, and focus goes with it: only the shown tab is in the page's tab order.
+function keyDown(event: KeyboardEvent) {
+  const move = MOVES[event.key]
+
+  if (!move)
+    return
+
+  event.preventDefault()
+
+  const next = move(tabs.findIndex(tab => tab.value === shown()), tabs.length)
+
+  show(tabs[next]!.value)
+  list?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus()
+}
+---
+.tabs({...rest} class={className})
+  .tabs-list(ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
+    for tab, index of tabs key={tab.value}
+      button.tabs-tab(type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} onClick={() => show(tab.value)}) {tab.label}
+  for tab, index of tabs key={tab.value}
+    .tabs-panel(role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex="0" hidden={shown() !== tab.value})
+      | {panel(tab.value)}

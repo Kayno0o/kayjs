@@ -148,10 +148,23 @@ Table(columns={columns} rows={posts} rowKey="id")
 - With `sortValue: true`, dates sort by time, booleans as 0 and 1, and a missing value sorts last in either direction.
 - `rowKey` is a field of the row or a function of it, and tells rows apart across a sort.
 
-### Segmented, TabNav, Toggle
+### Segmented, TabNav, Tabs, Toggle
+
+```kay
+Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: 'Reviews' }]} value="details" label="Product")
+  @panel(tab)
+    if tab === 'details'
+      ProductDetails(product={product})
+    else
+      Reviews(product={product})
+```
 
 - `Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} value="day" label="Period" name="period" onChange={period.set})`: real radios, so arrow keys move between options and the group posts as `name` inside a form. A parent passing another `value` moves the choice. Without `name`, the group draws one unique on the page, which keeps two groups apart.
 - `TabNav(links={[{ href: '/settings', label: 'Profile' }, { href: '/settings/keys', label: 'Keys' }]} current={ctx.url.pathname} label="Settings")`: tabs as links, one page each. The current tab is marked `aria-current="page"`, and a bar too narrow for every tab scrolls to centre it, without moving the page.
+- `Tabs`: panels that switch in place, without navigating, for settings or a product's details; use TabNav when each tab is a page of its own.
+  - A `tablist` of buttons, each paired with its `tabpanel` through ids drawn with `uid()`. `@panel(tab)` draws each tab's panel once, hidden while another tab shows, so what a panel holds survives a switch.
+  - A click, or the arrows (wrapping), Home and End, show a tab and focus it; only the shown tab is in the page's tab order. `onChange(value)` runs on each switch, and a parent passing another `value` shows that tab.
+  - It renders inside an island, since its panels come from a block.
 - `Toggle(label="Public" checked={post.public} name="public" onChange={setPublic})`: a checkbox drawn as a switch, with `role="switch"`, that posts like a checkbox. Without `label`, give it `aria-label`.
 
 ### TextInput, Select

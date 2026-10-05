@@ -1167,6 +1167,27 @@
     }
   }
 
+  /* In-page tabs look like TabNav's, the shown one marked by aria-selected rather than aria-current. */
+  .tabs {
+    @apply flex flex-col;
+  }
+
+  .tabs-list {
+    @apply flex gap-1 overflow-x-auto border-b border-surface2 pb-px;
+  }
+
+  .tabs-tab {
+    @apply -mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-subtext0 transition-colors hover:text-text;
+
+    &:where([aria-selected='true']) {
+      @apply border-accent text-accent;
+    }
+  }
+
+  .tabs-panel {
+    @apply pt-4 outline-none;
+  }
+
   .table-wrap {
     @apply w-full overflow-x-auto border border-surface2 bg-surface0;
   }

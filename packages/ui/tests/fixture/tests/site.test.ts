@@ -205,3 +205,15 @@ describe('drawn ids', () => {
     expect(select).toContain(`anchor-name: --popover-${target}`)
   })
 })
+
+describe('Tabs', () => {
+  test('pairs each tab with its panel through drawn ids, and shows the starting tab\'s panel alone', async () => {
+    const tabs = await element('/tabs', 'planets')
+    const pairs = [...tabs.matchAll(/role="tab" id="([^"]+)" aria-controls="([^"]+)" aria-selected="(\w+)" tabindex="(-?\d)"/g)].map(match => match.slice(1))
+    const panels = [...tabs.matchAll(/role="tabpanel" id="([^"]+)" aria-labelledby="([^"]+)" tabindex="0"( hidden)?/g)].map(match => match.slice(1))
+
+    expect(pairs.map(([, , selected, index]) => [selected, index])).toEqual([['false', '-1'], ['true', '0'], ['false', '-1']])
+    expect(panels.map(([panel, tab, hidden]) => [panel, tab, Boolean(hidden)])).toEqual(pairs.map(([tab, panel], index) => [panel, tab, index !== 1]))
+    expect(new Set(pairs.flatMap(([tab, panel]) => [tab, panel])).size).toBe(6)
+  })
+})
