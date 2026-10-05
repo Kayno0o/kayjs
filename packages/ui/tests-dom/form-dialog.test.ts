@@ -11,7 +11,9 @@ afterEach(() => {
   saved.length = 0
 })
 
-async function formDialog(save: (input: { name: string }) => Promise<string | { errors: Record<string, string> }>) {
+type Answer = string | { errors: Record<string, string> } | { fail: { error: string, field?: string } }
+
+async function formDialog(save: (input: { name: string }) => Promise<Answer>) {
   mounted = await mount('src/components/form-dialog.kay', { save, onSaved: (name: string) => saved.push(name) })
 
   return mounted.root
@@ -46,7 +48,7 @@ describe('FormDialog', () => {
   })
 
   test('shows a refused field\'s message on its FormField and stays open, then drops it once saved', async () => {
-    let answer: string | { errors: Record<string, string> } = { errors: { name: 'Taken' } }
+    let answer: Answer = { errors: { name: 'Taken' } }
     const root = await formDialog(async () => answer)
 
     submit(root)
@@ -85,6 +87,34 @@ describe('FormDialog', () => {
 
     expect(root.querySelector('.kui-form-field')).not.toBeNull()
     expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+  })
+
+  test('shows what the handler refused with through refused: a field\'s message on its FormField, the whole form\'s toasted, nothing said leaving failure', async () => {
+    let answer: Answer = { fail: { error: 'You already filed that slug', field: 'name' } }
+    const root = await formDialog(async () => answer)
+    // Toasts outlive a mounted dialog, so only new ones count.
+    const toasts = () => root.querySelectorAll('.kui-toast-message').length
+    const before = toasts()
+
+    submit(root)
+    await settle()
+
+    expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('You already filed that slug')
+    expect(toasts()).toBe(before)
+
+    answer = { fail: { error: 'Too many short links' } }
+    submit(root)
+    await settle()
+
+    expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Too many short links')
+
+    answer = { fail: { error: '' } }
+    submit(root)
+    await settle()
+
+    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not rename')
+    expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
   })
 
   test('submits on Ctrl+Enter from a textarea, which keeps a plain Enter for new lines', async () => {

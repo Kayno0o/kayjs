@@ -1,12 +1,18 @@
 ---
-import type { Action } from 'kay'
+import type { Action, Failure } from 'kay'
 import { ActionError, signal } from 'kay'
 import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 
-// `save` stands in for the server: it answers the saved name, or the messages a refusal carries, or throws for a call that failed outright.
-const { save, onSaved } = props<{ save: (input: { name: string }) => Promise<string | { errors: Record<string, string> }>, onSaved: (name: string) => void }>()
+// What the handler passes to `ctx.fail`: a message, for a field or the whole form.
+interface Refusal {
+  error: string
+  field?: string
+}
+
+// `save` stands in for the server: it answers the saved name, the messages a schema refusal carries, the data of a handler's refusal, or throws for a call that failed outright.
+const { save, onSaved } = props<{ save: (input: { name: string }) => Promise<string | { errors: Record<string, string> } | { fail: Refusal }>, onSaved: (name: string) => void }>()
 
 const open = signal(true)
 const pending = signal(false)
@@ -19,18 +25,26 @@ const rename = Object.assign(async (form: FormData) => {
     const answer = await save({ name: String(form.get('name')) })
 
     if (typeof answer !== 'string')
-      throw new ActionError(422, '', answer.errors)
+      throw 'fail' in answer ? new ActionError(400, '', {}, answer.fail) : new ActionError(422, '', answer.errors)
 
     return answer
   }
   finally {
     pending.set(false)
   }
-}, { pending, url: '/_kay/action/form/rename' }) as unknown as Action<{ name: string }, string>
+}, { pending, url: '/_kay/action/form/rename' }) as unknown as Action<{ name: string }, string | Failure<Refusal>>
+
+// An empty message says nothing, leaving the dialog's own `failure`.
+function said(refusal: Refusal) {
+  if (!refusal.error)
+    return undefined
+
+  return refusal.field ? { [refusal.field]: refusal.error } : refusal.error
+}
 ---
 button#open(onClick={() => open.set(true)}) Open
 button#hide(onClick={() => open.set(false)}) Hide
-FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" onSaved={onSaved} onClose={() => open.set(false)})
+FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" refused={said} onSaved={onSaved} onClose={() => open.set(false)})
   FormField(label="Name" name="name")
     input#name(name="name" value="Ada")
   textarea#notes(name="notes")

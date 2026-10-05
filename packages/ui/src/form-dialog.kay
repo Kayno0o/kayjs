@@ -1,5 +1,5 @@
 --- <Output>
-import type { Action, Failure, JSX } from 'kay'
+import type { Action, Failure, FailureData, JSX } from 'kay'
 import { ActionError, effect, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
@@ -7,7 +7,7 @@ import { formIssues } from './forms'
 import { toast } from './toast'
 
 
-const { open, title, action, submitLabel, failure, onSaved, onClose, extra, id, class: className } = props<{
+const { open, title, action, submitLabel, failure, refused, onSaved, onClose, extra, id, class: className } = props<{
   // Shows the dialog; the parent sets it back to false in `onClose`.
   open: boolean
   title: string
@@ -16,6 +16,8 @@ const { open, title, action, submitLabel, failure, onSaved, onClose, extra, id, 
   submitLabel: string
   // Toasted when the call fails other than on a field; a refused field shows its message on its FormField.
   failure: string
+  // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined, `failure` is toasted.
+  refused?: (data: FailureData<Output>) => Record<string, string> | string | undefined
   // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
   onSaved?: (result: Exclude<Output, Failure<unknown>>) => void
   // Called however the dialog closes, saved or not.
@@ -56,10 +58,12 @@ async function submit(event: SubmitEvent) {
     result = await action(new FormData(form))
   }
   catch (error) {
-    const refused: Record<string, string> = error instanceof ActionError ? error.errors : {}
-    const messages = Object.entries(refused)
+    // The schema refuses fields; the handler refuses with data of its own, which `refused` reads, a single message going under the empty name as the whole form's.
+    const said = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) : undefined
+    const byField = { ...error instanceof ActionError ? error.errors : {}, ...typeof said === 'string' ? { '': said } : said }
+    const messages = Object.entries(byField)
 
-    issues.set(refused)
+    issues.set(byField)
 
     // A message no FormField shows, such as a limit or a refusal of the whole form under the empty name, is toasted rather than lost; a failure carrying none toasts the page's own message.
     for (const message of messages.length === 0 ? [failure] : messages.filter(([name]) => !shown(name)).map(([, message]) => message))
