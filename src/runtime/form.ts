@@ -14,6 +14,8 @@ export interface FieldSchema {
 const BOOLEAN_TEXT = new Map([['true', true], ['on', true], ['false', false]])
 // A decimal number as a number input posts it; `Number()` alone would also read `0x10` or `Infinity`.
 const DECIMAL = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i
+// What a form posts for a line break, a lone carriage return included.
+const CRLF = /\r\n?/g
 // The string formats Elysia gives the numeric text `t.Integer()` and `t.Numeric()` also take.
 const NUMERIC_FORMATS = new Set<unknown>(['integer', 'numeric'])
 
@@ -65,7 +67,11 @@ function fromText(field: FieldSchema | undefined, value: unknown): unknown {
   if (field !== undefined && isNumeric(field))
     return DECIMAL.test(value) ? Number(value) : Number.NaN
 
-  return field?.type === 'boolean' ? BOOLEAN_TEXT.get(value) ?? value : value
+  if (field?.type === 'boolean')
+    return BOOLEAN_TEXT.get(value) ?? value
+
+  // A form posts a line break as CRLF, where the textarea the visitor typed in holds and counts it as one character: read as LF, a `maxLength` matches what the browser allowed and the text is stored as it was written.
+  return value.includes('\r') ? value.replaceAll(CRLF, '\n') : value
 }
 
 // `t.Number()`, or `t.Integer()` and `t.Numeric()`, which Elysia writes as a number or a numeric string; `t.Date()` takes a number too, but not only.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
+import { formInput } from '../src/runtime/form'
 import { defineEnv } from '../src/server'
 import { buildingWithoutEnv } from '../src/server/env'
 import { readQuery } from '../src/server/query'
@@ -80,6 +81,21 @@ describe('defineEnv', () => {
     }
 
     expect(() => defineEnv(schema, {})).toThrow('kay: the environment does not match its schema')
+  })
+})
+
+describe('formInput', () => {
+  const schema = t.Object({ message: t.String({ maxLength: 10 }), name: t.Optional(t.String()) })
+
+  it('reads a posted line break as the one character the textarea counted', () => {
+    // A form posts CRLF for every line break, so ten characters typed arrive as eleven and a `maxLength` of ten would refuse them.
+    expect(formInput(schema, { message: 'a\r\nb', name: 'x\r\n\r\ny' })).toEqual({ message: 'a\nb', name: 'x\n\ny' })
+    expect(formInput(schema, { message: 'a\rb' })).toEqual({ message: 'a\nb' })
+    expect((formInput(schema, { message: '12345678\r\n' }) as { message: string }).message).toHaveLength(9)
+  })
+
+  it('leaves text without a line break as it is', () => {
+    expect(formInput(schema, { message: 'plain', name: 'Ada' })).toEqual({ message: 'plain', name: 'Ada' })
   })
 })
 
