@@ -4,23 +4,61 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
 
-const { variant = 'default', icon, busy = false, label, type = 'button', expanded, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & {
+interface Look {
   variant?: 'default' | 'accent' | 'danger'
   // Drawn before the label.
   icon?: IconSlot | IconProps
   // Spins in place of the icon while what the press started is under way.
   busy?: boolean
   label?: string
+  class?: string
+}
+
+type AsButton = Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & Look & {
+  href?: undefined
   type?: 'button' | 'submit' | 'reset'
   // Whether the disclosure the button opens is showing, for a popover or a panel it toggles.
   expanded?: boolean
-  class?: string
-}>()
+}
+
+// With an `href`, the button is a link looking like one, for an action that goes to another page.
+type AsLink = Omit<JSX.IntrinsicElements['a'], 'class'> & Look & {
+  href: string
+}
+
+const { variant = 'default', icon, busy = false, label, class: className, ...rest } = props<AsButton | AsLink>()
+
+// What the tag takes. A rest taken from a union merges its members, so the union is put back for `href` to tell them apart.
+const attributes = rest as Omit<AsButton, keyof Look> | Omit<AsLink, keyof Look>
+
+const look = () => [{ 'btn-accent': variant === 'accent', 'btn-danger': variant === 'danger' }, className]
+
+function linkOf() {
+  return attributes.href === undefined ? undefined : attributes
+}
+
+function buttonOf() {
+  if (attributes.href !== undefined)
+    return undefined
+
+  const { type = 'button', expanded, ...others } = attributes
+
+  return { ...others, 'type': type, 'aria-expanded': expanded === undefined ? undefined : String(expanded) }
+}
 ---
-button.btn({...rest} type={type} class={[{ 'btn-accent': variant === 'accent', 'btn-danger': variant === 'danger' }, className]} aria-expanded={expanded === undefined ? undefined : String(expanded)} aria-busy={busy ? 'true' : undefined})
-  if busy
-    Icon(icon="spinner" class="spinner")
-  else if icon
-    Icon(icon={icon})
-  | {label}
-  slot
+if linkOf() as link
+  a.btn({...link} class={look()} aria-busy={busy ? 'true' : undefined})
+    if busy
+      Icon(icon="spinner" class="spinner")
+    else if icon
+      Icon(icon={icon})
+    | {label}
+    slot
+else if buttonOf() as button
+  button.btn({...button} class={look()} aria-busy={busy ? 'true' : undefined})
+    if busy
+      Icon(icon="spinner" class="spinner")
+    else if icon
+      Icon(icon={icon})
+    | {label}
+    slot

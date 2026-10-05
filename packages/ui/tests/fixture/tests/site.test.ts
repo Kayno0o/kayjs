@@ -47,6 +47,14 @@ describe('Button', () => {
   test('spins in place of its icon while busy', async () => {
     expect(await element('/buttons', 'busy')).toMatch(/aria-busy="true".*class="icon spinner"/)
   })
+
+  test('says whether the disclosure it toggles is showing', async () => {
+    expect(await element('/buttons', 'toggle')).toBe('<button id="toggle" disabled type="button" aria-expanded="false" class="btn">More</button>')
+  })
+
+  test('is a link looking like one with an href, taking the link\'s attributes', async () => {
+    expect(await element('/buttons', 'link')).toMatch(/^<a id="link" href="\/data" target="_blank" class="btn btn-accent"><svg[^>]*class="icon">.*<\/svg>Data<\/a>$/)
+  })
 })
 
 test('IconButton names its action for screen readers and as its tooltip', async () => {
@@ -170,6 +178,12 @@ describe('data', () => {
   test('SiteFavicon shows the site\'s icon, or the globe in a colour of the site\'s own', async () => {
     expect(await page('favicon')).toBe('<article id="favicon"><span class="site-favicon"><img class="site-favicon-img" src="/favicon.png" alt></span></article>')
     expect(await element('/data', 'no-favicon')).toMatch(/<svg[^>]*style="color: #[0-9A-F]{6}"[^>]*class="icon site-favicon-icon"/)
+  })
+
+  test('Rating reads its value out of its max, filling that share of the stars, kept between none and all', async () => {
+    expect(await page('rating')).toBe('<article id="rating"><span role="img" aria-label="4.6 out of 5" class="rating">★★★★★<span class="rating-fill" style="width: 92%">★★★★★</span></span></article>')
+    expect(await page('rating-out')).toBe('<article id="rating-out"><span role="img" aria-label="Top marks" class="rating">★★★★<span class="rating-fill" style="width: 100%">★★★★</span></span></article>')
+    expect(await page('rating-below')).toContain('style="width: 0%"')
   })
 
   test('CopyButton is a plain button saying what it copies', async () => {

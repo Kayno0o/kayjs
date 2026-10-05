@@ -11,6 +11,8 @@ main
   Button#plain(label="Save")
   Button#accent(variant="accent" icon="plus" type="submit") Add
   Button#busy(busy label="Saving")
+  Button#link(href="/data" label="Data" variant="accent" icon="plus" target="_blank")
+  Button#toggle(label="More" expanded={false} disabled)
   IconButton#delete(icon="delete" label="Delete" variant="danger" size="sm")
   #toasts
     Toaster

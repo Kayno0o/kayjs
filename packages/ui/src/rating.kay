@@ -1,0 +1,18 @@
+---
+import type { JSX } from 'kay'
+
+const { value, max = 5, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
+  // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star.
+  value: number
+  max?: number
+  // What screen readers read; `4 out of 5` by default.
+  label?: string
+  class?: string
+}>()
+
+const stars = () => '★'.repeat(max)
+const filled = () => Math.min(Math.max(value / max, 0), 1) * 100
+---
+span.rating({...rest} role="img" aria-label={label ?? `${value} out of ${max}`} class={className})
+  | {stars()}
+  span.rating-fill(style={`width: ${filled()}%`}) {stars()}

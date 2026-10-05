@@ -529,6 +529,15 @@
     @apply ml-auto hover:text-text;
   }
 
+  /* The empty stars are the element's own text, and the filled ones a copy over them cut to the rating's share. */
+  .rating {
+    @apply relative inline-block leading-none whitespace-nowrap text-overlay0;
+  }
+
+  .rating-fill {
+    @apply absolute inset-y-0 left-0 overflow-hidden text-warning;
+  }
+
   .icon-picker {
     @apply flex flex-col gap-2;
   }

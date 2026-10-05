@@ -1,6 +1,6 @@
 # kayjs-ui
 
-kay components for the user's sites, ported from `@kaynooo/svelte` and `@kaynooo/solidjs`: buttons and icons, toasts, dialogs and a form dialog calling a page's action, a sortable table, switches, inputs, cards, badges, popovers and tooltips. They are `.kay` sources the app compiles as its own, styled by `theme.css` classes the app restyles from its own stylesheet.
+kay components for the user's sites, ported from `@kaynooo/svelte` and `@kaynooo/solidjs`: buttons and icons, toasts, dialogs and a form dialog calling a page's action, a sortable table, switches, inputs, cards, badges, popovers and tooltips, and the rest listed in llms.txt. They are `.kay` sources the app compiles as its own, styled by `theme.css` classes the app restyles from its own stylesheet.
 
 ```sh
 bun add @kaynooo/kayjs-ui @iconify-json/tabler

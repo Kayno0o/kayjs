@@ -2,6 +2,7 @@
 import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import Meter from '@kaynooo/kayjs-ui/meter.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
 ---
@@ -20,3 +21,9 @@ main
     SiteFavicon(name="kaynooo.fr")
   article#copy
     CopyButton(text="https://kaynooo.fr" label="Copy link")
+  article#rating
+    Rating(value={4.6})
+  article#rating-out
+    Rating(value={9} max={4} label="Top marks")
+  article#rating-below
+    Rating(value={-1})
