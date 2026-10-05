@@ -234,6 +234,47 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('refuses a literal ctx.fail status, redirect target or cached ttl the server would refuse when it runs', async () => {
+    const page = [
+      '--- server',
+      'import { t } from \'elysia\'',
+      'import { action } from \'kay\'',
+      'import { cached } from \'kay/cache\'',
+      '',
+      'export const save = action(t.Object({ code: t.String(), status: t.Number(), next: t.String() }), async ({ code, status, next }, ctx) => {',
+      '  if (code === \'a\')',
+      '    return ctx.fail(422, { error: \'bad\' })',
+      '  if (code === \'b\')',
+      '    return ctx.fail(status)',
+      '  if (code === \'c\')',
+      '    return ctx.fail(200)',
+      '  if (code === \'d\')',
+      '    ctx.redirect(next)',
+      '  if (code === \'e\')',
+      '    ctx.redirect(\'https://example.com/done\')',
+      '  ctx.redirect(\'javascript:alert(1)\')',
+      '})',
+      '',
+      'const kept = await cached(\'kept\', 60, () => 1)',
+      'const never = await cached(\'never\', 0, () => 1)',
+      '---',
+      'p {kept} {never}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1]])).toEqual([
+        [12, 'ctx.fail takes an error status, from 400 to 599, not 200'],
+        [17, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
+        [21, 'A duration is a positive number of seconds, not 0'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks without the server\'s environment, as kay build renders pages: the config, the content and the messages may import an env module lacking a variable', async () => {
     const env = 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ KAY_CHECK_UNSET_SECRET: t.String() }))\n'
     const root = await scratchProject({

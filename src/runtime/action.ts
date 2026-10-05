@@ -1,6 +1,6 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
-import type { Locals, Redirect } from './checks'
+import type { ErrorStatus, Locals, Redirect } from './checks'
 import type { Locale } from './i18n'
 import { withBase } from './base'
 import { createSignal, untrack } from './reactive'
@@ -52,7 +52,7 @@ export interface ActionContext {
   headers: Headers
   redirect: Redirect
   // `return ctx.fail(409, { message: 'Taken' })`: a plain form post goes back to its page, which reads it through `ctx.failed(action)`; a call throws an `ActionError` carrying `data`.
-  fail: <const Data = undefined>(status: number, data?: Data) => Failure<Data>
+  fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data) => Failure<Data>
 }
 
 export interface Failure<Data> {

@@ -77,8 +77,30 @@ export type CheckedHref<Href extends string> = string extends Href
       ? IsRoute<PathOf<Href>> extends true ? unknown : { kayError: `No page, public file or app route serves ${PathOf<Href>}` }
       : unknown
 
+type Digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+type SchemeStart = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
+type SchemeRest<Text extends string> = Text extends '' ? true : Text extends `${infer Char}${infer Rest}` ? Char extends SchemeStart | Digit | '+' | '.' | '-' ? SchemeRest<Rest> : false : false
+type TrimStart<Text extends string> = Text extends ` ${infer Rest}` ? TrimStart<Rest> : Text
+// What comes before a URL's first `:` names its scheme when it is one, as `src/server/signals.ts` reads it.
+type SchemeOf<Head extends string> = Lowercase<TrimStart<Head>> extends `${infer First extends SchemeStart}${infer Rest}` ? SchemeRest<Rest> extends true ? `${First}${Rest}` : never : never
+
+// A literal target must be a path or an http(s) URL on one line, as the server refuses any other at runtime: a `javascript:` target would run in the page an island's call redirects.
+type CheckedTarget<Location extends string> = string extends Location
+  ? unknown
+  : Location extends `${string}${'\n' | '\r' | '\t' | '\0'}${string}`
+    ? { kayError: 'A redirect target holds a line break or another control character' }
+    : Location extends `${infer Head}:${string}`
+      ? [SchemeOf<Head>] extends [never] ? unknown : SchemeOf<Head> extends 'http' | 'https' ? unknown : { kayError: `A redirect goes to a path or an http(s) URL, not to a ${SchemeOf<Head>}: URL` }
+      : unknown
+
 // `ctx.redirect`: a site path is checked like a link, so a redirect cannot point at a page that does not exist.
-export type Redirect = <const Location extends string>(location: Location & CheckedHref<Location>, status?: 301 | 302 | 303 | 307 | 308) => never
+export type Redirect = <const Location extends string>(location: Location & CheckedHref<Location> & CheckedTarget<Location>, status?: 301 | 302 | 303 | 307 | 308) => never
+
+// A literal status `ctx.fail` takes is an error one, from 400 to 599; a computed one is checked when the action runs.
+export type ErrorStatus<Status extends number> = number extends Status ? unknown : `${Status}` extends `${'4' | '5'}${Digit}${Digit}` ? unknown : { kayError: `ctx.fail takes an error status, from 400 to 599, not ${Status}` }
+
+// A literal duration in seconds is positive; a computed one is checked when it is used.
+export type PositiveSeconds<Seconds extends number> = number extends Seconds ? unknown : `${Seconds}` extends `-${string}` | '0' ? { kayError: `A duration is a positive number of seconds, not ${Seconds}` } : unknown
 
 // What crosses to the browser besides plain objects and arrays, as `src/runtime/wire.ts` encodes it.
 type Sendable = string | number | boolean | bigint | null | undefined | Date | RegExp | URL | URLSearchParams

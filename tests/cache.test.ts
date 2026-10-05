@@ -91,8 +91,8 @@ describe('cached', () => {
     expect(await cached('tags:slow', 60, load)).toBe('new')
   })
 
-  it('refuses a ttl that is not a positive number of seconds', async () => {
-    await expect(cached('x', 0, () => 1)).rejects.toThrow('takes a positive ttl in seconds')
+  it('refuses a computed ttl that is not a positive number of seconds, which kay check cannot see', async () => {
+    await expect(cached('x', Number('0'), () => 1)).rejects.toThrow('takes a positive ttl in seconds')
   })
 
   it('shares a value across requests from a page\'s server fence', async () => {

@@ -1,3 +1,4 @@
+import type { PositiveSeconds } from './checks'
 import { parse, stringify } from 'devalue'
 
 // Where `cached` also keeps a value, so it outlives the process: read when a key is missing from memory, written on each load. Synchronous, so `invalidate` is done when it returns.
@@ -33,7 +34,7 @@ const RETRY_MS = 60_000
 
 // The value `load` gives for `key`, kept `ttl` seconds for every request in this process. Concurrent misses share one load; past `ttl`, the next call still gets the stale value and refreshes it in the background.
 // A first load that throws throws to its callers and keeps nothing; a refresh that throws is logged and keeps the stale value.
-export async function cached<T>(key: string, ttl: number, load: () => T | Promise<T>, options: CacheOptions = {}): Promise<T> {
+export async function cached<T, const Ttl extends number = number>(key: string, ttl: Ttl & PositiveSeconds<Ttl>, load: () => T | Promise<T>, options: CacheOptions = {}): Promise<T> {
   if (!Number.isFinite(ttl) || ttl <= 0)
     throw new Error(`kay: cached('${key}') takes a positive ttl in seconds`)
 
