@@ -85,16 +85,29 @@ export function isPlural(value: unknown): value is Plural {
   return typeof value === 'object' && value !== null && typeof (value as Plural).other === 'string' && Object.keys(value).every(key => PLURAL_CATEGORIES.has(key))
 }
 
-// The message at `key` with its placeholders filled; a key no locale has comes back as itself, which shows on the page rather than throwing.
+// The message at `key` with its placeholders filled.
 export function translate(translations: Translations, key: string, params: Record<string, MessageValue> = {}): string {
   const message = translations.messages.get(key) ?? translations.fallback?.get(key)
 
   if (message === undefined)
-    return key
+    return missingMessage(key)
 
   const text = typeof message === 'string' ? message : pluralForm(translations.locale, message, params.count)
 
   return text.replace(PLACEHOLDER, (placeholder, name: string) => name in params ? formatValue(translations.locale, params[name]!) : placeholder)
+}
+
+// A key no locale has, which `kay check` cannot see when the key is computed. Production shows it as itself rather than failing the page; development and tests fail the render on the server, and log it in the browser, where a test page fails on it.
+function missingMessage(key: string): string {
+  if (process.env.NODE_ENV === 'production')
+    return key
+
+  if (typeof window === 'undefined')
+    throw new Error(`kay: no locale has the message ${JSON.stringify(key)}; production would show the key itself`)
+
+  console.error(`[kay] no locale has the message ${JSON.stringify(key)}; production shows the key itself`)
+
+  return key
 }
 
 function pluralForm(locale: string, plural: Plural, count: MessageValue | undefined): string {

@@ -168,8 +168,8 @@ describe('islands', () => {
     expect(document.querySelector('form.typed p')!.textContent).toBe('Ada yes')
   })
 
-  it('renders an island afresh, with a warning, when its server markup is not what it builds', async () => {
-    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+  it('renders an island afresh, logging an error, when its server markup is not what it builds', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     document.body.innerHTML = pageHtml.replace('<button>Count <!--[-->2<!--]--></button>', '<em>changed</em>')
 
@@ -177,7 +177,7 @@ describe('islands', () => {
       const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
 
       await hydrateAgain()
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[kay] island tests/fixtures/islands/counter.kay did not match its server markup'))
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('[kay] island tests/fixtures/islands/counter.kay did not match its server markup'))
       const button = document.querySelector('slot button')!
 
       expect(document.querySelector('slot em')).toBeNull()
@@ -186,7 +186,7 @@ describe('islands', () => {
       expect(button.textContent).toBe('Count 3')
     }
     finally {
-      warn.mockRestore()
+      logged.mockRestore()
     }
   })
 

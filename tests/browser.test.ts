@@ -86,6 +86,16 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
     expect(page.errors.some(error => error.startsWith('Error: Thrown later'))).toBe(true)
   })
 
+  it('fails a call once the page reports a problem kay hides in production, unless opened with strict: false', async () => {
+    await expect(site.open('/mismatch')).rejects.toThrow('kay: the page reported a problem production would hide: island tests/fixtures/navigation/src/components/mismatch.kay did not match its server markup')
+
+    const lenient = await site.open('/mismatch', { strict: false })
+
+    await lenient.click('button.mismatch')
+    expect(await lenient.text('button.mismatch')).toBe('Clicked 1')
+    expect(lenient.errors).toEqual([expect.stringContaining('did not match its server markup')])
+  }, 30_000)
+
   it('opens each page as a new visitor, no cookie or storage of the last one kept', async () => {
     await page.goto('/state')
     await page.click('button.theme')

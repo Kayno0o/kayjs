@@ -1,0 +1,7 @@
+---
+import Mismatch from '../components/mismatch.kay'
+---
+head
+  title Mismatch
+h1 Mismatch
+Mismatch

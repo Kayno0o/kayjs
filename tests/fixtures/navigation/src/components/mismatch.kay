@@ -1,0 +1,9 @@
+---
+import { signal } from 'kay'
+
+const count = signal(0)
+---
+if !('document' in globalThis)
+  em Rendered on the server
+else
+  button.mismatch(onClick={() => count.set(c => c + 1)}) Clicked {count()}

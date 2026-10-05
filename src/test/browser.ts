@@ -8,6 +8,8 @@ export interface BrowserOptions {
   height?: number
   // How long a page waits for an element, a condition or a navigation, in milliseconds.
   timeout?: number
+  // The page's next call fails once it logs a problem kay recovers from in production, such as an island that did not match its server markup; `false` leaves it in `errors`.
+  strict?: boolean
 }
 
 export interface WaitOptions {
@@ -55,6 +57,8 @@ export interface TestPage {
   [Symbol.asyncDispose]: () => Promise<void>
 }
 
+// What kay logs in the browser for a problem it recovers from.
+const KAY_PROBLEM = '[kay]'
 const EXECUTABLES = ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable', 'chrome']
 const INSTALLED = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -96,7 +100,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }
 
   const timeout = options.timeout ?? TIMEOUT_MS
+  const strict = options.strict ?? true
   const errors: string[] = []
+  // How many of `errors` a call already looked through for kay's own.
+  let seen = 0
   // Chrome refuses to run its sandbox as root, as in a CI container, whose small /dev/shm crashes its renderer.
   const argv = process.getuid?.() === 0 ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
   const view = new Bun.WebView({
@@ -121,7 +128,15 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     try {
       await previous
 
-      return await run()
+      const result = await run()
+      const problem = strict ? errors.slice(seen).find(error => error.startsWith(KAY_PROBLEM)) : undefined
+
+      seen = errors.length
+
+      if (problem !== undefined)
+        throw new Error(`kay: the page reported a problem production would hide: ${problem.slice(KAY_PROBLEM.length).trimStart()}; open it with strict: false to allow it`)
+
+      return result
     }
     finally {
       resolve()
@@ -235,7 +250,16 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   })
   // Pages share one browser, whose cookies and storage outlive a page.
   await view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: 'all' })
-  await page.goto(url)
+
+  // Once open, a page is the caller's to close; one that failed to load is closed here.
+  try {
+    await page.goto(url)
+  }
+  catch (error) {
+    page.close()
+
+    throw error
+  }
 
   return page
 }

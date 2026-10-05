@@ -168,12 +168,36 @@ describe('locale detection', () => {
     expect(from('http://elsewhere.example/en/about', { 'accept-language': 'en' })).toBe('en')
   })
 
-  it('falls back to the default locale\'s message, and to the key itself', () => {
+  it('falls back to the default locale\'s message, then fails on a key no locale has, which production shows as itself', () => {
     const fallback = flattenMessages({ a: 'A', b: { c: 'C {n}' } })
     const translations = { locale: 'en', messages: new Map(), fallback }
+    const mode = process.env.NODE_ENV
 
     expect(translate(translations, 'b.c', { n: 2 })).toBe('C 2')
-    expect(translate(translations, 'missing')).toBe('missing')
+    expect(() => translate(translations, 'missing')).toThrow('kay: no locale has the message "missing"')
+
+    try {
+      process.env.NODE_ENV = 'production'
+      expect(translate(translations, 'missing')).toBe('missing')
+    }
+    finally {
+      process.env.NODE_ENV = mode
+    }
+  })
+
+  it('fails the render of a page asking for a computed key no locale has, as a test serving it sees', async () => {
+    const page = join(routes, 'computed.kay')
+
+    await Bun.write(page, '--- server\nimport { t } from \'kay/i18n\'\n\nconst state = [\'drafted\'][0]!\nconst label = t(`status.${state}` as never)\n---\np {label}\n')
+
+    try {
+      const served = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n, onError: () => undefined }))
+
+      expect((await get('/computed', served)).status).toBe(500)
+    }
+    finally {
+      await rm(page, { force: true })
+    }
   })
 })
 

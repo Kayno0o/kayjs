@@ -133,7 +133,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
       }
       catch (error) {
         // Markup the island would not build, such as one a browser extension changed, can fail anywhere along the way: rendered afresh rather than left dead.
-        console.warn(`[kay] island ${id} did not match its server markup, rendering it again: ${error instanceof Error ? error.message : String(error)}`)
+        console.error(`[kay] island ${id} did not match its server markup, rendering it again: ${error instanceof Error ? error.message : String(error)}`)
         dispose()
 
         const markup = [...element.childNodes]
