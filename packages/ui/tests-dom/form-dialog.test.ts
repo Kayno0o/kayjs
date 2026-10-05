@@ -13,8 +13,8 @@ afterEach(() => {
 
 type Answer = string | { errors: Record<string, string> } | { fail: { error: string, field?: string } }
 
-async function formDialog(save: (input: { name: string }) => Promise<Answer>) {
-  mounted = await mount('src/components/form-dialog.kay', { save, onSaved: (name: string) => saved.push(name) })
+async function formDialog(save: (input: { name: string }) => Promise<Answer>, plain = false) {
+  mounted = await mount('src/components/form-dialog.kay', { save, plain, onSaved: (name: string) => saved.push(name) })
 
   return mounted.root
 }
@@ -89,7 +89,7 @@ describe('FormDialog', () => {
     expect(root.querySelector('.kui-form-field-issue')).toBeNull()
   })
 
-  test('shows what the handler refused with through refused: a field\'s message on its FormField, the whole form\'s toasted, nothing said leaving failure', async () => {
+  test('shows what the handler refused with through refused: a field\'s message on its FormField, the whole form\'s toasted, an empty message leaving failure', async () => {
     let answer: Answer = { fail: { error: 'You already filed that slug', field: 'name' } }
     const root = await formDialog(async () => answer)
     // Toasts outlive a mounted dialog, so only new ones count.
@@ -115,6 +115,16 @@ describe('FormDialog', () => {
 
     expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not rename')
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
+  })
+
+  test('toasts failure for a handler\'s refusal when no refused reads it', async () => {
+    const root = await formDialog(async () => ({ fail: { error: 'You already filed that slug', field: 'name' } }), true)
+
+    submit(root)
+    await settle()
+
+    expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not rename')
   })
 
   test('submits on Ctrl+Enter from a textarea, which keeps a plain Enter for new lines', async () => {
