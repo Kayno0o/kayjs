@@ -125,6 +125,7 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
       const counted = window as unknown as { polls?: number }
 
       counted.polls = (counted.polls ?? 0) + 1
+
       if (counted.polls === 1)
         throw new Error('Swapping')
 
