@@ -1,6 +1,6 @@
 import type { Guard, GuardContext, LocalsOf } from 'kay'
 import type { AuthSessionData } from '../src/auth'
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
@@ -54,6 +54,17 @@ describe('createAuth', () => {
     await ada.fetch('/sign-in/u1', POST)
 
     expect(await ada.json('/me')).toMatchObject({ id: 'u1' })
+  })
+
+  test('says where the session plugin goes when a plugin of the app\'s own keeps it to itself', async () => {
+    const sessions = session<AuthSessionData>({ secret: SECRET })
+    const auth = createAuth({ sessions, secret: SECRET, store: memoryStore() })
+    const app = new Elysia().use(new Elysia().use(sessions).use(auth.plugin)).get('/me', async ({ auth }) => (await auth.user()) ?? 'anonymous')
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const response = await app.handle(new Request('http://localhost/me'))
+
+    logged.mockRestore()
+    expect([response.status, await response.text()]).toEqual([500, expect.stringContaining('Use the session plugin on the app itself')])
   })
 
   test('signing in changes the session cookie', async () => {

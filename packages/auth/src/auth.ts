@@ -349,7 +349,15 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   const plugin = new Elysia({ name: 'kayjs-auth' })
     // Typed as a plain instance: `AnyElysia` would merge `any` routes into the app's, and every link would check.
     .use(options.sessions as unknown as Elysia)
-    .derive(ctx => ({ auth: new Auth((ctx as unknown as { session: Session<AuthSessionData> }).session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server))) }))
+    .derive((ctx) => {
+      const { session } = ctx as unknown as { session?: Session<AuthSessionData> }
+
+      // Elysia uses a plugin once per app, so a plugin of the app's own that used the session plugin first keeps it to itself, out of the routes auth reaches.
+      if (!session)
+        throw new Error('kayjs-auth: no session reaches this route. Use the session plugin on the app itself, or leave it to auth.plugin, rather than in a plugin of the app\'s own before auth.plugin')
+
+      return { auth: new Auth(session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server))) }
+    })
     // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
     .as('global')
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
