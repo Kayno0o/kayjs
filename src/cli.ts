@@ -2,7 +2,9 @@
 import type { ParseArgsOptionsConfig } from 'node:util'
 import type { KayConfig } from './config'
 import type { Template } from './new'
+import type { ClientBuild } from './server/client'
 import { existsSync, statSync } from 'node:fs'
+import { rename, rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
@@ -139,7 +141,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string): 
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
-// It checks the project as `kay check` does first and builds nothing when that finds a problem, unless `--no-check` says not to.
+// It checks the project as `kay check` does while it builds, and leaves the last build in place when that finds a problem, unless `--no-check` says not to check.
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server.
 async function build(args: string[]): Promise<number> {
   const parsed = parseCommand(args, { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'project': { type: 'string', short: 'p' } }, 1)
@@ -184,36 +186,42 @@ async function build(args: string[]): Promise<number> {
 
   const config = await loadConfig(root)
 
-  if (!skipCheck && await checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json') > 0) {
+  const output = join(root, '.kay', 'client')
+  const previous = `${output}-previous`
+
+  // The check runs beside the build, which writes over the last build's output only once the check passed.
+  if (!skipCheck) {
+    await rm(previous, { recursive: true, force: true })
+
+    if (existsSync(output))
+      await rename(output, previous)
+  }
+
+  const [checked, built] = await Promise.allSettled([skipCheck ? 0 : checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json'), buildOutput(root, config, exported)])
+
+  if (checked.status === 'rejected' || checked.value > 0) {
+    await rm(output, { recursive: true, force: true })
+
+    if (existsSync(previous))
+      await rename(previous, output)
+
+    if (checked.status === 'rejected')
+      throw checked.reason
+
     console.error('kay build: nothing built, as kay check found the problems above; --no-check builds anyway')
 
     return 1
   }
 
-  const started = performance.now()
+  await rm(previous, { recursive: true, force: true })
 
   try {
-    if (exported)
-      refuseStaticConfig(config)
+    if (built.status === 'rejected')
+      throw built.reason
 
-    const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
-    // Before prerendering, whose pages read the collections from what it writes.
-    const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
+    const { client, summary } = built.value
 
-    // A static host has no image route, so pages link the variant files the build writes.
-    if (exported)
-      linkVariantFiles()
-
-    const prerendered = await prerenderPages(root, config, client, { exportAll: exported })
-
-    await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'))
-
-    if (config.favicon !== undefined)
-      await writeFavicons(resolve(root, config.favicon), join(client.dir, '..', FAVICON_DIR))
-
-    await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
-
-    console.error(`built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''} in ${Math.round(performance.now() - started)} ms`)
+    console.error(summary)
 
     if (exported) {
       const written = performance.now()
@@ -237,6 +245,33 @@ async function build(args: string[]): Promise<number> {
 
     return 1
   }
+}
+
+// Writes what the server serves to `.kay/client`: the browser bundles, the content manifests, the prerendered pages, image variants and favicons, compressed.
+async function buildOutput(root: string, config: KayConfig, exported: boolean): Promise<{ client: ClientBuild, summary: string }> {
+  const started = performance.now()
+
+  if (exported)
+    refuseStaticConfig(config)
+
+  const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
+  // Before prerendering, whose pages read the collections from what it writes.
+  const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
+
+  // A static host has no image route, so pages link the variant files the build writes.
+  if (exported)
+    linkVariantFiles()
+
+  const prerendered = await prerenderPages(root, config, client, { exportAll: exported })
+
+  await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'))
+
+  if (config.favicon !== undefined)
+    await writeFavicons(resolve(root, config.favicon), join(client.dir, '..', FAVICON_DIR))
+
+  await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
+
+  return { client, summary: `built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''} in ${Math.round(performance.now() - started)} ms` }
 }
 
 // The directory a command works on, or nothing once it said that the path is none.

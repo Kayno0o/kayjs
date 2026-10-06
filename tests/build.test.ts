@@ -1,5 +1,6 @@
 import type { BunPlugin } from 'bun'
 import type { KayConfig } from '../src/config'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -355,6 +356,34 @@ describe('kay build checks the project first', () => {
 
       expect(built.report).toStartWith('built 0 islands')
       expect(built.code).toBe(0)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('keeps the last build when the check beside the next one fails, and replaces it when it passes', async () => {
+    const page = (text: string) => `--- server\nexport const prerender = true\n---\np ${text}\n`
+    const root = await scratchProject({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': page('First') })
+    const prerendered = join(root, '.kay/client/pages/index.html')
+
+    try {
+      expect((await build(root)).code).toBe(0)
+      expect(await Bun.file(prerendered).text()).toContain('First')
+
+      // The page changes as a broken one comes along, which the check refuses.
+      await Bun.write(join(root, 'src/routes/index.kay'), page('Second'))
+      await Bun.write(join(root, 'src/routes/lost.kay'), 'a(href="/nowhere") Lost\n')
+
+      expect((await build(root)).code).toBe(1)
+      expect(await Bun.file(prerendered).text()).toContain('First')
+      expect(existsSync(join(root, '.kay/client-previous'))).toBe(false)
+
+      await Bun.write(join(root, 'src/routes/lost.kay'), 'a(href="/") Found\n')
+
+      expect((await build(root)).code).toBe(0)
+      expect(await Bun.file(prerendered).text()).toContain('Second')
+      expect(existsSync(join(root, '.kay/client-previous'))).toBe(false)
     }
     finally {
       await rm(root, { recursive: true, force: true })
