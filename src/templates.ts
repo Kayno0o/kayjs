@@ -452,8 +452,6 @@ export const signIn = action(t.Object({ name: t.String({ pattern: '\\\\S', maxLe
   await ctx.locals.session.set('name', name.trim())
   ctx.redirect('/account')
 })
-
-const failure = ctx.failed(signIn)
 ---
 head
   title Sign in
@@ -462,7 +460,7 @@ p.text-subtext1 A demo: any name signs in. Replace it with real credentials befo
 form.mt-4.flex.flex-col.items-start.gap-2(action={signIn})
   label(for="name") Name
   input#name(name="name" autocomplete="username")
-  if failure?.errors.name as error
+  if signIn.error('name') as error
     p.text-error {error}
   button(type="submit") Sign in
 `,

@@ -1,0 +1,48 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const save = action(t.Object({
+  name: t.String({ minLength: 2, maxLength: 40, error: 'Too short' }),
+  password: t.String(),
+  bio: t.String({ maxLength: 200 }),
+  plan: t.String({ maxLength: 10 }),
+  size: t.String({ maxLength: 10 }),
+  news: t.Boolean(),
+  terms: t.Optional(t.Boolean()),
+  website: t.Optional(t.String({ maxLength: 200 })),
+}), (_input, ctx) => ctx.fail(409, { message: 'Taken' }), { honeypot: 'website' })
+
+export const ping = action(t.Object({}), () => 'Saved')
+
+export const join = action(t.Object({ email: t.String({ format: 'email', maxLength: 200, error: 'Not an email' }) }), () => undefined)
+
+const refusedWith = save.failed()?.status
+---
+---
+import Signup from '../components/signup.kay'
+---
+form(action={save})
+  input(name="name" value="Ada")
+  input(type="password" name="password")
+  textarea(name="bio") Default bio
+  select(name="plan")
+    option(value="free" selected) Free
+    option(value="pro") Pro
+  input(type="radio" name="size" value="s" checked)
+  input(type="radio" name="size" value="l")
+  input(type="checkbox" name="news")
+  input(type="checkbox" name="terms" checked)
+  input(name="website" tabindex="-1" autocomplete="off" aria-hidden="true")
+  if save.error('name') as message
+    p.error {message}
+  if refusedWith
+    p.status {refusedWith}
+  if save.failed()?.data as data
+    p.taken {data.message}
+  button Save
+form(action={ping})
+  if ping.succeeded() as done
+    p.done {done.data}
+  button Ping
+Signup

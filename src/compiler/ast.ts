@@ -117,6 +117,50 @@ export function actionOf(element: ElementNode, source: string): Extract<Attribut
   return attribute?.kind === 'expression' ? attribute : undefined
 }
 
+// A field of a form posting to an action: what a refused post fills back in, and whether it can be marked invalid.
+export interface FormField {
+  name: string
+  fill?: 'value' | 'checked' | 'content' | 'selected'
+  invalid: boolean
+}
+
+const FIELD_ELEMENTS = new Set(['input', 'textarea', 'select'])
+// A password or a file is never sent back; the others post no text the visitor typed.
+const UNFILLED_TYPES = new Set(['password', 'file', 'hidden', 'submit', 'button', 'reset', 'image'])
+const UNCHECKED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
+
+// Only an element whose name and type are written out: the compiler then knows which field it is and how it shows its value.
+export function formFieldOf(element: ElementNode, source: string): FormField | undefined {
+  if (element.component || !FIELD_ELEMENTS.has(element.name) || element.attributes.some(attribute => attribute.kind === 'spread'))
+    return undefined
+
+  const attributes = new Map((element.attributes as NamedAttribute[]).map(attribute => [source.slice(attribute.name.start, attribute.name.end), attribute]))
+  const name = attributes.get('name')
+  const type = attributes.get('type')
+
+  if (name?.kind !== 'static' || (type !== undefined && type.kind !== 'static'))
+    return undefined
+
+  const bound = [...attributes.keys()].some(attribute => attribute.startsWith('bind:'))
+  const inputType = type?.text.toLowerCase() ?? 'text'
+  const field: FormField = { name: name.text, invalid: !attributes.has('aria-invalid') && (element.name !== 'input' || !UNCHECKED_TYPES.has(inputType)) }
+
+  // A disabled field posts nothing, so it would come back empty or unticked.
+  if (bound || attributes.has('disabled'))
+    return field
+
+  if (element.name === 'textarea')
+    field.fill = 'content'
+  else if (element.name === 'select')
+    field.fill = attributes.has('multiple') ? undefined : 'selected'
+  else if (inputType === 'checkbox' || inputType === 'radio')
+    field.fill = 'checked'
+  else if (!UNFILLED_TYPES.has(inputType))
+    field.fill = 'value'
+
+  return field
+}
+
 export function isHead(node: Node): node is ElementNode & { name: 'head' } {
   return node.kind === 'element' && !node.component && node.name === 'head'
 }

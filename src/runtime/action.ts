@@ -17,6 +17,9 @@ declare const RESULT: unique symbol
 declare const HONEYPOT: unique symbol
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 
+// Where the server writes the post a page with islands was rendered in answer to.
+export const OUTCOME_SCRIPT = 'data-kay-outcome'
+
 // A call whose input holds files goes as multipart: the encoded input in one part, each file in part `FILE_MARK + n`, where the input holds its index.
 export const INPUT_PART = '$kay'
 export const FILE_MARK = '$kayFile'
@@ -61,7 +64,8 @@ export interface Failure<Data> {
 }
 
 export type Success<Output> = Exclude<Output, Failure<unknown>>
-export type FailureData<Output> = Output extends Failure<infer Data> ? Data : never
+// Unknown for an action of any output, so any action passes where `Action<never, unknown>` is expected.
+export type FailureData<Output> = unknown extends Output ? unknown : Output extends Failure<infer Data> ? Data : never
 
 // What a page reads back through `ctx.failed(action)` after a plain form post failed.
 export interface FormFailure<Input, Data, Honeypot extends string = never> {
@@ -87,6 +91,18 @@ export interface FormSuccess<Output> {
 
 export type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Awaited<ReturnType<Target>>> : never
 
+// How a post to an action went: a refusal, or what its handler returned.
+export type Outcome
+  = | { action: string, succeeded?: undefined, status: number, values: Record<string, string>, errors: Record<string, string>, data?: unknown }
+    | { action: string, succeeded: true, data: unknown }
+
+// On the server, the form post the request being answered carries: null for none, undefined outside a request.
+let requestOutcome: (() => Outcome | null | undefined) | undefined
+
+export function setRequestOutcome(read: () => Outcome | null | undefined): void {
+  requestOutcome = read
+}
+
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output, Honeypot extends string = never> {
   (input: Input): Promise<Success<Output>>
@@ -94,6 +110,12 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   (form: FormData): Promise<Success<Output>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
+  // How the form post the page renders for went, refused, as `ctx.failed` reads it; in an island, how its last call went, read reactively.
+  readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
+  readonly succeeded: () => FormSuccess<Success<Output>> | undefined
+  // The message a refused post got for one field, or for the whole form under ''; a method, so any action still passes where `Action<never, unknown>` is expected.
+  // eslint-disable-next-line ts/method-signature-style
+  error(field?: Extract<keyof Input, string> | Honeypot | ''): string | undefined
   readonly url: string
   readonly [ACTION]: true
   readonly [RESULT]?: Output
@@ -144,10 +166,10 @@ export function actionUrl(moduleId: string, name: string): string {
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Awaited<Output>, Honeypot> {
   const state = { url: '' }
-  const { call, pending } = callable(() => state.url)
+  const { call, reads } = callable(() => state.url)
 
   return Object.defineProperties(call, {
-    pending: { value: pending, enumerable: true },
+    ...reads,
     url: { get: () => state.url, set: (url: string) => void (state.url = url), enumerable: true },
     schema: { value: schema, enumerable: true },
     handler: { value: handler, enumerable: true },
@@ -158,10 +180,10 @@ export function action<Schema extends TSchema, Output, const Honeypot extends st
 
 // What a browser build exports in place of a server action.
 export function actionStub(url: string): Action<unknown, unknown> {
-  const { call, pending } = callable(() => url)
+  const { call, reads } = callable(() => url)
 
   return Object.defineProperties(call, {
-    pending: { value: pending, enumerable: true },
+    ...reads,
     url: { value: url, enumerable: true },
     [ACTION]: { value: true },
   }) as unknown as Action<unknown, unknown>
@@ -209,23 +231,98 @@ export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Ex
 
 type HoneypotOf<Target> = Target extends { [HONEYPOT]?: (field: infer Field) => void } ? Field : never
 
+// An action as the fields of a form posting to it read it, whatever its input; a string target is a plain URL.
+type FormTarget = Action<Record<string, unknown>, unknown, string>
+
+// What a refused post sent for a field of a form posting to `target`, to show it again; undefined without one, and for the honeypot.
+export function formValue(target: unknown, name: string): string | undefined {
+  if (!isAction(target) || name === target.protection?.honeypot)
+    return undefined
+
+  return untrack((target as FormTarget).failed)?.values[name]
+}
+
+// Whether a checkbox or radio button was ticked in a refused post; undefined without one. One with no `value` posts `on`, read as `true` by a boolean field.
+export function formChecked(target: unknown, name: string, value: unknown): boolean | undefined {
+  const posted = isAction(target) ? untrack((target as FormTarget).failed)?.values : undefined
+
+  if (!posted)
+    return undefined
+
+  return value === undefined ? posted[name] !== undefined && posted[name] !== 'false' : posted[name] === String(value)
+}
+
+// `aria-invalid` for a field a refused post or call got an error for.
+export function formInvalid(target: unknown, name: string): 'true' | undefined {
+  return isAction(target) && (target as FormTarget).error(name) !== undefined ? 'true' : undefined
+}
+
+// The post a page with islands was rendered in answer to, read again once a swap brings another page.
+let pageRead: [Element | null, Outcome | undefined] | undefined
+
+function pageOutcome(): Outcome | undefined {
+  if (typeof document === 'undefined')
+    return undefined
+
+  const script = document.querySelector(`script[${OUTCOME_SCRIPT}]`)
+
+  if (pageRead?.[0] !== script)
+    pageRead = [script, script ? decodeValue(script.textContent ?? '') as Outcome : undefined]
+
+  return pageRead[1]
+}
+
 // Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes.
-function callable(url: () => string): { call: (input: never) => Promise<unknown>, pending: () => boolean } {
+// How a post went is the request's on the server; in the browser the last call's once the page made one, else the post the page answers.
+function callable(url: () => string): { call: (input: never) => Promise<unknown>, reads: PropertyDescriptorMap } {
   const [inFlight, setInFlight] = createSignal(0, undefined, false)
+  const [last, setLast] = createSignal<Outcome | null | undefined>(undefined, undefined, false)
   const shift = (by: number) => setInFlight(untrack(inFlight) + by)
+  const outcome = () => {
+    const posted = requestOutcome?.()
+    const found = posted !== undefined ? posted : last() === undefined ? pageOutcome() : last()
+
+    return found?.action === url() ? found : undefined
+  }
+  const failed = () => {
+    const found = outcome()
+
+    return found && !found.succeeded ? { status: found.status, values: found.values, errors: found.errors, data: found.data } : undefined
+  }
+  const read = (value: unknown) => ({ value, enumerable: true })
 
   return {
     call: async (input: unknown) => {
       shift(1)
+      setLast(null)
 
       try {
-        return await post(url(), input)
+        const data = await post(url(), input)
+
+        setLast({ action: url(), succeeded: true, data })
+
+        return data
+      }
+      catch (error) {
+        if (error instanceof ActionError && !(error instanceof ActionRedirect))
+          setLast({ action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
+
+        throw error
       }
       finally {
         shift(-1)
       }
     },
-    pending: () => inFlight() > 0,
+    reads: {
+      pending: read(() => inFlight() > 0),
+      failed: read(failed),
+      succeeded: read(() => {
+        const found = outcome()
+
+        return found?.succeeded ? { data: found.data } : undefined
+      }),
+      error: read((field = '') => failed()?.errors[field]),
+    },
   }
 }
 

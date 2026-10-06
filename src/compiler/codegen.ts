@@ -137,6 +137,10 @@ class Generator {
     const used = usedHelpers(this.file.template, script, this.src)
     const helpers = runnable ? [] : used.filter(helper => helper !== 'For')
 
+    // What fills a form's fields back in once a post was refused.
+    if (runnable && kayHelpers.includes('formAction'))
+      kayHelpers.push('formValue', 'formChecked', 'formInvalid')
+
     if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
 
@@ -1347,7 +1351,7 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return visit(file.template)
 }
 
-type KayHelper = 'formAction' | 'registerActions' | 'actionStub'
+type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'registerActions' | 'actionStub'
 
 function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`

@@ -1,7 +1,7 @@
 import type { Attribute, AwaitNode, ElementNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf } from './ast'
+import { actionOf, formFieldOf } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 import { BEHAVIOUR, CONTENT_PROPERTIES, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
 import { childItems, soleDynamic } from './items'
@@ -34,6 +34,8 @@ type Binding = (variable: (node: TemplateNode) => string) => void
 export class DomTemplate {
   private readonly templates: string[] = []
   private counter = 0
+  // The action the form being emitted posts to, whose refusal marks its fields invalid.
+  private formTarget: Span | undefined
 
   constructor(private readonly b: CodeBuilder, private readonly src: string) {}
 
@@ -399,6 +401,14 @@ export class DomTemplate {
       }
     }
 
+    const field = this.formTarget && !spreads ? formFieldOf(element, this.src) : undefined
+
+    if (field?.invalid) {
+      const target = this.formTarget!
+
+      own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-invalid", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)})));`))
+    }
+
     html += '>'
 
     if (VOID_ELEMENTS.has(name)) {
@@ -406,6 +416,12 @@ export class DomTemplate {
 
       return html
     }
+
+    const outerTarget = this.formTarget
+
+    this.formTarget = actionOf(element, this.src)?.expression ?? outerTarget
+
+    const target = this.formTarget
 
     if (children.length > 0) {
       const items = childItems(children)
@@ -421,14 +437,14 @@ export class DomTemplate {
           html += this.templateOf(item.node, this.child(node, 'element'), bindings)
         }
         else if (sole) {
-          bindings.push(variable => this.dynamic(item, variable(node), 'null', 'null'))
+          bindings.push(variable => this.inForm(target, () => this.dynamic(item, variable(node), 'null', 'null')))
         }
         else {
           const start = this.child(node, 'start')
           const end = this.child(node, 'end')
 
           html += START_MARKER + END_MARKER
-          bindings.push(variable => this.dynamic(item, 'null', variable(start), variable(end)))
+          bindings.push(variable => this.inForm(target, () => this.dynamic(item, 'null', variable(start), variable(end))))
         }
       }
     }
@@ -439,6 +455,8 @@ export class DomTemplate {
       own.push(contentBinding)
     }
 
+    this.formTarget = outerTarget
+
     if (selected) {
       const value = selected
 
@@ -448,6 +466,15 @@ export class DomTemplate {
     bindings.push(...own)
 
     return `${html}</${name}>`
+  }
+
+  // Emits what a binding builds with the form it sits in, which was left by the time bindings are written.
+  private inForm(target: Span | undefined, emit: () => void): void {
+    const outer = this.formTarget
+
+    this.formTarget = target
+    emit()
+    this.formTarget = outer
   }
 
   // A handler, a ref or a binding: what only the browser attaches.

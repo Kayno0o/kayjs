@@ -238,6 +238,33 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('types what an action reads back of a post in the template, its field names included', async () => {
+    const page = [
+      '--- server',
+      'import { t } from \'elysia\'',
+      'import { action } from \'kay\'',
+      '',
+      'export const save = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
+      '  if (code === \'x\')',
+      '    return ctx.fail(400, { error: \'bad\' })',
+      '  return 1',
+      '}, { honeypot: \'website\' })',
+      '---',
+      'p {save.error(\'code\')} {save.error(\'website\')} {save.error()} {save.failed()?.data?.error} {save.succeeded()?.data}',
+      'p {save.error(\'cod\')}',
+      'p {save.failed()?.data?.message}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code ?? firstLine(d.message)])).toEqual([[12, 'TS2345'], [13, 'TS2339']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('refuses a literal ctx.fail status, redirect target or cached ttl the server would refuse when it runs', async () => {
     const page = [
       '--- server',

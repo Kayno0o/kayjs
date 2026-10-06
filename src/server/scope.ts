@@ -1,5 +1,7 @@
+import type { Outcome } from '../runtime/action'
 import type { ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { setRequestOutcome } from '../runtime/action'
 import { setServerScope } from '../runtime/reactive'
 
 const store = new AsyncLocalStorage<ServerScope>()
@@ -21,4 +23,13 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
   }
 
   return store.run({ values: new WeakMap(), cookie, report }, run)
+}
+
+const outcomes = new AsyncLocalStorage<() => Outcome | null>()
+
+setRequestOutcome(() => outcomes.getStore()?.())
+
+// Answers a request whose form post, if any, `read` gives: an action's `failed()` and `succeeded()` read it in its loads and templates alike.
+export function withOutcome<T>(read: () => Outcome | null, run: () => T): T {
+  return outcomes.run(read, run)
 }

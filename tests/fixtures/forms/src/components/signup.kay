@@ -1,0 +1,23 @@
+---
+import { signal } from 'kay'
+import { join } from '../routes/index.kay'
+
+const calls = signal(0)
+
+async function call() {
+  calls.set(count => count + 1)
+
+  try {
+    await join({ email: 'x' })
+  }
+  catch {
+    calls.set(count => count + 1)
+  }
+}
+---
+form.signup(action={join})
+  input(name="email")
+  if join.error('email') as message
+    p.signup-error {message}
+  button.post(formnovalidate) Join
+  button.call(type="button" onClick={call} data-calls={calls()}) Call

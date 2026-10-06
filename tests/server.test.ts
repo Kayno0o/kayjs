@@ -888,7 +888,7 @@ describe('failed actions', () => {
     expect(page.headers.get('set-cookie')).toBeNull()
     expect(page.headers.get('cache-control')).toBe('private, no-store')
     expect(html).toContain('<base href="http://localhost/">')
-    expect(html).toContain('<input name="title" placeholder="New todo" value="">')
+    expect(html).toContain('<input name="title" placeholder="New todo" value="" aria-invalid="true">')
     expect(html).toContain('<p class="error">Write a title</p>')
     expect((await get('/')).html).not.toContain('class="error"')
   })

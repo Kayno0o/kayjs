@@ -1,12 +1,12 @@
 import type { Attribute, AwaitNode, ElementNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf } from './ast'
+import { actionOf, formFieldOf } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'dynamic', 'element', 'head', 'loop', 'merge', 'omit', 'raw', 'selectOptions', 'show', 'style']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'dynamic', 'element', 'head', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'show', 'style']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -88,6 +88,9 @@ class Markup {
 
 // A template as code building its markup: what pages, layouts and static components render to outside islands, with no reactive runtime.
 export class HtmlTemplate {
+  // The action the form being emitted posts to, whose refused post its fields show again.
+  private formTarget: Span | undefined
+
   constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly options: HtmlOptions = {}) {}
 
   // The nodes' markup as one string expression; an element's content lets a lone dynamic part go without markers.
@@ -313,6 +316,12 @@ export class HtmlTemplate {
     let rawContent = false
     let selected: (() => void) | undefined
     const read = (expression: Span, call: boolean) => () => void b.add('(').addSource(expression).add(call ? ')()' : ')')
+    const target = this.formTarget
+    const field = target && formFieldOf(element, this.src)
+    // The attribute a refused post's value goes back in, and what the template gives it otherwise.
+    const filled = field?.fill === 'value' || field?.fill === 'checked' ? field.fill : undefined
+    let ownFill: (() => void) | undefined
+    let checkboxValue: (() => void) | undefined
 
     markup.text(`<${name}`)
 
@@ -364,6 +373,15 @@ export class HtmlTemplate {
       if (BEHAVIOUR.test(attributeName))
         continue
 
+      if (attributeName === filled) {
+        ownFill = attribute.kind === 'expression' ? read(attribute.expression, false) : () => void b.add(attribute.kind === 'boolean' ? 'true' : JSON.stringify(decodeEntities(attribute.text)))
+
+        continue
+      }
+
+      if (filled === 'checked' && attributeName === 'value')
+        checkboxValue = attribute.kind === 'expression' ? read(attribute.expression, false) : () => void b.add(attribute.kind === 'boolean' ? '""' : JSON.stringify(decodeEntities(attribute.text)))
+
       if (attribute.kind === 'boolean') {
         markup.text(` ${attributeName}`)
 
@@ -371,6 +389,12 @@ export class HtmlTemplate {
       }
 
       if (attribute.kind === 'static') {
+        if (field?.fill === 'content' && attributeName === 'value') {
+          content = () => void b.add(JSON.stringify(decodeEntities(attribute.text)))
+
+          continue
+        }
+
         if (attributeName === 'innerHTML') {
           staticContent = attribute.text
 
@@ -420,6 +444,50 @@ export class HtmlTemplate {
       })
     }
 
+    if (field && target) {
+      const fieldArguments = () => void b.add('((').addSource(target).add(`), ${JSON.stringify(field.name)}`)
+
+      if (filled) {
+        markup.dynamic(() => {
+          b.add(`${htmlAlias('attribute')}(${JSON.stringify(filled)}, ${filled === 'value' ? 'KayFormValue' : 'KayFormChecked'}`)
+          fieldArguments()
+
+          if (filled === 'checked') {
+            b.add(', ')
+            checkboxValue ? checkboxValue() : b.add('undefined')
+          }
+
+          b.add(')')
+
+          if (ownFill) {
+            b.add(' ?? ')
+            ownFill()
+          }
+
+          b.add(')')
+        })
+      }
+
+      if (field.invalid) {
+        markup.dynamic(() => {
+          b.add(`${htmlAlias('attribute')}("aria-invalid", KayFormInvalid`)
+          fieldArguments()
+          b.add('))')
+        })
+      }
+
+      if (field.fill === 'content') {
+        const own = content
+
+        content = () => {
+          b.add('KayFormValue')
+          fieldArguments()
+          b.add(') ?? ')
+          own ? own() : b.add('undefined')
+        }
+      }
+    }
+
     if (actionOf(element, this.src)) {
       if (!this.named(element, 'method'))
         markup.text(' method="post"')
@@ -434,7 +502,33 @@ export class HtmlTemplate {
     if (VOID_ELEMENTS.has(name))
       return
 
-    if (children.length > 0 && selected) {
+    const outerTarget = this.formTarget
+
+    this.formTarget = actionOf(element, this.src)?.expression ?? outerTarget
+
+    if (children.length > 0 && field?.fill === 'selected' && target) {
+      const own = selected
+
+      markup.dynamic(() => {
+        b.add(`${htmlAlias('refillOptions')}(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}), `)
+        this.markup(children, true)
+
+        if (own) {
+          b.add(', () => ')
+          own()
+        }
+
+        b.add(')')
+      })
+    }
+    else if (children.length > 0 && field?.fill === 'content' && target) {
+      markup.dynamic(() => {
+        b.add('((value) => value === undefined ? ')
+        this.markup(children, true)
+        b.add(` : ${htmlAlias('child')}(value))(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}))`)
+      })
+    }
+    else if (children.length > 0 && selected) {
       markup.dynamic(() => {
         b.add(`${htmlAlias('selectOptions')}(`)
         selected()
@@ -457,6 +551,7 @@ export class HtmlTemplate {
       })
     }
 
+    this.formTarget = outerTarget
     markup.text(`</${name}>`)
   }
 
@@ -483,8 +578,12 @@ export class HtmlTemplate {
     b.add(']')
 
     if (children.length > 0) {
+      const outerTarget = this.formTarget
+
+      this.formTarget = actionOf(element, this.src)?.expression ?? outerTarget
       b.add(', () => ')
       this.markup(children, true)
+      this.formTarget = outerTarget
     }
 
     b.add(').t')

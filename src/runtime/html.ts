@@ -27,6 +27,7 @@ const RAW_TEXT_BREAK = /<\/(?=script|style)|<!--/gi
 const OPTION = /<option(?=[\s>])([^>]*)>([\s\S]*?)(?=<\/option>|<option[\s>]|<\/select>|$)/g
 const OPTION_VALUE = /\svalue="([^"]*)"/
 const SELECTED = /\sselected(?=[\s=>]|$)/
+const SELECTED_ALL = /\sselected(?:="[^"]*")?(?=[\s>]|$)/g
 const TAGS = /<[^>]*>/g
 const SPACES = /\s+/g
 const HTML_ENTITY = /&(?:amp|lt|gt|quot|#39);/g
@@ -290,19 +291,31 @@ export function loop<T>(each: readonly T[] | null | undefined | false, render: (
   return markup
 }
 
-// A `select` given a value marks the options it holds as selected, matching an option's `value`, or its text when it has none.
-export function selectOptions(value: unknown, markup: string): string {
+// A `select` given a value marks the options it holds as selected, matching an option's `value`, or its text when it has none; `only` unselects the others.
+export function selectOptions(value: unknown, markup: string, only = false): string {
   const values = Array.isArray(value) ? value.map(String) : [String(value)]
 
-  return markup.replace(OPTION, (option: string, attributes: string, text: string) => {
-    if (SELECTED.test(attributes))
+  return markup.replace(OPTION, (option: string, written: string, text: string) => {
+    const selected = SELECTED.test(written)
+
+    if (selected && !only)
       return option
+
+    const attributes = selected ? written.replace(SELECTED_ALL, '') : written
 
     const valueAttribute = OPTION_VALUE.exec(attributes)
     const optionValue = valueAttribute ? decode(valueAttribute[1]!) : decode(text.replace(TAGS, '')).replace(SPACES, ' ').trim()
 
-    return values.includes(optionValue) ? `<option${attributes} selected>${text}` : option
+    return values.includes(optionValue) ? `<option${attributes} selected>${text}` : `<option${attributes}>${text}`
   })
+}
+
+// A select a form posting to an action renders: the option a refused post chose, else what its own `value` selects, if it has one.
+export function refillOptions(posted: string | undefined, markup: string, value?: () => unknown): string {
+  if (posted !== undefined)
+    return selectOptions(posted, markup, true)
+
+  return value ? selectOptions(value(), markup) : markup
 }
 
 function decode(text: string): string {

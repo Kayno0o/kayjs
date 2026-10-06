@@ -1,5 +1,6 @@
 import type { KayConfig } from '../config'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
+import type { Outcome } from '../runtime/action'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Encoding } from './compress'
 import type { Flash, SuccessFlash } from './flash'
@@ -10,11 +11,12 @@ import type { Prefetch } from './speculation'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { browserOnlyHint, mapStack } from '../build/sourcemap'
-import { collectForms } from '../runtime/action'
+import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
 import { component } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
+import { encodeValue } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule } from './bundle'
 import { preferredEncoding } from './compress'
@@ -29,7 +31,7 @@ import { errorPage } from './overlay'
 import { matchesEtag } from './public'
 import { readQuery } from './query'
 import { reportServerError } from './report'
-import { inServerScope } from './scope'
+import { inServerScope, withOutcome } from './scope'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
 import { renderStatic, streamDocument } from './stream'
@@ -76,6 +78,8 @@ interface Rendering {
   status: number
   writeCookies: () => void
   base: string
+  // The form post the browser came back from, if any.
+  outcome: () => Outcome | null
 }
 
 const CHARSET = '<meta charset="utf-8">'
@@ -91,6 +95,11 @@ const NOT_ASCII = /[^\x20-\x7E]/g
 // The params come resolved, each matcher's value in place of its text.
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const rendering = createRendering(context, params, options)
+
+  return withOutcome(rendering.outcome, async () => renderRoute(route, rendering, client, options))
+}
+
+async function renderRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response> {
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
 
   if (refusal)
@@ -223,6 +232,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
     status: 200,
     base,
     // How a form post went is for the one page the browser went back to.
+    outcome: readOnce,
     writeCookies: () => {
       if (hasFlash(request))
         jar.cookies.delete(FLASH_COOKIE)
@@ -397,13 +407,18 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shipsEntry = hasIslands || posts
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') : ''
   const locale = localeState()
-  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) : ''}${options.base ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${speculationRules(options.prefetch, options.base)}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS : ''}</head><body>${body}`
+  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) : ''}${options.base ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${speculationRules(options.prefetch, options.base)}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS : ''}</head><body>${body}`
 
   if (!streamed)
     return `${start}</body></html>`
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
   return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError))
+}
+
+// The post the page answers, for its islands to render what the server did as they hydrate, then read through the action.
+function outcomeScript(outcome: Outcome | null): string {
+  return outcome ? `<script type="application/json" ${OUTCOME_SCRIPT}>${encodeValue(outcome).replaceAll('<', '\\u003c')}</script>` : ''
 }
 
 // The stylesheets of the layouts, outermost first, then the page's.
