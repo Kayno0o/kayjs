@@ -4,7 +4,7 @@ import { basename, join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
-import { check } from '../src/check'
+import { applySafeFixes, check } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
 import { compileShadow } from '../src/check/shadow'
 import { compileKay } from '../src/compiler'
@@ -895,22 +895,54 @@ describe('kay check, unused code', () => {
       expect(warned.output).toStartWith('warning[positional-key]: These rows are keyed by their position, though each has an `id`\n --> ')
       expect(warned.output.trim().split('\n').at(-1)).toBe('1 warning')
       expect(warned.code).toBe(0)
-      expect((await runCheck(root, '--deny-warnings')).code).toBe(1)
+      expect(await runCheck(root, '--deny-warnings')).toEqual({ code: 1, output: expect.stringContaining('\n1 warning, failing the check under --deny-warnings\n') })
     }
     finally {
       await rm(root, { recursive: true, force: true })
     }
   })
 
+  it('reports a lint or a level the config names that kay does not have', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
+
+    try {
+      expect((await check(root, { lints: { 'missing-alts': 'warn', 'missing-alt': 'warning' } as unknown as CheckOptions['lints'] })).map(d => [basename(d.file), d.message, d.help])).toEqual([
+        ['kay.config.ts', '`lints` names `missing-alts`, which is no lint', '`kay explain` lists them'],
+        ['kay.config.ts', 'The lint `missing-alt` is set to `warning`, which is no level', 'set it to `allow`, `warn` or `deny`'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves a file outside the project alone when applying safe fixes', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
+    const outside = await scratchProject({ 'lib/b.kay': 'button(onclick={go}) x\n' })
+    const fix = { title: 'Write `onClick`', edits: [{ start: 7, end: 14, text: 'onClick' }], safe: true }
+
+    try {
+      expect(await applySafeFixes(root, [{ file: join(outside, 'lib/b.kay'), line: 1, column: 8, message: 'm', fixes: [fix] }])).toBe(0)
+      expect(await Bun.file(join(outside, 'lib/b.kay')).text()).toBe('button(onclick={go}) x\n')
+      expect(await applySafeFixes(outside, [{ file: join(outside, 'lib/b.kay'), line: 1, column: 8, message: 'm', fixes: [fix, fix] }, { file: join(outside, 'lib/b.kay'), line: 1, column: 8, message: 'm', fixes: [fix] }])).toBe(1)
+      expect(await Bun.file(join(outside, 'lib/b.kay')).text()).toBe('button(onClick={go}) x\n')
+    }
+    finally {
+      await Promise.all([root, outside].map(async dir => rm(dir, { recursive: true, force: true })))
+    }
+  })
+
   it('applies the safe fixes with --fix, then prints what is left', async () => {
     const root = await scratchProject({
-      'src/card.kay': '---\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\n\nfunction go() {}\n---\nbutton(onclick={go}) {title}\niframe(src="https://example.com")\n',
+      'src/card.kay': '---\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\n---\np {title}\niframe(src="https://example.com")\n',
+      'src/button.kay': '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n',
     })
 
     try {
       const { code, output } = await runCheck(root, '--fix')
 
-      expect(await Bun.file(join(root, 'src/card.kay')).text()).toBe('---\nconst { title } = props<{ title: string, subtitle?: string }>()\n\nfunction go() {}\n---\nbutton(onClick={go}) {title}\niframe(src="https://example.com")\n')
+      expect(await Bun.file(join(root, 'src/card.kay')).text()).toBe('---\nconst { title } = props<{ title: string, subtitle?: string }>()\n---\np {title}\niframe(src="https://example.com")\n')
+      expect(await Bun.file(join(root, 'src/button.kay')).text()).toBe('---\nfunction go() {}\n---\nbutton(onClick={go}) x\n')
       expect(output).toStartWith('kay check: fixed 2 problems\n\nerror[missing-title]: An `iframe` needs a `title`\n')
       expect(code).toBe(1)
     }

@@ -58,6 +58,14 @@ describe('lint levels', () => {
   })
 })
 
+describe('unread names in a file that did not compile', () => {
+  it('reports none, as the code the parser skipped may read them', () => {
+    const source = '---\nconst { title, other } = props<{ title: string, other: string }>()\n---\nh1 {other}\neach x in y\n  p {title}\n'
+
+    expect(compileKay(source, 'list.kay', { check: true }).diagnostics.map(d => d.code ?? d.message)).toEqual(['`each` is pug syntax kay does not have'])
+  })
+})
+
 describe('kay explain', () => {
   const explain = async (...args: string[]) => {
     const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'explain', ...args], { stdout: 'pipe', stderr: 'pipe' })

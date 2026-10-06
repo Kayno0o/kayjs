@@ -21,7 +21,7 @@ import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacements, throughNodeModules } from '../build/libraries'
 import { componentName } from '../compiler'
 import { formatReport } from '../compiler/frame'
-import { lintLevels } from '../compiler/lints'
+import { isLint, LEVELS, lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
@@ -176,7 +176,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await Promise.all(libraries.flatMap(library => library.files).map(async (file) => {
     const source = await Bun.file(file).text()
-    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source)
+    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source, false, options.lints)
     const path = shadowPath(root, file)
 
     await writeIfChanged(path, shadow.tsx)
@@ -433,6 +433,8 @@ function spellings(path: string): string[] {
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const { files, diagnostics, unreached, libraries, settings, exports } = await writeShadowTypes(root, options)
+
+  diagnostics.push(...lintConfigProblems(root, options.lints))
   const settingsFile = join(resolve(root), SHADOW_DIR, SETTINGS_CHECK)
   const exportsFile = join(resolve(root), SHADOW_DIR, EXPORTS_CHECK)
   const contentFile = join(resolve(root), SHADOW_DIR, CONTENT_CHECK)
@@ -632,16 +634,28 @@ export function formatCheckDiagnostic(diagnostic: CheckDiagnostic, source?: stri
   return formatReport({ ...diagnostic, file: relative(process.cwd(), diagnostic.file), frame }, paint)
 }
 
+// A lint or a level `lints` names that kay does not have, which would otherwise pass unnoticed.
+function lintConfigProblems(root: string, lints: Record<string, string> = {}): CheckDiagnostic[] {
+  const at = { file: join(root, CONFIG_FILE), line: 1, column: 1 }
+
+  return Object.entries(lints).flatMap(([name, level]) => {
+    if (!isLint(name))
+      return [{ ...at, message: `\`lints\` names \`${name}\`, which is no lint`, help: '`kay explain` lists them' }]
+
+    return LEVELS.has(level) ? [] : [{ ...at, message: `The lint \`${name}\` is set to \`${level}\`, which is no level`, help: 'set it to `allow`, `warn` or `deny`' }]
+  })
+}
+
 function fromCompile(file: string, source: string, { start, end, message, label, related, note, help, code, severity, fixes, checkOnly }: Diagnostic): CheckDiagnostic {
   return { file, ...positionAt(source, start), end, message, label, related, note, help, code, severity, fixes, checkOnly }
 }
 
-// Applies the first safe fix of each problem to its file, leaving out one whose edits overlap another's, and answers how many problems that fixed.
-export async function applySafeFixes(diagnostics: CheckDiagnostic[]): Promise<number> {
+// Applies the first safe fix of each problem in the project's own files to its file, leaving out one whose edits overlap another's, and answers how many problems that fixed. A library's files are its own to fix.
+export async function applySafeFixes(root: string, diagnostics: CheckDiagnostic[]): Promise<number> {
   const byFile = Map.groupBy(diagnostics.flatMap((diagnostic) => {
     const fix = diagnostic.fixes?.find(candidate => candidate.safe)
 
-    return fix ? [{ file: diagnostic.file, fix }] : []
+    return fix && ownFile(root, diagnostic.file) ? [{ file: diagnostic.file, fix }] : []
   }), found => found.file)
   let fixed = 0
 

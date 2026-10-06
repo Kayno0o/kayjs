@@ -459,7 +459,8 @@ describe('kay lsp in a project nested in the workspace', () => {
       Bun.write(join(dir, 'src/home.kay'), 'p Home\n'),
       Bun.write(join(dir, 'shared/data.ts'), 'export const label: string = \'Item \'\n'),
       Bun.write(join(dir, 'apps/web/tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'apps/web/kay.config.ts'), 'export default { routes: \'src/pages\' }\n'),
+      Bun.write(join(dir, 'apps/web/kay.config.ts'), 'export default { routes: \'src/pages\', lints: { \'unread-name\': \'warn\' } }\n'),
+      Bun.write(join(dir, 'apps/web/src/card.kay'), '---\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\n---\np {title}\n'),
       Bun.write(join(dir, 'apps/web/src/counter.kay'), '---\nconst { start } = props<{ start: number }>()\n---\np {start}\n'),
       Bun.write(join(dir, page), '--- server\nimport { label } from \'../../../../shared/data\'\n\nconst id: string = ctx.params.id\nconst title = label + id\n---\n---\nimport Counter from \'../counter.kay\'\n---\nh1 {title}\nCounter(start={0})\n'),
     ])
@@ -476,6 +477,10 @@ describe('kay lsp in a project nested in the workspace', () => {
 
   it('checks a .kay file against its own project\'s tsconfig, routes and kay environment', async () => {
     expect(await editor.open(page)).toEqual([])
+  })
+
+  it('reports a lint at the level its project\'s kay.config.ts gives it', async () => {
+    expect((await editor.open('apps/web/src/card.kay')).map(diagnostic => [diagnostic.code, diagnostic.severity])).toEqual([['unread-name', 2]])
   })
 
   it('keeps a nested project\'s shadow files out of the workspace folder\'s', async () => {

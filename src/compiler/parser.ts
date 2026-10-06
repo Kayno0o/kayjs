@@ -405,7 +405,7 @@ class TemplateParser {
       value.end = value.start + inline.index
 
     if (value.start === value.end)
-      this.error(start, lineEnd, 'Expected the value to await: `await comments`')
+      this.error(start, lineEnd, 'Expected the value to await', { help: '`await comments`' })
 
     if (!inline) {
       const pending = this.parseBlock(indent)
@@ -475,7 +475,7 @@ class TemplateParser {
     const itemIndices = head?.indices?.[1]
 
     if (!head || !itemIndices) {
-      this.error(start, end, 'Expected `for <item> of <list> key={<key>}`, or `for <item>, <index> of <list> key={index}`')
+      this.error(start, end, 'Malformed `for`', { help: '`for <item> of <list> key={<key>}`, or `for <item>, <index> of <list> key={index}`' })
       this.pos = end
 
       return { kind: 'for', start, end, item: { start, end: start }, each: { start, end: start }, key: { start, end: start }, children: this.parseBlock(indent) }
@@ -671,7 +671,7 @@ class TemplateParser {
         const spreadAt = inner.indexOf('...')
 
         if (spreadAt === -1 || inner.slice(0, spreadAt).trim() !== '')
-          this.error(this.pos, end, 'A braced attribute must be a spread: `{...props}`')
+          this.error(this.pos, end, 'A braced attribute must be a spread', { help: '`{...props}`' })
 
         element.attributes.push({ kind: 'spread', expression: { start: this.pos + 1 + spreadAt + 3, end: end - 1 } })
         this.pos = end

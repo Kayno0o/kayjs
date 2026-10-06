@@ -116,8 +116,11 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   if (options.check && !client)
     diagnostics.push(...browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? [], routeFile))
 
+  // Code that did not compile may have taken reads and writes with it, so a file with an error is not searched for unread names or unwritten signals.
+  const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
+
   if (options.check)
-    diagnostics.push(...unboundedFields(source, file.server), ...unreadNames(source, script, server, found), ...constantSignals(source, file.script, found), ...templateLints(file))
+    diagnostics.push(...unboundedFields(source, file.server), ...broken ? [] : [...unreadNames(source, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })

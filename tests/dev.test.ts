@@ -282,7 +282,7 @@ describe('kay dev', () => {
     const html = await page.text()
 
     expect(page.status).toBe(500)
-    expect(html).toContain('<h2>src/broken.kay:2:1</h2>')
+    expect(html).toContain(' --&gt; src/broken.kay:2:1\n')
     expect(html).toContain('2 | else\n  | ^^^^')
     expect(html).toContain('new EventSource("/_kay/dev/events")')
 

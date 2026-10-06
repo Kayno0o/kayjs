@@ -160,7 +160,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
   const { routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints } = config
   const options = { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints }
   let diagnostics = await check(root, options)
-  const fixed = fix ? await applySafeFixes(diagnostics) : 0
+  const fixed = fix ? await applySafeFixes(root, diagnostics) : 0
 
   if (fixed > 0) {
     console.error(`kay check: fixed ${count(fixed, 'problem')}\n`)
@@ -180,7 +180,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
   const errors = diagnostics.length - warnings
 
   if (diagnostics.length > 0)
-    console.error([errors > 0 ? count(errors, 'error') : '', warnings > 0 ? count(warnings, 'warning') : ''].filter(part => part !== '').join(', '))
+    console.error([errors > 0 ? count(errors, 'error') : '', warnings > 0 ? `${count(warnings, 'warning')}${denyWarnings ? ', failing the check under --deny-warnings' : ''}` : ''].filter(part => part !== '').join(', '))
 
   return errors + (denyWarnings ? warnings : 0)
 }

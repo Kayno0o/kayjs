@@ -62,6 +62,8 @@ export type LintName = keyof typeof LINTS
 
 export type LintLevels = Partial<Record<LintName, LintLevel>>
 
+export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
+
 const ALLOW_COMMENT = /\/\/[ \t]*kay-allow[ \t]+([\w-]+(?:[ \t]*,[ \t]*[\w-]+)*)/g
 const LINT_NAME = /[\w-]+/g
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
@@ -86,7 +88,8 @@ export function lintLevels(source: string, levels: LintLevels = {}): (name: Lint
     allowed.set(target, names)
   }
 
-  return (name, offset) => allowed.get(positionAt(source, offset).line)?.has(name) ? 'allow' : levels[name] ?? LINTS[name].level
+  // A level the config misspells is reported by `kay check`, and leaves the default meanwhile.
+  return (name, offset) => allowed.get(positionAt(source, offset).line)?.has(name) ? 'allow' : LEVELS.has(levels[name] ?? '') ? levels[name]! : LINTS[name].level
 }
 
 // Sets each lint's severity from its level and drops the ones allowed; a `// kay-allow` naming no lint is reported.

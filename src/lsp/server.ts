@@ -271,7 +271,7 @@ export class KayLanguageServer {
   private async configure(project: Project) {
     const config = await projectConfig(project.root)
 
-    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, publicDir: config.publicDir, i18n: config.i18n, api: config.api, settings: config.settings }
+    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, publicDir: config.publicDir, i18n: config.i18n, api: config.api, settings: config.settings, lints: config.lints }
     project.routesDir = resolve(project.root, project.options.routes ?? 'src/routes')
     project.configured = true
   }
@@ -320,7 +320,7 @@ export class KayLanguageServer {
       severity: diagnostic.severity === 'warning' ? WARNING : ERROR,
       source: 'kay',
       ...diagnostic.code !== undefined && { code: diagnostic.code },
-      message: [diagnostic.message, ...[['note', diagnostic.note], ['help', diagnostic.help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n'),
+      message: [diagnostic.label ? `${diagnostic.message} (${diagnostic.label})` : diagnostic.message, ...[['note', diagnostic.note], ['help', diagnostic.help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n'),
       ...diagnostic.related && { relatedInformation: diagnostic.related.map(span => ({ location: { uri: document.uri, range: rangeOf(span) }, message: span.label })) },
       ...diagnostic.code === 'unread-name' && { tags: [UNNECESSARY] },
     }))

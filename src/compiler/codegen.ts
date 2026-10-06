@@ -883,7 +883,7 @@ class Generator {
       const passed = new Map<string, Labelled>(element.attributes.flatMap(attribute => attribute.kind === 'spread' ? [] : [[this.text(attribute.name), { ...attribute.name, label: 'passed by this attribute' }]]))
 
       if (children.length > 0)
-        passed.set('children', { ...children[0]!, label: 'passed by the lines under the tag' })
+        passed.set('children', { start: children[0]!.start, end: children[0]!.end, label: 'passed by the lines under the tag' })
 
       for (const slot of slots) {
         if (!element.component) {
