@@ -20,7 +20,7 @@ bun install
 bun run dev   # http://localhost:3000, reloads on every change
 ```
 
-The project depends on it as `"kay": "npm:@kaynooo/kayjs@^<version>"`, so imports read `kay`, `kay/server` and so on, and carries an `.npmrc` pointing the scope at the registry. `bun src/cli.ts new ../my-app` from a checkout of this repository depends on a packed copy of it instead.
+The project depends on it as `"kay": "npm:@kaynooo/kayjs@~<version>"`, a tilde since a minor may break, so imports read `kay`, `kay/server` and so on, and carries an `.npmrc` pointing the scope at the registry. `bun src/cli.ts new ../my-app` from a checkout of this repository depends on a packed copy of it instead.
 
 ## Ship it
 

@@ -34,7 +34,8 @@ export async function createProject(target: string, options: NewOptions = {}): P
 
   const name = packageName(basename(dir))
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
-  const dependency = options.kay ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@^${kay.version}`)
+  // A kay minor may break, so the project takes its patches only.
+  const dependency = options.kay ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@~${kay.version}`)
   const template = options.template ?? 'server'
   const site = template === 'site'
   const scripts = { 'check': 'kay check', 'lint': 'keslint --cache', 'lint:fix': 'keslint --fix --cache', 'fmt': 'kay fmt', 'test': 'bun test' }
