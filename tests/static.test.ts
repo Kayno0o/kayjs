@@ -98,13 +98,13 @@ describe('kay build --static', () => {
     expect(await Bun.file(join(out, 'index.html.gz')).exists()).toBe(true)
   })
 
-  it('ships none of the persisted signal code or the value writer to an island calling signal() alone', async () => {
+  it('ships none of the persisted signal code to an island calling signal() alone', async () => {
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
     const code = await Promise.all(chunks.map(chunk => Bun.file(join(out, chunk)).text()))
 
     // The counter's own chunk is among them, so its imports are too.
     expect(code.some(text => text.includes('<button>Count'))).toBe(true)
-    expect(code.filter(text => text.includes('cannot name a cookie') || text.includes('cannot be sent to the server'))).toEqual([])
+    expect(code.filter(text => text.includes('cannot name a cookie'))).toEqual([])
   })
 
   it('writes the public files, the sitemap and robots.txt under the mount point, and 404.html', async () => {

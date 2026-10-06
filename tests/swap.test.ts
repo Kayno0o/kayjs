@@ -4,7 +4,7 @@ import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t, ValidationError } from 'elysia'
-import { persisted } from '../src/runtime'
+import { persisted, signal } from '../src/runtime'
 import { action } from '../src/runtime/action'
 import { hydrateIslands } from '../src/runtime/client'
 import { attempt, hydrate, HydrationMismatch } from '../src/runtime/dom'
@@ -240,6 +240,14 @@ describe('page swap, checking a form in the browser', () => {
     document.cookie = 'cut=%E0%A4%A'
 
     expect(persisted('cut', 'light')()).toBe('light')
+  })
+
+  // `bun run check` fails on an `@ts-expect-error` with no error under it, so the type check is what this asserts.
+  it('refuses persist and storage on a plain signal, which persisted() took over', () => {
+    // @ts-expect-error -- persisted('a', 'x') keeps a value
+    expect(signal('x', { persist: 'a' })()).toBe('x')
+    // @ts-expect-error -- persisted('a', 'x', { storage: 'local' }) does
+    expect(signal('x', { storage: 'local' })()).toBe('x')
   })
 
   it('leaves markup a try block would not claim to its island, which renders afresh', () => {

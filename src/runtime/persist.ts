@@ -21,7 +21,7 @@ const TRAILING_SLASH = /\/$/
 // What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
 export function keepValue<T>(key: string, storage: PersistStorage, read: () => T, write: (value: T) => void): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
-    throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; persist under letters, digits and - _ . only`)
+    throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted() a name of letters, digits and - _ . only`)
 
   if (typeof document === 'undefined')
     return serverSide(key, storage, read)
