@@ -7,7 +7,7 @@
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
 - Signals are explicit. Read `count()`, write `count.set(1)` or `count.set(c => c + 1)`. Props and server data are plain names, never called: `{title}`, not `{title()}`.
 - Every `for` has a `key={...}`.
-- A promise an `await` block renders is made with `defer()`, never left bare.
+- A promise an `await` block renders by the name a server fence declares it under, `await comments`, is left unawaited and kay defers it; any other, such as `await data.comments` or one a component makes, is made with `defer()`.
 - The component script exports types only. Shared values live in `.ts` modules.
 - A page has no props: its data comes from its `--- server` fence.
 - `window`, `document`, `localStorage` and the other globals only a browser has are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
@@ -706,15 +706,14 @@ const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 
 ## Streaming
 
-A load waits for every `await` in its server fence before the page renders. A value the page can show later is made with `defer()` instead, left unawaited, and rendered by an `await` block:
+A load waits for every `await` in its server fence before the page renders. A value the page can show later is left unawaited instead, and rendered by an `await` block:
 
 ```kay
 --- server
-import { defer } from 'kay'
 import { findPost, listComments } from '../../data'
 
 const post = await findPost(Number(ctx.params.id)) ?? ctx.notFound()
-const comments = defer(listComments(post.id))
+const comments = listComments(post.id)
 ---
 h1 {post.title}
 await comments
@@ -729,7 +728,7 @@ catch
 
 - The page goes out at once with the block under `await`. Each `then` block streams in as its value resolves, in whatever order they do, swapped in by a few bytes of inline script; islands inside it hydrate when it lands.
 - `await value then name` on one line has no pending block. `catch error` binds the rejection; without `catch`, a rejection removes the pending block and is logged. A `then` block that throws while rendering is a bug, not a rejection: it removes the pending block and is logged too, never showing `catch`.
-- `defer()` handles a rejection where the promise is made. Without it, a promise rejecting before the page renders it would crash the server, so `kay check` refuses a bare promise in `await`.
+- A promise rejecting before the page renders it would crash the server, so kay handles one a server value holds where it is declared, as `defer()` from `kay` does: an `await` block naming it, `await comments`, needs nothing more. A promise reached any other way, `await data.comments` or a prop, is made with `defer()`, which `kay check` reports when it is not; a value that is no promise renders at once.
 - Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them, and a `head` block inside one is ignored. A block renders on its own, outside its layouts, and an `await` inside a pending block renders its own pending block only.
 - The response stays open until the last value settles. Bun closes a connection idle for `idleTimeout` seconds, 10 by default, so a value slower than that needs `Bun.serve({ idleTimeout })` raised.
 - In an island, the server sends the pending block and the browser renders the rest once the value settles.

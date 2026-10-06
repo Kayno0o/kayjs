@@ -491,6 +491,15 @@ describe('await blocks', () => {
     return chunks
   }
 
+  it('defers a promise the server fence leaves bare, rejecting while a later statement awaits, and renders any other value at once', async () => {
+    const response = await bare.handle(new Request('http://localhost/later'))
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(html).toContain('<p class="now">3</p>')
+    expect(html).toContain('<p class="failed">Comments are down</p>')
+  })
+
   it('sends the page at once, then each pending block as it settles', async () => {
     const [page, failed, ready, end] = await chunksOf('/feed?delay=30')
 

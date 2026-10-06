@@ -3,11 +3,11 @@ import { defer } from 'kay'
 
 const items = Promise.resolve(['a'])
 const later = defer(Promise.resolve(['a']))
-const either = ctx.url.search === '' ? later : items
+const bag = { either: ctx.url.search === '' ? later : items }
 ---
 await items then list
   p {list.length}
 await later then list
   p {list.lengt}
-await either then list
+await bag.either then list
   p {list.length}

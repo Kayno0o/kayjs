@@ -69,6 +69,7 @@ const DEFAULT_PREFIX = '__default_'
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
 // `kay build` renders the page once when it is `true`.
 const PRERENDER = 'prerender'
+const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 // The page's query schema, which types and validates `ctx.query`.
 const QUERY = 'query'
 // `t('nav.home')`: a message key an island's source names as it is written.
@@ -103,6 +104,8 @@ class Generator {
   private readonly src: string
   // The action expression of the form being emitted, so its fields' names are checked against the action's input.
   private formTarget: Span | undefined
+  // Server values an `await` block renders by name, which `load` defers once they are declared.
+  private deferred = new Set<string>()
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
     this.src = file.source
@@ -136,6 +139,15 @@ class Generator {
     const runnable = html || dom
     const used = usedHelpers(this.file.template, script, this.src)
     const helpers = runnable ? [] : used.filter(helper => helper !== 'For')
+
+    if (includeServer) {
+      const data = new Set(server.data.map(binding => binding.name))
+
+      this.deferred = new Set([...awaitedNames(this.file.template, this.src)].filter(name => data.has(name)))
+    }
+
+    if (this.deferred.size > 0)
+      kayHelpers.push('autoDefer')
 
     // What fills a form's fields back in once a post was refused.
     if (runnable && kayHelpers.includes('formAction'))
@@ -383,9 +395,16 @@ class Generator {
     const context = `KayPageContext<${params}${query ? `, KayQueryOf<typeof ${QUERY}>` : ''}>`
 
     b.add(`\nexport async function load(${ctx}: ${server.exportNames.includes(PRERENDER) ? `KayPrerenderedContext<typeof ${PRERENDER}, ${context}>` : context}) {\n`)
-    for (const span of server.body)
+    for (const span of server.body) {
       b.addSource(span)
-    b.add(`\nreturn { ${server.data.map(data => data.name).join(', ')} }\n}\n`)
+
+      // Right where it is declared, so a promise rejecting while a later statement awaits crashes nothing.
+      for (const data of server.data) {
+        if (this.deferred.has(data.name) && data.local.start >= span.start && data.local.end <= span.end)
+          b.add(`\n${kayAlias('autoDefer')}(${data.name})\n`)
+      }
+    }
+    b.add(`\nreturn { ${server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${kayAlias('autoDefer')}(${data.name})` : data.name).join(', ')} }\n}\n`)
   }
 
   // Script statements in source order, with the props declaration swapped for reads off `__props`.
@@ -1351,7 +1370,7 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return visit(file.template)
 }
 
-type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'registerActions' | 'actionStub'
+type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'registerActions' | 'actionStub' | 'autoDefer'
 
 function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
@@ -1381,6 +1400,50 @@ function formHelpers(file: KayFile): KayHelper[] {
   })
 
   return hasActionForm(file.template) ? ['formAction'] : []
+}
+
+// The names `await` blocks render as they are, `await comments`.
+function awaitedNames(nodes: Node[], source: string, found = new Set<string>()): Set<string> {
+  for (const node of nodes) {
+    switch (node.kind) {
+      case 'element':
+      case 'slot':
+        awaitedNames(node.children, source, found)
+
+        break
+      case 'text':
+        awaitedNames(node.parts.filter(part => part.kind === 'element'), source, found)
+
+        break
+      case 'if':
+        for (const branch of node.branches)
+          awaitedNames(branch.children, source, found)
+
+        break
+      case 'for':
+        awaitedNames([...node.children, ...node.fallback ?? []], source, found)
+
+        break
+      case 'await': {
+        const value = source.slice(node.value.start, node.value.end).trim()
+
+        if (IDENTIFIER.test(value))
+          found.add(value)
+
+        for (const block of awaitBlocks(node))
+          awaitedNames(block, source, found)
+
+        break
+      }
+      case 'try':
+        for (const block of tryBlocks(node))
+          awaitedNames(block, source, found)
+
+        break
+    }
+  }
+
+  return found
 }
 
 type Helper = 'For' | 'Show' | 'omit' | 'componentClass'

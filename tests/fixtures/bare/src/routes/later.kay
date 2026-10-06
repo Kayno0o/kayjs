@@ -1,0 +1,12 @@
+--- server
+const comments = Promise.reject(new Error('down'))
+const count = 3
+
+await Bun.sleep(20)
+---
+await comments then list
+  p {String(list)}
+catch
+  p.failed Comments are down
+await count then shown
+  p.now {shown}
