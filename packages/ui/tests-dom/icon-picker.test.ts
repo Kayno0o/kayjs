@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import type { IconChoice } from '../src/icon-picker'
 import { afterEach, expect, test } from 'bun:test'
+import { trustHtml } from 'kay'
 import { mount, settle } from 'kay/test'
 import { click } from './dom'
 
@@ -24,7 +25,7 @@ afterEach(() => {
 })
 
 function choice(name: string): IconChoice {
-  return { name, icon: { 'viewBox': '0 0 24 24', 'width': '1em', 'height': '1em', 'aria-hidden': 'true', 'innerHTML': `<path data-icon="${name}"/>` } }
+  return { name, icon: { 'viewBox': '0 0 24 24', 'width': '1em', 'height': '1em', 'aria-hidden': 'true', 'innerHTML': trustHtml(`<path data-icon="${name}"/>`) } }
 }
 
 const SET = ['tabler:home', 'tabler:house', ...Array.from({ length: 70 }, (_, index) => `tabler:shape-${index}`)].map(choice)
