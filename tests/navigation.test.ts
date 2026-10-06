@@ -102,9 +102,30 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
   it('checks a form against its action\'s schema before posting, with the server\'s message', async () => {
     await page.fill('input[name="title"]', 'ab')
     await page.click('form button')
+    await page.waitForFunction(() => document.querySelector('input')!.validationMessage === 'Too short')
 
-    expect(await page.evaluate(() => document.querySelector('input')!.validationMessage)).toBe('Too short')
     expect(await page.locator('p.error, p.done').count()).toBe(0)
+  })
+
+  it('loads the form checks once a form is used, and checks a form submitted before they loaded', async () => {
+    const fresh = await browser.newPage()
+    const checksLoaded = (): Promise<boolean> => fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/validate-[^/]*\.js$/).test(entry.name)))
+
+    await fresh.goto(`${origin}/second`)
+    await fresh.locator('form').waitFor()
+    await Bun.sleep(200)
+
+    expect(await checksLoaded()).toBe(false)
+
+    await fresh.evaluate(() => {
+      document.querySelector<HTMLInputElement>('input[name="title"]')!.value = 'ab'
+      document.querySelector('form')!.requestSubmit()
+    })
+    await fresh.waitForFunction(() => document.querySelector('input')!.validationMessage === 'Too short')
+
+    expect(await checksLoaded()).toBe(true)
+    expect(await fresh.locator('p.error, p.done').count()).toBe(0)
+    await fresh.close()
   })
 
   it('posts a form without a reload, pending meanwhile, and shows what the action answered', async () => {

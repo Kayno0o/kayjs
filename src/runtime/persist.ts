@@ -1,7 +1,8 @@
 import type { ServerScope } from './reactive'
 import { withBase } from './base'
 import { currentServerScope, whenHydrated } from './reactive'
-import { decodeValue, encodeValue } from './wire'
+import { sendValue } from './send'
+import { decodeValue } from './wire'
 
 export type PersistStorage = 'cookie' | 'local'
 
@@ -120,7 +121,7 @@ function cookie(name: string): string | undefined {
 }
 
 function saveCookie(name: string, value: unknown): void {
-  const text = encodeURIComponent(encodeValue(value))
+  const text = encodeURIComponent(sendValue(value))
 
   if (text.length + name.length > MAX_COOKIE_BYTES) {
     console.warn(`[kay] the value of the persisted signal ${name} is over ${MAX_COOKIE_BYTES} bytes encoded, too big for a cookie, so it was not kept; persist it with storage: 'local'`)
@@ -145,7 +146,7 @@ function readLocal(key: string): string | null {
 
 function saveLocal(key: string, value: unknown): void {
   try {
-    localStorage.setItem(key, encodeValue(value))
+    localStorage.setItem(key, sendValue(value))
   }
   catch (error) {
     console.warn(`[kay] the persisted signal ${key} could not be kept in localStorage: ${error instanceof Error ? error.message : String(error)}`)

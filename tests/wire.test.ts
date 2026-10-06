@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
+import { sendValue } from '../src/runtime/send'
 import { decodeValue, unflattenValue } from '../src/runtime/wire'
 
 const MALFORMED = /^kay: the devalue text received is malformed at index/
@@ -21,38 +22,39 @@ function holed(length: number, entries: Record<number, unknown>): unknown[] {
   return array
 }
 
+// Every kind of value an island prop, an action call or a persisted signal may hold.
+const VALUES: unknown[] = [
+  { name: 'kay', count: 3, ok: true, none: null, nested: { list: [1, 'two', [3]] } },
+  [],
+  {},
+  '',
+  'text with "quotes", </script> and \u2028\u2029',
+  0,
+  -12.5,
+  true,
+  null,
+  undefined,
+  Number.NaN,
+  Infinity,
+  -Infinity,
+  new Date('2026-10-04T21:01:00.000Z'),
+  new Map<unknown, unknown>([['a', 1], [{ key: true }, [2]]]),
+  new Set([1, 'two', { three: 3 }]),
+  123_456_789_012_345_678_901_234_567_890n,
+  -5n,
+  new URL('https://example.com/a?b=c#d'),
+  /^a.b$/,
+  /x\/y/giu,
+  { missing: undefined, list: [undefined, Number.NaN] },
+  holed(3, { 0: 1, 2: 3 }),
+  holed(2, {}),
+  holed(1_000_001, { 1_000_000: 'last' }),
+  Object.assign(Object.create(null) as object, { a: 1, b: { c: 2 } }),
+]
+
 describe('kay decodes devalue text', () => {
   it('reads back every value an island prop may hold', () => {
-    const values: unknown[] = [
-      { name: 'kay', count: 3, ok: true, none: null, nested: { list: [1, 'two', [3]] } },
-      [],
-      {},
-      '',
-      'text with "quotes", </script> and \u2028\u2029',
-      0,
-      -12.5,
-      true,
-      null,
-      undefined,
-      Number.NaN,
-      Infinity,
-      -Infinity,
-      new Date('2026-10-04T21:01:00.000Z'),
-      new Map<unknown, unknown>([['a', 1], [{ key: true }, [2]]]),
-      new Set([1, 'two', { three: 3 }]),
-      123_456_789_012_345_678_901_234_567_890n,
-      -5n,
-      new URL('https://example.com/a?b=c#d'),
-      /^a.b$/,
-      /x\/y/giu,
-      { missing: undefined, list: [undefined, Number.NaN] },
-      holed(3, { 0: 1, 2: 3 }),
-      holed(2, {}),
-      holed(1_000_001, { 1_000_000: 'last' }),
-      Object.assign(Object.create(null) as object, { a: 1, b: { c: 2 } }),
-    ]
-
-    for (const value of values) {
+    for (const value of VALUES) {
       const decoded = roundTrip(value)
 
       expect(decoded).toStrictEqual(value)
@@ -144,6 +146,73 @@ describe('kay decodes devalue text', () => {
   it('reads a top-level constant', () => {
     expect(unflattenValue(-1)).toBeUndefined()
     expect(unflattenValue(-3)).toBeNaN()
+  })
+})
+
+describe('the browser writes devalue text itself', () => {
+  it('writes every value kay sends so that kay and devalue read it back alike', () => {
+    for (const value of VALUES) {
+      const text = sendValue(value)
+
+      expect(decodeValue(text)).toStrictEqual(value)
+      expect(parse(text)).toStrictEqual(value)
+    }
+  })
+
+  it('writes a Date, URLSearchParams and -0', () => {
+    const [date, search, zero] = decodeValue(sendValue([new Date('2026-10-06'), new URLSearchParams('a=1&a=2'), -0])) as [Date, URLSearchParams, number]
+
+    expect(date.toISOString()).toBe('2026-10-06T00:00:00.000Z')
+    expect(String(search)).toBe('a=1&a=2')
+    expect(Object.is(zero, -0)).toBe(true)
+    expect(Object.is(decodeValue(sendValue(-0)), -0)).toBe(true)
+  })
+
+  it('writes a shared or cyclic value once', () => {
+    const shared = { id: 1 }
+    const object: Record<string, unknown> = { shared, again: shared }
+    const map = new Map<string, unknown>()
+
+    object.self = object
+    map.set('map', map)
+
+    const decoded = decodeValue(sendValue({ object, map })) as { object: typeof object, map: typeof map }
+
+    expect(decoded.object.again).toBe(decoded.object.shared)
+    expect(decoded.object.self).toBe(decoded.object)
+    expect(decoded.map.get('map')).toBe(decoded.map)
+  })
+
+  it('writes a far index of a sparse array without its holes', () => {
+    const text = sendValue(holed(1_000_001, { 1_000_000: 'last' }))
+
+    expect(text).toBe('[[-7,1000001,1000000,1],"last"]')
+  })
+
+  it('writes a custom type through its reducer', () => {
+    const blob = new Blob(['x'])
+    const files: Blob[] = []
+    const text = sendValue({ a: blob, b: blob }, { File: value => value instanceof Blob && [files.push(value) - 1] })
+    const decoded = decodeValue(text, { File: ([index]: [number]) => files[index] }) as { a: Blob, b: Blob }
+
+    expect(files).toEqual([blob])
+    expect(decoded.a).toBe(blob)
+    expect(decoded.b).toBe(blob)
+  })
+
+  it('refuses what neither reader rebuilds', () => {
+    class Point {
+      constructor(readonly x: number) {}
+    }
+
+    const proto = JSON.parse('{"__proto__":1}') as object
+
+    expect(() => sendValue({ format: () => 'x' })).toThrow('kay: a function cannot be sent')
+    expect(() => sendValue([Symbol('x')])).toThrow('kay: a symbol cannot be sent')
+    expect(() => sendValue(new Point(1))).toThrow('kay: an instance of Point cannot be sent')
+    expect(() => sendValue(new Uint8Array(1))).toThrow('kay: an instance of Uint8Array cannot be sent')
+    expect(() => sendValue({ [Symbol('x')]: 1 })).toThrow('kay: an object with symbol keys cannot be sent')
+    expect(() => sendValue(proto)).toThrow('kay: an object with a __proto__ key cannot be sent')
   })
 })
 

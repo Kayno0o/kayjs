@@ -1,16 +1,17 @@
 import { DevalueError } from 'devalue'
 
 // Island props, action calls and the flash cookie go as devalue text: JSON that also carries Dates, Maps, Sets, bigints, URLs, RegExps, undefined and shared references.
-// devalue's stringify writes it and kay reads it back itself, so the browser does not ship a parse decoding the typed arrays, ArrayBuffers and Temporal values kay never sends.
+// The server writes it with devalue's stringify, whose errors name the path of what it cannot send; the browser writes it with `sendValue` (send.ts) and kay reads it back itself, so no client chunk ships devalue.
 export { stringify as encodeValue } from 'devalue'
 
 // Reads back a custom type, from what the stringify reducer of the same name returned.
 export type Reviver = (value: never) => unknown
 
 // What devalue writes in place of an index for a value it does not store.
-const CONSTANTS = new Map<unknown, unknown>([[-1, undefined], [-3, Number.NaN], [-4, Infinity], [-5, -Infinity], [-6, -0]])
+export const CONSTANTS = new Map<unknown, unknown>([[-1, undefined], [-3, Number.NaN], [-4, Infinity], [-5, -Infinity], [-6, -0]])
 const HOLE = -2
-const SPARSE = -7
+
+export const SPARSE = -7
 const MAX_ARRAY_LENGTH = 2 ** 32 - 1
 // The types devalue writes as text, a RegExp with its flags after.
 const FROM_TEXT: Record<string, (text: string, flags?: string) => unknown> = {
@@ -165,7 +166,7 @@ function assign(object: object, key: unknown, value: unknown, index: number): vo
   ;(object as Record<string, unknown>)[key] = value
 }
 
-function isIndex(value: unknown, length: number): value is number {
+export function isIndex(value: unknown, length: number): value is number {
   return Number.isInteger(value) && (value as number) >= 0 && (value as number) < length
 }
 

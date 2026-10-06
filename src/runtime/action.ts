@@ -4,8 +4,9 @@ import type { ErrorStatus, Locals, Redirect } from './checks'
 import type { Locale } from './i18n'
 import { withBase } from './base'
 import { createSignal, untrack } from './reactive'
+import { sendValue } from './send'
 import { FAILURE_HEADER, prefetched, REDIRECT_HEADER } from './swap'
-import { decodeValue, encodeValue, unflattenValue } from './wire'
+import { decodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
 const FAILURE = Symbol.for('kay.failure')
@@ -243,7 +244,7 @@ export function encodeCall(input: unknown): EncodedCall {
     return { headers: { 'x-kay-action': FORM_CALL }, body: input }
 
   const files: Blob[] = []
-  const text = encodeValue(input, { [FILE_TYPE]: (value: unknown) => value instanceof Blob && [files.push(value) - 1] })
+  const text = sendValue(input, { [FILE_TYPE]: (value: unknown) => value instanceof Blob && [files.push(value) - 1] })
 
   if (files.length === 0)
     return { headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: text }

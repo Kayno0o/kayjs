@@ -2,7 +2,6 @@ import type { CheckedHref } from './checks'
 import type { FetchedPage } from './swap'
 import { withBase, withoutBase } from './base'
 import { FAILURE_HEADER, NAVIGATE_HEADER, prefetched, REDIRECT_HEADER } from './swap'
-import { checkForm } from './validate'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
@@ -70,6 +69,7 @@ let scrollTimer: ReturnType<typeof setTimeout> | undefined
 const busyForms = new WeakSet<HTMLFormElement>()
 // A form handed back to the browser after the swap could not send it, which the next submit event lets through.
 const nativeSubmits = new WeakSet<HTMLFormElement>()
+let checks: Promise<typeof import('./validate')> | undefined
 
 // Takes over the links and forms of the app; called once by the entry.
 export function startNavigation(given: NavigationHooks): void {
@@ -96,6 +96,7 @@ export function startNavigation(given: NavigationHooks): void {
   history.scrollRestoration = 'manual'
   document.addEventListener('click', onClick)
   document.addEventListener('submit', onSubmit)
+  document.addEventListener('focusin', onFormFocus)
   window.addEventListener('popstate', onPopState)
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('pagehide', saveScroll)
@@ -700,15 +701,37 @@ function onSubmit(event: SubmitEvent): void {
   if (busyForms.has(form))
     return
 
-  if (!form.noValidate && !event.submitter?.hasAttribute('formnovalidate') && !passes(form, withoutBase(url.pathname)))
-    return
-
-  void send(form, event.submitter, url)
+  void submit(form, event.submitter, url)
 }
 
-// A check that breaks, on a pattern the browser cannot read for one, leaves the form to the server rather than unsendable.
-function passes(form: HTMLFormElement, action: string): boolean {
+// The form is busy from its submit on, so a second submit while its checks load posts nothing.
+async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url: URL): Promise<void> {
+  busyForms.add(form)
+
+  if (form.noValidate || submitter?.hasAttribute('formnovalidate') || await passes(form, withoutBase(url.pathname))) {
+    await send(form, submitter, url)
+
+    return
+  }
+
+  busyForms.delete(form)
+}
+
+// The checks load once a form takes focus, so a page with no form never fetches them.
+function loadChecks(): Promise<typeof import('./validate')> {
+  return checks ??= import('./validate')
+}
+
+function onFormFocus(event: FocusEvent): void {
+  if (event.target instanceof Element && event.target.closest('form'))
+    void loadChecks()
+}
+
+// A check that breaks, on a pattern the browser cannot read for one, or checks that cannot load, leave the form to the server rather than unsendable.
+async function passes(form: HTMLFormElement, action: string): Promise<boolean> {
   try {
+    const { checkForm } = await loadChecks()
+
     return checkForm(form, action)
   }
   catch (error) {
