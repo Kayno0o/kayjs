@@ -1,6 +1,9 @@
 import type { LintMessage } from '../src/eslint'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { writeShadowTypes } from '../src/check'
 import { positionAt } from '../src/compiler/mapping'
 import { processor, shadowParser } from '../src/eslint'
 
@@ -44,6 +47,33 @@ describe('kay/eslint', () => {
     const messages = processor.postprocess([[at(block!.text, block!.text.indexOf('__props.'), { ruleId: null, fatal: true, message: 'Parsing error' })]], FILE)
 
     expect(messages).toEqual([expect.objectContaining({ line: 1, column: 1, fatal: true })])
+  })
+
+  it('keeps a parser that threw, which reports no position, at the top of the file', () => {
+    processor.preprocess(CARD, FILE)
+
+    expect(processor.postprocess([[{ ruleId: null, fatal: true, message: 'Parsing error: no type information yet', line: 0, column: 0 }]], FILE)).toEqual([expect.objectContaining({ line: 1, column: 1, fatal: true })])
+  })
+
+  it('compiles with the routes directory the last kay check wrote the shadow tree with', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-eslint-'))
+    const page = join(root, 'pages', 'posts', '[id].kay')
+    const source = '--- server\nconst id = ctx.params.id\n---\np {id}\n'
+
+    try {
+      await Bun.write(join(root, 'tsconfig.json'), '{}')
+      await Bun.write(page, source)
+
+      // Read with the default `src/routes`, the page is no route, and its params are untyped.
+      expect(processor.preprocess(source, page)[0]!.text).not.toContain('"id": string')
+
+      await writeShadowTypes(root, { routes: 'pages' })
+
+      expect(processor.preprocess(source, page)[0]!.text).toContain('"id": string')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('drops a fix reaching past the code copied from the fence', () => {

@@ -94,11 +94,12 @@ export function shadowParser<Options extends ParserOptions, Result>(parser: { pa
 }
 
 function mapMessage(entry: Compiled, message: LintMessage): LintMessage | undefined {
-  const start = offsetAt(entry.tsx, { line: message.line, column: message.column })
-  const source = entry.map.isExact(start) ? entry.map.toSource(start) : undefined
+  // A parser that throws, as the shadow parser does without a shadow file, reports no line, or line 0.
+  const start = message.line >= 1 ? offsetAt(entry.tsx, { line: message.line, column: message.column }) : undefined
+  const source = start !== undefined && entry.map.isExact(start) ? entry.map.toSource(start) : undefined
 
   // A copied run maps its end too, which is where generated code follows it, such as the `;` after a fence's last statement.
-  if (source === undefined || entry.tsx[start] !== entry.source[source] || !entry.fences.some(fence => source >= fence.start && source <= fence.end)) {
+  if (start === undefined || source === undefined || entry.tsx[start] !== entry.source[source] || !entry.fences.some(fence => source >= fence.start && source <= fence.end)) {
     // A file that does not parse would otherwise pass: kay check names the reason at its line, this only keeps lint from passing.
     return message.fatal ? { ...message, line: 1, column: 1, endLine: undefined, endColumn: undefined } : undefined
   }
@@ -123,7 +124,7 @@ function mapFix(entry: Compiled, fix: LintFix): LintFix | undefined {
   return span && entry.fences.some(fence => span.start >= fence.start && span.end <= fence.end) ? { range: [span.start, span.end], text: fix.text } : undefined
 }
 
-// The project a file belongs to, as kay check and the LSP find it: the nearest directory holding a tsconfig.json.
+// The project a file belongs to, as the LSP finds it: the nearest directory holding a tsconfig.json, which is where `kay check` runs.
 function projectRoot(file: string): string {
   for (let dir = dirname(file); dir !== dirname(dir); dir = dirname(dir)) {
     if (existsSync(join(dir, TSCONFIG)))

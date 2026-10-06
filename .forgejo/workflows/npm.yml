@@ -57,7 +57,7 @@ jobs:
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
 
-      # prepack writes the declarations under types/ that the exports point at.
+      # prepack writes what the exports point at: the declarations under types/ and the Node build of kay/eslint under dist/.
       - name: Publish to Forgejo npm registry
         run: bun publish --access public
         env:
