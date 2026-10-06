@@ -59,7 +59,7 @@ export async function builtFonts(dir: string): Promise<FontAssets | undefined> {
   return await file.exists() ? await file.json() as FontAssets : undefined
 }
 
-// Preloaded before the stylesheet asks for them, so text renders in its font on the first paint more often; `crossorigin` is what lets the browser reuse a font preload.
+// The faces with `preload: true` are fetched before the stylesheet asks for them, so their text renders in its font on the first paint more often; `crossorigin` is what lets the browser reuse a font preload.
 export function fontTags(assets: FontAssets): HeadTag[] {
   return [
     ...assets.preload.map(({ href, type }) => ({ tag: 'link', props: { rel: 'preload', href, as: 'font', type, crossorigin: '' } })),

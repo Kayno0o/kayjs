@@ -276,7 +276,7 @@ import { defineConfig } from 'kay/server'
 
 export default defineConfig({
   fonts: [
-    { family: 'Inter', src: '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', weight: '100 900' },
+    { family: 'Inter', src: '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', weight: '100 900', preload: true },
     { family: 'Lora', src: 'src/fonts/lora-italic.woff2', style: 'italic' },
   ],
 })
@@ -284,7 +284,7 @@ export default defineConfig({
 
 - `src` is a `.woff2`, `.woff`, `.ttf` or `.otf` file relative to the root, or a file of an installed package. `weight` defaults to 400, or takes a range for a variable font; `style` to `normal`; `display` to `swap`; `unicodeRange` is passed through.
 - A stylesheet names the family as it would any other: `font-family: Inter, system-ui, sans-serif`. With Tailwind, `@theme { --font-sans: Inter, system-ui, sans-serif; }`.
-- A face loads once the page uses it, its text showing in the fallback font until then (`display: swap`). `preload: true` fetches it with the page instead, so text is likelier to paint in it first, but on a slow phone a preload shares the link with the stylesheet and holds back the first paint, about 190 ms for two faces on jb-peinture under Lighthouse throttling: preload at most the one face the first screen's text is set in, and none when the first paint matters more.
+- A face loads once the page uses it, its text showing in the fallback font until then (`display: swap`). `preload: true` fetches it with the page instead, so text is likelier to paint in it first, but on a slow phone a preload shares the link with the stylesheet and holds back the first paint: dropping its two preloads painted jb-peinture about 190 ms sooner on a throttled phone, with no layout shift to speak of. Preload a face only when text painting in it first matters more than painting sooner.
 
 ## Styles
 

@@ -35,6 +35,14 @@ describe('fonts', () => {
     expect((await app.handle(new Request(`http://localhost${preloads[0]![0]}`))).status).toBe(200)
   })
 
+  it('preloads no font unless one asks for it, still linking their stylesheet', async () => {
+    const app = await pages({ routes: ROUTES, prebuilt: false, fonts: [{ ...FONTS[0]!, preload: false }, FONTS[1]!] })
+    const html = await (await app.handle(new Request('http://localhost/about'))).text()
+
+    expect(html).not.toContain('rel="preload"')
+    expect(html).toMatch(/<link rel="stylesheet" href="\/_kay\/assets\/fonts-\w+\.css">/)
+  })
+
   it('records what it wrote for an executable, which reads it back', async () => {
     const written = await prepareFonts(process.cwd(), FONTS, scratch)
 
