@@ -4,7 +4,7 @@ import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t, ValidationError } from 'elysia'
-import { signal } from '../src/runtime'
+import { persisted } from '../src/runtime'
 import { action } from '../src/runtime/action'
 import { hydrateIslands } from '../src/runtime/client'
 import { attempt, hydrate, HydrationMismatch } from '../src/runtime/dom'
@@ -239,7 +239,7 @@ describe('page swap, checking a form in the browser', () => {
   it('leaves the default for a persisted cookie cut short', () => {
     document.cookie = 'cut=%E0%A4%A'
 
-    expect(signal('light', { persist: 'cut' })()).toBe('light')
+    expect(persisted('cut', 'light')()).toBe('light')
   })
 
   it('leaves markup a try block would not claim to its island, which renders afresh', () => {

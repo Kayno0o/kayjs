@@ -19,7 +19,7 @@ const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 const TRAILING_SLASH = /\/$/
 
 // What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
-export function persisted<T>(key: string, storage: PersistStorage, read: () => T, write: (value: T) => void): Persisted<T> {
+export function keepValue<T>(key: string, storage: PersistStorage, read: () => T, write: (value: T) => void): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
     throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; persist under letters, digits and - _ . only`)
 
@@ -124,7 +124,7 @@ function saveCookie(name: string, value: unknown): void {
   const text = encodeURIComponent(sendValue(value))
 
   if (text.length + name.length > MAX_COOKIE_BYTES) {
-    console.warn(`[kay] the value of the persisted signal ${name} is over ${MAX_COOKIE_BYTES} bytes encoded, too big for a cookie, so it was not kept; persist it with storage: 'local'`)
+    console.warn(`[kay] the value of the persisted signal ${name} is over ${MAX_COOKIE_BYTES} bytes encoded, too big for a cookie, so it was not kept; persist it with { storage: 'local' }`)
 
     return
   }

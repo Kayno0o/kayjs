@@ -5,7 +5,7 @@ import type { Deferred, Locals, Redirect } from './checks'
 import type { Locale } from './i18n'
 import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
-import { persisted } from './persist'
+import { keepValue } from './persist'
 import { createSignal, onCleanup, provideContext, readContext, tracking, untrack } from './reactive'
 
 // Writes a value, or what a function makes of the current one.
@@ -19,24 +19,33 @@ export interface Signal<T> {
 // A function passed to `set` is an updater, so a signal holds no functions.
 type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
-export interface SignalSettings<T> extends SignalOptions<T> {
-  // Keeps the value across pages and visits under this name.
-  persist?: string
+export interface PersistedOptions<T> extends SignalOptions<T> {
   // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated.
   storage?: PersistStorage
 }
 
 // A signal read as `count()` and written as `count.set(1)` or `count.set(c => c + 1)`.
 export function signal<T>(): Signal<T | undefined>
-export function signal<T>(value: PlainValue<T>, options?: SignalSettings<T>): Signal<T>
-export function signal<T>(value?: PlainValue<T>, options?: SignalSettings<T | undefined>): Signal<T | undefined> {
-  const [own, write] = createSignal<T | undefined>(value, options)
-  const kept = options?.persist === undefined ? undefined : persisted(options.persist, options.storage ?? 'cookie', own, write)
-  const read = kept?.read ?? own
-  const set: Setter<T | undefined> = (next) => {
-    write(typeof next === 'function' ? (next as (current: T | undefined) => T | undefined)(untrack(read)) : next)
-    kept?.save(untrack(own))
-  }
+export function signal<T>(value: PlainValue<T>, options?: SignalOptions<T>): Signal<T>
+export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | undefined>): Signal<T | undefined> {
+  const [read, write] = createSignal<T | undefined>(value, options)
+
+  return withSetter(read, write)
+}
+
+// A signal whose value is kept across pages and visits under `name`, the cookie's or the localStorage key's.
+export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T>): Signal<T> {
+  const [own, write] = createSignal<T>(value, options)
+  const kept = keepValue(name, options?.storage ?? 'cookie', own, write)
+
+  return withSetter(kept.read, (next) => {
+    write(next)
+    kept.save(untrack(own))
+  })
+}
+
+function withSetter<T>(read: () => T, write: (value: T) => void): Signal<T> {
+  const set: Setter<T> = next => write(typeof next === 'function' ? (next as (current: T) => T)(untrack(read)) : next)
 
   return Object.assign(read, { set })
 }
