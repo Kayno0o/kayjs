@@ -27,7 +27,9 @@ export function compileErrorPage(diagnostics: FileDiagnostic[], error: unknown):
     const { line, column } = positionAt(diagnostic.source, diagnostic.start)
     const where = `${relative(process.cwd(), diagnostic.file)}:${line}:${column}`
 
-    return `<h2>${Bun.escapeHTML(where)}</h2><p>${Bun.escapeHTML(diagnostic.message)}</p><pre>${Bun.escapeHTML(codeFrame(diagnostic.source, diagnostic.start, diagnostic.end))}</pre>`
+    const footer = [['note', diagnostic.note], ['help', diagnostic.help]].map(([kind, text]) => text === undefined ? '' : `<p><b>${kind}:</b> ${Bun.escapeHTML(text)}</p>`).join('')
+
+    return `<h2>${Bun.escapeHTML(where)}</h2><p>${Bun.escapeHTML(diagnostic.message)}</p><pre>${Bun.escapeHTML(codeFrame(diagnostic.source, diagnostic.start, diagnostic.end))}</pre>${footer}`
   })
 
   return document('Compile error', `<h1>${diagnostics.length} compile error${diagnostics.length === 1 ? '' : 's'}</h1>${sections.join('')}`)

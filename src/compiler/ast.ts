@@ -5,12 +5,32 @@ export interface Span {
 }
 
 export interface Diagnostic extends Span {
+  // What is wrong, short; what to do about it goes in `help`.
   message: string
+  // Printed under the span, when the message alone does not say what this part of the line is.
+  label?: string
+  // The other places the problem involves, each labelled with its part in it.
+  related?: Labelled[]
+  // Why it is a problem, when the message does not say.
+  note?: string
+  // What to write instead.
+  help?: string
+  // A lint's name, which `kay.config.ts` and a `// kay-allow` comment set the level of; a compile error has none.
+  code?: string
+  // A lint at the `warn` level is a warning, reported without failing; anything else is an error.
+  severity?: 'error' | 'warning'
   // What the editor offers to fix it with.
   fixes?: Fix[]
   // Reported by type checking only: the code generated around it is whole, so the file's type errors still count.
   checkOnly?: boolean
 }
+
+export interface Labelled extends Span {
+  label: string
+}
+
+// What a diagnostic says besides its message and span.
+export type Details = Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'fixes'>
 
 // Edits to the `.kay` source, by offset into it.
 export interface Fix {

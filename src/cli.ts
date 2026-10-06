@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import type { ParseArgsOptionsConfig } from 'node:util'
+import type { Paint } from './compiler/frame'
 import type { KayConfig } from './config'
 import type { Template } from './new'
 import type { ClientBuild } from './server/client'
@@ -7,7 +8,7 @@ import { existsSync, statSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { parseArgs } from 'node:util'
+import { parseArgs, styleText } from 'node:util'
 import { compileServer } from './build/compile'
 import { exportStatic, refuseStaticConfig } from './build/static'
 import { KayCompileError } from './build/transform'
@@ -30,6 +31,8 @@ import { writeImageVariants } from './server/image'
 import { ExportError, prerenderPages } from './server/prerender'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
+// Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
+const toStderr: Paint = (styles, text) => styleText(styles, text, { stream: process.stderr })
 const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 interface Parsed {
@@ -131,7 +134,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
     if (!sources.has(diagnostic.file))
       sources.set(diagnostic.file, await readSource(diagnostic.file))
 
-    console.error(`${formatCheckDiagnostic(diagnostic, sources.get(diagnostic.file))}\n`)
+    console.error(`${formatCheckDiagnostic(diagnostic, sources.get(diagnostic.file), toStderr)}\n`)
   }
 
   if (diagnostics.length > 0)
@@ -440,7 +443,7 @@ async function fmt(args: string[]): Promise<number> {
 
   for (const { file, source, diagnostics } of errors) {
     for (const diagnostic of diagnostics)
-      console.error(`${formatDiagnostic(source, relative(process.cwd(), file), diagnostic)}\n`)
+      console.error(`${formatDiagnostic(source, relative(process.cwd(), file), diagnostic, toStderr)}\n`)
   }
 
   for (const file of changed)

@@ -2,6 +2,7 @@ import type { Subprocess } from 'bun'
 import type { CheckOptions } from '../check'
 import type { ShadowFile } from '../check/shadow'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
+import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import { existsSync } from 'node:fs'
@@ -56,6 +57,7 @@ const WORD_CHARACTER = /[\w$]/
 const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|Prop|FunctionProp|Children|PageContext|PrerenderedContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
 const FULL_SYNC = 1
 const ERROR = 1 as const
+const WARNING = 2 as const
 const CREATED = 1
 const CHANGED = 2
 const DELETED = 3
@@ -310,11 +312,14 @@ export class KayLanguageServer {
 
   private async publishDiagnostics(document: Document) {
     // A compile error leaves the shadow TSX half-written, so its type errors would only be noise; one found by type checking only leaves it whole.
+    const rangeOf = (span: Span) => ({ start: toPosition(document.source, span.start), end: toPosition(document.source, Math.max(span.end, span.start + 1)) })
     const compileErrors = document.diagnostics.map(diagnostic => ({
-      range: { start: toPosition(document.source, diagnostic.start), end: toPosition(document.source, Math.max(diagnostic.end, diagnostic.start + 1)) },
-      severity: ERROR,
+      range: rangeOf(diagnostic),
+      severity: diagnostic.severity === 'warning' ? WARNING : ERROR,
       source: 'kay',
-      message: diagnostic.message,
+      ...diagnostic.code !== undefined && { code: diagnostic.code },
+      message: [diagnostic.message, ...[['note', diagnostic.note], ['help', diagnostic.help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n'),
+      ...diagnostic.related && { relatedInformation: diagnostic.related.map(span => ({ location: { uri: document.uri, range: rangeOf(span) }, message: span.label })) },
     }))
     const report = document.diagnostics.some(diagnostic => !diagnostic.checkOnly) ? undefined : await this.server.request<DocumentDiagnosticReport>('textDocument/diagnostic', { textDocument: { uri: document.shadowUri } })
 

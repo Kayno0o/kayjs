@@ -1,4 +1,5 @@
 import type { Diagnostic, Node, Span } from './ast'
+import type { Paint } from './frame'
 import type { FoundRewrites } from './rewrite'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
@@ -6,7 +7,7 @@ import process from 'node:process'
 import { awaitBlocks, tryBlocks } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandMessages } from './codegen'
-import { codeFrame } from './frame'
+import { formatReport } from './frame'
 import { positionAt, SourceMap } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
@@ -115,7 +116,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     diagnostics.push(...unboundedFields(source, file.server), ...unreadNames(source, script, server, found))
 
   if (file.client && routeFile)
-    diagnostics.push({ ...file.client, message: 'A page, layout or special page renders on the server; only a component it renders can be `--- client`' })
+    diagnostics.push({ ...file.client, message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
 
   // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.
   if (client && options.output === 'html' && island)
@@ -193,8 +194,6 @@ function freeName(name: string, code: string): string {
   return new RegExp(`(?<![\\w$])${name}(?![\\w$])`).test(code) ? freeName(`${name}Page`, code) : name
 }
 
-export function formatDiagnostic(source: string, filename: string, diagnostic: Diagnostic): string {
-  const { line, column } = positionAt(source, diagnostic.start)
-
-  return `${filename}:${line}:${column} - ${diagnostic.message}\n${codeFrame(source, diagnostic.start, diagnostic.end)}`
+export function formatDiagnostic(source: string, filename: string, diagnostic: Diagnostic, paint?: Paint): string {
+  return formatReport({ ...diagnostic, file: filename, ...positionAt(source, diagnostic.start), frame: { source, start: diagnostic.start, end: diagnostic.end } }, paint)
 }

@@ -41,6 +41,8 @@ const TYPEOF_GLOBAL = /\btypeof\s+([a-z_$][\w$]*)/gi
 const VARYING_HINT = /\b(?:Date|Math|toLocale\w*|Intl)\b/
 const LOCALE_METHODS = new Set(['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString'])
 const MOVED = 'read it in `effect` or `onMount`, or on the server and pass it as a prop'
+const BROWSER_ONLY_HELP = 'read it in `effect` or `onMount`, or render the component in the browser only with `--- client`'
+const MISMATCH = 'what the island renders from it will not match the server\'s markup when it hydrates'
 const CLOCK = { reason: 'reads the clock, which has moved on by the time the island hydrates', remedy: MOVED }
 const RANDOM = { reason: 'gives another number in the browser', remedy: MOVED }
 const NO_LOCALE = { reason: 'formats in the server\'s default locale there and in the visitor\'s in the browser', remedy: 'pass it a locale' }
@@ -211,9 +213,9 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
     const span = { start, end: start + read.name.length }
 
     if (!read.typeOf)
-      diagnostics.push({ ...span, message: `\`${read.name}\` exists only in the browser, and this reads it while the component renders on the server too: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``, fixes: [...effectFix(file, program.code, read, effectBound, toSource, ast), ...toClient], checkOnly: true })
+      diagnostics.push({ ...span, message: `\`${read.name}\` exists only in the browser`, note: 'this reads it while the component renders on the server too', help: BROWSER_ONLY_HELP, fixes: [...effectFix(file, program.code, read, effectBound, toSource, ast), ...toClient], checkOnly: true })
     else if (island)
-      diagnostics.push({ ...span, message: `\`typeof ${read.name}\` differs between the server and the browser, so what the island renders from it will not match the server's markup when it hydrates: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``, fixes: toClient, checkOnly: true })
+      diagnostics.push({ ...span, message: `\`typeof ${read.name}\` differs between the server and the browser`, note: MISMATCH, help: BROWSER_ONLY_HELP, fixes: toClient, checkOnly: true })
   }
 
   for (const value of varying) {
@@ -221,7 +223,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
     const end = toSource(value.end)
 
     if (start !== undefined && end !== undefined && renders(value.chain))
-      diagnostics.push({ start, end, message: `\`${value.label}\` ${value.reason}, so what the island renders from it will not match the server's markup when it hydrates: ${value.remedy}`, checkOnly: true })
+      diagnostics.push({ start, end, message: `\`${value.label}\` ${value.reason}`, note: MISMATCH, help: value.remedy, checkOnly: true })
   }
 
   return diagnostics

@@ -1057,7 +1057,7 @@ describe('problems kay check reports', () => {
     const block = (/<script type="application\/json" id="kay-check-problems">(.*?)<\/script>/).exec(await (await dev.handle(new Request('http://localhost/'))).text())?.[1]
 
     expect(block).not.toContain('<')
-    expect(JSON.parse(block!)).toContainEqual(expect.stringMatching(/^tests\/fixtures\/problems\/src\/routes\/index\.kay:1:1 - An `img` needs `alt`/))
+    expect(JSON.parse(block!)).toContainEqual(expect.stringMatching(/^error: An `img` needs `alt`\n --> tests\/fixtures\/problems\/src\/routes\/index\.kay:1:1\n/))
 
     const production = new Elysia().use(await pages({ routes, prebuilt: false, security: false }))
 

@@ -48,6 +48,13 @@ async function run(...args: string[]): Promise<{ code: number, output: string }>
   return { code, output: `${stdout}${stderr}` }
 }
 
+// Each error kay check printed, as its location then its heading.
+function reported(output: string): string[] {
+  const lines = output.split('\n')
+
+  return lines.flatMap((line, index) => line.startsWith('error') ? [`${lines.slice(index).find(next => next.trimStart().startsWith('--> '))!.trim().slice('--> '.length)} ${line}`] : [])
+}
+
 async function newProject(): Promise<string> {
   const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
 
@@ -229,8 +236,8 @@ describe('kay libraries', () => {
 
     const { code, output } = await run('check', project)
 
-    expect(output.split('\n').filter(line => line.includes(' - error '))).toEqual([
-      `${relative(process.cwd(), join(project, 'src/doubled.ts'))}:3:30 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.`,
+    expect(reported(output)).toEqual([
+      `${relative(process.cwd(), join(project, 'src/doubled.ts'))}:3:30 error[TS2345]: Argument of type 'string' is not assignable to parameter of type 'number'.`,
     ])
     expect(code).toBe(1)
   })
@@ -248,12 +255,10 @@ describe('kay libraries', () => {
 
     expect(code).toBe(1)
 
-    const errors = output.split('\n').filter(line => line.includes(' - error '))
-
-    expect(errors).toEqual([
-      `${relative(process.cwd(), join(project, 'src/ui-settings.ts'))}:1:1 - error TS2322: The settings for kay-lib do not match what it takes: Type '{ tone: number; icon: (name: string) => string; }' is not assignable to type 'Settings'.`,
-      `${relative(process.cwd(), join(project, 'node_modules/kay-lib/src/typo.kay'))}:4:20 - error TS2339: Property 'missing' does not exist on type 'string'.`,
-      `${relative(process.cwd(), join(project, 'src/routes/typed.kay'))}:5:7 - error TS2322: Type 'number' is not assignable to type 'string'.`,
+    expect(reported(output)).toEqual([
+      `${relative(process.cwd(), join(project, 'src/ui-settings.ts'))}:1:1 error[TS2322]: The settings for kay-lib do not match what it takes: Type '{ tone: number; icon: (name: string) => string; }' is not assignable to type 'Settings'.`,
+      `${relative(process.cwd(), join(project, 'node_modules/kay-lib/src/typo.kay'))}:4:20 error[TS2339]: Property 'missing' does not exist on type 'string'.`,
+      `${relative(process.cwd(), join(project, 'src/routes/typed.kay'))}:5:7 error[TS2322]: Type 'number' is not assignable to type 'string'.`,
     ])
   })
 })

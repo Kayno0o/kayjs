@@ -144,7 +144,7 @@ describe('client-only islands', () => {
 describe('browser-only globals read while rendering', () => {
   // Each fix as the source it leaves, its edits applied from the last.
   const fixed = (source: string, edits: { start: number, end: number, text: string }[]) => edits.toSorted((a, b) => b.start - a.start).reduce((text, change) => text.slice(0, change.start) + change.text + text.slice(change.end), source)
-  const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message.slice(0, diagnostic.message.indexOf(',')), fixes: diagnostic.fixes?.map(fix => fixed(source, fix.edits)) }))
+  const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message, fixes: diagnostic.fixes?.map(fix => fixed(source, fix.edits)) }))
   const client = (source: string) => source.replace('---', '--- client')
 
   it('reports one read by the script, a function the template calls, a memo or the template itself, each with its fixes', () => {
@@ -172,10 +172,11 @@ describe('browser-only globals read while rendering', () => {
 
     expect(reads(island)).toEqual([{ text: 'window', message: '`typeof window` differs between the server and the browser', fixes: [client(island)] }])
     expect(reads(page)).toEqual([])
+    expect(compileKay(island, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [diagnostic.note, diagnostic.help])).toEqual([['what the island renders from it will not match the server\'s markup when it hydrates', 'read it in `effect` or `onMount`, or render the component in the browser only with `--- client`']])
   })
 
   it('refuses `--- client` on a layout or a page with a server fence', () => {
-    expect(compileKay('--- client\n---\nslot\n', join(process.cwd(), '_layout.kay')).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['A page, layout or special page renders on the server; only a component it renders can be `--- client`'])
+    expect(compileKay('--- client\n---\nslot\n', join(process.cwd(), '_layout.kay')).diagnostics.map(diagnostic => [diagnostic.message, diagnostic.note])).toEqual([['A page, layout or special page cannot be `--- client`', 'it renders on the server']])
     expect(compileKay('--- server\nconst a = 1\n---\n--- client\n---\np {a}\n', join(process.cwd(), 'page.kay')).diagnostics).toHaveLength(1)
   })
 
@@ -203,7 +204,7 @@ describe('browser-only globals read while rendering', () => {
 })
 
 describe('values an island renders differently on the server and in the browser', () => {
-  const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [source.slice(diagnostic.start, diagnostic.end), diagnostic.message.slice(0, diagnostic.message.indexOf(', so'))])
+  const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [source.slice(diagnostic.start, diagnostic.end), diagnostic.message])
   const island = (script: string, template: string) => `---\nimport { signal } from 'kay'\n\nconst count = signal(0)\n${script}\n---\nbutton(onClick={() => count.set(c => c + 1)}) ${template}\n`
 
   it('reports the clock, a random number, and a locale or time zone left to the platform while an island renders', () => {
@@ -219,7 +220,7 @@ describe('values an island renders differently on the server and in the browser'
       ['new Intl.DateTimeFormat(\'fr\', { hour: \'numeric\' })', '`Intl.DateTimeFormat` formats in the server\'s time zone there and in the visitor\'s in the browser'],
       ['Date()', '`Date()` reads the clock, which has moved on by the time the island hydrates'],
     ])
-    expect(compileKay(island('const now = Date.now()', '{now}'), join(process.cwd(), 'widget.kay'), { check: true }).diagnostics[0]!.message).toBe('`Date.now()` reads the clock, which has moved on by the time the island hydrates, so what the island renders from it will not match the server\'s markup when it hydrates: read it in `effect` or `onMount`, or on the server and pass it as a prop')
+    expect(compileKay(island('const now = Date.now()', '{now}'), join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [diagnostic.message, diagnostic.note, diagnostic.help])).toEqual([['`Date.now()` reads the clock, which has moved on by the time the island hydrates', 'what the island renders from it will not match the server\'s markup when it hydrates', 'read it in `effect` or `onMount`, or on the server and pass it as a prop']])
   })
 
   it('leaves alone what both sides compute alike, what runs in the browser only, and a static component', () => {

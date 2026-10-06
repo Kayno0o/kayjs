@@ -95,7 +95,7 @@ describe('fence', () => {
   })
 
   it('reports type parameters on the server fence', () => {
-    expect(parse('--- server <T>\nconst a = 1\n---\np hi\n').diagnostics.map(diagnostic => diagnostic.message)).toEqual(['Type parameters go on the component script fence: `--- <T>`'])
+    expect(parse('--- server <T>\nconst a = 1\n---\np hi\n').diagnostics.map(diagnostic => [diagnostic.message, diagnostic.help])).toEqual([['Type parameters go on the component script fence', '`--- <T>`']])
   })
 })
 
@@ -159,7 +159,8 @@ describe('elements', () => {
   it('reports a control line after `tag: ` rather than reading it as an element', () => {
     const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message.slice(0, 30)])
 
-    expect(at('li: if a\n  p x')).toEqual([['if', '`if` starts a line of its own;']])
+    expect(at('li: if a\n  p x')).toEqual([['if', '`if` starts a line of its own']])
+    expect(parse('li: if a\n  p x').diagnostics[0]?.help).toBe('put it on the next line, indented under <li>')
     expect(at('ul: for x of xs key={x}\n  li x')).toEqual([['for', '`for` starts a line of its own']])
     expect(at('div: await p then v')).toEqual([['await', '`await` starts a line of its o']])
   })
@@ -167,7 +168,8 @@ describe('elements', () => {
   it('reports the pug lines kay has no counterpart for, with their indented block', () => {
     const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message.slice(0, 40)])
 
-    expect(at('each x in xs\n  p {x}')).toEqual([['each', '`each` is pug syntax kay does not have; ']])
+    expect(at('each x in xs\n  p {x}')).toEqual([['each', '`each` is pug syntax kay does not have']])
+    expect(parse('each x in xs\n  p {x}').diagnostics[0]?.help).toBe('kay loops with `for item of list key={item.id}`')
     expect(at('doctype html\np')).toEqual([['doctype', '`doctype` is pug syntax kay does not hav']])
     expect(at('div\n  include a.pug')).toEqual([['include', '`include` is pug syntax kay does not hav']])
     expect(at('blockquote each one\np while\n')).toEqual([])
@@ -287,7 +289,7 @@ describe('control flow', () => {
   })
 
   it('requires then after await and rejects a stray then or catch', () => {
-    expect(parse('await x\n  p wait\np after').diagnostics[0]?.message).toContain('needs a `then` block')
+    expect(parse('await x\n  p wait\np after').diagnostics[0]?.message).toBe('`await` has no `then` block')
     expect(parse('p a\nthen x').diagnostics[0]?.message).toContain('`then` must directly follow an `await`')
     expect(parse('await x\n  p\ncatch e\n  p').diagnostics.map(d => d.message)).toContain('`catch` must directly follow a `try`, or the `then` of an `await`, at the same indentation')
     expect(parse('await x then a\n  p\nthen b\n  p').diagnostics[0]?.message).toContain('`then` must directly follow')
@@ -305,7 +307,7 @@ describe('control flow', () => {
   })
 
   it('rejects text on a try line, and a second catch', () => {
-    expect(parse('try now\n  p').diagnostics.map(d => d.message)).toEqual(['`try` takes nothing on its line: its block goes below it, indented'])
+    expect(parse('try now\n  p').diagnostics.map(d => d.message)).toEqual(['`try` takes nothing on its line'])
     expect(parse('try\n  p\ncatch\n  p\ncatch\n  p').diagnostics.map(d => d.message)).toEqual(['`catch` must directly follow a `try`, or the `then` of an `await`, at the same indentation'])
   })
 

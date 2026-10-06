@@ -239,7 +239,7 @@ describe('kay lsp', () => {
   it('shows the signature of the call under the cursor', async () => {
     const help = await site.request<{ signatures: { label: string }[] }>('textDocument/signatureHelp', 'src/components/quick-add.kay', 9, 28)
 
-    expect(help.signatures[0]!.label).toBe('add(input: { title: string; }): Promise<number>')
+    expect(help.signatures[0]!.label).toBe('add(input: { title: string; }, options?: CallOptions): Promise<number>')
   })
 
   it('formats a .kay document as one whole-document edit', async () => {
@@ -353,7 +353,7 @@ describe('kay lsp imports', () => {
     const line = { start: { line: 4, character: 0 }, end: { line: 4, character: 12 } }
     const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range: line, context: { diagnostics } })
 
-    expect(diagnostics.map(diagnostic => diagnostic.source === 'kay' ? diagnostic.message.slice(0, diagnostic.message.indexOf(',')) : diagnostic.code)).toEqual(['`localStorage` exists only in the browser', 2339])
+    expect(diagnostics.map(diagnostic => diagnostic.source === 'kay' ? diagnostic.message : diagnostic.code)).toEqual(['`localStorage` exists only in the browser\nnote: this reads it while the component renders on the server too\nhelp: read it in `effect` or `onMount`, or render the component in the browser only with `--- client`', 2339])
     expect(actions.map(action => ({ title: action.title, text: applyEdits(source, action.edit!.changes![editor.uri(page)]!) }))).toEqual([
       { title: 'Read `localStorage` in an effect, once the component renders in the browser', text: source.replace('signal }', 'signal, effect }').replace('localStorage.clear()', 'effect(() => localStorage.clear())') },
       { title: 'Render the component in the browser only with `--- client`', text: source.replace('---', '--- client') },

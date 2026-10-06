@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
@@ -83,9 +83,9 @@ const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
 // Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a `role`.
 const INTERACTIVE_TAGS = new Set(['a', 'audio', 'button', 'details', 'embed', 'iframe', 'input', 'label', 'object', 'option', 'select', 'summary', 'textarea', 'video'])
 // An attribute an element needs to be understood without seeing it, and what to write.
-const REQUIRED_TEXT = new Map<string, [attribute: string, message: string]>([
-  ['img', ['alt', 'An `img` needs `alt`: what it shows, or `alt=""` when it is only decoration']],
-  ['iframe', ['title', 'An `iframe` needs a `title` naming what it holds, which screen readers announce']],
+const REQUIRED_TEXT = new Map<string, [attribute: string, message: string, help: string]>([
+  ['img', ['alt', 'An `img` needs `alt`', 'say what it shows, or write `alt=""` when it is only decoration']],
+  ['iframe', ['title', 'An `iframe` needs a `title`', 'name what it holds, which screen readers announce']],
 ])
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script` and `base` elements only'
 
@@ -219,7 +219,7 @@ class Generator {
 
     if (this.file.typeParameters) {
       if (server)
-        this.error(this.file.typeParameters, 'A page gets its data from `--- server` and takes no props, so it has no type parameters')
+        this.error(this.file.typeParameters, 'A page has no type parameters', { note: 'a page gets its data from `--- server` and takes no props' })
       else
         b.add('<').addSource(this.file.typeParameters).add('>')
     }
@@ -230,7 +230,7 @@ class Generator {
       b.add(`__props: KayPageData<typeof load>${childrenSlot ? childrenType : ''}`)
 
       if (script.props)
-        this.error(script.props.statement, 'A page gets its data from `--- server`, so it declares no props; read the server names directly')
+        this.error(script.props.statement, 'A page declares no props', { note: 'a page gets its data from `--- server`', help: 'read the server names directly' })
     }
     else if (script.props) {
       b.add(childrenSlot ? '__props: (' : '__props: ')
@@ -284,7 +284,7 @@ class Generator {
     const span = this.server?.exportSpans.get(QUERY)
 
     if (span && this.options.special) {
-      this.error(span, 'Only a page declares its query; a layout or special page reads its page\'s through `ctx.query`')
+      this.error(span, 'Only a page declares its query', { help: 'read the page\'s query through `ctx.query`' })
 
       return false
     }
@@ -329,7 +329,7 @@ class Generator {
       if (first.imported === binding.imported && first.source === binding.source && (binding.typeOnly || !first.typeOnly))
         duplicates.push(binding)
       else
-        this.error(binding.span, `\`${binding.local}\` is imported twice, once in each fence, and not the same way; import it once`)
+        this.error(binding.span, `\`${binding.local}\` is imported twice, once in each fence, and not the same way`, { related: [{ ...first.span, label: 'first imported here' }], help: 'import it once' })
     }
 
     return duplicates
@@ -488,9 +488,9 @@ class Generator {
       }
 
       if (head)
-        this.error(node, 'A template has one `head` block')
+        this.error(node.tag, 'A template has one `head` block', { related: [{ ...head.tag, label: 'the first one' }] })
       else if (this.options.island)
-        this.error(node, 'An island also renders in the browser, so it cannot set the document head; move the `head` block to its page')
+        this.error(node.tag, 'An island cannot set the document head', { note: 'an island also renders in the browser', help: 'move the `head` block to its page' })
       else if (node.attributes.length > 0 || node.classes.length > 0 || node.id)
         this.error(node, 'A `head` block takes no attributes')
 
@@ -845,7 +845,7 @@ class Generator {
 
     if (isChildrenSlot(element)) {
       if (element.attributes.length > 0 || element.classes.length > 0 || element.id || element.children.length > 0)
-        this.error(element, '`slot` marks where a layout or wrapper renders its children; it takes no attributes or content')
+        this.error(element, '`slot` takes no attributes or content', { note: '`slot` marks where a layout or wrapper renders its children' })
 
       b.wrap(element, () => b.add('{__props.children}'))
 
@@ -873,10 +873,10 @@ class Generator {
       }
 
       // Each prop is passed once: by an attribute, by an `@name` block, or for `children` by the lines under the tag.
-      const passed = new Map<string, string>(element.attributes.flatMap(attribute => attribute.kind === 'spread' ? [] : [[this.text(attribute.name), 'an attribute']]))
+      const passed = new Map<string, Labelled>(element.attributes.flatMap(attribute => attribute.kind === 'spread' ? [] : [[this.text(attribute.name), { ...attribute.name, label: 'passed by this attribute' }]]))
 
       if (children.length > 0)
-        passed.set('children', 'the lines under the tag')
+        passed.set('children', { ...children[0]!, label: 'passed by the lines under the tag' })
 
       for (const slot of slots) {
         if (!element.component) {
@@ -889,9 +889,9 @@ class Generator {
         const earlier = passed.get(name)
 
         if (earlier !== undefined)
-          this.error(slot.name, `\`${name}\` is passed twice, by ${earlier} and by this \`@${name}\``)
+          this.error(slot.name, `\`${name}\` is passed twice`, { label: 'passed again here', related: [earlier] })
 
-        passed.set(name, `another \`@${name}\``)
+        passed.set(name, { ...slot.name, label: `passed by this \`@${name}\`` })
 
         // `@row(todo)` passes a function the component calls per item, its parameters typed from the prop.
         if (slot.params && this.options.check && !this.options.island && !this.options.insideIsland) {
@@ -942,7 +942,7 @@ class Generator {
 
     if (element.id) {
       if (element.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'id'))
-        this.error(element.id, 'The id is set twice: by `#id` and by an `id` attribute')
+        this.error(element.id, 'The id is set twice', { label: 'set by `#id`', related: element.attributes.flatMap(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'id' ? [{ ...attribute.name, label: 'and by this attribute' }] : []) })
 
       b.add(' id="').addSource(element.id).add('"')
     }
@@ -950,7 +950,7 @@ class Generator {
     const classAttributes = element.attributes.filter((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'class')
 
     if (classAttributes.length > 1)
-      this.error(classAttributes[1]!.name, 'An element takes one `class` attribute; put several classes in it')
+      this.error(classAttributes[1]!.name, 'An element takes one `class` attribute', { related: [{ ...classAttributes[0]!.name, label: 'the first one' }], help: 'put several classes in one: `class="a b"`' })
 
     // A spread may carry a `class` of its own, which merges in too, so the class goes after every attribute and spread.
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
@@ -964,7 +964,7 @@ class Generator {
         continue
 
       if (element.component && (this.options.island || this.options.insideIsland) && attribute.kind !== 'spread' && ISLAND_OPTIONS.has(this.text(attribute.name)))
-        this.error(attribute.name, `\`${this.text(attribute.name)}\` has no effect inside an island, which hydrates and lives on as a whole`)
+        this.error(attribute.name, `\`${this.text(attribute.name)}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
 
       b.add(' ')
 
@@ -1091,14 +1091,14 @@ class Generator {
         return
       case 'boolean':
         if (this.text(attribute.name).startsWith('bind:'))
-          this.error(attribute.name, '`bind:` needs a signal: `bind:value={name}`')
+          this.error(attribute.name, '`bind:` needs a signal', { help: '`bind:value={name}`' })
 
         b.addSource(attribute.name)
 
         return
       case 'static': {
         if (this.text(attribute.name).startsWith('bind:'))
-          this.error(attribute.name, '`bind:` needs a signal: `bind:value={name}`')
+          this.error(attribute.name, '`bind:` needs a signal', { help: '`bind:value={name}`' })
 
         b.addSource(attribute.name).add('=')
         const quoted = quoteAttribute(attribute.text)
@@ -1142,13 +1142,13 @@ class Generator {
     const required = REQUIRED_TEXT.get(element.name)
 
     if (required && !names.has(required[0]))
-      this.lint(at, required[1])
+      this.lint(at, required[1], { help: required[2] })
 
     if (element.name === 'input' && this.staticAttribute(element, 'type') === 'image' && !names.has('alt'))
-      this.lint(at, 'An image button needs `alt` naming what it does')
+      this.lint(at, 'An image button needs `alt`', { help: 'name what it does' })
 
     if (names.has('onClick') && !names.has('role') && !INTERACTIVE_TAGS.has(element.name))
-      this.lint(at, `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers: use a \`button\`, or give it a \`role\` along with a \`tabindex\` and a key handler`)
+      this.lint(at, `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a `role` along with a `tabindex` and a key handler' })
   }
 
   // The text of an attribute written as a quoted string.
@@ -1168,9 +1168,9 @@ class Generator {
     if (name === undefined)
       return
 
-    const camel = name.replace(COMPOUND_EVENT, (_, first: string, second: string) => capitalize(first) + capitalize(second))
+    const camel = `on${capitalize(name.replace(COMPOUND_EVENT, (_, first: string, second: string) => capitalize(first) + capitalize(second)))}`
 
-    this.error(attribute.name, `\`${this.text(attribute.name)}\` does not attach a handler: events are written in camelCase, as \`on${capitalize(camel)}\``)
+    this.error(attribute.name, `\`${this.text(attribute.name)}\` does not attach a handler`, { note: 'events are written in camelCase', help: `\`${camel}\``, fixes: [{ title: `Write \`${camel}\``, edits: [{ ...attribute.name, text: camel }] }] })
   }
 
   // Check-only wrappers: a site link must match a page, markup must be made safe or written out, and a static parent passes an island serializable props only.
@@ -1249,13 +1249,13 @@ class Generator {
     const { b } = this
 
     if (element.component || !BINDABLE.has(element.name)) {
-      this.error(attribute.name, '`bind:` works on <input>, <textarea> and <select>; pass a value and a setter to components')
+      this.error(attribute.name, '`bind:` works on <input>, <textarea> and <select> only', { help: 'pass a component a value and a setter' })
 
       return
     }
 
     if (property !== 'value' && property !== 'checked') {
-      this.error(attribute.name, `\`bind:${property}\` is not supported; use \`bind:value\` or \`bind:checked\``)
+      this.error(attribute.name, `\`bind:${property}\` is not supported`, { help: 'use `bind:value` or `bind:checked`' })
 
       return
     }
@@ -1263,8 +1263,10 @@ class Generator {
     const inputType = this.staticAttribute(element, 'type') ?? 'text'
     const event = property === 'checked' || element.name === 'select' ? 'onChange' : 'onInput'
 
-    if (element.attributes.some(candidate => candidate.kind !== 'spread' && this.text(candidate.name) === event))
-      this.error(attribute.name, `\`bind:${property}\` already handles \`${event}\`; drop one of them`)
+    const handler = element.attributes.find(candidate => candidate.kind !== 'spread' && this.text(candidate.name) === event) as NamedAttribute | undefined
+
+    if (handler)
+      this.error(attribute.name, `\`bind:${property}\` already handles \`${event}\``, { related: [{ ...handler.name, label: 'handled here too' }], help: 'drop one of them' })
 
     const read = property === 'checked' ? 'checked' : NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
 
@@ -1328,14 +1330,14 @@ class Generator {
   }
 
   // Both passes generate the same code, so only the first one reports.
-  private error(span: Span, message: string) {
+  private error(span: Span, message: string, details?: Details) {
     if (!this.options.rewrites)
-      this.diagnostics.push({ start: span.start, end: span.end, message })
+      this.diagnostics.push({ start: span.start, end: span.end, message, ...details })
   }
 
-  private lint(span: Span, message: string) {
+  private lint(span: Span, message: string, details?: Details) {
     if (!this.options.rewrites)
-      this.diagnostics.push({ start: span.start, end: span.end, message, checkOnly: true })
+      this.diagnostics.push({ start: span.start, end: span.end, message, ...details, checkOnly: true })
   }
 }
 

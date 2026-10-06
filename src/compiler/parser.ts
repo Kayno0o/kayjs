@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 
 // `--- server`, `--- client`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
@@ -72,7 +72,7 @@ export function parseKay(source: string): KayFile {
       diagnostics.push({ start: fence.index, end: fence.index + 3, message: 'This fence is never closed with a `---` line' })
 
     if (!spaced || (kind !== 'script' && kind !== 'server'))
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`${fence[0].trim()}\`; use \`---\` for the component script, \`--- client\` for one rendering in the browser only, or \`--- server\` for server code` })
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` for the component script, `--- client` for one rendering in the browser only, or `--- server` for server code' })
     else if (fences[kind])
       diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `A file has one ${kind === 'server' ? '`--- server`' : 'script'} fence` })
     else
@@ -81,7 +81,7 @@ export function parseKay(source: string): KayFile {
     const parameters = fence.indices?.[3] ?? fence.indices?.[4]
 
     if (kind === 'server' && parameters)
-      diagnostics.push({ start: parameters[0], end: parameters[1], message: 'Type parameters go on the component script fence: `--- <T>`' })
+      diagnostics.push({ start: parameters[0], end: parameters[1], message: 'Type parameters go on the component script fence', help: '`--- <T>`' })
 
     if (kind === 'script' && fences.script === span) {
       if (parameters)
@@ -179,7 +179,7 @@ class TemplateParser {
       if (blockIndent === -1)
         blockIndent = indent
       else if (indent !== blockIndent)
-        this.error(this.pos, this.pos + indent, `Inconsistent indentation: expected ${blockIndent} spaces, found ${indent}`)
+        this.error(this.pos, this.pos + indent, 'Inconsistent indentation', { label: `expected ${blockIndent} spaces, found ${indent}`, note: 'the first line of a block sets its indentation' })
 
       this.pos += indent
       this.parseLine(indent, nodes)
@@ -187,7 +187,7 @@ class TemplateParser {
 
     for (const node of nodes) {
       if (node.kind === 'await' && !node.resolved)
-        this.error(node.start, node.value.end, '`await` needs a `then` block at the same indentation, or `await <value> then <name>` on one line')
+        this.error(node.start, node.value.end, '`await` has no `then` block', { help: 'add a `then` block at the same indentation, or write `await <value> then <name>` on one line' })
     }
 
     return nodes
@@ -264,7 +264,7 @@ class TemplateParser {
     const pug = PUG_KEYWORD.exec(this.src)?.[1]
 
     if (pug !== undefined) {
-      this.error(start, start + pug.length, `\`${pug}\` is pug syntax kay does not have; ${PUG_HINTS[pug]}`)
+      this.error(start, start + pug.length, `\`${pug}\` is pug syntax kay does not have`, { help: PUG_HINTS[pug] })
       this.pos = this.lineEnd(start)
       this.skipChildren(indent)
 
@@ -369,7 +369,7 @@ class TemplateParser {
       }
 
       this.pos = start + 4
-      this.expectLineEnd('`else` takes no condition; use `else if <condition>`')
+      this.expectLineEnd('`else` takes no condition', { help: 'use `else if <condition>`' })
       const children = this.parseBlock(indent)
 
       previous.branches.push({ start, end: this.lastContentEnd(), children })
@@ -425,7 +425,7 @@ class TemplateParser {
     const start = this.pos
 
     this.pos = start + 'try'.length
-    this.expectLineEnd('`try` takes nothing on its line: its block goes below it, indented')
+    this.expectLineEnd('`try` takes nothing on its line', { help: 'put its block below it, indented' })
 
     const children = this.parseBlock(indent)
 
@@ -454,7 +454,7 @@ class TemplateParser {
     if (alias)
       this.pos = alias.end
 
-    this.expectLineEnd(`\`${keyword}\` takes one name at most: \`${keyword} ${keyword === 'then' ? 'value' : 'error'}\``)
+    this.expectLineEnd(`\`${keyword}\` takes one name at most`, { help: `\`${keyword} ${keyword === 'then' ? 'value' : 'error'}\`` })
     const children = this.parseBlock(indent)
     const branch: AwaitBranch = { start, end: this.lastContentEnd(), alias, children }
 
@@ -501,7 +501,7 @@ class TemplateParser {
       this.expectLineEnd('Nothing may follow `key={...}`')
     }
     else {
-      this.error(start, this.lineEnd(start), '`for` needs a key: `key={item.id}` for rows with an identity, or `for item, i of list key={i}` for positional rows')
+      this.error(start, this.lineEnd(start), '`for` needs a key', { help: '`key={item.id}` for rows with an identity, or `for item, i of list key={i}` for positional rows' })
     }
 
     const children = this.parseBlock(indent)
@@ -557,7 +557,7 @@ class TemplateParser {
       const keyword = KEYWORD.exec(this.src)?.[1]
 
       if (keyword !== undefined) {
-        this.error(this.pos, this.pos + keyword.length, `\`${keyword}\` starts a line of its own; put it on the next line, indented under <${name}>`)
+        this.error(this.pos, this.pos + keyword.length, `\`${keyword}\` starts a line of its own`, { help: `put it on the next line, indented under <${name}>` })
         this.pos = this.lineEnd(this.pos)
         this.target = element
 
@@ -593,7 +593,7 @@ class TemplateParser {
     }
 
     if (!this.atLineEnd() && !(terminator === ']' && next === ']')) {
-      this.error(this.pos, this.lineEnd(this.pos), `Unexpected \`${next}\` after <${name}>; inline text needs a space before it`)
+      this.error(this.pos, this.lineEnd(this.pos), `Unexpected \`${next}\` after <${name}>`, { help: `inline text needs a space before it: \`${name} Hello\`` })
       this.pos = this.lineEnd(this.pos)
     }
 
@@ -740,7 +740,7 @@ class TemplateParser {
       return { kind: 'expression', name, expression }
     }
 
-    this.error(name.start, this.pos, `Attribute values are a quoted string or a \`{expression}\`: ${this.src.slice(name.start, name.end)}={...}`)
+    this.error(name.start, this.pos, 'An attribute value is a quoted string or a `{expression}`', { help: `\`${this.src.slice(name.start, name.end)}={...}\`` })
 
     return { kind: 'boolean', name }
   }
@@ -776,7 +776,7 @@ class TemplateParser {
         const expression = { start: this.pos + 1, end: end - 1 }
 
         if (this.src.slice(expression.start, expression.end).trim() === '')
-          this.error(this.pos, end, 'Empty `{}` in text; write `\\{` for a literal brace')
+          this.error(this.pos, end, 'Empty `{}` in text', { help: 'write `\\{` for a literal brace' })
 
         parts.push({ kind: 'expression', start: this.pos, end, expression })
         this.pos = end
@@ -1080,11 +1080,11 @@ class TemplateParser {
       this.pos = save
   }
 
-  private expectLineEnd(message: string) {
+  private expectLineEnd(message: string, details?: Details) {
     this.skipSpaces()
 
     if (!this.atLineEnd()) {
-      this.error(this.pos, this.lineEnd(this.pos), message)
+      this.error(this.pos, this.lineEnd(this.pos), message, details)
       this.pos = this.lineEnd(this.pos)
     }
   }
@@ -1135,7 +1135,7 @@ class TemplateParser {
     return end
   }
 
-  private error(start: number, end: number, message: string) {
-    this.diagnostics.push({ start, end: Math.max(end, start + 1), message })
+  private error(start: number, end: number, message: string, details?: Details) {
+    this.diagnostics.push({ start, end: Math.max(end, start + 1), message, ...details })
   }
 }

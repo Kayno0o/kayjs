@@ -27,6 +27,9 @@ function traverse(...args: Parameters<typeof traverseModule>): void {
 
 export type Rewrites = Map<number, Rewrite & { end: number }>
 
+// What writing to a name that cannot be written says.
+type ReadOnly = Pick<Diagnostic, 'message' | 'note' | 'help'>
+
 export interface FoundRewrites {
   rewrites: Rewrites
   diagnostics: Diagnostic[]
@@ -65,7 +68,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
 
   // `typeOf` spells the type of the value the name stands for, when `typeof name` cannot read it through the rewritten name.
   // `rewrite` gives what a read becomes, or nothing to leave it as written.
-  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Rewrite | undefined, readOnly: string, typeOf?: string) => {
+  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Rewrite | undefined, readOnly: ReadOnly, typeOf?: string) => {
     const binding = scope.getBinding(name)
 
     if (!binding)
@@ -106,7 +109,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       const source = identifier?.start == null ? undefined : map.toSource(identifier.start)
 
       if (source !== undefined)
-        diagnostics.push({ start: source, end: source + name.length, message: readOnly })
+        diagnostics.push({ start: source, end: source + name.length, ...readOnly })
     }
   }
 
@@ -120,13 +123,13 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
         if (param.type !== 'Identifier' || !accessorSites.has(param.start!))
           continue
 
-        const message = `\`${param.name}\` is read-only here; it tracks the current value`
+        const readOnly = { message: `\`${param.name}\` is read-only here`, note: 'it tracks the current value' }
 
         // Read as a value, a row or an alias is left as written, except as a tag, which still goes through `Dynamic` as a value of any component type may.
         if (values)
-          visitBinding(path.scope, param.name, reference => tagPosition(reference) === 'opening' ? {} : undefined, message)
+          visitBinding(path.scope, param.name, reference => tagPosition(reference) === 'opening' ? {} : undefined, readOnly)
         else
-          visitBinding(path.scope, param.name, reference => withShorthand(reference, param.name, { after: '()' }), message, `ReturnType<typeof ${param.name}>`)
+          visitBinding(path.scope, param.name, reference => withShorthand(reference, param.name, { after: '()' }), readOnly, `ReturnType<typeof ${param.name}>`)
       }
     },
     VariableDeclarator: (path) => {
@@ -147,7 +150,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
 
         const name = property.value.name
 
-        visitBinding(path.scope, name, reference => withShorthand(reference, name, propRead(prop.binding, prop.index, name)), `\`${name}\` is a prop, and props are read-only; copy it into a signal to change it locally`, propType(prop.binding))
+        visitBinding(path.scope, name, reference => withShorthand(reference, name, propRead(prop.binding, prop.index, name)), { message: `\`${name}\` is a prop, and props are read-only`, help: 'copy it into a signal to change it locally' }, propType(prop.binding))
 
         if (path.scope.getBinding(name)?.referencePaths.length === 0)
           unread.add(source!)
@@ -174,9 +177,9 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
 function syntaxError(error: unknown, map: SourceMap): Diagnostic {
   const { pos, message } = error as { pos?: number, message: string }
   const start = (pos === undefined ? undefined : map.toSource(pos)) ?? 0
-  const hint = message.includes('\'await\'') ? '; a component renders synchronously, so read async data in the `--- server` fence' : ''
+  const awaits = message.includes('\'await\'')
 
-  return { start, end: start + 1, message: `${message.replace(POSITION_SUFFIX, '')}${hint}` }
+  return { start, end: start + 1, message: message.replace(POSITION_SUFFIX, ''), ...awaits && { note: 'a component renders synchronously', help: 'read async data in the `--- server` fence' } }
 }
 
 // Whether the reference names a component being opened or closed, which JSX spells differently from a read.

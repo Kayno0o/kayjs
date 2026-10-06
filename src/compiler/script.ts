@@ -92,7 +92,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
       }
       else {
         if (statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration' || statement.type === 'ExportAllDeclaration')
-          analysis.diagnostics.push({ ...span, message: 'A component script exports only types; values belong in a `.ts` module' })
+          analysis.diagnostics.push({ ...span, message: 'A component script exports only types', help: 'move the value to a `.ts` module and import it' })
 
         analysis.body.push(span)
       }
@@ -174,7 +174,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
       }
     }
     else if (isExport(statement)) {
-      analysis.diagnostics.push({ ...span, message: 'A server fence exports declarations only: `export const add = action(...)`' })
+      analysis.diagnostics.push({ ...span, message: 'A server fence exports declarations only', help: '`export const add = action(...)`' })
     }
     else {
       // What an export reads is declared at module level, next to it, and the template still reads it.
@@ -300,7 +300,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
           const reason = why.get(declaredBy.get(name)!)
 
           if (reason !== undefined)
-            diagnostics.push(...spans.map(span => ({ ...span, message: `\`${name}\` is computed per request, in the page's load, since ${reason}; an export runs outside the load, so compute it there instead` })))
+            diagnostics.push(...spans.map(span => ({ ...span, message: `\`${name}\` is computed per request, in the page's load, since ${reason}`, note: 'an export runs outside the load', help: 'compute it in the export instead' })))
         }
       }
 
@@ -408,7 +408,7 @@ function reportJsx(code: string, span: Span, diagnostics: Diagnostic[]): boolean
   if (!jsx)
     return false
 
-  diagnostics.push({ start: span.start + jsx.start!, end: span.start + jsx.end!, message: 'Markup belongs in the template, or in a component of its own: a fence holds TypeScript, never JSX' })
+  diagnostics.push({ start: span.start + jsx.start!, end: span.start + jsx.end!, message: 'A fence holds TypeScript, never JSX', help: 'put markup in the template, or in a component of its own' })
 
   return true
 }
@@ -542,7 +542,9 @@ export function unboundedFields(source: string, server: Span | undefined): Diagn
 
       diagnostics.push({
         ...parsed.shift(call.callee),
-        message: `${field === undefined ? 'This string field' : `The string field ${field}`} has no maxLength: it takes whatever a visitor posts, up to the request body limit; give it one`,
+        message: `${field === undefined ? 'This string field' : `The string field ${field}`} has no maxLength`,
+        note: 'it takes whatever a visitor posts, up to the request body limit',
+        help: 'give it one',
         fixes: [{ title: `Give it a maxLength of ${SUGGESTED_MAX_LENGTH}`, edits: [{ start: at, end: at, text: edit.text }] }],
         checkOnly: true,
       })
@@ -650,7 +652,7 @@ function bodyTypes(statements: t.Statement[], extraNames: string[], shift: (node
       // An export belongs at module level, where the body's names are out of reach.
       if (type.statement.type === 'ExportNamedDeclaration') {
         if (!exported.has(type.statement))
-          diagnostics.push({ ...shift(type.statement), message: `\`${type.name}\` is exported, so it sits at module level, where it cannot refer to the script's own names; drop the \`export\`` })
+          diagnostics.push({ ...shift(type.statement), message: `\`${type.name}\` cannot refer to the script's own names`, note: 'an exported type sits at module level', help: 'drop the `export`' })
 
         exported.add(type.statement)
 
@@ -690,10 +692,10 @@ function propsDeclaration(statement: t.Statement, shift: (node: t.Node) => Span,
   const declaration: PropsDeclaration = { statement: shift(statement), type: typeArgument && shift(typeArgument), bindings: [] }
 
   if (declarator.init.arguments.length > 0)
-    diagnostics.push({ ...shift(declarator.init), message: '`props<T>()` takes no arguments; give defaults in the destructuring: `const { size = \'md\' } = props<T>()`' })
+    diagnostics.push({ ...shift(declarator.init), message: '`props<T>()` takes no arguments', help: 'give defaults in the destructuring: `const { size = \'md\' } = props<T>()`' })
 
   if (!typeArgument)
-    diagnostics.push({ ...shift(declarator.init), message: '`props()` needs the props type: `props<{ title: string }>()`' })
+    diagnostics.push({ ...shift(declarator.init), message: '`props()` needs the props type', help: '`props<{ title: string }>()`' })
 
   if (declarator.id.type === 'Identifier') {
     declaration.name = shift(declarator.id)
@@ -721,7 +723,7 @@ function propsDeclaration(statement: t.Statement, shift: (node: t.Node) => Span,
     const local = value.type === 'AssignmentPattern' ? value.left : value
 
     if (key === undefined || property.computed || local.type !== 'Identifier') {
-      diagnostics.push({ ...shift(property), message: 'Destructure props one level deep (`{ todo }`), then read nested fields as `todo.title`' })
+      diagnostics.push({ ...shift(property), message: 'Props are destructured one level deep', help: 'destructure `{ todo }`, then read nested fields as `todo.title`' })
 
       continue
     }

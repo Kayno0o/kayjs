@@ -147,7 +147,7 @@ describe('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([
-        ['_layout.kay', 4, 'Only a page declares its query; a layout or special page reads its page\'s through `ctx.query`'],
+        ['_layout.kay', 4, 'Only a page declares its query'],
         ['index.kay', 6, 'TS2322'],
         ['index.kay', 7, 'TS2551'],
       ])
@@ -690,7 +690,7 @@ describe('kay check, string fields an action leaves unbounded', () => {
   const fields = (fence: string) => {
     const source = `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\n${fence}\n---\np x\n`
 
-    return compileKay(source, join(process.cwd(), 'page.kay'), { check: true }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message.slice(0, diagnostic.message.indexOf(':')), checkOnly: diagnostic.checkOnly, fixed: diagnostic.fixes?.map(fix => fix.edits.reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source).split('\n')[4]) }))
+    return compileKay(source, join(process.cwd(), 'page.kay'), { check: true }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message, checkOnly: diagnostic.checkOnly, fixed: diagnostic.fixes?.map(fix => fix.edits.reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source).split('\n')[4]) }))
   }
 
   it('reports a string field with no maxLength, offering one, nested or optional ones included', () => {

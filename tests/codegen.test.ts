@@ -13,6 +13,11 @@ function errors(source: string): string[] {
   return compileKay(source, 'test.kay').diagnostics.map(d => d.message)
 }
 
+// Each diagnostic as rustc would print its parts: the message, the text it and each related span cover, and the help.
+function reports(source: string) {
+  return compileKay(source, 'test.kay').diagnostics.map(d => ({ message: d.message, at: source.slice(d.start, d.end), ...d.label && { label: d.label }, ...d.related && { related: d.related.map(span => [source.slice(span.start, span.end), span.label]) }, ...d.note && { note: d.note }, ...d.help && { help: d.help } }))
+}
+
 // The returned JSX alone, which is where most assertions look.
 function jsx(source: string): string {
   const code = tsx(source)
@@ -191,9 +196,9 @@ describe('elements', () => {
   })
 
   it('reports a prop a slot passes a second time', () => {
-    expect(errors('Card\n  @a\n    p x\n  @a\n    p y')).toEqual(['`a` is passed twice, by another `@a` and by this `@a`'])
-    expect(errors('Card(a="1")\n  @a\n    p x')).toEqual(['`a` is passed twice, by an attribute and by this `@a`'])
-    expect(errors('Card\n  @children\n    p x\n  p y')).toEqual(['`children` is passed twice, by the lines under the tag and by this `@children`'])
+    expect(reports('Card\n  @a\n    p x\n  @a\n    p y')).toEqual([{ message: '`a` is passed twice', at: 'a', label: 'passed again here', related: [['a', 'passed by this `@a`']] }])
+    expect(reports('Card(a="1")\n  @a\n    p x')).toEqual([{ message: '`a` is passed twice', at: 'a', label: 'passed again here', related: [['a', 'passed by this attribute']] }])
+    expect(reports('Card\n  @children\n    p x\n  p y')).toEqual([{ message: '`children` is passed twice', at: 'children', label: 'passed again here', related: [['p y', 'passed by the lines under the tag']] }])
     expect(errors('Card\n  @a\n    p x\n  @b\n    p y\n  p z')).toEqual([])
   })
 
@@ -212,8 +217,8 @@ describe('islands', () => {
 
 describe('fences', () => {
   it('report markup as belonging in the template, a fence holding TypeScript only', () => {
-    expect(errors('---\nconst el = <p>x</p>\n---\np x')).toEqual([expect.stringContaining('a fence holds TypeScript, never JSX')])
-    expect(errors('--- server\nconst el = <><b /></>\n---\np x')).toEqual([expect.stringContaining('a fence holds TypeScript, never JSX')])
+    expect(reports('---\nconst el = <p>x</p>\n---\np x')).toEqual([{ message: 'A fence holds TypeScript, never JSX', at: '<p>x</p>', help: 'put markup in the template, or in a component of its own' }])
+    expect(errors('--- server\nconst el = <><b /></>\n---\np x')).toEqual(['A fence holds TypeScript, never JSX'])
     expect(errors('---\nconst x = 1 +\n---\np x')).toEqual(['Unexpected token'])
   })
 })
@@ -234,8 +239,8 @@ describe('head', () => {
   })
 
   it('rejects head blocks an island, a nested element or a second block holds, and content the head cannot', () => {
-    expect(errors('---\nimport { signal } from "kay"\n---\nhead\n  title x\np')).toEqual([expect.stringContaining('An island also renders in the browser')])
-    expect(errors('head\n  title a\nhead\n  title b')).toEqual(['A template has one `head` block'])
+    expect(errors('---\nimport { signal } from "kay"\n---\nhead\n  title x\np')).toEqual(['An island cannot set the document head'])
+    expect(reports('head\n  title a\nhead\n  title b')).toEqual([{ message: 'A template has one `head` block', at: 'head', related: [['head', 'the first one']] }])
     expect(errors('div\n  head\n    title a')).toEqual(['A `head` block sits at the top level of a template'])
     expect(errors('head\n  div x\n  if a\n    title a')).toEqual([expect.stringContaining('holds `title`'), expect.stringContaining('holds `title`')])
     expect(errors('head\n  title Read #[b this]')).toEqual(['`title` holds text only'])
@@ -431,7 +436,7 @@ describe('generic components', () => {
   })
 
   it('refuses type parameters on a page', () => {
-    expect(errors('--- server\nconst a = 1\n---\n--- <T>\n---\np {a}')).toEqual([expect.stringContaining('takes no props, so it has no type parameters')])
+    expect(errors('--- server\nconst a = 1\n---\n--- <T>\n---\np {a}')).toEqual(['A page has no type parameters'])
   })
 
   it('leaves a function given to a component unwrapped in check output, so a generic one types its parameters', () => {
@@ -464,7 +469,7 @@ describe('types in the component script', () => {
   })
 
   it('reports an exported type that needs a script name', () => {
-    expect(errors('---\nconst rows = [1]\nexport type Row = typeof rows[number]\n---\np x')).toEqual([expect.stringContaining('`Row` is exported')])
+    expect(errors('---\nconst rows = [1]\nexport type Row = typeof rows[number]\n---\np x')).toEqual(['`Row` cannot refer to the script\'s own names'])
   })
 })
 
@@ -473,7 +478,8 @@ describe('invalid code', () => {
 
   it('reports template expressions that do not parse at their position in the source', () => {
     expect(at('p {x +}')).toEqual([{ message: expect.stringContaining('Unexpected token'), text: '}' }])
-    expect(at('---\nconst p = 1\n---\np {await p}')).toEqual([{ message: expect.stringContaining('read async data in the `--- server` fence'), text: 'await' }])
+    expect(at('---\nconst p = 1\n---\np {await p}')).toEqual([{ message: expect.stringContaining('\'await\''), text: 'await' }])
+    expect(compileKay('---\nconst p = 1\n---\np {await p}', 'test.kay').diagnostics[0]?.help).toBe('read async data in the `--- server` fence')
   })
 
   it('reports code that does not parse in a fence at its position, with no position of its own in the message', () => {
@@ -526,9 +532,10 @@ describe('text lines', () => {
 
 describe('lowercase events', () => {
   it('suggests the camelCase name', () => {
-    expect(errors('button(onclick={go}) x')).toEqual(['`onclick` does not attach a handler: events are written in camelCase, as `onClick`'])
-    expect(errors('button(on:click={go}) x')).toEqual(['`on:click` does not attach a handler: events are written in camelCase, as `onClick`'])
-    expect(errors('input(onkeydown={go} ondblclick={go})')).toEqual([expect.stringContaining('`onKeyDown`'), expect.stringContaining('`onDblClick`')])
+    expect(reports('button(onclick={go}) x')).toEqual([{ message: '`onclick` does not attach a handler', at: 'onclick', note: 'events are written in camelCase', help: '`onClick`' }])
+    expect(errors('button(on:click={go}) x')).toEqual(['`on:click` does not attach a handler'])
+    expect(compileKay('input(onkeydown={go} ondblclick={go})', 'test.kay').diagnostics.map(d => d.help)).toEqual(['`onKeyDown`', '`onDblClick`'])
+    expect(compileKay('button(on:click={go}) x', 'test.kay').diagnostics[0]?.fixes).toEqual([{ title: 'Write `onClick`', edits: [{ start: 7, end: 15, text: 'onClick' }] }])
   })
 
   it('leaves components, strings and the camelCase form alone', () => {
@@ -543,19 +550,19 @@ describe('accessibility checks', () => {
 
   it('ask an img for alt and an iframe for a title, alt="" marking decoration', () => {
     expect(checked('img(src="/a.png")\niframe(src="/map")')).toEqual([
-      'An `img` needs `alt`: what it shows, or `alt=""` when it is only decoration',
-      'An `iframe` needs a `title` naming what it holds, which screen readers announce',
+      'An `img` needs `alt`',
+      'An `iframe` needs a `title`',
     ])
     expect(checked('img(src="/a.png" alt="")\niframe(src="/map" title="Map")')).toEqual([])
-    expect(checked('input(type="image" src="/go.png")\ninput(type="image" src="/go.png" alt="Search")')).toEqual(['An image button needs `alt` naming what it does'])
+    expect(checked('input(type="image" src="/go.png")\ninput(type="image" src="/go.png" alt="Search")')).toEqual(['An image button needs `alt`'])
   })
 
   it('report a click handler on an element the keyboard never reaches, unless it has a role', () => {
     const click = 'onClick={() => undefined}'
 
     expect(checked(`.card(${click})\nli(${click}) x\nbutton(${click}) ok\na(href="/" ${click}) ok`)).toEqual([
-      'This `div` reacts to `onClick` but is out of reach of the keyboard and screen readers: use a `button`, or give it a `role` along with a `tabindex` and a key handler',
-      'This `li` reacts to `onClick` but is out of reach of the keyboard and screen readers: use a `button`, or give it a `role` along with a `tabindex` and a key handler',
+      'This `div` reacts to `onClick` but is out of reach of the keyboard and screen readers',
+      'This `li` reacts to `onClick` but is out of reach of the keyboard and screen readers',
     ])
     expect(checked(`li(role="option" ${click}) x`)).toEqual([])
   })

@@ -1,4 +1,6 @@
 import type { KayLibrary, SettingsReplacement } from '../build/libraries'
+import type { Diagnostic } from '../compiler/ast'
+import type { Paint } from '../compiler/frame'
 import type { I18nConfig } from '../config'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
@@ -17,7 +19,7 @@ import { findKayFiles, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacements, throughNodeModules } from '../build/libraries'
 import { componentName } from '../compiler'
-import { codeFrame } from '../compiler/frame'
+import { formatReport } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
@@ -67,10 +69,12 @@ export interface CheckOptions {
   i18n?: I18nConfig
 }
 
-export interface CheckDiagnostic {
+export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity'> {
   file: string
   line: number
   column: number
+  // Where the span ends in the file's source, when it is longer than one character.
+  end?: number
   message: string
   code?: string
   // Found by type checking only, so the file's type errors are still reported.
@@ -124,7 +128,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
     await writeIfChanged(path, shadow.tsx)
     files.set(path, shadow)
     for (const diagnostic of compileDiagnostics)
-      diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message, checkOnly: diagnostic.checkOnly })
+      diagnostics.push(fromCompile(file, source, diagnostic))
   }
 
   const [routes, publicPaths, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
@@ -181,7 +185,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
     }
 
     for (const diagnostic of compileDiagnostics)
-      diagnostics.push({ file, ...positionAt(source, diagnostic.start), message: diagnostic.message, checkOnly: diagnostic.checkOnly })
+      diagnostics.push(fromCompile(file, source, diagnostic))
   }))
 
   await writeIfChanged(packagesPath, packageTypes(root, libraries))
@@ -597,10 +601,14 @@ function remap(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): Che
   return { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, source) }
 }
 
-// Followed by a code frame when the file's source is given.
-export function formatCheckDiagnostic(diagnostic: CheckDiagnostic, source?: string): string {
-  const code = diagnostic.code ? ` ${diagnostic.code}` : ''
-  const heading = `${relative(process.cwd(), diagnostic.file)}:${diagnostic.line}:${diagnostic.column} - error${code}: ${diagnostic.message}`
+// With a code frame when the file's source is given.
+export function formatCheckDiagnostic(diagnostic: CheckDiagnostic, source?: string, paint?: Paint): string {
+  const start = source === undefined ? 0 : offsetAt(source, diagnostic)
+  const frame = source === undefined ? undefined : { source, start, end: diagnostic.end ?? start + 1 }
 
-  return source === undefined ? heading : `${heading}\n${codeFrame(source, offsetAt(source, diagnostic))}`
+  return formatReport({ ...diagnostic, file: relative(process.cwd(), diagnostic.file), frame }, paint)
+}
+
+function fromCompile(file: string, source: string, { start, end, message, label, related, note, help, code, severity, checkOnly }: Diagnostic): CheckDiagnostic {
+  return { file, ...positionAt(source, start), end, message, label, related, note, help, code, severity, checkOnly }
 }
