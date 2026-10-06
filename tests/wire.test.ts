@@ -159,10 +159,12 @@ describe('the browser writes devalue text itself', () => {
     }
   })
 
-  it('writes a Date, URLSearchParams and -0', () => {
-    const [date, search, zero] = decodeValue(sendValue([new Date('2026-10-06'), new URLSearchParams('a=1&a=2'), -0])) as [Date, URLSearchParams, number]
+  it('writes a Date, an invalid one, URLSearchParams and -0', () => {
+    const [date, invalid, search, zero] = decodeValue(sendValue([new Date('2026-10-06'), new Date(Number.NaN), new URLSearchParams('a=1&a=2'), -0])) as [Date, Date, URLSearchParams, number]
 
     expect(date.toISOString()).toBe('2026-10-06T00:00:00.000Z')
+    expect(invalid.getTime()).toBeNaN()
+    expect((parse(sendValue(new Date(Number.NaN))) as Date).getTime()).toBeNaN()
     expect(String(search)).toBe('a=1&a=2')
     expect(Object.is(zero, -0)).toBe(true)
     expect(Object.is(decodeValue(sendValue(-0)), -0)).toBe(true)
@@ -189,6 +191,12 @@ describe('the browser writes devalue text itself', () => {
     expect(text).toBe('[[-7,1000001,1000000,1],"last"]')
   })
 
+  it('leaves out a holed array\'s properties that are no canonical index', () => {
+    const array = Object.assign(holed(3, { 0: 1 }), { '01': 'a', '1e0': 'b' })
+
+    expect(decodeValue(sendValue(array))).toStrictEqual(holed(3, { 0: 1 }))
+  })
+
   it('writes a custom type through its reducer', () => {
     const blob = new Blob(['x'])
     const files: Blob[] = []
@@ -196,6 +204,7 @@ describe('the browser writes devalue text itself', () => {
     const decoded = decodeValue(text, { File: ([index]: [number]) => files[index] }) as { a: Blob, b: Blob }
 
     expect(files).toEqual([blob])
+    expect(decodeValue(sendValue({ none: 0 }, { File: () => 0 }))).toStrictEqual({ none: 0 })
     expect(decoded.a).toBe(blob)
     expect(decoded.b).toBe(blob)
   })

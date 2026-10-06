@@ -48,11 +48,15 @@ export function sendValue(value: unknown, reducers: Record<string, Reducer> = {}
     if (thing === null || typeof thing !== 'object')
       return JSON.stringify(thing)
 
+    // An invalid Date goes as devalue writes it, an empty string that reads back as an invalid Date.
     if (thing instanceof Date)
-      return `["Date",${JSON.stringify(thing.toISOString())}]`
+      return `["Date","${Number.isNaN(thing.getTime()) ? '' : thing.toISOString()}"]`
 
-    if (thing instanceof URL || thing instanceof URLSearchParams)
-      return `[${JSON.stringify(thing.constructor.name)},${JSON.stringify(String(thing))}]`
+    if (thing instanceof URL)
+      return `["URL",${JSON.stringify(thing.href)}]`
+
+    if (thing instanceof URLSearchParams)
+      return `["URLSearchParams",${JSON.stringify(String(thing))}]`
 
     if (thing instanceof RegExp)
       return `["RegExp",${JSON.stringify(thing.source)}${thing.flags === '' ? '' : `,"${thing.flags}"`}]`
@@ -99,7 +103,8 @@ function writeArray(array: unknown[], flatten: (thing: unknown) => number): stri
   if (!holes)
     return `[${array.map(flatten).join(',')}]`
 
-  const entries = Object.keys(array).filter(key => isIndex(Number(key), array.length))
+  // Only canonical indexes: a property such as `01` would be written unquoted, as JSON no reader parses.
+  const entries = Object.keys(array).filter(key => String(Number(key)) === key && isIndex(Number(key), array.length))
 
   return `[${SPARSE},${array.length}${entries.map(key => `,${key},${flatten(array[Number(key)])}`).join('')}]`
 }

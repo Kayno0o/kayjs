@@ -724,7 +724,16 @@ function loadChecks(): Promise<typeof import('./validate')> {
 
 function onFormFocus(event: FocusEvent): void {
   if (event.target instanceof Element && event.target.closest('form'))
-    void loadChecks()
+    void preloadChecks()
+}
+
+async function preloadChecks(): Promise<void> {
+  try {
+    await loadChecks()
+  }
+  catch {
+    // The browser keeps a module that failed to load as failed, so every submit then leaves the form to the server.
+  }
 }
 
 // A check that breaks, on a pattern the browser cannot read for one, or checks that cannot load, leave the form to the server rather than unsendable.

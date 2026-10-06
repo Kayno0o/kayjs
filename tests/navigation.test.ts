@@ -128,6 +128,28 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
     await fresh.close()
   })
 
+  it('leaves a form to the server when its checks cannot load, reporting no error', async () => {
+    const fresh = await browser.newPage()
+    const posts: string[] = []
+
+    fresh.on('request', (request) => {
+      if (request.method() === 'POST')
+        posts.push(new URL(request.url()).pathname.replace(/\/_kay\/action\/.*/, '/_kay/action'))
+    })
+    await fresh.route(/\/validate-[^/]*\.js$/, route => route.abort())
+    await fresh.goto(`${origin}/second`)
+    await fresh.focus('input[name="title"]')
+    await fresh.fill('input[name="title"]', 'ab')
+    await Promise.all([
+      fresh.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.startsWith('/_kay/action/')),
+      fresh.click('form button'),
+    ])
+
+    // Sent unchecked for the server to refuse, the failed load reported to no one.
+    expect(posts).toEqual(['/_kay/action'])
+    await fresh.close()
+  })
+
   it('posts a form without a reload, pending meanwhile, and shows what the action answered', async () => {
     await page.fill('input[name="title"]', 'abcd')
     await page.click('form button')
