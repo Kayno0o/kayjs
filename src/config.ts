@@ -26,7 +26,7 @@ export interface KayConfig {
   favicon?: string
   // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
   manifest?: ManifestConfig
-  // Self-hosted fonts, declared and preloaded on every page.
+  // Self-hosted fonts, declared on every page and preloaded where they ask for it.
   fonts?: FontConfig[]
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
   security?: SecurityConfig | false
@@ -116,7 +116,7 @@ export interface FontConfig {
   // Defaults to `swap`.
   display?: 'auto' | 'block' | 'swap' | 'fallback' | 'optional'
   unicodeRange?: string
-  // Fetched with the page rather than once the stylesheet asks for it; on by default, worth turning off for a face few pages use.
+  // Fetched with the page rather than once the stylesheet asks for it; off by default, since a preload shares a slow link with the stylesheet and holds back the first paint.
   preload?: boolean
 }
 

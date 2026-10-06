@@ -269,7 +269,7 @@ The manifest is named after `seo.name`, `shortName` defaulting to it, and descri
 
 ### Fonts
 
-`fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by one `@font-face` stylesheet every page links, and preloaded unless `preload: false`.
+`fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by one `@font-face` stylesheet every page links, and preloaded only with `preload: true`.
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -277,14 +277,14 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({
   fonts: [
     { family: 'Inter', src: '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', weight: '100 900' },
-    { family: 'Lora', src: 'src/fonts/lora-italic.woff2', style: 'italic', preload: false },
+    { family: 'Lora', src: 'src/fonts/lora-italic.woff2', style: 'italic' },
   ],
 })
 ```
 
 - `src` is a `.woff2`, `.woff`, `.ttf` or `.otf` file relative to the root, or a file of an installed package. `weight` defaults to 400, or takes a range for a variable font; `style` to `normal`; `display` to `swap`; `unicodeRange` is passed through.
 - A stylesheet names the family as it would any other: `font-family: Inter, system-ui, sans-serif`. With Tailwind, `@theme { --font-sans: Inter, system-ui, sans-serif; }`.
-- Preload only the faces the first screen shows: each preload is fetched with the page, used or not.
+- A face loads once the page uses it, its text showing in the fallback font until then (`display: swap`). `preload: true` fetches it with the page instead, so text is likelier to paint in it first, but on a slow phone a preload shares the link with the stylesheet and holds back the first paint, about 190 ms for two faces on jb-peinture under Lighthouse throttling: preload at most the one face the first screen's text is set in, and none when the first paint matters more.
 
 ## Styles
 

@@ -41,7 +41,7 @@ export async function prepareFonts(root: string, fonts: FontConfig[], dir: strin
 
     rules.push(`@font-face{${declarations.join(';')}}`)
 
-    if (font.preload ?? true)
+    if (font.preload === true)
       preload.push({ href: url, type: `font/${format === 'truetype' ? 'ttf' : format === 'opentype' ? 'otf' : format}` })
   }
 

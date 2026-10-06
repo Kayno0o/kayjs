@@ -8,8 +8,8 @@ import { builtFonts, prepareFonts } from '../src/server/fonts'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 const FONTS = [
-  { family: 'Display "One"', src: 'tests/fixtures/seo/src/fonts/display.woff2', weight: '100 900' },
-  { family: 'Body', src: './tests/fixtures/seo/src/fonts/body-italic.woff', style: 'italic' as const, display: 'optional' as const, unicodeRange: 'U+0000-00FF', preload: false },
+  { family: 'Display "One"', src: 'tests/fixtures/seo/src/fonts/display.woff2', weight: '100 900', preload: true },
+  { family: 'Body', src: './tests/fixtures/seo/src/fonts/body-italic.woff', style: 'italic' as const, display: 'optional' as const, unicodeRange: 'U+0000-00FF' },
 ]
 const scratch = await mkdtemp(join(tmpdir(), 'kay-fonts-'))
 
