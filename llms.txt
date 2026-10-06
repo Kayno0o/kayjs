@@ -325,17 +325,17 @@ The URL, such as `/_kay/assets/logo-2k1v9.png`, is named after the file's conten
 
 ### Responsive images
 
-`image()` from `kay/image` gives an `img` the props that load the right size, spread into it:
+An imported image an `img` takes as its `src` loads the size it shows at:
 
 ```kay
 ---
-import { image } from 'kay/image'
 import hero from '../hero.jpg'
 ---
-img({...image(hero, { sizes: '(min-width: 60rem) 50vw, 100vw' })} alt="The workshop")
+img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 ```
 
-- An imported PNG, JPEG or WebP gets a `srcset` of WebP variants at 320, 640, 960, 1280, 1920, 2560 and 3840 pixels wide, those below its own width, plus its own; `src` is the 1280 one, or the widest below it; `width` and `height` are its own, so the page keeps its space while it loads. `sizes` is passed through. Any other file, an SVG for instance, gets its `src` alone, with its size when kay read one.
+- An imported PNG, JPEG or WebP gets a `srcset` of WebP variants at 320, 640, 960, 1280, 1920, 2560 and 3840 pixels wide, those below its own width, plus its own; `src` is the 1280 one, or the widest below it; `width` and `height` are its own, so the page keeps its space while it loads, unless the template writes either. `sizes` is the template's. Any other file, an SVG for instance, gets its `src` alone, with its size when kay read one. An `img` that writes its own `srcset` keeps its `src` as it is, and a `src` that is no imported file, such as `/logo.png`, goes as it is.
+- `image(src, options)` from `kay/image` gives the same props to spread, for an element that is no `img` or an image kay did not import: `img({...image(post.photo, { width: post.photoWidth, height: post.photoHeight, sizes: '100vw' })} alt="")`.
 - Variants are served by `/_kay/image?src=...&w=...`, which answers only those widths. `kay build` writes every variant of every imported image, served as files with a year of immutable caching; development makes them on request, kept in `.kay/cache/images`.
 - Images added at runtime, such as uploads, are resized too from a directory listed by the URL path the app serves it at: `images: { dirs: { '/uploads/': 'data/uploads' } }` in `kay.config.ts`, relative to the root, or to where an executable runs. Give their size, `image(post.photo, { width: post.photoWidth, height: post.photoHeight })`, for the variants; without it the image keeps its `src` alone. Each variant is made once per version of the file and revalidated by its ETag, since an upload can change in place; one over 50 megapixels is refused with 413 from its header alone. kay does not serve the originals: the app does.
 - `images.quality` sets the WebP quality, 80 by default. Variants are WebP, which every current browser reads; AVIF encoding is not available on Linux.

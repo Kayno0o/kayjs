@@ -6,7 +6,7 @@ import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'dynamic', 'element', 'head', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'show', 'style']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'dynamic', 'element', 'head', 'imageAttributes', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'show', 'style']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -428,6 +428,15 @@ export class HtmlTemplate {
         markup.text(` ${attributeName}="`)
         markup.dynamic(() => b.add(`${htmlAlias(attributeName === 'class' ? 'className' : 'style')}((`).addSource(expression).add('))'))
         markup.text('"')
+
+        continue
+      }
+
+      // An imported image loads the size it shows at, unless the template writes its own `srcset`.
+      if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
+        const sized = this.named(element, 'width') || this.named(element, 'height')
+
+        markup.dynamic(() => b.add(`${htmlAlias('imageAttributes')}((`).addSource(expression).add(`), ${sized})`))
 
         continue
       }

@@ -60,6 +60,21 @@ export function image(src: string, options: ImageOptions = {}): ImageProps {
   return props
 }
 
+// What `img(src={hero})` takes for an imported image: its variants, and its size unless the template gives one. Any other `src` goes as it is.
+export function imageSource(src: unknown, sized: boolean): ImageProps | { src: unknown } {
+  if (typeof src !== 'string' || !sizes.has(src))
+    return { src }
+
+  const props = image(src)
+
+  if (sized) {
+    delete props.width
+    delete props.height
+  }
+
+  return props
+}
+
 // A static export has no image route, so an imported image's variants are linked as the files `kay build` wrote.
 let variantFiles = false
 

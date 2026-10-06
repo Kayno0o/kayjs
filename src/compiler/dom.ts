@@ -7,7 +7,7 @@ import { BEHAVIOUR, CONTENT_PROPERTIES, END_MARKER, escapeStaticAttribute, escap
 import { childItems, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'setClass', 'setStyle', 'spread', 'template', 'text']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'setClass', 'setStyle', 'spread', 'template', 'text']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 
 export function domHelperImport(): string {
@@ -376,6 +376,14 @@ export class DomTemplate {
 
         if (attributeName === 'class' || attributeName === 'style') {
           own.push(variable => b.add(`KayEffect(() => ${attributeName === 'class' ? 'KaySetClass' : 'KaySetStyle'}(${variable(node)}, (`).addSource(expression).add(')));'))
+
+          continue
+        }
+
+        if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
+          const sized = this.named(element, 'width') || this.named(element, 'height')
+
+          own.push(variable => b.add(`KayEffect(() => KayImage(${variable(node)}, (`).addSource(expression).add(`), ${sized}));`))
 
           continue
         }

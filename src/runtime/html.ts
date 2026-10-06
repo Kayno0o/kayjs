@@ -3,6 +3,7 @@
 
 import { flattenClasses } from './classes'
 import { escape, escapeAttribute } from './escape'
+import { imageSource } from './image'
 import { currentServerScope, scope } from './reactive'
 import { failedIds, idMark } from './uid'
 import { safeUrl } from './url'
@@ -308,6 +309,16 @@ export function selectOptions(value: unknown, markup: string, only = false): str
 
     return values.includes(optionValue) ? `<option${attributes} selected>${text}` : `<option${attributes}>${text}`
   })
+}
+
+// An `img` source, with the variants and size of an imported image.
+export function imageAttributes(src: unknown, sized: boolean): string {
+  let markup = ''
+
+  for (const [name, value] of Object.entries(imageSource(src, sized)))
+    markup += attribute(name, value)
+
+  return markup
 }
 
 // A select a form posting to an action renders: the option a refused post chose, else what its own `value` selects, if it has one.

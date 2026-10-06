@@ -2,6 +2,7 @@
 // A dynamic part sits between `<!--[-->` and `<!--]-->` comments unless it is the only content of its element; hydration walks the server's nodes in the order the generated code asks for them.
 
 import { flattenClasses } from './classes'
+import { imageSource } from './image'
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
@@ -996,6 +997,14 @@ export function attribute(element: Element, name: string, value: unknown): void 
     element.removeAttribute(name)
   else
     element.setAttribute(name, value === true ? '' : safeUrl(name, String(value)))
+}
+
+// An `img` source, with the variants and size of an imported image; a later source clears what an earlier one set.
+export function image(element: Element, src: unknown, sized: boolean): void {
+  const props = imageSource(src, sized) as Record<string, unknown>
+
+  for (const name of sized ? ['src', 'srcset'] : ['src', 'srcset', 'width', 'height'])
+    attribute(element, name, props[name])
 }
 
 // A property where the element has one, such as an input's `value`; an attribute otherwise.

@@ -151,12 +151,14 @@ describe('pages', () => {
   it('serves the files components import at one content-hashed URL, the same on the server and in islands', async () => {
     const manifest = await Bun.file(join(process.cwd(), '.kay/client/manifest.json')).json() as ClientManifest
     const { html } = await get('/assets')
-    const logo = (/<img class="static" src="([^"]+)"/).exec(html)![1]!
+    // An imported image goes out as the variant of its size, which names the file it was made from.
+    const logoSrc = (/<img class="static" src="([^"]+)"/).exec(html)![1]!
+    const logo = decodeURIComponent((/src=([^&]+)&amp;/).exec(logoSrc)![1]!)
     const response = await app.handle(new Request(`http://localhost${logo}`))
     const chunk = await app.handle(new Request(`http://localhost${manifest.islands['tests/fixtures/site/src/components/brand.kay']![0]}`))
 
     expect(logo).toMatch(/^\/_kay\/assets\/logo-\w+\.png$/)
-    expect(html).toContain(`class="brand" src="${logo}"`)
+    expect(html).toContain(`class="brand" src="${logoSrc}"`)
     expect(html).toMatch(/<meta property="og:image" content="\/_kay\/assets\/og-\w+\.svg"/)
     expect(response.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
     expect(await response.bytes()).toEqual(await Bun.file('tests/fixtures/site/src/logo.png').bytes())

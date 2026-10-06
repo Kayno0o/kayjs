@@ -15,7 +15,7 @@ let outdir: string
 let client: ClientModule
 
 // Bundles `main.kay` and the files beside it for the browser, and mounts it in a fresh element.
-async function mountKay(files: Record<string, string>): Promise<{ root: HTMLElement, dispose: () => Promise<void> }> {
+async function mountKay(files: Record<string, string | Blob>): Promise<{ root: HTMLElement, dispose: () => Promise<void> }> {
   const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
 
   try {
@@ -137,6 +137,33 @@ describe('bound URLs', () => {
       await settle()
       expect(root.querySelector('a')!.getAttribute('href')).toBe('unsafe: javascript:alert(1)')
       expect(root.querySelector('img')!.getAttribute('src')).toBe('unsafe: javascript:alert(1)')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
+describe('imported images', () => {
+  it('load the size they show at in an island too, and a source that changes clears what the last one set', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\nimport hero from \'./hero.png\'\n\nconst src = signal(hero)\n---\nimg.hero(src={src()} alt="")\nimg.sized(src={hero} height="10" alt="")\nbutton(onClick={() => src.set(\'/logo.svg\')}) x\n',
+      'hero.png': Bun.file(join(import.meta.dir, 'fixtures/images/src/hero.png')),
+    })
+
+    try {
+      const hero = root.querySelector('img.hero')!
+      const sized = root.querySelector('img.sized')!
+
+      expect(hero.getAttribute('srcset')).toEndWith(' 1000w')
+      expect([hero.getAttribute('width'), hero.getAttribute('height')]).toEqual(['1000', '600'])
+      expect(hero.getAttribute('src')).toEndWith('&w=1000')
+      expect([sized.getAttribute('width'), sized.getAttribute('height'), sized.hasAttribute('srcset')]).toEqual([null, '10', true])
+
+      root.querySelector('button')!.click()
+      await settle()
+
+      expect([hero.getAttribute('src'), hero.getAttribute('srcset'), hero.getAttribute('width')]).toEqual(['/logo.svg', null, null])
     }
     finally {
       await dispose()
