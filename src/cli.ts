@@ -34,7 +34,7 @@ import { ExportError, prerenderPages } from './server/prerender'
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const toStderr: Paint = (styles, text) => styleText(styles, text, { stream: process.stderr })
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -137,12 +137,13 @@ function explain(args: string[]): number {
 }
 
 async function runCheck(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { 'project': { type: 'string', short: 'p' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' } }, 1)
+  const parsed = parseCommand(args, { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
 
-  const tsconfig = typeof parsed.values.project === 'string' ? parsed.values.project : 'tsconfig.json'
+  const { project, entry } = parsed.values
+  const tsconfig = typeof project === 'string' ? project : 'tsconfig.json'
   const root = projectRoot('check', parsed.positionals[0])
 
   if (root === undefined)
@@ -151,7 +152,7 @@ async function runCheck(args: string[]): Promise<number> {
   // The checking machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
   buildingWithoutEnv()
 
-  return await checkProject(root, await loadConfig(root), tsconfig, undefined, { denyWarnings: parsed.values['deny-warnings'] === true, fix: parsed.values.fix === true }) > 0 ? 1 : 0
+  return await checkProject(root, await loadConfig(root), tsconfig, typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: parsed.values['deny-warnings'] === true, fix: parsed.values.fix === true }) > 0 ? 1 : 0
 }
 
 // Prints what `kay check` finds in the project, as it finds it, and answers how many of those problems fail it: the errors, and the warnings too with `denyWarnings`.

@@ -502,6 +502,8 @@ describe('kay check, edge cases', () => {
       await rm(join(root, 'src/server.ts'))
 
       expect(await found()).toEqual([[2, 'TS2339'], [4, '/feed.xml'], [5, '/nope']])
+      expect((await runCheck(root, '--entry', join(root, 'src/main.ts'))).output).not.toContain('TS2339')
+      expect((await runCheck(root)).output).toContain('TS2339')
 
       await Bun.write(join(root, 'src/register.ts'), `import type { LocalsOf } from 'kay'\nimport { Elysia } from 'elysia'\n\n${plugin}\ndeclare module 'kay' {\n  interface Register {\n    locals: LocalsOf<typeof user>\n  }\n}\n`)
 
