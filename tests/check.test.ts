@@ -101,6 +101,14 @@ const tsconfig = JSON.stringify({
 })
 
 // A project under the checkout's node_modules, so `kay` and the types resolve without installing anything.
+// Runs `kay check` on the project as a user would, answering its exit code and what it printed.
+async function runCheck(root: string, ...flags: string[]): Promise<{ code: number, output: string }> {
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, ...flags], { stdout: 'pipe', stderr: 'pipe' })
+  const output = await new Response(child.stderr).text()
+
+  return { code: await child.exited, output }
+}
+
 async function scratchProject(files: Record<string, string>): Promise<string> {
   await mkdir(scratchRoot, { recursive: true })
   const root = await mkdtemp(join(scratchRoot, 'check-'))
@@ -880,20 +888,31 @@ describe('kay check, unused code', () => {
     const root = await scratchProject({
       'src/list.kay': '---\nconst { todos } = props<{ todos: { id: number, title: string }[] }>()\n---\nfor todo, i of todos key={i}\n  a(href={`/todos/${todo.id}`}) {todo.title}\n',
     })
-    const run = async (...flags: string[]) => {
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, ...flags], { stdout: 'pipe', stderr: 'pipe' })
-      const output = await new Response(child.stderr).text()
-
-      return { code: await child.exited, output }
-    }
 
     try {
-      const warned = await run()
+      const warned = await runCheck(root)
 
       expect(warned.output).toStartWith('warning[positional-key]: These rows are keyed by their position, though each has an `id`\n --> ')
       expect(warned.output.trim().split('\n').at(-1)).toBe('1 warning')
       expect(warned.code).toBe(0)
-      expect((await run('--deny-warnings')).code).toBe(1)
+      expect((await runCheck(root, '--deny-warnings')).code).toBe(1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('applies the safe fixes with --fix, then prints what is left', async () => {
+    const root = await scratchProject({
+      'src/card.kay': '---\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\n\nfunction go() {}\n---\nbutton(onclick={go}) {title}\niframe(src="https://example.com")\n',
+    })
+
+    try {
+      const { code, output } = await runCheck(root, '--fix')
+
+      expect(await Bun.file(join(root, 'src/card.kay')).text()).toBe('---\nconst { title } = props<{ title: string, subtitle?: string }>()\n\nfunction go() {}\n---\nbutton(onClick={go}) {title}\niframe(src="https://example.com")\n')
+      expect(output).toStartWith('kay check: fixed 2 problems\n\nerror[missing-title]: An `iframe` needs a `title`\n')
+      expect(code).toBe(1)
     }
     finally {
       await rm(root, { recursive: true, force: true })

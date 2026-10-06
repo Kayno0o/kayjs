@@ -144,7 +144,7 @@ function unreadNames(source: string, script: ScriptAnalysis, server: ServerAnaly
 
   for (const binding of script.props?.rest ? [] : script.props?.bindings ?? []) {
     if (unused(binding.local))
-      unread.push({ ...binding.local, checkOnly: true, code: 'unread-name', message: `The prop \`${binding.key}\` is never read`, fixes: binding.removal && [{ title: `Remove \`${binding.key}\``, edits: [{ ...binding.removal, text: '' }] }] })
+      unread.push({ ...binding.local, checkOnly: true, code: 'unread-name', message: `The prop \`${binding.key}\` is never read`, fixes: binding.removal && [{ title: `Remove \`${binding.key}\``, edits: [{ ...binding.removal, text: '' }], safe: true }] })
   }
 
   for (const data of server?.data ?? []) {

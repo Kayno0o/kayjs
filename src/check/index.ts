@@ -1,5 +1,5 @@
 import type { KayLibrary, SettingsReplacement } from '../build/libraries'
-import type { Diagnostic } from '../compiler/ast'
+import type { Diagnostic, Fix } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
 import type { LintLevel, LintLevels } from '../compiler/lints'
 import type { I18nConfig } from '../config'
@@ -73,7 +73,7 @@ export interface CheckOptions {
   lints?: LintLevels
 }
 
-export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity'> {
+export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity' | 'fixes'> {
   file: string
   line: number
   column: number
@@ -632,6 +632,34 @@ export function formatCheckDiagnostic(diagnostic: CheckDiagnostic, source?: stri
   return formatReport({ ...diagnostic, file: relative(process.cwd(), diagnostic.file), frame }, paint)
 }
 
-function fromCompile(file: string, source: string, { start, end, message, label, related, note, help, code, severity, checkOnly }: Diagnostic): CheckDiagnostic {
-  return { file, ...positionAt(source, start), end, message, label, related, note, help, code, severity, checkOnly }
+function fromCompile(file: string, source: string, { start, end, message, label, related, note, help, code, severity, fixes, checkOnly }: Diagnostic): CheckDiagnostic {
+  return { file, ...positionAt(source, start), end, message, label, related, note, help, code, severity, fixes, checkOnly }
+}
+
+// Applies the first safe fix of each problem to its file, leaving out one whose edits overlap another's, and answers how many problems that fixed.
+export async function applySafeFixes(diagnostics: CheckDiagnostic[]): Promise<number> {
+  const byFile = Map.groupBy(diagnostics.flatMap((diagnostic) => {
+    const fix = diagnostic.fixes?.find(candidate => candidate.safe)
+
+    return fix ? [{ file: diagnostic.file, fix }] : []
+  }), found => found.file)
+  let fixed = 0
+
+  for (const [file, found] of byFile) {
+    const taken: Fix['edits'] = []
+
+    for (const { fix } of found) {
+      if (fix.edits.some(edit => taken.some(other => edit.start < other.end && other.start < edit.end)))
+        continue
+
+      taken.push(...fix.edits)
+      fixed++
+    }
+
+    const source = await Bun.file(file).text()
+
+    await Bun.write(file, taken.sort((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source))
+  }
+
+  return fixed
 }

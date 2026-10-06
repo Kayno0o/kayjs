@@ -1177,7 +1177,7 @@ class Generator {
 
     const camel = `on${capitalize(name.replace(COMPOUND_EVENT, (_, first: string, second: string) => capitalize(first) + capitalize(second)))}`
 
-    this.error(attribute.name, `\`${this.text(attribute.name)}\` does not attach a handler`, { note: 'events are written in camelCase', help: `\`${camel}\``, fixes: [{ title: `Write \`${camel}\``, edits: [{ ...attribute.name, text: camel }] }] })
+    this.error(attribute.name, `\`${this.text(attribute.name)}\` does not attach a handler`, { note: 'events are written in camelCase', help: `\`${camel}\``, fixes: [{ title: `Write \`${camel}\``, edits: [{ ...attribute.name, text: camel }], safe: true }] })
   }
 
   // Check-only wrappers: a site link must match a page, markup must be made safe or written out, and a static parent passes an island serializable props only.

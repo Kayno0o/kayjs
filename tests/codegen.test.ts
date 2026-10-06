@@ -535,7 +535,7 @@ describe('lowercase events', () => {
     expect(reports('button(onclick={go}) x')).toEqual([{ message: '`onclick` does not attach a handler', at: 'onclick', note: 'events are written in camelCase', help: '`onClick`' }])
     expect(errors('button(on:click={go}) x')).toEqual(['`on:click` does not attach a handler'])
     expect(compileKay('input(onkeydown={go} ondblclick={go})', 'test.kay').diagnostics.map(d => d.help)).toEqual(['`onKeyDown`', '`onDblClick`'])
-    expect(compileKay('button(on:click={go}) x', 'test.kay').diagnostics[0]?.fixes).toEqual([{ title: 'Write `onClick`', edits: [{ start: 7, end: 15, text: 'onClick' }] }])
+    expect(compileKay('button(on:click={go}) x', 'test.kay').diagnostics[0]?.fixes).toEqual([{ title: 'Write `onClick`', edits: [{ start: 7, end: 15, text: 'onClick' }], safe: true }])
   })
 
   it('leaves components, strings and the camelCase form alone', () => {

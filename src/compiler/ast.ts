@@ -36,6 +36,8 @@ export type Details = Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | '
 export interface Fix {
   title: string
   edits: (Span & { text: string })[]
+  // It changes nothing the code means besides the problem it fixes, so `kay check --fix` applies it unasked.
+  safe?: boolean
 }
 
 export type Attribute
