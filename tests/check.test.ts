@@ -4,8 +4,9 @@ import { basename, join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
-import { check, compileShadow } from '../src/check'
+import { check } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
+import { compileShadow } from '../src/check/shadow'
 import { compileKay } from '../src/compiler'
 
 const fixtures = join(import.meta.dir, 'fixtures')

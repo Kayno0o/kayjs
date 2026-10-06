@@ -37,26 +37,27 @@ export async function createProject(target: string, options: NewOptions = {}): P
   const dependency = options.kay ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@^${kay.version}`)
   const template = options.template ?? 'server'
   const site = template === 'site'
-  const devDependencies = Object.fromEntries(['@iconify-json/tabler', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'].map(name => [name, kay.devDependencies[name]!]))
+  const scripts = { 'check': 'kay check', 'lint': 'keslint --cache', 'lint:fix': 'keslint --fix --cache', 'fmt': 'kay fmt', 'test': 'bun test' }
+  const devDependencies = Object.fromEntries(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'].map(name => [name, kay.devDependencies[name]!]))
   const files: Record<string, string> = {
     ...TEMPLATE_FILES[template],
     'package.json': `${JSON.stringify({
       name,
       type: 'module',
       private: true,
-      scripts: site ? { dev: 'kay dev', build: 'kay build --static', check: 'kay check', fmt: 'kay fmt', test: 'bun test' } : { dev: 'kay dev', build: 'kay build', compile: 'kay build --compile server', start: 'NODE_ENV=production bun src/server.ts', check: 'kay check', fmt: 'kay fmt', test: 'bun test' },
+      scripts: site ? { dev: 'kay dev', build: 'kay build --static', ...scripts } : { dev: 'kay dev', build: 'kay build', compile: 'kay build --compile server', start: 'NODE_ENV=production bun src/server.ts', ...scripts },
       dependencies: { elysia: kay.dependencies.elysia, kay: dependency },
       devDependencies,
     }, null, 2)}\n`,
     'tsconfig.json': `${JSON.stringify({
       compilerOptions: {
         target: 'ESNext',
-        lib: ['ESNext', 'DOM', 'DOM.Iterable'],
         jsx: 'preserve',
         jsxImportSource: 'kay',
+        lib: ['ESNext', 'DOM', 'DOM.Iterable'],
+        rootDirs: ['.', '.kay/types'],
         module: 'Preserve',
         moduleResolution: 'bundler',
-        rootDirs: ['.', '.kay/types'],
         types: ['bun'],
         strict: true,
         noFallthroughCasesInSwitch: true,
@@ -65,7 +66,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
         noEmit: true,
         skipLibCheck: true,
       },
-      include: ['src', 'tests', 'kay.config.ts', '.kay/types'],
+      include: ['src', 'tests', 'kay.config.ts', 'eslint.config.ts', '.kay/types'],
     }, null, 2)}\n`,
   }
 

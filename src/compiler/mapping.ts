@@ -146,6 +146,13 @@ export class SourceMap {
     return best?.source.start
   }
 
+  // The source a generated span was copied from when one verbatim run holds all of it, so an edit to it can be made to the source instead.
+  toSourceSpan(start: number, end: number): Span | undefined {
+    const exact = findContaining(this.byGenerated, start, mapping => mapping.generated)
+
+    return exact && end <= exact.generated + exact.length ? { start: exact.source + start - exact.generated, end: exact.source + end - exact.generated } : undefined
+  }
+
   toGenerated(source: number): number | undefined {
     const exact = findContaining(this.bySource, source, mapping => mapping.source)
 

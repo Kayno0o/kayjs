@@ -199,7 +199,9 @@ const COMMON_FILES: Record<string, string> = {
   ...THEME_FILES,
   '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
   // Lets test files import pages and their actions.
-  'bunfig.toml': '[test]\npreload = ["kay/test/preload"]\n',
+  'bunfig.toml': '[test]\npreload = [ "kay/test/preload" ]\n',
+  // Type-aware, .kay fences included, once `kay check` or `kay dev` has written the types they read.
+  'eslint.config.ts': 'import { defineConfig } from \'@kaynooo/eslint\'\n\nexport default defineConfig({ strict: true, kay: true })\n',
   'src/routes/_layout.kay': LAYOUT,
   'src/routes/index.kay': HOME,
   'tests/home.test.ts': HOME_TEST,
@@ -230,7 +232,7 @@ const SERVER_ENTRY = `import process from 'node:process'
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-const app = new Elysia().use(await pages()).listen(Number(process.env.PORT || 3000))
+const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 3000))
 
 console.log(\`Listening on http://localhost:\${app.server?.port}\`)
 
@@ -270,6 +272,10 @@ jobs:
       - name: Check
         run: bun run check
 
+      # After the check, which writes the types the lint of .kay files reads.
+      - name: Lint
+        run: bun run lint
+
       - name: Test
         run: bun run test
 `
@@ -278,7 +284,7 @@ const SERVER_FILES: Record<string, string> = {
   ...COMMON_FILES,
   ...CONTAINER_FILES,
   '.forgejo/workflows/test.yml': TEST_WORKFLOW,
-  '.gitignore': 'node_modules\n.kay\n/server\n',
+  '.gitignore': 'node_modules\n.kay\n.eslintcache\n/server\n',
   'kay.config.ts': CONFIG,
   'src/server.ts': SERVER_ENTRY,
   'src/components/header.kay': header('[{ href: \'/\', label: \'Home\' }]'),
@@ -294,7 +300,7 @@ const SERVER_FILES: Record<string, string> = {
 // A site with no server: `kay build --static` writes it to `dist`, which a Forgejo Pages workflow publishes, or a container serves with nginx.
 const SITE_FILES: Record<string, string> = {
   ...COMMON_FILES,
-  '.gitignore': 'node_modules\n.kay\ndist\n',
+  '.gitignore': 'node_modules\n.kay\n.eslintcache\ndist\n',
   'kay.config.ts': `import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { defineConfig } from 'kay/server'
@@ -302,8 +308,8 @@ import { defineConfig } from 'kay/server'
 // The Pages workflow sets both: the host the site is published on, and the path it is published under.
 export default defineConfig({
   lang: 'en',
-  site: process.env.SITE_URL || undefined,
-  base: process.env.SITE_BASE || undefined,
+  site: process.env.SITE_URL,
+  base: process.env.SITE_BASE,
   plugins: [tailwind],
   seo: { name: '__NAME__', titleTemplate: '%s | __NAME__', description: '__NAME__, made with kay' },
 })
@@ -348,6 +354,10 @@ jobs:
           SITE_BASE: /\${{ github.repository }}
         run: bun run build
 
+      # After the build's check, which writes the types the lint of .kay files reads.
+      - name: Lint
+        run: bun run lint
+
       - name: Publish to the gitea-pages branch
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -389,7 +399,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 // The server template, plus what an app adds: sessions, a sign-in, a guarded section, an API module and a live island over its websocket.
 const APP_FILES: Record<string, string> = {
   ...SERVER_FILES,
-  '.gitignore': 'node_modules\n.kay\n/server\n.env\n',
+  '.gitignore': 'node_modules\n.kay\n.eslintcache\n/server\n.env\n',
   '.env.example': 'SESSION_SECRET=at-least-32-characters-kept-out-of-the-repository\n',
   // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret.
   '.env.test': 'SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\n',

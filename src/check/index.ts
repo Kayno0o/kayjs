@@ -1,5 +1,4 @@
 import type { KayLibrary, SettingsReplacement } from '../build/libraries'
-import type { Diagnostic, SourceMap } from '../compiler'
 import type { I18nConfig } from '../config'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
@@ -7,6 +6,7 @@ import type { LocaleSettings } from '../runtime/i18n'
 import type { ApiModule } from '../server/api'
 import type { Redirects } from '../server/redirects'
 import type { Route } from '../server/routes'
+import type { ShadowFile } from './shadow'
 import { existsSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -16,25 +16,23 @@ import { ASSET_EXTENSIONS } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacements, throughNodeModules } from '../build/libraries'
-import { compileKay, componentName } from '../compiler'
+import { componentName } from '../compiler'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
-import * as builtInMatchers from '../runtime/params'
 import { scanApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
 import { localePrefixes, localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
-import { matcherFile } from '../server/params'
 import { publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
-import { patternShapes, routeOf, scanRoutes } from '../server/routes'
+import { patternShapes, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { bootProblems } from './boot'
 import { islandOnlyComponents } from './island-only'
+import { compileShadow, matcherSource, serializeShadowSettings, SHADOW_DIR, SHADOW_SETTINGS, shadowPath } from './shadow'
 
-export const SHADOW_DIR = join('.kay', 'types')
 const KAY_FILE = /\.kay$/
 const SETTINGS_CHECK = 'kay-settings.ts'
 const EXPORTS_CHECK = 'kay-exports.ts'
@@ -76,13 +74,6 @@ export interface CheckDiagnostic {
   checkOnly?: boolean
 }
 
-export interface ShadowFile {
-  source: string
-  file: string
-  tsx: string
-  map: SourceMap
-}
-
 // What `noUnusedLocals` reports: `kay check` turns it on for .kay files, and leaves other files to the project's tsconfig.
 export const UNUSED_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205])
 // What `noUnusedParameters` alone reports: a parameter, a destructured one or a type parameter, under the codes locals share.
@@ -117,6 +108,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const packagesPath = join(root, SHADOW_DIR, 'kay-packages.d.ts')
   const settingsPath = join(root, SHADOW_DIR, SETTINGS_CHECK)
   const exportsPath = join(root, SHADOW_DIR, EXPORTS_CHECK)
+  const settingsFile = join(root, SHADOW_DIR, SHADOW_SETTINGS)
   const own = await findKayFiles(root, { project: true, ownOnly: true })
   const sources = new Map(await Promise.all(own.map(async file => [file, await Bun.file(file).text()] as const)))
   const islandOnly = await islandOnlyComponents(root, routesDir, own, sources)
@@ -194,12 +186,13 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await writeIfChanged(settingsPath, replaced.code)
   await writeIfChanged(exportsPath, exported.code)
+  await writeIfChanged(settingsFile, serializeShadowSettings(root, { routesDir, islandOnly }))
 
   // Rewriting in place keeps every shadow file present for editors reading the tree meanwhile; only stale ones go.
   const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))
     .filter(entry => entry.isFile())
     .map(entry => join(entry.parentPath, entry.name))
-    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && path !== packagesPath && path !== settingsPath && path !== exportsPath && path !== join(root, SHADOW_DIR, CONTENT_CHECK) && !files.has(path))
+    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && path !== packagesPath && path !== settingsPath && path !== exportsPath && path !== settingsFile && path !== join(root, SHADOW_DIR, CONTENT_CHECK) && !files.has(path))
 
   await Promise.all(stale.map(async path => rm(path)))
 
@@ -323,52 +316,6 @@ function i18nSettings(root: string, config: I18nConfig, diagnostics: CheckDiagno
 
     return undefined
   }
-}
-
-export function shadowPath(root: string, file: string): string {
-  return join(root, SHADOW_DIR, `${relative(root, file)}.tsx`)
-}
-
-// Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`; `insideIsland` for a static component only islands render.
-export function compileShadow(root: string, routesDir: string, file: string, source: string, insideIsland = false): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
-  const route = file.startsWith(routesDir + sep) ? routeOf(routesDir, file) : undefined
-  const shadowDir = dirname(shadowPath(root, file))
-  // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
-  const relocateImport = (specifier: string) => {
-    if (!specifier.startsWith('.'))
-      return undefined
-
-    const target = resolve(dirname(file), specifier)
-
-    return target.startsWith(root + sep) ? undefined : relative(shadowDir, target)
-  }
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, insideIsland, relocateImport })
-  // Reported as the server reports it, rather than as a type error in the shadow file.
-  const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
-
-  return { shadow: { source, file, tsx, map }, diagnostics: [...diagnostics, ...unknown.map(matcher => ({ start: 0, end: 0, message: `names the matcher ${matcher}, which is neither ${relative(root, matcherFile(routesDir, matcher))} nor one kay ships: ${Object.keys(builtInMatchers).join(', ')}` }))] }
-}
-
-// A matcher's param is what it returns, the project's own or kay's; an optional one may be missing.
-function paramTypesOf(routesDir: string, shadowDir: string, route: Pick<Route, 'params' | 'optional' | 'matchers'>): Record<string, string> {
-  return Object.fromEntries(route.params.map((name) => {
-    const matcher = route.matchers?.[name]
-    const source = matcher === undefined ? undefined : matcherSource(routesDir, matcher)
-    const module = source === 'kay' ? `'kay/params').${matcher}` : `${JSON.stringify(relative(shadowDir, source ?? '').replace(TS_EXTENSION, ''))}).default`
-    const type = matcher === undefined ? 'string' : source === undefined ? 'unknown' : `Exclude<ReturnType<typeof import(${module}>, undefined>`
-
-    return [name, route.optional?.includes(name) ? `${type} | undefined` : type]
-  }))
-}
-
-// Where a matcher comes from, as the server looks it up: the project's file, `kay` for one kay ships, or undefined for neither.
-function matcherSource(routesDir: string, matcher: string): string | undefined {
-  const file = matcherFile(routesDir, matcher)
-
-  if (existsSync(file))
-    return file
-
-  return Object.hasOwn(builtInMatchers, matcher) ? 'kay' : undefined
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.

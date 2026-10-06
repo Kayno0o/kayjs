@@ -81,6 +81,11 @@
       "types": "./types/compiler/public.d.ts",
       "default": "./src/compiler/public.ts"
     },
+    "./eslint": {
+      "types": "./types/eslint/index.d.ts",
+      "bun": "./src/eslint/index.ts",
+      "default": "./dist/eslint.js"
+    },
     "./server": {
       "types": "./types/server/index.d.ts",
       "default": "./src/server/index.ts"
@@ -108,6 +113,7 @@
   "files": [
     "LICENSE",
     "README.md",
+    "dist",
     "llms.txt",
     "src",
     "types"
@@ -118,8 +124,9 @@
   "scripts": {
     "check": "tsgo --noEmit",
     "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
-    "prepack": "bun run build:types",
-    "postpack": "rm -rf types",
+    "build:eslint": "bun build src/eslint/index.ts --target node --packages external --outfile dist/eslint.js",
+    "prepack": "bun run build:types && bun run build:eslint",
+    "postpack": "rm -rf types dist",
     "lint": "keslint --cache",
     "lint:fix": "keslint --fix --cache",
     "test": "bun test",

@@ -46,7 +46,7 @@ it('changes the accent on a click', async () => {
 })
 `
 
-// Stands in for `bun install` of a packed kay: its source and the declarations `prepack` emits, beside this checkout's dependencies.
+// Stands in for `bun install` of a packed kay: its source and what `prepack` emits, the declarations and the ESLint processor, beside this checkout's dependencies.
 async function installKay(dir: string) {
   const modules = join(dir, 'node_modules')
   const kay = join(modules, 'kay')
@@ -61,6 +61,20 @@ async function installKay(dir: string) {
   const emit = Bun.spawn([join(repo, 'node_modules/.bin/tsgo'), '-p', join(repo, 'tsconfig.build.json'), '--outDir', join(kay, 'types')], { stdout: 'pipe', stderr: 'pipe' })
 
   expect(await emit.exited).toBe(0)
+
+  const processor = await Bun.build({ entrypoints: [join(repo, 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: join(kay, 'dist'), naming: 'eslint.js' })
+
+  expect(processor.success).toBe(true)
+}
+
+// Lints as `bun run lint` does, through keslint and the eslint it runs under Node, as JSON.
+async function lint(dir: string, path: string): Promise<{ filePath: string, messages: { ruleId: string | null, line: number }[] }[]> {
+  const child = Bun.spawn([join(dir, 'node_modules/.bin/keslint'), '--format', 'json', path], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+  const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  expect(stderr).toBe('')
+
+  return JSON.parse(stdout) as { filePath: string, messages: { ruleId: string | null, line: number }[] }[]
 }
 
 async function kay(args: string[], cwd?: string): Promise<{ stdout: string, stderr: string, code: number }> {
@@ -165,22 +179,33 @@ describe('kay new', () => {
       expect(files).toEqual(expect.arrayContaining(['Dockerfile', 'compose.prod.yaml', 'src/components/accent-picker.kay']))
       expect(manifest.scripts.compile).toBe('kay build --compile server')
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
-      expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
+      expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.dependencies.kay).toBe('^1.0.0')
       expect(await Bun.file(join(dir, 'src/components/header.kay')).text()).toContain('(href="/") my-app\n')
-      // As strict as kay itself, and checked and tested on every push.
+      // As strict as kay itself, and checked, linted and tested on every push.
       expect(((await Bun.file(join(dir, 'tsconfig.json')).json()) as { compilerOptions: Record<string, unknown> }).compilerOptions).toMatchObject({ strict: true, noFallthroughCasesInSwitch: true, noImplicitOverride: true, noUncheckedIndexedAccess: true })
-      expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain('run: bun run check\n\n      - name: Test\n        run: bun run test\n')
+      expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain('run: bun run check\n\n      # After the check, which writes the types the lint of .kay files reads.\n      - name: Lint\n        run: bun run lint\n\n      - name: Test\n        run: bun run test\n')
 
       await installKay(dir)
 
       // Stricter than kay itself: its source fails this flag, its declarations must not.
-      const tsconfig = await Bun.file(join(dir, 'tsconfig.json')).json() as { compilerOptions: Record<string, unknown> }
+      const scaffolded = await Bun.file(join(dir, 'tsconfig.json')).text()
+      const tsconfig = JSON.parse(scaffolded) as { compilerOptions: Record<string, unknown> }
 
       await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, exactOptionalPropertyTypes: true } }))
       expect(await check(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
+      // The scaffolded tsconfig, as lint reads every file of the project.
+      await Bun.write(join(dir, 'tsconfig.json'), scaffolded)
+      expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
+
+      // A page's server fence is linted with the project's types, at its .kay line.
+      await Bun.write(join(dir, 'src/routes/later.kay'), '--- server\nBun.write(\'later.txt\', \'later\')\n---\np Later\n')
+      expect(await check(dir)).toEqual([])
+      expect((await lint(dir, 'src/routes/later.kay'))[0]!.messages).toEqual([expect.objectContaining({ ruleId: 'ts/no-floating-promises', line: 2 })])
+      await rm(join(dir, 'src/routes/later.kay'))
+
       // The accent picker as a visitor meets it: rendered from the cookie, a value it does not know read as the default, and changed by a click.
       await Bun.write(join(dir, 'tests/accent.test.ts'), ACCENT_TEST.replace('__WIRE__', JSON.stringify(join(repo, 'src/runtime/wire'))))
 
@@ -200,7 +225,7 @@ describe('kay new', () => {
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-site')
@@ -214,11 +239,13 @@ describe('kay new', () => {
       expect(files).not.toContain('src/server.ts')
       expect(manifest.scripts.build).toBe('kay build --static')
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toContain('SITE_BASE: /${{ github.repository }}')
-      // Tested before it builds, which checks it.
+      // Tested before it builds, which checks it, and linted once the check has written the types it reads.
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run test\n\n {6}- name: Build the site\n/)
+      expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run build\n\n.*\n {6}- name: Lint\n {8}run: bun run lint\n/)
 
       await installKay(dir)
       expect(await check(dir)).toEqual([])
+      expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
       const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', '--static'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, SITE_URL: 'https://pages.example', SITE_BASE: '/me/my-site' } })
       const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
@@ -240,7 +267,7 @@ describe('kay new', () => {
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('scaffolds an app with sessions, a guarded section and a websocket island, which checks, tests and builds as it is', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
@@ -257,6 +284,7 @@ describe('kay new', () => {
       await installKay(dir)
       expect(await check(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
+      expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
       // Signs in through the action and lands in the guarded section, and counts the visitors online over the websocket.
       const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
@@ -269,7 +297,7 @@ describe('kay new', () => {
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('refuses a directory that already holds files', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-new-'))
