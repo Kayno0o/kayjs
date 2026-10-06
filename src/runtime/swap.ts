@@ -13,5 +13,8 @@ export interface FetchedPage {
   html: string
 }
 
+// Set once the swap took over the app's links, which an action call then shows its effects through.
+export const swap = { started: false }
+
 // Pages fetched ahead of a click, by URL; an action may change what they show, so each post forgets them.
 export const prefetched = new Map<string, { at: number, page: Promise<FetchedPage> }>()

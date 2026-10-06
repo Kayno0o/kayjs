@@ -85,6 +85,23 @@ describe.skipIf(!path && !process.env.CI)('an island form posting to an action',
     expect(page.errors).toEqual([])
   })
 
+  it('shows the page again once a call went through, unless the call says not to', async () => {
+    const page = await browser.open('/')
+    const before = Number(await page.text('p.tally'))
+
+    await page.click('button.bump')
+    await page.waitFor('p.tally', { text: String(before + 1) })
+    await page.click('button.quiet')
+    await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 300)))
+
+    expect(await page.text('p.tally')).toBe(String(before + 1))
+
+    await page.reload()
+
+    expect(await page.text('p.tally')).toBe(String(before + 2))
+    expect(page.errors).toEqual([])
+  })
+
   it('shows what a call was refused for, reactively', async () => {
     const page = await browser.open('/')
 

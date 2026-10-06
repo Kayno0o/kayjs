@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import { join } from '../routes/index.kay'
+import { bump, join } from '../routes/index.kay'
 
 const calls = signal(0)
 
@@ -21,3 +21,5 @@ form.signup(action={join})
     p.signup-error {message}
   button.post(formnovalidate) Join
   button.call(type="button" onClick={call} data-calls={calls()}) Call
+button.bump(type="button" onClick={() => void bump({})}) Bump
+button.quiet(type="button" onClick={() => void bump({}, { refresh: false })}) Quiet

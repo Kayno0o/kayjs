@@ -50,6 +50,16 @@ async function hydrateFrom(html: string): Promise<void> {
   hydrated = true
 }
 
+// Polls until `done` holds, for two seconds at most.
+async function waitFor(done: () => boolean): Promise<void> {
+  for (let tries = 0; !done(); tries++) {
+    if (tries === 200)
+      throw new Error('timed out')
+
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+}
+
 async function get(path: string): Promise<{ status: number, html: string, headers: Headers }> {
   const response = await app.handle(new Request(`http://localhost${path}`))
 
@@ -304,8 +314,19 @@ describe('pages', () => {
     const html = await (await app.handle(new Request('http://localhost/new'))).text()
     const realFetch = globalThis.fetch
 
-    GlobalRegistrator.register()
-    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => app.handle(new NativeRequest(new URL(String(input), 'http://localhost'), init))) as typeof fetch
+    const requests: string[] = []
+
+    // The page swap the call's refresh runs puts the next page's stylesheets in, which nothing serves here.
+    GlobalRegistrator.register({ url: 'http://localhost/new', settings: { disableCSSFileLoading: true, disableJavaScriptFileLoading: true, handleDisabledFileLoadingAsSuccess: true } })
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://localhost')
+      const response = await app.handle(new NativeRequest(url, init))
+
+      requests.push(`${init?.method ?? 'GET'} ${url.pathname}`)
+
+      // As a browser's fetch gives it, which the page swap reads where the page came from.
+      return Object.defineProperty(response, 'url', { value: url.href })
+    }) as typeof fetch
 
     try {
       // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
@@ -320,6 +341,9 @@ describe('pages', () => {
       await new Promise(resolve => setTimeout(resolve, 0))
       document.querySelector('form.quick')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
       await new Promise(resolve => setTimeout(resolve, 50))
+      expect(document.querySelector('p.saved')?.textContent).toStartWith('Saved as ')
+      // The call went through, so the page runs its loads again; it lands before the DOM goes away.
+      await waitFor(() => requests.includes('GET /new') && !document.documentElement.hasAttribute('aria-busy'))
       expect(document.querySelector('p.saved')?.textContent).toStartWith('Saved as ')
     }
     finally {

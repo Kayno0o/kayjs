@@ -209,7 +209,7 @@ export type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
-export type { Action, ActionContext, ActionProtection, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, ServerAction, Success, SuccessOf } from './action'
+export type { Action, ActionContext, ActionProtection, CallOptions, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, ServerAction, Success, SuccessOf } from './action'
 export { action, ActionError, ActionRedirect } from './action'
 export { localPath, withBase } from './base'
 export type { ApiRoutesOf, AwaitProps, CheckedHref, CheckedHtml, ChildrenProp, Deferred, FunctionProp, HydrateWhen, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, SafeHtml, TemplateHelpers } from './checks'

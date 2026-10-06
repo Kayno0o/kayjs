@@ -17,6 +17,9 @@ export const ping = action(t.Object({}), () => 'Saved')
 
 export const join = action(t.Object({ email: t.String({ format: 'email', maxLength: 200, error: 'Not an email' }) }), () => undefined)
 
+export const bump = action(t.Object({}), () => ++tally.count)
+
+const tally = { count: 0 }
 const refusedWith = save.failed()?.status
 ---
 ---
@@ -46,3 +49,4 @@ form(action={ping})
     p.done {done.data}
   button Ping
 Signup
+p.tally {tally.count}
