@@ -3,14 +3,15 @@ import type { TestSite } from '../src/test'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { browserPath, testSite } from '../src/test'
 
 const site = await testSite({ routes: 'tests/fixtures/forms/src/routes' })
-const { save, ping } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/index.kay')) as {
+const { save, ping, odd } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/index.kay')) as {
   save: Action<Record<string, string | boolean>, unknown, 'website'>
   ping: Action<Record<string, never>, string>
+  odd: Action<Record<string, never>, unknown>
 }
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 const REFUSED = { name: 'A', password: 'hunter2', bio: 'Hi <b>', plan: 'pro', size: 'l', news: 'on', website: '' }
@@ -73,6 +74,25 @@ describe.skipIf(!path && !process.env.CI)('an island form posting to an action',
 
   afterAll(async () => browser?.close())
 
+  it('hands the islands how a refused post went without what it sent, a failure no island can read left out', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const refused = await browser.submit(save, { ...REFUSED, name: 'Ada', website: 'spam.example' }, { from: '/' })
+      const unsendable = await browser.submit(odd, {}, { from: '/' })
+
+      expect(refused.html).toContain('data-kay-outcome')
+      expect(refused.html).not.toContain('spam.example')
+      expect(refused.html).not.toContain('hunter2')
+      expect(unsendable.status).toBe(409)
+      expect(unsendable.html).not.toContain('data-kay-outcome')
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('cannot reach the page\'s islands'))
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
   it('hydrates the page a refused post renders as the server drew it, the field filled in and marked', async () => {
     const page = await browser.open('/')
 
@@ -99,6 +119,30 @@ describe.skipIf(!path && !process.env.CI)('an island form posting to an action',
     await page.reload()
 
     expect(await page.text('p.tally')).toBe(String(before + 2))
+    expect(page.errors).toEqual([])
+  })
+
+  it('lets a navigation the caller starts once a call went through win over the refresh', async () => {
+    const page = await browser.open('/')
+
+    await page.click('button.away')
+    await page.waitFor('h1', { text: 'Other' })
+
+    expect(await page.path()).toBe('/other')
+    expect(page.errors).toEqual([])
+  })
+
+  it('leaves what a call was refused for on the page that made it', async () => {
+    const page = await browser.open('/')
+
+    await page.click('button.call')
+    await page.waitFor('p.signup-error', { text: 'Not an email' })
+    await page.click('a.other')
+    await page.waitFor('h1', { text: 'Other' })
+    await page.click('a.home')
+    await page.waitFor('p.tally')
+
+    expect(await page.text('p.signup-error')).toBeNull()
     expect(page.errors).toEqual([])
   })
 

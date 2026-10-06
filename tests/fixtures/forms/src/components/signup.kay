@@ -1,8 +1,13 @@
 ---
-import { signal } from 'kay'
+import { navigate, signal } from 'kay'
 import { bump, join } from '../routes/index.kay'
 
 const calls = signal(0)
+
+async function away() {
+  await bump({})
+  await navigate('/other')
+}
 
 async function call() {
   calls.set(count => count + 1)
@@ -23,3 +28,4 @@ form.signup(action={join})
   button.call(type="button" onClick={call} data-calls={calls()}) Call
 button.bump(type="button" onClick={() => void bump({})}) Bump
 button.quiet(type="button" onClick={() => void bump({}, { refresh: false })}) Quiet
+button.away(type="button" onClick={away}) Away

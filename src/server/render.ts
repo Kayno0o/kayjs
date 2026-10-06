@@ -16,7 +16,7 @@ import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
 import { component } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
-import { encodeValue } from '../runtime/wire'
+import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule } from './bundle'
 import { preferredEncoding } from './compress'
@@ -215,7 +215,9 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, con
 
 // A URL no page serves, answered by the routes directory's own `_404.kay` or `_error.kay`.
 export async function renderUnmatched(special: SpecialPages, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
-  return renderFailure(new NotFound(), special, createRendering(context, {}, options), new Map(), client, options)
+  const rendering = createRendering(context, {}, options)
+
+  return withOutcome(rendering.outcome, async () => renderFailure(new NotFound(), special, rendering, new Map(), client, options))
 }
 
 function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '' }: RenderOptions): Rendering {
@@ -417,8 +419,23 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
 }
 
 // The post the page answers, for its islands to render what the server did as they hydrate, then read through the action.
+// What the post sent stays out: a field the server cannot tell is a secret, such as a password field named `confirm`, or the honeypot's text, would show in the page's source.
 function outcomeScript(outcome: Outcome | null): string {
-  return outcome ? `<script type="application/json" ${OUTCOME_SCRIPT}>${encodeValue(outcome).replaceAll('<', '\\u003c')}</script>` : ''
+  if (!outcome)
+    return ''
+
+  let text: string
+
+  try {
+    text = encodeValue(outcome.succeeded ? outcome : { ...outcome, values: {} })
+  }
+  catch (error) {
+    console.warn(`kay: what ${outcome.action} ${outcome.succeeded ? 'returned' : 'passed to ctx.fail'} cannot reach the page's islands: ${unsendable(error) ?? String(error)}`)
+
+    return ''
+  }
+
+  return `<script type="application/json" ${OUTCOME_SCRIPT}>${text.replaceAll('<', '\\u003c')}</script>`
 }
 
 // The stylesheets of the layouts, outermost first, then the page's.

@@ -461,9 +461,10 @@ export class HtmlTemplate {
           b.add(`${htmlAlias('attribute')}(${JSON.stringify(filled)}, ${filled === 'value' ? 'KayFormValue' : 'KayFormChecked'}`)
           fieldArguments()
 
+          // A radio button with no `value` posts `on`, as a checkbox does, but only the ticked one of its group.
           if (filled === 'checked') {
             b.add(', ')
-            checkboxValue ? checkboxValue() : b.add('undefined')
+            checkboxValue ? checkboxValue() : b.add(this.isRadio(element) ? '"on"' : 'undefined')
           }
 
           b.add(')')
@@ -799,6 +800,10 @@ export class HtmlTemplate {
 
   private shorthand(element: ElementNode): string {
     return element.classes.map(span => this.source(span)).join(' ')
+  }
+
+  private isRadio(element: ElementNode): boolean {
+    return element.attributes.some(attribute => attribute.kind === 'static' && this.source(attribute.name) === 'type' && attribute.text.toLowerCase() === 'radio')
   }
 
   private named(element: ElementNode, name: string): boolean {

@@ -381,8 +381,10 @@ class Generator {
   private emitLoad(server: ServerAnalysis, query: boolean) {
     const { b } = this
 
-    for (const span of server.exports)
+    for (const span of server.exports) {
       b.addSource(span).add('\n')
+      this.deferDeclared(server, span)
+    }
 
     if (server.exportNames.length > 0)
       b.add(`KayRegisterActions(${JSON.stringify(this.options.moduleId)}, { ${server.exportNames.join(', ')} })\n`)
@@ -398,13 +400,17 @@ class Generator {
     for (const span of server.body) {
       b.addSource(span)
 
-      // Right where it is declared, so a promise rejecting while a later statement awaits crashes nothing.
-      for (const data of server.data) {
-        if (this.deferred.has(data.name) && data.local.start >= span.start && data.local.end <= span.end)
-          b.add(`\n${kayAlias('autoDefer')}(${data.name})\n`)
-      }
+      this.deferDeclared(server, span)
     }
     b.add(`\nreturn { ${server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${kayAlias('autoDefer')}(${data.name})` : data.name).join(', ')} }\n}\n`)
+  }
+
+  // Right where a deferred value is declared, so a promise rejecting while a later statement awaits crashes nothing; a statement an export reads runs at module level.
+  private deferDeclared(server: ServerAnalysis, span: Span) {
+    for (const data of server.data) {
+      if (this.deferred.has(data.name) && data.local.start >= span.start && data.local.end <= span.end)
+        this.b.add(`\n${kayAlias('autoDefer')}(${data.name})\n`)
+    }
   }
 
   // Script statements in source order, with the props declaration swapped for reads off `__props`.

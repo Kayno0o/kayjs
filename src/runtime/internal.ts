@@ -4,7 +4,7 @@ import type { Deferred } from './checks'
 export { actionStub, formAction, formChecked, formInvalid, formValue, isAction, registerActions } from './action'
 export { registerImage } from './image'
 
-export type AutoDeferred<T> = T extends PromiseLike<infer Value> ? Deferred<Value> : T
+export type AutoDeferred<T> = T extends Promise<infer Value> ? Deferred<Value> : T
 
 // A server value an `await` block renders: a promise is handled at once, as `defer()` handles it, and anything else is left as it is.
 export function autoDefer<T>(value: T): AutoDeferred<T> {

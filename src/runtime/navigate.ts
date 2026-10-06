@@ -1,7 +1,7 @@
 import type { CheckedHref } from './checks'
 import type { FetchedPage } from './swap'
 import { withBase, withoutBase } from './base'
-import { FAILURE_HEADER, NAVIGATE_HEADER, prefetched, REDIRECT_HEADER, swap } from './swap'
+import { FAILURE_HEADER, NAVIGATE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
@@ -77,7 +77,7 @@ export function startNavigation(given: NavigationHooks): void {
     return
 
   hooks = given
-  swap.started = true
+  swapState.started = true
   eagerness = speculationEagerness()
 
   shown = pageKey(new URL(location.href))
@@ -402,6 +402,9 @@ async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () =
       history.pushState(state(), '', target)
     else if (swap.history === 'replace')
       history.replaceState(state(), '', target)
+
+    if (pageKey(target) !== shown)
+      swapState.page++
 
     shown = pageKey(target)
     restoreScroll(swap, hash)

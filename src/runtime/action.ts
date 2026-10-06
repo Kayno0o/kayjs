@@ -5,7 +5,7 @@ import type { Locale } from './i18n'
 import { withBase } from './base'
 import { createSignal, untrack } from './reactive'
 import { sendValue } from './send'
-import { FAILURE_HEADER, prefetched, REDIRECT_HEADER, swap } from './swap'
+import { FAILURE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
 import { decodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
@@ -251,7 +251,8 @@ export function formValue(target: unknown, name: string): string | undefined {
 export function formChecked(target: unknown, name: string, value: unknown): boolean | undefined {
   const posted = isAction(target) ? untrack((target as FormTarget).failed)?.values : undefined
 
-  if (!posted)
+  // A refusal that read no field, such as a body too large, has nothing to tick or untick.
+  if (!posted || Object.keys(posted).length === 0)
     return undefined
 
   return value === undefined ? posted[name] !== undefined && posted[name] !== 'false' : posted[name] === String(value)
@@ -278,14 +279,16 @@ function pageOutcome(): Outcome | undefined {
 }
 
 // Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes.
-// How a post went is the request's on the server; in the browser the last call's once the page made one, else the post the page answers.
+// How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
 function callable(url: () => string): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
   const [inFlight, setInFlight] = createSignal(0, undefined, false)
-  const [last, setLast] = createSignal<Outcome | null | undefined>(undefined, undefined, false)
+  const [last, setLast] = createSignal<{ page: number, outcome: Outcome | null } | undefined>(undefined, undefined, false)
   const shift = (by: number) => setInFlight(untrack(inFlight) + by)
+  const called = (outcome: Outcome | null) => setLast({ page: swapState.page, outcome })
   const outcome = () => {
     const posted = requestOutcome?.()
-    const found = posted !== undefined ? posted : last() === undefined ? pageOutcome() : last()
+    const own = last()
+    const found = posted !== undefined ? posted : own?.page === swapState.page ? own.outcome : pageOutcome()
 
     return found?.action === url() ? found : undefined
   }
@@ -299,21 +302,25 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   return {
     call: async (input: unknown, options?: CallOptions) => {
       shift(1)
-      setLast(null)
+      called(null)
 
       try {
         const data = await post(url(), input)
 
-        setLast({ action: url(), succeeded: true, data })
+        called({ action: url(), succeeded: true, data })
 
-        if (swap.started && options?.refresh !== false)
-          void refreshPage()
+        // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; the swap is loaded already.
+        if (swapState.started && options?.refresh !== false) {
+          const { refresh } = await import('./navigate')
+
+          void refresh()
+        }
 
         return data
       }
       catch (error) {
         if (error instanceof ActionError && !(error instanceof ActionRedirect))
-          setLast({ action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
+          called({ action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
 
         throw error
       }
@@ -411,13 +418,6 @@ export async function readActionResponse<Output>(response: Response): Promise<Ou
   }
 
   return (body === '' ? undefined : decodeValue(body)) as Output
-}
-
-// Once the call resolved, so what its caller does next lands first; the swap is loaded already.
-async function refreshPage(): Promise<void> {
-  const { refresh } = await import('./navigate')
-
-  await refresh()
 }
 
 // Imported when needed: an island calling actions on a site with `navigation: false` ships none of the swap.
