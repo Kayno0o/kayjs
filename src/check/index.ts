@@ -34,6 +34,7 @@ import { islandOnlyComponents } from './island-only'
 import { compileShadow, matcherSource, serializeShadowSettings, SHADOW_DIR, SHADOW_SETTINGS, shadowPath } from './shadow'
 
 const KAY_FILE = /\.kay$/
+const SERVER_ENTRY = 'src/server.ts'
 const SETTINGS_CHECK = 'kay-settings.ts'
 const EXPORTS_CHECK = 'kay-exports.ts'
 const CONTENT_CHECK = 'kay-content.ts'
@@ -44,6 +45,8 @@ const MESSAGE_PROBLEMS = fileURLToPath(new URL('./messages.ts', import.meta.url)
 
 export interface CheckOptions {
   tsconfig?: string
+  // The server entry relative to the root, `src/server.ts` by default: the `app` it exports types `ctx.locals` and the app routes links may point at.
+  entry?: string
   // Page directory relative to the root, so `ctx.params` is typed per route.
   routes?: string
   // Public file directory relative to the root, whose files links may point at.
@@ -140,8 +143,10 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: relative(dirname(environmentPath), module.file).replace(TS_EXTENSION, '') }))
 
   const config = existsSync(join(root, CONFIG_FILE)) ? relative(dirname(environmentPath), join(root, CONFIG_FILE)).replace(TS_EXTENSION, '') : undefined
+  const entry = resolve(root, options.entry ?? SERVER_ENTRY)
+  const app = await exportsApp(entry) ? relative(dirname(environmentPath), entry).replace(TS_EXTENSION, '') : undefined
 
-  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }, config))
+  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }, config, app))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS]
@@ -319,7 +324,7 @@ function i18nSettings(root: string, config: I18nConfig, diagnostics: CheckDiagno
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], messages: string }, config?: string): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], messages: string }, config?: string, app?: string): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   const paths = files.length > 0 ? files.flatMap(spellings).map(file => JSON.stringify(file)).join(' | ') : 'never'
   const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: typeof import(${importSpecifier(i18n.messages)}).default` : ''
@@ -327,10 +332,11 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
 
   return [
-    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ChildrenProp, FieldName, FunctionProp, IslandProp, PublicEnvOf } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ChildrenProp, FieldName, FunctionProp, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
     '',
     'declare module \'kay\' {',
     `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules}${publicEnv} }`,
+    ...app === undefined ? [] : [`  interface Inferred { app: typeof import(${importSpecifier(app)}).app, locals: LocalsOf<typeof import(${importSpecifier(app)}).app> }`],
     '}',
     '',
     'declare global {',
@@ -343,6 +349,19 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     '}',
     '',
   ].join('\n')
+}
+
+// Read off its source rather than imported: the entry starts the server as it loads.
+async function exportsApp(entry: string): Promise<boolean> {
+  if (!existsSync(entry))
+    return false
+
+  try {
+    return new Bun.Transpiler({ loader: 'ts' }).scan(await Bun.file(entry).text()).exports.includes('app')
+  }
+  catch {
+    return false
+  }
 }
 
 function importSpecifier(path: string): string {

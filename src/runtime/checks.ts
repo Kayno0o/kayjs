@@ -23,8 +23,11 @@ export type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Elem
 // Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every page route, public file and API module, and by the app with `locals: LocalsOf<typeof auth>` and `app: typeof app`.
 export interface Register {}
 
-// Nothing is readable off `ctx.locals` until the app registers its type.
-export type Locals = Register extends { locals: infer Values extends object } ? Values : object
+// What `kay check` reads off the server entry exporting `app`, standing in for what `Register` leaves out.
+export interface Inferred {}
+
+// Nothing is readable off `ctx.locals` until the app registers its type, or exports its app from the server entry.
+export type Locals = Register extends { locals: infer Values extends object } ? Values : Inferred extends { locals: infer Values extends object } ? Values : object
 
 // The values an Elysia instance adds to every handler's context.
 export type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'>> = App['~Singleton']['decorator'] & App['~Singleton']['derive'] & App['~Singleton']['resolve']
@@ -59,7 +62,7 @@ type EndsWithSlash<Path extends string> = Path extends `${string}/` ? true : fal
 // The files in `public/`, by the path they are served at.
 type PublicFiles = Register extends { files: infer Files extends string } ? Files : never
 // The app registered as `app` keeps its routes, under Elysia 1.4's `~Routes`, as a tree of path segments down to their methods: `/` is the root's own `get`, `:name` a parameter, `*` the rest of the path.
-type AppRoutes = Register extends { app: { '~Routes': infer Routes } } ? Routes : never
+type AppRoutes = Register extends { app: { '~Routes': infer Routes } } ? Routes : Inferred extends { app: { '~Routes': infer Routes } } ? Routes : never
 type ServesGet<Tree> = 'get' extends keyof Tree ? true : false
 // `/files/*` serves `/files/` too, as a catch-all page does.
 type TreeMatches<Segments extends readonly string[], Tree, Slash extends boolean> = Segments extends readonly [infer Segment extends string, ...infer Rest extends readonly string[]]

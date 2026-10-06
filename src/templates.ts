@@ -232,16 +232,10 @@ const SERVER_ENTRY = `import process from 'node:process'
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 3000))
+// Exported for \`kay check\`, which checks links against the routes it serves besides the pages and types \`ctx.locals\` from its plugins.
+export const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 3000))
 
 console.log(\`Listening on http://localhost:\${app.server?.port}\`)
-
-// Links and redirects in pages are checked against the routes the app serves besides them too.
-declare module 'kay' {
-  interface Register {
-    app: typeof app
-  }
-}
 `
 
 // Every push is checked and tested before anything deploys it; the container build checks again, as `kay build` does.
@@ -412,34 +406,21 @@ export const env = defineEnv(t.Object({
   PORT: t.Integer({ default: 3000 }),
 }))
 `,
-  'src/session.ts': `import type { LocalsOf } from 'kay'
-import { session } from 'kay/server'
+  'src/session.ts': `import { session } from 'kay/server'
 import { env } from './env'
 
 // The data travels sealed in the cookie; pass a \`store\`, such as \`sqliteStore('sessions.sqlite')\`, to keep it on the server.
 export const sessions = session<{ name: string }>({ secret: env.SESSION_SECRET })
-
-declare module 'kay' {
-  interface Register {
-    locals: LocalsOf<typeof sessions>
-  }
-}
 `,
   'src/server.ts': `import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 import { env } from './env'
 import { sessions } from './session'
 
-const app = new Elysia().use(sessions).use(await pages()).listen(env.PORT)
+// Exported for \`kay check\`, which checks links against the routes it serves besides the pages and types \`ctx.locals\` from its plugins.
+export const app = new Elysia().use(sessions).use(await pages()).listen(env.PORT)
 
 console.log(\`Listening on http://localhost:\${app.server?.port}\`)
-
-// Links and redirects in pages are checked against the routes the app serves besides them too.
-declare module 'kay' {
-  interface Register {
-    app: typeof app
-  }
-}
 `,
   'src/components/header.kay': header('[{ href: \'/\', label: \'Home\' }, { href: \'/account\', label: \'Account\' }]'),
   'src/routes/login.kay': `--- server

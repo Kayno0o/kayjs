@@ -114,9 +114,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 }
 
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
-async function regenerateTypes(root: string, { routes, publicDir, api, settings }: DevOptions) {
+async function regenerateTypes(root: string, { entry, routes, publicDir, api, settings }: DevOptions) {
   try {
-    await writeShadowTypes(root, { routes, publicDir, api, settings })
+    await writeShadowTypes(root, { entry, routes, publicDir, api, settings })
   }
   catch (error) {
     console.error(error)

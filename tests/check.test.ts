@@ -481,6 +481,30 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('reads the app routes and locals off the app the server entry exports, a Register the app writes itself winning', async () => {
+    const plugin = 'const user = new Elysia({ name: \'user\' }).derive({ as: \'scoped\' }, () => ({ user: { name: \'Ada\' } }))\n'
+    const entry = `import { Elysia } from 'elysia'\nimport { pages } from 'kay/server'\n\n${plugin}\nexport const app = new Elysia().use(user).get('/feed.xml', () => 'feed').use(await pages())\n`
+    const page = '--- server\nconst name: string = ctx.locals.user.name\n---\na(href="/feed.xml") {name}\na(href="/nope") nope\n'
+    const root = await scratchProject({ 'src/server.ts': entry, 'src/main.ts': entry, 'src/routes/index.kay': page })
+    const found = async (options: CheckOptions = {}) => (await check(root, options)).map(d => [d.file.endsWith('.kay') ? d.line : d.file, d.message.match(/serves ([^\s;"`]+)/)?.[1] ?? d.code])
+
+    try {
+      expect(await found()).toEqual([[5, '/nope']])
+      expect(await found({ entry: 'src/main.ts' })).toEqual([[5, '/nope']])
+
+      await rm(join(root, 'src/server.ts'))
+
+      expect(await found()).toEqual([[2, 'TS2339'], [4, '/feed.xml'], [5, '/nope']])
+
+      await Bun.write(join(root, 'src/register.ts'), `import type { LocalsOf } from 'kay'\nimport { Elysia } from 'elysia'\n\n${plugin}\ndeclare module 'kay' {\n  interface Register {\n    locals: LocalsOf<typeof user>\n  }\n}\n`)
+
+      expect(await found({ entry: 'src/main.ts' })).toEqual([[5, '/nope']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('lets a link whose start or end is interpolated match any page it may reach', async () => {
     const root = await scratchProject({
       'src/routes/about.kay': 'p about\n',

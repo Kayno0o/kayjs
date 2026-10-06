@@ -122,9 +122,9 @@ async function runCheck(args: string[]): Promise<number> {
 }
 
 // Prints what `kay check` finds in the project, as it finds it, and answers how many problems that was.
-async function checkProject(root: string, config: KayConfig, tsconfig: string): Promise<number> {
+async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string): Promise<number> {
   const { routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout } = config
-  const diagnostics = await check(root, { tsconfig, routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout })
+  const diagnostics = await check(root, { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout })
   const sources = new Map<string, string | undefined>()
 
   for (const diagnostic of diagnostics) {
@@ -197,7 +197,7 @@ async function build(args: string[]): Promise<number> {
     await rm(previous, { recursive: true, force: true })
 
   const started = performance.now()
-  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json') : 0, bundleClient(root, config, exported)])
+  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined) : 0, bundleClient(root, config, exported)])
 
   if (checked.status === 'rejected' || checked.value > 0) {
     await putBack(output, previous)

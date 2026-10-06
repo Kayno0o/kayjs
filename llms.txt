@@ -784,40 +784,32 @@ form(action={add})
 
 ## Locals
 
-`ctx.locals` is the Elysia context of the request. Declare what the app adds once, in a `.ts` module, and register its type:
+`ctx.locals` is the Elysia context of the request, typed from the app the server entry exports: what the plugins it uses before the pages add.
 
 ```ts
-import type { LocalsOf } from 'kay'
 import { Elysia } from 'elysia'
+import { pages } from 'kay/server'
 
-export const auth = new Elysia({ name: 'auth' }).derive({ as: 'scoped' }, async ({ cookie }) => ({ user: await findSession(cookie.session?.value) }))
+const auth = new Elysia({ name: 'auth' }).derive({ as: 'scoped' }, async ({ cookie }) => ({ user: await findSession(cookie.session?.value) }))
 
-declare module 'kay' {
-  interface Register {
-    locals: LocalsOf<typeof auth>
-  }
-}
+export const app = new Elysia().use(auth).use(await pages()).listen(3000)
 ```
+
+- `kay check`, the editor and `kay dev` read `export const app` off `src/server.ts`, or the entry `kay dev --entry` and `kay build --entry` name, without running it, and type `ctx.locals.user` from it; an entry exporting no `app` leaves `ctx.locals` empty.
+- An app whose entry `kay check` does not read, or that wants other locals than its app's, registers them itself, which wins over what the entry gives: `declare module 'kay' { interface Register { locals: LocalsOf<typeof auth> } }`, `LocalsOf` from `kay`.
 
 ## Sessions
 
 `session()` from `kay/server` is an Elysia plugin adding `session` to the context: `ctx.locals.session` in pages, actions and guards, `({ session })` in the app's own Elysia routes.
 
 ```ts
-import type { LocalsOf } from 'kay'
 import { session, sqliteStore } from 'kay/server'
 import { env } from './env'
 
 export const sessions = session<{ userId: string }>({ secret: env.SESSION_SECRET, store: sqliteStore('sessions.sqlite') })
-
-declare module 'kay' {
-  interface Register {
-    locals: LocalsOf<typeof sessions>
-  }
-}
 ```
 
-The server entry uses it before the pages: `new Elysia().use(sessions).use(await pages())`. An app with locals of its own registers `LocalsOf` of an Elysia that uses both.
+The server entry exports the app using it before the pages, `export const app = new Elysia().use(sessions).use(await pages())`, which types `ctx.locals.session` (see Locals).
 
 ```kay
 --- server
@@ -918,7 +910,7 @@ export default api()
   .post('/answer', ({ body }) => eventStream(complete(body.prompt)), { body: t.Object({ prompt: t.String() }) })
 ```
 
-- `api()` is a `new Elysia()` whose handlers read the app's locals, typed through `Register`: `({ user })`, `ws.data.user`. A plain `new Elysia()` is mounted the same way.
+- `api()` is a `new Elysia()` whose handlers read the app's locals, typed as `ctx.locals` is (see Locals): `({ user })`, `ws.data.user`. A plain `new Elysia()` is mounted the same way.
 - A `_guard.ts` in `src/api/` or below runs before every route of the modules in its directory and below, outermost first, a websocket upgrade included, as it does for pages and actions: a redirect or a denial answers the request, and the cookies and headers it sets go out with the route's response.
 - A websocket upgrade, or a request other than GET, HEAD and OPTIONS, another site's page sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403 once the guards let it through, since a browser lets any page open a websocket or post a form to any host with the user's cookies. A request carrying neither header, such as a webhook, goes through; a route other sites' pages call from the browser belongs on the app's own Elysia instance.
 - `eventStream(source)` answers with server-sent events, one per value an async iterable, a generator or an array gives, crossing as island props do, Dates, Maps and Sets included. The source is read once the browser reads the response and stopped when it goes away; a source that throws ends the stream as failed, the error logged and handed to `onError`. A comment line every 5 seconds keeps a quiet stream open past Bun's `idleTimeout` and a proxy's.
@@ -1020,16 +1012,10 @@ kay is published as `@kaynooo/kayjs` to the registry at `https://git.kaynooo.fr/
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-const app = new Elysia().get('/feed.xml', feed).use(await pages()).listen(3000)
-
-declare module 'kay' {
-  interface Register {
-    app: typeof app
-  }
-}
+export const app = new Elysia().get('/feed.xml', feed).use(await pages()).listen(3000)
 ```
 
-Registering `app` lets links and redirects point at the app's own GET routes, such as `/feed.xml`, which `kay check` otherwise reports as served by no page.
+Exporting `app` lets links and redirects point at the app's own GET routes, such as `/feed.xml`, which `kay check` otherwise reports as served by no page, and types `ctx.locals` (see Locals). An entry `kay check` does not read registers it instead: `declare module 'kay' { interface Register { app: typeof app } }`.
 
 Project settings live in an optional `kay.config.ts` at the root, read by `pages()` and every command; options passed to `pages()` or `testSite()` win over it key by key, an `undefined` option leaving the file's value, and in an executable `kay build --compile` wrote, the root, routes and public directory it was built with win over both. It must `export default` its config, or the command fails with a message saying so.
 
