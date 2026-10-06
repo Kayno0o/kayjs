@@ -1,6 +1,7 @@
 import type { KayLibrary, SettingsReplacement } from '../build/libraries'
 import type { Diagnostic } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
+import type { LintLevel, LintLevels } from '../compiler/lints'
 import type { I18nConfig } from '../config'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
@@ -20,6 +21,7 @@ import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacements, throughNodeModules } from '../build/libraries'
 import { componentName } from '../compiler'
 import { formatReport } from '../compiler/frame'
+import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
@@ -67,6 +69,8 @@ export interface CheckOptions {
   shutdownTimeout?: number
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
   i18n?: I18nConfig
+  // The level of each lint, over its default.
+  lints?: LintLevels
 }
 
 export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity'> {
@@ -122,7 +126,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   for (const file of own) {
     const source = sources.get(file)!
-    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source, islandOnly.has(file))
+    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source, islandOnly.has(file), options.lints)
     const path = shadowPath(root, file)
 
     await writeIfChanged(path, shadow.tsx)
@@ -446,6 +450,20 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const broken = new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file))
   // A library's own modules are its to check, as `skipLibCheck` leaves a declaration file's, a missing optional peer included: only its components compile as the app's. An app inside a linked library's repository keeps its own files.
   const libraryModule = (file: string) => !KAY_FILE.test(file) && libraryOf(libraries, file) !== undefined && !ownFile(root, file)
+  const levels = new Map<ShadowFile, ReturnType<typeof lintLevels>>()
+  // Unread code in a .kay file is the `unread-name` lint, at its level there.
+  const unreadLevel = (diagnostic: CheckDiagnostic): LintLevel | undefined => {
+    const shadow = files.get(diagnostic.file)
+
+    if (!shadow || diagnostic.code === undefined || !UNUSED_CODES.has(Number(diagnostic.code.slice(2))))
+      return undefined
+
+    const levelAt = levels.get(shadow) ?? lintLevels(shadow.source, options.lints)
+
+    levels.set(shadow, levelAt)
+
+    return levelAt('unread-name', shadow.map.toSource(offsetAt(shadow.tsx, diagnostic)) ?? 0)
+  }
 
   if (errors.trim() !== '')
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })
@@ -454,7 +472,12 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
     if (diagnostic.code !== undefined && UNUSED_CODES.has(Number(diagnostic.code.slice(2))) && (files.has(diagnostic.file) ? generatedOnly(diagnostic, files) : !projectUnused.has(Number(diagnostic.code.slice(2)))))
       continue
 
-    const remapped = remap(diagnostic, files)
+    const unread = unreadLevel(diagnostic)
+
+    if (unread === 'allow')
+      continue
+
+    const remapped = unread === undefined ? remap(diagnostic, files) : { ...remap(diagnostic, files), code: 'unread-name', severity: unread === 'warn' ? 'warning' as const : 'error' as const }
     const setting = remapped.file === settingsFile ? settings.get(remapped.line) : undefined
     const exported = remapped.file === exportsFile ? exports.get(remapped.line) : undefined
     const used = remapped.file === contentFile ? props.lines.get(remapped.line) : undefined

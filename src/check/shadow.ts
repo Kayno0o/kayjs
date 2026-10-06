@@ -1,4 +1,5 @@
 import type { Diagnostic, SourceMap } from '../compiler'
+import type { LintLevels } from '../compiler/lints'
 import type { Route } from '../server/routes'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -45,7 +46,7 @@ export function readShadowSettings(root: string): ShadowSettings {
 }
 
 // Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`; `insideIsland` for a static component only islands render.
-export function compileShadow(root: string, routesDir: string, file: string, source: string, insideIsland = false): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
+export function compileShadow(root: string, routesDir: string, file: string, source: string, insideIsland = false, lints?: LintLevels): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
   const route = file.startsWith(routesDir + sep) ? routeOf(routesDir, file) : undefined
   const shadowDir = dirname(shadowPath(root, file))
   // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
@@ -57,7 +58,7 @@ export function compileShadow(root: string, routesDir: string, file: string, sou
 
     return target.startsWith(root + sep) ? undefined : relative(shadowDir, target)
   }
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, insideIsland, relocateImport })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, insideIsland, relocateImport, lints })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 

@@ -348,7 +348,7 @@ describe('kay lsp imports', () => {
   })
 
   it('reports a browser-only global read while rendering next to the type errors, fixed with an effect or `--- client`', async () => {
-    const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nlocalStorage.clear()\n---\np {count().missing}\n'
+    const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nlocalStorage.clear()\n---\np {count().missing}\nbutton(onClick={() => count.set(1)}) +\n'
     const diagnostics = await editor.change(page, source, 6)
     const line = { start: { line: 4, character: 0 }, end: { line: 4, character: 12 } }
     const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range: line, context: { diagnostics } })
@@ -361,7 +361,7 @@ describe('kay lsp imports', () => {
   })
 
   it('reports unused imports, declarations, props and server values as errors, a prop with its fix', async () => {
-    const source = '---\nimport { effect, signal } from \'kay\'\n\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\nconst count = signal(0)\nconst idle = 1\n---\np {title} {count()}\n'
+    const source = '---\nimport { effect, signal } from \'kay\'\n\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\nconst count = signal(0)\nconst idle = 1\n---\np {title} {count()}\nbutton(onClick={() => count.set(1)}) +\n'
     const diagnostics = await editor.change(page, source, 7)
 
     const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range: diagnostics[0]!.range, context: { diagnostics } })
@@ -372,6 +372,14 @@ describe('kay lsp imports', () => {
       [5, 1, '\'idle\' is declared but its value is never read.'],
     ])
     expect(actions.map(action => ({ title: action.title, text: applyEdits(source, action.edit!.changes![editor.uri(page)]!) }))).toContainEqual({ title: 'Remove `subtitle`', text: source.replace('title, subtitle }', 'title }') })
+    expect(diagnostics.map(diagnostic => [diagnostic.code, diagnostic.tags])).toEqual([['unread-name', [1]], ['unread-name', [1]], ['unread-name', [1]]])
+  })
+
+  it('reports a lint that warns as a warning, and none a `// kay-allow` comment allows', async () => {
+    const source = '---\nconst { todos } = props<{ todos: { id: number }[] }>()\n// kay-allow unread-name\nconst idle = 1\n---\nfor todo, i of todos key={i}\n  p {i}. {todo.id}\n'
+    const diagnostics = await editor.change(page, source, 8)
+
+    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.severity, diagnostic.code])).toEqual([[5, 2, 'positional-key']])
   })
 })
 

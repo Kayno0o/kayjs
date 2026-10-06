@@ -1,5 +1,6 @@
 import type { Diagnostic, Node, Span } from './ast'
 import type { Paint } from './frame'
+import type { LintLevels } from './lints'
 import type { FoundRewrites } from './rewrite'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
@@ -8,6 +9,7 @@ import { awaitBlocks, tryBlocks } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandMessages } from './codegen'
 import { formatReport } from './frame'
+import { applyLints, templateLints } from './lints'
 import { positionAt, SourceMap } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
@@ -34,6 +36,8 @@ export interface CompileOptions {
   hydratable?: boolean
   // Server output of a static component's `?island` twin, which carries markers like an island.
   twinBuild?: boolean
+  // Type checking only: the level of each lint, over its default.
+  lints?: LintLevels
   // Renders in the browser only, as `--- client` does: set when a package the component imports cannot load on the server.
   clientOnly?: boolean
   // Type-checking a static component only islands render: its children render inline with it, so the props it passes them are not serialized.
@@ -113,21 +117,23 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     diagnostics.push(...browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? [], routeFile))
 
   if (options.check)
-    diagnostics.push(...unboundedFields(source, file.server), ...unreadNames(source, script, server, found))
+    diagnostics.push(...unboundedFields(source, file.server), ...unreadNames(source, script, server, found), ...constantSignals(source, file.script, found), ...templateLints(file))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
 
+  const reported = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).sort((a, b) => a.start - b.start)
+
   // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.
   if (client && options.output === 'html' && island)
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true)})\n`, map: new SourceMap([], []), island, classes: shorthandClasses(file.template, source), diagnostics: diagnostics.sort((a, b) => a.start - b.start) }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true)})\n`, map: new SourceMap([], []), island, classes: shorthandClasses(file.template, source), diagnostics: reported }
 
   return {
     tsx: final.builder.code,
     map: final.builder.map(),
     island,
     classes: shorthandClasses(file.template, source),
-    diagnostics: diagnostics.sort((a, b) => a.start - b.start),
+    diagnostics: reported,
   }
 }
 
@@ -138,15 +144,31 @@ function unreadNames(source: string, script: ScriptAnalysis, server: ServerAnaly
 
   for (const binding of script.props?.rest ? [] : script.props?.bindings ?? []) {
     if (unused(binding.local))
-      unread.push({ ...binding.local, checkOnly: true, message: `The prop \`${binding.key}\` is never read`, fixes: binding.removal && [{ title: `Remove \`${binding.key}\``, edits: [{ ...binding.removal, text: '' }] }] })
+      unread.push({ ...binding.local, checkOnly: true, code: 'unread-name', message: `The prop \`${binding.key}\` is never read`, fixes: binding.removal && [{ title: `Remove \`${binding.key}\``, edits: [{ ...binding.removal, text: '' }] }] })
   }
 
   for (const data of server?.data ?? []) {
     if (unused(data.local) && !found.serverReads.has(data.name))
-      unread.push({ ...data.local, checkOnly: true, message: `\`${data.name}\` is never read` })
+      unread.push({ ...data.local, checkOnly: true, code: 'unread-name', message: `\`${data.name}\` is never read` })
   }
 
   return unread
+}
+
+// The signals the component script declares and nothing writes.
+function constantSignals(source: string, script: Span | undefined, found: FoundRewrites): Diagnostic[] {
+  return found.constantSignals.filter(({ name }) => script !== undefined && name.start >= script.start && name.end <= script.end).map(({ name, value }) => {
+    const text = source.slice(name.start, name.end)
+
+    return {
+      ...name,
+      code: 'constant-signal',
+      message: `\`${text}\` is a signal nothing writes`,
+      note: 'it never changes',
+      help: value ? `make it a plain value, \`const ${text} = ${source.slice(value.start, value.end)}\`, read as \`${text}\`` : `make it a plain \`const\`, read as \`${text}\``,
+      checkOnly: true,
+    }
+  })
 }
 
 function shorthandClasses(nodes: Node[], source: string, found: string[] = []): string[] {

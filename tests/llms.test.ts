@@ -2,6 +2,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { compileKay, formatDiagnostic } from '../src/compiler'
+import { LINTS } from '../src/compiler/lints'
 import { formatKay } from '../src/format'
 
 const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
@@ -33,6 +34,10 @@ function documentedImports(): Map<string, Set<string>> {
 describe('llms.txt', () => {
   it('has examples', () => {
     expect(examples.length).toBeGreaterThan(5)
+  })
+
+  it('lists every lint at its default level', () => {
+    expect(Object.entries(LINTS).filter(([name, lint]) => !spec.includes(`| \`${name}\` | ${lint.level} |`)).map(([name]) => name)).toEqual([])
   })
 
   it.each(examples.map((source, index) => [index, source]))('example %d compiles cleanly and is formatted', (_index, source) => {

@@ -13,6 +13,7 @@ import { findKayFiles, TSCONFIG } from '../build/files'
 import { TSGO, UNUSED_CODES, writeShadowTypes } from '../check'
 import { compileShadow, SHADOW_DIR, shadowPath } from '../check/shadow'
 import { formatKay } from '../compiler/format'
+import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
@@ -58,6 +59,7 @@ const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticF
 const FULL_SYNC = 1
 const ERROR = 1 as const
 const WARNING = 2 as const
+const UNNECESSARY = 1
 const CREATED = 1
 const CHANGED = 2
 const DELETED = 3
@@ -292,7 +294,7 @@ export class KayLanguageServer {
     const file = fileURLToPath(uri)
     const project = this.projectAt(projectRoot(this.root, file))
     const insideIsland = project.islandOnly.has(file)
-    const { shadow, diagnostics } = compileShadow(project.root, project.routesDir, file, source, insideIsland)
+    const { shadow, diagnostics } = compileShadow(project.root, project.routesDir, file, source, insideIsland, project.options.lints)
     const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics, insideIsland }
 
     this.documents.set(uri, document)
@@ -320,13 +322,15 @@ export class KayLanguageServer {
       ...diagnostic.code !== undefined && { code: diagnostic.code },
       message: [diagnostic.message, ...[['note', diagnostic.note], ['help', diagnostic.help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n'),
       ...diagnostic.related && { relatedInformation: diagnostic.related.map(span => ({ location: { uri: document.uri, range: rangeOf(span) }, message: span.label })) },
+      ...diagnostic.code === 'unread-name' && { tags: [UNNECESSARY] },
     }))
     const report = document.diagnostics.some(diagnostic => !diagnostic.checkOnly) ? undefined : await this.server.request<DocumentDiagnosticReport>('textDocument/diagnostic', { textDocument: { uri: document.shadowUri } })
 
     if (this.documents.get(document.uri) !== document)
       return
 
-    // Related information points into the shadow TSX, a file the user never sees. Unused code, a hint to TypeScript without `noUnusedLocals`, is an error in a .kay file, as `kay check` reports it.
+    // Related information points into the shadow TSX, a file the user never sees. Unused code, a hint to TypeScript without `noUnusedLocals`, is the `unread-name` lint in a .kay file, as `kay check` reports it.
+    const levelAt = lintLevels(document.source, this.projectAt(projectRoot(this.root, document.file)).options.lints)
     const typeErrors = (report?.items ?? []).flatMap(({ relatedInformation: _related, ...diagnostic }) => {
       const range = toSourceRange(document, diagnostic.range, true)
 
@@ -334,7 +338,9 @@ export class KayLanguageServer {
         return [{ ...diagnostic, range: range ?? zeroRange() }]
 
       // A name kay generated is no unused code of the user's.
-      return range ? [{ ...diagnostic, severity: ERROR, range }] : []
+      const level = range && levelAt('unread-name', toOffset(document.source, range.start))
+
+      return range && level !== 'allow' ? [{ ...diagnostic, code: 'unread-name', severity: level === 'warn' ? WARNING : ERROR, tags: [UNNECESSARY], range }] : []
     })
 
     this.client.notify('textDocument/publishDiagnostics', { uri: document.uri, version: document.version, diagnostics: [...compileErrors, ...typeErrors] })

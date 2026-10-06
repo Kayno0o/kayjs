@@ -1,4 +1,5 @@
 import type { Attribute, AwaitBranch, AwaitNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { LintName } from './lints'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
@@ -1148,13 +1149,13 @@ class Generator {
     const required = REQUIRED_TEXT.get(element.name)
 
     if (required && !names.has(required[0]))
-      this.lint(at, required[1], { help: required[2] })
+      this.lint(at, required[0] === 'alt' ? 'missing-alt' : 'missing-title', required[1], { help: required[2] })
 
     if (element.name === 'input' && this.staticAttribute(element, 'type') === 'image' && !names.has('alt'))
-      this.lint(at, 'An image button needs `alt`', { help: 'name what it does' })
+      this.lint(at, 'missing-alt', 'An image button needs `alt`', { help: 'name what it does' })
 
     if (names.has('onClick') && !names.has('role') && !INTERACTIVE_TAGS.has(element.name))
-      this.lint(at, `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a `role` along with a `tabindex` and a key handler' })
+      this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a `role` along with a `tabindex` and a key handler' })
   }
 
   // The text of an attribute written as a quoted string.
@@ -1341,9 +1342,9 @@ class Generator {
       this.diagnostics.push({ start: span.start, end: span.end, message, ...details })
   }
 
-  private lint(span: Span, message: string, details?: Details) {
+  private lint(span: Span, code: LintName, message: string, details?: Details) {
     if (!this.options.rewrites)
-      this.diagnostics.push({ start: span.start, end: span.end, message, ...details, checkOnly: true })
+      this.diagnostics.push({ start: span.start, end: span.end, code, message, ...details, checkOnly: true })
   }
 }
 

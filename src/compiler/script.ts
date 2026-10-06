@@ -542,6 +542,7 @@ export function unboundedFields(source: string, server: Span | undefined): Diagn
 
       diagnostics.push({
         ...parsed.shift(call.callee),
+        code: 'unbounded-string',
         message: `${field === undefined ? 'This string field' : `The string field ${field}`} has no maxLength`,
         note: 'it takes whatever a visitor posts, up to the request body limit',
         help: 'give it one',

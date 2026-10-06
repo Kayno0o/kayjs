@@ -1,4 +1,5 @@
 import type { BunPlugin } from 'bun'
+import type { LintLevels } from './compiler/lints'
 import type { JsonLd } from './runtime/seo'
 import type { EnvSchema } from './server/env'
 import type { RequestLogger } from './server/log'
@@ -64,6 +65,8 @@ export interface KayConfig {
   settings?: Record<string, string>
   // Variables an island may read, as `publicEnv` from `kay`: `t.Object({ MAP_KEY: t.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser.
   publicEnv?: EnvSchema
+  // The level of each lint `kay check`, `kay dev` and the editor report, over its default: `{ 'positional-key': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
+  lints?: LintLevels
   // Receives every error a load, a render, a guard or an action throws, as it is logged: the place to send them to an error tracker.
   onError?: (error: unknown, request: Request) => void | Promise<void>
 }

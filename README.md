@@ -42,7 +42,8 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | `kay build [dir] [--no-check]` | bundle the browser code for production while checking the project as `kay check` does, keeping the last build when either fails; `--no-check` skips the check |
 | `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |
 | `kay build [dir] --static [--outdir dist]` | the same, then the whole site as static files for a host with no server |
-| `kay check [dir] [-p tsconfig.json]` | type-check the project, `.kay` files included, `-p` naming another tsconfig |
+| `kay check [dir] [-p tsconfig.json] [--deny-warnings]` | type-check the project, `.kay` files included, `-p` naming another tsconfig; warnings fail it only with `--deny-warnings` |
+| `kay explain [lint]` | list the lints, or explain one with an example it reports and the same written right |
 | `kay fmt [paths] [--check]` | format `.kay` files |
 | `kay lsp --stdio` | language server for the editor extension in `editors/vscode` |
 

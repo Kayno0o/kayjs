@@ -144,7 +144,7 @@ describe('client-only islands', () => {
 describe('browser-only globals read while rendering', () => {
   // Each fix as the source it leaves, its edits applied from the last.
   const fixed = (source: string, edits: { start: number, end: number, text: string }[]) => edits.toSorted((a, b) => b.start - a.start).reduce((text, change) => text.slice(0, change.start) + change.text + text.slice(change.end), source)
-  const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message, fixes: diagnostic.fixes?.map(fix => fixed(source, fix.edits)) }))
+  const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true, lints: { 'constant-signal': 'allow' } }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message, fixes: diagnostic.fixes?.map(fix => fixed(source, fix.edits)) }))
   const client = (source: string) => source.replace('---', '--- client')
 
   it('reports one read by the script, a function the template calls, a memo or the template itself, each with its fixes', () => {

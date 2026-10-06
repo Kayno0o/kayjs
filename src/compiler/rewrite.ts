@@ -1,7 +1,7 @@
 import type traverseModule from '@babel/traverse'
-import type { NodePath, Scope } from '@babel/traverse'
+import type { Binding, NodePath, Scope } from '@babel/traverse'
 import type * as t from '@babel/types'
-import type { Diagnostic } from './ast'
+import type { Diagnostic, Span } from './ast'
 import type { Rewrite, SourceMap } from './mapping'
 import type { PropsBinding } from './script'
 import { createRequire } from 'node:module'
@@ -27,6 +27,11 @@ function traverse(...args: Parameters<typeof traverseModule>): void {
 
 export type Rewrites = Map<number, Rewrite & { end: number }>
 
+export interface ConstantSignal {
+  name: Span
+  value?: Span
+}
+
 // What writing to a name that cannot be written says.
 type ReadOnly = Pick<Diagnostic, 'message' | 'note' | 'help'>
 
@@ -41,6 +46,8 @@ export interface FoundRewrites {
   unread: Set<number>
   // The server data the fence itself reads, besides handing it to the template.
   serverReads: Set<string>
+  // Where the signals nothing writes are declared, and the value they start with: every use of one reads it.
+  constantSignals: ConstantSignal[]
 }
 
 // Reads the analysis-pass TSX with real scope resolution, so shadowed names are left alone, and returns the rewrites to apply in the final pass.
@@ -51,13 +58,14 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
   const diagnostics: Diagnostic[] = []
   const unread = new Set<number>()
   const serverReads = new Set<string>()
+  const constantSignals = new Map<number, ConstantSignal>()
   let ast: t.File
 
   try {
     ast = parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'] })
   }
   catch (error) {
-    return { rewrites, diagnostics, syntaxError: syntaxError(error, map), shadowsName: false, unread, serverReads }
+    return { rewrites, diagnostics, syntaxError: syntaxError(error, map), shadowsName: false, unread, serverReads, constantSignals: [] }
   }
 
   const propsByLocal = new Map<number, { binding: PropsBinding, index: number }>()
@@ -134,6 +142,10 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     },
     VariableDeclarator: (path) => {
       const { id, init } = path.node
+      const start = id.type === 'Identifier' && map.isExact(id.start!) ? map.toSource(id.start!) : undefined
+
+      if (start !== undefined && id.type === 'Identifier' && init?.type === 'CallExpression' && importedFromKay(path.scope, init.callee) === 'signal' && onlyRead(path.scope.getBinding(id.name)))
+        constantSignals.set(start, { name: { start, end: start + id.name.length }, value: sourceSpan(map, init.arguments[0]) })
 
       if (id.type !== 'ObjectPattern' || init?.type !== 'Identifier' || init.name !== '__props')
         return
@@ -170,7 +182,32 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     },
   })
 
-  return { rewrites, diagnostics, shadowsName, unread, serverReads }
+  return { rewrites, diagnostics, shadowsName, unread, serverReads, constantSignals: [...constantSignals.values()] }
+}
+
+// Where a node of the generated code was written, when all of it was.
+function sourceSpan(map: SourceMap, node: t.Node | undefined): Span | undefined {
+  const start = node && map.isExact(node.start!) ? map.toSource(node.start!) : undefined
+
+  return start === undefined ? undefined : { start, end: start + node!.end! - node!.start! }
+}
+
+// The name `kay` exports that `callee` imports, such as `signal`.
+function importedFromKay(scope: Scope, callee: t.Node): string | undefined {
+  const specifier = callee.type === 'Identifier' ? scope.getBinding(callee.name)?.path : undefined
+  const declaration = specifier?.parent
+
+  if (!specifier?.isImportSpecifier() || declaration?.type !== 'ImportDeclaration' || declaration.source.value !== 'kay')
+    return undefined
+
+  const imported = specifier.node.imported
+
+  return imported.type === 'Identifier' ? imported.name : imported.value
+}
+
+// Whether every use of the binding calls it with no arguments, which reads a signal: a `.set`, or the signal handed on, may write it.
+function onlyRead(binding: Binding | undefined): boolean {
+  return binding !== undefined && binding.constant && binding.referencePaths.length > 0 && binding.referencePaths.every(reference => reference.parent.type === 'CallExpression' && reference.parent.callee === reference.node && reference.parent.arguments.length === 0)
 }
 
 // Babel's message ends in the position within the generated code, which means nothing to the user; the error lands on the source it was generated from.

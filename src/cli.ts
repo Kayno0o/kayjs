@@ -14,6 +14,7 @@ import { exportStatic, refuseStaticConfig } from './build/static'
 import { KayCompileError } from './build/transform'
 import { check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
+import { explainLint, isLint, lintList } from './compiler/lints'
 import { loadConfig } from './config'
 import { writeContentManifests } from './content/server'
 import { ContentError } from './content/validate'
@@ -33,7 +34,7 @@ import { ExportError, prerenderPages } from './server/prerender'
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const toStderr: Paint = (styles, text) => styleText(styles, text, { stream: process.stderr })
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--deny-warnings]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -88,6 +89,9 @@ async function main(args: string[]): Promise<number> {
   if (command === 'fmt')
     return fmt(rest)
 
+  if (command === 'explain')
+    return explain(rest)
+
   if (command === 'dev')
     return runDev(rest)
 
@@ -106,8 +110,34 @@ async function main(args: string[]): Promise<number> {
   return runCheck(rest)
 }
 
+// Lists the lints, or explains the one named.
+function explain(args: string[]): number {
+  const parsed = parseCommand(args, {}, 1)
+
+  if (typeof parsed === 'number')
+    return parsed
+
+  const [name] = parsed.positionals
+
+  if (name === undefined) {
+    console.log(lintList())
+
+    return 0
+  }
+
+  if (!isLint(name)) {
+    console.error(`kay explain: \`${name}\` is no lint; \`kay explain\` lists them`)
+
+    return 1
+  }
+
+  console.log(explainLint(name))
+
+  return 0
+}
+
 async function runCheck(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { project: { type: 'string', short: 'p' } }, 1)
+  const parsed = parseCommand(args, { 'project': { type: 'string', short: 'p' }, 'deny-warnings': { type: 'boolean' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
@@ -121,13 +151,13 @@ async function runCheck(args: string[]): Promise<number> {
   // The checking machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
   buildingWithoutEnv()
 
-  return await checkProject(root, await loadConfig(root), tsconfig) > 0 ? 1 : 0
+  return await checkProject(root, await loadConfig(root), tsconfig, undefined, parsed.values['deny-warnings'] === true) > 0 ? 1 : 0
 }
 
-// Prints what `kay check` finds in the project, as it finds it, and answers how many problems that was.
-async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string): Promise<number> {
-  const { routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout } = config
-  const diagnostics = await check(root, { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout })
+// Prints what `kay check` finds in the project, as it finds it, and answers how many of those problems fail it: the errors, and the warnings too with `denyWarnings`.
+async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string, denyWarnings = false): Promise<number> {
+  const { routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints } = config
+  const diagnostics = await check(root, { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints })
   const sources = new Map<string, string | undefined>()
 
   for (const diagnostic of diagnostics) {
@@ -137,10 +167,13 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
     console.error(`${formatCheckDiagnostic(diagnostic, sources.get(diagnostic.file), toStderr)}\n`)
   }
 
-  if (diagnostics.length > 0)
-    console.error(`${diagnostics.length} error${diagnostics.length === 1 ? '' : 's'}`)
+  const warnings = diagnostics.filter(diagnostic => diagnostic.severity === 'warning').length
+  const errors = diagnostics.length - warnings
 
-  return diagnostics.length
+  if (diagnostics.length > 0)
+    console.error([errors > 0 ? count(errors, 'error') : '', warnings > 0 ? count(warnings, 'warning') : ''].filter(part => part !== '').join(', '))
+
+  return errors + (denyWarnings ? warnings : 0)
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.

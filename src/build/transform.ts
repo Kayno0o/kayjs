@@ -1,4 +1,5 @@
 import type { Diagnostic, SourceMap } from '../compiler'
+import type { LintLevels } from '../compiler/lints'
 import type { CacheSlot } from './cache'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -93,15 +94,15 @@ export async function transformKayCached(source: string, filename: string, given
 }
 
 // The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept. `check` adds the problems only `kay check` reports otherwise, flagged `checkOnly`.
-export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false): Promise<Analysis> {
+export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false, lints?: LintLevels): Promise<Analysis> {
   // The id the file goes by is part of what it compiles to, and a link may change it.
-  const entry = cacheEntry(cacheDir, filename, check ? 'analysis-check' : 'analysis', `${root}\0${throughLinks(root, filename)}\0${source}`)
+  const entry = cacheEntry(cacheDir, filename, check ? 'analysis-check' : 'analysis', `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${source}`)
   const cached = await readCacheEntry<Analysis>(entry)
 
   if (cached !== undefined)
     return cached
 
-  const { island, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check })
+  const { island, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints })
   const analysis = { island, classes, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly))

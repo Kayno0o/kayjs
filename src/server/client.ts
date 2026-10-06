@@ -1,6 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { KayLibrary } from '../build/libraries'
 import type { FileDiagnostic } from '../build/transform'
+import type { LintLevels } from '../compiler/lints'
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
@@ -78,6 +79,8 @@ export interface ClientOptions {
   hot?: boolean
   // The config declares `publicEnv`: the entry imports its values from the server before any island hydrates.
   publicEnv?: boolean
+  // The level of each lint the problems panel shows in development.
+  lints?: LintLevels
 }
 
 interface MetafileOutput {
@@ -110,7 +113,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
   const cacheDir = join(root, '.kay', 'cache')
-  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot)))
+  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints)))
   const problems: string[] = []
 
   for (const [index, file] of files.entries()) {
