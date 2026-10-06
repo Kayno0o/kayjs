@@ -1,6 +1,6 @@
 import type { Elysia } from 'elysia'
 import { existsSync } from 'node:fs'
-import { readdir, rename, stat } from 'node:fs/promises'
+import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { IMAGE_ROUTE, IMAGE_WIDTHS, RESIZABLE } from '../runtime/image'
@@ -24,6 +24,7 @@ const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 const LADDER = new Set<number>(IMAGE_WIDTHS)
 // About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
 const MAX_UPLOAD_PIXELS = 50_000_000
+const DEFAULT_QUALITY = 80
 
 // The file name of one variant of an image the build or the route wrote.
 export function variantName(source: string, width: number): string {
@@ -31,7 +32,7 @@ export function variantName(source: string, width: number): string {
 }
 
 // Written under a temporary name and moved into place, so a reader never sees a variant half written, nor one a crash cut short.
-export async function writeVariant(source: string, width: number, target: string, quality = 80): Promise<void> {
+export async function writeVariant(source: string, width: number, target: string, quality = DEFAULT_QUALITY): Promise<void> {
   const partial = `${target}.${crypto.randomUUID()}.tmp`
 
   // Read through Bun.file, which also reaches the files an executable embeds, where Bun.Image given a path does not.
@@ -39,13 +40,15 @@ export async function writeVariant(source: string, width: number, target: string
   await rename(partial, target)
 }
 
-// Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files.
-export async function writeImageVariants(clientDir: string, quality?: number): Promise<number> {
+// Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files; returns how many were encoded.
+// With a cache directory, a variant an earlier build encoded is copied from it, and what this build no longer uses is pruned from it.
+export async function writeImageVariants(clientDir: string, quality = DEFAULT_QUALITY, cacheDir?: string): Promise<number> {
   const assets = join(clientDir, 'assets')
-  let written = 0
+  const used = new Set<string>()
+  let encoded = 0
 
   if (!existsSync(assets))
-    return written
+    return encoded
 
   const names = await readdir(assets)
 
@@ -55,15 +58,29 @@ export async function writeImageVariants(clientDir: string, quality?: number): P
 
     for (const variant of [...IMAGE_WIDTHS.filter(step => step < width), width]) {
       const target = join(clientDir, VARIANTS_DIR, variantName(name, variant))
+      // Asset names carry a hash of their content, so a cached variant only goes stale when the quality changes.
+      const cachedName = `${quality}-${variantName(name, variant)}`
+      const cached = cacheDir && join(cacheDir, cachedName)
 
-      if (!await Bun.file(target).exists()) {
-        await writeVariant(source, variant, target, quality)
-        written++
+      used.add(cachedName)
+
+      if (await Bun.file(target).exists())
+        continue
+
+      if (!cached || !await Bun.file(cached).exists()) {
+        await writeVariant(source, variant, cached || target, quality)
+        encoded++
       }
+
+      if (cached)
+        await Bun.write(target, Bun.file(cached))
     }
   }))
 
-  return written
+  if (cacheDir && existsSync(cacheDir))
+    await Promise.all((await readdir(cacheDir)).filter(name => !used.has(name)).map(async name => rm(join(cacheDir, name), { force: true })))
+
+  return encoded
 }
 
 // `/_kay/image?src=...&w=640` answers a WebP of an imported image, or of one in a directory of runtime images, at a width of the ladder or its own.

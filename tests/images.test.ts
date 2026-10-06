@@ -142,4 +142,28 @@ describe('build variants', () => {
       await rm(client, { recursive: true, force: true })
     }
   })
+
+  it('copies the variants an earlier build cached, encoding again only when the quality changes, and prunes what no build uses', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-variants-'))
+    const cache = join(dir, 'cache')
+    const widths = [320, 640, 960, 1000]
+
+    async function build(client: string, quality?: number): Promise<number> {
+      await Bun.write(join(dir, client, 'assets', 'hero-abc.png'), Bun.file(HERO))
+
+      return writeImageVariants(join(dir, client), quality, cache)
+    }
+
+    try {
+      expect(await build('first')).toBe(4)
+      expect(await build('second')).toBe(0)
+      expect((await readdir(join(dir, 'second', 'images'))).sort()).toEqual(widths.map(width => variantName('hero-abc.png', width)).sort())
+      expect(await Bun.file(join(dir, 'second', 'images', variantName('hero-abc.png', 640))).bytes()).toEqual(await Bun.file(join(dir, 'first', 'images', variantName('hero-abc.png', 640))).bytes())
+      expect(await build('third', 60)).toBe(4)
+      expect((await readdir(cache)).sort()).toEqual(widths.map(width => `60-${variantName('hero-abc.png', width)}`).sort())
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })

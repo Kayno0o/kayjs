@@ -206,7 +206,7 @@ async function build(args: string[]): Promise<number> {
 
     const prerendered = await prerenderPages(root, config, client, { exportAll: exported })
 
-    await writeImageVariants(client.dir, config.images?.quality)
+    await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'))
 
     if (config.favicon !== undefined)
       await writeFavicons(resolve(root, config.favicon), join(client.dir, '..', FAVICON_DIR))
