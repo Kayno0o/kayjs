@@ -141,7 +141,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string): 
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
-// It checks the project as `kay check` does while it builds, and leaves the last build in place when that finds a problem, unless `--no-check` says not to check.
+// It checks the project as `kay check` does while it bundles for the browser, runs nothing of the app's own until that passed, and leaves the last build in place when either fails, unless `--no-check` says not to check.
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server.
 async function build(args: string[]): Promise<number> {
   const parsed = parseCommand(args, { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'project': { type: 'string', short: 'p' } }, 1)
@@ -188,22 +188,19 @@ async function build(args: string[]): Promise<number> {
 
   const output = join(root, '.kay', 'client')
   const previous = `${output}-previous`
+  const checking = !skipCheck
 
-  // The check runs beside the build, which writes over the last build's output only once the check passed.
-  if (!skipCheck) {
+  // The last build waits aside until this one is known good, which the check decides beside the browser bundle.
+  if (checking)
+    await setAside(output, previous)
+  else
     await rm(previous, { recursive: true, force: true })
 
-    if (existsSync(output))
-      await rename(output, previous)
-  }
-
-  const [checked, built] = await Promise.allSettled([skipCheck ? 0 : checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json'), buildOutput(root, config, exported)])
+  const started = performance.now()
+  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json') : 0, bundleClient(root, config, exported)])
 
   if (checked.status === 'rejected' || checked.value > 0) {
-    await rm(output, { recursive: true, force: true })
-
-    if (existsSync(previous))
-      await rename(previous, output)
+    await putBack(output, previous)
 
     if (checked.status === 'rejected')
       throw checked.reason
@@ -213,16 +210,30 @@ async function build(args: string[]): Promise<number> {
     return 1
   }
 
+  let client: ClientBuild
+
+  try {
+    if (bundled.status === 'rejected')
+      throw bundled.reason
+
+    client = bundled.value
+
+    const { prerendered, entries } = await finishOutput(root, config, exported, client)
+
+    console.error(`built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''} in ${Math.round(performance.now() - started)} ms`)
+  }
+  catch (error) {
+    if (checking)
+      await putBack(output, previous)
+
+    console.error(buildError(error))
+
+    return 1
+  }
+
   await rm(previous, { recursive: true, force: true })
 
   try {
-    if (built.status === 'rejected')
-      throw built.reason
-
-    const { client, summary } = built.value
-
-    console.error(summary)
-
     if (exported) {
       const written = performance.now()
       const target = resolve(typeof outdir === 'string' ? outdir : join(root, 'dist'))
@@ -241,20 +252,46 @@ async function build(args: string[]): Promise<number> {
     return 0
   }
   catch (error) {
-    console.error(error instanceof KayCompileError || error instanceof ContentError || error instanceof ExportError ? error.message.trimStart() : error)
+    console.error(buildError(error))
 
     return 1
   }
 }
 
-// Writes what the server serves to `.kay/client`: the browser bundles, the content manifests, the prerendered pages, image variants and favicons, compressed.
-async function buildOutput(root: string, config: KayConfig, exported: boolean): Promise<{ client: ClientBuild, summary: string }> {
-  const started = performance.now()
+// An output set aside earlier is the last good build of a run that was interrupted, and what is in its place now is that run's partial one.
+async function setAside(output: string, previous: string) {
+  if (existsSync(previous))
+    await rm(output, { recursive: true, force: true })
+  else if (existsSync(output))
+    await rename(output, previous)
+}
 
+async function putBack(output: string, previous: string) {
+  await rm(output, { recursive: true, force: true })
+
+  if (existsSync(previous))
+    await rename(previous, output)
+}
+
+function buildError(error: unknown): unknown {
+  return error instanceof KayCompileError || error instanceof ContentError || error instanceof ExportError ? error.message.trimStart() : error
+}
+
+// The browser bundles and the variants of the images they import, which run none of the app's code, so they build while the check runs.
+async function bundleClient(root: string, config: KayConfig, exported: boolean): Promise<ClientBuild> {
   if (exported)
     refuseStaticConfig(config)
 
   const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
+
+  // The prerender may import more images, so the cache is pruned once it has.
+  await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'), { prune: false })
+
+  return client
+}
+
+// The rest of what the server serves from `.kay/client`, which runs the app's content config and pages, so only once the check passed: content manifests, prerendered pages, the variants of images only they import, and favicons, compressed.
+async function finishOutput(root: string, config: KayConfig, exported: boolean, client: ClientBuild): Promise<{ prerendered: number, entries: number }> {
   // Before prerendering, whose pages read the collections from what it writes.
   const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
 
@@ -271,7 +308,7 @@ async function buildOutput(root: string, config: KayConfig, exported: boolean): 
 
   await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 
-  return { client, summary: `built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''} in ${Math.round(performance.now() - started)} ms` }
+  return { prerendered, entries }
 }
 
 // The directory a command works on, or nothing once it said that the path is none.

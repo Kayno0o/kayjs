@@ -161,6 +161,10 @@ describe('build variants', () => {
       expect(await Bun.file(join(dir, 'second', 'images', variantName('hero-abc.png', 640))).bytes()).toEqual(await Bun.file(join(dir, 'first', 'images', variantName('hero-abc.png', 640))).bytes())
       expect(await build('third', 60)).toBe(4)
       expect((await readdir(cache)).sort()).toEqual(widths.map(width => `60-${variantName('hero-abc.png', width)}`).sort())
+      // A pass seeing only some of the build's images leaves what it does not use in the cache.
+      await Bun.write(join(dir, 'fourth', 'assets', 'hero-abc.png'), Bun.file(HERO))
+      expect(await writeImageVariants(join(dir, 'fourth'), 50, cache, { prune: false })).toBe(4)
+      expect((await readdir(cache)).filter(name => name.startsWith('60-'))).toHaveLength(widths.length)
     }
     finally {
       await rm(dir, { recursive: true, force: true })

@@ -41,8 +41,8 @@ export async function writeVariant(source: string, width: number, target: string
 }
 
 // Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files; returns how many were encoded.
-// With a cache directory, a variant an earlier build encoded is copied from it, and what this build no longer uses is pruned from it.
-export async function writeImageVariants(clientDir: string, quality = DEFAULT_QUALITY, cacheDir?: string): Promise<number> {
+// With a cache directory, a variant an earlier build encoded is copied from it, and what this build no longer uses is pruned from it, unless `prune` is off for a pass that sees only some of the build's images.
+export async function writeImageVariants(clientDir: string, quality = DEFAULT_QUALITY, cacheDir?: string, { prune = true } = {}): Promise<number> {
   const assets = join(clientDir, 'assets')
   const used = new Set<string>()
   let encoded = 0
@@ -77,7 +77,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
     }
   }))
 
-  if (cacheDir && existsSync(cacheDir))
+  if (prune && cacheDir && existsSync(cacheDir))
     await Promise.all((await readdir(cacheDir)).filter(name => !used.has(name)).map(async name => rm(join(cacheDir, name), { force: true })))
 
   return encoded

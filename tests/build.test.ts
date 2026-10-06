@@ -1,7 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { KayConfig } from '../src/config'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rename, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
@@ -362,28 +362,52 @@ describe('kay build checks the project first', () => {
     }
   }, 60_000)
 
-  it('keeps the last build when the check beside the next one fails, and replaces it when it passes', async () => {
-    const page = (text: string) => `--- server\nexport const prerender = true\n---\np ${text}\n`
-    const root = await scratchProject({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': page('First') })
+  it('keeps the last build when the check or the build fails, runs no page while the check fails, and recovers from an interrupted run', async () => {
+    const root = await scratchProject({ 'tsconfig.json': tsconfig })
+    const ran = join(root, 'ran')
+    // A prerendered page that records it ran, which the build does once the check passed.
+    const page = (text: string, code = '') => Bun.write(join(root, 'src/routes/index.kay'), `--- server\nexport const prerender = true\nawait Bun.write(${JSON.stringify(ran)}, '${text}')\n${code}---\np ${text}\n`)
     const prerendered = join(root, '.kay/client/pages/index.html')
+    const output = join(root, '.kay/client')
+    const previous = join(root, '.kay/client-previous')
 
     try {
+      await page('First')
       expect((await build(root)).code).toBe(0)
       expect(await Bun.file(prerendered).text()).toContain('First')
 
       // The page changes as a broken one comes along, which the check refuses.
-      await Bun.write(join(root, 'src/routes/index.kay'), page('Second'))
+      await page('Second')
       await Bun.write(join(root, 'src/routes/lost.kay'), 'a(href="/nowhere") Lost\n')
 
       expect((await build(root)).code).toBe(1)
       expect(await Bun.file(prerendered).text()).toContain('First')
-      expect(existsSync(join(root, '.kay/client-previous'))).toBe(false)
+      expect(await Bun.file(ran).text()).toBe('First')
+      expect(existsSync(previous)).toBe(false)
+
+      // A run interrupted mid-build leaves the last build aside and a partial one in its place.
+      await rename(output, previous)
+      await Bun.write(join(output, 'partial'), '')
+
+      expect((await build(root)).code).toBe(1)
+      expect(await Bun.file(prerendered).text()).toContain('First')
+      expect(existsSync(join(output, 'partial'))).toBe(false)
 
       await Bun.write(join(root, 'src/routes/lost.kay'), 'a(href="/") Found\n')
 
       expect((await build(root)).code).toBe(0)
       expect(await Bun.file(prerendered).text()).toContain('Second')
-      expect(existsSync(join(root, '.kay/client-previous'))).toBe(false)
+      expect(existsSync(previous)).toBe(false)
+
+      // The check passes and the build fails, as the page throws once it renders.
+      await page('Third', 'if (Date.now() > 0)\n  throw new Error(\'Feed down\')\n')
+
+      const failed = await build(root)
+
+      expect(failed.report).toContain('Feed down')
+      expect(failed.code).toBe(1)
+      expect(await Bun.file(prerendered).text()).toContain('Second')
+      expect(existsSync(previous)).toBe(false)
     }
     finally {
       await rm(root, { recursive: true, force: true })
