@@ -141,7 +141,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string): 
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
-// It checks the project as `kay check` does while it bundles for the browser, runs nothing of the app's own until that passed, and leaves the last build in place when either fails, unless `--no-check` says not to check.
+// It checks the project as `kay check` does while it bundles for the browser, runs no page, API module or guard until that passed, and leaves the last build in place when either fails, unless `--no-check` says not to check.
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server.
 async function build(args: string[]): Promise<number> {
   const parsed = parseCommand(args, { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'project': { type: 'string', short: 'p' } }, 1)
@@ -277,7 +277,7 @@ function buildError(error: unknown): unknown {
   return error instanceof KayCompileError || error instanceof ContentError || error instanceof ExportError ? error.message.trimStart() : error
 }
 
-// The browser bundles and the variants of the images they import, which run none of the app's code, so they build while the check runs.
+// The browser bundles and the variants of the images they import, which run no page, API module or guard, so they build while the check runs.
 async function bundleClient(root: string, config: KayConfig, exported: boolean): Promise<ClientBuild> {
   if (exported)
     refuseStaticConfig(config)
