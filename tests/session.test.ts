@@ -85,7 +85,8 @@ describe('sessions', () => {
 
     expect(sealed).not.toContain('count')
 
-    const forged = await counter().handle(new Request('http://localhost/peek', { headers: { cookie: `${sealed.slice(0, -2)}xx` } }))
+    // The last character can carry unused bits, so the one before it is changed: a different one always changes the bytes.
+    const forged = await counter().handle(new Request('http://localhost/peek', { headers: { cookie: `${sealed.slice(0, -2)}${sealed.at(-2) === 'A' ? 'B' : 'A'}${sealed.at(-1)}` } }))
 
     expect(await forged.text()).toBe('none')
     expect(forged.headers.getSetCookie()[0]).toMatch(/^session=; .*Max-Age=0/i)

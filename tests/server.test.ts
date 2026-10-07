@@ -567,7 +567,7 @@ describe('await blocks', () => {
   it('swaps each block in for its pending one and hydrates the islands it brings', async () => {
     const html = (await chunksOf('/feed')).join('')
 
-    GlobalRegistrator.register()
+    GlobalRegistrator.register({ settings: { disableJavaScriptFileLoading: true, handleDisabledFileLoadingAsSuccess: true } })
 
     try {
       document.body.innerHTML = BODY.exec(html)![1]!
