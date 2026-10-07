@@ -13,6 +13,10 @@ const MENTIONED = /\b(?:process|Bun)\b/
 const KAY_FILE = /\.kay$/
 // The one read the client build replaces with a literal, so it reaches no chunk.
 const DEFINED = 'NODE_ENV'
+// Part of the message of the browser's stand-in for kay's `t`, which survives minifying: a chunk holding it builds a schema where Elysia is not.
+const BROWSER_T = 'builds a schema on the server, and kay'
+const KAY_IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"]kay['"]/g
+const T_SPECIFIER = /^t(?:\s+as\s+\w+)?$/
 
 export interface ServerOnlyRead {
   name: string
@@ -218,6 +222,7 @@ function asksTypeof(node: t.Node, name: string): boolean {
 // `dir` is where the bundler wrote them, the metafile naming each chunk relative to it and each module relative to where the build ran.
 export async function refuseServerOnlyReads(root: string, dir: string, outputs: Record<string, Output>): Promise<void> {
   const problems: string[] = []
+  const schemaBuilders = new Set<string>()
 
   await Promise.all(Object.entries(outputs).map(async ([file, meta]) => {
     if (!file.endsWith('.js'))
@@ -235,7 +240,9 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
     if (names === undefined)
       return unchecked('could not be parsed')
 
-    if (names.size === 0)
+    const buildsSchemas = code.includes(BROWSER_T)
+
+    if (names.size === 0 && !buildsSchemas)
       return
 
     // Only the modules whose code is in the chunk: a tree-shaken one is listed with none of it.
@@ -247,12 +254,44 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
       return source === undefined ? undefined : [path.startsWith(root + sep) ? relative(root, path) : input, source] as const
     }))).filter(entry => entry !== undefined))
 
+    if (buildsSchemas) {
+      const builders = [...sources].filter(([module, source]) => importsKayT(KAY_FILE.test(module) ? scriptFence(source) : source)).map(([module]) => module)
+
+      for (const module of builders.length > 0 ? builders : [`a module of ${basename(file)} kay could not pin down`])
+        schemaBuilders.add(module)
+    }
+
     for (const { name, modules } of serverOnlyReads(code, sources))
       problems.push(`\`${name}\` in ${basename(file)}, read by ${modules.length > 0 ? modules.join(', ') : 'a module of it kay could not pin down'}`)
   }))
 
+  const refusals: string[] = []
+
   if (problems.length > 0)
-    throw new Error(`kay: a browser has no \`process\` or \`Bun\`, and these chunks a page loads read one, so every island in them dies as the chunk evaluates: ${problems.sort().join('; ')}. Keep the module reading it out of what an island imports, directly or through the page's script fence, and pass what it holds as a prop; ask \`typeof\` first where the module runs on both sides.`)
+    refusals.push(`a browser has no \`process\` or \`Bun\`, and these chunks a page loads read one, so every island in them dies as the chunk evaluates: ${problems.sort().join('; ')}. Keep the module reading it out of what an island imports, directly or through the page's script fence, and pass what it holds as a prop; ask \`typeof\` first where the module runs on both sides.`)
+
+  if (schemaBuilders.size > 0)
+    refusals.push(`kay's \`t\` builds schemas on the server only, and an island imports ${[...schemaBuilders].sort().join(', ')}, which take${schemaBuilders.size === 1 ? 's' : ''} it from 'kay': its first \`t.Object(...)\` would throw as the island loads, and Elysia's own \`t\` reads \`Bun\`. Keep the schemas in a module only the server imports, and what an island needs of them, a length or a list of choices, in another.`)
+
+  if (refusals.length > 0)
+    throw new Error(`kay: ${refusals.join(' And ')}`)
+}
+
+// Whether a module imports `t` itself from 'kay', not as a type.
+function importsKayT(source: string): boolean {
+  for (const [, specifiers] of source.matchAll(KAY_IMPORT)) {
+    if (specifiers!.split(',').some(specifier => T_SPECIFIER.test(specifier.trim())))
+      return true
+  }
+
+  return false
+}
+
+// The component script of a `.kay` file: its server fence never reaches the browser.
+function scriptFence(source: string): string {
+  const { script } = parseKay(source)
+
+  return script ? source.slice(script.start, script.end) : ''
 }
 
 // A module of the chunk kay cannot read, a virtual one for instance, tells nothing about where the read came from.

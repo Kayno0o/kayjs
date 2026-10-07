@@ -45,6 +45,37 @@ describe('kay build', () => {
     }
   })
 
+  it('refuses a client build where an island builds a schema with kay\'s t, naming the module taking it from kay', async () => {
+    const root = await scratchProject({
+      // A schema module shared by an action and an island's own check.
+      'src/schemas.ts': 'import { t } from \'kay\'\n\nexport const title = t.String({ minLength: 1 })\nexport const longest = 200\n',
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { longest, title } from \'./schemas\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {longest} {String(title)} {n()}\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+    })
+
+    try {
+      await expect(buildClient(root, { minify: true })).rejects.toThrow('an island imports src/schemas.ts, which takes it from \'kay\'')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('builds an island whose modules take t from kay as a type, the page building its schema in its server fence', async () => {
+    const root = await scratchProject({
+      'src/schemas.ts': 'import type { t as schema } from \'kay\'\n\nexport const longest: number = 200\nexport type Builder = typeof schema\n',
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { longest } from \'./schemas\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {longest} {n()}\n',
+      'src/routes/index.kay': '--- server\nimport { t } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String({ maxLength: 20 }) }), () => 1)\n---\n---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+    })
+
+    try {
+      await buildClient(root, { minify: true })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('names the island\'s own fence when the read is there, and minifies as the build does', async () => {
     const root = await scratchProject({
       'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst own = process.env.OWN\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {own} {n()}\n',

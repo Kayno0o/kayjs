@@ -42,6 +42,6 @@ describe('t from kay', () => {
 
     const { schema } = await import(`data:text/javascript;base64,${Buffer.from(calling).toString('base64')}`) as { schema: () => unknown }
 
-    expect(schema).toThrow('kay: t.String() builds a schema on the server, and kay\'s `t` is not in the browser; a module an island imports takes `t` from \'elysia\'')
+    expect(schema).toThrow('kay: t.String() builds a schema on the server, and kay\'s `t` is not in the browser; keep schemas in a module only the server imports')
   })
 })
