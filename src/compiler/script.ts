@@ -10,6 +10,10 @@ const REACTIVE_MODULES = new Set(['kay'])
 // What `kay` exports that a static component may use and stay static.
 const STATIC_EXPORTS = new Set(['uid'])
 
+// What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
+export const SCRIPT_GLOBALS = ['signal', 'memo', 'effect', 'onMount']
+export const SERVER_GLOBALS = ['action']
+
 export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.
   local: Span
@@ -47,6 +51,8 @@ export interface ScriptAnalysis {
   specifiers: Span[]
   // True when the script imports a value from `kay`: it holds client state, so the component becomes an island.
   reactive: boolean
+  // What the script reads of SCRIPT_GLOBALS without declaring or importing it.
+  implicit: string[]
   body: Span[]
   props?: PropsDeclaration
   diagnostics: Diagnostic[]
@@ -55,7 +61,7 @@ export interface ScriptAnalysis {
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 // `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of.
 export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = []): ScriptAnalysis {
-  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], reactive: false, diagnostics: [] }
+  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], reactive: false, implicit: [], diagnostics: [] }
 
   if (!script)
     return analysis
@@ -68,6 +74,9 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
   const { ast, shift } = parsed
   const local = bodyTypes(ast.program.body, serverNames, shift, analysis.diagnostics)
   let cursor = script.start
+
+  analysis.implicit = undeclared(ast, source.slice(script.start, script.end), SCRIPT_GLOBALS.filter(name => !serverNames.includes(name)))
+  analysis.reactive = analysis.implicit.length > 0
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
@@ -128,6 +137,8 @@ export interface ServerAnalysis {
   actionNames: string[]
   // Statements that run per request, inside `load(ctx)`.
   body: Span[]
+  // What the fence reads of SERVER_GLOBALS without declaring or importing it.
+  implicit: string[]
   // Names declared at the top of the fence: `load` returns them and the template reads them.
   data: ServerData[]
   diagnostics: Diagnostic[]
@@ -138,7 +149,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], exportSpans: new Map(), actionNames: [], body: [], data: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], exportSpans: new Map(), actionNames: [], body: [], implicit: [], data: [], diagnostics: [] }
   const parsed = parseFence(source, server, analysis.diagnostics)
 
   if (!parsed)
@@ -150,6 +161,8 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   const perRequest = ast.program.body.filter(statement => !isHoisted(statement, local) && !isExport(statement))
   const shared = sharedWithExports(ast, exported, perRequest, shift, analysis.diagnostics)
   let cursor = server.start
+
+  analysis.implicit = undeclared(ast, source.slice(server.start, server.end), SERVER_GLOBALS)
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
@@ -435,6 +448,24 @@ function findJsx(node: unknown): t.Node | undefined {
   }
 
   return undefined
+}
+
+// Which of `names` the fence reads with nothing in it declaring or importing them.
+function undeclared(ast: ParseResult<t.File>, code: string, names: string[]): string[] {
+  const mentioned = names.filter(name => new RegExp(`(?<![\\w$.])${name}(?![\\w$])`).test(code))
+  const found: string[] = []
+
+  if (mentioned.length === 0)
+    return found
+
+  loadTraverse()(ast, {
+    Program(path) {
+      found.push(...mentioned.filter(name => name in path.scope.globals && !path.scope.hasBinding(name)))
+      path.stop()
+    },
+  })
+
+  return found
 }
 
 function importsReactiveValue(statement: t.Statement): boolean {

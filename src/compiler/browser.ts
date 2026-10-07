@@ -125,7 +125,6 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   const calls: { name: string, chain: t.Node[] }[] = []
   const reads: Read[] = []
   const varying: Varying[] = []
-  let effectBound = false
 
   const noteVarying = (path: NodePath<t.CallExpression | t.NewExpression>) => {
     const found = island ? varyingValue(path) : undefined
@@ -158,9 +157,6 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
       },
       NewExpression(path) {
         noteVarying(path)
-      },
-      Program(path) {
-        effectBound = path.scope.hasBinding('effect', true)
       },
       Identifier(path) {
         const { name } = path.node
@@ -213,7 +209,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
     const span = { start, end: start + read.name.length }
 
     if (!read.typeOf)
-      diagnostics.push({ ...span, message: `\`${read.name}\` exists only in the browser`, note: 'this reads it while the component renders on the server too', help: BROWSER_ONLY_HELP, fixes: [...effectFix(file, program.code, read, effectBound, toSource, ast), ...toClient], checkOnly: true })
+      diagnostics.push({ ...span, message: `\`${read.name}\` exists only in the browser`, note: 'this reads it while the component renders on the server too', help: BROWSER_ONLY_HELP, fixes: [...effectFix(file, program.code, read, toSource), ...toClient], checkOnly: true })
     else if (island)
       diagnostics.push({ ...span, message: `\`typeof ${read.name}\` differs between the server and the browser`, note: MISMATCH, help: BROWSER_ONLY_HELP, fixes: toClient, checkOnly: true })
   }
@@ -435,8 +431,8 @@ function visit(nodes: Node[], each: (node: Node) => void): void {
   }
 }
 
-// A statement of the script reading the global as it runs wraps into `effect`, imported from `kay` when it is not yet; a declaration would take its name out of reach of the rest, so only an expression statement does.
-function effectFix(file: KayFile, code: string, read: Read, effectBound: boolean, toSource: (generated: number) => number | undefined, ast: t.File): Fix[] {
+// A statement of the script reading the global as it runs wraps into `effect`, which the compiler imports; a declaration would take its name out of reach of the rest, so only an expression statement does.
+function effectFix(file: KayFile, code: string, read: Read, toSource: (generated: number) => number | undefined): Fix[] {
   const statement = read.statement
 
   if (!file.script || statement?.type !== 'ExpressionStatement')
@@ -450,16 +446,8 @@ function effectFix(file: KayFile, code: string, read: Read, effectBound: boolean
     return []
 
   const expression = code.slice(statement.expression.start!, statement.expression.end!)
-  const edits = [{ start, end, text: `effect(() => ${expression})` }]
 
-  if (!effectBound) {
-    const kay = ast.program.body.find((node): node is t.ImportDeclaration => node.type === 'ImportDeclaration' && node.source.value === 'kay' && node.importKind !== 'type' && node.specifiers.at(-1)?.type === 'ImportSpecifier')
-    const last = kay && toSource(kay.specifiers.at(-1)!.end!)
-
-    edits.unshift(last === undefined ? { start: file.script.start, end: file.script.start, text: 'import { effect } from \'kay\'\n\n' } : { start: last, end: last, text: ', effect' })
-  }
-
-  return [{ title: `Read \`${read.name}\` in an effect, once the component renders in the browser`, edits }]
+  return [{ title: `Read \`${read.name}\` in an effect, once the component renders in the browser`, edits: [{ start, end, text: `effect(() => ${expression})` }] }]
 }
 
 // `---` becomes `--- client`; a file without a script gets an empty one.

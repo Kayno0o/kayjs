@@ -119,8 +119,6 @@ h1.text-2xl.font-bold Nothing here
 a(href="/") Back home
 `,
   'src/components/counter.kay': `---
-import { signal } from 'kay'
-
 const { start } = props<{ start: number }>()
 const count = signal(start)
 ---
@@ -423,7 +421,7 @@ console.log(\`Listening on http://localhost:\${app.server?.port}\`)
 `,
   'src/components/header.kay': header('[{ href: \'/\', label: \'Home\' }, { href: \'/account\', label: \'Account\' }]'),
   'src/routes/login.kay': `--- server
-import { action, t } from 'kay'
+import { t } from 'kay'
 
 // Anyone may sign in under any name: swap in real credentials, such as @kaynooo/kayjs-auth's.
 export const signIn = action(t.Object({ name: t.String({ pattern: '\\\\S', maxLength: 40, error: 'Write a name' }) }), async ({ name }, ctx) => {
@@ -452,7 +450,7 @@ export default guard(async ({ locals, redirect }) => {
 })
 `,
   'src/routes/account/index.kay': `--- server
-import { action, t } from 'kay'
+import { t } from 'kay'
 
 export const signOut = action(t.Object({}), async (_input, ctx) => {
   await ctx.locals.session.destroy()

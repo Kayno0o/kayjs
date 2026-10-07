@@ -124,6 +124,10 @@ describe('constant-signal', () => {
     expect(diagnostics.map(d => [d.code, d.severity, d.help])).toEqual([['constant-signal', 'warning', 'make it a plain value, `const title = \'Todos\'`, read as `title`']])
   })
 
+  it('reports a signal kay imports by itself too', () => {
+    expect(lints('---\nconst title = signal(\'Todos\')\n---\nh1 {title()}\n')).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'title' }])
+  })
+
   it('leaves a signal something writes, binds or hands on, and a `signal` that is not kay\'s', () => {
     expect(lints(script('const name = signal(\'\')', 'input(bind:value={name})\np {name()}'))).toEqual([])
     expect(lints(script('const open = signal(false)', 'Child(open={open})\np {open()}'))).toEqual([])

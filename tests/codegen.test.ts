@@ -213,6 +213,19 @@ describe('islands', () => {
     expect(errors('---\nimport { signal } from "kay"\nimport Counter from "./counter.kay"\n---\nCounter(persist)')).toEqual([expect.stringContaining('`persist` has no effect inside an island')])
     expect(errors('---\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="visible")')).toEqual([])
   })
+
+  it('imports what the fences use of kay unimported, which makes the component an island', () => {
+    const source = '--- server\nexport const add = action(t.Object({}), async () => 1)\n---\n---\nconst count = signal(0)\nconst double = memo(() => count() * 2)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()}\n'
+
+    expect(tsx(source)).toStartWith('import { signal, memo, action } from \'kay\'\n')
+    expect(compileKay(source, 'test.kay').island).toBe('test.kay')
+    expect(compileKay('---\nconst label = \'signal\'\n---\np {label}\n', 'test.kay').island).toBeUndefined()
+  })
+
+  it('leaves a name the file declares or imports itself', () => {
+    expect(tsx('---\nfunction signal(value: number) {\n  return value\n}\n\nconst one = signal(1)\n---\np {one}\n')).not.toContain('from \'kay\'')
+    expect(tsx('--- server\nimport { signal } from \'kay\'\n\nconst one = 1\n---\n---\nconst count = signal(one)\n---\np {count()}\n').match(/import \{ signal \} from 'kay'/g)).toHaveLength(1)
+  })
 })
 
 describe('fences', () => {

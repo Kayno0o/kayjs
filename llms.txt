@@ -24,8 +24,6 @@ Up to two fences come first, in either order, then the template. Both are option
 const greeting = 'Hello'
 ---
 ---
-import { signal } from 'kay'
-
 const count = signal(0)
 ---
 p {greeting}
@@ -38,7 +36,7 @@ button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times
 
 ## Component script
 
-Props are declared once, at the top level, with the `props<T>()` macro. It needs no import.
+Props are declared once, at the top level, with the `props<T>()` macro. It needs no import, and neither do `signal`, `memo`, `effect` and `onMount` in a script, nor `action` in a server fence: the compiler imports them from `kay` when the file uses them without declaring or importing a name of its own. The rest of `kay`, such as `persisted`, `context` or `navigate`, is imported.
 
 ```kay
 ---
@@ -98,7 +96,6 @@ Each line is one of the following; deeper indentation nests children under the l
 ```kay
 ---
 import type { Todo } from './todo'
-import { signal } from 'kay'
 import TodoItem from './todo-item.kay'
 
 const { todos } = props<{ todos: Todo[] }>()
@@ -366,7 +363,7 @@ const found = iconNames(tabler).filter(name => name.includes('home')).slice(0, 2
 
 ## Islands
 
-A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script imports a value from `kay`, such as `signal`. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript, except the small script swapping pages in on a page posting a form to an action (see Navigation). Interactive components rendered inside an island are part of it.
+A component is interactive when any element in it has an `on*` handler, a `bind:` or a `ref`, or when its script uses a value from `kay`, such as `signal`, imported or not. An interactive component renders on the server and hydrates in the browser as an island; everything else ships no JavaScript, except the small script swapping pages in on a page posting a form to an action (see Navigation). Interactive components rendered inside an island are part of it.
 
 Props a static component passes to an island are serialized for the browser: plain objects and arrays, strings, numbers, booleans, `null` and `undefined`, and also Dates, Maps, Sets, bigints, URLs and RegExps, which arrive as themselves, a value referenced twice arriving once. `kay check` rejects functions and class instances there, and rendering throws on a class instance it could not tell apart, naming the prop. A static component that only islands render, directly or through other such components, renders inline with them, so it passes its interactive children anything, functions included; once a page, a layout or a script imports it too, its props to them are serialized again. Children cannot cross either: `kay check` reports lines under an island's tag in a static parent, and rendering one throws.
 
@@ -416,7 +413,7 @@ A component's script calls `Theme.provide('dark')`, and any component it renders
 
 ```kay
 ---
-import { signal, uid } from 'kay'
+import { uid } from 'kay'
 
 const id = uid()
 const open = signal(false)
@@ -734,7 +731,7 @@ A page's or a layout's server fence exports actions: an Elysia schema and a hand
 
 ```kay
 --- server
-import { action, t } from 'kay'
+import { t } from 'kay'
 import { addTodo, listTodos } from '../data'
 
 export const add = action(t.Object({ title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }) }), async ({ title }, ctx) => {
@@ -807,7 +804,7 @@ The server entry exports the app using it before the pages, `export const app = 
 
 ```kay
 --- server
-import { action, t } from 'kay'
+import { t } from 'kay'
 
 export const signIn = action(t.Object({ email: t.String({ maxLength: 254 }), password: t.String() }), async (input, ctx) => {
   const user = await verify(input)
@@ -913,7 +910,7 @@ An island imports a module for its routes:
 
 ```kay
 ---
-import { signal, socket, stream } from 'kay'
+import { socket, stream } from 'kay'
 import chat from '../api/chat'
 
 const { room } = props<{ room: string }>()

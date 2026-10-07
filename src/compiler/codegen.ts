@@ -116,6 +116,12 @@ class Generator {
   run(): Generated {
     const { b, script, server } = this
     const includeServer = server !== undefined && this.options.includeServer !== false
+    // What the fences use from `kay` unimported, as they use `props<T>()`; a name the other fence of the same module imports needs no import.
+    const imported = new Set([...script.imports, ...includeServer ? server.imports : []].map(binding => binding.local))
+    const implicit = [...script.implicit, ...includeServer ? server.implicit : []].filter(name => !imported.has(name))
+
+    if (implicit.length > 0)
+      b.add(`import { ${[...new Set(implicit)].join(', ')} } from 'kay'\n`)
 
     for (const span of script.hoisted)
       this.emitHoisted(span, script.specifiers, script.imports, [])

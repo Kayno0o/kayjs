@@ -119,6 +119,17 @@ async function scratchProject(files: Record<string, string>): Promise<string> {
 }
 
 describe('kay check, edge cases', () => {
+  it('types what the fences use of kay unimported', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { t } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title")\np {label}\n' })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[8, 'TS2322']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types the item of a for without a key', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': '---\nconst todos = [{ id: 1, title: \'a\' }]\n---\nul\n  for todo of todos\n    li {todo.title} {todo.nope}\n' })
 

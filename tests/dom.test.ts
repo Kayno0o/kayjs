@@ -199,6 +199,25 @@ describe('event handlers', () => {
   })
 })
 
+describe('kay without imports', () => {
+  it('runs signal, memo, effect and onMount a script uses unimported', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nconst count = signal(1)\nconst double = memo(() => count() * 2)\nconst seen = signal(0)\nconst mounted = signal(false)\n\neffect(() => seen.set(count()))\nonMount(() => mounted.set(true))\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()} {seen()} {mounted() ? \'mounted\' : \'not yet\'}\n',
+    })
+
+    try {
+      await settle()
+      expect(root.querySelector('button')!.textContent).toBe('2 1 mounted')
+      root.querySelector('button')!.click()
+      await settle()
+      expect(root.querySelector('button')!.textContent).toBe('4 2 mounted')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('loops', () => {
   it('keeps rendering components a loop iterates over as the list changes', async () => {
     const { root, dispose } = await mountKay({

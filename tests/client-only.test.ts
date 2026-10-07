@@ -152,7 +152,7 @@ describe('browser-only globals read while rendering', () => {
 
     expect(reads(source)).toEqual([
       { text: 'window', message: '`window` exists only in the browser', fixes: [client(source)] },
-      { text: 'localStorage', message: '`localStorage` exists only in the browser', fixes: [source.replace('memo, signal', 'memo, signal, effect').replace('localStorage.setItem(\'seen\', \'1\')', 'effect(() => localStorage.setItem(\'seen\', \'1\'))'), client(source)] },
+      { text: 'localStorage', message: '`localStorage` exists only in the browser', fixes: [source.replace('localStorage.setItem(\'seen\', \'1\')', 'effect(() => localStorage.setItem(\'seen\', \'1\'))'), client(source)] },
       { text: 'document', message: '`document` exists only in the browser', fixes: [client(source)] },
       { text: 'devicePixelRatio', message: '`devicePixelRatio` exists only in the browser', fixes: [client(source)] },
       { text: 'sessionStorage', message: '`sessionStorage` exists only in the browser', fixes: [client(source)] },

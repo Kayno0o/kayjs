@@ -355,7 +355,7 @@ describe('kay lsp imports', () => {
 
     expect(diagnostics.map(diagnostic => diagnostic.source === 'kay' ? diagnostic.message : diagnostic.code)).toEqual(['`localStorage` exists only in the browser\nnote: this reads it while the component renders on the server too\nhelp: read it in `effect` or `onMount`, or render the component in the browser only with `--- client`', 2339])
     expect(actions.map(action => ({ title: action.title, text: applyEdits(source, action.edit!.changes![editor.uri(page)]!) }))).toEqual([
-      { title: 'Read `localStorage` in an effect, once the component renders in the browser', text: source.replace('signal }', 'signal, effect }').replace('localStorage.clear()', 'effect(() => localStorage.clear())') },
+      { title: 'Read `localStorage` in an effect, once the component renders in the browser', text: source.replace('localStorage.clear()', 'effect(() => localStorage.clear())') },
       { title: 'Render the component in the browser only with `--- client`', text: source.replace('---', '--- client') },
     ])
   })
