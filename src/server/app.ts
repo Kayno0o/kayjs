@@ -38,7 +38,7 @@ import { servePublic } from './public'
 import { readRedirects, refuseRedirectClashes, serveRedirects } from './redirects'
 import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './render'
 import { reportServerError } from './report'
-import { revalidateStale } from './revalidate'
+import { revalidateStale, trackPrerendered } from './revalidate'
 import { rewriteRequests } from './rewrite'
 import { decodePath, refuseClashes, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
 import { securityHeaders } from './security'
@@ -261,6 +261,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     serveFavicons(app, new Set([...publicUrls, ...servedPaths(routes)]), { source: resolve(root, options.favicon), builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
+
+  for (const pages of prerendered.values())
+    trackPrerendered(pages)
+
   const matchers = await loadMatchers(routesDir, routes)
   const trailingSlash = options.trailingSlash ?? 'never'
   const redirects = readRedirects(options.redirects ?? {})
@@ -287,7 +291,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     }
 
     // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
-    revalidateStale(page, async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), error => reportServerError(error, context.request, renderOptions.onError))
+    await revalidateStale(page, async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), error => reportServerError(error, context.request, renderOptions.onError))
 
     return servePrerendered(route, page, context, client, renderOptions)
   }

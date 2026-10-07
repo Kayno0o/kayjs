@@ -9,7 +9,7 @@ import { parse, stringify } from 'devalue'
 import { Elysia, t } from 'elysia'
 import { check } from '../src/check'
 import { action } from '../src/runtime'
-import { inlineScriptHashes, pages, shutdown } from '../src/server'
+import { inlineScriptHashes, invalidatePage, pages, shutdown } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, protectionRefusal, rateKey } from '../src/server/protection'
@@ -287,6 +287,8 @@ describe('request body limits', () => {
 
 describe('revalidation', () => {
   const routes = 'tests/fixtures/production/src/routes'
+  // Held in a variable so tsc leaves the .kay import to Bun.
+  const NEWS = './fixtures/production/src/routes/news.kay'
 
   it('serves a stale prerendered page while rendering it again in the background, then the new one with its own tag', async () => {
     const root = process.cwd()
@@ -357,6 +359,46 @@ describe('revalidation', () => {
       logged.mockRestore()
       news.edition = 1
       news.failing = false
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('renders a page an action invalidated before the next request gets it, whatever its revalidate period', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const { news } = await import('./fixtures/production/src/news')
+
+    try {
+      await prerenderPages(root, { routes }, (await readClient(root))!)
+      const app = await pages({ routes, prebuilt: true, security: false })
+      const { publish } = await import(NEWS) as { publish: Action<{ edition: number }, void> }
+      const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
+      const built = await visit()
+      const etag = built.headers.get('etag')!
+
+      expect(await built.text()).toContain('<h1>Edition 1</h1>')
+
+      const posted = await app.handle(new Request(`http://localhost${publish.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/news' }, body: new URLSearchParams({ edition: '4' }) }))
+
+      expect(posted.status).toBe(303)
+
+      const fresh = await visit({ 'if-none-match': etag })
+
+      expect(fresh.status).toBe(200)
+      expect(fresh.headers.get('etag')).not.toBe(etag)
+      expect(await fresh.text()).toContain('<h1>Edition 4</h1>')
+
+      // A function names every page it matches; a path no page has names nothing.
+      news.edition = 5
+      invalidatePage(path => path.startsWith('/ne'))
+      invalidatePage('/nowhere')
+      expect(await (await visit()).text()).toContain('<h1>Edition 5</h1>')
+      news.edition = 6
+      expect(await (await visit()).text()).toContain('<h1>Edition 5</h1>')
+    }
+    finally {
+      news.edition = 1
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }

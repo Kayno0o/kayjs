@@ -7,6 +7,8 @@ import { afterAll, afterEach, describe, expect, it, setSystemTime, spyOn } from 
 import { Elysia } from 'elysia'
 import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
 import { pages } from '../src/server'
+import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { prerenderPages } from '../src/server/prerender'
 import { feed } from './fixtures/production/src/news'
 
 afterEach(() => {
@@ -159,6 +161,63 @@ describe('cached with a store', () => {
     invalidate('reviews')
     expect(store.keys()).toEqual([])
     expect(await cached('reviews', 60, () => 'new', { store })).toBe('new')
+  })
+
+  it('drops a key another process sharing the store invalidated, within a second', async () => {
+    const path = await storePath()
+    const store = sqliteCache(path)
+
+    expect(await cached('shared', 60, () => 'old', { store })).toBe('old')
+
+    const child = Bun.spawn([process.execPath, '-e', `import { invalidate, sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.server.ts'))}\nsqliteCache(${JSON.stringify(path)})\ninvalidate(key => key === 'shared')\n`], { stderr: 'inherit' })
+
+    expect(await child.exited).toBe(0)
+
+    // Without the broadcast this process would keep its copy for its whole ttl.
+    let value = await cached('shared', 60, () => 'new', { store })
+
+    for (let wait = 0; value === 'old' && wait < 40; wait++) {
+      await Bun.sleep(50)
+      value = await cached('shared', 60, () => 'new', { store })
+    }
+
+    expect(value).toBe('new')
+  })
+
+  it('marks a prerendered page stale when another process sharing a store invalidated it', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const { news } = await import('./fixtures/production/src/news')
+    const path = await storePath()
+
+    sqliteCache(path)
+
+    try {
+      await prerenderPages(root, { routes: 'tests/fixtures/production/src/routes' }, (await readClient(root))!)
+      const app = await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: true, security: false })
+      const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
+
+      expect(await visit()).toContain('<h1>Edition 1</h1>')
+      news.edition = 7
+
+      const child = Bun.spawn([process.execPath, '-e', `import { sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.server.ts'))}\nimport { invalidatePage } from ${JSON.stringify(resolve('src/server/revalidate.ts'))}\nsqliteCache(${JSON.stringify(path)})\ninvalidatePage('/news')\n`], { stderr: 'inherit' })
+
+      expect(await child.exited).toBe(0)
+
+      let html = await visit()
+
+      for (let wait = 0; !html.includes('Edition 7') && wait < 40; wait++) {
+        await Bun.sleep(50)
+        html = await visit()
+      }
+
+      expect(html).toContain('<h1>Edition 7</h1>')
+    }
+    finally {
+      news.edition = 1
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
   })
 
   it('keeps the stale value when a refresh gives one the store cannot hold, and a value whose store failed to write', async () => {

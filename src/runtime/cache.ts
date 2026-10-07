@@ -10,7 +10,13 @@ export interface CacheStore {
   set: (key: string, text: string, freshUntil: number) => void
   delete: (key: string) => void
   keys: () => string[]
+  // Tells the other processes sharing the store what this one invalidated, and hears what they did, so no process keeps serving a copy another one dropped. Optional: without them an invalidation stays in its process.
+  publish?: (message: string) => void
+  subscribe?: (listener: (message: string) => void) => void
 }
+
+// What one process tells the others: cache keys it dropped, or prerendered page paths it marked stale.
+export type Invalidation = { keys: string[] } | { pages: string[] }
 
 export interface CacheOptions {
   // Keeps the value across restarts, and for every process sharing the store; the value must survive devalue, as session data does.
@@ -29,6 +35,8 @@ interface Entry {
 const entries = new Map<string, Entry>()
 // Every store a call named, which `invalidate` empties too.
 const stores = new Set<CacheStore>()
+// What hears the page paths another process marked stale: the server serving them.
+const pageListeners = new Set<(paths: string[]) => void>()
 // Past this many keys, the least recently written goes first.
 const MAX_ENTRIES = 10_000
 // After a background refresh that failed, the longest a stale value is kept before the next call tries again.
@@ -72,25 +80,69 @@ export async function cached<T, const Ttl extends Duration = Duration>(key: stri
   return entry.value as T
 }
 
-// Drops `key`, or every key the function matches, so the next call loads afresh: for an action that changed what they hold.
 // A store `invalidate` empties too: each one a call names, and a `sqliteCache` as soon as it opens, so an action invalidating after a restart reaches what the store kept before any page asked for it.
 export function trackStore(store: CacheStore): void {
+  if (stores.has(store))
+    return
+
   stores.add(store)
+  store.subscribe?.(heard)
 }
 
+// Drops `key`, or every key the function matches, so the next call loads afresh: for an action that changed what they hold.
+// Every process sharing a store that broadcasts, a `sqliteCache`, drops the same keys: a string key always, a function's keys as far as this process and the store know them.
 export function invalidate(key: string | ((key: string) => boolean)): void {
   const matches = typeof key === 'string' ? (name: string) => name === key : key
+  const dropped = new Set<string>(typeof key === 'string' ? [key] : [])
 
   for (const name of entries.keys()) {
-    if (matches(name))
+    if (matches(name)) {
       entries.delete(name)
+      dropped.add(name)
+    }
   }
 
   for (const store of stores) {
     for (const name of store.keys()) {
-      if (matches(name))
+      if (matches(name)) {
         store.delete(name)
+        dropped.add(name)
+      }
     }
+  }
+
+  if (dropped.size > 0)
+    broadcast({ keys: [...dropped] })
+}
+
+export function broadcast(invalidation: Invalidation): void {
+  const message = JSON.stringify(invalidation)
+
+  for (const store of stores) {
+    try {
+      store.publish?.(message)
+    }
+    catch (error) {
+      console.error('kay: an invalidation could not reach the other processes', error)
+    }
+  }
+}
+
+export function onPagesInvalidated(listener: (paths: string[]) => void): void {
+  pageListeners.add(listener)
+}
+
+// Another process's invalidation, applied here alone: the store is emptied already, and passing it on would echo it back.
+function heard(message: string): void {
+  const invalidation = JSON.parse(message) as Invalidation
+
+  if ('keys' in invalidation) {
+    for (const key of invalidation.keys)
+      entries.delete(key)
+  }
+  else {
+    for (const listener of pageListeners)
+      listener(invalidation.pages)
   }
 }
 

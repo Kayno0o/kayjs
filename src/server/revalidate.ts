@@ -1,41 +1,99 @@
 import type { ServedPage } from './render'
+import { broadcast, onPagesInvalidated } from '../runtime/cache'
 import { compressText } from './compress'
 import { pageEtag, storedHeaders } from './prerender'
 
 interface Revalidation {
+  // When the render of the page in place started: data changed after that is not in it.
+  renderedFrom: number
+  // When its `revalidate` period runs out.
   staleAt: number
-  running: boolean
+  // When `invalidatePage` last named it.
+  invalidatedAt: number
+  // After a render that failed, no request waits for another before this.
+  retryAt: number
+  running?: Promise<void>
 }
 
 const revalidations = new WeakMap<ServedPage, Revalidation>()
+// The prerendered pages of every `pages()`, by path as the routes serve it.
+const served = new Set<Map<string, ServedPage>>()
 // After a render that failed, the longest a page waits before the next request tries again.
 const RETRY_MS = 60_000
 
-// Once a page with a `revalidate` period is older than it, renders it again in the background, one render at a time; until that lands, every request gets the page as it was.
-export function revalidateStale(page: ServedPage, render: () => Promise<Response>, report: (error: unknown) => void): void {
-  if (page.revalidate === undefined)
-    return
+onPagesInvalidated((paths) => {
+  markStale(path => paths.includes(path))
+})
 
-  const period = page.revalidate * 1000
-  let revalidation = revalidations.get(page)
-
-  if (!revalidation)
-    revalidations.set(page, revalidation = { staleAt: (page.renderedAt ?? 0) + period, running: false })
-
-  if (revalidation.running || Date.now() < revalidation.staleAt)
-    return
-
-  revalidation.running = true
-  void rerender(page, render, period, revalidation, report)
+export function trackPrerendered(pages: Map<string, ServedPage>): void {
+  served.add(pages)
 }
 
-async function rerender(page: ServedPage, render: () => Promise<Response>, period: number, revalidation: Revalidation, report: (error: unknown) => void): Promise<void> {
+// Marks the prerendered page at `path`, or every one the function matches, as `/blog/` + anything, stale: the next request for it waits for a fresh render instead of getting it as it was.
+// Paths are as the routes serve them, without the base, a locale's under its segment; every process sharing a `sqliteCache` marks the same pages.
+export function invalidatePage(path: string | ((path: string) => boolean)): void {
+  const marked = markStale(typeof path === 'string' ? candidate => candidate === path : path)
+  // A path given as it is reaches the other processes even when this one serves no such page.
+  const paths = typeof path === 'string' ? [path] : marked
+
+  if (paths.length > 0)
+    broadcast({ pages: paths })
+}
+
+function markStale(matches: (path: string) => boolean): string[] {
+  const paths: string[] = []
+
+  for (const pages of served) {
+    for (const [path, page] of pages) {
+      if (matches(path)) {
+        revalidationOf(page).invalidatedAt = Date.now()
+        paths.push(path)
+      }
+    }
+  }
+
+  return paths
+}
+
+function revalidationOf(page: ServedPage): Revalidation {
+  let revalidation = revalidations.get(page)
+
+  if (!revalidation) {
+    const renderedFrom = page.renderedAt ?? 0
+
+    revalidations.set(page, revalidation = { renderedFrom, staleAt: page.revalidate === undefined ? Infinity : renderedFrom + page.revalidate * 1000, invalidatedAt: -Infinity, retryAt: 0 })
+  }
+
+  return revalidation
+}
+
+// A page `invalidatePage` named since its render is rendered again before this resolves, concurrent requests waiting for the same render. One older than its `revalidate` period is rendered again in the background, every request getting the page as it was until that lands.
+export async function revalidateStale(page: ServedPage, render: () => Promise<Response>, report: (error: unknown) => void): Promise<void> {
+  const revalidation = revalidationOf(page)
+  const outdated = () => revalidation.invalidatedAt >= revalidation.renderedFrom && Date.now() >= revalidation.retryAt
+
+  // A render already running may have started before the page was named, and then lands outdated still: a second one follows it.
+  for (let attempt = 0; attempt < 2 && outdated(); attempt++)
+    await (revalidation.running ??= rerender(page, render, revalidation, report))
+
+  if (!revalidation.running && Date.now() >= revalidation.staleAt)
+    revalidation.running = rerender(page, render, revalidation, report)
+}
+
+async function rerender(page: ServedPage, render: () => Promise<Response>, revalidation: Revalidation, report: (error: unknown) => void): Promise<void> {
+  const started = Date.now()
+  const period = page.revalidate === undefined ? Infinity : page.revalidate * 1000
+  const failed = () => {
+    revalidation.retryAt = Date.now() + Math.min(period, RETRY_MS)
+    revalidation.staleAt = revalidation.retryAt
+  }
+
   try {
     const response = await render()
 
     // The render reported its error already; the page as it was stays up.
     if (response.status >= 500) {
-      revalidation.staleAt = Date.now() + Math.min(period, RETRY_MS)
+      failed()
 
       return
     }
@@ -45,13 +103,14 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, perio
 
     // All at once, so no request reads the new html with the old tag.
     Object.assign(page, { html, encoded, status: response.status, headers: Object.entries(storedHeaders(response.headers)), etag: pageEtag(html), renderedAt: Date.now() })
+    revalidation.renderedFrom = started
     revalidation.staleAt = Date.now() + period
   }
   catch (error) {
-    revalidation.staleAt = Date.now() + Math.min(period, RETRY_MS)
+    failed()
     report(error)
   }
   finally {
-    revalidation.running = false
+    revalidation.running = undefined
   }
 }

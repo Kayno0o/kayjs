@@ -1,8 +1,15 @@
 --- server
+import { t } from 'kay'
+import { invalidatePage } from 'kay/server'
 import { news } from '../news'
 
 export const prerender = true
 export const revalidate = 60
+
+export const publish = action(t.Object({ edition: t.Integer({ minimum: 1, maximum: 1000 }) }), ({ edition }) => {
+  news.edition = edition
+  invalidatePage('/news')
+})
 
 if (news.failing)
   throw new Error('the news feed is down')

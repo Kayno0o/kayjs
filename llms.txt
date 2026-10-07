@@ -574,6 +574,18 @@ Each value is a string with no empty, `.` or `..` segment, a catch-all's include
 
 `export const revalidate = '1h'` beside `prerender` keeps a prerendered page fresh: once it is older than that, seconds or a string such as `'1h'`, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does; every request after that render lands gets the new page, with a new ETag and compressed copies. One render runs at a time per path. A render that fails or answers 5xx is logged and leaves the page as it was, the next attempt coming a minute later at most. The new page lives in memory, so a restart serves the built file again until it goes stale; an executable built a while ago revalidates on its first request.
 
+An action or an API route that changed what a prerendered page shows calls `invalidatePage` from `kay/server`, and the next request for it waits for a fresh render rather than getting it as it was, whether or not the page has a `revalidate` period:
+
+```ts
+import { invalidatePage } from 'kay/server'
+
+invalidatePage('/blog/hello')
+invalidatePage(path => path.startsWith('/blog/'))
+```
+
+- The path is the one the routes serve, without the base, a locale's page under its segment, `/fr/blog/hello`. Requests arriving while the render runs wait for the same one; a render that fails or answers 5xx is logged, leaves the page as it was, and no request waits on another before a minute has passed.
+- Processes sharing a `sqliteCache` (see Caching) mark the same pages within about half a second: a path given as it is reaches them all, a function the paths it matched in this process, which serves the same build.
+
 ## Content collections
 
 A collection is a folder of Markdown files, or of JSON and YAML data files, read against a schema. The project declares its collections in `src/content.config.ts`, or the module `content` names in kay.config.ts, each folder relative to that module:
@@ -691,13 +703,13 @@ const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 ```
 
 - A key missing from memory is read from the store before `load` runs, and each load writes it back, so a restart, a deploy or `kay dev` reloading starts from what was kept; a stale one is given and refreshed as above.
-- The processes of one machine share a SQLite store. Each still keeps its copy in memory, so an `invalidate` in one process empties the store at once and reaches the others once their copy is past its ttl; a load another process had already started may still write the old value back.
+- The processes of one machine share a SQLite store. Each keeps its copy in memory, and an `invalidate` in one process empties the store at once and reaches the others' copies within about half a second, through an events table each process polls once it has opened the store: a string key always, a function's keys as far as that process and the store know them. A load another process had already started may still write the old value back.
 - `invalidate` empties a `sqliteCache` from the moment it opens, so an action after a restart reaches what it kept; a store of your own, once a `cached` call has named it.
 - A key belongs to one store: once in memory, it is read and written there whatever store a later call names.
 - A store that fails to write, locked or full, is logged and the value kept in memory. Rows are never swept, since a stale one is still served: `invalidate` keys a site stops using, such as those of deleted posts.
 - The value goes through devalue, as session data does: dates, maps and sets survive, and a value holding a function or a class instance throws on its first load, keeping nothing; on a refresh, it is logged and the stale value kept.
 - `sqliteCache` is server-only: in the browser, `kay/cache` has `cached` and `invalidate` alone.
-- `CacheStore` is the shape of a store, synchronous so that `invalidate` is done when it returns: `get(key)` giving `{ text, freshUntil }`, `set(key, text, freshUntil)`, `delete(key)` and `keys()`.
+- `CacheStore` is the shape of a store, synchronous so that `invalidate` is done when it returns: `get(key)` giving `{ text, freshUntil }`, `set(key, text, freshUntil)`, `delete(key)` and `keys()`, plus, optionally, `publish(message)` and `subscribe(listener)` carrying invalidations between processes, as a Redis channel would.
 - In the `server` and `app` templates' image the app runs as `nobody`, so the store's directory is a mounted volume it can write.
 
 ## Streaming
