@@ -41,8 +41,8 @@ export const LINTS = {
   'unbounded-string': {
     level: 'deny',
     summary: 'A string field of an action\'s schema with no `maxLength`, which takes whatever a visitor posts, up to the request body limit. A secret such as a password is left alone.',
-    wrong: '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String() }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
-    right: '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String({ maxLength: 200 }) }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
+    wrong: '--- server\nimport { action, t } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String() }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
+    right: '--- server\nimport { action, t } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String({ maxLength: 200 }) }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
   },
   'positional-key': {
     level: 'warn',

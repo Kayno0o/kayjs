@@ -583,7 +583,7 @@ Each value is a string with no empty, `.` or `..` segment, a catch-all's include
 A collection is a folder of Markdown files, or of JSON and YAML data files, read against a schema. The project declares its collections in `src/content.config.ts`, or the module `content` names in kay.config.ts, each folder relative to that module:
 
 ```ts
-import { t } from 'elysia'
+import { t } from 'kay'
 import { collection } from 'kay/content'
 import Callout from './components/callout.kay'
 
@@ -739,8 +739,7 @@ A page's or a layout's server fence exports actions: an Elysia schema and a hand
 
 ```kay
 --- server
-import { t } from 'elysia'
-import { action } from 'kay'
+import { action, t } from 'kay'
 import { addTodo, listTodos } from '../data'
 
 export const add = action(t.Object({ title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }) }), async ({ title }, ctx) => {
@@ -764,6 +763,7 @@ form(action={add})
   button Add
 ```
 
+- `t` from `kay` is Elysia's schema builder, the same one `elysia` exports, there to save an import; an island has none, so calling it in a browser throws. Server modules, `defineEnv` and API modules included, import it from `kay` too.
 - `form(action={add})` posts without JavaScript; `kay check` verifies every field `name` against the schema. After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
 - A line break a form posts, CRLF per the standard, is read as `\n`, the one character the `textarea` the visitor typed in counts, so a `maxLength` matches what the browser let them write.
 - A plain form posts text, read against the schema before it validates: a `t.Number()`, `t.Integer()` or `t.Boolean()` field becomes one, a number only from decimal text such as `-1.5` or `2e3`, never `0x10` (a ticked checkbox posts `on`, read as `true`, and an unticked one nothing, read as `false` when the field is required), a `t.Array()` field takes a single value or none as a list, and a blank optional field other than a plain `t.String()` counts as left out.
@@ -812,8 +812,7 @@ The server entry exports the app using it before the pages, `export const app = 
 
 ```kay
 --- server
-import { t } from 'elysia'
-import { action } from 'kay'
+import { action, t } from 'kay'
 
 export const signIn = action(t.Object({ email: t.String({ maxLength: 254 }), password: t.String() }), async (input, ctx) => {
   const user = await verify(input)
@@ -841,7 +840,7 @@ const userId = await ctx.locals.session.get('userId')
 `defineEnv` from `kay/server` reads `process.env` once against a schema, as the server boots, and gives it back typed:
 
 ```ts
-import { t } from 'elysia'
+import { t } from 'kay'
 import { defineEnv } from 'kay/server'
 
 export const env = defineEnv(t.Object({
@@ -856,7 +855,7 @@ A number or boolean is read from its text as a form field is, a variable left ou
 `publicEnv` in kay.config.ts declares the variables an island may read, such as a map key or an analytics id, which a component reads as `publicEnv` from `kay`, typed from the declaration:
 
 ```ts
-import { t } from 'elysia'
+import { t } from 'kay'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({ publicEnv: t.Object({ MAP_KEY: t.String(), ANALYTICS_ID: t.Optional(t.String()) }) })
@@ -893,7 +892,7 @@ export default guard(({ locals, redirect, deny }) => {
 Each `.ts` module under `src/api/`, the `api` option of `kay.config.ts` naming another directory, exports an Elysia instance by default, which `pages()` mounts at `/api` plus its path there, with nothing to register: `src/api/chat.ts` serves its routes under `/api/chat`, `src/api/index.ts` under `/api`. Files and directories starting with `_`, and `.test.ts` files, are left out.
 
 ```ts
-import { t } from 'elysia'
+import { t } from 'kay'
 import { api, eventStream } from 'kay/server'
 import { complete, listRooms } from '../data'
 

@@ -397,7 +397,7 @@ const APP_FILES: Record<string, string> = {
   '.env.example': 'SESSION_SECRET=at-least-32-characters-kept-out-of-the-repository\n',
   // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret.
   '.env.test': 'SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\n',
-  'src/env.ts': `import { t } from 'elysia'
+  'src/env.ts': `import { t } from 'kay'
 import { defineEnv } from 'kay/server'
 
 // Read once as the server boots; \`kay new\` wrote a secret to .env, and production sets its own.
@@ -424,8 +424,7 @@ console.log(\`Listening on http://localhost:\${app.server?.port}\`)
 `,
   'src/components/header.kay': header('[{ href: \'/\', label: \'Home\' }, { href: \'/account\', label: \'Account\' }]'),
   'src/routes/login.kay': `--- server
-import { t } from 'elysia'
-import { action } from 'kay'
+import { action, t } from 'kay'
 
 // Anyone may sign in under any name: swap in real credentials, such as @kaynooo/kayjs-auth's.
 export const signIn = action(t.Object({ name: t.String({ pattern: '\\\\S', maxLength: 40, error: 'Write a name' }) }), async ({ name }, ctx) => {
@@ -454,8 +453,7 @@ export default guard(async ({ locals, redirect }) => {
 })
 `,
   'src/routes/account/index.kay': `--- server
-import { t } from 'elysia'
-import { action } from 'kay'
+import { action, t } from 'kay'
 
 export const signOut = action(t.Object({}), async (_input, ctx) => {
   await ctx.locals.session.destroy()
@@ -474,7 +472,7 @@ Online
 form.mt-4(action={signOut})
   button(type="submit") Sign out
 `,
-  'src/api/online.ts': `import { t } from 'elysia'
+  'src/api/online.ts': `import { t } from 'kay'
 import { api } from 'kay/server'
 
 let online = 0

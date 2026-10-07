@@ -16,6 +16,13 @@
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/",
     "access": "restricted"
   },
+  "imports": {
+    "#schema": {
+      "types": "./types/runtime/schema.d.ts",
+      "browser": "./src/runtime/schema.client.ts",
+      "default": "./src/runtime/schema.ts"
+    }
+  },
   "exports": {
     ".": {
       "types": "./types/runtime/index.d.ts",
