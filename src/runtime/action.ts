@@ -56,6 +56,16 @@ export interface ActionProtection<Honeypot extends string = never> {
   honeypot?: Honeypot
   // The most bytes a post may send, files included, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.
   bodyLimit?: number
+  // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
+  messages?: ProtectionMessages
+}
+
+export interface ProtectionMessages {
+  // Given the seconds until the client may post again.
+  rateLimit?: string | ((wait: number) => string)
+  honeypot?: string
+  // Given the most bytes a post may send.
+  bodyLimit?: string | ((bytes: number) => string)
 }
 
 export interface ActionContext {

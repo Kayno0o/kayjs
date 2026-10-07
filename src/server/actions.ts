@@ -135,7 +135,9 @@ async function tooLarge(action: ServerAction<TSchema, unknown>, request: Request
   if (isCrossSite(request))
     return crossSiteRefusal()
 
-  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': `Too large to send; ${sizeText(bytes)} at most` } }, server, back)
+  const message = action.protection?.messages?.bodyLimit ?? (most => `Too large to send; ${sizeText(most)} at most`)
+
+  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': typeof message === 'string' ? message : message(bytes) } }, server, back)
 }
 
 // Two files whose paths differ only where a URL keeps neither, `a b.kay` and `a_b.kay`, serve their actions at one URL.

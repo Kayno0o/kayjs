@@ -141,6 +141,25 @@ describe('action protection', () => {
     expect((await call('198.51.100.2')).status).toBe(200)
   })
 
+  it('refuses in the messages the action gives, in place of kay\'s English', async () => {
+    const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: { hops: 1 } })
+    const { write } = await import(CONTACT) as { write: Action<{ message: string }, number, 'website'> }
+    const call = async (message: string) => {
+      const body = stringify({ message })
+
+      return app.handle(new Request(`http://localhost${write.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)), 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.8' }, body }))
+    }
+
+    expect((await protectionRefusal(write as never, new Request('http://localhost/'), { website: 'https://spam.example' }, true, null))?.message).toBe('Laissez ce champ vide')
+    expect(parse(await (await call('a'.repeat(1100))).text())).toEqual({ errors: { '': '1024 octets au plus' }, data: undefined })
+    expect((await call('hi')).status).toBe(200)
+
+    const limited = await call('hi')
+
+    expect(limited.status).toBe(429)
+    expect(parse(await limited.text())).toEqual({ errors: { '': `Réessayez dans ${limited.headers.get('retry-after')} s` }, data: undefined })
+  })
+
   it('limits a guard or an API route by name as an action is limited, names counting apart', async () => {
     const signIn = rateLimit('sign-in', { max: 2, window: '1m' })
     const search = rateLimit('search', { max: 2, window: '1m' })

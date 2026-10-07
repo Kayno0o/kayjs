@@ -131,13 +131,13 @@ function waitFor(window: { count: number, resetAt: number }, max: number): numbe
 
 // Why a post must not reach the handler, or undefined when it may.
 export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined): Promise<ProtectionRefusal | undefined> {
-  const { honeypot, rateLimit } = action.protection ?? {}
+  const { honeypot, rateLimit, messages } = action.protection ?? {}
 
   if (form && honeypot !== undefined && typeof body === 'object' && body !== null) {
     const value = (body as Record<string, unknown>)[honeypot]
 
     if (filledIn(value))
-      return { status: 422, field: honeypot, message: 'Leave this field empty' }
+      return { status: 422, field: honeypot, message: messages?.honeypot ?? 'Leave this field empty' }
   }
 
   if (!rateLimit)
@@ -146,7 +146,12 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
   // Counted under the action's URL, the same in every process.
   const wait = waitFor(await (rateLimit.store ?? memory).hit(limitKey(action.url, clientAddress(request, server)), windowMs(rateLimit)), rateLimit.max)
 
-  return wait === undefined ? undefined : { status: 429, field: '', message: `Too many attempts; try again in ${wait} s`, headers: { 'retry-after': String(wait) } }
+  if (wait === undefined)
+    return undefined
+
+  const message = messages?.rateLimit ?? (seconds => `Too many attempts; try again in ${seconds} s`)
+
+  return { status: 429, field: '', message: typeof message === 'string' ? message : message(wait), headers: { 'retry-after': String(wait) } }
 }
 
 // Something a person never types into a field they cannot see: text, several values, or a file.
