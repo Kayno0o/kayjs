@@ -1,6 +1,6 @@
 import { withBase } from './base'
 import { dispatch, hydrate, render } from './dom'
-import { recordSignals, reportError, root, setErrorReporter } from './reactive'
+import { batch, createSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { decodeValue } from './wire'
 
@@ -11,6 +11,8 @@ export type IslandRegistry = Record<string, () => Promise<{ default: (props: obj
 interface IslandElement extends HTMLElement {
   // Set once hydrated, so the inline hydration script stops queuing its events.
   _$k?: boolean
+  // Gives a hydrated island the props of the next page, which kept it.
+  _$p?: (props: object) => void
 }
 
 // Starts loading a `visible` island this far before it scrolls into view.
@@ -110,7 +112,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   if (!element.isConnected)
     return
 
-  const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
+  const [props, update] = liveProps(element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as Record<string, unknown>)
   const early = takeEvents(element)
   // Counted again from where the server's were, so the ids it rendered are claimed as they are.
   const ids = element.dataset.uid ?? freshPrefix()
@@ -152,7 +154,8 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     })
   }
 
-  (element as IslandElement)._$k = true
+  (element as IslandElement)._$k = true;
+  (element as IslandElement)._$p = update
 
   // A click or an input reaches the handlers alone, its default action done already; a change, heard on the element itself, fires again. A target an afresh render replaced is gone with its event.
   for (const event of early) {
@@ -255,6 +258,33 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
     document.querySelector('script[type="module"][src]')?.setAttribute('src', withBase(swap.entry))
 
   return true
+}
+
+// Props read through a signal each, so an island marked `persist` the next page gives other props shows them, as a component inside an island does.
+function liveProps(initial: Record<string, unknown>): [props: object, update: (next: object) => void] {
+  const props = {}
+  const writes = new Map<string, (value: unknown) => void>()
+  const define = (key: string, value: unknown) => {
+    const [read, write] = createSignal(value, undefined, false)
+
+    writes.set(key, write)
+    Object.defineProperty(props, key, { get: read, enumerable: true, configurable: true })
+  }
+
+  for (const [key, value] of Object.entries(initial))
+    define(key, value)
+
+  return [props, next => batch(() => {
+    for (const key of new Set([...writes.keys(), ...Object.keys(next)])) {
+      const value = (next as Record<string, unknown>)[key]
+      const write = writes.get(key)
+
+      if (write)
+        write(value)
+      else
+        define(key, value)
+    }
+  })]
 }
 
 // Ends every island under `root`, as a page swap takes them away.

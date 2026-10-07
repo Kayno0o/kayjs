@@ -6,7 +6,7 @@ import type { Locale } from './i18n'
 import { withBase } from './base'
 import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
-import { createSignal, untrack } from './reactive'
+import { createSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
 import { decodeValue, unflattenValue } from './wire'
@@ -151,6 +151,8 @@ export function setRequestOutcome(read: () => Outcome | null | undefined): void 
 export interface CallOptions {
   // Whether the page shows what the call changed once it succeeded, its loads run again as `refresh()` runs them; on unless `false`, and only where the page swap runs.
   refresh?: boolean
+  // Shows the change at once, as the call goes: the signals it writes go back to what they held if the call fails, unless something wrote them since.
+  optimistic?: () => void
 }
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
@@ -370,6 +372,8 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       shift(1)
       called(null)
 
+      const undo = options?.optimistic ? undoable(options.optimistic) : undefined
+
       try {
         const data = await post(url(), input)
 
@@ -385,6 +389,8 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
         return data
       }
       catch (error) {
+        undo?.()
+
         if (error instanceof ActionError && !(error instanceof ActionRedirect))
           called({ action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
 

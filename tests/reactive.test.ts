@@ -1,6 +1,9 @@
+import type { Action } from '../src/runtime'
 import { describe, expect, it, spyOn } from 'bun:test'
-import { batch, effect, flush, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
-import { createSignal, recordSignals, renderEffect, renderOnServer, unrecorded } from '../src/runtime/reactive'
+import { stringify } from 'devalue'
+import { batch, effect, flush, linked, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
+import { ActionError, actionStub } from '../src/runtime/action'
+import { createSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded } from '../src/runtime/reactive'
 
 describe('signals', () => {
   it('read the last value written, a function written being an updater', () => {
@@ -274,5 +277,59 @@ describe('recordSignals', () => {
     const reshaped = recordSignals(() => [createSignal(0)[0](), createSignal(0)[0](), createSignal('')[0]()], first.values())
 
     expect(reshaped.result).toEqual([5, 0, ''])
+  })
+})
+
+describe('linked', () => {
+  it('takes the source\'s value, keeps an edit until the source changes, then follows it again', () => {
+    const board = signal({ title: 'First' })
+    const title = linked(() => board().title)
+    const seen: string[] = []
+
+    root(() => effect(() => void seen.push(title())))
+    flush()
+    title.set('Edited')
+    flush()
+    expect(title()).toBe('Edited')
+    title.set(current => `${current}!`)
+    expect(title()).toBe('Edited!')
+    board.set({ title: 'Second' })
+    flush()
+    expect(title()).toBe('Second')
+    expect(seen).toEqual(['First', 'Edited', 'Second'])
+  })
+})
+
+describe('optimistic changes', () => {
+  it('undo what they wrote, but not what was written since', () => {
+    const count = signal(1)
+    const label = signal('a')
+    const undo = undoable(() => {
+      count.set(2)
+      count.set(3)
+      label.set('b')
+    })
+
+    label.set('c')
+    undo()
+    expect(count()).toBe(1)
+    expect(label()).toBe('c')
+  })
+
+  it('roll back when the action call fails, and stand once it went through', async () => {
+    const move = actionStub('/_kay/action/test/move') as unknown as Action<{ to: number }, number>
+    const at = signal(0)
+    const answers = [new Response(stringify({ errors: { '': 'Locked' } }), { status: 409, headers: { 'x-kay-failure': '1' } }), new Response(stringify(2))]
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => answers.shift()!) as unknown as typeof fetch)
+
+    try {
+      await expect(move({ to: 1 }, { optimistic: () => at.set(1) })).rejects.toBeInstanceOf(ActionError)
+      expect(at()).toBe(0)
+      expect(await move({ to: 2 }, { optimistic: () => at.set(2) })).toBe(2)
+      expect(at()).toBe(2)
+    }
+    finally {
+      fetched.mockRestore()
+    }
   })
 })

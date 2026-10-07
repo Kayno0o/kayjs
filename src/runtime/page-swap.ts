@@ -3,6 +3,7 @@ import type { FetchedPage } from './swap'
 import { withoutBase } from './base'
 import { busyForms, leave, navigation, pageKey, restoreScroll, saveScroll, submitNatively, swappable, writeHistory } from './navigate'
 import { FAILURE_HEADER, NAVIGATE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
+import { decodeValue } from './wire'
 
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link or post a form.
 
@@ -28,6 +29,11 @@ const RUNNABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/ja
 
 let current = 0
 let checks: Promise<typeof import('./validate')> | undefined
+
+interface KeptIsland extends HTMLElement {
+  // Set by the entry once the island hydrated: gives it new props.
+  _$p?: (props: object) => void
+}
 
 // Fetches a link's page ahead of the click, kept a few seconds for it.
 export function prefetch(url: URL): void {
@@ -298,11 +304,23 @@ function swapBody(next: Document, swap: Swap): void {
   const kept = new Set<Element>()
 
   for (const placeholder of body.querySelectorAll<HTMLElement>(PERSISTENT)) {
-    const live = old.querySelector<HTMLElement>(`${PERSISTENT}[data-persist="${CSS.escape(placeholder.dataset.persist!)}"]`)
+    const live = old.querySelector<KeptIsland>(`${PERSISTENT}[data-persist="${CSS.escape(placeholder.dataset.persist!)}"]`)
 
     if (live && live.dataset.component === placeholder.dataset.component) {
       placeholder.replaceWith(live)
       kept.add(live)
+
+      const props = placeholder.dataset.props
+
+      // What the next page gives it, which it reads from now on, or once it hydrates.
+      if (props !== live.dataset.props) {
+        if (props === undefined)
+          delete live.dataset.props
+        else
+          live.dataset.props = props
+
+        live._$p?.(props === undefined ? {} : decodeValue(props) as object)
+      }
     }
   }
 

@@ -6,7 +6,7 @@ import type { Locale } from './i18n'
 import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
 import { keepValue } from './persist'
-import { createSignal, onCleanup, provideContext, readContext, tracking, untrack } from './reactive'
+import { createSignal, memo, onCleanup, provideContext, readContext, tracking, untrack } from './reactive'
 
 // Writes a value, or what a function makes of the current one.
 export type Setter<T> = (next: T | ((current: T) => T)) => void
@@ -42,6 +42,21 @@ export function persisted<T>(name: string, value: PlainValue<T>, options?: Persi
     write(next)
     kept.save(untrack(own))
   })
+}
+
+// A signal an island edits locally that takes `source`'s value again whenever it changes: `const tiers = linked(() => board.tiers)` follows the prop once the page brings a new board.
+export function linked<T>(source: () => T): Signal<T> {
+  const from = memo(source)
+  // The edit, with the value of `source` it was made over: once that changes, the edit is out of date.
+  const [edit, write] = createSignal<{ over: T, value: T } | undefined>(undefined)
+  const read = () => {
+    const over = from()
+    const own = edit()
+
+    return own !== undefined && own.over === over ? own.value : over
+  }
+
+  return withSetter(read, value => write({ over: untrack(from), value }))
 }
 
 function withSetter<T>(read: () => T, write: (value: T) => void): Signal<T> {

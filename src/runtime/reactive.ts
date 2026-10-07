@@ -79,6 +79,8 @@ let unrecordedDepth = 0
 // Set while an island claims its server markup, with what waits for it to be done.
 let hydrating = 0
 let afterHydration: (() => void)[] = []
+// While an optimistic change applies: each signal it writes, with what it held before its first write.
+let undoing: Map<SignalNode<unknown>, { before: unknown, write: (value: unknown) => void }> | undefined
 
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
@@ -110,11 +112,38 @@ export function createSignal<T>(value: T, options?: SignalOptions<T>, kept = tru
     if (node.equals !== false && node.equals(node.value, next))
       return
 
+    if (undoing && !undoing.has(node as SignalNode<unknown>))
+      undoing.set(node as SignalNode<unknown>, { before: node.value, write: write as (value: unknown) => void })
+
     node.value = next
     notify(node)
   }
 
   return [read, write]
+}
+
+// Runs `change`, giving back what undoes it: each signal it wrote goes back to what it held, unless something wrote it since.
+export function undoable(change: () => void): () => void {
+  const writes: NonNullable<typeof undoing> = new Map()
+  const outer = undoing
+
+  undoing = writes
+
+  try {
+    batch(change)
+  }
+  finally {
+    undoing = outer
+  }
+
+  const written = new Map([...writes.keys()].map(node => [node, node.value]))
+
+  return () => batch(() => {
+    for (const [node, { before, write }] of writes) {
+      if (node.value === written.get(node))
+        write(before)
+    }
+  })
 }
 
 // A component's call: an owner of its own, so what it provides reaches what it renders and nothing beside it. `detached`, as an island is, it reads nothing provided above.

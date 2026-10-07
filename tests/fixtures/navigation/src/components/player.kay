@@ -1,6 +1,10 @@
 ---
-import { signal } from 'kay'
+import { linked, signal } from 'kay'
 
+const { page } = props<{ page?: string }>()
 const played = signal(0)
+// A note on the page shown, edited here until the next page brings its own.
+const note = linked(() => page)
 ---
 button.player(onClick={() => played.set(n => n + 1)}) Played {played()}
+button.page-note(onClick={() => note.set('edited')}) {note ?? 'none'}

@@ -68,6 +68,9 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
     await page.click('button.player')
     await page.click('button.player')
     await page.locator('button.player', { hasText: 'Played 2' }).waitFor()
+    expect(await page.textContent('button.page-note')).toBe('/')
+    await page.click('button.page-note')
+    expect(await page.textContent('button.page-note')).toBe('edited')
     await page.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
       ;(document.querySelector('slot[data-persist]') as HTMLElement & { kayMark?: string }).kayMark = 'kept'
@@ -94,6 +97,8 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('H1')
     expect(await page.textContent('button.player')).toBe('Played 2')
     expect(await page.evaluate(() => (document.querySelector('slot[data-persist]') as HTMLElement & { kayMark?: string }).kayMark)).toBe('kept')
+    // Kept, it takes the props the new page gives it, and the note edited over the old ones follows them.
+    expect(await page.textContent('button.page-note')).toBe('/second')
     await page.click('button.player')
     expect(await page.textContent('button.player')).toBe('Played 3')
     expect(errors).toEqual([])

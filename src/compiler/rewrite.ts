@@ -10,7 +10,7 @@ import { defaultName } from './codegen'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 // What `kay` exports that is read by calling it, which the template reads by name.
-const ACCESSORS = new Set(['signal', 'memo', 'persisted'])
+const ACCESSORS = new Set(['signal', 'memo', 'persisted', 'linked'])
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
 const require = createRequire(import.meta.url)
