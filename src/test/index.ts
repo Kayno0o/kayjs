@@ -14,6 +14,7 @@ import { servePages } from '../server/app'
 import { basePath } from '../server/base'
 import { buildClient } from '../server/client'
 import { shutdown } from '../server/lifecycle'
+import { drainQueues } from '../server/queue'
 import { servedThrough } from '../server/visit'
 import { browse } from './browser'
 import { testRoot } from './root'
@@ -62,6 +63,8 @@ export interface TestSite {
   stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
   // A page loaded in a headless Chrome over a server the site starts on a free port, once `browser` is set; its cookies are the browser's, not `cookies`.
   open: (path: string, options?: BrowserOptions) => Promise<TestPage>
+  // Runs every job the queues hold whose time has come, those the jobs enqueue included, until none is left; resolves with how many ran.
+  runJobs: () => Promise<number>
   cookies: Bun.CookieMap
   handle: (request: Request) => Promise<Response>
   // Closes the pages `open()` opened and stops the server it or `socket()` started, if any.
@@ -173,6 +176,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   return {
     cookies,
     handle,
+    runJobs: drainQueues,
     fetch: async (path, init = {}) => send(path, init),
     socket: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])

@@ -965,6 +965,7 @@ it('shows why a todo was refused', async () => {
 
 - `site.visit(path)` GETs a page and follows redirects, stopping at one to another site. `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page, or reads the page a refused post renders. Both resolve with `{ url, status, headers, html }`. `site.call(action, input)` calls an action as an island does, `input` its typed input or a `FormData`, resolving with its result, throwing `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
 - `site.fetch(path, init)` sends any request, an API route's included, with the cookies so far, and resolves with the response as it is, redirects not followed.
+- `site.runJobs()` runs every job the app's queues hold whose time has come, those the jobs enqueue included, and resolves with how many ran: an action enqueues, the test runs the jobs, then checks what they did. Queues keep their jobs in memory under `bun test` unless one names a store.
 - `site.socket(module, path, options)` opens a websocket route and `site.stream(module, path, options)` reads an event stream as an island does, the options taking `headers` too. Both keep every message in `received` and resolve `next()` with the oldest one not read yet, waiting for one if need be; a stream's `finished()` resolves with all its values once it ended. `site.socket` starts the site on a free port the first time, which `site.close()` stops.
 - Cookies a response sets go with the next request and read as `site.cookies`. `use` takes the plugins the server entry uses before the pages, in order, so an app on `session()` signs in through `site.submit` and stays signed in: `testSite({ use: [sessions] })`. `locals` stands in for the app's Elysia `derive`, called with each request, after those plugins.
 - `mount(file, props)` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click. `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build; props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop; a library's settings apply as `kay.config.ts` sets them. The test registers the DOM itself, such as `GlobalRegistrator.register()` from `@happy-dom/global-registrator`. After an interaction, `await settle()` lets effects land before the DOM is read.
@@ -1142,7 +1143,29 @@ new Elysia()
 - `schedule` takes five cron fields, `minute hour day-of-month month day-of-week`, or a nickname such as `@daily`, read in the system's time zone unless `tz` names one. A literal one with another number of fields, an unknown nickname or a day its month never has, `0 0 30 2 *`, is a type error; a computed one it cannot read, or that never comes, fails the boot. Runs never overlap: the next is planned once the last settles. A run that throws is logged and the next one comes as planned.
 - `background` starts `work` with the server, for a queue consumer or anything else that runs the whole time. On stop its signal aborts and the server waits for it to return. Work that throws is logged and not started again.
 - Stopping on a signal waits for a scheduled run in progress, and for every `onStop` hook the app registers, async ones included, in turn. `shutdown(app)` from `kay/server` stops a server the same way, as a test does; Elysia's own `app.stop()` does not wait for the hooks.
-- With several server processes, each runs its own schedules: a job that must run once overall belongs to one process only, or takes a lock.
+- With several server processes, each runs its own schedules. `schedule(cron, job, { lock: 'weekly-report' })` runs each time once across every process sharing the job store (below), the first to reach it taking it; `store` names another store than the default one.
+
+A queue holds jobs that must not be lost: an action enqueues one and goes on, and the server runs it in the background, after a restart or a deploy if need be:
+
+```ts
+// src/jobs.ts
+import { queue } from 'kay/server'
+
+export const welcomeMails = queue('welcome-mails', async ({ to }: { to: string }) => sendWelcome(to), { attempts: 5, backoff: '30s' })
+```
+
+```ts
+// src/server.ts
+new Elysia().use(welcomeMails).use(await pages()).listen(3000)
+```
+
+An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
+
+- `queue(name, handler, options)` is an Elysia plugin: the server using it runs the queue's jobs from start to stop, `concurrency` at a time, 1 by default, and waits on stop for the runs in progress. A process that only enqueues, a script say, need not use it.
+- Jobs wait in a store shared by every process of the machine opening it: `sqliteJobs('data/jobs.sqlite')` by default, opened on first use, its directory created; `store: sqliteJobs(path)` names another, `memoryJobs()` keeps them in the process, and `JobStore` is the shape of an app's own. Under `bun test` the default is in memory. Each job runs in one process. The payload goes through devalue, as cached values do: dates, maps and sets survive, a function or a class instance throws from `enqueue`.
+- A run that throws is retried: `backoff` after the first failure, 10 seconds by default, twice as long after each next one, until `attempts` runs in all, 5 by default. The last failure keeps the job as failed, logs it and hands its payload and error to `onFailed`; `failed()` lists the failed jobs.
+- A process that dies running a job leaves it held: it runs again once `lostAfter` has passed since it started, 10 minutes by default, so a job outlasting it may run twice.
+- `drain()` runs every job whose time has come, here and now, until none is left; in tests `site.runJobs()` from `kay/test` does it for every queue.
 
 ## Behind a proxy
 
