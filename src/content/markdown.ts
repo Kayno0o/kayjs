@@ -35,8 +35,10 @@ export interface CompiledMarkdown {
 export type Highlighter = (code: string, language: string | undefined) => string | Promise<string>
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
-const HEADING = /<h([1-6]) id="([^"]*)"><a href="#[^"]*">([\s\S]*?)<\/a><\/h\1>/g
-const CODE_BLOCK = /<pre><code(?: class="language-([^"]*)")?>([\s\S]*?)<\/code><\/pre>/g
+// Where a heading and a code block open, each closed by the first `</a></hN>` or `</code></pre>` after it.
+const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#[^"]*">/g
+const CODE_OPEN = /<pre><code(?: class="language-([^"]*)")?>/g
+const CODE_CLOSE = '</code></pre>'
 // A tag naming a component: capitalized, as kay components are; lowercase tags stay HTML.
 const COMPONENT_TAG = /<(\/?)([A-Z][\w.]*)((?:[\s/](?:[^>"'{}]|"[^"]*"|'[^']*'|\{(?:[^{}"]|"(?:[^"\\]|\\.)*"|\{(?:[^{}"]|"(?:[^"\\]|\\.)*")*\})*\})*)?)>/g
 const SELF_CLOSING = /\/\s*$/
@@ -86,13 +88,14 @@ export interface RenderedMarkdown {
 }
 
 // Markdown text rendered as a collection's entries are, headings anchored and code highlighted when `highlight` is given, for text the app has at runtime, such as a user's note.
-// The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`.
+// The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`, and the headings may be ones a user typed as raw tags.
+// The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
 export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter } = {}): Promise<RenderedMarkdown> {
   const html = Bun.markdown.html(markdown, { headings: { ids: true, autolink: true }, autolinks: true })
   const headings: Heading[] = []
 
-  for (const [, depth, id, inner] of html.matchAll(HEADING))
-    headings.push({ depth: Number(depth), id: id!, text: decode(inner!.replace(TAGS, '')).trim() })
+  for (const { open: [, depth, id], inner } of elements(html, HEADING_OPEN, ([, depth]) => `</a></h${depth}>`))
+    headings.push({ depth: Number(depth), id: id!, text: decode(inner.replace(TAGS, '')).trim() })
 
   return { html: options.highlight ? await highlighted(html, options.highlight) : html, headings }
 }
@@ -106,11 +109,43 @@ export async function highlightCode(code: string, language?: string, options: { 
 }
 
 async function highlighted(html: string, highlight: Highlighter): Promise<string> {
-  const blocks = [...html.matchAll(CODE_BLOCK)]
-  const rendered = await Promise.all(blocks.map(async ([, language, code]) => highlight(decode(code!), language)))
-  let index = 0
+  const blocks = [...elements(html, CODE_OPEN, () => CODE_CLOSE)]
+  const rendered = await Promise.all(blocks.map(async ({ open: [, language], inner }) => highlight(decode(inner), language)))
+  let result = ''
+  let last = 0
 
-  return html.replace(CODE_BLOCK, () => rendered[index++]!)
+  for (const [index, { open, end }] of blocks.entries()) {
+    result += html.slice(last, open.index) + rendered[index]!
+    last = end
+  }
+
+  return result + html.slice(last)
+}
+
+// Each element `open` finds, up to the first `close` after it, read in one pass: a closing tag not found is looked for no further, so no input, such as a user's text of unclosed raw tags, makes the scan quadratic.
+function* elements(html: string, open: RegExp, close: (match: RegExpExecArray) => string): Generator<{ open: RegExpExecArray, inner: string, end: number }> {
+  const missing = new Set<string>()
+
+  open.lastIndex = 0
+
+  for (let match = open.exec(html); match; match = open.exec(html)) {
+    const closing = close(match)
+
+    if (missing.has(closing))
+      continue
+
+    const start = match.index + match[0].length
+    const at = html.indexOf(closing, start)
+
+    if (at === -1) {
+      missing.add(closing)
+
+      continue
+    }
+
+    open.lastIndex = at + closing.length
+    yield { open: match, inner: html.slice(start, at), end: open.lastIndex }
+  }
 }
 
 // The body with each component tag outside code replaced by a placeholder, and the components in the order their tags open.

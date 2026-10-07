@@ -232,5 +232,33 @@ describe('Markdown outside collections', () => {
     expect(kept).not.toContain('onerror')
     expect(() => sanitizeHtml('', { tags: ['script'] })).toThrow('never keeps <script>')
     expect(() => sanitizeHtml('', { attributes: { img: ['onerror'] } })).toThrow('never keeps onerror')
+    expect(() => sanitizeHtml('', { tags: ['plaintext'] })).toThrow('never keeps <plaintext>')
+    expect(() => sanitizeHtml('', { tags: ['img'], attributes: { imgg: ['src'] } })).toThrow('attributes of <imgg>, a tag it does not keep')
+  })
+
+  it('checks every URL an opted-in attribute holds, and writes back only the attributes it read', () => {
+    const options = { tags: ['img', 'video', 'source', 'blockquote'], attributes: { img: ['src', 'srcset', 'alt'], video: ['poster'], source: ['src'], blockquote: ['cite'], a: ['href', 'rel'] } }
+    const kept = (markup: string) => String(sanitizeHtml(markup, options))
+
+    expect(kept('<img src="javascript:x" srcset="/a.png 1x, javascript:y 2x" alt="a">')).toBe('<img alt="a">')
+    expect(kept('<img srcset="/a.png 1x, https://cdn.example.com/b.png 2x">')).toBe('<img srcset="/a.png 1x, https://cdn.example.com/b.png 2x">')
+    expect(kept('<video poster="javascript:x"><source src="/v.mp4"></video>')).toBe('<video><source src="/v.mp4"></video>')
+    expect(kept('<blockquote cite="data:text/html,x">q</blockquote>')).toBe('<blockquote>q</blockquote>')
+    expect(kept('<img src="/a.png" src="javascript:x" alt=\'say "hi"\'>')).toBe('<img src="/a.png" alt="say &quot;hi&quot;">')
+    expect(kept('<img alt="a > b" src="javascript:x">')).toBe('<img> b" src="javascript:x">')
+    expect(kept('<a href="/x" rel="opener">x</a>')).toBe('<a href="/x" rel="nofollow ugc">x</a>')
+  })
+
+  it('renders a user\'s text of unclosed tags in linear time', async () => {
+    const time = async (markup: string) => {
+      const start = performance.now()
+
+      await renderMarkdown(markup, { highlight: code => code })
+
+      return performance.now() - start
+    }
+
+    expect(await time('<pre><code>'.repeat(40_000))).toBeLessThan(500)
+    expect(await time('<h2 id="a"><a href="#b">x\n\n'.repeat(40_000))).toBeLessThan(500)
   })
 })

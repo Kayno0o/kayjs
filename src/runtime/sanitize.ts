@@ -3,18 +3,21 @@ import type { SafeHtml } from './checks'
 export interface SanitizeOptions {
   // Tags kept besides the formatted text kept by default, such as `['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td']`.
   tags?: string[]
-  // Attributes kept per tag, besides a link's `href`: `{ img: ['src', 'alt', 'width', 'height'] }`. An `href` or `src` is kept when it is an http(s), `mailto:` or site URL.
+  // Attributes kept per tag, besides a link's `href`: `{ img: ['src', 'alt', 'width', 'height'] }`. A URL, such as an `href`, a `src` or each of a `srcset`'s, is kept when it is an http(s), `mailto:` or site URL.
+  // Read once per options object, so they are best declared once, outside the function calling `sanitizeHtml`.
   attributes?: Record<string, string[]>
 }
 
 // What `sanitizeHtml` keeps, written back without attributes but a link's `href`: formatted text, such as a comment or rendered Markdown, and nothing that loads, runs, styles or covers the page.
 const KEPT = new Set(['a', 'b', 'blockquote', 'br', 'code', 'del', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'ins', 'li', 'ol', 'p', 'pre', 's', 'small', 'strong', 'sub', 'sup', 'u', 'ul'])
-const VOID = new Set(['area', 'br', 'col', 'hr', 'img', 'wbr'])
-// Never kept, whatever the options say: what runs code, loads another document or takes the user's input.
-const UNSAFE_TAGS = new Set(['base', 'button', 'embed', 'form', 'frame', 'frameset', 'iframe', 'input', 'link', 'math', 'meta', 'noscript', 'object', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title'])
+const VOID = new Set(['area', 'br', 'col', 'hr', 'img', 'param', 'source', 'track', 'wbr'])
+// Never kept, whatever the options say: what runs code, loads another document, takes the user's input or swallows the rest of the page.
+const UNSAFE_TAGS = new Set(['applet', 'base', 'bgsound', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'keygen', 'link', 'math', 'meta', 'noembed', 'noframes', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
 // Handlers and styles, which run code or cover the page.
 const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$|formaction$)/i
-const URL_ATTRIBUTES = new Set(['href', 'src'])
+const URL_ATTRIBUTES = new Set(['background', 'cite', 'href', 'longdesc', 'ping', 'poster', 'src'])
+const SRCSET_CANDIDATE = /\s*,\s*/
+const DESCRIPTOR = /\s+\S+$/
 const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
 const LINK_ATTRIBUTES = ['href']
 
@@ -23,7 +26,7 @@ interface Allowed {
   attributes: Record<string, readonly string[]>
 }
 
-const DEFAULTS: Allowed = { tags: KEPT, attributes: { a: LINK_ATTRIBUTES } }
+const DEFAULTS: Allowed = { tags: KEPT, attributes: Object.assign(Object.create(null), { a: LINK_ATTRIBUTES }) }
 const resolved = new WeakMap<SanitizeOptions, Allowed>()
 // Elements whose content is code or another document rather than text, dropped whole, and comments.
 const DROPPED = /<(script|style|template|textarea|title|noscript|iframe|object|svg|math)\b|<!--/gi
@@ -37,6 +40,18 @@ function text(markup: string): string {
   return markup.replace(TEXT, char => char === '<' ? '&lt;' : '&amp;')
 }
 
+function safeUrl(value: string): boolean {
+  return SAFE_URL.test(value.replace(AMPERSAND, ''))
+}
+
+// Whether an attribute's value is fine to write back: a URL safe, and every URL of a `srcset`.
+function safeValue(attribute: string, value: string): boolean {
+  if (attribute === 'srcset')
+    return value.trim().split(SRCSET_CANDIDATE).every(candidate => safeUrl(candidate.replace(DESCRIPTOR, '')))
+
+  return !URL_ATTRIBUTES.has(attribute) || safeUrl(value)
+}
+
 // The opening tag with the attributes kept for it, a URL only when safe, and a link marked as the user's.
 function openingTag(tag: string, attributes: string | undefined, kept: readonly string[] | undefined): string {
   const written = new Map<string, string>()
@@ -46,7 +61,7 @@ function openingTag(tag: string, attributes: string | undefined, kept: readonly 
       const attribute = name!.toLowerCase()
       const value = double ?? single ?? bare ?? ''
 
-      if (kept.includes(attribute) && !written.has(attribute) && !(URL_ATTRIBUTES.has(attribute) && !SAFE_URL.test(value.replace(AMPERSAND, ''))))
+      if (kept.includes(attribute) && !written.has(attribute) && safeValue(attribute, value))
         written.set(attribute, text(value).replaceAll('"', '&quot;'))
     }
   }
@@ -68,7 +83,7 @@ function allowed(options: SanitizeOptions | undefined): Allowed {
     return found
 
   const tags = new Set(KEPT)
-  const attributes: Record<string, string[]> = { a: [...LINK_ATTRIBUTES] }
+  const attributes: Record<string, string[]> = Object.assign(Object.create(null), { a: [...LINK_ATTRIBUTES] })
 
   for (const tag of options.tags ?? []) {
     if (UNSAFE_TAGS.has(tag.toLowerCase()))
@@ -82,6 +97,9 @@ function allowed(options: SanitizeOptions | undefined): Allowed {
       if (UNSAFE_ATTRIBUTE.test(name))
         throw new Error(`kay: sanitizeHtml never keeps ${name}, which runs code or styles the page`)
     }
+
+    if (!tags.has(tag.toLowerCase()))
+      throw new Error(`kay: sanitizeHtml is given attributes of <${tag}>, a tag it does not keep: add it to \`tags\``)
 
     attributes[tag.toLowerCase()] = [...attributes[tag.toLowerCase()] ?? [], ...names.map(name => name.toLowerCase())]
   }
