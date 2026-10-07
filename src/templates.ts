@@ -7,7 +7,6 @@ const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
 // astro-template's look: Tailwind over the Catppuccin Mocha palette, the accent one of its colours, which the picker in the header changes.
 const THEME_FILES: Record<string, string> = {
   'src/app.css': `@import 'tailwindcss';
-@source '../.kay/classes.txt';
 
 @view-transition {
   navigation: auto;

@@ -1,6 +1,6 @@
 import type { BunPlugin } from 'bun'
 import type { KayLibrary } from './libraries'
-import { dirname, sep } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { ASSET_FILE, writeAsset } from './assets'
 import { scriptLoader, transpilerFor } from './files'
@@ -15,6 +15,8 @@ const ABSOLUTE_URL = /^\//
 // A page's server code is left out but for its assets, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
 export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlugin {
   const project = root + sep
+  // Tailwind reads the class names of every module the bundle parses, so importing the ones kay collected from the `.class` shorthand hands them over with no `@source` line.
+  const classes = `import ${JSON.stringify(join(root, '.kay', 'classes.txt'))}\n`
   const resolve = (specifier: string, importer: string): string | undefined => {
     try {
       return Bun.resolveSync(specifier, dirname(importer))
@@ -63,7 +65,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
           server ? serverAssets(source.slice(server.start, server.end), path, 'ts') : undefined,
         ])
 
-        return { contents, loader: 'js' }
+        return { contents: classes + contents, loader: 'js' }
       })
       build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => ({ contents: await imports(await Bun.file(path).text(), path, scriptLoader(path)), loader: 'js' }))
       // `url(/logo.png)` points at a public file the server serves as is.

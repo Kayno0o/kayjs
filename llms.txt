@@ -299,12 +299,7 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({ plugins: [tailwind] })
 ```
 
-`src/app.css`, imported by the root `_layout.kay`, points Tailwind at the classes kay collects from the `.class` shorthand, which it cannot read off `div.md:flex.w-1/2` itself:
-
-```css
-@import 'tailwindcss';
-@source '../.kay/classes.txt';
-```
+`src/app.css`, imported by the root `_layout.kay`, needs nothing more than `@import 'tailwindcss';`. Tailwind cannot read classes off the `.class` shorthand, `div.md:flex.w-1/2`, so kay collects them into `.kay/classes.txt` and hands them to it as the stylesheets build; `source(none)` on the import turns that off along with Tailwind's own scan of the project.
 
 ## Public files
 
@@ -475,7 +470,7 @@ Using one:
 
 - Install it and import its components; `kay check`, the editor, auto-import and go-to-definition included, types them through `.kay/types/kay-packages.d.ts`, and needs no change to `tsconfig.json`.
 - Only the components the app's imports reach ship: an island of the library the app never imports adds nothing to its bundles, unless a module re-exporting every component, such as a barrel `index.ts`, is imported.
-- The classes in their templates and in the library scripts they import, default theme classes included, reach `.kay/classes.txt` with the app's own, so Tailwind builds them with no `@source` line into `node_modules`.
+- The classes in their templates and in the library scripts they import, default theme classes included, reach `.kay/classes.txt` with the app's own, so Tailwind builds them with no `@source` line.
 - `kay check` reports a type error inside a library component the app uses once, at the component's own line; one the app never imports reports nothing. Errors inside the library's own `.ts` modules are the library's, as `skipLibCheck` leaves a declaration file's, so an optional peer the app has not installed reports nothing there, while the app's own calls into those modules are checked.
 - A library imports an optional peer with `import()` inside a `try` block, or followed by `.catch`: Bun builds an app without the peer then, and fails on a bare `import()` of a package it cannot find.
 - `settings` in `kay.config.ts` replaces a library's settings module with the app's, by the library's name, on the server and in the browser: `settings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`, a module default-exporting the library's `Settings`, which may spread the library's defaults to change a few: `export default { ...defaults, tone: 'text-red-500' }`. `kay check` checks it against the defaults it replaces. One process renders with one set of settings: `kay test`, the server and `kay build` all read them from `kay.config.ts`.

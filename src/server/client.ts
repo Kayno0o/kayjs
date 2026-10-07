@@ -151,7 +151,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true })])
   await mkdir(dir, { recursive: true })
   forgetBundleMaps()
-  // Tailwind reads class names from here: `@source "../.kay/classes.txt"` in the stylesheet importing it.
+  // The stylesheet build hands these to Tailwind, which cannot read the `.class` shorthand: see styleImports.
   await writeIfChanged(join(root, '.kay', 'classes.txt'), [...classes].sort().join('\n'))
 
   const [scripts, styles] = await Promise.all([
