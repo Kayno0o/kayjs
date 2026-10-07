@@ -32,15 +32,15 @@ const sent = ctx.succeeded(magic)
 h1 Sign in
 a#discord(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
 form#register(action={register})
-  input(name="email")
-  input(name="password" type="password")
+  input(name="email" aria-label="email")
+  input(name="password" type="password" aria-label="password")
   button Create an account
 form#password(action={password})
-  input(name="identifier")
-  input(name="password" type="password")
+  input(name="identifier" aria-label="identifier")
+  input(name="password" type="password" aria-label="password")
   button Sign in
 form#magic(action={magic})
-  input(name="email")
+  input(name="email" aria-label="email")
   button Mail me a link
 if failure?.data as data
   p#error {data.error}

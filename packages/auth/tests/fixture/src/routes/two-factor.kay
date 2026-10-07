@@ -17,7 +17,7 @@ const failure = ctx.failed(verify)
 h1 Two-factor
 if pending
   form#code(action={verify})
-    input(name="code" autocomplete="one-time-code")
+    input(name="code" autocomplete="one-time-code" aria-label="code")
     button Verify
 else
   p#nothing Nothing to verify

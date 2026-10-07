@@ -24,12 +24,12 @@ const secret = ctx.succeeded(setUp)
 ---
 h1#account {user.email}
 form#set-up(action={setUp})
-  input(name="password" type="password")
+  input(name="password" type="password" aria-label="password")
   button Set up two-factor
 if secret?.data as shown
   p#secret {shown}
 form#enable(action={enable})
-  input(name="code")
+  input(name="code" aria-label="code")
   button Turn on
 form#sign-out(action={signOut})
   button Sign out
