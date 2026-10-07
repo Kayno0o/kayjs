@@ -538,7 +538,7 @@ Other files starting with `_` are not routes. Every top-level name the server fe
 - `ctx.redirect('/login')`, `ctx.notFound()` and `ctx.deny(403, 'Members only')` stop rendering; `deny` renders `_error.kay` with that status and message
 - `ctx.redirect` goes to any http(s) URL it is given, so a `?next=` param goes through `localPath(value, fallback)` from `kay`, which gives `value` when it is a path of this site and `fallback` otherwise: `ctx.redirect(localPath(ctx.query.next, '/account'))`. `https://evil.example`, `//evil.example`, `/\evil.example` and a value that is no string all fall back; `fallback` is checked as a link.
 
-Layout and page loads run in parallel; when several fail, the outermost one decides the response. In development each response carries a `Server-Timing` header with the time of every load and of the render, shown in the browser's network panel.
+Layout and page loads run in parallel; when several fail, the outermost one decides the response. In development each response carries a `Server-Timing` header with the time of every load and of the render, shown in the browser's network panel; `serverTiming: true` in kay.config.ts sends it in production too (see Tracing and timing).
 
 The nearest special page wins, wrapped by the layouts of its own directory. `_error.kay` reads `ctx.error`: `status`, `message` and, in development only, `stack`. Logged and displayed stacks point at `.kay` lines. In production the message is generic and the real error goes to `console.error`; without an `_error.kay` the response is plain text, and development shows the stack instead.
 
@@ -1157,6 +1157,14 @@ export default defineConfig({
 ## Request logs
 
 With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms`, the method, the path without its query string, which may carry tokens, the status, and the milliseconds until the response was made, a streamed one's headers. kay's own `/_kay/` routes, assets included, and the health route, wherever `health.path` puts it, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration }`, for a log collector; a function receives each `{ method, path, status, duration }` entry instead; `true` logs outside production too, `false` never.
+
+## Tracing and timing
+
+- `serverTiming: true` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too: `load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`, layouts first. Anyone loading the page reads it, page file names included; a prerendered page has none.
+- `tracer` takes an OpenTelemetry tracer, which kay calls without depending on OpenTelemetry: the app installs `@opentelemetry/api` and an SDK exporting the spans, as `@opentelemetry/sdk-trace-node` with an OTLP exporter, registered before the server starts, then passes `tracer: trace.getTracer('my-site')`. Without one, kay starts no span and the requests cost nothing more.
+- A page request is a server span named after its route, `GET /blog/[slug]`, with `http.request.method`, `http.route`, `url.path` and `http.response.status_code`, and inside it one span per load, `kay.load src/routes/blog/[slug].kay`, and one for the render, `kay.render ...`; spans the loads start nest under theirs. An action call is one too, `POST /_kay/action/...`, holding the handler's spans and the page it renders back. A span whose work threw records the error and an error status, as does a request answered with a 5xx.
+- An API request is a server span from its guards to its response, `POST /api/upload`; spans its handler starts do not nest under it, since Elysia runs the handler outside any call kay makes.
+- Spans nest across `await` through the context manager the SDK registers, which Bun's `AsyncLocalStorage` backs.
 
 ## Health and shutdown
 

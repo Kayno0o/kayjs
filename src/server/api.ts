@@ -4,6 +4,7 @@ import type { EventStream } from '../runtime/live'
 import type { ActionOptions } from './actions'
 import type { BodyLimit } from './body'
 import type { LoadedGuard } from './guards'
+import type { Span } from './trace'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
 import { Elysia } from 'elysia'
@@ -14,6 +15,7 @@ import { inLocale, isCrossSite, passGuards } from './actions'
 import { importModule } from './bundle'
 import { loadGuard } from './guards'
 import { reportServerError } from './report'
+import { answered, failed, SERVER_SPAN, startSpan } from './trace'
 
 // A module under the API directory, as `pages()` mounts it.
 export interface ApiModule {
@@ -83,6 +85,10 @@ function guardsOf(apiDir: string, dir: string): string[] {
   return guards
 }
 
+const TRAILING_SLASH = /\/$/
+// The span of each API request in flight.
+const spans = new WeakMap<Request, Span>()
+
 // Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused.
 // Gives back the body limit of each module by the path it is mounted at.
 export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<Map<string, BodyLimit>> {
@@ -100,7 +106,32 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     const guards = await Promise.all(module.guards.map(async file => loadGuard({ file, special: {} })))
 
     app.group(module.mount, group => group
+      // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
+      .onBeforeHandle(({ request, route: mounted }) => {
+        // `/api/echo` rather than the `/api/echo/` a module's `/` route is mounted at.
+        const route = mounted.length > 1 ? mounted.replace(TRAILING_SLASH, '') : mounted
+        const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': new URL(request.url).pathname } })
+
+        if (span)
+          spans.set(request, span)
+      })
       .onBeforeHandle(async context => inLocale(context.request, options, async () => admit(guards, context, options)))
+      .onError(({ request, error }) => {
+        const span = spans.get(request)
+
+        if (span)
+          failed(span, error)
+      })
+      .onAfterResponse(({ request, set, responseValue }) => {
+        const span = spans.get(request)
+
+        if (!span)
+          return
+
+        spans.delete(request)
+        answered(span, responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200)
+        span.end()
+      })
       .onAfterHandle(({ request, responseValue }) => {
         const reporter = responseValue instanceof Response ? streamReporters.get(responseValue) : undefined
 

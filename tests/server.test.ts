@@ -1,5 +1,7 @@
 import type { ClientManifest } from '../src/server/client'
 import type { Encoding } from '../src/server/compress'
+import type { Span, SpanOptions, Tracer } from '../src/server/trace'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -19,6 +21,7 @@ import { renderPage } from '../src/server/render'
 import { refuseClashes, scanRoutes } from '../src/server/routes'
 import { speculationRules } from '../src/server/speculation'
 import { KEEP_ALIVE_MS, streamDocument } from '../src/server/stream'
+import { setTracer } from '../src/server/trace'
 import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
 
@@ -1209,6 +1212,97 @@ describe('special pages', () => {
     finally {
       logged.mockRestore()
     }
+  })
+})
+
+interface RecordedSpan {
+  name: string
+  // The span active where it started, as OpenTelemetry's context manager tracks it.
+  parent?: string
+  kind?: number
+  attributes: Record<string, unknown>
+  status?: number
+}
+
+// A tracer keeping each span as it ends, the active one tracked across awaits.
+function recordingTracer(): { tracer: Tracer, ended: RecordedSpan[] } {
+  const active = new AsyncLocalStorage<string>()
+  const ended: RecordedSpan[] = []
+  const open = (name: string, options?: SpanOptions): RecordedSpan => ({ name, parent: active.getStore(), kind: options?.kind, attributes: { ...options?.attributes } })
+  const span = (record: RecordedSpan): Span => ({
+    setAttribute: (key, value) => void (record.attributes[key] = value),
+    setStatus: ({ code }) => void (record.status = code),
+    recordException: () => undefined,
+    end: () => void ended.push(record),
+  })
+
+  return {
+    tracer: {
+      startSpan: (name, options) => span(open(name, options)),
+      startActiveSpan: (name, options, fn) => {
+        const record = open(name, options)
+
+        return active.run(name, () => fn(span(record))) as ReturnType<typeof fn>
+      },
+    },
+    ended,
+  }
+}
+
+describe('tracing and timing in production', () => {
+  afterAll(() => setTracer(undefined))
+
+  it('times each load in a Server-Timing header when the config asks', async () => {
+    const timed = await pages({ routes: 'tests/fixtures/site/src/routes', serverTiming: true })
+
+    expect((await timed.handle(new Request('http://localhost/'))).headers.get('server-timing')).toMatch(/^load-0;desc="tests\/fixtures\/site\/src\/routes\/_layout\.kay";dur=\d+\.\d, load-1;desc="tests\/fixtures\/site\/src\/routes\/index\.kay";dur=\d+\.\d, render;dur=\d+\.\d$/)
+  })
+
+  it('hands a tracer a span per page request with one per load and the render in it', async () => {
+    const { tracer, ended } = recordingTracer()
+    const traced = await pages({ routes: 'tests/fixtures/site/src/routes', tracer })
+
+    expect((await traced.handle(new Request('http://localhost/'))).status).toBe(200)
+    expect(ended.toSorted((a, b) => a.name.localeCompare(b.name))).toEqual([
+      { name: 'GET /', parent: undefined, kind: 1, attributes: { 'http.request.method': 'GET', 'http.route': '/', 'url.path': '/', 'http.response.status_code': 200 } },
+      { name: 'kay.load tests/fixtures/site/src/routes/_layout.kay', parent: 'GET /', kind: undefined, attributes: {} },
+      { name: 'kay.load tests/fixtures/site/src/routes/index.kay', parent: 'GET /', kind: undefined, attributes: {} },
+      { name: 'kay.render tests/fixtures/site/src/routes/index.kay', parent: 'GET /', kind: undefined, attributes: {} },
+    ])
+  })
+
+  it('marks a span whose load threw, and the request it failed', async () => {
+    const { tracer, ended } = recordingTracer()
+    const traced = await pages({ routes: 'tests/fixtures/site/src/routes', tracer })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect((await traced.handle(new Request('http://localhost/boom?fail'))).status).toBe(500)
+      expect(ended.filter(span => span.status === 2).map(span => span.name).sort()).toEqual(['GET /boom', 'kay.load tests/fixtures/site/src/routes/boom.kay'])
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('hands it a span per action call', async () => {
+    const { tracer, ended } = recordingTracer()
+    const traced = await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true, tracer })
+    const url = '/_kay/action/tests/fixtures/bare/src/routes/survey.kay/answer'
+    const response = await traced.handle(new Request(`http://localhost${url}`, { method: 'POST', headers: { referer: 'http://localhost/survey' }, body: new URLSearchParams('tags=a&count=3') }))
+
+    expect(response.status).toBe(303)
+    expect(ended).toEqual([{ name: `POST ${url}`, parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': url, 'url.path': url, 'http.response.status_code': 303 } }])
+  })
+
+  it('hands it a span per API request too', async () => {
+    const { tracer, ended } = recordingTracer()
+    const traced = await pages({ routes: 'tests/fixtures/production/src/routes', api: 'tests/fixtures/production/src/api', prebuilt: false, tracer })
+
+    expect(await (await traced.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' }))).text()).toBe('5')
+    // Elysia runs the hook ending it once the response is out.
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(ended).toEqual([{ name: 'POST /api/echo', parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': '/api/echo', 'url.path': '/api/echo', 'http.response.status_code': 200 } }])
   })
 })
 

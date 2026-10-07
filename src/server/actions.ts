@@ -25,6 +25,7 @@ import { requestLocale, stateFor } from './i18n'
 import { protectionRefusal } from './protection'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
+import { answered, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
 
 export interface GuardedRequest {
@@ -92,7 +93,15 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
 
       served.set(value.url, { file, action: value })
       limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })
-      app.post(value.url, async context => inLocale(context.request, options, async () => runAction(value, context, options, back)), {
+      // A span per call, the handler's own spans and the page it renders back nested in it.
+      app.post(value.url, async context => traced(`POST ${value.url}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url } }, async (span) => {
+        const response = await inLocale(context.request, options, async () => runAction(value, context, options, back))
+
+        if (span)
+          answered(span, response.status)
+
+        return response
+      }), {
         body: value.schema,
         transform: async (context) => {
           refuseCrossSite(context.request)

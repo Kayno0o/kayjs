@@ -44,6 +44,7 @@ import { decodePath, refuseClashes, scanRoutes, servedPaths, specialPagesOf, wit
 import { securityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
 import { serveSitemap } from './sitemap'
+import { answered, SERVER_SPAN, setTracer, traced } from './trace'
 
 // Every slash at either end of a path.
 const EDGE_SLASHES = /^\/+|\/+$/g
@@ -158,8 +159,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)
 
   setMaxDensity(maxDensity)
+  setTracer(options.tracer)
 
-  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base, maxDensity }
+  const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base, maxDensity }
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const security = securityHeaders(options)
@@ -319,8 +321,19 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
       const params = matchedParams(route, text, matchers)
 
-      if (params)
-        return servePage(route, params, context, url)
+      // A span per page request, its loads and render nested in it.
+      if (params) {
+        const { method } = context.request
+
+        return traced(`${method} ${route.pattern}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': method, 'http.route': route.pattern, 'url.path': url.pathname } }, async (span) => {
+          const response = await servePage(route, params, context, url)
+
+          if (span)
+            answered(span, response.status)
+
+          return response
+        })
+      }
     }
 
     return renderUnmatched(candidates.at(-1)!.route.special, context, client, renderOptions)

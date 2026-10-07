@@ -7,6 +7,7 @@ import type { RequestLogger } from './server/log'
 import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
+import type { Tracer } from './server/trace'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -42,6 +43,10 @@ export interface KayConfig {
   health?: HealthConfig | false
   // One line per request on stdout, on by default when NODE_ENV is production: `'json'` for one JSON object instead, a function to send each entry elsewhere, `false` for none.
   log?: RequestLogger
+  // A `Server-Timing` header on each page rendered per request, timing its loads and its render for the browser's network panel: on in development, off otherwise unless set.
+  serverTiming?: boolean
+  // An OpenTelemetry tracer, `trace.getTracer('my-site')` from @opentelemetry/api: a span per page request with one per load and the render in it, and one per API request. None by default, which costs nothing.
+  tracer?: Tracer
   // Serves a request from another path, query included, such as a host's pages from a section: `url => url.hostname === 'blog.example.com' ? `/blog${url.pathname}` : undefined`. The browser keeps its URL.
   rewrite?: Rewrite
   // Old paths sent elsewhere with a 308, or a 307 with `permanent: false`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*' }`. `kay check` reports a target no page serves.

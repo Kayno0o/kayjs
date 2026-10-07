@@ -36,6 +36,7 @@ import { inServerScope, withOutcome } from './scope'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
 import { renderStatic, streamDocument } from './stream'
+import { traced } from './trace'
 
 interface PageModule {
   default: (props: Record<string, unknown>) => unknown
@@ -68,6 +69,8 @@ export interface RenderOptions {
   base?: string
   // `images.maxDensity`, written for the islands when it is not the default.
   maxDensity?: number
+  // Times each load and the render in a `Server-Timing` header, as development always does.
+  serverTiming?: boolean
 }
 
 // What Elysia hands a route handler, derived and resolved values included; pages see it whole as `ctx.locals`.
@@ -121,8 +124,8 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
     if (query !== undefined && !options.prerendering)
       rendering.ctx.query = readQuery(query, rendering.ctx.url)
 
-    const timings = options.dev ? Array.from<number>({ length: files.length }) : undefined
-    const loads = await Promise.allSettled(modules.map(async (module, index) => runLoad(module, rendering.ctx, timings, index)))
+    const timings = options.serverTiming ? Array.from<number>({ length: files.length }) : undefined
+    const loads = await Promise.allSettled(modules.map(async (module, index) => runLoad(files[index]!, module, rendering.ctx, timings, index)))
 
     for (const [index, load] of loads.entries())
       loaded.set(files[index]!, load)
@@ -135,7 +138,7 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
     })
 
     const started = performance.now()
-    const body = renderDocument(files, modules, data, client, rendering, options)
+    const body = traced(`kay.render ${projectPath(route.file)}`, {}, () => renderDocument(files, modules, data, client, rendering, options))
 
     if (timings)
       rendering.headers.set('server-timing', serverTiming(files, modules, timings, performance.now() - started))
@@ -147,15 +150,25 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
   }
 }
 
-// Development times each load, for the browser's network panel.
-async function runLoad(module: PageModule, ctx: PageContext<Record<string, unknown>>, timings: number[] | undefined, index: number): Promise<Record<string, unknown>> {
+function projectPath(file: string): string {
+  return relative(process.cwd(), file)
+}
+
+// Each load in a span of its own, timed for the browser's network panel in development or when `serverTiming` asks.
+async function runLoad(file: string, module: PageModule, ctx: PageContext<Record<string, unknown>>, timings: number[] | undefined, index: number): Promise<Record<string, unknown>> {
+  if (!module.load)
+    return {}
+
+  const load = module.load
+  const run = async () => traced(`kay.load ${projectPath(file)}`, {}, async () => await load(ctx) ?? {})
+
   if (!timings)
-    return await module.load?.(ctx) ?? {}
+    return run()
 
   const started = performance.now()
 
   try {
-    return await module.load?.(ctx) ?? {}
+    return await run()
   }
   finally {
     timings[index] = performance.now() - started
@@ -164,7 +177,7 @@ async function runLoad(module: PageModule, ctx: PageContext<Record<string, unkno
 
 // One entry per load, layouts first, then the render; a streamed page's render covers what it sends first.
 function serverTiming(files: string[], modules: PageModule[], timings: number[], render: number): string {
-  const loads = files.flatMap((file, index) => modules[index]!.load ? [`load-${index};desc=${JSON.stringify(relative(process.cwd(), file)).replace(NOT_ASCII, encodeURIComponent)};dur=${timings[index]!.toFixed(1)}`] : [])
+  const loads = files.flatMap((file, index) => modules[index]!.load ? [`load-${index};desc=${JSON.stringify(projectPath(file)).replace(NOT_ASCII, encodeURIComponent)};dur=${timings[index]!.toFixed(1)}`] : [])
 
   return [...loads, `render;dur=${render.toFixed(1)}`].join(', ')
 }
