@@ -58,7 +58,7 @@
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "elysia": "^1.4.30",
-    "kay": "file:../poc-framework",
+    "kay": "npm:@kaynooo/kayjs@~1.6.0",
     "typescript": "^6.0.3"
   }
 }
