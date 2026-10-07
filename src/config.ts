@@ -138,6 +138,8 @@ export interface ImagesConfig {
   dirs?: Record<string, string>
   // WebP quality, 1 to 100. Defaults to 80.
   quality?: number
+  // The most pixels per CSS pixel an image loads at on a denser screen, at least 1. Defaults to 2: a 3x phone loads what a 2x one does, which looks the same; `Infinity` leaves the browser's choice.
+  maxDensity?: number
 }
 
 export type TrailingSlash = 'never' | 'always' | 'ignore'

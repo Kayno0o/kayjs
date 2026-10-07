@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
+import { cappedSizes } from '../src/runtime/image'
 import { DEV_PROBLEMS, LIVE_RELOAD, problemsBlock } from '../src/server/dev'
 import { settle } from '../src/test'
 
@@ -145,9 +146,28 @@ describe('bound URLs', () => {
 })
 
 describe('imported images', () => {
+  it('cap their density as images.maxDensity, which the server wrote on the page, sets it', async () => {
+    const meta = Object.assign(document.createElement('meta'), { name: 'kay-max-density', content: '1' })
+
+    document.head.append(meta)
+
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport hero from \'./hero.png\'\n---\nimg(src={hero} alt="")\n',
+      'hero.png': Bun.file(join(import.meta.dir, 'fixtures/images/src/hero.png')),
+    })
+
+    try {
+      expect(root.querySelector('img')!.getAttribute('sizes')).toBe(cappedSizes('100vw', 1))
+    }
+    finally {
+      meta.remove()
+      await dispose()
+    }
+  })
+
   it('load the size they show at in an island too, and a source that changes clears what the last one set', async () => {
     const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\nimport hero from \'./hero.png\'\n\nconst src = signal(hero)\n---\nimg.hero(src={src()} alt="")\nimg.sized(src={hero} height="10" alt="")\nbutton(onClick={() => src.set(\'/logo.svg\')}) x\n',
+      'main.kay': '---\nimport { signal } from \'kay\'\nimport hero from \'./hero.png\'\n\nconst src = signal(hero)\n---\nimg.hero(src={src()} sizes="50vw" alt="")\nimg.sized(src={hero} height="10" alt="")\nbutton(onClick={() => src.set(\'/logo.svg\')}) x\n',
       'hero.png': Bun.file(join(import.meta.dir, 'fixtures/images/src/hero.png')),
     })
 
@@ -158,12 +178,13 @@ describe('imported images', () => {
       expect(hero.getAttribute('srcset')).toEndWith(' 1000w')
       expect([hero.getAttribute('width'), hero.getAttribute('height')]).toEqual(['1000', '600'])
       expect(hero.getAttribute('src')).toEndWith('&w=1000')
+      expect(hero.getAttribute('sizes')).toBe(cappedSizes('50vw', 2))
       expect([sized.getAttribute('width'), sized.getAttribute('height'), sized.hasAttribute('srcset')]).toEqual([null, '10', true])
 
       root.querySelector('button')!.click()
       await settle()
 
-      expect([hero.getAttribute('src'), hero.getAttribute('srcset'), hero.getAttribute('width')]).toEqual(['/logo.svg', null, null])
+      expect([hero.getAttribute('src'), hero.getAttribute('srcset'), hero.getAttribute('sizes'), hero.getAttribute('width')]).toEqual(['/logo.svg', null, '50vw', null])
     }
     finally {
       await dispose()

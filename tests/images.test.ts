@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { image, imageUrl, registerImage } from '../src/runtime/image'
+import { cappedSizes, image, imageUrl, registerImage, setMaxDensity } from '../src/runtime/image'
 import { pages } from '../src/server'
 import { variantName, writeImageVariants } from '../src/server/image'
 
@@ -28,7 +28,7 @@ describe('image()', () => {
   it('gives an imported image every width of the ladder below its own, and its own size', () => {
     const [hero] = [...html.matchAll(/<img ([^>]*)>/g)].map(match => match[1]!)
 
-    expect(hero).toContain('sizes="100vw"')
+    expect(hero).toContain(`sizes="${cappedSizes('100vw', 2)}"`)
     expect(hero).toContain('width="1000" height="600"')
     expect([...hero!.matchAll(/&amp;w=(\d+) (\d+)w/g)].map(match => [Number(match[1]), Number(match[2])])).toEqual([[320, 320], [640, 640], [960, 960], [1000, 1000]])
     expect(hero).toContain(`src="${imageUrl(`/_kay/assets/${heroUrl}`, 1000).replaceAll('&', '&amp;')}"`)
@@ -38,8 +38,8 @@ describe('image()', () => {
     const imgs = new Map([...html.matchAll(/<img class="(\w+)" ([^>]*)>/g)].map(match => [match[1]!, match[2]!]))
     const variant = imageUrl(`/_kay/assets/${heroUrl}`, 1000).replaceAll('&', '&amp;')
 
-    expect(imgs.get('plain')).toBe(`src="${variant}" srcset="${(/srcset="([^"]+)"/).exec(html)![1]}" width="1000" height="600" sizes="50vw" alt="Plain"`)
-    expect(imgs.get('sized')).toMatch(/^src="[^"]+&amp;w=1000" srcset="[^"]+ 1000w" width="500" alt="Sized"$/)
+    expect(imgs.get('plain')).toBe(`src="${variant}" srcset="${(/srcset="([^"]+)"/).exec(html)![1]}" sizes="${cappedSizes('50vw', 2)}" width="1000" height="600" alt="Plain"`)
+    expect(imgs.get('sized')).toMatch(/^src="[^"]+&amp;w=1000" srcset="[^"]+ 1000w" sizes="[^"]+, 100vw" width="500" alt="Sized"$/)
     expect(imgs.get('own')).toBe(`src="/_kay/assets/${heroUrl}" srcset="/a.png 1x" alt="Own"`)
     expect(imgs.get('other')).toBe('src="/logo.svg" alt="Other"')
   })
@@ -49,6 +49,44 @@ describe('image()', () => {
     expect(image('/uploads/a.jpg', { width: 2000, height: 1000 }).src).toBe(imageUrl('/uploads/a.jpg', 1280))
     expect(image('/uploads/a.jpg')).toEqual({ src: '/uploads/a.jpg' })
     expect(image(registerImage('/_kay/assets/icon-1.svg', 24, 24))).toEqual({ src: '/_kay/assets/icon-1.svg', width: 24, height: 24 })
+  })
+})
+
+describe('density cap', () => {
+  it('shows an image narrower on screens past the cap, each entry of sizes kept with its condition', () => {
+    expect(cappedSizes('100vw', 2)).toBe('(min-resolution: 3dppx) calc(100vw * 2 / 3), (min-resolution: 2.5dppx) calc(100vw * 2 / 2.5), 100vw')
+    expect(cappedSizes('(min-width: 60rem) calc(50vw - 2rem), min(100vw, 30rem)', 1)).toBe([
+      '(min-resolution: 2dppx) and ((min-width: 60rem)) calc(calc(50vw - 2rem) * 1 / 2)',
+      '(min-resolution: 2dppx) calc(min(100vw, 30rem) * 1 / 2)',
+      '(min-resolution: 1.5dppx) and ((min-width: 60rem)) calc(calc(50vw - 2rem) * 1 / 1.5)',
+      '(min-resolution: 1.5dppx) calc(min(100vw, 30rem) * 1 / 1.5)',
+      '(min-width: 60rem) calc(50vw - 2rem)',
+      'min(100vw, 30rem)',
+    ].join(', '))
+  })
+
+  it('leaves auto sizes and an uncapped density as they are', () => {
+    expect(cappedSizes('auto, 100vw', 2)).toBe('auto, 100vw')
+    expect(cappedSizes('50vw', Infinity)).toBe('50vw')
+  })
+
+  it('takes images.maxDensity from the config, and refuses one under 1', async () => {
+    try {
+      const uncapped = await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { maxDensity: Infinity } })
+      const markup = await (await uncapped.handle(new Request('http://localhost/'))).text()
+
+      expect(markup).toContain('sizes="50vw"')
+
+      // Islands read it off the page, where it is written only when it is not the default.
+      const withIslands = await pages({ routes: 'tests/fixtures/navigation/src/routes', prebuilt: false, images: { maxDensity: 3 } })
+
+      expect(await (await withIslands.handle(new Request('http://localhost/'))).text()).toContain('<meta name="kay-max-density" content="3">')
+      expect(html).not.toContain('kay-max-density')
+      await expect(pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { maxDensity: 0.5 } })).rejects.toThrow('images.maxDensity is 0.5')
+    }
+    finally {
+      setMaxDensity(2)
+    }
   })
 })
 

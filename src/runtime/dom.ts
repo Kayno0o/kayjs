@@ -30,8 +30,8 @@ export class HydrationMismatch extends Error {
 
 const TAG_END = /[\s>]/
 // What `img(src={hero})` sets, its size left alone when the template gives one.
-const IMAGE_SOURCE = ['src', 'srcset']
-const SIZED_IMAGE = ['src', 'srcset', 'width', 'height']
+const IMAGE_SOURCE = ['src', 'srcset', 'sizes']
+const SIZED_IMAGE = ['src', 'srcset', 'sizes', 'width', 'height']
 const START = '['
 const END = ']'
 const VOID_PROPERTIES = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
@@ -1007,9 +1007,9 @@ export function attribute(element: Element, name: string, value: unknown): void 
     element.setAttribute(name, value === true ? '' : safeUrl(name, String(value)))
 }
 
-// An `img` source, with the variants and size of an imported image; a later source clears what an earlier one set.
-export function image(element: Element, src: unknown, sized: boolean): void {
-  const props = imageSource(src, sized) as Record<string, unknown>
+// An `img` source, with the variants, `sizes` and size of an imported image; a later source clears what an earlier one set.
+export function image(element: Element, src: unknown, sized: boolean, sizes?: unknown): void {
+  const props = imageSource(src, sized, sizes) as Record<string, unknown>
 
   for (const name of sized ? IMAGE_SOURCE : SIZED_IMAGE)
     attribute(element, name, props[name])

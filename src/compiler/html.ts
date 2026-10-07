@@ -322,6 +322,7 @@ export class HtmlTemplate {
     const filled = field?.fill === 'value' || field?.fill === 'checked' ? field.fill : undefined
     let ownFill: (() => void) | undefined
     let checkboxValue: (() => void) | undefined
+    const imageSizes = this.imageSizes(element)
 
     markup.text(`<${name}`)
 
@@ -342,7 +343,7 @@ export class HtmlTemplate {
     }
 
     for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread' || (element.classes.length > 0 && attribute === classAttribute))
+      if (attribute.kind === 'spread' || (element.classes.length > 0 && attribute === classAttribute) || attribute === imageSizes)
         continue
 
       const attributeName = this.source(attribute.name)
@@ -436,7 +437,11 @@ export class HtmlTemplate {
       if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
         const sized = this.named(element, 'width') || this.named(element, 'height')
 
-        markup.dynamic(() => b.add(`${htmlAlias('imageAttributes')}((`).addSource(expression).add(`), ${sized})`))
+        markup.dynamic(() => {
+          b.add(`${htmlAlias('imageAttributes')}((`).addSource(expression).add(`), ${sized}`)
+          this.sizesArgument(imageSizes)
+          b.add(')')
+        })
 
         continue
       }
@@ -804,6 +809,21 @@ export class HtmlTemplate {
 
   private isRadio(element: ElementNode): boolean {
     return element.attributes.some(attribute => attribute.kind === 'static' && this.source(attribute.name) === 'type' && attribute.text.toLowerCase() === 'radio')
+  }
+
+  // The `sizes` of an `img` whose `src` goes through `imageAttributes`, which caps it for dense screens, so the loop leaves it out.
+  private imageSizes(element: ElementNode): NamedAttribute | undefined {
+    if (element.name !== 'img' || this.named(element, 'srcset') || !element.attributes.some(attribute => attribute.kind === 'expression' && this.source(attribute.name) === 'src'))
+      return undefined
+
+    return element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && attribute.kind !== 'boolean' && this.source(attribute.name) === 'sizes')
+  }
+
+  private sizesArgument(sizes: NamedAttribute | undefined): void {
+    if (sizes?.kind === 'static')
+      this.b.add(`, ${JSON.stringify(decodeEntities(sizes.text))}`)
+    else if (sizes?.kind === 'expression')
+      this.b.add(', (').addSource(sizes.expression).add(')')
   }
 
   private named(element: ElementNode, name: string): boolean {

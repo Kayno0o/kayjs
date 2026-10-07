@@ -311,11 +311,11 @@ export function selectOptions(value: unknown, markup: string, only = false): str
   })
 }
 
-// An `img` source, with the variants and size of an imported image.
-export function imageAttributes(src: unknown, sized: boolean): string {
+// An `img` source, with the variants, `sizes` and size of an imported image.
+export function imageAttributes(src: unknown, sized: boolean, sizes?: unknown): string {
   let markup = ''
 
-  for (const [name, value] of Object.entries(imageSource(src, sized)))
+  for (const [name, value] of Object.entries(imageSource(src, sized, sizes)))
     markup += attribute(name, value)
 
   return markup

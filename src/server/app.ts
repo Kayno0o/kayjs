@@ -12,6 +12,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { projectCollections, serveFeeds } from '../content/server'
 import { localePath, splitLocale } from '../runtime/i18n'
+import { DEFAULT_MAX_DENSITY, setMaxDensity } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { overHttps, registerActionRoutes } from './actions'
 import { scanApi, serveApi } from './api'
@@ -151,7 +152,14 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     refuseLocaleClashes(i18n.settings, routes)
 
   const base = basePath(options.base)
-  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base }
+  const maxDensity = options.images?.maxDensity ?? DEFAULT_MAX_DENSITY
+
+  if (!(maxDensity >= 1))
+    throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)
+
+  setMaxDensity(maxDensity)
+
+  const renderOptions = { lang: options.lang, dev: options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base, maxDensity }
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const security = securityHeaders(options)
