@@ -1,0 +1,16 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+// Every attempt counts up to 4, the messages that went through up to 1; "fail" fails as a mail server down would.
+export const enquire = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }, ctx) => message === 'fail' ? ctx.fail(502, 'Not sent; try again later') : message.length, { rateLimit: [{ max: 4, window: '1m' }, { max: 1, window: '1m', count: 'succeeded' }], honeypot: { field: 'nectar', pretend: true } })
+
+const sent = ctx.succeeded(enquire)
+---
+form(action={enquire})
+  input(name="message" aria-label="Message")
+  button Send
+if enquire.error() as message
+  p.error {message}
+if sent
+  p.sent Sent

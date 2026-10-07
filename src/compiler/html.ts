@@ -520,6 +520,7 @@ export class HtmlTemplate {
     const outerTarget = this.formTarget
 
     this.formTarget = actionOf(element, this.src)?.expression ?? outerTarget
+    this.honeypot(element, () => markup.dynamic(() => this.honeypotField(element)))
 
     if (children.length > 0 && field?.fill === 'selected' && target) {
       const own = selected
@@ -570,6 +571,16 @@ export class HtmlTemplate {
     markup.text(`</${name}>`)
   }
 
+  // A form posting to an action renders the action's honeypot field first; an island leaves it to the template, its markup claimed node by node as it hydrates.
+  private honeypot(element: ElementNode, emit: () => void): void {
+    if (actionOf(element, this.src) && !this.options.hydratable)
+      emit()
+  }
+
+  private honeypotField(element: ElementNode): void {
+    this.b.add('KayFormHoneypot((').addSource(actionOf(element, this.src)!.expression).add('))')
+  }
+
   // An element with a spread renders through `element`, which reads every attribute the spread brings at render time.
   private spreadElement(element: ElementNode): void {
     const { b } = this
@@ -597,6 +608,10 @@ export class HtmlTemplate {
 
       this.formTarget = actionOf(element, this.src)?.expression ?? outerTarget
       b.add(', () => ')
+      this.honeypot(element, () => {
+        this.honeypotField(element)
+        b.add(' + ')
+      })
       this.markup(children, true)
       this.formTarget = outerTarget
     }

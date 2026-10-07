@@ -162,6 +162,9 @@ class Generator {
     if (runnable && kayHelpers.includes('formAction'))
       kayHelpers.push('formValue', 'formChecked', 'formInvalid')
 
+    if (html && kayHelpers.includes('formAction'))
+      kayHelpers.push('formHoneypot')
+
     if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
 
@@ -1425,7 +1428,7 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return visit(file.template)
 }
 
-type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'registerActions' | 'actionStub' | 'autoDefer'
+type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'formHoneypot' | 'registerActions' | 'actionStub' | 'autoDefer'
 
 function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`

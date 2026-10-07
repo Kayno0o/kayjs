@@ -1,5 +1,6 @@
 import type { Server } from 'bun'
 import type { Action } from '../src/runtime'
+import type { ProtectionRefusal } from '../src/server/protection'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,17 +10,23 @@ import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia, t } from 'elysia'
 import { check } from '../src/check'
+import { compileKay } from '../src/compiler'
 import { action } from '../src/runtime'
 import { inlineScriptHashes, invalidatePage, pages, shutdown } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
-import { clientAddress, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
+import { clientAddress, countSucceeded, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
 import { testSite } from '../src/test'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 
 function socket(address: string): Server<unknown> {
   return { requestIP: () => ({ address }) } as unknown as Server<unknown>
+}
+
+// What a post was refused with, a honeypot pretending aside.
+async function refusalOf(...args: Parameters<typeof protectionRefusal>): Promise<ProtectionRefusal | undefined> {
+  return await protectionRefusal(...args) as ProtectionRefusal | undefined
 }
 
 function directives(policy: string | null): Map<string, string[]> {
@@ -107,6 +114,7 @@ describe('action protection', () => {
   const FIXTURE = 'tests/fixtures/production'
   // Held in a variable so tsc leaves the .kay import to Bun.
   const CONTACT = './fixtures/production/src/routes/contact.kay'
+  const ENQUIRY = './fixtures/production/src/routes/enquiry.kay'
 
   it('refuses a form whose honeypot is filled in, with a message on the field, the handler never running', async () => {
     const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
@@ -119,9 +127,71 @@ describe('action protection', () => {
 
     // Repeated, or a file, it is filled in all the same.
     for (const website of [['', 'https://spam.example'], new File(['x'], 'x.txt')])
-      expect((await protectionRefusal(send as never, new Request('http://localhost/'), { website }, true, null))?.status).toBe(422)
+      expect((await refusalOf(send as never, new Request('http://localhost/'), { website }, true, null))?.status).toBe(422)
 
-    expect(await protectionRefusal(send as never, new Request('http://localhost/'), { website: [''] }, true, null)).toBeUndefined()
+    expect(await refusalOf(send as never, new Request('http://localhost/'), { website: [''] }, true, null)).toBeUndefined()
+  })
+
+  it('renders the honeypot field in a form posting to the action, out of sight, and leaves it to an island\'s template', async () => {
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
+    const page = await site.visit('/contact')
+
+    expect(page.html).toContain('enctype="multipart/form-data"><div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert><input name="website" type="text" tabindex="-1" autocomplete="off"></div><input name="message"')
+    expect(page.html.match(/name="website"/g)).toHaveLength(1)
+    expect((await site.visit('/enquiry')).html).toContain('<input name="nectar" type="text" tabindex="-1" autocomplete="off">')
+
+    const form = 'form(action={send})\n  input(name="message" aria-label="Message")\n'
+
+    expect(compileKay(form, 'page.kay', { output: 'html' }).tsx).toContain('KayFormHoneypot((send))')
+    expect(compileKay(form, 'page.kay', { output: 'html', hydratable: true, twinBuild: true }).tsx).not.toContain('KayFormHoneypot((send))')
+  })
+
+  it('counts only the posts that went through on a limit saying so, every attempt still counting on the others', async () => {
+    const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: { hops: 1 } })
+    const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
+    const call = async (from: string, message: string) => app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': from }, body: stringify({ message }) }))
+
+    // A mail server failing three times locks no one out.
+    for (let attempt = 0; attempt < 3; attempt++)
+      expect((await call('203.0.113.20', 'fail')).status).toBe(502)
+
+    expect((await call('203.0.113.20', 'hi')).status).toBe(200)
+    // The fifth attempt passes the limit on every attempt.
+    expect((await call('203.0.113.20', 'fail')).status).toBe(429)
+
+    expect((await call('203.0.113.21', 'hi')).status).toBe(200)
+
+    const limited = await call('203.0.113.21', 'hi')
+
+    expect(limited.status).toBe(429)
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
+  })
+
+  it('puts a message ctx.fail is given where a form reads its own message', async () => {
+    const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: { hops: 1 } })
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
+    const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
+    const failed = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.30' }, body: stringify({ message: 'fail' }) }))
+
+    expect(parse(await failed.text())).toEqual({ errors: { '': 'Not sent; try again later' }, data: 'Not sent; try again later' })
+    expect((await site.submit(enquire, { message: 'fail' }, { from: '/enquiry' })).html).toContain('<p class="error">Not sent; try again later</p>')
+  })
+
+  it('answers a bot the honeypot caught as if its post went through, when the action says so', async () => {
+    const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: { hops: 1 } })
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
+    const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number, 'nectar'> }
+    const form = new FormData()
+
+    form.set('message', 'fail')
+    form.set('nectar', 'https://spam.example')
+
+    const call = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'x-kay-action': 'form', 'x-forwarded-for': '203.0.113.40' }, body: form }))
+
+    // The handler would have failed a message saying "fail".
+    expect(call.status).toBe(200)
+    expect(await call.text()).toBe('')
+    expect((await site.submit(enquire, { message: 'fail', nectar: 'https://spam.example' }, { from: '/enquiry' })).html).toContain('<p class="sent">Sent</p>')
   })
 
   it('lets a client post as often as the limit allows in a window, then answers 429 with when to retry', async () => {
@@ -150,7 +220,7 @@ describe('action protection', () => {
       return app.handle(new Request(`http://localhost${write.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)), 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.8' }, body }))
     }
 
-    expect((await protectionRefusal(write as never, new Request('http://localhost/'), { website: 'https://spam.example' }, true, null))?.message).toBe('Laissez ce champ vide')
+    expect((await refusalOf(write as never, new Request('http://localhost/'), { website: 'https://spam.example' }, true, null))?.message).toBe('Laissez ce champ vide')
     expect(parse(await (await call('a'.repeat(1100))).text())).toEqual({ errors: { '': '1024 octets au plus' }, data: undefined })
     expect((await call('hi')).status).toBe(200)
 
@@ -169,6 +239,11 @@ describe('action protection', () => {
     expect(await signIn.hit(request())).toBeUndefined()
     expect(await signIn.hit(request())).toBeGreaterThan(0)
     expect(await search.hit(request())).toBeUndefined()
+    // Under the app's own key, such as an account, whoever sends the request.
+    expect(await search.hit('account-1')).toBeUndefined()
+    expect(await search.hit('account-1')).toBeUndefined()
+    expect(await search.hit('account-1')).toBeGreaterThan(0)
+    expect(await search.hit('account-2')).toBeUndefined()
     expect(() => rateLimit('x', { max: 0, window: '1m' })).toThrow('max is 0')
     expect(() => rateLimit('x', { max: 1, window: 'soon' as never })).toThrow('window')
   })
@@ -183,9 +258,15 @@ describe('action protection', () => {
       const request = () => new Request('http://localhost/')
       const limited = (store: typeof first) => ({ url: '/_kay/action/contact/send', protection: { rateLimit: { max: 2, window: '1m', store } } }) as never
 
-      expect(await protectionRefusal(limited(first), request(), {}, false, null)).toBeUndefined()
-      expect(await protectionRefusal(limited(second), request(), {}, false, null)).toBeUndefined()
-      expect((await protectionRefusal(limited(first), request(), {}, false, null))?.status).toBe(429)
+      expect(await refusalOf(limited(first), request(), {}, false, null)).toBeUndefined()
+      expect(await refusalOf(limited(second), request(), {}, false, null)).toBeUndefined()
+      expect((await refusalOf(limited(first), request(), {}, false, null))?.status).toBe(429)
+
+      const succeeded = (store: typeof first) => ({ url: '/_kay/action/contact/write', protection: { rateLimit: { max: 1, window: '1m', store, count: 'succeeded' } } }) as never
+
+      expect(await refusalOf(succeeded(first), request(), {}, false, null)).toBeUndefined()
+      await countSucceeded(succeeded(first), request(), null)
+      expect((await refusalOf(succeeded(second), request(), {}, false, null))?.status).toBe(429)
 
       expect(await rateLimit('login', { max: 1, window: '1m', store: first }).hit(request())).toBeUndefined()
       expect(await rateLimit('login', { max: 1, window: '1m', store: second }).hit(request())).toBeGreaterThan(0)
@@ -202,6 +283,7 @@ describe('action protection', () => {
 
   it('refuses a rate limit window it cannot read as the action is declared', () => {
     expect(() => action(t.Object({}), () => 1, { rateLimit: { max: 1, window: 'soon' as never } })).toThrow('kay: rateLimit.window is \'soon\'; it takes a positive duration')
+    expect(() => action(t.Object({}), () => 1, { rateLimit: [{ max: 1, window: '1m' }, { max: 1, window: '1m', count: 'succeeded', store: { hit: () => ({ count: 1, resetAt: 0 }) } }] })).toThrow('needs a peek(key) method')
   })
 
   it('counts an IPv6 client by its /64, so rotating addresses inside it buys nothing', () => {
@@ -263,9 +345,9 @@ describe('action protection', () => {
     expect(await check(FIXTURE)).toEqual([])
 
     try {
-      await Bun.write(typo, '---\nimport { send } from \'./contact.kay\'\n---\nform(action={send})\n  input(name="websit" aria-label="Website")\n')
+      await Bun.write(typo, '---\nimport { send } from \'./contact.kay\'\nimport { enquire } from \'./enquiry.kay\'\n---\nform(action={send})\n  input(name="websit" aria-label="Website")\nform(action={enquire})\n  input(name="nectar" aria-label="Nectar")\n')
 
-      expect((await check(FIXTURE)).map(diagnostic => diagnostic.line)).toEqual([5])
+      expect((await check(FIXTURE)).map(diagnostic => diagnostic.line)).toEqual([6])
     }
     finally {
       await rm(typo, { force: true })

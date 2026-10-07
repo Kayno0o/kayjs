@@ -22,7 +22,7 @@ import { cookieJar } from './cookies'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { runGuards } from './guards'
 import { requestLocale, stateFor } from './i18n'
-import { protectionRefusal } from './protection'
+import { countSucceeded, PRETEND, protectionRefusal } from './protection'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
 import { answered, SERVER_SPAN, traced } from './trace'
@@ -111,6 +111,9 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
           const asForm = !call || isFormCall(context.request)
           const refusal = await protectionRefusal(value, context.request, context.body, asForm, context.server)
 
+          if (refusal === PRETEND)
+            throw new Refusal(pretended(value, context.request))
+
           // Before the schema reads the input: every attempt counts, a valid one or not.
           if (refusal)
             throw new Refusal(failed(context.request, new Headers(refusal.headers), cookieJar(context.request).cookies, { action: value.url, status: refusal.status, values: call ? {} : submittedValues(context.body), errors: { [refusal.field]: refusal.message } }, context.server, back))
@@ -119,7 +122,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
         ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, context, options)) }),
-        error: async ({ code, error, request, body, server }) => {
+        error: async ({ code, error, request, body, server, set }) => {
           if (code === 'VALIDATION')
             return refused(value, error, request, server, back)
 
@@ -130,7 +133,18 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
             return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [field]: fieldError(value, field) ?? 'Invalid file type' } }, server, back)
           }
 
-          return error instanceof Refusal ? error.response : undefined
+          // Read as unknown: some apps' Elysia types narrow the error to an intersection holding `number`.
+          const refusal: unknown = error
+
+          if (!(refusal instanceof Refusal))
+            return undefined
+
+          const response = await refusal.response
+
+          // Elysia answers a hook's error 500 unless told otherwise, even with a Response, which a honeypot pretending answers 200.
+          set.status = response.status
+
+          return response
         },
       })
     }
@@ -336,28 +350,45 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
   try {
     const result = await action.handler(context.body, ctx)
 
+    // A string passed to `ctx.fail` is the form's message, read where a rate limit's is.
     if (isFailure(result))
-      return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: {}, data: result.data }, context.server, back)
+      return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: typeof result.data === 'string' ? { '': result.data } : {}, data: result.data }, context.server, back)
 
-    if (!isCall(request))
-      writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result }, overHttps(request))
+    await countSucceeded(action, request, context.server)
 
-    jar.writeTo(headers)
-
-    // An empty body reads back as `undefined`.
-    if (isCall(request)) {
-      headers.set('content-type', 'application/json')
-
-      return new Response(result === undefined ? null : encodeOrExplain(result, `what ${action.url} returned`), { status, headers })
-    }
-
-    headers.set(redirectHeader(request), backTo(request))
-
-    return new Response(null, { status: 303, headers })
+    return succeeded(action, request, jar, headers, result, status)
   }
   catch (error) {
+    // Sent on after it went through, as to a thank-you page.
+    if (error instanceof Redirect)
+      await countSucceeded(action, request, context.server)
+
     return stopped(error, request, state, options)
   }
+}
+
+// A call gets the result; a plain form post goes back to the page it came from, which reads the result through `ctx.succeeded`.
+function succeeded(action: ServerAction<TSchema, unknown>, request: Request, jar: CookieJar, headers: Headers, result: unknown, status: number): Response {
+  if (!isCall(request))
+    writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result }, overHttps(request))
+
+  jar.writeTo(headers)
+
+  // An empty body reads back as `undefined`.
+  if (isCall(request)) {
+    headers.set('content-type', 'application/json')
+
+    return new Response(result === undefined ? null : encodeOrExplain(result, `what ${action.url} returned`), { status, headers })
+  }
+
+  headers.set(redirectHeader(request), backTo(request))
+
+  return new Response(null, { status: 303, headers })
+}
+
+// A bot the honeypot caught sees what a person whose post went through sees, the handler having returned nothing.
+function pretended(action: ServerAction<TSchema, unknown>, request: Request): Response {
+  return succeeded(action, request, cookieJar(request), new Headers(), undefined, 200)
 }
 
 // A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.

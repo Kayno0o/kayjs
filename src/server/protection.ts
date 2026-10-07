@@ -1,9 +1,10 @@
 import type { Server } from 'bun'
 import type { Elysia, TSchema } from 'elysia'
 import type { ProxyConfig } from '../config'
-import type { RateLimit, RateStore, ServerAction } from '../runtime/action'
+import type { ActionRateLimit, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import { Database } from 'bun:sqlite'
+import { honeypotField } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { rewrittenAddress } from './rewrite'
 
@@ -15,15 +16,13 @@ export interface ProtectionRefusal {
   headers?: Record<string, string>
 }
 
-interface Window {
-  count: number
-  resetAt: number
+export interface RateLimiter {
+  // Counts an attempt from the request's client, or under the app's own key such as an account id: the seconds it must wait before the next one once over the limit, else undefined. `server` is the one serving the request, read from `pages()`'s app when left out.
+  hit: (from: Request | string, server?: Server<unknown> | null) => Promise<number | undefined>
 }
 
-export interface RateLimiter {
-  // Counts an attempt from the request's client: the seconds it must wait before the next one once over the limit, else undefined. `server` is the one serving the request, read from `pages()`'s app when left out.
-  hit: (request: Request, server?: Server<unknown> | null) => Promise<number | undefined>
-}
+// A post a honeypot caught, answered as if it went through.
+export const PRETEND = 'pretend'
 
 // The most windows a memory store keeps: past it, a new client makes room by dropping the expired windows, then the oldest ones.
 const MAX_WINDOWS = 10_000
@@ -54,11 +53,16 @@ function windowMs(rateLimit: { window: Duration }): number {
 }
 
 // Fixed windows per key in this process: enough to slow a script hammering a form, which is what a contact or login form needs.
-export function memoryRates(): { hit: (key: string, windowMs: number) => Window } {
+export function memoryRates(): { hit: (key: string, windowMs: number) => RateWindow, peek: (key: string) => RateWindow | undefined } {
   // Ordered by when each window opened, so the oldest come first.
-  const windows = new Map<string, Window>()
+  const windows = new Map<string, RateWindow>()
 
   return {
+    peek(key) {
+      const window = windows.get(key)
+
+      return window && window.resetAt > Date.now() ? { ...window } : undefined
+    },
     hit(key, windowMs) {
       const now = Date.now()
       let window = windows.get(key)
@@ -90,6 +94,7 @@ export function sqliteRates(path: string): RateStore {
 
   // The row's old values are what both cases read: a closed window opens afresh, an open one counts one more.
   const hit = db.query<{ count: number, reset_at: number }, [string, number, number]>('INSERT INTO kay_rates (key, count, reset_at) VALUES (?1, 1, ?2 + ?3) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN reset_at <= ?2 THEN 1 ELSE count + 1 END, reset_at = CASE WHEN reset_at <= ?2 THEN ?2 + ?3 ELSE reset_at END RETURNING count, reset_at')
+  const peek = db.query<{ count: number, reset_at: number }, [string, number]>('SELECT count, reset_at FROM kay_rates WHERE key = ? AND reset_at > ?')
   const sweep = db.query('DELETE FROM kay_rates WHERE reset_at <= ?')
   let swept = 0
 
@@ -106,6 +111,11 @@ export function sqliteRates(path: string): RateStore {
 
       return { count: row.count, resetAt: row.reset_at }
     },
+    peek(key) {
+      const row = peek.get(key, Date.now())
+
+      return row ? { count: row.count, resetAt: row.reset_at } : undefined
+    },
   }
 }
 
@@ -117,7 +127,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
   const ms = durationSeconds(limit.window, `rateLimit('${name}')'s window`) * 1000
 
   return {
-    hit: async (request, server) => waitFor(await (limit.store ?? memoryOf(name)).hit(limitKey(name, clientAddress(request, server)), ms), limit.max),
+    hit: async (from, server) => waitFor(await (limit.store ?? memoryOf(name)).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), ms), limit.max),
   }
 }
 
@@ -125,34 +135,58 @@ function limitKey(name: string, client: string): string {
   return `${name}\n${rateKey(client)}`
 }
 
+// The action's limits, each counted under its own name: the first under the action's URL, the same in every process.
+function actionLimits(action: ServerAction<TSchema, unknown>): { name: string, limit: ActionRateLimit }[] {
+  return [action.protection?.rateLimit ?? []].flat().map((limit, index) => ({ name: index === 0 ? action.url : `${action.url}#${index}`, limit }))
+}
+
 // Seconds until the next attempt may go through, or undefined while under the limit.
 function waitFor(window: { count: number, resetAt: number }, max: number): number | undefined {
   return window.count > max ? Math.ceil((window.resetAt - Date.now()) / 1000) : undefined
 }
 
-// Why a post must not reach the handler, or undefined when it may.
-export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined): Promise<ProtectionRefusal | undefined> {
-  const { honeypot, rateLimit, messages } = action.protection ?? {}
+// Why a post must not reach the handler, `PRETEND` for a bot to answer as if it went through, or undefined when it may.
+export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
+  const { honeypot, messages } = action.protection ?? {}
+  const field = honeypotField(action.protection)
 
-  if (form && honeypot !== undefined && typeof body === 'object' && body !== null) {
-    const value = (body as Record<string, unknown>)[honeypot]
+  if (form && field !== undefined && typeof body === 'object' && body !== null && filledIn((body as Record<string, unknown>)[field])) {
+    if (typeof honeypot === 'object' && honeypot.pretend)
+      return PRETEND
 
-    if (filledIn(value))
-      return { status: 422, field: honeypot, message: messages?.honeypot ?? 'Leave this field empty' }
+    return { status: 422, field, message: messages?.honeypot ?? 'Leave this field empty' }
   }
 
-  if (!rateLimit)
-    return undefined
+  const client = clientAddress(request, server)
 
-  // Counted under the action's URL, the same in every process.
-  const wait = waitFor(await (rateLimit.store ?? memoryOf(action.url)).hit(limitKey(action.url, clientAddress(request, server)), windowMs(rateLimit)), rateLimit.max)
+  for (const { name, limit } of actionLimits(action)) {
+    const store = limit.store ?? memoryOf(name)
+    const key = limitKey(name, client)
+    // A limit on the posts that went through only reads its count here; the handler's success adds to it.
+    const wait = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowMs(limit)), limit.max)
 
-  if (wait === undefined)
-    return undefined
+    if (wait === undefined)
+      continue
 
-  const message = messages?.rateLimit ?? (seconds => `Too many attempts; try again in ${seconds} s`)
+    const message = messages?.rateLimit ?? (seconds => `Too many attempts; try again in ${seconds} s`)
 
-  return { status: 429, field: '', message: typeof message === 'string' ? message : message(wait), headers: { 'retry-after': String(wait) } }
+    return { status: 429, field: '', message: typeof message === 'string' ? message : message(wait), headers: { 'retry-after': String(wait) } }
+  }
+
+  return undefined
+}
+
+// Counts a post whose handler went through against the action's limits on those.
+export async function countSucceeded(action: ServerAction<TSchema, unknown>, request: Request, server: Server<unknown> | null | undefined): Promise<void> {
+  for (const { name, limit } of actionLimits(action)) {
+    if (limit.count === 'succeeded')
+      await (limit.store ?? memoryOf(name)).hit(limitKey(name, clientAddress(request, server)), windowMs(limit))
+  }
+}
+
+// Seconds until the window closes once `max` posts went through in it, or undefined while fewer did.
+function reached(window: RateWindow | undefined, max: number): number | undefined {
+  return window && window.count >= max ? Math.ceil((window.resetAt - Date.now()) / 1000) : undefined
 }
 
 // Something a person never types into a field they cannot see: text, several values, or a file.
@@ -181,7 +215,7 @@ function memoryOf(name: string): ReturnType<typeof memoryRates> {
 }
 
 // Expired windows sit first, so dropping them, then the oldest live ones when still full, costs each new window what it removes.
-function makeRoom(windows: Map<string, Window>, now: number): void {
+function makeRoom(windows: Map<string, RateWindow>, now: number): void {
   for (const [key, window] of windows) {
     if (window.resetAt > now && windows.size < MAX_WINDOWS)
       return

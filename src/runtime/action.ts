@@ -5,6 +5,7 @@ import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import { withBase } from './base'
 import { durationSeconds } from './duration'
+import { escapeAttribute } from './escape'
 import { createSignal, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
@@ -39,7 +40,14 @@ export interface EncodedCall {
 // Where rate limits count, shared by every process opening it: `sqliteRates` from `kay/server`, or one of an app's own.
 export interface RateStore {
   // Counts one more attempt under `key`, opening a window of `windowMs` when none is open: the attempts in it so far, this one included, and when it closes, in ms since the epoch.
-  hit: (key: string, windowMs: number) => { count: number, resetAt: number } | Promise<{ count: number, resetAt: number }>
+  hit: (key: string, windowMs: number) => RateWindow | Promise<RateWindow>
+  // The window open under `key` without counting an attempt, undefined when none is: what a limit counting only the posts that went through reads before the handler runs.
+  peek?: (key: string) => RateWindow | undefined | Promise<RateWindow | undefined>
+}
+
+export interface RateWindow {
+  count: number
+  resetAt: number
 }
 
 export interface RateLimit {
@@ -49,11 +57,23 @@ export interface RateLimit {
   store?: RateStore
 }
 
-export interface ActionProtection<Honeypot extends string = never> {
+export interface ActionRateLimit extends RateLimit {
+  // `'succeeded'` counts only the posts whose handler returned without `ctx.fail` or an error, so typos and a failing mail server lock no one out; every attempt counts unless given.
+  count?: 'succeeded'
+}
+
+export interface HoneypotOptions<Field extends string = string> {
+  field: Field
+  // Answers a bot filling the field in as if its post went through, the handler never running, rather than refusing it.
+  pretend?: boolean
+}
+
+export interface ActionProtection<Field extends string = never> {
   // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
-  rateLimit?: RateLimit
-  // A field the form renders out of sight, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.
-  honeypot?: Honeypot
+  // Several limits all apply, such as one on every attempt and a tighter one on the posts that went through.
+  rateLimit?: ActionRateLimit | ActionRateLimit[]
+  // A field a form posting to the action renders out of sight by itself, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.
+  honeypot?: Field | HoneypotOptions<Field>
   // The most bytes a post may send, files included, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.
   bodyLimit?: number
   // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
@@ -78,7 +98,7 @@ export interface ActionContext {
   status: (code: number) => void
   headers: Headers
   redirect: Redirect
-  // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `ctx.failed(action)`; a call throws an `ActionError` carrying `data`.
+  // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `ctx.failed(action)`; a call throws an `ActionError` carrying `data`. A string is also the form's message, under `errors['']`.
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data) => Failure<Data>
 }
 
@@ -196,8 +216,12 @@ export function actionUrl(moduleId: string, name: string): string {
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Awaited<Output>, Honeypot> {
   // Refused as the module loads, rather than on the first post.
-  if (protection?.rateLimit)
-    durationSeconds(protection.rateLimit.window, 'rateLimit.window')
+  for (const limit of [protection?.rateLimit ?? []].flat()) {
+    durationSeconds(limit.window, 'rateLimit.window')
+
+    if (limit.count === 'succeeded' && limit.store && !limit.store.peek)
+      throw new Error('kay: a rateLimit counting only the posts that went through reads its count before the handler runs, so its store needs a peek(key) method')
+  }
 
   const state = { url: '' }
   const { call, reads } = callable(() => state.url)
@@ -270,10 +294,23 @@ type FormTarget = Action<Record<string, unknown>, unknown, string>
 
 // What a refused post sent for a field of a form posting to `target`, to show it again; undefined without one, and for the honeypot.
 export function formValue(target: unknown, name: string): string | undefined {
-  if (!isAction(target) || name === target.protection?.honeypot)
+  if (!isAction(target) || name === honeypotField(target.protection))
     return undefined
 
   return untrack((target as FormTarget).failed)?.values[name]
+}
+
+// The honeypot field a form posting to `target` renders, out of sight and out of reach of the keyboard and screen readers; empty for an action with none.
+export function formHoneypot(target: unknown): string {
+  const field = isAction(target) ? honeypotField(target.protection) : undefined
+
+  return field === undefined ? '' : `<div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert><input name="${escapeAttribute(field)}" type="text" tabindex="-1" autocomplete="off"></div>`
+}
+
+export function honeypotField(protection: ActionProtection<string> | undefined): string | undefined {
+  const honeypot = protection?.honeypot
+
+  return typeof honeypot === 'object' ? honeypot.field : honeypot
 }
 
 // Whether a checkbox or radio button was ticked in a refused post; undefined without one. One with no `value` posts `on`, read as `true` by a boolean field.

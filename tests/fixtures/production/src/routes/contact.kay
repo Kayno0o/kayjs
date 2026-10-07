@@ -11,7 +11,6 @@ const sent = ctx.succeeded(send)
 ---
 form(action={send})
   input(name="message" aria-label="Message")
-  input(name="website" tabindex="-1" autocomplete="off" aria-hidden="true")
   button Send
 if failure
   p.error {failure.status} {Object.values(failure.errors).join(' ')}
