@@ -24,7 +24,7 @@ import { createAuth, discordProvider } from '@kaynooo/kayjs-auth'
 import { authTables, pgStore } from '@kaynooo/kayjs-auth/pg'
 import { Database } from '@kaynooo/pg-orm'
 import { session } from 'kay/server'
-import { mailer } from './mail'
+import { mail } from './mail'
 import { Posts } from './tables'
 
 export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...authTables, Posts] })
@@ -37,7 +37,7 @@ export const auth = createAuth({
   site: 'Example',
   signInPage: '/login',
   oauth: { discord: { provider: discordProvider(), clientId: process.env.DISCORD_CLIENT_ID!, clientSecret: process.env.DISCORD_CLIENT_SECRET! } },
-  email: { mailer, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } },
+  email: { mailer: { send: mail.enqueue }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } },
   roles: { admin: ['editor'], editor: [] },
 })
 
@@ -163,14 +163,15 @@ if failure?.data?.error === 'invalid'
 
 ```ts
 email: {
-  mailer: { send: mail => transport.sendMail({ to: mail.to, subject: mail.subject, text: mail.text, html: mail.html }) },
+  mailer: { send: mail.enqueue },
   links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' },
   templates: { 'magic-link': ({ site, url }) => ({ subject: `Your ${site} link`, text: url!, html: `<a href="${url}">Sign in</a>` }) },
   requireVerified: true,
 }
 ```
 
-- `mailer.send(mail)` gets `{ to, kind, subject, text, html, url? }`, filled from `defaultTemplates` or `templates`, keyed by `kind`. An app with its own templating reads `kind` and `url`.
+- `mailer.send(mail)` gets `{ to, kind, subject, text, html, url? }`, filled from `defaultTemplates` or `templates`, keyed by `kind`, and is awaited, its result ignored. An app with its own templating reads `kind` and `url`.
+- A mailer of `@kaynooo/kayjs-mail` fits as it is, `mail` being its `mailer()`: `{ send: mail.enqueue }` renders each mail at once and leaves it to its queue, which retries a mail server that is away, `{ send: mail.send }` sends it before the call answers. In development and tests the mails go to its outbox, listed at `/_kay/mail`.
 - `links` names the app's page for each kind; the link is `url` + that path + `?token=`. The page shows a button posting the token to an action, so opening the link spends nothing:
 
 ```kay
@@ -273,4 +274,4 @@ const site = await testSite({ use: [auth.plugin] })
 const page = await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct horse battery' }, { from: '/login' })
 ```
 
-Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed.
+Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.

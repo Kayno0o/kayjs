@@ -20,7 +20,8 @@ export interface Mail extends MailContent {
 }
 
 export interface Mailer {
-  send: (mail: Mail) => void | Promise<void>
+  // Awaited, its result ignored, so a queue's enqueue fits as it is.
+  send: (mail: Mail) => unknown
 }
 
 // What a template is given: the site's name, the address written to, the link when the mail carries one, and the provider or token an event is about.
