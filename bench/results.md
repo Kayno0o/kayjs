@@ -18,10 +18,10 @@ The products page (layout, 500 products, one counter) rendered in-process throug
 
 |  | kay | solid | svelte |
 | --- | --- | --- | --- |
-| renders/s | **4752** | 1753 (2.71x) | 3751 (1.27x) |
-| mean (ms) | **0.2** | 0.6 (2.71x) | 0.3 (1.27x) |
-| p50 (ms) | **0.2** | 0.5 (2.79x) | 0.2 (1.33x) |
-| p99 (ms) | **0.7** | 1.6 (2.27x) | 0.7 (1.05x) |
+| renders/s | **4788** | 1754 (2.73x) | 3853 (1.24x) |
+| mean (ms) | **0.2** | 0.6 (2.73x) | 0.3 (1.24x) |
+| p50 (ms) | **0.2** | 0.5 (2.77x) | 0.2 (1.30x) |
+| p99 (ms) | **0.7** | 1.6 (2.31x) | 0.7 (1.05x) |
 
 ## Products page in Chromium
 
@@ -29,29 +29,29 @@ Medians of fresh loads with an empty cache: Chromium's main-thread time up to ne
 
 |  | kay | solid | svelte |
 | --- | --- | --- | --- |
-| JS shipped (gzip) | 9.7 KB (1.21x) | **8.0 KB** | 21.8 KB (2.73x) |
-| JS shipped (raw) | 22.1 KB (1.09x) | **20.3 KB** | 57.6 KB (2.84x) |
-| JS files | 5 | 1 | 1 |
-| HTML (gzip) | **8.1 KB** | 21.6 KB (2.66x) | 15.6 KB (1.92x) |
-| HTML (raw) | **85.4 KB** | 171.8 KB (2.01x) | 138.6 KB (1.62x) |
-| script (ms) | **1.8** | 12.6 (6.98x) | 15.3 (8.51x) |
-| style (ms) | 6.7 (1.08x) | 6.3 (1.02x) | **6.2** |
-| layout (ms) | **30.6** | 31.6 (1.03x) | 31.0 (1.01x) |
-| JS heap | **1262.6 KB** | 2981.5 KB (2.36x) | 3127.6 KB (2.48x) |
+| JS shipped (gzip) | 8.7 KB (1.09x) | **8.0 KB** | 21.8 KB (2.73x) |
+| JS shipped (raw) | 21.4 KB (1.05x) | **20.3 KB** | 57.6 KB (2.84x) |
+| JS files | 2 | 1 | 1 |
+| HTML (gzip) | **8.1 KB** | 21.6 KB (2.67x) | 15.6 KB (1.93x) |
+| HTML (raw) | **85.3 KB** | 171.8 KB (2.01x) | 138.6 KB (1.63x) |
+| script (ms) | **0.4** | 12.4 (32.23x) | 15.6 (40.38x) |
+| style (ms) | 6.5 (1.04x) | 6.4 (1.03x) | **6.3** |
+| layout (ms) | 31.6 (1.02x) | 31.9 (1.03x) | **31.1** |
+| JS heap | **1248.0 KB** | 3008.3 KB (2.41x) | 3122.3 KB (2.50x) |
 
 ## Table page in Chromium
 
 |  | kay | solid | svelte |
 | --- | --- | --- | --- |
-| JS shipped (gzip) | 10.6 KB (1.33x) | **8.0 KB** | 21.8 KB (2.73x) |
-| JS shipped (raw) | 24.3 KB (1.20x) | **20.3 KB** | 57.6 KB (2.84x) |
-| JS files | 5 | 1 | 1 |
-| HTML (gzip) | 0.7 KB (1.62x) | 0.7 KB (1.58x) | **0.4 KB** |
-| HTML (raw) | 1.4 KB (1.68x) | 1.3 KB (1.49x) | **0.9 KB** |
-| script (ms) | **2.1** | 2.5 (1.19x) | 4.5 (2.13x) |
-| style (ms) | 0.4 (2.20x) | 0.2 (1.05x) | **0.2** |
-| layout (ms) | 2.8 (1.04x) | **2.7** | 2.7 (1.01x) |
-| JS heap | 1654.7 KB (1.05x) | **1572.1 KB** | 1593.1 KB (1.01x) |
+| JS shipped (gzip) | 9.7 KB (1.21x) | **8.0 KB** | 21.8 KB (2.73x) |
+| JS shipped (raw) | 23.5 KB (1.16x) | **20.3 KB** | 57.6 KB (2.84x) |
+| JS files | 2 | 1 | 1 |
+| HTML (gzip) | 0.7 KB (1.56x) | 0.7 KB (1.58x) | **0.4 KB** |
+| HTML (raw) | 1.3 KB (1.55x) | 1.3 KB (1.49x) | **0.9 KB** |
+| script (ms) | **1.2** | 2.6 (2.14x) | 4.6 (3.83x) |
+| style (ms) | 0.4 (2.57x) | **0.2** | 0.2 (1.03x) |
+| layout (ms) | 2.9 (1.09x) | **2.7** | 2.7 (1.01x) |
+| JS heap | 1638.1 KB (1.03x) | **1596.0 KB** | 1627.3 KB (1.02x) |
 
 ## Table operations
 
@@ -59,12 +59,12 @@ The js-framework-benchmark keyed operations, median ms over fresh pages: from th
 
 | operation | kay | solid | svelte |
 | --- | --- | --- | --- |
-| create 1,000 rows | 31.0 (1.01x) | **30.7** | 32.4 (1.05x) |
-| replace 1,000 rows | **29.4** | 29.8 (1.01x) | 31.3 (1.06x) |
-| update every 10th row | 3.5 (1.17x) | 3.1 (1.03x) | **3.0** |
-| select row | **0.1** | 0.4 (2.67x) | 1.2 (8.00x) |
-| swap rows | 2.5 (1.14x) | **2.2** | 2.5 (1.14x) |
-| remove row | **2.2** | 2.2 (1.02x) | 2.5 (1.16x) |
-| create 10,000 rows | 277 (1.07x) | **259** | 261 (1.01x) |
-| append 1,000 rows | 27.5 (1.04x) | 28.3 (1.07x) | **26.5** |
-| clear 1,000 rows | **3.3** | 3.3 (1.02x) | 3.7 (1.12x) |
+| create 1,000 rows | 31.1 (1.05x) | **29.7** | 32.3 (1.09x) |
+| replace 1,000 rows | 29.5 (1.01x) | **29.1** | 30.3 (1.04x) |
+| update every 10th row | 3.6 (1.20x) | 3.1 (1.02x) | **3.0** |
+| select row | **0.2** | 0.3 (1.50x) | 1.1 (5.50x) |
+| swap rows | 2.5 (1.19x) | 2.2 (1.02x) | **2.1** |
+| remove row | 2.3 (1.05x) | **2.2** | 2.5 (1.14x) |
+| create 10,000 rows | **250** | 256 (1.02x) | 256 (1.02x) |
+| append 1,000 rows | **27.4** | 28.2 (1.03x) | 27.9 (1.02x) |
+| clear 1,000 rows | 3.3 (1.06x) | **3.1** | 3.6 (1.16x) |

@@ -36,18 +36,19 @@ const SPECULATION = /<script type="speculationrules">(.*?)<\/script>/
 // happy-dom swaps in its own Request, which Elysia cannot read headers from.
 const NativeRequest = Request
 
+// What the entry leaves on the window: `hydrate` hydrating a root, with `ready` settling once the document it loaded in has hydrated.
 interface ClientEntry {
-  ready: Promise<void>
-  hydrate: (root?: ParentNode) => Promise<void>
+  $kayHydrate: ((root?: ParentNode) => Promise<void>) & { ready: Promise<void> }
 }
 
 let hydrated = false
 
 // The entry hydrates the document it loads in; a module is evaluated once per process, so later documents go through its `hydrate`.
 async function hydrateFrom(html: string): Promise<void> {
-  const entry = await import(join(process.cwd(), '.kay/client/dist', ENTRY.exec(html)![1]!)) as ClientEntry
+  await import(join(process.cwd(), '.kay/client/dist', ENTRY.exec(html)![1]!))
+  const { $kayHydrate: hydrate } = globalThis as unknown as ClientEntry
 
-  await (hydrated ? entry.hydrate() : entry.ready)
+  await (hydrated ? hydrate() : hydrate.ready)
   hydrated = true
 }
 

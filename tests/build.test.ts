@@ -212,6 +212,12 @@ describe('kay build', () => {
       expect(entry).not.toContain('\n  ')
       expect(Bun.gunzipSync(await Bun.file(`${entryFile}.gz`).bytes())).toEqual(await Bun.file(entryFile).bytes())
       expect(await Bun.file(`${entryFile}.br`).exists()).toBe(true)
+
+      // The runtime and the entry's own code are one chunk, which every island and the page swap import alone: a page loads it, then one chunk per island.
+      const swap = (await readdir(dirname(entryFile))).find(file => file.startsWith('page-swap-') && file.endsWith('.js'))!
+
+      expect(Object.values(manifest.islands).filter(chunks => chunks.length !== 2 || chunks[1] !== manifest.entry)).toEqual([])
+      expect([...(await Bun.file(join(dirname(entryFile), swap)).text()).matchAll(/from\s*"\.\/([^"]+)"/g)].map(match => `/_kay/${match[1]}`)).toEqual([manifest.entry])
     }
     finally {
       await rm(join(root, '.kay'), { recursive: true, force: true })

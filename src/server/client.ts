@@ -10,6 +10,7 @@ import { ASSET_PREFIX, clientDir } from '../build/assets'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { findKayLibraries, reachableLibraryFiles, sourceWords } from '../build/libraries'
 import { kay } from '../build/plugin'
+import { ANCHOR, runtimeAnchor, runtimeChunk } from '../build/runtime-chunk'
 import { refuseServerOnlyReads } from '../build/server-only'
 import { forgetBundleMaps } from '../build/sourcemap'
 import { styleImports, withoutStyles } from '../build/styles'
@@ -199,41 +200,61 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     return { entryImports: [], islands: {} }
 
   const entryFile = join(base, 'entry.ts')
+  const bootFile = join(base, 'boot.ts')
   const apiDir = resolve(root, options.api ?? 'src/api')
   const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
 
   // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`.
   const publicEnv = options.publicEnv ? `${options.base ?? ''}${PUBLIC_ENV_PATH}` : undefined
 
-  await Bun.write(entryFile, [
+  await Bun.write(bootFile, [
     ...publicEnv ? [`import kayPublicEnv from ${JSON.stringify(publicEnv)}`] : [],
     `import { ${[...navigation ? ['disposeIslands'] : [], ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
     '',
     ...publicEnv ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
     `const islands = {\n${registry}\n}`,
+    'const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)',
     '',
-    ...options.hot ? ['enableHotSwap(islands)', ''] : [],
-    'export const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)',
-    'export const ready = hydrate()',
+    // A lazy module of the runtime the page also loads up front, as `navigate`, imports the module importing this one, a cycle in which this one may run before a module it calls: what it starts waits until all of them have run.
+    'const ready = Promise.resolve().then(async () => {',
+    ...options.hot ? ['  enableHotSwap(islands)'] : [],
+    '  const hydrated = hydrate()',
     '',
-    ';(globalThis as { $kayHydrate?: () => unknown }).$kayHydrate = hydrate',
-    ...navigation ? ['startNavigation({ hydrate, dispose: disposeIslands })'] : [],
+    ...navigation ? ['  startNavigation({ hydrate, dispose: disposeIslands })', ''] : [],
+    '  return hydrated',
+    '})',
+    '',
+    ';(globalThis as { $kayHydrate?: unknown }).$kayHydrate = Object.assign(hydrate, { ready })',
     '',
   ].join('\n'))
+
+  // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
+  const define = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') }
+  const external = publicEnv ? [publicEnv] : []
+  const plugins = async (anchor?: string) => [withoutStyles(), apiStubs(apiDir, await scanApi(apiDir)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings, anchor }), ...options.plugins ?? []]
+
+  await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
+
+  const chunk = await runtimeChunk(entryFile, { plugins: await plugins(), define, external })
+
+  // In development the entry keeps its own code, the islands it imports by their hashed names included: the runtime's chunk then stays as it was through an edit of an island, which swaps in alone.
+  if (chunk)
+    await Bun.write(entryFile, `import ${JSON.stringify(ANCHOR)}\n${options.hot ? `import ${JSON.stringify(bootFile)}\n` : ''}`)
 
   const build = await Bun.build({
     entrypoints: [entryFile],
     outdir: clientDir(root),
     target: 'browser',
     splitting: true,
+    // The pages preload the chunks of their islands themselves, and every island shares the one the page loads first, so Bun's own preloading would only weigh on it.
+    modulePreload: false,
     minify: options.minify ?? false,
     sourcemap: options.sourcemap ? 'linked' : 'none',
     metafile: true,
-    // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
-    define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') },
+    define,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
-    external: publicEnv ? [publicEnv] : [],
-    plugins: [withoutStyles(), apiStubs(apiDir, await scanApi(apiDir)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings }), ...options.plugins ?? []],
+    external,
+    plugins: chunk ? [runtimeAnchor(chunk, options.hot ? undefined : bootFile), ...await plugins(ANCHOR)] : await plugins(),
   })
 
   if (!build.success)
@@ -334,8 +355,12 @@ function islandManifest(root: string, outputs: Outputs, islands: Map<string, str
     if (!entryFile(root, meta.entryPoint, entries))
       continue
 
-    manifest.entry = assetUrl(output)
-    manifest.entryImports = [...closure(output)].filter(chunk => chunk !== output).map(assetUrl)
+    // An entry holding nothing but the import of the runtime's chunk is a request the page saves by loading that chunk itself.
+    const statics = meta.imports.filter(imported => imported.kind === 'import-statement')
+    const loaded = statics.length === 1 && Object.values(meta.inputs ?? {}).every(input => !input.bytesInOutput) ? statics[0]!.path : output
+
+    manifest.entry = assetUrl(loaded)
+    manifest.entryImports = [...closure(loaded)].filter(chunk => chunk !== loaded).map(assetUrl)
   }
 
   return manifest

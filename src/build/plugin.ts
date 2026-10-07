@@ -20,6 +20,8 @@ export interface KayPluginOptions {
   cacheDir?: string
   // The app's own module for a library's settings, by the library's name, relative to the root: `kay.config.ts`'s `settings`.
   settings?: Record<string, string>
+  // A module every component imports, which ties the runtime it uses to the chunk the page loads first: see runtime-chunk.ts.
+  anchor?: string
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
@@ -58,7 +60,9 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
       const load = async (file: string) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
-        return { contents: await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir }), loader: 'ts' as const }
+        const contents = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir })
+
+        return { contents: options.anchor ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents, loader: 'ts' as const }
       }
 
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))

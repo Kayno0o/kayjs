@@ -223,6 +223,14 @@ function asksTypeof(node: t.Node, name: string): boolean {
 export async function refuseServerOnlyReads(root: string, dir: string, outputs: Record<string, Output>): Promise<void> {
   const problems: string[] = []
   const schemaBuilders = new Set<string>()
+  // Only the modules whose code is in a chunk: a tree-shaken one is listed with none of it.
+  const modulesOf = async (meta: Output) => new Map((await Promise.all(Object.entries(meta.inputs ?? {}).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(async ([input]) => {
+    const path = resolve(process.cwd(), input)
+    const source = await sourceOf(path)
+
+    return source === undefined ? undefined : [path.startsWith(root + sep) ? relative(root, path) : input, source] as const
+  }))).filter(entry => entry !== undefined))
+  let buildsSchemas = false
 
   await Promise.all(Object.entries(outputs).map(async ([file, meta]) => {
     if (!file.endsWith('.js'))
@@ -240,30 +248,27 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
     if (names === undefined)
       return unchecked('could not be parsed')
 
-    const buildsSchemas = code.includes(BROWSER_T)
+    buildsSchemas ||= code.includes(BROWSER_T)
 
-    if (names.size === 0 && !buildsSchemas)
+    if (names.size === 0)
       return
 
-    // Only the modules whose code is in the chunk: a tree-shaken one is listed with none of it.
-    const kept = Object.entries(meta.inputs ?? {}).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(([input]) => input)
-    const sources = new Map((await Promise.all(kept.map(async (input) => {
-      const path = resolve(process.cwd(), input)
-      const source = await sourceOf(path)
-
-      return source === undefined ? undefined : [path.startsWith(root + sep) ? relative(root, path) : input, source] as const
-    }))).filter(entry => entry !== undefined))
-
-    if (buildsSchemas) {
-      const builders = [...sources].filter(([module, source]) => importsKayT(KAY_FILE.test(module) ? scriptFence(source) : source)).map(([module]) => module)
-
-      for (const module of builders.length > 0 ? builders : [`a module of ${basename(file)} kay could not pin down`])
-        schemaBuilders.add(module)
-    }
-
-    for (const { name, modules } of serverOnlyReads(code, sources))
+    for (const { name, modules } of serverOnlyReads(code, await modulesOf(meta)))
       problems.push(`\`${name}\` in ${basename(file)}, read by ${modules.length > 0 ? modules.join(', ') : 'a module of it kay could not pin down'}`)
   }))
+
+  // The browser's `t` sits with the runtime, and the modules taking it in any chunk.
+  if (buildsSchemas) {
+    for (const meta of Object.values(outputs)) {
+      for (const [module, source] of await modulesOf(meta)) {
+        if (importsKayT(KAY_FILE.test(module) ? scriptFence(source) : source))
+          schemaBuilders.add(module)
+      }
+    }
+
+    if (schemaBuilders.size === 0)
+      schemaBuilders.add('a module kay could not pin down')
+  }
 
   const refusals: string[] = []
 
