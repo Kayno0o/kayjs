@@ -1,7 +1,7 @@
-import type { Attribute, AwaitNode, ElementNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, formFieldOf } from './ast'
+import { actionOf, errorKey, formFieldOf } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 import { BEHAVIOUR, CONTENT_PROPERTIES, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
 import { childItems, soleDynamic } from './items'
@@ -38,7 +38,8 @@ export class DomTemplate {
   // The action the form being emitted posts to, whose refusal marks its fields invalid.
   private formTarget: Span | undefined
 
-  constructor(private readonly b: CodeBuilder, private readonly src: string) {}
+  // `errors`: what a refused form's fields are described by.
+  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly errors?: ErrorMessages) {}
 
   // A block: one element, or a fragment of its items, or `null` when empty.
   block(nodes: Node[]): void {
@@ -315,8 +316,12 @@ export class DomTemplate {
       own.push(variable => this.spreadBinding(element, variable(node), children.length === 0))
     }
     else {
+      const errorId = this.errors?.ids.get(element)
+
       if (element.id)
         html += ` id="${escapeStaticAttribute(this.source(element.id))}"`
+      else if (errorId)
+        html += ` id="${escapeStaticAttribute(errorId)}"`
 
       const classAttribute = this.classAttribute(element)
       const imageSizes = this.imageSizes(element)
@@ -408,12 +413,19 @@ export class DomTemplate {
         })
       }
 
-      if (actionOf(element, this.src)) {
+      const action = actionOf(element, this.src)
+
+      if (action) {
         if (!this.named(element, 'method'))
           html += ' method="post"'
 
         if (!this.named(element, 'enctype'))
           html += ' enctype="multipart/form-data"'
+
+        const described = this.describedBy(element, action.expression, '')
+
+        if (described)
+          own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), "") && ${JSON.stringify(described)}));`))
       }
     }
 
@@ -423,6 +435,11 @@ export class DomTemplate {
       const target = this.formTarget!
 
       own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-invalid", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)})));`))
+
+      const described = this.describedBy(element, target, field.name)
+
+      if (described)
+        own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)}) && ${JSON.stringify(described)}));`))
     }
 
     html += '>'
@@ -792,6 +809,11 @@ export class DomTemplate {
 
   private named(element: ElementNode, name: string): boolean {
     return element.attributes.some(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === name)
+  }
+
+  // The element showing the error a refused post got for the field, `''` for the form's own message, unless the template describes it itself.
+  private describedBy(element: ElementNode, action: Span, field: string): string | undefined {
+    return this.named(element, 'aria-describedby') ? undefined : this.errors?.describing.get(errorKey(this.source(action), field))
   }
 
   private staticAttribute(element: ElementNode, name: string): string | undefined {

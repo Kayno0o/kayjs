@@ -26,6 +26,8 @@ const SWAP_PATTERN = /\$kayAwait/
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
 // Scripts the browser runs; any other type, such as `application/json` or `application/ld+json`, holds data of the page it came with.
 const RUNNABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/javascript', 'importmap'])
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
+const ID_LIST = /\s+/
 
 let current = 0
 let checks: Promise<typeof import('./validate')> | undefined
@@ -355,6 +357,9 @@ function swapBody(next: Document, swap: Swap): void {
 
 // The element focused before, found again on a refreshed page; on a new page its autofocus field or its heading, so a screen reader starts there, the title announced.
 function moveFocus(swap: Swap): void {
+  if (swap.refused && showRefusal(document.forms[swap.refused.form], swap.refused.control))
+    return
+
   if (swap.focus !== undefined) {
     const before = swap.focus
 
@@ -384,6 +389,34 @@ function moveFocus(swap: Swap): void {
   announce(document.title)
 }
 
+// A refused form's first invalid field takes the focus, read out with the error describing it; with none, what describes the form is announced and the control focused before, a submit button with no id or name too, is focused again.
+function showRefusal(form: HTMLFormElement | undefined, control: number): boolean {
+  if (!form)
+    return false
+
+  const field = form.querySelector<HTMLElement>('[aria-invalid="true"]')
+
+  if (field) {
+    field.focus()
+
+    return true
+  }
+
+  const message = form.getAttribute('aria-describedby')?.split(ID_LIST).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean).join(' ')
+
+  if (message)
+    announce(message)
+
+  const again = form.elements[control]
+
+  if (!(again instanceof HTMLElement))
+    return false
+
+  again.focus({ preventScroll: true })
+
+  return true
+}
+
 // Pinned to the top corner: left where it falls, after the page, it would add a pixel to a layout filling the screen and give it a scrollbar.
 function announce(text: string): void {
   const region = document.createElement('div')
@@ -396,9 +429,9 @@ function announce(text: string): void {
   }, 50)
 }
 
-// The page's stylesheets opt in to view transitions between pages with `@view-transition { navigation: auto; }`, which a swap honours as a full load would.
+// The page's stylesheets opt in to view transitions between pages with `@view-transition { navigation: auto; }`, which a swap honours as a full load would, inside an `@media` or `@supports` that holds too; never for a visitor asking for less motion.
 function viewTransitions(): boolean {
-  if (!('startViewTransition' in document))
+  if (!('startViewTransition' in document) || matchMedia(REDUCED_MOTION).matches)
     return false
 
   for (const sheet of document.styleSheets) {
@@ -411,10 +444,20 @@ function viewTransitions(): boolean {
       continue
     }
 
-    for (const rule of rules) {
-      if (rule.constructor.name === 'CSSViewTransitionRule' && (rule as CSSRule & { navigation?: string }).navigation === 'auto')
-        return true
-    }
+    if (optsIn(rules))
+      return true
+  }
+
+  return false
+}
+
+function optsIn(rules: CSSRuleList): boolean {
+  for (const rule of rules) {
+    if (rule.constructor.name === 'CSSViewTransitionRule' && (rule as CSSRule & { navigation?: string }).navigation === 'auto')
+      return true
+
+    if (((rule instanceof CSSMediaRule && matchMedia(rule.media.mediaText).matches) || (rule instanceof CSSSupportsRule && CSS.supports(rule.conditionText))) && optsIn(rule.cssRules))
+      return true
   }
 
   return false
@@ -463,6 +506,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
   const data = new FormData(form, submitter)
   const multipart = (submitter?.getAttribute('formenctype') ?? form.enctype) === 'multipart/form-data'
   const focused = document.activeElement
+  const refused = { form: [...document.forms].indexOf(form), control: [...form.elements].indexOf(focused as Element) }
 
   busyForms.add(form)
   form.setAttribute('aria-busy', 'true')
@@ -508,7 +552,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
   // A refused post's page replaces this one where it stands, as its redirect back here did; an error page is shown as it came; a denial answered as text, as the browser shows text.
   if (HTML.test(response.type)) {
     try {
-      await show({ url: location.href, type: response.type, html: response.text }, '', response.refused ? { history: 'none', scroll: 'keep', focus: focused } : { history: 'none', scroll: 'top' })
+      await show({ url: location.href, type: response.type, html: response.text }, '', response.refused ? { history: 'none', scroll: 'keep', focus: focused, refused } : { history: 'none', scroll: 'top' })
     }
     catch (error) {
       console.error(error)

@@ -3,7 +3,7 @@ import type { LintName } from './lints'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, awaitBlocks, isChildrenSlot, isHead, tryBlocks } from './ast'
+import { actionOf, awaitBlocks, errorMessages, isChildrenSlot, isHead, tryBlocks } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -268,10 +268,11 @@ class Generator {
 
     b.add('\nreturn ')
 
-    const domTemplate = dom ? new DomTemplate(b, this.src) : undefined
+    const errors = html || dom ? errorMessages(template, this.src) : undefined
+    const domTemplate = dom ? new DomTemplate(b, this.src, errors) : undefined
 
     if (html)
-      new HtmlTemplate(b, this.src, { hydratable: this.options.hydratable, accessorLoops: !staticLoops }).value(this.withoutSlots(template))
+      new HtmlTemplate(b, this.src, { hydratable: this.options.hydratable, accessorLoops: !staticLoops, errors }).value(this.withoutSlots(template))
     else if (domTemplate)
       domTemplate.block(this.withoutSlots(template))
     else

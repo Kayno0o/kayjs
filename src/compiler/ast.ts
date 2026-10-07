@@ -184,6 +184,99 @@ export function formFieldOf(element: ElementNode, source: string): FormField | u
   return field
 }
 
+// The elements showing an action's errors, and the id each field, or the form for its own message, is described by while refused.
+export interface ErrorMessages {
+  // Generated ids, for elements with none of their own.
+  ids: Map<ElementNode, string>
+  // Keyed by `errorKey`.
+  describing: Map<string, string>
+}
+
+const ERROR_READ = /^([\w$.]+)\.error\((?:(['"])([^'"]*)\2)?\)$/
+const WHITESPACE = /\s+/g
+const ID_UNSAFE = /[^\w-]+/g
+
+export function errorKey(action: string, field: string): string {
+  return `${action.replace(WHITESPACE, '')}\n${field}`
+}
+
+// `if add.error('title') as message` and `p {add.error('title')}`: the element shown holds the message, outside a `for`, which would repeat its id.
+export function errorMessages(nodes: Node[], source: string): ErrorMessages {
+  const found: ErrorMessages = { ids: new Map(), describing: new Map() }
+  const text = (span: Span) => source.slice(span.start, span.end)
+  const read = (span: Span) => ERROR_READ.exec(text(span).replace(WHITESPACE, ''))
+
+  const shows = (element: ElementNode | undefined, match: RegExpExecArray | null) => {
+    if (!element || !match || element.component || element.attributes.some(attribute => attribute.kind === 'spread'))
+      return
+
+    const key = errorKey(match[1]!, match[3] ?? '')
+
+    if (found.describing.has(key))
+      return
+
+    const own = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && text(attribute.name) === 'id')
+    let id = element.id ? text(element.id) : own?.kind === 'static' ? own.text : undefined
+
+    if (own !== undefined && own.kind !== 'static')
+      return
+
+    if (id === undefined) {
+      id = `${match[1]!.replaceAll('.', '-')}-${match[3] ? `${match[3].replace(ID_UNSAFE, '-')}-` : ''}error`
+      found.ids.set(element, id)
+    }
+
+    found.describing.set(key, id)
+  }
+
+  const visit = (children: Node[]) => {
+    for (const node of children) {
+      switch (node.kind) {
+        case 'element':
+          for (const child of node.children) {
+            if (child.kind === 'text') {
+              for (const part of child.parts) {
+                if (part.kind === 'expression')
+                  shows(node, read(part.expression))
+              }
+            }
+          }
+
+          visit(node.children)
+
+          break
+        case 'if':
+          for (const branch of node.branches) {
+            if (branch.test)
+              shows(branch.children.find((child): child is ElementNode => child.kind === 'element'), read(branch.test))
+
+            visit(branch.children)
+          }
+
+          break
+        case 'await':
+          for (const block of awaitBlocks(node))
+            visit(block)
+
+          break
+        case 'try':
+          for (const block of tryBlocks(node))
+            visit(block)
+
+          break
+        case 'slot':
+          visit(node.children)
+
+          break
+      }
+    }
+  }
+
+  visit(nodes)
+
+  return found
+}
+
 export function isHead(node: Node): node is ElementNode & { name: 'head' } {
   return node.kind === 'element' && !node.component && node.name === 'head'
 }

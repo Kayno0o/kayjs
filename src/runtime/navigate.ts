@@ -27,6 +27,8 @@ export interface Swap {
   refresh?: boolean
   // The element to focus once swapped, found again by id or name; the new page's own otherwise.
   focus?: Element | null
+  // A form the server refused a post of, and the control focused in it, by their index among the page's forms and the form's controls.
+  refused?: { form: number, control: number }
 }
 
 interface HistoryState {

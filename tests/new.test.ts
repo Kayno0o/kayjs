@@ -224,7 +224,7 @@ describe('kay new', () => {
       expect(Object.keys(client.islands)).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
       const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
 
-      expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toContain('@view-transition')
+      expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toMatch(/@media \(prefers-reduced-motion: ?no-preference\) ?\{\s*@view-transition/)
     }
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })

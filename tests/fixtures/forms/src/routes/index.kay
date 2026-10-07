@@ -19,6 +19,11 @@ export const join = action(t.Object({ email: t.String({ format: 'email', maxLeng
 
 export const bump = action(t.Object({}), () => ++tally.count)
 
+export const busy = action(t.Object({
+  topic: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
+  note: t.Optional(t.String({ maxLength: 3, error: 'Too long' })),
+}), (_input, ctx) => ctx.fail(503, 'Try later'))
+
 export const odd = action(t.Object({}), (_input, ctx) => ctx.fail(409, { retry: () => 'later' }))
 
 const tally = { count: 0 }
@@ -50,6 +55,17 @@ form(action={ping})
   if ping.succeeded() as done
     p.done {done.data}
   button Ping
+form.busy(action={busy})
+  input(name="topic")
+  input(name="note" aria-describedby="note-help")
+  p#note-help Optional
+  if busy.error('topic') as message
+    p#topic-problem {message}
+  if busy.error('note') as message
+    p.note-error {message}
+  if busy.error() as message
+    p.busy-error {message}
+  button Busy
 Signup
 p.tally {tally.count}
 a.other(href="/other") Other

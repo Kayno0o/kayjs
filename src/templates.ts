@@ -8,8 +8,10 @@ const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
 const THEME_FILES: Record<string, string> = {
   'src/app.css': `@import 'tailwindcss';
 
-@view-transition {
-  navigation: auto;
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
 }
 
 /* Static: the picker reads every accent through var(), which Tailwind cannot see. */

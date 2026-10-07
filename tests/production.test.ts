@@ -202,7 +202,7 @@ describe('action protection', () => {
     const failed = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.30' }, body: stringify({ message: 'fail' }) }))
 
     expect(parse(await failed.text())).toEqual({ errors: { '': 'Not sent; try again later' }, data: 'Not sent; try again later' })
-    expect((await site.submit(enquire, { message: 'fail' }, { from: '/enquiry' })).html).toContain('<p class="error">Not sent; try again later</p>')
+    expect((await site.submit(enquire, { message: 'fail' }, { from: '/enquiry' })).html).toContain('<p id="enquire-error" class="error">Not sent; try again later</p>')
   })
 
   it('answers a bot the honeypot caught as if its post went through, when the action says so', async () => {

@@ -389,6 +389,63 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
     expect(warnings).toEqual([])
   })
 
+  it('focuses the field a post was refused for, described by its message', async () => {
+    await page.goto(`${origin}/second`)
+    await page.fill('input[name="title"]', 'ab')
+    await page.focus('button.unchecked')
+    await page.keyboard.press('Enter')
+    await page.locator('p.title-error', { hasText: 'Too short' }).waitFor()
+    await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'title')
+
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('aria-describedby'))).toBe('add-title-error')
+    expect(await page.evaluate(() => document.getElementById('add-title-error')?.textContent)).toBe('Too short')
+  })
+
+  it('announces a form\'s own refusal, the button that posted it focused again', async () => {
+    await page.goto(`${origin}/second`)
+    await page.fill('input[name="title"]', 'busy')
+    await page.focus('form button')
+    await page.keyboard.press('Enter')
+    await page.locator('p.form-error', { hasText: 'Try later' }).waitFor()
+    await page.waitForFunction(() => [...document.querySelectorAll('body > [aria-live="polite"]')].some(region => region.textContent === 'Try later'))
+
+    expect(await page.evaluate(() => document.querySelector('form')?.getAttribute('aria-describedby'))).toBe('add-error')
+    expect(await page.evaluate(() => document.activeElement === document.querySelector('form button'))).toBe(true)
+  })
+
+  it('animates a swap where a stylesheet opts in under a condition that holds, and never for a visitor asking for less motion', async () => {
+    const transitions = async (reducedMotion: 'reduce' | 'no-preference', css: string): Promise<number> => {
+      const fresh = await browser.newPage({ reducedMotion })
+
+      await fresh.goto(origin)
+      await fresh.addStyleTag({ content: css })
+      await fresh.evaluate(() => {
+        const start = document.startViewTransition.bind(document)
+        const counted = window as { kayTransitions?: number }
+
+        counted.kayTransitions = 0
+        document.startViewTransition = ((update: () => void) => {
+          counted.kayTransitions!++
+
+          return start(update)
+        }) as typeof document.startViewTransition
+      })
+      await fresh.click('a.second')
+      await fresh.locator('h1', { hasText: 'Second' }).waitFor()
+
+      const count = await fresh.evaluate(() => (window as { kayTransitions?: number }).kayTransitions!)
+
+      await fresh.close()
+
+      return count
+    }
+
+    expect(await transitions('no-preference', '@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }')).toBe(1)
+    expect(await transitions('no-preference', '@supports (display: grid) { @view-transition { navigation: auto; } }')).toBe(1)
+    expect(await transitions('reduce', '@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }')).toBe(0)
+    expect(await transitions('reduce', '@view-transition { navigation: auto; }')).toBe(0)
+  })
+
   it('announces the swapped page without making it any taller, so one filling the screen gets no scrollbar', async () => {
     await page.goto(origin)
     await page.click('a.second')

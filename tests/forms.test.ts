@@ -8,9 +8,10 @@ import { chromium } from 'playwright-core'
 import { browserPath, testSite } from '../src/test'
 
 const site = await testSite({ routes: 'tests/fixtures/forms/src/routes' })
-const { save, ping, odd } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/index.kay')) as {
+const { save, ping, busy, odd } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/index.kay')) as {
   save: Action<Record<string, string | boolean>, unknown, 'website'>
   ping: Action<Record<string, never>, string>
+  busy: Action<Record<string, string>, unknown>
   odd: Action<Record<string, never>, unknown>
 }
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
@@ -26,13 +27,14 @@ describe('a form posting to an action', () => {
     expect(html).toContain('<input type="radio" name="size" value="s" checked>')
     expect(html).toContain('<input type="checkbox" name="terms" checked>')
     expect(html).not.toContain('aria-invalid')
+    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy" method="post" enctype="multipart/form-data">')
   })
 
   it('shows a refused post again with what was sent, refused fields marked, a password never echoed', async () => {
     const { status, html } = await site.submit(save, REFUSED, { from: '/' })
 
     expect(status).toBe(422)
-    expect(html).toContain('<input name="name" value="A" aria-invalid="true">')
+    expect(html).toContain('<input name="name" value="A" aria-invalid="true" aria-describedby="save-name-error">')
     expect(html).toContain('<input type="password" name="password">')
     expect(html).not.toContain('hunter2')
     expect(html).toContain('<textarea name="bio">Hi &lt;b></textarea>')
@@ -41,8 +43,27 @@ describe('a form posting to an action', () => {
     expect(html).toContain('<input type="radio" name="size" value="l" checked>')
     expect(html).toContain('<input type="checkbox" name="news" checked>')
     expect(html).toContain('<input type="checkbox" name="terms">')
-    expect(html).toContain('<p class="error">Too short</p>')
+    expect(html).toContain('<p id="save-name-error" class="error">Too short</p>')
     expect(html).toContain('<p class="status">422</p>')
+  })
+
+  it('describes a refused field by the message the template shows for it, keeping an id or a description of the template\'s own', async () => {
+    const { status, html } = await site.submit(busy, { topic: 'ab', note: 'long' }, { from: '/' })
+
+    expect(status).toBe(422)
+    expect(html).toContain('<input name="topic" value="ab" aria-invalid="true" aria-describedby="topic-problem">')
+    expect(html).toContain('<p id="topic-problem">Too short</p>')
+    expect(html).toContain('<input name="note" aria-describedby="note-help" value="long" aria-invalid="true">')
+    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy" method="post" enctype="multipart/form-data">')
+  })
+
+  it('describes a form by its own message once the handler refused it', async () => {
+    const { status, html } = await site.submit(busy, { topic: 'abc' }, { from: '/' })
+
+    expect(status).toBe(503)
+    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy" method="post" enctype="multipart/form-data" aria-describedby="busy-error">')
+    expect(html).toContain('<p id="busy-error" class="busy-error">Try later</p>')
+    expect(html).toContain('<input name="topic" value="abc">')
   })
 
   it('leaves the honeypot empty when a bot filled it in', async () => {
@@ -155,6 +176,8 @@ describe.skipIf(!path && !process.env.CI)('an island form posting to an action',
     await page.waitFor('p.signup-error', { text: 'Not an email' })
 
     expect(await page.evaluate(() => document.querySelector('form.signup input')?.getAttribute('aria-invalid'))).toBe('true')
+    expect(await page.evaluate(() => document.querySelector('form.signup input')?.getAttribute('aria-describedby'))).toBe('join-email-error')
+    expect(await page.evaluate(() => document.querySelector('p.signup-error')?.id)).toBe('join-email-error')
     expect(page.errors).toEqual([])
   })
 })

@@ -9,6 +9,9 @@ export const add = action(t.Object({ title: t.String({ maxLength: 200, minLength
   if (title === 'taken')
     return ctx.fail(409, { message: 'Already taken' })
 
+  if (title === 'busy')
+    return ctx.fail(503, 'Try later')
+
   store.titles.push(title)
 
   return title
@@ -26,7 +29,12 @@ head
 h1 Second
 form(action={add})
   input(name="title" value={failure?.values.title})
+  if add.error('title') as message
+    p.title-error {message}
+  if add.error() as message
+    p.form-error {message}
   button Add
+  button.unchecked(formnovalidate) Add unchecked
 if failure?.data as data
   p.error {data.message}
 if success as done

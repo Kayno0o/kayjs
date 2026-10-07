@@ -1,7 +1,7 @@
-import type { Attribute, AwaitNode, ElementNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, formFieldOf } from './ast'
+import { actionOf, errorKey, formFieldOf } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
@@ -35,6 +35,8 @@ export interface HtmlOptions {
   hydratable?: boolean
   // Loop rows read their item, and a keyed row its index, through functions, as the island build of the same template does.
   accessorLoops?: boolean
+  // What a refused form's fields are described by.
+  errors?: ErrorMessages
 }
 
 // Static text written as markup: `& b` and `&amp;` both stay as written, the way JSX text reaches the server markup.
@@ -324,10 +326,14 @@ export class HtmlTemplate {
     let checkboxValue: (() => void) | undefined
     const imageSizes = this.imageSizes(element)
 
+    const errorId = this.options.errors?.ids.get(element)
+
     markup.text(`<${name}`)
 
     if (element.id)
       markup.text(` id="${escapeStaticAttribute(this.source(element.id))}"`)
+    else if (errorId)
+      markup.text(` id="${escapeStaticAttribute(errorId)}"`)
 
     if (element.classes.length > 0) {
       const shorthand = this.shorthand(element)
@@ -491,6 +497,16 @@ export class HtmlTemplate {
           fieldArguments()
           b.add('))')
         })
+
+        const described = this.describedBy(element, target, field.name)
+
+        if (described) {
+          markup.dynamic(() => {
+            b.add(`${htmlAlias('attribute')}("aria-describedby", KayFormInvalid`)
+            fieldArguments()
+            b.add(`) && ${JSON.stringify(described)})`)
+          })
+        }
       }
 
       if (field.fill === 'content') {
@@ -505,13 +521,20 @@ export class HtmlTemplate {
       }
     }
 
-    if (actionOf(element, this.src)) {
+    const action = actionOf(element, this.src)
+
+    if (action) {
       if (!this.named(element, 'method'))
         markup.text(' method="post"')
 
       // Multipart whatever the schema, so file inputs post too; Elysia parses either encoding alike.
       if (!this.named(element, 'enctype'))
         markup.text(' enctype="multipart/form-data"')
+
+      const described = this.describedBy(element, action.expression, '')
+
+      if (described)
+        markup.dynamic(() => b.add(`${htmlAlias('attribute')}("aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), "") && ${JSON.stringify(described)})`))
     }
 
     markup.text('>')
@@ -858,6 +881,11 @@ export class HtmlTemplate {
 
   private named(element: ElementNode, name: string): boolean {
     return element.attributes.some(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === name)
+  }
+
+  // The element showing the error a refused post got for the field, `''` for the form's own message, unless the template describes it itself.
+  private describedBy(element: ElementNode, action: Span, field: string): string | undefined {
+    return this.named(element, 'aria-describedby') ? undefined : this.options.errors?.describing.get(errorKey(this.source(action), field))
   }
 
   private source(span: Span): string {
