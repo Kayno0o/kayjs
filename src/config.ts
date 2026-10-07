@@ -1,5 +1,6 @@
 import type { BunPlugin } from 'bun'
 import type { LintLevels } from './compiler/lints'
+import type { Duration } from './runtime/duration'
 import type { JsonLd } from './runtime/seo'
 import type { EnvSchema } from './server/env'
 import type { RequestLogger } from './server/log'
@@ -53,8 +54,8 @@ export interface KayConfig {
   trailingSlash?: TrailingSlash
   // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.
   content?: string
-  // Seconds a stopping server gives open requests and streams to finish before closing them; 10 by default.
-  shutdownTimeout?: number
+  // How long a stopping server gives open requests and streams to finish before closing them, seconds or a string such as '30s'; 10 seconds by default.
+  shutdownTimeout?: Duration
   // Swaps the next page in place when a link or a form of the site is followed from a page with islands or forms posting to actions, so islands marked `persist` live on; on by default. `false` loads every page as a plain site does.
   navigation?: boolean
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.

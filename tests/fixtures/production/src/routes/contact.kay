@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const send = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { rateLimit: { max: 2, window: 60 }, honeypot: 'website' })
+export const send = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { rateLimit: { max: 2, window: '1m' }, honeypot: 'website' })
 
 const failure = ctx.failed(send)
 const sent = ctx.succeeded(send)

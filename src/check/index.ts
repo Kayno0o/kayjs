@@ -5,6 +5,7 @@ import type { LintLevel, LintLevels } from '../compiler/lints'
 import type { I18nConfig } from '../config'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
+import type { Duration } from '../runtime/duration'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ApiModule } from '../server/api'
 import type { Redirects } from '../server/redirects'
@@ -66,7 +67,7 @@ export interface CheckOptions {
   // Where the site is mounted, the origin it is public at and how long a stopping server waits, which the server refuses at boot when it cannot read them.
   base?: string
   site?: string
-  shutdownTimeout?: number
+  shutdownTimeout?: Duration
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
   i18n?: I18nConfig
   // The level of each lint, over its default.

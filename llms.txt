@@ -11,7 +11,7 @@
 - The component script exports types only. Shared values live in `.ts` modules.
 - A page has no props: its data comes from its `--- server` fence.
 - `window`, `document`, `localStorage` and the other globals only a browser has are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
-- Durations kay's config and server code take are in seconds: `cached`'s `ttl`, `revalidate`, a session's `maxAge`, `rateLimit`'s `window` and `shutdownTimeout`. Only `kay/test`'s browser `timeout` is in milliseconds, as `bun:test`'s own timeouts are.
+- Durations kay's config and server code take are seconds as a number, or a number with its unit as a string, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`): `cached`'s `ttl`, `revalidate`, a session's `maxAge`, `rateLimit`'s `window` and `shutdownTimeout`. Each must be positive, which `kay check` reports for a literal `cached` ttl and the server for the rest. Only `kay/test`'s browser `timeout` is in milliseconds, as `bun:test`'s own timeouts are; a store's `set(id, data, maxAge)` gets seconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.
 
@@ -571,7 +571,7 @@ h1 {post.title}
 
 Each value is a string with no empty, `.` or `..` segment, a catch-all's included with its slashes. `export const prerender = false` prerenders nothing.
 
-`export const revalidate = 3600` beside `prerender` keeps a prerendered page fresh: once it is older than that many seconds, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does; every request after that render lands gets the new page, with a new ETag and compressed copies. One render runs at a time per path. A render that fails or answers 5xx is logged and leaves the page as it was, the next attempt coming a minute later at most. The new page lives in memory, so a restart serves the built file again until it goes stale; an executable built a while ago revalidates on its first request.
+`export const revalidate = '1h'` beside `prerender` keeps a prerendered page fresh: once it is older than that, seconds or a string such as `'1h'`, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does; every request after that render lands gets the new page, with a new ETag and compressed copies. One render runs at a time per path. A render that fails or answers 5xx is logged and leaves the page as it was, the next attempt coming a minute later at most. The new page lives in memory, so a restart serves the built file again until it goes stale; an executable built a while ago revalidates on its first request.
 
 ## Content collections
 
@@ -662,14 +662,14 @@ The page's `<html lang>` is its locale. With `site`, every page links its copy i
 
 ## Caching
 
-`cached(key, ttl, load)` from `kay/cache` keeps what a load fetches for `ttl` seconds, shared by every request in the process:
+`cached(key, ttl, load)` from `kay/cache` keeps what a load fetches for `ttl`, seconds or a string such as `'5m'`, shared by every request in the process:
 
 ```kay
 --- server
 import { cached } from 'kay/cache'
 import { listPosts } from '../data'
 
-const posts = await cached('posts', 300, listPosts)
+const posts = await cached('posts', '5m', listPosts)
 ---
 ```
 
@@ -772,7 +772,7 @@ form(action={add})
 - A handler that throws answers 500 with a generic message and logs the error.
 - The handler's second argument has `request`, `cookies`, `locals`, `status(code)`, `headers`, `redirect(location)` and `fail(status, data)`, whose status is an error status, 400 to 599. A location outside ASCII, such as `/blog/日本語`, goes out percent-encoded, from pages and guards too; one holding a control character, or a scheme other than `http:` and `https:`, such as `javascript:`, throws.
 - A post another site sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403. The cookie carrying `ctx.succeeded` back is `HttpOnly`, `SameSite=Lax`, and `Secure` when the request came over https, `X-Forwarded-Proto` included.
-- A third argument protects an action from scripts: `action(schema, handler, { rateLimit: { max: 5, window: 60 }, honeypot: 'website' })`. `rateLimit` lets one client post `max` times every `window` seconds, then answers 429 with `Retry-After` and `errors['']` saying when to retry, counting every attempt, valid or not; the client is the address the request came from, or the one the proxies in front passed on once `proxy` says how to read it (see Behind a proxy). An IPv6 client counts as its /64 block, which one host or home network holds. Counts live in the process, so each server process keeps its own, for at most 10,000 clients per action, the oldest windows dropped past that. `honeypot` names a field the form renders out of sight, `input(name="website" tabindex="-1" autocomplete="off" aria-hidden="true")` hidden by a class, which people leave empty and bots fill in: a form post giving it any value, a file included, fails with 422 and `errors.website`, and `kay check` takes it as one of the form's fields. Neither reaches the handler.
+- A third argument protects an action from scripts: `action(schema, handler, { rateLimit: { max: 5, window: '1m' }, honeypot: 'website' })`. `rateLimit` lets one client post `max` times every `window`, then answers 429 with `Retry-After` and `errors['']` saying when to retry, counting every attempt, valid or not; the client is the address the request came from, or the one the proxies in front passed on once `proxy` says how to read it (see Behind a proxy). An IPv6 client counts as its /64 block, which one host or home network holds. Counts live in the process, so each server process keeps its own, for at most 10,000 clients per action, the oldest windows dropped past that. `honeypot` names a field the form renders out of sight, `input(name="website" tabindex="-1" autocomplete="off" aria-hidden="true")` hidden by a class, which people leave empty and bots fill in: a form post giving it any value, a file included, fails with 422 and `errors.website`, and `kay check` takes it as one of the form's fields. Neither reaches the handler.
 - A library or route limiting attempts its own way reads the client as `rateLimit` does: `clientAddress(request, server)` from `kay/server` gives the address, read through the `proxy` setting, and `rateKey(address)` the key a limit counts it under, an IPv6 address's /64 block.
 - A request to an action or an API route sends at most `bodyLimit` bytes, 1 MB unless kay.config.ts sets another: `bodyLimit: 4 * 1024 * 1024`. An action raises or lowers it for itself, `action(schema, handler, { bodyLimit: 20 * 1024 * 1024 })`, and an API module for its routes, `api({ bodyLimit })`. A bigger request is refused before anything reads it, from its `Content-Length`, or, sent in chunks without one, as soon as it passes the limit: a plain form post goes back to its page with `errors['']` saying the most it may send, an island's call throws `ActionError` with status 413 and that error, and an API route answers 413. Bun's own cap, 128 MB unless `new Elysia({ serve: { maxRequestBodySize } })` sets another, holds whatever `bodyLimit` says, and it alone limits the app's own routes.
 
@@ -828,7 +828,7 @@ const userId = await ctx.locals.session.get('userId')
 - `secret` is at least 32 characters, read from the environment. A list rotates secrets: the first seals new cookies, every one opens old ones, and a cookie an older one sealed goes out sealed with the first on its next use.
 - Without a `store`, the data travels in the cookie, sealed with AES-GCM so it can be neither read nor altered, about 3.5 KB at most: past that the response fails with an error saying so. Such a cookie cannot be revoked: `destroy()` clears the browser's copy, but one taken before stays valid until `maxAge`, so a site that must end a session everywhere, after a password change say, uses a store. With a store, the cookie carries only a sealed id, and `destroy()` deletes the session itself. `memoryStore()` keeps sessions in the process, gone on restart. `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine. Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, is a store too, such as one over Redis.
 - Values cross as island props do, Dates, Maps, Sets and bigints included.
-- The cookie, `session` unless `cookie` names another, is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` over https, `X-Forwarded-Proto` included. It belongs to the visited host alone, unless `domain` names the visited host or a parent of it, which the browser otherwise drops the cookie for: `domain: 'example.com'` shares one session between `app.example.com` and `auth.example.com`. Adding `domain` to a running site leaves each browser's host-only cookie beside the new one until it expires, so a site keeping its sessions in the cookie, without a store, changes its `cookie` name with it. Those sibling hosts still count as other sites to each other's actions, API posts and websockets, which only a page of the same host reaches. It is read on first use only, and written only when the session changed or is due an extension: a session lasts `maxAge` seconds without use, 30 days by default, and one used past half of it is extended. A forged or expired cookie reads as an empty session and is cleared.
+- The cookie, `session` unless `cookie` names another, is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` over https, `X-Forwarded-Proto` included. It belongs to the visited host alone, unless `domain` names the visited host or a parent of it, which the browser otherwise drops the cookie for: `domain: 'example.com'` shares one session between `app.example.com` and `auth.example.com`. Adding `domain` to a running site leaves each browser's host-only cookie beside the new one until it expires, so a site keeping its sessions in the cookie, without a store, changes its `cookie` name with it. Those sibling hosts still count as other sites to each other's actions, API posts and websockets, which only a page of the same host reaches. It is read on first use only, and written only when the session changed or is due an extension: a session lasts `maxAge` without use, `'30d'` by default, and one used past half of it is extended. A forged or expired cookie reads as an empty session and is cleared.
 
 ## Environment
 
@@ -1103,7 +1103,7 @@ With NODE_ENV=production, every request kay or the app's routes registered after
 
 `/_kay/health` answers `200 ok` while the server takes requests, for a load balancer or a container's health check. `health: { path: '/up', check: async () => await db.ping() }` in kay.config.ts moves it and adds a check: one returning `false`, throwing, or taking over 5 s answers 503, the error logged. `health: false` leaves the route out.
 
-On SIGTERM or SIGINT, a server started with `.listen()` stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0. New connections are refused from the signal on, so a load balancer stops sending any; a client on a connection kept alive gets 503 from the health route meanwhile. Requests still open after `shutdownTimeout` seconds, 10 by default, are closed and the process exits with 1. `kay dev` restarts at once instead.
+On SIGTERM or SIGINT, a server started with `.listen()` stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0. New connections are refused from the signal on, so a load balancer stops sending any; a client on a connection kept alive gets 503 from the health route meanwhile. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed and the process exits with 1. `kay dev` restarts at once instead.
 
 ## Background jobs
 

@@ -6,8 +6,9 @@ import process from 'node:process'
 import { brotliDecompressSync, constants } from 'node:zlib'
 import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
-import { Elysia } from 'elysia'
+import { Elysia, t } from 'elysia'
 import { check } from '../src/check'
+import { action } from '../src/runtime'
 import { inlineScriptHashes, pages, shutdown } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
@@ -134,8 +135,13 @@ describe('action protection', () => {
 
     expect(limited.status).toBe(429)
     expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
+    expect(Number(limited.headers.get('retry-after'))).toBeLessThanOrEqual(60)
     expect(parse(await limited.text())).toEqual({ errors: { '': expect.stringMatching(/^Too many attempts; try again in \d+ s$/) }, data: undefined })
     expect((await call('198.51.100.2')).status).toBe(200)
+  })
+
+  it('refuses a rate limit window it cannot read as the action is declared', () => {
+    expect(() => action(t.Object({}), () => 1, { rateLimit: { max: 1, window: 'soon' as never } })).toThrow('kay: rateLimit.window is \'soon\'; it takes a positive duration')
   })
 
   it('counts an IPv6 client by its /64, so rotating addresses inside it buys nothing', () => {
@@ -356,15 +362,15 @@ describe('revalidation', () => {
     }
   })
 
-  it('refuses a revalidate that is not a positive number of seconds', async () => {
+  it('refuses a revalidate that is no positive duration', async () => {
     const root = process.cwd()
     const manifest = (await readManifest(root))!
     const page = join(routes, 'broken.kay')
 
     try {
-      await Bun.write(page, '--- server\nexport const prerender = true\nexport const revalidate = \'1h\'\n---\np Broken\n')
+      await Bun.write(page, '--- server\nexport const prerender = true\nexport const revalidate = \'hourly\'\n---\np Broken\n')
 
-      await expect(prerenderPages(root, { routes }, (await readClient(root))!)).rejects.toThrow('exports a revalidate that is not a positive number of seconds')
+      await expect(prerenderPages(root, { routes }, (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration')
     }
     finally {
       await rm(page, { force: true })

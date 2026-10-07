@@ -1,7 +1,9 @@
+import type { Duration } from '../runtime/duration'
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import { Database } from 'bun:sqlite'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { durationSeconds } from '../runtime/duration'
 import { overHttps } from './actions'
 
 export type SessionData = Record<string, unknown>
@@ -19,8 +21,8 @@ export interface SessionOptions {
   secret: string | string[]
   // Defaults to `session`.
   cookie?: string
-  // Seconds a session lasts without being used, 30 days by default; one used past half of it is extended.
-  maxAge?: number
+  // How long a session lasts without being used, seconds or a string such as '30d', 30 days by default; one used past half of it is extended.
+  maxAge?: Duration
   // The parent domain sibling hosts share the session under, `example.com` for `app.example.com` and `auth.example.com`, the visited host or a parent of it; the cookie is the visited host's only without it.
   domain?: string
   // Keeps the data server-side, the cookie carrying only an id; without one the data travels sealed in the cookie, about 3.5 KB at most.
@@ -71,7 +73,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (domain !== undefined && !COOKIE_DOMAIN.test(domain))
     throw new Error(`kay: the session domain is ${JSON.stringify(options.domain)}, which is no host name such as example.com`)
 
-  const config = { name: options.cookie ?? 'session', maxAge: options.maxAge ?? DEFAULT_MAX_AGE, domain, store: options.store, keys }
+  const config = { name: options.cookie ?? 'session', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : durationSeconds(options.maxAge, 'the session maxAge'), domain, store: options.store, keys }
 
   return new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) as Session<Data> }))

@@ -1,7 +1,9 @@
 import type { AnyElysia, Elysia } from 'elysia'
 import type { HealthConfig } from '../config'
+import type { Duration } from '../runtime/duration'
 import process from 'node:process'
 import { logError } from '../build/sourcemap'
+import { durationSeconds } from '../runtime/duration'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
@@ -39,15 +41,14 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, config: HealthCon
   })
 }
 
-export function refuseShutdownTimeout(timeout: number): void {
-  if (!Number.isFinite(timeout) || timeout <= 0)
-    throw new Error(`kay: shutdownTimeout is ${timeout}; it takes a positive number of seconds`)
+export function shutdownSeconds(timeout: Duration): number {
+  return durationSeconds(timeout, 'shutdownTimeout')
 }
 
 // On SIGTERM or SIGINT, the server stops taking connections, lets the open requests and streams finish, runs the app's `onStop` hooks, then the process exits.
-// Past `timeout` seconds whatever is still open is closed and the process exits with 1.
-export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, timeout = DEFAULT_SHUTDOWN_TIMEOUT): void {
-  refuseShutdownTimeout(timeout)
+// Past `wait` whatever is still open is closed and the process exits with 1.
+export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration = DEFAULT_SHUTDOWN_TIMEOUT): void {
+  const timeout = shutdownSeconds(wait)
 
   let release: (() => void) | undefined
 

@@ -310,8 +310,10 @@ describe('kay check, edge cases', () => {
       '',
       'const kept = await cached(\'kept\', 60, () => 1)',
       'const never = await cached(\'never\', 0, () => 1)',
+      'const later = await cached(\'later\', \'5m\', () => 1)',
+      'const none = await cached(\'none\', \'0m\', () => 1)',
       '---',
-      'p {kept} {never}',
+      'p {kept} {never} {later} {none}',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': page })
@@ -320,7 +322,8 @@ describe('kay check, edge cases', () => {
       expect((await check(root)).map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1]])).toEqual([
         [12, 'ctx.fail takes an error status, from 400 to 599, not 200'],
         [17, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
-        [21, 'A duration is a positive number of seconds, not 0'],
+        [21, 'A duration is positive, seconds or a string such as \'5m\', not 0'],
+        [23, 'A duration is positive, seconds or a string such as \'5m\', not 0m'],
       ])
     }
     finally {
@@ -614,13 +617,13 @@ describe('kay check, what the server refuses at boot', () => {
     try {
       expect(await refusals(root, { base: 'docs', site: 'example.com', shutdownTimeout: 0, redirects: { '/old/:slug': '/:id' } })).toEqual([
         ['kay.config.ts', 'kay: base is docs, which is no path such as /docs'],
-        ['kay.config.ts', 'kay: shutdownTimeout is 0; it takes a positive number of seconds'],
+        ['kay.config.ts', 'kay: shutdownTimeout is 0; it takes a positive duration, seconds or a string such as \'5m\', \'12h\' or \'30d\''],
         ['kay.config.ts', 'kay: site is the origin the site is public at, such as https://example.com, not "example.com"'],
         ['kay.config.ts', 'kay: the redirect from /old/:slug goes to /:id, whose :id its path has none of'],
       ])
       expect(await refusals(root, { redirects: { old: '/' } })).toEqual([['kay.config.ts', 'kay: the redirect from old needs a path starting with /']])
       expect(await refusals(root, { redirects: { '/a*b': '/' } })).toEqual([['kay.config.ts', 'kay: the redirect from /a*b has a*b, neither a :param nor a final *']])
-      expect(await refusals(root, { base: '/docs/', site: 'https://example.com', shutdownTimeout: 5, redirects: { '/old/*': '/*' } })).toEqual([])
+      expect(await refusals(root, { base: '/docs/', site: 'https://example.com', shutdownTimeout: '30s', redirects: { '/old/*': '/*' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })

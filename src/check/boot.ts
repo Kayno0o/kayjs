@@ -9,7 +9,7 @@ import { actionUrl } from '../runtime/action'
 import { actionClash } from '../server/actions'
 import { basePath } from '../server/base'
 import { localeSettings, refuseLocaleClashes } from '../server/i18n'
-import { refuseShutdownTimeout } from '../server/lifecycle'
+import { shutdownSeconds } from '../server/lifecycle'
 import { publicFiles, refusePublicClashes } from '../server/public'
 import { readRedirects, refuseRedirectClashes } from '../server/redirects'
 import { refuseClashes, scanRoutes } from '../server/routes'
@@ -41,7 +41,7 @@ export async function bootProblems(root: string, options: CheckOptions): Promise
     refused(config, () => siteOrigin(site))
 
   if (shutdownTimeout !== undefined)
-    refused(config, () => refuseShutdownTimeout(shutdownTimeout))
+    refused(config, () => shutdownSeconds(shutdownTimeout))
 
   refused(config, () => refuseRedirectClashes(readRedirects(options.redirects ?? {}), routes))
   refused(routesDir, () => refuseClashes(routesDir, routes))

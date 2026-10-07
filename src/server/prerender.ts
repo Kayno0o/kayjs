@@ -7,6 +7,7 @@ import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { isCollection } from '../content'
 import { isAction } from '../runtime/action'
+import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { runInLocale } from '../runtime/locale-state'
 import { scanApi } from './api'
@@ -171,15 +172,9 @@ export function pageEtag(html: string): string {
   return `"${Bun.hash(html).toString(36)}"`
 }
 
-// A page's `revalidate` export: seconds, or undefined when it has none.
+// A page's `revalidate` export in seconds, or undefined when it has none.
 function revalidatePeriod(file: string, value: unknown): number | undefined {
-  if (value === undefined)
-    return undefined
-
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
-    throw new Error(`kay: ${file} exports a revalidate that is not a positive number of seconds`)
-
-  return value
+  return value === undefined ? undefined : durationSeconds(value, `${file}'s revalidate`)
 }
 
 async function exportsPrerender(file: string): Promise<boolean> {

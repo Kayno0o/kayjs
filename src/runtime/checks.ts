@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import type { Duration } from './duration'
 import type { Component, JSX } from './jsx'
 
 // Types behind the checks `kay check` adds to generated code; nothing here runs.
@@ -112,8 +113,8 @@ export type Redirect = <const Location extends string>(location: Location & Chec
 // A literal status `ctx.fail` takes is an error one, from 400 to 599; a computed one is checked when the action runs.
 export type ErrorStatus<Status extends number> = number extends Status ? unknown : `${Status}` extends `${'4' | '5'}${Digit}${Digit}` ? unknown : { kayError: `ctx.fail takes an error status, from 400 to 599, not ${Status}` }
 
-// A literal duration in seconds is positive; a computed one is checked when it is used.
-export type PositiveSeconds<Seconds extends number> = number extends Seconds ? unknown : `${Seconds}` extends `-${string}` | '0' ? { kayError: `A duration is a positive number of seconds, not ${Seconds}` } : unknown
+// A literal duration is positive; a computed one is checked when it is used.
+export type PositiveDuration<Length extends Duration> = number extends Length ? unknown : string extends Length ? unknown : `${Length}` extends `-${string}` | '0' | `0${'s' | 'm' | 'h' | 'd' | 'w'}` ? { kayError: `A duration is positive, seconds or a string such as '5m', not ${Length}` } : unknown
 
 type CronNickname = 'yearly' | 'annually' | 'monthly' | 'weekly' | 'daily' | 'midnight' | 'hourly'
 // Fields may be apart by tabs as by spaces.

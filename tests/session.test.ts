@@ -150,6 +150,11 @@ describe('sessions', () => {
     expect((await visit('/peek')).text).toBe('none')
   })
 
+  it('takes a maxAge with its unit, refusing one it cannot read', async () => {
+    expect((await browser(counter({ maxAge: '2m' }))('/count')).set).toMatch(/Max-Age=120;/)
+    expect(() => counter({ maxAge: '2 minutes' as never })).toThrow('the session maxAge is \'2 minutes\'; it takes a positive duration')
+  })
+
   it('moves the data to a new id on regenerate, the old id worth nothing', async () => {
     const store = memoryStore()
     const visit = browser(counter({ store }))

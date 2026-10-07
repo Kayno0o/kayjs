@@ -2,6 +2,7 @@ import type { Server } from 'bun'
 import type { Elysia, TSchema } from 'elysia'
 import type { ProxyConfig } from '../config'
 import type { ServerAction } from '../runtime/action'
+import { durationSeconds } from '../runtime/duration'
 import { rewrittenAddress } from './rewrite'
 
 export interface ProtectionRefusal {
@@ -44,7 +45,7 @@ export function protectionRefusal(action: ServerAction<TSchema, unknown>, reques
   if (!rateLimit)
     return undefined
 
-  const wait = overLimit(action, clientAddress(request, server), rateLimit.max, rateLimit.window * 1000)
+  const wait = overLimit(action, clientAddress(request, server), rateLimit.max, durationSeconds(rateLimit.window, 'rateLimit.window') * 1000)
 
   return wait === undefined ? undefined : { status: 429, field: '', message: `Too many attempts; try again in ${wait} s`, headers: { 'retry-after': String(wait) } }
 }

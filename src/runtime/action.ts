@@ -1,8 +1,10 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { ErrorStatus, Locals, Redirect } from './checks'
+import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import { withBase } from './base'
+import { durationSeconds } from './duration'
 import { createSignal, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
@@ -35,8 +37,8 @@ export interface EncodedCall {
 }
 
 export interface ActionProtection<Honeypot extends string = never> {
-  // At most `max` posts from one client every `window` seconds; past that a post fails with 429 without reaching the handler.
-  rateLimit?: { max: number, window: number }
+  // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler.
+  rateLimit?: { max: number, window: Duration }
   // A field the form renders out of sight, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.
   honeypot?: Honeypot
   // The most bytes a post may send, files included, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.
@@ -170,6 +172,10 @@ export function actionUrl(moduleId: string, name: string): string {
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Awaited<Output>, Honeypot> {
+  // Refused as the module loads, rather than on the first post.
+  if (protection?.rateLimit)
+    durationSeconds(protection.rateLimit.window, 'rateLimit.window')
+
   const state = { url: '' }
   const { call, reads } = callable(() => state.url)
 
