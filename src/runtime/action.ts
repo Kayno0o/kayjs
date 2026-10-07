@@ -36,9 +36,22 @@ export interface EncodedCall {
   body: string | FormData
 }
 
+// Where rate limits count, shared by every process opening it: `sqliteRates` from `kay/server`, or one of an app's own.
+export interface RateStore {
+  // Counts one more attempt under `key`, opening a window of `windowMs` when none is open: the attempts in it so far, this one included, and when it closes, in ms since the epoch.
+  hit: (key: string, windowMs: number) => { count: number, resetAt: number } | Promise<{ count: number, resetAt: number }>
+}
+
+export interface RateLimit {
+  max: number
+  window: Duration
+  // In this process's memory unless given.
+  store?: RateStore
+}
+
 export interface ActionProtection<Honeypot extends string = never> {
-  // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler.
-  rateLimit?: { max: number, window: Duration }
+  // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
+  rateLimit?: RateLimit
   // A field the form renders out of sight, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.
   honeypot?: Honeypot
   // The most bytes a post may send, files included, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.

@@ -12,7 +12,7 @@ const MAX_URL_LENGTH = 2048
 const REPORTS_PER_MINUTE = 20
 const MINUTE_MS = 60_000
 // What the rate limit counts reports under, apart from any action's.
-const REPORTS = {}
+const REPORTS = 'kay:error-reports'
 
 // An error a browser met on a page of the app, as it reported it: what `onError` gets for errors islands throw.
 export class BrowserError extends Error {

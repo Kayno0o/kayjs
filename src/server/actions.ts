@@ -94,13 +94,13 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
       limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })
       app.post(value.url, async context => inLocale(context.request, options, async () => runAction(value, context, options, back)), {
         body: value.schema,
-        transform: (context) => {
+        transform: async (context) => {
           refuseCrossSite(context.request)
 
           const call = isCall(context.request)
           // A call may send a form's fields, read as a plain form post's are.
           const asForm = !call || isFormCall(context.request)
-          const refusal = protectionRefusal(value, context.request, context.body, asForm, context.server)
+          const refusal = await protectionRefusal(value, context.request, context.body, asForm, context.server)
 
           // Before the schema reads the input: every attempt counts, a valid one or not.
           if (refusal)

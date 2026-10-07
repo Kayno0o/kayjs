@@ -1,6 +1,7 @@
 import type { Server } from 'bun'
 import type { Action } from '../src/runtime'
-import { rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { brotliDecompressSync, constants } from 'node:zlib'
@@ -12,7 +13,7 @@ import { action } from '../src/runtime'
 import { inlineScriptHashes, invalidatePage, pages, shutdown } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
-import { clientAddress, protectionRefusal, rateKey } from '../src/server/protection'
+import { clientAddress, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
 import { testSite } from '../src/test'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -118,9 +119,9 @@ describe('action protection', () => {
 
     // Repeated, or a file, it is filled in all the same.
     for (const website of [['', 'https://spam.example'], new File(['x'], 'x.txt')])
-      expect(protectionRefusal(send as never, new Request('http://localhost/'), { website }, true, null)?.status).toBe(422)
+      expect((await protectionRefusal(send as never, new Request('http://localhost/'), { website }, true, null))?.status).toBe(422)
 
-    expect(protectionRefusal(send as never, new Request('http://localhost/'), { website: [''] }, true, null)).toBeUndefined()
+    expect(await protectionRefusal(send as never, new Request('http://localhost/'), { website: [''] }, true, null)).toBeUndefined()
   })
 
   it('lets a client post as often as the limit allows in a window, then answers 429 with when to retry', async () => {
@@ -138,6 +139,46 @@ describe('action protection', () => {
     expect(Number(limited.headers.get('retry-after'))).toBeLessThanOrEqual(60)
     expect(parse(await limited.text())).toEqual({ errors: { '': expect.stringMatching(/^Too many attempts; try again in \d+ s$/) }, data: undefined })
     expect((await call('198.51.100.2')).status).toBe(200)
+  })
+
+  it('limits a guard or an API route by name as an action is limited, names counting apart', async () => {
+    const signIn = rateLimit('sign-in', { max: 2, window: '1m' })
+    const search = rateLimit('search', { max: 2, window: '1m' })
+    const request = () => new Request('http://localhost/login')
+
+    expect(await signIn.hit(request())).toBeUndefined()
+    expect(await signIn.hit(request())).toBeUndefined()
+    expect(await signIn.hit(request())).toBeGreaterThan(0)
+    expect(await search.hit(request())).toBeUndefined()
+    expect(() => rateLimit('x', { max: 0, window: '1m' })).toThrow('max is 0')
+    expect(() => rateLimit('x', { max: 1, window: 'soon' as never })).toThrow('window')
+  })
+
+  it('counts every process sharing a SQLite store together, for an action and a named limit alike', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-rates-'))
+
+    try {
+      const path = join(dir, 'rates.sqlite')
+      // Two processes, each with its own connection to the file.
+      const [first, second] = [sqliteRates(path), sqliteRates(path)]
+      const request = () => new Request('http://localhost/')
+      const limited = (store: typeof first) => ({ url: '/_kay/action/contact/send', protection: { rateLimit: { max: 2, window: '1m', store } } }) as never
+
+      expect(await protectionRefusal(limited(first), request(), {}, false, null)).toBeUndefined()
+      expect(await protectionRefusal(limited(second), request(), {}, false, null)).toBeUndefined()
+      expect((await protectionRefusal(limited(first), request(), {}, false, null))?.status).toBe(429)
+
+      expect(await rateLimit('login', { max: 1, window: '1m', store: first }).hit(request())).toBeUndefined()
+      expect(await rateLimit('login', { max: 1, window: '1m', store: second }).hit(request())).toBeGreaterThan(0)
+
+      // A window that closed opens afresh.
+      setSystemTime(Date.now() + 61_000)
+      expect(await rateLimit('login', { max: 1, window: '1m', store: second }).hit(request())).toBeUndefined()
+    }
+    finally {
+      setSystemTime()
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('refuses a rate limit window it cannot read as the action is declared', () => {
