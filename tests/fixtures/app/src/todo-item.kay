@@ -4,5 +4,5 @@ import type { Todo } from './todo'
 const { todo, index, selected = false, onToggle } = props<{ todo: Todo, index: number, selected?: boolean, onToggle?: (id: number) => void }>()
 ---
 li.todo(class={{ done: todo.done, selected }})
-  input(type="checkbox" checked={todo.done} onChange={() => onToggle?.(todo.id)})
+  input(type="checkbox" aria-label="Done" checked={todo.done} onChange={() => onToggle?.(todo.id)})
   span {index + 1}. {todo.title}

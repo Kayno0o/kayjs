@@ -244,7 +244,7 @@ describe('action protection', () => {
     expect(await check(FIXTURE)).toEqual([])
 
     try {
-      await Bun.write(typo, '---\nimport { send } from \'./contact.kay\'\n---\nform(action={send})\n  input(name="websit")\n')
+      await Bun.write(typo, '---\nimport { send } from \'./contact.kay\'\n---\nform(action={send})\n  input(name="websit" aria-label="Website")\n')
 
       expect((await check(FIXTURE)).map(diagnostic => diagnostic.line)).toEqual([5])
     }

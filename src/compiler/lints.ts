@@ -1,4 +1,5 @@
 import type { Diagnostic, ForNode, KayFile, Node } from './ast'
+import { accessibilityLints } from './a11y'
 import { awaitBlocks, tryBlocks } from './ast'
 import { positionAt } from './mapping'
 
@@ -39,6 +40,24 @@ export const LINTS = {
     summary: 'An element with `onClick` that neither a keyboard reaches nor a screen reader announces as a control: no `button`, `a` or other interactive tag, and no `role`.',
     wrong: 'li(onClick={open}) {item.title}',
     right: 'li\n  button(onClick={open}) {item.title}',
+  },
+  'missing-label': {
+    level: 'warn',
+    summary: 'An `input`, `select` or `textarea` with no label: no `label` around it or pointing at its id, and no `aria-label`, `aria-labelledby`, `title` or `placeholder`. A screen reader announces a field by its label, and says nothing of what to type in one without. One inside a component\'s children, or with an id written as an expression, is left alone, as the label may be elsewhere.',
+    wrong: 'input(name="email")',
+    right: 'label\n  | Email\n  input(name="email")',
+  },
+  'empty-control': {
+    level: 'deny',
+    summary: 'A `button`, or an `a` with an `href`, holding nothing a screen reader announces, an icon alone for one, and no `aria-label`, `aria-labelledby` or `title`.',
+    wrong: 'button(onClick={close})\n  svg(viewBox="0 0 24 24" aria-hidden="true")',
+    right: 'button(onClick={close} aria-label="Close")\n  svg(viewBox="0 0 24 24" aria-hidden="true")',
+  },
+  'skipped-heading': {
+    level: 'warn',
+    summary: 'A heading more than one level below the heading before it in the same template, an `h4` after an `h2`: screen reader users move through a page by its headings, and a skipped level reads as a missing section. Style a heading as it should look rather than picking its level by size.',
+    wrong: 'h2 Plans\nh4 Monthly',
+    right: 'h2 Plans\nh3 Monthly',
   },
   'unbounded-string': {
     level: 'deny',
@@ -161,7 +180,7 @@ export function templateLints(file: KayFile): Diagnostic[] {
 
   visit(file.template)
 
-  return found
+  return [...found, ...accessibilityLints(file)]
 }
 
 // `for todo, i of todos key={i}` whose rows read `todo.id`.

@@ -588,8 +588,53 @@ describe('accessibility checks', () => {
     expect(checked(`li(role="option" ${click}) x`)).toEqual([])
   })
 
+  it('ask a field for a label, one around it, pointing at its id or written as an attribute', () => {
+    expect(checked('input(name="email")\nselect(name="size")\ntextarea#bio\ninput(id="age")')).toEqual([
+      'This `input` has no label',
+      'This `select` has no label',
+      'This `textarea` has no label',
+      'This `input` has no label',
+    ])
+    expect(checked([
+      'label Email\n  input(name="email")',
+      'label(for="bio") Bio\ntextarea#bio',
+      'input(id="age")\nlabel(for="age") Age',
+      'input(aria-label="Search")\ninput(placeholder="Search")\ninput(title="Search")\ninput(aria-labelledby="heading")',
+      'input(type="hidden" name="id")\ninput(type="submit" value="Send")\ninput(type="button" value="Go")',
+      'input(name="website" aria-hidden="true")\n.trap(hidden)\n  input(name="phone")',
+    ].join('\n'))).toEqual([])
+  })
+
+  it('leave a field whose label may be elsewhere: one with an id written as an expression, or among a component\'s children', () => {
+    expect(checked('---\nimport Field from \'./field.kay\'\n\nconst { name } = props<{ name: string }>()\n---\ninput(id={name})\nField(label="Email")\n  input(name="email")')).toEqual([])
+  })
+
+  it('ask a button or a link for something to announce, an icon alone not being one', () => {
+    expect(checked('button\n  svg\na(href="/")\n  img(src="/logo.png" alt="")\nbutton(type="submit")')).toEqual([
+      'This `button` has nothing for a screen reader to announce',
+      'This `a` has nothing for a screen reader to announce',
+      'This `button` has nothing for a screen reader to announce',
+    ])
+    expect(checked([
+      'button Save',
+      'button(aria-label="Close")\n  svg',
+      'a(href="/")\n  img(src="/logo.png" alt="Home")',
+      'a(name="top")',
+    ].join('\n'))).toEqual([])
+    expect(checked('---\nconst { count } = props<{ count: number }>()\n---\nbutton {count}')).toEqual([])
+  })
+
+  it('report a heading skipping a level, each branch of an if following the heading before it', () => {
+    expect(checked('h1 Shop\nh3 Shoes\nh4 Boots\nh2 Hats\nh4 Caps')).toEqual([
+      'This `h3` follows an `h1`, skipping a level',
+      'This `h4` follows an `h2`, skipping a level',
+    ])
+    expect(checked('---\nconst { open } = props<{ open: boolean }>()\n---\nh1 Shop\nif open\n  h2 Open\nelse\n  h2 Closed\nh3 Hours')).toEqual([])
+  })
+
   it('leave an element with a spread alone, and never stop a page from running', () => {
     expect(checked('---\nconst { attrs } = props<{ attrs: Record<string, string> }>()\n---\nimg({...attrs})')).toEqual([])
+    expect(checked('---\nconst { attrs } = props<{ attrs: Record<string, string> }>()\n---\ninput({...attrs})\nbutton({...attrs})')).toEqual([])
     expect(errors('img(src="/a.png")\n.card(onClick={() => undefined})')).toEqual([])
   })
 })

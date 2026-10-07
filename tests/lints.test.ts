@@ -131,7 +131,7 @@ describe('constant-signal', () => {
   })
 
   it('leaves a signal something writes, binds or hands on, and a `signal` that is not kay\'s', () => {
-    expect(lints(script('const name = signal(\'\')', 'input(bind:value={name})\np {name}'))).toEqual([])
+    expect(lints(script('const name = signal(\'\')', 'input(aria-label="Name" bind:value={name})\np {name}'))).toEqual([])
     expect(lints(script('const open = signal(false)', 'button(onClick={() => open.set(!open)}) {open}'))).toEqual([])
     expect(lints(script('const shown = signal(false)\nkeep(shown)', 'p {shown}'))).toEqual([])
     expect(lints(script('const width = signal(0)\neffect(() => width.set(1))', 'p {width()}'))).toEqual([])

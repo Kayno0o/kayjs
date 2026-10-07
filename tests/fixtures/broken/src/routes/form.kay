@@ -7,5 +7,5 @@ export const rename = action(t.Object({ title: t.String({ maxLength: 200 }) }), 
 const failure = ctx.failed(rename)
 ---
 form(action={rename})
-  input(name="titel")
+  input(name="titel" aria-label="Title")
   p {failure?.errors.titel}

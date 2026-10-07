@@ -36,8 +36,8 @@ Rows(items={[EARLIEST]})
   @row(day, i)
     li {i}: {day.toISOString()}
 form(action={schedule})
-  input(name="title")
-  input(name="at")
+  input(name="title" aria-label="Title")
+  input(name="at" aria-label="At")
   button Schedule
 if scheduled as done
   p.done Scheduled {done.data.title} on {done.data.at.toISOString()}, {done.data.tags.size} tag, {String(done.data.seats)} seats

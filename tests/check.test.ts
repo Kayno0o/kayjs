@@ -148,7 +148,7 @@ describe('kay check, edge cases', () => {
   })
 
   it('types what the fences use of kay unimported', async () => {
-    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { t } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title")\np {label}\n' })
+    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { t } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[8, 'TS2322']])

@@ -11,7 +11,7 @@ async function submit(event: SubmitEvent) {
 }
 ---
 form.quick(onSubmit={submit})
-  input(bind:value={title})
+  input(aria-label="Title" bind:value={title})
   button Save
   if saved() as id
     p.saved Saved as {id}

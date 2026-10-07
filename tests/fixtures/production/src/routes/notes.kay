@@ -9,7 +9,7 @@ const failure = ctx.failed(note)
 const sent = ctx.succeeded(note)
 ---
 form(action={note})
-  textarea(name="text")
+  textarea(name="text" aria-label="Text")
   button Send
 if failure
   p.error {failure.status} {Object.values(failure.errors).join(' ')}

@@ -10,7 +10,7 @@ const failure = ctx.failed(join)
 const joined = ctx.succeeded(join)
 ---
 form(action={join})
-  input(name="email" value={failure?.values.email})
+  input(name="email" aria-label="Email" value={failure?.values.email})
   button Join
 if failure
   p.error {failure.errors.email}
