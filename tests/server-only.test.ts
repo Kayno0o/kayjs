@@ -31,6 +31,15 @@ describe('a server-only global in a built chunk', () => {
     expect(names('var has = typeof process !== "undefined", v = has ? process.env.X : 1;\n')).toEqual([])
   })
 
+  it('is left alone inside a `try` whose `catch` takes the error a missing global throws', () => {
+    // html-to-image's getPixelRatio, as it ships.
+    expect(names('function ratio() { let p; try { p = process } catch (e) {} return p && p.env ? p.env.devicePixelRatio : null }\n')).toEqual([])
+    expect(names('try { Bun.file("x") } catch {}\n')).toEqual([])
+    // A `finally` alone lets the error through, and the `catch` covers its `try` block, not itself.
+    expect(names('try { process.exit() } finally {}\n')).toEqual(['process'])
+    expect(names('try { f() } catch (e) { process.exit() }\n')).toEqual(['process'])
+  })
+
   it('is found where the guard covers other code in the same statement, as minifying merges it', () => {
     expect(names('var o = typeof process < "u" ? "production" : "x", c = process.env.OTHER;\n')).toEqual(['process'])
     expect(names('var d = typeof Bun !== "undefined" && Bun.version, p = process.env.X;\n')).toEqual(['process'])

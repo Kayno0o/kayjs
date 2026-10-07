@@ -119,7 +119,7 @@ function property(node: t.MemberExpression): string | undefined {
   return node.property.type === 'StringLiteral' ? node.property.value : undefined
 }
 
-// Whether a `typeof` of the same name stands between the read and the code around it: the shape a module takes to run on either side.
+// Whether a `typeof` of the same name, or a `try` catching what the read throws, stands between the read and the code around it: the shapes a module takes to run on either side.
 function guarded(path: NodePath<t.Identifier>, name: string): boolean {
   if (path.parentPath?.isUnaryExpression() && path.parentPath.node.operator === 'typeof')
     return true
@@ -129,7 +129,7 @@ function guarded(path: NodePath<t.Identifier>, name: string): boolean {
 
   // Only up to the function holding the read: a guard outside it does not say this code runs.
   while (parent && !parent.isFunction() && !parent.isProgram()) {
-    if (branchGuarded(parent, child, name, path.scope) || exitsEarlier(parent, child, name))
+    if (branchGuarded(parent, child, name, path.scope) || exitsEarlier(parent, child, name) || caught(parent, child))
       return true
 
     child = parent
@@ -151,6 +151,11 @@ function branchGuarded(parent: NodePath, child: NodePath, name: string, scope: S
     return child.node === parent.node.body && asks(parent.node.test!, name, scope)
 
   return false
+}
+
+// The block of a `try` with a `catch`, which takes the ReferenceError a missing global throws: `try { p = process } catch {}`. A `finally` alone lets it through.
+function caught(parent: NodePath, child: NodePath): boolean {
+  return parent.isTryStatement() && child.node === parent.node.block && parent.node.handler !== null
 }
 
 // `if (typeof process === 'undefined') return`, after which the block runs only where it exists.
