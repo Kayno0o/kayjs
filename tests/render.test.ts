@@ -332,6 +332,16 @@ describe('renderToString', () => {
     await expect(renderToString(uncaught, { value: Promise.reject(new Error('down')) })).rejects.toThrow('down')
   })
 
+  it('renders several blocks in place, and one nested in a then block once its own value settles', async () => {
+    const view = await load<{ first: Promise<string>, second: Promise<string>, inner: Promise<string> }>('---\nimport { defer } from \'kay\'\n\nconst { first, second, inner } = props<{ first: Promise<string>, second: Promise<string>, inner: Promise<string> }>()\nconst a = defer(first)\nconst b = defer(second)\nconst c = defer(inner)\n---\np start\nawait a then x\n  p {x}\n  await c then y\n    p {y}\np middle\nawait b then z\n  p {z}')
+
+    expect(await renderToString(view, { first: Promise.resolve('one'), second: (async () => {
+      await Bun.sleep(5)
+
+      return 'two'
+    })(), inner: Promise.resolve('nested') })).toBe('<p>start</p><p>one</p><p>nested</p><p>middle</p><p>two</p>')
+  })
+
   it('takes no props argument for a component without required props', async () => {
     const view = await load('p Static')
 

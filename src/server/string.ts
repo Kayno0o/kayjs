@@ -40,6 +40,10 @@ async function settled(view: () => unknown): Promise<string> {
     const start = result.indexOf(open)
     const end = result.indexOf(close, start)
 
+    // A block rendered where nothing shows, as a `head` block outside a page, left no markers to replace.
+    if (start === -1 || end === -1)
+      continue
+
     result = result.slice(0, start) + block.html + result.slice(end + close.length)
   }
 
