@@ -5,6 +5,14 @@ export interface RoomConnection {
   raw: object & { sendText: (text: string) => unknown }
 }
 
+// Who in a room a message goes to: everyone but the connection `except` names, and only the members equal to `to`, as JSON, when given.
+export interface RoomRecipients {
+  except?: string
+  to?: string
+}
+
+type RoomListener = (room: string, text: string, recipients: RoomRecipients) => void
+
 // Where members and messages are kept, for one process or every process of the machine.
 export interface RoomStore {
   // Records a connection of this process in a room, with its member as JSON, or drops it.
@@ -13,9 +21,11 @@ export interface RoomStore {
   // The members of a room, as JSON, in every process sharing the store.
   members: (room: string) => string[]
   // Hands a message to the listeners of every process sharing the store, this one's included.
-  publish: (room: string, text: string, except?: string) => void
-  // Called with each message published; returns what stops it.
-  subscribe: (listener: (room: string, text: string, except: string | undefined) => void) => () => void
+  publish: (room: string, text: string, recipients: RoomRecipients) => void
+  // Called with each message published from then on; returns what stops it.
+  subscribe: (listener: RoomListener) => () => void
+  // Stops what the store runs in the background and lets go of its file.
+  close: () => void
 }
 
 export interface RoomsOptions {
@@ -37,8 +47,8 @@ export interface Rooms<Message, Member = undefined> {
   roomsOf: (ws: RoomConnection) => string[]
   // The members of a room, in every process sharing the store; a room no one is in is gone, and lists none.
   members: (room: string) => Member[]
-  // Sends a message to everyone in a room, but `except` when given, such as the connection it came from.
-  publish: (room: string, message: Message, options?: { except?: RoomConnection }) => void
+  // Sends a message to everyone in a room, but `except` when given, such as the connection it came from, or only to the connections joined as the member `to` names, such as a game's host.
+  publish: (room: string, message: Message, options?: { except?: RoomConnection, to?: Member }) => void
   // A function sending a room one snapshot, read when it goes, however many times it is called within `wait`: a burst of changes goes out as one message.
   coalesce: (read: (room: string) => Message, options?: CoalesceOptions) => (room: string) => void
 }
@@ -54,11 +64,11 @@ const KEPT = 30_000
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
 export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): Rooms<Message, Member> {
   const store = options.store ?? memoryRooms()
-  // The connections of this process in each room, by their id.
-  const local = new Map<string, Map<string, RoomConnection['raw']>>()
+  // The connections of this process in each room, by their id, with their member as JSON.
+  const local = new Map<string, Map<string, { raw: RoomConnection['raw'], member: string }>>()
   const ids = new WeakMap<object, string>()
   const joined = new WeakMap<object, Set<string>>()
-  let stop: (() => void) | undefined
+  let subscribed = false
 
   const idOf = (raw: object) => {
     let id = ids.get(raw)
@@ -69,9 +79,9 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
     return id
   }
 
-  const deliver = (room: string, text: string, except: string | undefined) => {
-    for (const [id, raw] of local.get(room) ?? []) {
-      if (id !== except)
+  const deliver: RoomListener = (room, text, { except, to }) => {
+    for (const [id, { raw, member }] of local.get(room) ?? []) {
+      if (id !== except && (to === undefined || to === member))
         raw.sendText(text)
     }
   }
@@ -92,11 +102,16 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
   return {
     join(ws, room, ...[member]) {
       const id = idOf(ws.raw)
+      const written = JSON.stringify(member ?? null)
 
-      stop ??= store.subscribe(deliver)
-      local.set(room, (local.get(room) ?? new Map()).set(id, ws.raw))
+      if (!subscribed) {
+        store.subscribe(deliver)
+        subscribed = true
+      }
+
+      local.set(room, (local.get(room) ?? new Map()).set(id, { raw: ws.raw, member: written }))
       joined.set(ws.raw, (joined.get(ws.raw) ?? new Set()).add(room))
-      store.add(room, id, JSON.stringify(member ?? null))
+      store.add(room, id, written)
     },
     leave(ws, room) {
       for (const name of room === undefined ? [...joined.get(ws.raw) ?? []] : [room])
@@ -104,8 +119,8 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
     },
     roomsOf: ws => [...joined.get(ws.raw) ?? []],
     members: room => store.members(room).map(member => (JSON.parse(member) ?? undefined) as Member),
-    publish(room, message, { except } = {}) {
-      store.publish(room, JSON.stringify(message), except && idOf(except.raw))
+    publish(room, message, { except, to } = {}) {
+      store.publish(room, messageText(message), { ...except && { except: idOf(except.raw) }, ...to !== undefined && { to: JSON.stringify(to) } })
     },
     coalesce(read, { wait = DEFAULT_WAIT } = {}) {
       // The rooms a snapshot is on its way to.
@@ -116,105 +131,149 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
           return
 
         waiting.add(room)
-        setTimeout(() => {
+        setTimeout(guarded(() => {
           waiting.delete(room)
-          store.publish(room, JSON.stringify(read(room)))
-        }, wait)
+          store.publish(room, messageText(read(room)), {})
+        }), wait)
       }
     },
   }
 }
 
+// A message as Elysia sends one: a string as it is, anything else as JSON.
+function messageText(message: unknown): string {
+  return typeof message === 'string' ? message : JSON.stringify(message)
+}
+
+// What a timer runs, its error logged rather than taking the process down.
+function guarded(run: () => void): () => void {
+  return () => {
+    try {
+      run()
+    }
+    catch (error) {
+      console.error(error)
+    }
+  }
+}
+
 // Rooms in this process's memory, gone when it stops.
 export function memoryRooms(): RoomStore {
-  const rooms = new Map<string, Map<string, string>>()
-  const listeners = new Set<(room: string, text: string, except: string | undefined) => void>()
+  const byRoom = new Map<string, Map<string, string>>()
+  const listeners = new Set<RoomListener>()
 
   return {
     add(room, connection, member) {
-      rooms.set(room, (rooms.get(room) ?? new Map()).set(connection, member))
+      byRoom.set(room, (byRoom.get(room) ?? new Map()).set(connection, member))
     },
     remove(room, connection) {
-      const members = rooms.get(room)
+      const members = byRoom.get(room)
 
       members?.delete(connection)
 
       if (members?.size === 0)
-        rooms.delete(room)
+        byRoom.delete(room)
     },
-    members: room => [...rooms.get(room)?.values() ?? []],
-    publish(room, text, except) {
+    members: room => [...byRoom.get(room)?.values() ?? []],
+    publish(room, text, recipients) {
       for (const listener of listeners)
-        listener(room, text, except)
+        listener(room, text, recipients)
     },
     subscribe(listener) {
       listeners.add(listener)
 
       return () => listeners.delete(listener)
     },
+    close() {
+      listeners.clear()
+    },
   }
 }
 
 // Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others, within `poll` milliseconds.
-// A process that stops without leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds.
+// A process that stops without leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one that was only stalled that long writes its members back once it runs again.
 export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {}): RoomStore {
   const db = openSqlite(path)
-  const process = crypto.randomUUID()
+  const self = crypto.randomUUID()
 
   db.run('CREATE TABLE IF NOT EXISTS kay_room_members (room TEXT NOT NULL, connection TEXT NOT NULL, process TEXT NOT NULL, member TEXT NOT NULL, PRIMARY KEY (room, connection))')
   db.run('CREATE TABLE IF NOT EXISTS kay_room_processes (process TEXT PRIMARY KEY, seen INTEGER NOT NULL)')
-  db.run('CREATE TABLE IF NOT EXISTS kay_room_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, text TEXT NOT NULL, process TEXT NOT NULL, skipped TEXT, at INTEGER NOT NULL)')
+  db.run('CREATE TABLE IF NOT EXISTS kay_room_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, text TEXT NOT NULL, process TEXT NOT NULL, skipped TEXT, recipient TEXT, at INTEGER NOT NULL)')
 
-  const add = db.query('INSERT OR REPLACE INTO kay_room_members (room, connection, process, member) VALUES (?, ?, ?, ?)')
+  // An upsert, so a member joining again keeps its place in the list, as it does in memory.
+  const add = db.query('INSERT INTO kay_room_members (room, connection, process, member) VALUES (?, ?, ?, ?) ON CONFLICT (room, connection) DO UPDATE SET member = excluded.member')
   const remove = db.query('DELETE FROM kay_room_members WHERE room = ? AND connection = ?')
   const members = db.query<{ member: string }, [string, number]>('SELECT member FROM kay_room_members JOIN kay_room_processes USING (process) WHERE room = ? AND seen > ? ORDER BY kay_room_members.rowid')
-  const insert = db.query('INSERT INTO kay_room_messages (room, text, process, skipped, at) VALUES (?, ?, ?, ?, ?)')
-  const since = db.query<{ id: number, room: string, text: string, skipped: string | null }, [number, string]>('SELECT id, room, text, skipped FROM kay_room_messages WHERE id > ? AND process != ? ORDER BY id')
+  const insert = db.query('INSERT INTO kay_room_messages (room, text, process, skipped, recipient, at) VALUES (?, ?, ?, ?, ?, ?)')
+  const since = db.query<{ id: number, room: string, text: string, skipped: string | null, recipient: string | null }, [number, string]>('SELECT id, room, text, skipped, recipient FROM kay_room_messages WHERE id > ? AND process != ? ORDER BY id')
   const latest = db.query<{ id: number | null }, []>('SELECT max(id) AS id FROM kay_room_messages')
+  const known = db.query<{ seen: number }, [string]>('SELECT seen FROM kay_room_processes WHERE process = ?')
   const heartbeat = db.query('INSERT OR REPLACE INTO kay_room_processes (process, seen) VALUES (?, ?)')
-  const listeners = new Set<(room: string, text: string, except: string | undefined) => void>()
-  let last = latest.get()?.id ?? 0
+  const listeners = new Set<RoomListener>()
+  // This process's members, written back should the others have dropped them while it was stalled.
+  const own = new Map<string, { room: string, connection: string, member: string }>()
+  let last = 0
   let reading: ReturnType<typeof setInterval> | undefined
 
   const beat = () => {
     const now = Date.now()
 
-    heartbeat.run(process, now)
-    db.run('DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ?)', [now - EXPIRY])
-    db.run('DELETE FROM kay_room_processes WHERE seen <= ?', [now - EXPIRY])
-    db.run('DELETE FROM kay_room_messages WHERE at <= ?', [now - KEPT])
+    db.transaction(() => {
+      const dropped = known.get(self) === null
+
+      heartbeat.run(self, now)
+
+      if (dropped) {
+        for (const { room, connection, member } of own.values())
+          add.run(room, connection, self, member)
+      }
+
+      db.run('DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ?)', [now - EXPIRY])
+      db.run('DELETE FROM kay_room_processes WHERE seen <= ?', [now - EXPIRY])
+      db.run('DELETE FROM kay_room_messages WHERE at <= ?', [now - KEPT])
+    })()
   }
 
   const read = () => {
-    for (const row of since.all(last, process)) {
+    for (const row of since.all(last, self)) {
       last = row.id
 
       for (const listener of listeners)
-        listener(row.room, row.text, row.skipped ?? undefined)
+        listener(row.room, row.text, { ...row.skipped !== null && { except: row.skipped }, ...row.recipient !== null && { to: row.recipient } })
     }
   }
 
   beat()
-  setInterval(beat, HEARTBEAT).unref()
+
+  const beating = setInterval(guarded(beat), HEARTBEAT)
+
+  beating.unref()
 
   return {
     add(room, connection, member) {
-      add.run(room, connection, process, member)
+      own.set(`${room}\n${connection}`, { room, connection, member })
+      add.run(room, connection, self, member)
     },
     remove(room, connection) {
+      own.delete(`${room}\n${connection}`)
       remove.run(room, connection)
     },
     members: room => members.all(room, Date.now() - EXPIRY).map(row => row.member),
-    publish(room, text, except) {
-      insert.run(room, text, process, except ?? null, Date.now())
+    publish(room, text, recipients) {
+      insert.run(room, text, self, recipients.except ?? null, recipients.to ?? null, Date.now())
 
       for (const listener of listeners)
-        listener(room, text, except)
+        listener(room, text, recipients)
     },
     subscribe(listener) {
       listeners.add(listener)
-      reading ??= setInterval(read, poll)
-      reading.unref()
+
+      // Read from now on: what others published before anyone here listened is for the members they had then.
+      if (!reading) {
+        last = latest.get()?.id ?? 0
+        reading = setInterval(guarded(read), poll)
+        reading.unref()
+      }
 
       return () => {
         listeners.delete(listener)
@@ -224,6 +283,13 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
           reading = undefined
         }
       }
+    },
+    close() {
+      clearInterval(beating)
+      clearInterval(reading)
+      reading = undefined
+      listeners.clear()
+      db.close()
     },
   }
 }

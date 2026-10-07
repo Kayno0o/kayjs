@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Database } from 'bun:sqlite'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
@@ -404,48 +405,148 @@ describe('rooms', () => {
     ada.close()
   })
 
-  it('reaches the members other processes hold through a SQLite file', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'kay-rooms-'))
+  it('runs the handlers a reconnect calls before what was queued while it was down', async () => {
+    const bob = guest('bob')
+
+    bob.send({ type: 'join', room: 'order' })
+    await bob.next()
+
+    const ada = guest('ada')
+
+    ada.onOpen(() => ada.send({ type: 'join', room: 'order' }))
+    ada.send({ type: 'say', room: 'order', text: 'queued' })
+
+    expect(await bob.next()).toEqual({ type: 'joined', room: 'order', members: ['bob', 'ada'] })
+    expect(await bob.next()).toEqual({ type: 'said', from: 'ada', text: 'queued' })
+    ada.close()
+    bob.close()
+  })
+
+  describe('in a SQLite file', () => {
+    let dir: string
+
     const connection = () => {
       const received: string[] = []
 
       return { received, raw: { sendText: (text: string) => void received.push(text) } }
     }
 
-    try {
-      // Two stores on one file stand for two processes.
-      const first = rooms<{ text: string }, string>({ store: sqliteRooms(join(dir, 'rooms.sqlite'), { poll: 5 }) })
-      const second = rooms<{ text: string }, string>({ store: sqliteRooms(join(dir, 'rooms.sqlite'), { poll: 5 }) })
-      const [ada, bob] = [connection(), connection()]
+    // Polls a condition another process makes true, failing past a second.
+    async function until(condition: () => boolean): Promise<void> {
+      for (let waited = 0; !condition(); waited += 5) {
+        if (waited > 1_000)
+          throw new Error('timed out')
 
-      first.join(ada, 'hall', 'ada')
-      second.join(bob, 'hall', 'bob')
-      expect(first.members('hall')).toEqual(['ada', 'bob'])
-
-      first.publish('hall', { text: 'hi' })
-      await Bun.sleep(50)
-      expect(ada.received).toEqual(['{"text":"hi"}'])
-      expect(bob.received).toEqual(['{"text":"hi"}'])
-
-      second.publish('hall', { text: 'back' }, { except: bob })
-      await Bun.sleep(50)
-      expect(ada.received).toEqual(['{"text":"hi"}', '{"text":"back"}'])
-      expect(bob.received).toEqual(['{"text":"hi"}'])
-
-      second.leave(bob)
-      expect(first.members('hall')).toEqual(['ada'])
-      expect(second.roomsOf(bob)).toEqual([])
+        await Bun.sleep(5)
+      }
     }
-    finally {
+
+    beforeAll(async () => {
+      dir = await mkdtemp(join(tmpdir(), 'kay-rooms-'))
+    })
+
+    afterAll(async () => {
       await rm(dir, { recursive: true, force: true })
+    })
+
+    // Two stores on one file stand for two processes.
+    function processes(name: string) {
+      const stores = [sqliteRooms(join(dir, `${name}.sqlite`), { poll: 5 }), sqliteRooms(join(dir, `${name}.sqlite`), { poll: 5 })] as const
+
+      return { stores, first: rooms<{ text: string }, string>({ store: stores[0] }), second: rooms<{ text: string }, string>({ store: stores[1] }), close: () => {
+        for (const store of stores) {
+          store.close()
+        }
+      } }
     }
+
+    it('lists the members of every process and reaches them, but the sender or to the member named', async () => {
+      const { first, second, close } = processes('reach')
+      const [ada, bob, host] = [connection(), connection(), connection()]
+
+      try {
+        first.join(ada, 'hall', 'ada')
+        second.join(bob, 'hall', 'bob')
+        second.join(host, 'hall', 'host')
+        expect(first.members('hall')).toEqual(['ada', 'bob', 'host'])
+        expect(second.roomsOf(bob)).toEqual(['hall'])
+
+        first.publish('hall', { text: 'hi' })
+        await until(() => bob.received.length === 1 && host.received.length === 1)
+        expect(ada.received).toEqual(['{"text":"hi"}'])
+
+        second.publish('hall', { text: 'back' }, { except: bob })
+        await until(() => ada.received.length === 2)
+        expect(bob.received).toEqual(['{"text":"hi"}'])
+
+        first.publish('hall', { text: 'host only' }, { to: 'host' })
+        await until(() => host.received.length === 3)
+        expect([ada.received.length, bob.received.length]).toEqual([2, 1])
+
+        // Joining again changes the member, in its place.
+        second.join(bob, 'hall', 'robert')
+        expect(first.members('hall')).toEqual(['ada', 'robert', 'host'])
+
+        second.leave(bob)
+        expect(first.members('hall')).toEqual(['ada', 'host'])
+        expect(second.roomsOf(bob)).toEqual([])
+      }
+      finally {
+        close()
+      }
+    })
+
+    it('sends a process only what is published once it listens, not what came before', async () => {
+      const { first, second, close } = processes('fresh')
+      const ada = connection()
+
+      try {
+        second.publish('hall', { text: 'before' })
+        first.join(ada, 'hall', 'ada')
+        second.publish('hall', { text: 'after' })
+        await until(() => ada.received.length > 0)
+        await Bun.sleep(20)
+        expect(ada.received).toEqual(['{"text":"after"}'])
+      }
+      finally {
+        close()
+      }
+    })
+
+    it('drops the members of a process no longer heard from, and writes them back once a stalled one runs again', async () => {
+      const { first, second, close } = processes('expiry')
+      const [ada, bob] = [connection(), connection()]
+      const file = new Database(join(dir, 'expiry.sqlite'))
+
+      try {
+        first.join(ada, 'hall', 'ada')
+        second.join(bob, 'hall', 'bob')
+
+        // Every process silent for a minute, as a crashed one is, and then the others prune them.
+        file.run('UPDATE kay_room_processes SET seen = seen - 60000')
+        expect(first.members('hall')).toEqual([])
+        file.run('DELETE FROM kay_room_members')
+        file.run('DELETE FROM kay_room_processes')
+
+        // The next heartbeat, within 2 seconds, finds each process dropped and writes its members back.
+        await Bun.sleep(2_200)
+        expect(first.members('hall')).toEqual(['ada', 'bob'])
+      }
+      finally {
+        file.close()
+        close()
+      }
+    }, 5_000)
   })
 
-  it('calls the handler a message\'s type names', () => {
+  it('calls the handler a message\'s type names, and refuses a type none names', () => {
     type Message = { type: 'add', amount: number } | { type: 'reset' }
     const handle = (message: Message) => dispatch(message, { add: ({ amount }) => amount, reset: () => 0 })
 
     expect(handle({ type: 'add', amount: 3 })).toBe(3)
     expect(handle({ type: 'reset' })).toBe(0)
+    expect(() => handle({ type: 'toString' } as never)).toThrow('no handler for a message of type toString')
+    // @ts-expect-error every type is handled
+    dispatch({ type: 'reset' } as Message, { reset: () => 0 })
   })
 })
