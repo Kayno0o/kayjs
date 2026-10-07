@@ -119,6 +119,17 @@ async function scratchProject(files: Record<string, string>): Promise<string> {
 }
 
 describe('kay check, edge cases', () => {
+  it('types a signal the template reads by name as its value', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count + 1)}) {count.toFixed(1)} {count.nope}\n' })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([[6, 'TS2339', 'Property \'nope\' does not exist on type \'number\'.']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types what the fences use of kay unimported', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { t } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title")\np {label}\n' })
 

@@ -218,6 +218,34 @@ describe('kay without imports', () => {
   })
 })
 
+describe('signals in the template', () => {
+  it('read by name, in text, conditions, loops and handlers, a bind still writing the signal', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nconst items = signal([\'a\'])\nconst count = memo(() => items().length)\nconst draft = signal(\'b\')\n---\ninput(bind:value={draft})\nbutton(onClick={() => items.set([...items, draft])}) {count} items\nif count > 1\n  p.many many\nul\n  for item of items\n    li {item}\n',
+    })
+    const texts = () => [...root.querySelectorAll('li')].map(item => item.textContent)
+
+    try {
+      expect(root.querySelector('button')!.textContent).toBe('1 items')
+      expect(root.querySelector('.many')).toBeNull()
+
+      const input = root.querySelector('input')!
+
+      input.value = 'c'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      root.querySelector('button')!.click()
+      await settle()
+
+      expect(root.querySelector('button')!.textContent).toBe('2 items')
+      expect(root.querySelector('.many')).not.toBeNull()
+      expect(texts()).toEqual(['a', 'c'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('loops', () => {
   it('keeps rendering components a loop iterates over as the list changes', async () => {
     const { root, dispose } = await mountKay({

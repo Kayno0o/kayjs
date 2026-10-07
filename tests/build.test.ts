@@ -107,7 +107,7 @@ describe('kay build', () => {
       const lines = sourceLines(bundle.mappings, index)
 
       expect(bundle.sourcesContent[index]).toBe(source)
-      // `button(onClick={() => count.set(c => c + 1)}) Count {count()}` is the template's one line.
+      // `button(onClick={() => count.set(count + 1)}) Count {count}` is the template's one line.
       expect(lines).toContain(source.split('\n').findIndex(line => line.startsWith('button(')))
       expect(Math.max(...lines)).toBeLessThan(source.split('\n').length)
     }

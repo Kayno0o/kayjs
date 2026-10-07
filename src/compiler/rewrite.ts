@@ -9,6 +9,8 @@ import { parse } from '@babel/parser'
 import { defaultName } from './codegen'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
+// What `kay` exports that is read by calling it, which the template reads by name.
+const ACCESSORS = new Set(['signal', 'memo', 'persisted'])
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
 const require = createRequire(import.meta.url)
@@ -53,7 +55,8 @@ export interface FoundRewrites {
 // Reads the analysis-pass TSX with real scope resolution, so shadowed names are left alone, and returns the rewrites to apply in the final pass.
 // `bindings` are the names read off `__props`: destructured props first, so their indexes match the generated defaults, then server data.
 // `values`: code only read by the type checker, where a row or an alias is its value rather than an accessor to it, so TypeScript narrows it; its reads stay as written, its assignments are still reported.
-export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, bindings: PropsBinding[], componentName: string, values: boolean): FoundRewrites {
+// `templateStart`: where the template begins in the source, past which a signal's name reads its value.
+export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, bindings: PropsBinding[], componentName: string, values: boolean, templateStart: number): FoundRewrites {
   const rewrites: Rewrites = new Map()
   const diagnostics: Diagnostic[] = []
   const unread = new Set<number>()
@@ -121,6 +124,20 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     }
   }
 
+  // In the template a signal or memo is its value, `{count}` reading `count()`; a call, `.set` and `bind:` still take the signal itself.
+  const templateRead = (reference: NodePath): boolean => {
+    const { node, parent } = reference
+    const source = map.isExact(node.start!) ? map.toSource(node.start!) : undefined
+
+    if (source === undefined || source < templateStart || tagPosition(reference) !== undefined || typeQueryOf(reference) !== undefined)
+      return false
+
+    if ((parent.type === 'CallExpression' || parent.type === 'OptionalCallExpression') && parent.callee === node)
+      return false
+
+    return !((parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression') && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && parent.property.name === 'set')
+  }
+
   traverse(ast, {
     Program: (path) => {
       // The export of the function counts as a reference to it, and a tag of that name is the component rendering itself; neither is a read of a global.
@@ -143,8 +160,18 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     VariableDeclarator: (path) => {
       const { id, init } = path.node
       const start = id.type === 'Identifier' && map.isExact(id.start!) ? map.toSource(id.start!) : undefined
+      const made = id.type === 'Identifier' && init?.type === 'CallExpression' ? importedFromKay(path.scope, init.callee) : undefined
 
-      if (start !== undefined && id.type === 'Identifier' && init?.type === 'CallExpression' && importedFromKay(path.scope, init.callee) === 'signal' && onlyRead(path.scope.getBinding(id.name)))
+      if (id.type === 'Identifier' && made !== undefined && ACCESSORS.has(made)) {
+        for (const reference of path.scope.getBinding(id.name)?.referencePaths ?? []) {
+          const source = templateRead(reference) ? map.toSource(reference.node.start!) : undefined
+
+          if (source !== undefined)
+            rewrites.set(source, { ...withShorthand(reference, id.name, { after: '()' }), end: source + id.name.length })
+        }
+      }
+
+      if (start !== undefined && id.type === 'Identifier' && init?.type === 'CallExpression' && made === 'signal' && onlyRead(path.scope.getBinding(id.name), templateRead))
         constantSignals.set(start, { name: { start, end: start + id.name.length }, value: sourceSpan(map, init.arguments[0]) })
 
       if (id.type !== 'ObjectPattern' || init?.type !== 'Identifier' || init.name !== '__props')
@@ -205,9 +232,9 @@ function importedFromKay(scope: Scope, callee: t.Node): string | undefined {
   return imported.type === 'Identifier' ? imported.name : imported.value
 }
 
-// Whether every use of the binding calls it with no arguments, which reads a signal: a `.set`, or the signal handed on, may write it.
-function onlyRead(binding: Binding | undefined): boolean {
-  return binding !== undefined && binding.constant && binding.referencePaths.length > 0 && binding.referencePaths.every(reference => reference.parent.type === 'CallExpression' && reference.parent.callee === reference.node && reference.parent.arguments.length === 0)
+// Whether every use of the binding reads the signal, a call with no arguments or its name in the template: a `.set`, or the signal handed on, may write it.
+function onlyRead(binding: Binding | undefined, templateRead: (reference: NodePath) => boolean): boolean {
+  return binding !== undefined && binding.constant && binding.referencePaths.length > 0 && binding.referencePaths.every(reference => (reference.parent.type === 'CallExpression' && reference.parent.callee === reference.node && reference.parent.arguments.length === 0) || templateRead(reference))
 }
 
 // Babel's message ends in the position within the generated code, which means nothing to the user; the error lands on the source it was generated from.

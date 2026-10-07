@@ -5,7 +5,7 @@
 ## Rules that are easy to get wrong
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
-- Signals are explicit. Read `count()`, write `count.set(1)` or `count.set(c => c + 1)`. Props and server data are plain names, never called: `{title}`, not `{title()}`.
+- A signal or memo the script declares is read by its name in the template, `{count}`, and by calling it in the script, `count()`; it is written with `count.set(1)` or `count.set(c => c + 1)`. In the template, `count.set`, `bind:value={count}` and a call, `count()`, still take the signal itself, and a component handed `open={open}` gets the value, kept current. Props and server data are plain names everywhere: `{title}`, not `{title()}`.
 - A `for` matches its rows across renders by `item.id`, else by the item itself, so a list of objects with no `id`, made afresh on each render, names a key: `for post of posts key={post.slug}`.
 - A promise an `await` block renders by the name a server fence declares it under, `await comments`, is left unawaited and kay defers it; any other, such as `await data.comments` or one a component makes, is made with `defer()`.
 - The component script exports types only. Shared values live in `.ts` modules.
@@ -27,7 +27,7 @@ const greeting = 'Hello'
 const count = signal(0)
 ---
 p {greeting}
-button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times
+button(onClick={() => count.set(count + 1)}) Clicked {count} times
 ```
 
 - `---` holds the component script: imports, props, signals, functions. It runs wherever the component renders.
@@ -52,7 +52,7 @@ li(class={size})
 - Destructure one level deep and read nested fields as `todo.title`; give defaults in the destructuring. A default applies only to an `undefined` prop (`null` stays `null`) and runs only then, once per component, the first time the prop is read. `const all = props<T>()` also works and reads as `all.todo`.
 - Props stay reactive: the compiler turns each destructured name into a live read. They are read-only.
 - Imports, `type` and `interface` declarations are module level, except a type taking the `typeof` a name the script declares, which stays inside the component. Both fences may import the same name; the server fence's copy is dropped. A fence holds TypeScript only: markup goes in the template, and JSX in a fence is reported.
-- `signal(value)` from `kay` makes state; `signal<T>()` starts as `undefined`. Derived values are plain functions: `const shown = () => todos.filter(t => !t.done)`.
+- `signal(value)` from `kay` makes state; `signal<T>()` starts as `undefined`. A derived value is a `memo`, or a plain function the template calls: `const shown = () => todos.filter(t => !t.done)`, read as `shown()`. `persisted` signals read by name as `signal` ones do; a `selection`, a `resource` or a `socket` is called or read through its members, as in the script.
 - `selection<Key>(initial?)` from `kay` holds one selected string or number key among many rows, or none. It reads as `selected()` and writes as `selected.set(id)`, and `selected.is(row.id)` re-runs only for the rows a change selects or unselects, not every row: `tr(class={{ danger: selected.is(row.id) }})`.
 - `memo(fn)` caches a derived value until what it read changes, `effect(fn)` runs once the render is done and again whenever what it read changes, and `onMount`, `onCleanup`, `untrack`, `batch`, `root` and `flush` come from `kay` too. A write applies at once; the effects it touches run together in a microtask, or right away through `flush()`.
 
@@ -101,16 +101,16 @@ import TodoItem from './todo-item.kay'
 const { todos } = props<{ todos: Todo[] }>()
 const filter = signal('')
 const selected = signal<Todo>()
-const shown = () => todos.filter(todo => todo.title.includes(filter()))
+const shown = memo(() => todos.filter(todo => todo.title.includes(filter())))
 ---
 section.todo-list
   input(type="search" bind:value={filter} placeholder="Filter")
   ul
-    for todo, i of shown()
+    for todo, i of shown
       TodoItem(todo={todo} index={i} onToggle={id => selected.set(todos.find(t => t.id === id))})
     else
       li.empty Nothing matches
-  if selected() as todo
+  if selected as todo
     p Selected #[strong {todo.title}]
 ```
 
@@ -420,8 +420,8 @@ import { uid } from 'kay'
 const id = uid()
 const open = signal(false)
 ---
-button(aria-controls={id} aria-expanded={open() ? 'true' : 'false'} onClick={() => open.set(o => !o)}) Menu
-ul(id={id} hidden={!open()})
+button(aria-controls={id} aria-expanded={open ? 'true' : 'false'} onClick={() => open.set(!open)}) Menu
+ul(id={id} hidden={!open})
   slot
 ```
 
@@ -922,7 +922,7 @@ const text = signal('')
 p {messages.status()}
 p {messages.last()?.text}
 input(bind:value={text})
-button(onClick={() => messages.send({ text: text() })}) Send
+button(onClick={() => messages.send({ text })}) Send
 ```
 
 - `socket(module, path, options)` opens one of the module's websocket routes, the path written as the module writes it, `params` and `query` filling it in, all typed from the route. `send` takes the route's `body`, `last()` reads the last message reactively, typed from its `response`, `on(listener)` gets each one and returns what stops it, and `status()` is `connecting`, `open` or `closed`. Messages travel as Elysia sends them, as JSON. What is sent before the connection opens goes once it does. A connection that drops reconnects, waiting longer each time up to 30 seconds, unless the server closed it with code 1000; `close()` closes it for good.

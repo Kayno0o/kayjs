@@ -101,13 +101,13 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   let analysis = generate(file, script, server, { ...generateOptions, name })
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.
   const values = options.output === undefined
-  let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name, values)
+  let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name, values, file.templateStart)
 
   // A `date.kay` declaring `function Date` would break the `new Date()` its template reads.
   while (found.shadowsName) {
     name = `${name}Page`
     analysis = generate(file, script, server, { ...generateOptions, name })
-    found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name, values)
+    found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name, values, file.templateStart)
   }
 
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.rewrites })

@@ -122,7 +122,7 @@ a(href="/") Back home
 const { start } = props<{ start: number }>()
 const count = signal(start)
 ---
-button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times
+button(onClick={() => count.set(count + 1)}) Clicked {count} times
 `,
 }
 

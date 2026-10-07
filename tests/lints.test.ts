@@ -124,13 +124,15 @@ describe('constant-signal', () => {
     expect(diagnostics.map(d => [d.code, d.severity, d.help])).toEqual([['constant-signal', 'warning', 'make it a plain value, `const title = \'Todos\'`, read as `title`']])
   })
 
-  it('reports a signal kay imports by itself too', () => {
+  it('reports a signal kay imports by itself too, and one the template reads by name, a prop included', () => {
     expect(lints('---\nconst title = signal(\'Todos\')\n---\nh1 {title()}\n')).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'title' }])
+    expect(lints(script('const open = signal(false)', 'Child(open={open})\np {open}'))).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'open' }])
   })
 
   it('leaves a signal something writes, binds or hands on, and a `signal` that is not kay\'s', () => {
-    expect(lints(script('const name = signal(\'\')', 'input(bind:value={name})\np {name()}'))).toEqual([])
-    expect(lints(script('const open = signal(false)', 'Child(open={open})\np {open()}'))).toEqual([])
+    expect(lints(script('const name = signal(\'\')', 'input(bind:value={name})\np {name}'))).toEqual([])
+    expect(lints(script('const open = signal(false)', 'button(onClick={() => open.set(!open)}) {open}'))).toEqual([])
+    expect(lints(script('const shown = signal(false)\nkeep(shown)', 'p {shown}'))).toEqual([])
     expect(lints(script('const width = signal(0)\neffect(() => width.set(1))', 'p {width()}'))).toEqual([])
     expect(lints('---\nfunction signal(value: number) {\n  return () => value\n}\n\nconst width = signal(1)\n---\np {width()}\n')).toEqual([])
   })
