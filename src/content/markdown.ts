@@ -1,4 +1,6 @@
 // Markdown entries compiled once into what renders them: the HTML around the kay components they use, plus their headings.
+import type { SafeHtml } from '../runtime/checks'
+import { escape, escapeAttribute } from '../runtime/escape'
 
 export interface Heading {
   depth: number
@@ -73,16 +75,34 @@ export function splitFrontmatter(source: string): { frontmatter: string | undefi
 // Component tags are swapped for placeholder elements first, so Markdown passes them through whatever their attributes hold, and code never holds one.
 export async function compileMarkdown(body: string, bodyLine: number, highlight?: Highlighter): Promise<CompiledMarkdown> {
   const { text, components } = extractComponents(body, bodyLine)
-  let html = Bun.markdown.html(text, { headings: { ids: true, autolink: true }, autolinks: true })
+  const { html, headings } = await renderMarkdown(text, { highlight })
+
+  return { segments: componentSegments(html, components), headings }
+}
+
+export interface RenderedMarkdown {
+  html: string
+  headings: Heading[]
+}
+
+// Markdown text rendered as a collection's entries are, headings anchored and code highlighted when `highlight` is given, for text the app has at runtime, such as a user's note.
+// The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`.
+export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter } = {}): Promise<RenderedMarkdown> {
+  const html = Bun.markdown.html(markdown, { headings: { ids: true, autolink: true }, autolinks: true })
   const headings: Heading[] = []
 
   for (const [, depth, id, inner] of html.matchAll(HEADING))
     headings.push({ depth: Number(depth), id: id!, text: decode(inner!.replace(TAGS, '')).trim() })
 
-  if (highlight)
-    html = await highlighted(html, highlight)
+  return { html: options.highlight ? await highlighted(html, options.highlight) : html, headings }
+}
 
-  return { segments: componentSegments(html, components), headings }
+// A code block as Markdown renders one, through `highlight` when given, for a page's `innerHTML`.
+export async function highlightCode(code: string, language?: string, options: { highlight?: Highlighter } = {}): Promise<SafeHtml> {
+  if (options.highlight)
+    return await options.highlight(code, language) as SafeHtml
+
+  return `<pre><code${language === undefined ? '' : ` class="language-${escapeAttribute(language)}"`}>${escape(code)}</code></pre>` as SafeHtml
 }
 
 async function highlighted(html: string, highlight: Highlighter): Promise<string> {

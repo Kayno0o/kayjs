@@ -6,11 +6,12 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { check } from '../src/check'
-import { collection } from '../src/content'
+import { collection, highlightCode, renderMarkdown } from '../src/content'
 import { feedXml } from '../src/content/feed'
 import { setContentPlace } from '../src/content/load'
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
 import { writeContentManifests } from '../src/content/server'
+import { sanitizeHtml } from '../src/runtime'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
@@ -199,5 +200,37 @@ describe('compiling Markdown', () => {
       setContentPlace(process.cwd(), join(process.cwd(), FIXTURE, 'src'))
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('Markdown outside collections', () => {
+  it('renders a string as entries render, headings anchored and code highlighted when asked', async () => {
+    const shout = (code: string, language: string | undefined) => `<pre class="shout">${language}:${code.toUpperCase()}</pre>`
+    const note = await renderMarkdown('## Hello world\n\nSee https://example.com\n\n```ts\nconst a = 1\n```\n', { highlight: shout })
+
+    expect(note.headings).toEqual([{ depth: 2, id: 'hello-world', text: 'Hello world' }])
+    expect(note.html).toContain('<h2 id="hello-world"><a href="#hello-world">Hello world</a></h2>')
+    expect(note.html).toContain('<a href="https://example.com">https://example.com</a>')
+    expect(note.html).toContain('<pre class="shout">ts:CONST A = 1\n</pre>')
+    expect((await renderMarkdown('```ts\na < b\n```\n')).html).toBe('<pre><code class="language-ts">a &lt; b\n</code></pre>\n')
+  })
+
+  it('highlights a code string as a Markdown code block renders, plain without a highlighter', async () => {
+    expect(String(await highlightCode('a < b', 'ts'))).toBe('<pre><code class="language-ts">a &lt; b</code></pre>')
+    expect(String(await highlightCode('x', undefined))).toBe('<pre><code>x</code></pre>')
+    expect(String(await highlightCode('x', 'ts', { highlight: async (code, language) => `<pre data-lang="${language}">${code}</pre>` }))).toBe('<pre data-lang="ts">x</pre>')
+  })
+
+  it('keeps the images and tables a user\'s Markdown holds once sanitizeHtml is told to, and nothing that runs', async () => {
+    const { html } = await renderMarkdown('![Cat](/cat.png "A cat")\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n<img src="javascript:x" onerror="alert(1)">\n')
+    const options = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'] } }
+    const kept = String(sanitizeHtml(html, options))
+
+    expect(kept).toContain('<img src="/cat.png" alt="Cat" title="A cat">')
+    expect(kept).toContain('<table>\n<thead>\n<tr><th>a</th><th>b</th></tr>\n</thead>\n<tbody>\n<tr><td>1</td><td>2</td></tr>\n</tbody>\n</table>')
+    expect(kept).toContain('<img>')
+    expect(kept).not.toContain('onerror')
+    expect(() => sanitizeHtml('', { tags: ['script'] })).toThrow('never keeps <script>')
+    expect(() => sanitizeHtml('', { attributes: { img: ['onerror'] } })).toThrow('never keeps onerror')
   })
 })

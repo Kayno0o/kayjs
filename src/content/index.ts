@@ -10,7 +10,8 @@ import { loadEntries } from './load'
 import { decodeEntries } from './validate'
 
 export type { FeedItem, FeedOptions } from './feed'
-export type { Heading, Highlighter } from './markdown'
+export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
+export { highlightCode, renderMarkdown } from './markdown'
 
 export const COLLECTION = Symbol.for('kay.collection')
 
