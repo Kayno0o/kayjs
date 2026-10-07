@@ -119,6 +119,17 @@ async function scratchProject(files: Record<string, string>): Promise<string> {
 }
 
 describe('kay check, edge cases', () => {
+  it('types the item of a for without a key', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '---\nconst todos = [{ id: 1, title: \'a\' }]\n---\nul\n  for todo of todos\n    li {todo.title} {todo.nope}\n' })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[6, 'TS2339']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks a project whose tsconfig only extends kay\'s, its .kay files and modules alike', async () => {
     const root = await scratchProject({
       'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n',

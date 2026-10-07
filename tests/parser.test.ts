@@ -169,7 +169,7 @@ describe('elements', () => {
     const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message.slice(0, 40)])
 
     expect(at('each x in xs\n  p {x}')).toEqual([['each', '`each` is pug syntax kay does not have']])
-    expect(parse('each x in xs\n  p {x}').diagnostics[0]?.help).toBe('kay loops with `for item of list key={item.id}`')
+    expect(parse('each x in xs\n  p {x}').diagnostics[0]?.help).toBe('kay loops with `for item of list`')
     expect(at('doctype html\np')).toEqual([['doctype', '`doctype` is pug syntax kay does not hav']])
     expect(at('div\n  include a.pug')).toEqual([['include', '`include` is pug syntax kay does not hav']])
     expect(at('blockquote each one\np while\n')).toEqual([])
@@ -238,8 +238,11 @@ describe('control flow', () => {
     expect(file.diagnostics).toEqual([])
   })
 
-  it('requires a key on for', () => {
-    expect(parse('for t of list\n  li x').diagnostics[0]?.message).toContain('needs a key')
+  it('reads a for without a key, its rows matched by item.id or the item', () => {
+    const file = parse('for t of list\n  li x')
+
+    expect(file.diagnostics).toEqual([])
+    expect((file.template[0] as ForNode).key).toBeUndefined()
   })
 
   it('rejects a stray else', () => {
@@ -274,7 +277,7 @@ describe('control flow', () => {
   it('requires the head of a for on one line', () => {
     expect(parse('ul\n  for todo of todos\n\nkey={todo.id}\n    li x\n').diagnostics.length).toBeGreaterThan(0)
     expect(parse('for todo of\n  todos key={todo.id}\n  p').diagnostics.length).toBeGreaterThan(0)
-    expect(parse('for todo of todos\n  key={todo.id}\n  p').diagnostics[0]?.message).toContain('needs a key')
+    expect(parse('for todo of todos\n  key={todo.id}\n  p').diagnostics[0]?.help).toContain('a `for`\'s key goes on the `for` line')
   })
 
   it('reads await with its pending, then and catch blocks', () => {

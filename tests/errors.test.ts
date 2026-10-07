@@ -55,7 +55,7 @@ describe('compile errors', () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-errors-'))
 
     try {
-      await Bun.write(join(root, 'src/a.kay'), 'for t of list\n  li x\n')
+      await Bun.write(join(root, 'src/a.kay'), 'for of list\n  li x\n')
       await Bun.write(join(root, 'src/b.kay'), 'p ok\nelse\n  p no\n')
       let error: unknown
 
@@ -70,12 +70,12 @@ describe('compile errors', () => {
       const { diagnostics, message } = error as KayCompileError
 
       expect(diagnostics.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.message])).toEqual([
-        ['src/a.kay', '`for` needs a key'],
+        ['src/a.kay', 'Malformed `for`'],
         ['src/b.kay', expect.stringContaining('must directly follow')],
       ])
-      expect(message).toContain('error: `for` needs a key\n --> ')
-      expect(message).toContain('src/a.kay:1:1\n  |\n1 | for t of list\n  | ^^^^^^^^^^^^^\n  |\n')
-      expect(message).toContain('  = help: `key={item.id}` for rows with an identity')
+      expect(message).toContain('error: Malformed `for`\n --> ')
+      expect(message).toContain('src/a.kay:1:1\n  |\n1 | for of list\n  | ^^^^^^^^^^^\n  |\n')
+      expect(message).toContain('  = help: `for <item> of <list>`')
     }
     finally {
       await rm(root, { recursive: true, force: true })

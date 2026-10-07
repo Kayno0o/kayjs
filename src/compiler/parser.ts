@@ -15,8 +15,8 @@ const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch|try)(?=[ \t]|\r?\n|$
 // Pug lines kay has no counterpart for, which would otherwise read as an element named after the keyword.
 const PUG_KEYWORD = /(each|while|unless|case|when|include|extends|block|mixin|doctype)(?=[ \t]|\r?\n|$)/y
 const PUG_HINTS: Record<string, string> = {
-  each: 'kay loops with `for item of list key={item.id}`',
-  while: 'kay loops with `for item of list key={item.id}`',
+  each: 'kay loops with `for item of list`',
+  while: 'kay loops with `for item of list`',
   unless: 'kay writes `unless x` as `if !x`',
   case: 'kay writes `case` as `if`, `else if` and `else`',
   when: 'kay writes `case` as `if`, `else if` and `else`',
@@ -475,10 +475,10 @@ class TemplateParser {
     const itemIndices = head?.indices?.[1]
 
     if (!head || !itemIndices) {
-      this.error(start, end, 'Malformed `for`', { help: '`for <item> of <list> key={<key>}`, or `for <item>, <index> of <list> key={index}`' })
+      this.error(start, end, 'Malformed `for`', { help: '`for <item> of <list>`, or `for <item>, <index> of <list>`, then `key={<key>}` when rows are not matched by `item.id`' })
       this.pos = end
 
-      return { kind: 'for', start, end, item: { start, end: start }, each: { start, end: start }, key: { start, end: start }, children: this.parseBlock(indent) }
+      return { kind: 'for', start, end, item: { start, end: start }, each: { start, end: start }, children: this.parseBlock(indent) }
     }
 
     const item = { start: itemIndices[0], end: itemIndices[1] }
@@ -487,7 +487,7 @@ class TemplateParser {
 
     this.pos = start + head[0].length
     const each = this.scanToLineEnd(true)
-    let key: Span = { start: each.end, end: each.end }
+    let key: Span | undefined
 
     KEY_ATTRIBUTE.lastIndex = each.end
     const keyMatch = KEY_ATTRIBUTE.exec(this.src)
@@ -499,9 +499,6 @@ class TemplateParser {
       key = { start: open + 1, end: close - 1 }
       this.pos = close
       this.expectLineEnd('Nothing may follow `key={...}`')
-    }
-    else {
-      this.error(start, this.lineEnd(start), '`for` needs a key', { help: '`key={item.id}` for rows with an identity, or `for item, i of list key={i}` for positional rows' })
     }
 
     const children = this.parseBlock(indent)
@@ -593,7 +590,7 @@ class TemplateParser {
     }
 
     if (!this.atLineEnd() && !(terminator === ']' && next === ']')) {
-      this.error(this.pos, this.lineEnd(this.pos), `Unexpected \`${next}\` after <${name}>`, { help: `inline text needs a space before it: \`${name} Hello\`` })
+      this.error(this.pos, this.lineEnd(this.pos), `Unexpected \`${next}\` after <${name}>`, { help: name === 'key' && next === '=' ? 'a `for`\'s key goes on the `for` line: `for todo of todos key={todo.slug}`' : `inline text needs a space before it: \`${name} Hello\`` })
       this.pos = this.lineEnd(this.pos)
     }
 

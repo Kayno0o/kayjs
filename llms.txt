@@ -6,7 +6,7 @@
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
 - Signals are explicit. Read `count()`, write `count.set(1)` or `count.set(c => c + 1)`. Props and server data are plain names, never called: `{title}`, not `{title()}`.
-- Every `for` has a `key={...}`.
+- A `for` matches its rows across renders by `item.id`, else by the item itself, so a list of objects with no `id`, made afresh on each render, names a key: `for post of posts key={post.slug}`.
 - A promise an `await` block renders by the name a server fence declares it under, `await comments`, is left unawaited and kay defers it; any other, such as `await data.comments` or one a component makes, is made with `defer()`.
 - The component script exports types only. Shared values live in `.ts` modules.
 - A page has no props: its data comes from its `--- server` fence.
@@ -67,7 +67,7 @@ Type parameters on the script fence line make a component generic, written as Ty
 const { items, show } = props<{ items: T[], show: (item: T) => string }>()
 ---
 ul
-  for item of items key={item.id}
+  for item of items
     li {show(item)}
 ```
 
@@ -86,7 +86,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `// note` | A comment. Lines indented under it are commented out too. |
 | `if cond` / `else if cond` / `else` | Conditional rendering. |
 | `if user() as u` | Binds the truthy value to `u` for the children. |
-| `for item of list key={item.id}` | A keyed list. `else` right after it renders when the list is empty. |
+| `for item of list` | A list, its rows matched across renders by `item.id`, else by the item itself; `key={item.slug}` names another key. `else` right after it renders when the list is empty. |
 | `for item, i of list key={i}` | Rows matched by position. |
 | `slot` | Where a layout or wrapper renders its children. |
 | `@name` | Directly under a component: passes the indented block as its `name` prop. |
@@ -109,7 +109,7 @@ const shown = () => todos.filter(todo => todo.title.includes(filter()))
 section.todo-list
   input(type="search" bind:value={filter} placeholder="Filter")
   ul
-    for todo, i of shown() key={todo.id}
+    for todo, i of shown()
       TodoItem(todo={todo} index={i} onToggle={id => selected.set(todos.find(t => t.id === id))})
     else
       li.empty Nothing matches
@@ -166,7 +166,7 @@ import type { JSX } from 'kay'
 const { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()
 ---
 ul
-  for item, i of items key={item.id}
+  for item, i of items
     | {row(item, i)}
 ```
 
@@ -606,7 +606,7 @@ const { Content } = post
 ---
 h1 {post.data.title}
 nav
-  for heading of post.headings key={heading.id}
+  for heading of post.headings
     a(href={`#${heading.id}`}) {heading.text}
 article
   Content
@@ -715,7 +715,7 @@ await comments
   p Loading comments
 then list
   ul
-    for comment of list key={comment.id}
+    for comment of list
       li {comment.body}
 catch
   p Comments are unavailable
@@ -747,7 +747,7 @@ export const add = action(t.Object({ title: t.String({ minLength: 1, maxLength: 
 const todos = await listTodos()
 ---
 ul
-  for todo of todos key={todo.id}
+  for todo of todos
     li: a(href={`/todos/${todo.id}`}) {todo.title}
 form(action={add})
   input(name="title" placeholder="New todo")
@@ -1006,7 +1006,7 @@ it('counts the clicks', async () => {
 | `missing-title` | deny | An `iframe` with no `title`. |
 | `unreachable-click` | deny | An `onClick` on an element no keyboard reaches and no `role` names. |
 | `unbounded-string` | deny | A string field of an action's schema with no `maxLength`. |
-| `positional-key` | warn | `for todo, i of todos key={i}` whose rows read `todo.id`: keyed by position, a row added before others hands their markup and state to the wrong rows. The quick fix keys them by `todo.id`. |
+| `positional-key` | warn | `for todo, i of todos key={i}` whose rows read `todo.id`: keyed by position, a row added before others hands their markup and state to the wrong rows. The quick fix drops the key, so they are matched by `todo.id`. |
 | `constant-signal` | warn | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |
 
 ## Linting

@@ -90,7 +90,8 @@ export interface ForNode extends Span {
   item: Span
   index?: Span
   each: Span
-  key: Span
+  // Without one, rows are matched by the item's `id`, else by the item itself.
+  key?: Span
   children: Node[]
   fallback?: Node[]
 }

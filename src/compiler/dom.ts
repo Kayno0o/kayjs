@@ -7,7 +7,7 @@ import { BEHAVIOUR, CONTENT_PROPERTIES, END_MARKER, escapeStaticAttribute, escap
 import { childItems, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'setClass', 'setStyle', 'spread', 'template', 'text']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 
 export function domHelperImport(): string {
@@ -154,14 +154,16 @@ export class DomTemplate {
   private for(node: ForNode, at: string): void {
     const { b } = this
     // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
-    const positional = node.index !== undefined && this.source(node.key).trim() === this.source(node.index)
+    const positional = node.index !== undefined && node.key !== undefined && this.source(node.key).trim() === this.source(node.index)
 
     b.add(`KayLoop(${at}, () => (`).addSource(node.each).add('), ')
 
     if (positional)
       b.add('false')
-    else
+    else if (node.key)
       b.add('(').addSource(node.item).add(') => (').addSource(node.key).add(')')
+    else
+      b.add(domAlias('rowKey'))
 
     b.add(', (').addSource(node.item)
 

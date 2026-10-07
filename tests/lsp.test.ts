@@ -147,7 +147,7 @@ describe('kay lsp', () => {
   })
 
   it('reports compile errors from the .kay compiler itself', async () => {
-    const diagnostics = await broken.change('src/routes/[id].kay', 'ul\n  for item of [1, 2]\n    li {item}\n', 3)
+    const diagnostics = await broken.change('src/routes/[id].kay', 'ul\n  for of [1, 2]\n    li x\n', 3)
 
     expect(diagnostics).toEqual([expect.objectContaining({ source: 'kay', range: expect.objectContaining({ start: { line: 1, character: 2 } }) })])
   })

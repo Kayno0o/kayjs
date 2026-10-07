@@ -154,7 +154,7 @@ function multiLineSpans(nodes: Node[]): Span[] {
       case 'if':
         return node.branches.flatMap(branch => [...(branch.test ? [branch.test] : []), ...multiLineSpans(branch.children)])
       case 'for':
-        return [node.each, { start: node.key.start - 1, end: node.key.end + 1 }, ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]
+        return [node.each, ...node.key ? [{ start: node.key.start - 1, end: node.key.end + 1 }] : [], ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]
       case 'await':
         return [node.value, ...multiLineSpans(awaitBlocks(node).flat())]
       case 'try':

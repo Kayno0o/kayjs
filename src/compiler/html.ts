@@ -230,7 +230,7 @@ export class HtmlTemplate {
       }
 
       if (this.options.accessorLoops)
-        b.add(node.index !== undefined && this.source(node.key).trim() === this.source(node.index) ? ', "positional"' : ', "keyed"')
+        b.add(node.index !== undefined && node.key !== undefined && this.source(node.key).trim() === this.source(node.index) ? ', "positional"' : ', "keyed"')
 
       b.add(')')
     })

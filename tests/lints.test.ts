@@ -95,17 +95,17 @@ describe('kay explain', () => {
 })
 
 describe('positional-key', () => {
-  it('reports rows keyed by their index while each has an `id`, keying them by it and dropping the index once nothing else reads it', () => {
+  it('reports rows keyed by their index while each has an `id`, dropping the key, and the index once nothing else reads it', () => {
     const source = `${ROWS}for todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`
 
     expect(lints(source)).toEqual([{ code: 'positional-key', severity: 'warning', at: 'i' }])
-    expect(fixed(source)).toEqual([source.replace('for todo, i of todos key={i}', 'for todo of todos key={todo.id}')])
+    expect(fixed(source)).toEqual([source.replace('for todo, i of todos key={i}', 'for todo of todos')])
   })
 
   it('keeps an index the rows read', () => {
     const source = `${ROWS}for todo, i of todos key={i}\n  p {i + 1}. {todo.id}\n`
 
-    expect(fixed(source)).toEqual([source.replace('key={i}', 'key={todo.id}')])
+    expect(fixed(source)).toEqual([source.replace(' key={i}', '')])
   })
 
   it('leaves rows with no `id`, and rows keyed otherwise', () => {

@@ -127,11 +127,11 @@ describe('formatKay', () => {
   })
 
   it('leaves a file that does not parse untouched and reports why', () => {
-    const source = 'ul\n  for item of items\n    li {item}\n'
+    const source = 'ul\n  for of items\n    li {item}\n'
     const { code, diagnostics } = formatKay(source)
 
     expect(code).toBe(source)
-    expect(diagnostics).toEqual([expect.objectContaining({ message: expect.stringContaining('`for` needs a key') })])
+    expect(diagnostics).toEqual([expect.objectContaining({ message: 'Malformed `for`' })])
   })
 
   it('leaves every fixture unchanged', async () => {

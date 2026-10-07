@@ -221,6 +221,7 @@ describe('loops', () => {
   it.each([
     ['as the only content of their element', 'ul\n  for n, i of list() key={n}\n    li {n}:{i}\n'],
     ['between other children, several nodes a row', 'ul\n  li.first first\n  for n, i of list() key={n}\n    li {n}:{i}\n    | ,\n  li.last last\n'],
+    ['with no key, matched by the value itself', 'ul\n  for n, i of list()\n    li {n}:{i}\n'],
   ])('move, insert and remove keyed rows %s, keeping the nodes of the rows that stay', async (_name, template) => {
     const { root, dispose } = await mountKay({
       'main.kay': `---\nimport { signal } from 'kay'\n\nconst list = signal([1, 2, 3, 4, 5, 6])\n;(globalThis as { setList?: (next: number[]) => void }).setList = next => list.set(next)\n---\n${template}`,
@@ -249,6 +250,28 @@ describe('loops', () => {
         if (next.length === 0)
           byKey.clear()
       }
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('match rows with no key by their item\'s id, so fresh copies of the same items keep their nodes', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal([{ id: 1, name: \'a\' }, { id: 2, name: \'b\' }])\n;(globalThis as { setItems?: (next: { id: number, name: string }[]) => void }).setItems = next => list.set(next)\n---\nul\n  for item of list()\n    li {item.name}\n',
+    })
+    const setItems = (globalThis as unknown as { setItems: (next: { id: number, name: string }[]) => void }).setItems
+    const [a, b] = root.querySelectorAll('li')
+
+    try {
+      setItems([{ id: 2, name: 'B' }, { id: 1, name: 'A' }, { id: 3, name: 'c' }])
+      await settle()
+
+      const items = [...root.querySelectorAll('li')]
+
+      expect(items.map(item => item.textContent)).toEqual(['B', 'A', 'c'])
+      expect(items[0]).toBe(b!)
+      expect(items[1]).toBe(a!)
     }
     finally {
       await dispose()

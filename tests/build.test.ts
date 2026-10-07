@@ -493,7 +493,7 @@ describe('compile cache', () => {
 
       expect(analysis).toMatchObject({ island: 'counter.kay', classes: ['counter'], diagnostics: [] })
       expect(await analyzeKayCached(source, file, cacheDir, cacheDir)).toEqual(analysis)
-      expect((await analyzeKayCached('for t of list\n  li x\n', file, cacheDir, cacheDir)).diagnostics).not.toHaveLength(0)
+      expect((await analyzeKayCached('for of list\n  li x\n', file, cacheDir, cacheDir)).diagnostics).not.toHaveLength(0)
       expect(await analyzeKayCached(source, file, cacheDir, cacheDir)).toEqual(analysis)
       expect((await readdir(cacheDir)).sort()).toEqual([expect.stringMatching(/-analysis\.json$/), expect.stringMatching(/-dom\.json$/), expect.stringMatching(/-ssr-hydratable\.json$/), expect.stringMatching(/-ssr\.json$/)])
     }

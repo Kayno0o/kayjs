@@ -781,15 +781,18 @@ class Generator {
 
     const tag = 'KayLoopFor'
     // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
-    const positional = node.index !== undefined && this.text(node.key).trim() === this.text(node.index)
+    const positional = node.index !== undefined && node.key !== undefined && this.text(node.key).trim() === this.text(node.index)
 
     b.wrap(node, () => {
       b.add(`<${tag} each={`).addSource(node.each).add('} keyed={')
 
       if (positional)
         b.add('false')
-      else
+      else if (node.key)
         b.add('(').addSource(node.item).add(') => (').addSource(node.key).add(')')
+      // Rows keyed by the item's `id` or the item itself, which any item has.
+      else
+        b.add('() => 0')
 
       b.add('}')
 
@@ -815,7 +818,7 @@ class Generator {
       b.add(') => ')
 
       // A positional key reads the index, so the type check sees it read, and hover and rename reach the key's name.
-      if (positional && this.options.check) {
+      if (positional && node.key && this.options.check) {
         b.add('(void (').addSource(node.key).add('), ')
         this.emitRoot(node.children)
         b.add(')')

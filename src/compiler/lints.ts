@@ -48,7 +48,7 @@ export const LINTS = {
     level: 'warn',
     summary: 'A `for` keyed by the row\'s index while its rows have an `id`: a row added or removed before others shifts every later one to another key, so their markup and state stay where the old rows were.',
     wrong: 'for todo, i of todos key={i}\n  TodoRow(id={todo.id} title={todo.title})',
-    right: 'for todo of todos key={todo.id}\n  TodoRow(id={todo.id} title={todo.title})',
+    right: 'for todo of todos\n  TodoRow(id={todo.id} title={todo.title})',
   },
   'constant-signal': {
     level: 'warn',
@@ -162,7 +162,7 @@ function positionalKey(source: string, node: ForNode, found: Diagnostic[]) {
   const index = node.index && text(node.index)
   const first = node.children[0]
 
-  if (!index || !first || text(node.key).trim() !== index || !IDENTIFIER.test(item))
+  if (!index || !first || !node.key || text(node.key).trim() !== index || !IDENTIFIER.test(item))
     return
 
   const rows = source.slice(first.start, node.children.at(-1)!.end)
@@ -170,17 +170,17 @@ function positionalKey(source: string, node: ForNode, found: Diagnostic[]) {
   if (!new RegExp(`(?<![\\w$.])${item.replaceAll('$', '\\$')}\\.id(?![\\w$])`).test(rows))
     return
 
-  // The index goes too once nothing else reads it, as the key was its only use.
+  // Without the key the rows are matched by `id`; the index goes too once nothing else reads it, as the key was its only use.
   const indexRead = new RegExp(`(?<![\\w$.])${index.replaceAll('$', '\\$')}(?![\\w$])`).test(rows)
-  const edits = [{ ...node.key, text: `${item}.id` }, ...indexRead ? [] : [{ start: node.item.end, end: node.index!.end, text: '' }]]
+  const edits = [...indexRead ? [] : [{ start: node.item.end, end: node.index!.end, text: '' }], { start: node.each.end, end: node.key.end + 1, text: '' }]
 
   found.push({
     ...node.key,
     code: 'positional-key',
     message: 'These rows are keyed by their position, though each has an `id`',
     note: 'a row added or removed before others gives every later one another key, while their markup and state stay with the old keys',
-    help: `key them by it: \`key={${item}.id}\``,
-    fixes: [{ title: `Key the rows by \`${item}.id\``, edits }],
+    help: `drop the key, so the rows are matched by \`${item}.id\``,
+    fixes: [{ title: `Match the rows by \`${item}.id\``, edits }],
     checkOnly: true,
   })
 }

@@ -108,7 +108,7 @@ details.relative
     svg({...palette} class="size-5 text-accent")
     | Accent
   div.absolute.right-0.mt-2.grid.grid-cols-7.gap-1.rounded.border-2.border-overlay0.bg-mantle.p-2.shadow-lg(role="radiogroup" aria-label="Accent colour")
-    for name of ACCENTS key={name}
+    for name of ACCENTS
       button.grid.size-6.place-items-center.rounded.border-2.border-overlay0.p-0(type="button" role="radio" aria-label={name} aria-checked={currentAccent() === name ? 'true' : 'false'} style={\`background-color: var(--accent-\${name})\`} onClick={() => accent.set(name)})
         if currentAccent() === name
           svg({...check} class="size-4 text-base")
@@ -139,7 +139,7 @@ header.border-b-2.border-overlay0.bg-base.px-8.py-3
   nav.mx-auto.flex.max-w-5xl.items-center.justify-between.gap-4(aria-label="Main navigation")
     a.text-xl.font-bold.no-underline(href="/") __NAME__
     ul.flex.gap-4
-      for link of links key={link.href}
+      for link of links
         li
           a(href={link.href}) {link.label}
     AccentPicker

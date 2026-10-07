@@ -501,6 +501,11 @@ interface Row {
   dispose: () => void
 }
 
+// The key of a row whose `for` names none: the item's `id` when it has one, else the item itself.
+export function rowKey(item: unknown): unknown {
+  return typeof item === 'object' && item !== null && 'id' in item ? item.id : item
+}
+
 // A `for`: one row per item, matched to the rows of the last render by key, or by position when `keyed` is false.
 // A row reads its item through a function, and its index through one too when keyed, so a row kept across renders follows the new values.
 export function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => readonly T[] | null | undefined | false, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: () => unknown): void {

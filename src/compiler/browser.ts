@@ -394,7 +394,7 @@ function templateExpressions(file: KayFile): { span: Span, deferred: boolean }[]
       }
     }
     else if (node.kind === 'for') {
-      found.push({ span: node.each, deferred: false }, { span: node.key, deferred: false })
+      found.push({ span: node.each, deferred: false }, ...node.key ? [{ span: node.key, deferred: false }] : [])
     }
     else if (node.kind === 'await') {
       found.push({ span: node.value, deferred: false })
