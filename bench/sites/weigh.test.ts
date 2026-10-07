@@ -12,9 +12,25 @@ describe('slotWidth', () => {
     expect(slotWidth('(max-width: 600px) 300px, 100vw', PHONE)).toBe(300)
   })
 
-  it('assumes the viewport width without sizes or with a length it does not read', () => {
+  it('reads calc, min and max, and a list splits on the commas outside them', () => {
+    expect(slotWidth('calc(100vw - 2rem)', PHONE)).toBe(358)
+    expect(slotWidth('(min-width: 60rem) calc(50vw - 2rem), min(100vw, 30rem)', DESKTOP)).toBe(608)
+    expect(slotWidth('(min-width: 60rem) calc(50vw - 2rem), min(100vw, 30rem)', PHONE)).toBe(390)
+  })
+
+  it('reads the density conditions kay caps sizes with, as Chromium does', () => {
+    const capped = '(min-resolution: 3dppx) and ((min-width: 1024px)) calc(38rem * 2 / 3), (min-resolution: 3dppx) calc(100vw * 2 / 3), (min-resolution: 2.5dppx) and ((min-width: 1024px)) calc(38rem * 2 / 2.5), (min-resolution: 2.5dppx) calc(100vw * 2 / 2.5), (min-width: 1024px) 38rem, 100vw'
+    const ladder = [320, 640, 960, 1280, 1920, 2560].map(width => `/a?w=${width} ${width}w`).join(', ')
+
+    // What Chromium 151 loads for each.
+    expect(pickImage('/a', ladder, capped, DESKTOP)).toBe('/a?w=640')
+    expect(pickImage('/a', ladder, capped, PHONE)).toBe('/a?w=960')
+    expect(pickImage('/a', ladder, capped, { name: 'laptop', width: 1440, dpr: 2 })).toBe('/a?w=1280')
+  })
+
+  it('assumes the viewport width without sizes or with a condition it does not read', () => {
     expect(slotWidth(null, PHONE)).toBe(390)
-    expect(slotWidth('calc(100vw - 2rem)', PHONE)).toBe(390)
+    expect(slotWidth('(orientation: portrait) 50vw, 100vw', PHONE)).toBe(390)
   })
 })
 

@@ -27,9 +27,12 @@ const CSS_URL = /url\(\s*["']?([^"')\s]+)["']?\s*\)/g
 const FONT_FACE = /@font-face\s*\{([^}]*)\}/g
 const UNICODE_RANGE = /unicode-range:\s*([^;]+)/
 const BASIC_LATIN = /U\+(?:0+-0*FF\b|\?\?(?![\da-f?]))/i
-const SIZE_ENTRY = /^(?:\((min|max)-width:\s*(\d+(?:\.\d+)?)(px|rem|em)\)\s+)?(\S.*)$/
-const LENGTH = /^(\d+(?:\.\d+)?)(vw|px|rem|em)$/
+// One media feature of an entry's condition, in as many parentheses as it comes, joined to the next by `and`: kay writes `(min-resolution: 3dppx) and ((min-width: 1024px))`.
+const CONDITION = /^\(+\s*(min|max)-(width|resolution)\s*:\s*(\d+(?:\.\d+)?)(px|rem|em|dppx|x)?\s*\)+\s*(?:and\s+)?/
+// A token of a length: a number with its unit, an operator, a parenthesis, a comma or a function's name.
+const LENGTH_TOKEN = /\s*(\d+(?:\.\d+)?(?:vw|px|rem|em)?|[-+*/(),]|calc|min|max)/y
 const ISLAND_CHUNK = /"([^"]+\.kay)":\(\)=>\(\w+\("[^"]*"\),import\("\.\/([^"]+)"\)\)/g
+const NUMBER = /^[\d.]+/
 const SRCSET_SEPARATOR = /,\s+/
 const WHITESPACE = /\s+/
 const ROOT_FONT_PX = 16
@@ -45,27 +48,127 @@ function resolve(url: string, base: string): string {
   return resolved.origin === 'http://site' ? resolved.pathname + resolved.search : resolved.href
 }
 
-// The width in CSS pixels a `sizes` list gives the image at this viewport.
-export function slotWidth(sizes: string | null, viewport: Viewport): number {
-  for (const entry of sizes?.split(',').map(part => part.trim()) ?? []) {
-    const [, bound, amount, unit, length] = SIZE_ENTRY.exec(entry) ?? []
+// A `sizes` list's entries, split on the commas outside parentheses, which `min(100vw, 30rem)` holds.
+function entriesOf(sizes: string): string[] {
+  const entries: string[] = []
+  let depth = 0
+  let start = 0
 
-    if (!length)
-      continue
+  for (const [index, char] of [...sizes].entries()) {
+    depth += char === '(' ? 1 : char === ')' ? -1 : 0
 
-    if (bound) {
-      const limit = Number(amount) * (unit === 'px' ? 1 : ROOT_FONT_PX)
+    if (char === ',' && depth === 0) {
+      entries.push(sizes.slice(start, index).trim())
+      start = index + 1
+    }
+  }
 
-      if (bound === 'min' ? viewport.width < limit : viewport.width > limit)
-        continue
+  return [...entries, sizes.slice(start).trim()]
+}
+
+// Whether the media features leading an entry all hold at this viewport, and the length after them; undefined for a condition it does not read.
+function condition(entry: string, viewport: Viewport): { holds: boolean, length: string } | undefined {
+  let rest = entry
+  let holds = true
+
+  for (let match = CONDITION.exec(rest); match; match = CONDITION.exec(rest)) {
+    const [whole, bound, feature, amount, unit] = match
+    const actual = feature === 'width' ? viewport.width : viewport.dpr
+    const limit = Number(amount) * (unit === 'rem' || unit === 'em' ? ROOT_FONT_PX : 1)
+
+    holds &&= bound === 'min' ? actual >= limit : actual <= limit
+    rest = rest.slice(whole!.length)
+  }
+
+  return rest.startsWith('(') ? undefined : { holds, length: rest }
+}
+
+// Reads a length's tokens left to right: sums of products of terms, a term being a number with its unit or a parenthesised `calc`, `min` or `max`.
+class LengthReader {
+  private at = 0
+
+  constructor(private readonly tokens: string[], private readonly viewport: Viewport) {}
+
+  read(): number | undefined {
+    const value = this.sum()
+
+    return this.at === this.tokens.length && Number.isFinite(value) ? value : undefined
+  }
+
+  private take(): string | undefined {
+    return this.tokens[this.at++]
+  }
+
+  private sum(): number {
+    let value = this.product()
+
+    while (this.tokens[this.at] === '+' || this.tokens[this.at] === '-')
+      value = this.take() === '+' ? value + this.product() : value - this.product()
+
+    return value
+  }
+
+  private product(): number {
+    let value = this.term()
+
+    while (this.tokens[this.at] === '*' || this.tokens[this.at] === '/')
+      value = this.take() === '*' ? value * this.term() : value / this.term()
+
+    return value
+  }
+
+  private term(): number {
+    const token = this.take()
+
+    if (token === '(' || token === 'calc' || token === 'min' || token === 'max') {
+      if (token !== '(' && this.take() !== '(')
+        return Number.NaN
+
+      const values = [this.sum()]
+
+      while (this.tokens[this.at] === ',') {
+        this.take()
+        values.push(this.sum())
+      }
+
+      if (this.take() !== ')')
+        return Number.NaN
+
+      return token === 'min' ? Math.min(...values) : token === 'max' ? Math.max(...values) : values[0]!
     }
 
-    const [, number, lengthUnit] = LENGTH.exec(length) ?? []
+    const number = Number.parseFloat(token ?? '')
+    const unit = token?.replace(NUMBER, '')
 
-    if (!number)
-      return viewport.width
+    return unit === 'vw' ? number / 100 * this.viewport.width : unit === 'rem' || unit === 'em' ? number * ROOT_FONT_PX : number
+  }
+}
 
-    return lengthUnit === 'vw' ? Number(number) / 100 * viewport.width : lengthUnit === 'px' ? Number(number) : Number(number) * ROOT_FONT_PX
+// A length in CSS pixels at this viewport: units, `calc`, `min` and `max`, or undefined for one it does not read.
+function lengthOf(text: string, viewport: Viewport): number | undefined {
+  const tokens: string[] = []
+  let read = 0
+
+  LENGTH_TOKEN.lastIndex = 0
+
+  // A failed match sets `lastIndex` back to 0, so how far the tokens reached is kept apart.
+  for (let match = LENGTH_TOKEN.exec(text); match; match = LENGTH_TOKEN.exec(text)) {
+    tokens.push(match[1]!)
+    read = LENGTH_TOKEN.lastIndex
+  }
+
+  return text.slice(read).trim() === '' ? new LengthReader(tokens, viewport).read() : undefined
+}
+
+// The width in CSS pixels a `sizes` list gives the image at this viewport: the length of the first entry whose condition holds, the viewport's width for one it cannot read.
+export function slotWidth(sizes: string | null, viewport: Viewport): number {
+  for (const entry of sizes === null ? [] : entriesOf(sizes)) {
+    const read = condition(entry, viewport)
+
+    if (read?.holds === false || read?.length === '')
+      continue
+
+    return (read && lengthOf(read.length, viewport)) ?? viewport.width
   }
 
   return viewport.width
