@@ -58,7 +58,7 @@ export interface RateLimit {
 }
 
 export interface ActionRateLimit extends RateLimit {
-  // `'succeeded'` counts only the posts whose handler returned without `ctx.fail` or an error, so typos and a failing mail server lock no one out; every attempt counts unless given.
+  // `'succeeded'` counts only the posts whose handler returned without `ctx.fail` or an error, so typos and a failing mail server lock no one out; every attempt counts unless given. Posts arriving together all read the count before any adds to it, so a burst may pass `max` by a few: pair it with a limit on every attempt.
   count?: 'succeeded'
 }
 

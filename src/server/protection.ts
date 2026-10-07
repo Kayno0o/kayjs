@@ -36,6 +36,14 @@ const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[
 const proxies = new WeakMap<Request, ProxyConfig | null>()
 // The server each request came through, for `clientAddress` called where only the request is at hand, as in a guard.
 const servers = new WeakMap<Request, Server<unknown>>()
+
+interface ActionLimit {
+  name: string
+  limit: ActionRateLimit
+}
+
+// Each action's limits with the name each counts under, read once.
+const limitLists = new WeakMap<object, ActionLimit[]>()
 // One memory store per limit, so clients flooding one never push another's windows out, such as a login form's.
 const memories = new Map<string, ReturnType<typeof memoryRates>>()
 let warnedUnconfigured = false
@@ -135,9 +143,14 @@ function limitKey(name: string, client: string): string {
   return `${name}\n${rateKey(client)}`
 }
 
-// The action's limits, each counted under its own name: the first under the action's URL, the same in every process.
-function actionLimits(action: ServerAction<TSchema, unknown>): { name: string, limit: ActionRateLimit }[] {
-  return [action.protection?.rateLimit ?? []].flat().map((limit, index) => ({ name: index === 0 ? action.url : `${action.url}#${index}`, limit }))
+// The action's limits, each counted under its own name: the first under the action's URL, the same in every process, the others under their place in the list.
+function actionLimits(action: ServerAction<TSchema, unknown>): ActionLimit[] {
+  let limits = limitLists.get(action)
+
+  if (!limits)
+    limitLists.set(action, limits = [action.protection?.rateLimit ?? []].flat().map((limit, index) => ({ name: index === 0 ? action.url : `${action.url}#${index}`, limit })))
+
+  return limits
 }
 
 // Seconds until the next attempt may go through, or undefined while under the limit.
@@ -157,31 +170,45 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
     return { status: 422, field, message: messages?.honeypot ?? 'Leave this field empty' }
   }
 
-  const client = clientAddress(request, server)
+  const limits = actionLimits(action)
 
-  for (const { name, limit } of actionLimits(action)) {
+  // Read only for an action limiting posts: reading it may warn about a proxy setting that only rate limits need.
+  if (limits.length === 0)
+    return undefined
+
+  const client = clientAddress(request, server)
+  let wait: number | undefined
+
+  // Every limit counts the attempt, whichever refuses it, and the longest wait is the one to tell.
+  for (const { name, limit } of limits) {
     const store = limit.store ?? memoryOf(name)
     const key = limitKey(name, client)
     // A limit on the posts that went through only reads its count here; the handler's success adds to it.
-    const wait = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowMs(limit)), limit.max)
+    const own = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowMs(limit)), limit.max)
 
-    if (wait === undefined)
-      continue
-
-    const message = messages?.rateLimit ?? (seconds => `Too many attempts; try again in ${seconds} s`)
-
-    return { status: 429, field: '', message: typeof message === 'string' ? message : message(wait), headers: { 'retry-after': String(wait) } }
+    if (own !== undefined && (wait === undefined || own > wait))
+      wait = own
   }
 
-  return undefined
+  if (wait === undefined)
+    return undefined
+
+  const message = messages?.rateLimit ?? (seconds => `Too many attempts; try again in ${seconds} s`)
+
+  return { status: 429, field: '', message: typeof message === 'string' ? message : message(wait), headers: { 'retry-after': String(wait) } }
 }
 
 // Counts a post whose handler went through against the action's limits on those.
 export async function countSucceeded(action: ServerAction<TSchema, unknown>, request: Request, server: Server<unknown> | null | undefined): Promise<void> {
-  for (const { name, limit } of actionLimits(action)) {
-    if (limit.count === 'succeeded')
-      await (limit.store ?? memoryOf(name)).hit(limitKey(name, clientAddress(request, server)), windowMs(limit))
-  }
+  const limits = actionLimits(action).filter(({ limit }) => limit.count === 'succeeded')
+
+  if (limits.length === 0)
+    return
+
+  const client = clientAddress(request, server)
+
+  for (const { name, limit } of limits)
+    await (limit.store ?? memoryOf(name)).hit(limitKey(name, client), windowMs(limit))
 }
 
 // Seconds until the window closes once `max` posts went through in it, or undefined while fewer did.

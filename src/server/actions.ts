@@ -354,16 +354,26 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     if (isFailure(result))
       return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: typeof result.data === 'string' ? { '': result.data } : {}, data: result.data }, context.server, back)
 
-    await countSucceeded(action, request, context.server)
+    await countGoneThrough(action, request, context.server, options)
 
     return succeeded(action, request, jar, headers, result, status)
   }
   catch (error) {
     // Sent on after it went through, as to a thank-you page.
     if (error instanceof Redirect)
-      await countSucceeded(action, request, context.server)
+      await countGoneThrough(action, request, context.server, options)
 
     return stopped(error, request, state, options)
+  }
+}
+
+// What the handler did is done, a mail sent maybe, so a store failing to count it is reported rather than answered 500, which would invite the visitor to post again.
+async function countGoneThrough(action: ServerAction<TSchema, unknown>, request: Request, server: Server | null, { onError }: ActionOptions): Promise<void> {
+  try {
+    await countSucceeded(action, request, server)
+  }
+  catch (error) {
+    reportServerError(error, request, onError)
   }
 }
 

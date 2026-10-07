@@ -15,7 +15,7 @@ import { action } from '../src/runtime'
 import { inlineScriptHashes, invalidatePage, pages, shutdown } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
-import { clientAddress, countSucceeded, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
+import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
 import { testSite } from '../src/test'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -143,6 +143,7 @@ describe('action protection', () => {
     const form = 'form(action={send})\n  input(name="message" aria-label="Message")\n'
 
     expect(compileKay(form, 'page.kay', { output: 'html' }).tsx).toContain('KayFormHoneypot((send))')
+    expect(compileKay('form(action={send} {...rest})\n  input(name="message" aria-label="Message")\n', 'page.kay', { output: 'html' }).tsx).toContain('() => KayFormHoneypot((send)) + (')
     expect(compileKay(form, 'page.kay', { output: 'html', hydratable: true, twinBuild: true }).tsx).not.toContain('KayFormHoneypot((send))')
   })
 
@@ -165,6 +166,31 @@ describe('action protection', () => {
 
     expect(limited.status).toBe(429)
     expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
+
+    // A handler throwing has not gone through; one sending the visitor on has.
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect((await call('203.0.113.22', 'throw')).status).toBe(500)
+      expect((await call('203.0.113.22', 'throw')).status).toBe(500)
+    }
+    finally {
+      logged.mockRestore()
+    }
+
+    expect((await call('203.0.113.22', 'away')).status).toBe(303)
+    expect((await call('203.0.113.22', 'hi')).status).toBe(429)
+  })
+
+  it('counts an attempt on every limit, whichever refuses it', async () => {
+    const every = memoryRates()
+    const action = { url: '/_kay/action/both', protection: { rateLimit: [{ max: 1, window: '1m', count: 'succeeded' }, { max: 5, window: '1m', store: every }] } } as never
+    const request = () => new Request('http://localhost/')
+
+    await countSucceeded(action, request(), null)
+    expect((await refusalOf(action, request(), {}, false, null))?.status).toBe(429)
+    expect((await refusalOf(action, request(), {}, false, null))?.status).toBe(429)
+    expect(every.peek('/_kay/action/both#1\nunknown')?.count).toBe(2)
   })
 
   it('puts a message ctx.fail is given where a form reads its own message', async () => {
