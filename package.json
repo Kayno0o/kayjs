@@ -160,7 +160,7 @@
     "@happy-dom/global-registrator": "^20.14.5",
     "@iconify-json/tabler": "^1.2.41",
     "@kaynooo/eslint": "^6.1.0",
-    "@kaynooo/pg-orm": "^5.1.0",
+    "@kaynooo/pg-orm": "^5.1.1",
     "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.2",
     "bun-plugin-tailwind": "^0.1.2",

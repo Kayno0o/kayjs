@@ -279,7 +279,7 @@ describe('kay new', () => {
     try {
       const files = await createProject(dir, { kay: '^1.0.0', template: 'app' })
 
-      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts', 'tests/members.test.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
       expect(await Bun.file(join(dir, '.gitignore')).text()).toContain('.env')
@@ -296,7 +296,7 @@ describe('kay new', () => {
         const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...TEST_DATABASE_URL && { DATABASE_URL: TEST_DATABASE_URL } } })
         const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
-        expect(report).toContain('4 pass')
+        expect(report).toContain('5 pass')
         expect(code).toBe(0)
       }
 

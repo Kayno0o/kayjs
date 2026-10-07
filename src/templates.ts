@@ -397,6 +397,7 @@ const APP_TEST_WORKFLOW = TEST_WORKFLOW.replace('    runs-on: debian\n', `    ru
           POSTGRES_USER: app
           POSTGRES_PASSWORD: app
           POSTGRES_DB: app_test
+        options: --health-cmd "pg_isready -h 127.0.0.1 -U app" --health-interval 2s --health-retries 15
 `).replace('      - name: Test\n        run: bun run test\n', `      - name: Test
         run: bun run test
         env:
@@ -407,7 +408,8 @@ const APP_TEST_WORKFLOW = TEST_WORKFLOW.replace('    runs-on: debian\n', `    ru
 const APP_FILES: Record<string, string> = {
   ...SERVER_FILES,
   '.gitignore': 'node_modules\n.kay\n.eslintcache\n/server\n.env\n',
-  '.env.example': 'SESSION_SECRET=at-least-32-characters-kept-out-of-the-repository\nDATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n',
+  // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
+  '.env.example': 'SESSION_SECRET=at-least-32-characters-kept-out-of-the-repository\nPOSTGRES_PASSWORD=letters-and-digits-only-as-it-goes-into-a-url\n',
   // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. Each test file gets a copy of this database, which need not exist.
   '.env.test': 'SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\nDATABASE_URL=postgres://app:app@127.0.0.1:5433/app_test\n',
   '.forgejo/workflows/test.yml': APP_TEST_WORKFLOW,
@@ -488,6 +490,17 @@ afterAll(async () => {
   await database.drop()
 })
 `,
+  'tests/members.test.ts': `import { expect, it } from 'bun:test'
+import { db } from '../src/db'
+import { Member } from '../src/db/member'
+
+// Whatever another test file signed in, this one starts from the seed alone: tests/database.ts copies a database per file.
+it('starts from the seed, with no member another test file added', async () => {
+  await db.repo(Member).write.insertOne({ name: 'Linus' })
+
+  expect((await db.repo(Member).read.findMany(q => q.orderBy('name', 'asc'))).map(member => member.name)).toEqual(['Ada', 'Linus'])
+})
+`,
   'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d --wait\`, which .env points at this file. Tests copy a database per test file on it.
 services:
   db:
@@ -501,9 +514,9 @@ services:
       - 127.0.0.1:5433:5432
     volumes:
       - db:/var/lib/postgresql
-    # What --wait waits for, so the migrations run on a database that answers.
+    # What --wait waits for, so the migrations run on a database that answers, over TCP: on its first start the image's server listens on its socket only.
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U app]
+      test: [CMD-SHELL, pg_isready -h 127.0.0.1 -U app]
       interval: 2s
       retries: 15
 
@@ -654,12 +667,13 @@ it('tells every visitor how many are online', async () => {
     restart: unless-stopped
     environment:
       POSTGRES_USER: app
+      # Letters and digits only: it goes into DATABASE_URL below as it is.
       POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: app
     volumes:
       - db:/var/lib/postgresql
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U app]
+      test: [CMD-SHELL, pg_isready -h 127.0.0.1 -U app]
       interval: 5s
       retries: 10
 
