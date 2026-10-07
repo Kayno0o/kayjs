@@ -4,6 +4,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { t } from 'kay'
 import { defineEnv, queue, renderToString } from 'kay/server'
+import { escapeHtml as escape } from './escape'
 import { addressOf, outbox } from './outbox'
 import { preview } from './preview'
 import { smtp } from './smtp'
@@ -47,12 +48,7 @@ export type Mailer = Elysia & {
 
 const DOCTYPE = /^\s*<!doctype/i
 const HTML_ROOT = /^\s*<html[\s>]/i
-const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
-const HTML_SPECIAL = /[&<>"]/g
-
-function escape(text: string): string {
-  return text.replace(HTML_SPECIAL, char => HTML_ESCAPES[char]!)
-}
+const LINE_BREAK = /[\r\n]/
 
 function list(addresses: Address | Address[] | undefined): Address[] {
   return addresses === undefined ? [] : Array.isArray(addresses) ? addresses : [addresses]
@@ -93,6 +89,11 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
     SMTP_PASS: t.Optional(t.String()),
     SMTP_FROM: optional || from !== undefined ? t.Optional(t.String()) : t.String(),
   }))
+
+  // Optional both, so reading them never throws under `kay build`, and a server given one without the other stops as it boots.
+  if ((env.SMTP_USER === undefined) !== (env.SMTP_PASS === undefined))
+    throw new Error('kayjs-mail: SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
+
   let transport: Transport | undefined
   const sender = () => from ?? named(env.SMTP_FROM!, fromName)
   const missing = () => [...env.SMTP_HOST === undefined ? ['SMTP_HOST'] : [], ...from === undefined && env.SMTP_FROM === undefined ? ['SMTP_FROM'] : []]
@@ -135,6 +136,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
     if (to.length === 0)
       throw new Error(`kayjs-mail: "${message.subject}" has no recipient`)
+
+    // nodemailer neutralises a line break in a name, a subject or a header, but one in an address still adds a recipient to the envelope.
+    for (const address of [...to, ...list(message.cc), ...list(message.bcc), ...list(message.replyTo), ...list(message.from)]) {
+      if (LINE_BREAK.test(addressOf(address)))
+        throw new Error(`kayjs-mail: "${message.subject}" has an address holding a line break`)
+    }
 
     return {
       from: message.from ?? sender(),

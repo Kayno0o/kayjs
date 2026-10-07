@@ -45,6 +45,12 @@ describe('smtp', () => {
     expect(server.received).toHaveLength(before)
   })
 
+  it('refuses a timeout that is no positive duration where the transport is made', () => {
+    expect(() => smtp({ host: '127.0.0.1', timeout: 'soon' as '10s' })).toThrow('takes a positive duration')
+    expect(() => smtp({ host: '127.0.0.1', timeout: 0 })).toThrow('takes a positive duration')
+    expect(() => smtp({ host: '127.0.0.1', timeout: '1.5m' })).not.toThrow()
+  })
+
   it('reads its settings from the environment in production, the greeting named after the sender\'s domain', async () => {
     const saved = { ...process.env }
 

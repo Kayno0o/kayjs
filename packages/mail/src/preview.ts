@@ -1,15 +1,16 @@
 import type { SentMail } from './outbox'
 import type { Address } from './types'
 import { Elysia } from 'elysia'
+import { escapeHtml as escape } from './escape'
 import { outbox } from './outbox'
 
 export const PREVIEW_PATH = '/_kay/mail'
 
-const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }
-const HTML_SPECIAL = /[&<>"']/g
-
 // The mail's own markup runs nothing and loads only images and fonts, so a link or a script in it never acts as the development site.
 const MAIL_POLICY = 'sandbox allow-popups allow-popups-to-escape-sandbox; default-src \'none\'; img-src * data: cid:; style-src \'unsafe-inline\' *; font-src * data:'
+
+// The pages' own policy, which a site's narrower one, such as a `frame-src` naming only a map provider, would otherwise replace and leave the mail's frame blank.
+const PAGE_POLICY = 'default-src \'none\'; style-src \'unsafe-inline\'; frame-src \'self\'; base-uri \'none\'; form-action \'none\''
 
 const STYLE = `
 body{margin:0;font:14px/1.5 system-ui,sans-serif;color:#1a1a1a;background:#f6f6f4}
@@ -25,10 +26,6 @@ pre{white-space:pre-wrap;background:#fff;border:1px solid #e5e5e0;padding:12px;m
 h2{font-size:15px;margin:24px 0 8px}
 `
 
-function escape(text: string): string {
-  return text.replace(HTML_SPECIAL, char => HTML_ESCAPES[char]!)
-}
-
 function shown(addresses: Address | Address[] | undefined): string {
   const all = addresses === undefined ? [] : Array.isArray(addresses) ? addresses : [addresses]
 
@@ -36,7 +33,7 @@ function shown(addresses: Address | Address[] | undefined): string {
 }
 
 function page(title: string, body: string, status = 200): Response {
-  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${escape(title)}</title><style>${STYLE}</style></head><body><main>${body}</main></body></html>`, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${escape(title)}</title><style>${STYLE}</style></head><body><main>${body}</main></body></html>`, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': PAGE_POLICY } })
 }
 
 function listPage(): Response {

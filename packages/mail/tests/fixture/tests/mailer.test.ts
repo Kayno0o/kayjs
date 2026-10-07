@@ -34,8 +34,10 @@ describe('rendering', () => {
     expect(await mail.render({ to: 'a@example.com', subject: 'S', text: 'Just text' })).toMatchObject({ html: undefined, text: 'Just text' })
   })
 
-  it('refuses a mail with no recipient', async () => {
+  it('refuses a mail with no recipient, or an address holding a line break, which would add a recipient of its own', async () => {
     await expect(mail.render({ to: [], subject: 'Nobody', text: 'Hi' })).rejects.toThrow('"Nobody" has no recipient')
+    await expect(mail.render({ to: 'ada@example.com\r\nBcc: spam@example.com', subject: 'Spam', text: 'Hi' })).rejects.toThrow('"Spam" has an address holding a line break')
+    await expect(mail.render({ to: 'ada@example.com', replyTo: { name: 'Ada', address: 'ada@example.com\nBcc: spam@example.com' }, subject: 'Spam', text: 'Hi' })).rejects.toThrow('line break')
   })
 })
 
@@ -126,13 +128,18 @@ describe('configuration', () => {
     expect(mailer({ optional: true, queue: { name: 'optional-set' } }).configured).toBe(true)
   })
 
-  it('refuses a user without a password', async () => {
+  it('stops the boot of a server given a user without a password, or the other way round', () => {
     process.env.NODE_ENV = 'production'
     process.env.SMTP_HOST = 'smtp.example.com'
     process.env.SMTP_FROM = 'site@example.com'
     process.env.SMTP_USER = 'site@example.com'
     delete process.env.SMTP_PASS
 
-    await expect(mailer().send({ to: 'a@example.com', subject: 'S', text: 'T' })).rejects.toThrow('SMTP_USER and SMTP_PASS go together')
+    expect(() => mailer()).toThrow('SMTP_USER and SMTP_PASS go together')
+    expect(() => mailer({ optional: true })).toThrow('SMTP_USER and SMTP_PASS go together')
+
+    delete process.env.SMTP_USER
+    process.env.SMTP_PASS = 'secret'
+    expect(() => mailer()).toThrow('SMTP_USER and SMTP_PASS go together')
   })
 })

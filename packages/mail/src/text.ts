@@ -1,14 +1,17 @@
-// A comment or a doctype, a tag with its attributes, or the text between them.
-const TOKEN = /(<!--[\s\S]*?-->|<![^>]*>)|<(\/?)([a-z][a-z0-9]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>|([^<]+)/gi
+// A comment or a doctype, a tag with its attributes, or the text between them, a lone \`<\` included.
+const TOKEN = /(<!--[\s\S]*?-->|<![^>]*>)|<(\/?)([a-z][a-z0-9]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>|([^<]+|<)/gi
 const SPACES = /\s+/g
 const SKIPPED = new Set(['head', 'style', 'script', 'title', 'template'])
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
-const HIDDEN = /\baria-hidden\s*=\s*["']?true|(?:^|\s)hidden(?:\s|\/|$)|display\s*:\s*none/i
+const DISPLAY_NONE = /display\s*:\s*none/i
+const BOOLEAN_HIDDEN = /(?:^|\s)hidden(?=[\s/=]|$)/i
+const QUOTED = /"[^"]*"|'[^']*'/g
 const BLOCKS = new Set(['address', 'article', 'aside', 'blockquote', 'body', 'center', 'dd', 'div', 'dl', 'dt', 'figcaption', 'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'html', 'main', 'nav', 'p', 'section', 'table', 'tr'])
 const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi
-// kay escapes these alone, so a template's other characters arrive as themselves, and a numeric reference covers the rest.
-const ENTITY = /&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi
-const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ' }
+// kay escapes the first five alone, so a component's other characters arrive as themselves; the rest are what html written by hand often holds.
+const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ', ...Object.fromEntries(Object.entries({ copy: 169, reg: 174, trade: 8482, hellip: 8230, mdash: 8212, ndash: 8211, lsquo: 8216, rsquo: 8217, ldquo: 8220, rdquo: 8221, laquo: 171, raquo: 187, middot: 183, bull: 8226, euro: 8364 }).map(([name, code]) => [name, String.fromCodePoint(code)])) }
+const ENTITY = new RegExp(`&(#x[0-9a-f]+|#\\d+|${Object.keys(NAMED).join('|')});`, 'gi')
+const LAST_CODE_POINT = 0x10FFFF
 const NBSP = /\xA0/g
 const TRAILING_SPACES = /[ \t]+\n/g
 // Kept before a list item, which nests it.
@@ -53,7 +56,7 @@ export function htmlToText(html: string): string {
       continue
     }
 
-    if (!closing && (SKIPPED.has(tag) || HIDDEN.test(attributes!))) {
+    if (!closing && (SKIPPED.has(tag) || hidden(attributes!))) {
       if (!VOID.has(tag))
         skipping = { tag, depth: 1 }
 
@@ -133,12 +136,18 @@ function withAddress(text: string, start: number, href: string): string {
   return label === address || label === href ? text : `${text} (${address})`
 }
 
+function hidden(attributes: string): boolean {
+  return attribute(attributes, 'aria-hidden') === 'true' || DISPLAY_NONE.test(attribute(attributes, 'style') ?? '') || BOOLEAN_HIDDEN.test(attributes.replace(QUOTED, '""'))
+}
+
 function decode(text: string): string {
-  return text.replace(ENTITY, (_, code: string) => {
+  return text.replace(ENTITY, (entity, code: string) => {
     if (!code.startsWith('#'))
       return NAMED[code.toLowerCase()]!
 
-    return String.fromCodePoint(code[1] === 'x' || code[1] === 'X' ? Number.parseInt(code.slice(2), 16) : Number(code.slice(1)))
+    const point = code[1] === 'x' || code[1] === 'X' ? Number.parseInt(code.slice(2), 16) : Number(code.slice(1))
+
+    return point <= LAST_CODE_POINT ? String.fromCodePoint(point) : entity
   })
 }
 

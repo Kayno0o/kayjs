@@ -34,11 +34,13 @@ export function smtp(settings: SmtpSettings): Transport {
   if ((settings.user === undefined) !== (settings.pass === undefined))
     throw new Error('kayjs-mail: SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
 
+  // Read now, so a timeout that is no duration fails where the transport is made rather than at its first mail.
+  const wait = settings.timeout === undefined ? DEFAULT_TIMEOUT_MS : milliseconds(settings.timeout)
   let transporter: ReturnType<typeof open> | undefined
 
   return {
     send: async (mail: Mail): Promise<Delivery> => {
-      transporter ??= open(settings)
+      transporter ??= open(settings, wait)
 
       const info = await transporter.sendMail({
         from: mail.from,
@@ -63,9 +65,8 @@ export function smtp(settings: SmtpSettings): Transport {
   }
 }
 
-function open({ host, port = DEFAULT_PORT, user, pass, name, timeout }: SmtpSettings) {
+function open({ host, port = DEFAULT_PORT, user, pass, name }: SmtpSettings, wait: number) {
   const auth = user === undefined || pass === undefined ? undefined : { user, pass }
-  const wait = timeout === undefined ? DEFAULT_TIMEOUT_MS : milliseconds(timeout)
 
   return createTransport({
     host,

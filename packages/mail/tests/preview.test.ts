@@ -38,6 +38,8 @@ describe('the development outbox page', () => {
     expect(page).toContain('<th>From</th><td>dev@example.com</td>')
     expect(page).toContain(`src="/_kay/mail/${first.id}/html"`)
     expect(page).toContain('<pre>Hello there (https://example.com)</pre>')
+    // Its own, so a site's narrower frame-src cannot blank the mail's frame.
+    expect(detail.headers.get('content-security-policy')).toContain('frame-src \'self\'')
 
     const html = await get(mail, `/_kay/mail/${first.id}/html`)
 

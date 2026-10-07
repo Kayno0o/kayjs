@@ -20,10 +20,15 @@ describe('htmlToText', () => {
   it('leaves out what the html hides, a preheader say, and shows images by their alt text', () => {
     expect(htmlToText('<div style="display:none"><div>Preview</div> text</div><p aria-hidden="true">Gone</p><p hidden>Also</p><p><img src="x.png" alt="Logo"> Kept <img src="y.png" aria-hidden="true" alt="Spacer"></p>')).toBe('Logo Kept')
     expect(htmlToText('<div style="overflow:hidden">Shown</div>')).toBe('Shown')
+    expect(htmlToText('<p><a title="the hidden gem" class="display: none" href="https://x.test/a">Gem</a></p>')).toBe('Gem (https://x.test/a)')
   })
 
   it('decodes character references and keeps a pre block as written', () => {
     expect(htmlToText('<p>Fish &amp; chips &lt;3 &#233;t&#xE9; a&nbsp;b</p><pre>  two\n  lines</pre>')).toBe('Fish & chips <3 été a b\n\n  two\n  lines')
+  })
+
+  it('keeps a lone angle bracket, decodes the entities html written by hand holds, and leaves an impossible one as written', () => {
+    expect(htmlToText('<p>5 < 6 &copy; &hellip; &#x110000;</p>')).toBe(`5 < 6 ${String.fromCharCode(169)} ${String.fromCharCode(8230)} &#x110000;`)
   })
 
   it('separates table cells', () => {
