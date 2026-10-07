@@ -381,6 +381,26 @@ A signal a `.ts` module exports is one state for every island of the page that i
 - `persisted('draft', '', { storage: 'local' })` keeps it in localStorage instead, which the server never sees: the page renders the default and the kept value applies once the islands reading it have hydrated, so it suits what the first paint does not show.
 - A persisted value crosses as island props do, Dates, Maps and Sets included. A cookie value over about 3.8 KB encoded is not kept, with a warning; one written by another version of the app, or by hand, that does not decode leaves the default. A value that decodes is not checked against the signal's type, so one whose shape the code relies on is checked before use. The cookie is `SameSite=Lax`, for the site's mount point, kept a year, and `Secure` over https.
 
+### Transitions
+
+`transition="fade"` on the element an `if` branch, a `for` row or an `await` block shows animates it in as the block shows it and out before the block takes it away, as Vue's `<Transition>` does, with CSS alone:
+
+```kay
+if open()
+  .dialog(transition="fade") Saved
+```
+
+```css
+.fade-enter-active, .fade-leave-active { transition: opacity 200ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+```
+
+- Entering, the element gets `fade-enter-from` and `fade-enter-active`, then from the next frame `fade-enter-to` in place of `fade-enter-from`, and loses them all once the longest transition or animation they start has run. Leaving goes the same way with `fade-leave-`, then removes the element. The rest of the block changes at once: a row taken out of a `for` stays where it was while it leaves, and a row added plays in where it goes.
+- Each phase takes classes of its own too, so Tailwind's utilities need no stylesheet: `li(transition:enter="transition duration-200" transition:enter-from="opacity-0" transition:leave="transition duration-150" transition:leave-to="opacity-0")`. `transition:enter` and `transition:leave` hold for the whole phase, `-from` for its first frame and `-to` after it; they add to the named classes when `transition` names some.
+- Only the element a block shows plays: the first element of its branch or row, or the root of a component it renders. What renders with the island, or with the first render of a block, shows as it is, and a row moving to another place in the list does not play.
+- A visitor asking for reduced motion (`prefers-reduced-motion: reduce`) gets no phase at all: elements come and go at once.
+- It plays in islands only, the server leaving the attributes out of the markup. On a component it is an error, as on an unknown phase such as `transition:out`.
+
 ### Error fallbacks
 
 A `try` block renders its `catch` block instead when what it renders throws, so one broken widget does not take the page down:

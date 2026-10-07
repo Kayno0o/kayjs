@@ -7,8 +7,9 @@ import { BEHAVIOUR, CONTENT_PROPERTIES, END_MARKER, escapeStaticAttribute, escap
 import { childItems, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
+const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
   return `import { ${DOM_HELPERS.map(helper => `${helper} as ${domAlias(helper)}`).join(', ')} } from 'kay/dom'\n`
@@ -492,9 +493,24 @@ export class DomTemplate {
     this.formTarget = outer
   }
 
-  // A handler, a ref or a binding: what only the browser attaches.
+  // A handler, a ref, a binding or a transition: what only the browser attaches.
   private behaviour(element: ElementNode, attribute: Attribute, name: string, node: TemplateNode): Binding | undefined {
     const { b } = this
+
+    if (name === 'transition' || name.startsWith(TRANSITION_PART)) {
+      const part = name === 'transition' ? 'name' : name.slice(TRANSITION_PART.length)
+
+      return (variable) => {
+        b.add(`KayTransition(${variable(node)}, ${JSON.stringify(part)}, `)
+
+        if (attribute.kind === 'expression')
+          b.add('(').addSource(attribute.expression).add(')')
+        else
+          b.add(JSON.stringify(attribute.kind === 'static' ? decodeEntities(attribute.text) : ''))
+
+        b.add(');')
+      }
+    }
 
     if (attribute.kind !== 'expression')
       return undefined

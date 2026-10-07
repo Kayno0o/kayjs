@@ -87,42 +87,51 @@ type Handlers<Target, Events> = { [Name in keyof Events & string as HandlerName<
 
 // What every element takes, whatever its tag.
 interface CommonAttributes<Target> {
-  children?: JSX.Element
-  ref?: (element: Target) => void
-  innerHTML?: string
-  textContent?: string
-  innerText?: string
-  class?: ClassValue
-  style?: StyleValue
-  id?: AttributeValue
-  title?: AttributeValue
-  lang?: AttributeValue
-  dir?: AttributeValue
-  hidden?: AttributeValue
-  inert?: AttributeValue
-  tabindex?: AttributeValue
-  role?: AttributeValue
-  slot?: AttributeValue
-  part?: AttributeValue
-  exportparts?: AttributeValue
-  is?: AttributeValue
-  draggable?: AttributeValue
-  contenteditable?: AttributeValue
-  spellcheck?: AttributeValue
-  translate?: AttributeValue
-  autofocus?: AttributeValue
-  autocapitalize?: AttributeValue
-  accesskey?: AttributeValue
-  enterkeyhint?: AttributeValue
-  inputmode?: AttributeValue
-  nonce?: AttributeValue
-  popover?: AttributeValue
-  itemid?: AttributeValue
-  itemprop?: AttributeValue
-  itemref?: AttributeValue
-  itemscope?: AttributeValue
-  itemtype?: AttributeValue
-  writingsuggestions?: AttributeValue
+  'children'?: JSX.Element
+  'ref'?: (element: Target) => void
+  'innerHTML'?: string
+  'textContent'?: string
+  'innerText'?: string
+  'class'?: ClassValue
+  'style'?: StyleValue
+  'id'?: AttributeValue
+  'title'?: AttributeValue
+  'lang'?: AttributeValue
+  'dir'?: AttributeValue
+  'hidden'?: AttributeValue
+  'inert'?: AttributeValue
+  'tabindex'?: AttributeValue
+  'role'?: AttributeValue
+  'slot'?: AttributeValue
+  'part'?: AttributeValue
+  'exportparts'?: AttributeValue
+  'is'?: AttributeValue
+  'draggable'?: AttributeValue
+  'contenteditable'?: AttributeValue
+  'spellcheck'?: AttributeValue
+  'translate'?: AttributeValue
+  'autofocus'?: AttributeValue
+  'autocapitalize'?: AttributeValue
+  'accesskey'?: AttributeValue
+  'enterkeyhint'?: AttributeValue
+  'inputmode'?: AttributeValue
+  'nonce'?: AttributeValue
+  'popover'?: AttributeValue
+  'itemid'?: AttributeValue
+  'itemprop'?: AttributeValue
+  'itemref'?: AttributeValue
+  'itemscope'?: AttributeValue
+  'itemtype'?: AttributeValue
+  'writingsuggestions'?: AttributeValue
+  // Animates the element in an island as an `if`, a `for` row or an `await` shows it and before it goes: `fade` adds `fade-enter-from`, `fade-enter-active`, `fade-enter-to`, and `fade-leave-` likewise.
+  'transition'?: string
+  // Classes of each phase besides or instead of the named ones, Tailwind's included: `enter` and `leave` throughout, `-from` for the first frame, `-to` after it.
+  'transition:enter'?: string
+  'transition:enter-from'?: string
+  'transition:enter-to'?: string
+  'transition:leave'?: string
+  'transition:leave-from'?: string
+  'transition:leave-to'?: string
   [data: `data-${string}`]: AttributeValue
   [aria: `aria-${string}`]: AttributeValue
 }

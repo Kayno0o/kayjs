@@ -52,6 +52,8 @@ export interface Generated {
 // JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
 const JSX_TEXT_ESCAPES = /[{}<>]|[ \t]{2,}/g
 const BINDABLE = new Set(['input', 'textarea', 'select'])
+const TRANSITION_PART = 'transition:'
+const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 const LINK_ELEMENTS = new Set(['a', 'area'])
@@ -1114,6 +1116,9 @@ class Generator {
   private emitAttribute(element: ElementNode, attribute: Attribute) {
     const { b } = this
 
+    if (attribute.kind !== 'spread')
+      this.checkTransition(element, attribute)
+
     if (this.options.check && this.emitCheckedAttribute(element, attribute))
       return
 
@@ -1278,6 +1283,18 @@ class Generator {
   // Reports a function passed to an island, `0` standing for the prop.
   private emitFunctionPropCheck(element: ElementNode, name: Span) {
     this.b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(name, () => this.b.add('0')).add(')}')
+  }
+
+  private checkTransition(element: ElementNode, attribute: NamedAttribute) {
+    const name = this.text(attribute.name)
+
+    if (name !== 'transition' && !name.startsWith(TRANSITION_PART))
+      return
+
+    if (element.component)
+      this.error(attribute.name, `\`${name}\` animates an element, not a component`, { help: 'set it on the element the component renders, which a prop can carry' })
+    else if (name !== 'transition' && !TRANSITION_PARTS.has(name.slice(TRANSITION_PART.length)))
+      this.error(attribute.name, `\`${name}\` is no phase of a transition`, { help: 'use `transition:enter`, `transition:enter-from` or `transition:enter-to`, or the same for `leave`' })
   }
 
   // `bind:value={name}` reads the signal and writes it back from the matching input event.

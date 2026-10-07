@@ -12,8 +12,8 @@ export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr'
 export const RAW_ELEMENTS = new Set(['script', 'style'])
 // Properties that set an element's content rather than an attribute.
 export const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
-// Handlers, refs and bindings, which only an island attaches; `open` is the one attribute starting with `on` that is none.
-export const BEHAVIOUR = /^(?:on(?!en$)|ref$|bind:)/
+// Handlers, refs, bindings and transitions, which only an island attaches; `open` is the one attribute starting with `on` that is none.
+export const BEHAVIOUR = /^(?:on(?!en$)|ref$|bind:|transition(?::|$))/
 const LESS_THAN = /</g
 const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
 const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }

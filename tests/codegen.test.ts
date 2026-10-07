@@ -176,6 +176,12 @@ describe('elements', () => {
     expect(errors('input(bind:value={v} onInput={f})')).toEqual([expect.stringContaining('already handles')])
   })
 
+  it('keeps a transition on an element, its phases named as they are, and refuses one on a component', () => {
+    expect(jsx('p(transition="fade" transition:leave-to="opacity-0") x')).toBe('<p transition="fade" transition:leave-to="opacity-0">x</p>')
+    expect(errors('Card(transition="fade")')).toEqual(['`transition` animates an element, not a component'])
+    expect(errors('p(transition:out="fade") x')).toEqual(['`transition:out` is no phase of a transition'])
+  })
+
   it('escapes text JSX would read as code, and runs of spaces it would collapse', () => {
     expect(jsx('p a < b > c } \\{d')).toBe('<p>a {"<"} b {">"} c {"}"} {"{"}d</p>')
     expect(jsx('p a   b')).toBe('<p>a{"   "}b</p>')

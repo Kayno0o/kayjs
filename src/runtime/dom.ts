@@ -9,6 +9,7 @@ import { safeUrl } from './url'
 
 export { componentClass } from './classes'
 export { renderEffect as effect } from './reactive'
+export { transition } from './transition'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.
 export class Range {
@@ -45,6 +46,19 @@ interface DelegatingDocument extends Document {
 }
 
 let claim: Claim | undefined
+
+// What plays an element's transition, set by the first one a template sets, so a page whose islands set none ships none of its code.
+export interface Transitions {
+  has: (node: Node) => node is Element
+  enter: (element: Element) => void
+  leave: (element: Element) => void
+}
+
+let transitions: Transitions | undefined
+
+export function playTransitions(given: Transitions): void {
+  transitions = given
+}
 // The comment `FAILED_MARKER` of kay/html holds.
 const FAILED_MARKER_DATA = 'kay-failed'
 const ISLAND_SLOT = 'slot[data-component]'
@@ -299,21 +313,42 @@ function insertUnit(parent: Node, unit: Unit, before: Node | null): void {
   }
 }
 
+// The nodes a unit is made of, in order.
+function nodesOf(unit: Unit): Node[] {
+  if (!(unit instanceof Range))
+    return [unit]
+
+  const nodes: Node[] = []
+
+  for (let node: Node | null = unit.first; node; node = node === unit.last ? null : node.nextSibling)
+    nodes.push(node)
+
+  return nodes
+}
+
+// An element with a `transition` plays its leave phase first.
 function removeUnit(unit: Unit): void {
-  if (!(unit instanceof Range)) {
-    unit.parentNode?.removeChild(unit)
+  for (const node of nodesOf(unit)) {
+    if (transitions?.has(node))
+      transitions.leave(node)
+    else
+      node.parentNode?.removeChild(node)
+  }
+}
 
+// What a block shows after its first render plays its enter phase, the elements with a `transition` it starts with.
+function entered(unit: Unit | null): void {
+  if (!unit || !transitions)
     return
+
+  for (const node of nodesOf(unit)) {
+    if (transitions.has(node))
+      transitions.enter(node)
   }
+}
 
-  let node: Node | null = unit.first
-
-  while (node) {
-    const next: Node | null = node === unit.last ? null : node.nextSibling
-
-    node.parentNode?.removeChild(node)
-    node = next
-  }
+function animated(unit: Unit | null): boolean {
+  return unit !== null && transitions !== undefined && nodesOf(unit).some(transitions.has)
 }
 
 // The units `render` claims from the region's server markup; one a client-only component built afresh goes in where the server left its part empty, before the unit claimed after it.
@@ -453,8 +488,8 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
   })
 }
 
-// Swaps the unit a dynamic part holds for the one `render` builds, claimed instead when hydrating.
-function show(region: Region, previous: Unit[], render: () => unknown): Unit[] {
+// Swaps the unit a dynamic part holds for the one `render` builds, claimed instead when hydrating; `entering` when the block showed something before, so what it shows now plays its enter phase.
+function show(region: Region, previous: Unit[], render: () => unknown, entering = false): Unit[] {
   if (claim)
     return claimUnits(region, render)
 
@@ -465,6 +500,11 @@ function show(region: Region, previous: Unit[], render: () => unknown): Unit[] {
 
   for (const unit of next)
     region.insert(unit)
+
+  if (entering) {
+    for (const unit of next)
+      entered(unit)
+  }
 
   return next
 }
@@ -485,11 +525,13 @@ export function branches(element: Node | null, start: Node | null, end: Node | n
   const index = memo(() => chosen()[0])
   const value = () => chosen()[1]
   let current: Unit[] = []
+  let started = false
 
   renderEffect(() => {
     const selected = index()
 
-    current = untrack(() => unrecorded(() => show(region, current, () => selected < 0 ? null : list[selected]![1](value))))
+    current = untrack(() => unrecorded(() => show(region, current, () => selected < 0 ? null : list[selected]![1](value), started)))
+    started = true
   })
 }
 
@@ -539,12 +581,12 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
     return { key: rowKey, unit: made.length === 0 ? null : made.length === 1 ? made[0]! : new Range(firstOf(made[0]!), lastOf(made.at(-1)!)), setItem: setItem as (item: unknown) => void, setIndex, dispose }
   }))
 
-  const showFallback = (on: boolean) => {
+  const showFallback = (on: boolean, entering: boolean) => {
     if (on && !fallbackUnits && fallback) {
       fallbackUnits = root((dispose) => {
         disposeFallback = dispose
 
-        return show(region, [], fallback)
+        return show(region, [], fallback, entering)
       })
     }
     else if (!on && fallbackUnits) {
@@ -568,25 +610,49 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
 
         if (claim) {
           rows = region.claim(() => list.map((item, index) => makeRow(item, index, key === false ? index : key(item))))
-          showFallback(list.length === 0)
+          showFallback(list.length === 0, false)
 
           return
         }
+
+        rows = reconcileRows(region, rows, list, key, makeRow, false)
+        showFallback(list.length === 0, false)
+
+        return
       }
 
-      rows = reconcileRows(region, rows, list, key, makeRow)
-      showFallback(list.length === 0)
+      rows = reconcileRows(region, rows, list, key, makeRow, true)
+      showFallback(list.length === 0, true)
     })
   })
 }
 
-function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], key: ((item: T) => unknown) | false, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
+// `entering` once the loop rendered before: the rows it makes then play their enter phase.
+function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], key: ((item: T) => unknown) | false, makeOwnRow: (item: T, index: number, key: unknown) => Row, entering: boolean): Row[] {
+  const made: Row[] = []
+  const makeRow = (item: T, index: number, rowKey: unknown) => {
+    const row = makeOwnRow(item, index, rowKey)
+
+    made.push(row)
+
+    return row
+  }
+  const placed = <R>(rows: R) => {
+    if (entering) {
+      for (const row of made)
+        entered(row.unit)
+    }
+
+    return rows
+  }
+
   if (list.length === 0) {
     if (previous.length > 0) {
       for (const row of previous)
         row.dispose()
 
-      if (region.start) {
+      // Clearing the element at once would cut the leave phase of a row playing one.
+      if (region.start || previous.some(row => animated(row.unit))) {
         for (const row of previous) {
           if (row.unit)
             removeUnit(row.unit)
@@ -628,7 +694,7 @@ function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], k
         removeUnit(row.unit)
     }
 
-    return next
+    return placed(next)
   }
 
   const keys = list.map(key)
@@ -683,8 +749,8 @@ function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], k
     }
   }
 
-  // Every old row goes: the whole content is cleared at once.
-  if (byKey.size === previous.length && !region.start) {
+  // Every old row goes: the whole content is cleared at once, unless a row plays its leave phase.
+  if (byKey.size === previous.length && !region.start && !previous.some(row => animated(row.unit))) {
     for (const row of previous)
       row.dispose()
 
@@ -707,12 +773,12 @@ function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], k
     region.parent.insertBefore(holder, after)
   }
   else {
-    const placed = new Set(middle)
+    const kept = new Set(middle)
 
-    moveRows(region.parent, previous.slice(start, oldEnd).filter(row => placed.has(row)), middle, after)
+    moveRows(region.parent, previous.slice(start, oldEnd).filter(row => kept.has(row)), middle, after)
   }
 
-  return [...previous.slice(0, start), ...middle, ...previous.slice(oldEnd)]
+  return placed([...previous.slice(0, start), ...middle, ...previous.slice(oldEnd)])
 }
 
 function removeRow(row: Row): void {
@@ -826,14 +892,17 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
   const region = new Region(element, start, end)
   let current: Unit[] = []
   let version = 0
+  let started = false
 
   renderEffect(() => {
     const settled = value()
     const own = ++version
+    const entering = started
 
+    started = true
     untrack(() => {
       if (!(settled instanceof Promise)) {
-        current = unrecorded(() => show(region, current, () => ready(settled)))
+        current = unrecorded(() => show(region, current, () => ready(settled), entering))
 
         return
       }
@@ -849,17 +918,17 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
         dispose?.()
       })
 
-      const block = (render: () => unknown) => root((disposeBlock) => {
+      const block = (render: () => unknown, entering: boolean) => root((disposeBlock) => {
         dispose?.()
         dispose = disposeBlock
-        current = unrecorded(() => show(region, current, render))
+        current = unrecorded(() => show(region, current, render, entering))
       })
 
-      block(() => pending?.())
+      block(() => pending?.(), entering)
 
       const land = (render: () => unknown) => {
         if (own === version)
-          runWithOwner(parent, () => block(render))
+          runWithOwner(parent, () => block(render, true))
       }
 
       // A `then` block that throws while rendering is not the promise failing, so it stays out of the catch.

@@ -409,6 +409,131 @@ describe('blocks', () => {
   })
 })
 
+describe('transitions', () => {
+  // Past two frames of happy-dom's, at about 16 ms each, and short of the 200 ms the transitions below take.
+  // Once the effects a click queued have run, before any frame.
+  const updated = async () => new Promise<void>(resolve => queueMicrotask(resolve))
+  const twoFrames = async () => new Promise(resolve => setTimeout(resolve, 60))
+  const done = async () => new Promise(resolve => setTimeout(resolve, 260))
+  const STYLE = 'style="transition-duration: 200ms"'
+  const toggled = (open: boolean, element: string) => `---\nimport { signal } from 'kay'\n\nconst open = signal(${open})\n---\nbutton(onClick={() => open.set(!open())}) Toggle\nif open()\n  ${element}\n`
+
+  it('play an if branch out before it goes and in as it shows again, not as the island first renders', async () => {
+    const { root, dispose } = await mountKay({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
+
+    try {
+      const panel = root.querySelector('.panel')!
+
+      expect(panel.className).toBe('panel')
+      root.querySelector('button')!.click()
+      await updated()
+      expect([panel.className, panel.isConnected]).toEqual(['panel fade-leave-from fade-leave-active', true])
+      await twoFrames()
+      expect([panel.className, panel.isConnected]).toEqual(['panel fade-leave-active fade-leave-to', true])
+      await done()
+      expect(panel.isConnected).toBe(false)
+
+      root.querySelector('button')!.click()
+
+      await updated()
+      const shown = root.querySelector('.panel')!
+
+      expect(shown.className).toBe('panel fade-enter-from fade-enter-active')
+      await twoFrames()
+      expect(shown.className).toBe('panel fade-enter-active fade-enter-to')
+      await done()
+      expect(shown.className).toBe('panel')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('take the classes of each phase from its own attribute, as Tailwind writes them', async () => {
+    const { root, dispose } = await mountKay({ 'main.kay': toggled(false, `p.panel(transition:enter="transition-opacity" transition:enter-from="opacity-0" transition:leave-to="opacity-0 scale-95" ${STYLE}) Hi`) })
+
+    try {
+      root.querySelector('button')!.click()
+      await updated()
+      const panel = root.querySelector('.panel')!
+
+      expect(panel.className).toBe('panel opacity-0 transition-opacity')
+      await twoFrames()
+      expect(panel.className).toBe('panel transition-opacity')
+      root.querySelector('button')!.click()
+      await updated()
+      await twoFrames()
+      expect(panel.className).toBe('panel opacity-0 scale-95')
+      await done()
+      expect(panel.isConnected).toBe(false)
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('play a for row out as its item goes and the new rows in, the rows left in their order', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(['a', 'c'])}) Drop\nbutton.add(onClick={() => items.set(['a', 'c', 'd'])}) Add\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,
+    })
+
+    try {
+      const texts = () => [...root.querySelectorAll('li')].map(row => row.textContent)
+      const b = root.querySelectorAll('li')[1]!
+
+      expect([...root.querySelectorAll('li')].map(row => row.className)).toEqual(['', '', ''])
+      root.querySelector<HTMLElement>('button.drop')!.click()
+      await updated()
+      expect([texts(), b.className]).toEqual([['a', 'b', 'c'], 'row-leave-from row-leave-active'])
+      await done()
+      expect(texts()).toEqual(['a', 'c'])
+
+      root.querySelector<HTMLElement>('button.add')!.click()
+
+      await updated()
+      expect([texts(), root.querySelectorAll('li')[2]!.className]).toEqual([['a', 'c', 'd'], 'row-enter-from row-enter-active'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('play the last row out of a list its element holds alone, rather than clearing the element', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a'])\n---\nbutton(onClick={() => items.set([])}) Clear\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,
+    })
+
+    try {
+      root.querySelector('button')!.click()
+      await updated()
+      expect(root.querySelector('li')?.className).toBe('row-leave-from row-leave-active')
+      await done()
+      expect(root.querySelector('li')).toBeNull()
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('skip both phases when the user asks for reduced motion', async () => {
+    const matchMedia = spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: query === '(prefers-reduced-motion: reduce)' }) as MediaQueryList)
+    const { root, dispose } = await mountKay({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
+
+    try {
+      root.querySelector('button')!.click()
+      await updated()
+      expect(root.querySelector('.panel')).toBeNull()
+      root.querySelector('button')!.click()
+      await updated()
+      expect(root.querySelector('.panel')!.className).toBe('panel')
+    }
+    finally {
+      matchMedia.mockRestore()
+      await dispose()
+    }
+  })
+})
+
 describe('slots with parameters', () => {
   it('render a row per item the component passes, following its list and the parent\'s signals', async () => {
     const { root, dispose } = await mountKay({

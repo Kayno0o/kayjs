@@ -275,6 +275,10 @@ describe('static server output', () => {
     expect(html).toEndWith('data-props="[{}]"><input value=""><input type="checkbox" checked><textarea>&lt;i></textarea><select value="b"><option value="a">A</option><option value="b" selected>B</option></select></slot>')
   })
 
+  it('leaves a transition out of the markup, which only an island plays', async () => {
+    expect(await renderKay('p(transition="fade" transition:enter="duration-200" class="note") x')).toBe('<p class="note">x</p>')
+  })
+
   it('leaves script and style text unescaped', async () => {
     expect(await renderKay('---\nconst { code } = props<{ code: string }>()\n---\nscript {code}', { code: 'a < b && c' })).toBe('<script>a < b && c</script>')
   })
