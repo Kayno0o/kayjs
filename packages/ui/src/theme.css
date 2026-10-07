@@ -1261,6 +1261,32 @@
     }
   }
 
+  .kui-pagination {
+    @apply flex flex-wrap items-center gap-1 text-sm;
+  }
+
+  .kui-pagination-page,
+  .kui-pagination-step {
+    @apply min-w-9 border border-kui-surface2 px-3 py-1.5 text-center text-kui-subtext0 transition-colors hover:text-kui-text;
+
+    &:where([aria-current='page']) {
+      @apply border-kui-accent text-kui-accent;
+    }
+
+    &:where([aria-disabled='true']) {
+      @apply opacity-50 hover:text-kui-subtext0;
+    }
+  }
+
+  .kui-pagination-gap {
+    @apply px-2 text-kui-overlay1;
+  }
+
+  /* The code keeps its own light ground and dark modules, which scanners need, whatever the theme. */
+  .kui-qr-code {
+    @apply block h-auto max-w-full;
+  }
+
   .kui-tab-nav {
     @apply flex gap-1 overflow-x-auto border-b border-kui-surface2 pb-px;
   }

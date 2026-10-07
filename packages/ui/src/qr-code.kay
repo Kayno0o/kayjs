@@ -1,0 +1,19 @@
+---
+import type { QrCodeSvgOptions } from '@kaynooo/utils/tools/QrCode'
+import type { JSX } from 'kay'
+import { qrCodeDataUri } from '@kaynooo/utils/tools/QrCode'
+
+const { value, label, size, options, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['img'], 'class' | 'src' | 'alt' | 'width' | 'height' | 'children'> & {
+  // What the code holds, such as a URL.
+  value: string
+  // What a screen reader says in place of the code, such as where it leads.
+  label: string
+  // Its width and height in pixels; without it the image takes the width CSS gives it.
+  size?: number
+  // How the code is drawn, as `qrCodeSvg` from @kaynooo/utils takes it: `ecc`, `moduleShape`, `eyeColor`, `foreground`, `background`, `margin` and the rest.
+  options?: Omit<QrCodeSvgOptions, 'size' | 'title' | 'ariaLabel'>
+  class?: string
+}>()
+---
+// An SVG image drawn when the page renders, on the server for a static page: dark modules on a light ground with a quiet zone, which every scanner reads.
+img.kui-qr-code({...rest} src={qrCodeDataUri(value, options)} alt={label} width={size} height={size} class={className})

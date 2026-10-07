@@ -1,6 +1,6 @@
 # kayjs-ui
 
-> kay components ported from @kaynooo/svelte and @kaynooo/solidjs. They ship as `.kay` sources that the app compiles as its own, and they are styled by the classes of one `theme.css`, which the app restyles from its own stylesheet. The set: buttons and icons, toasts, dialogs and a form dialog that calls a page's action, a sortable table, switches, tabs and segmented controls, inputs, selects and pickers, cards, badges, popovers and tooltips, page layouts and panels, a command palette, charts, drag and drop, a markdown editor, media galleries, a cropper, and a carousel, a star rating and a site menu for marketing pages.
+> kay components ported from @kaynooo/svelte and @kaynooo/solidjs. They ship as `.kay` sources that the app compiles as its own, and they are styled by the classes of one `theme.css`, which the app restyles from its own stylesheet. The set: buttons and icons, toasts, dialogs and a form dialog that calls a page's action, a sortable table, switches, tabs and segmented controls, inputs, selects and pickers, cards, badges, popovers and tooltips, page layouts and panels, a command palette, charts, drag and drop, a markdown editor, media galleries, a cropper, pagination, QR codes, and a carousel, a star rating and a site menu for marketing pages.
 
 ## Rules that are easy to get wrong
 
@@ -183,6 +183,15 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
   - It renders inside an island, since its panels come from a block.
 - `Toggle(label="Public" checked={post.public} name="public" onChange={setPublic})`: a checkbox drawn as a switch, with `role="switch"`, that posts like a checkbox. Without `label`, give it `aria-label`.
   - `onChange` may return a promise: the switch is `aria-busy` and flips no further until it settles, and goes back where it was when it resolves to `false`, rejects or throws (logged), unless the parent set `checked` meanwhile. A void answer leaves the switch as clicked. The switch jumping back is all the user sees, so toast the failure too. `attempt` resolves to `undefined` on failure, so turn that into `false`: `onChange={async checked => (await attempt(async () => { await setPublic({ id, public: checked }); return true }, 'Could not publish')) ?? false}`.
+
+### Pagination, QrCode
+
+- `Pagination(page={page} pages={pages} url={ctx.url})`: links to the pages of a list through the URL's query, so it renders on the server with no island and each page has a URL of its own.
+  - Each link keeps `url`'s path and query, `param`, `page` by default, set to its page and left out for the first one. Read the page in a server fence: `const page = Number(ctx.url.searchParams.get('page') ?? 1)`.
+  - It shows the first and last pages and `siblings` on each side of the current one, 1 by default, an ellipsis for those left out, or the page itself when only one would be. The current page is marked `aria-current="page"`; Previous and Next are disabled at the ends, with `rel="prev"` and `rel="next"` otherwise. With one page or none it draws nothing.
+  - `label` (`Pagination`), `previousLabel` and `nextLabel` replace its words.
+- `QrCode(value={shareUrl} label="Scan to open the list" size={160})`: the value as a QR code, an SVG image drawn where the page renders, on the server for a static page. `label` is its `alt`. Without `size` it takes the width CSS gives it.
+  - It keeps dark modules on a light ground with a quiet zone, which every scanner reads, whatever the theme. `options` takes what `qrCodeSvg` from @kaynooo/utils does, `ecc`, `moduleShape`, `eyeColor`, `foreground`, `background`, `margin` and the rest, its colours written out since the image cannot read the page's CSS.
 
 ### TextInput, Select
 

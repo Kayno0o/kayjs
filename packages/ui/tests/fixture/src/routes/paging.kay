@@ -1,0 +1,17 @@
+--- server
+const page = Number(ctx.url.searchParams.get('page') ?? 1)
+const here = ctx.url
+---
+---
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
+---
+main
+  article#first
+    Pagination(page={1} pages={3} url="/posts?tag=kay")
+  article#middle
+    Pagination(page={page} pages={20} url={here} label="Posts" previousLabel="Précédent" nextLabel="Suivant")
+  article#single
+    Pagination(page={1} pages={1} url="/posts")
+  article#qr
+    QrCode(value="https://kaynooo.fr" label="kaynooo.fr" size={160})

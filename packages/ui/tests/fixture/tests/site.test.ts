@@ -290,3 +290,33 @@ describe('charts', () => {
     expect(graph).toMatch(/^<article id="graph"><div class="kui-contribution-graph kui-contribution-graph-months"><span class="kui-contribution-month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="kui-contribution-cell"/)
   })
 })
+
+describe('Pagination', () => {
+  test('links each page through the query, the current one marked, the steps past the ends disabled', async () => {
+    const first = await element('/paging', 'first')
+
+    expect(first).toContain('<nav aria-label="Pagination" class="kui-pagination">')
+    expect(first).toContain('<span class="kui-pagination-step" aria-disabled="true">Previous</span>')
+    expect(first).toContain('<a class="kui-pagination-page" href="/posts?tag=kay" aria-current="page">1</a>')
+    expect(first).toContain('<a class="kui-pagination-page" href="/posts?tag=kay&amp;page=3">3</a>')
+    expect(first).toContain('<a class="kui-pagination-step" href="/posts?tag=kay&amp;page=2" rel="next">Next</a>')
+  })
+
+  test('follows the page the URL asks for, with gaps around it, and draws nothing for a single page', async () => {
+    const middle = (await element('/paging?page=10', 'middle')).replaceAll(/<!--[^>]*-->/g, '')
+
+    expect(middle).toContain('aria-label="Posts"')
+    expect([...middle.matchAll(/class="kui-pagination-(page|gap)"[^>]*>([^<]*)</g)].map(([, , text]) => text)).toEqual(['1', '…', '9', '10', '11', '…', '20'])
+    expect(middle).toContain('<a class="kui-pagination-step" href="/paging?page=9" rel="prev">Précédent</a>')
+    expect(middle).toContain('href="/paging?page=10" aria-current="page"')
+    expect(await element('/paging', 'single')).not.toContain('kui-pagination')
+  })
+})
+
+test('QrCode draws its value as an SVG image named for screen readers', async () => {
+  const qr = await element('/paging', 'qr')
+  const src = (/src="data:image\/svg\+xml,([^"]+)"/).exec(qr)![1]!
+
+  expect(qr).toContain('alt="kaynooo.fr" width="160" height="160" class="kui-qr-code"')
+  expect(decodeURIComponent(src)).toStartWith('<svg')
+})

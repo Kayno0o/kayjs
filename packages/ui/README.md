@@ -1,6 +1,6 @@
 # kayjs-ui
 
-kay components for the user's sites, ported from `@kaynooo/svelte` and `@kaynooo/solidjs`: buttons and icons, toasts, dialogs and a form dialog calling a page's action, a sortable table, switches, inputs, cards, badges, popovers and tooltips, layouts, a command palette, charts, drag and drop, media, and a carousel, a rating and a site menu for marketing pages. They are `.kay` sources the app compiles as its own, styled by one `theme.css` the app restyles from its own stylesheet.
+kay components for the user's sites, ported from `@kaynooo/svelte` and `@kaynooo/solidjs`: buttons and icons, toasts, dialogs and a form dialog calling a page's action, a sortable table, switches, inputs, cards, badges, popovers and tooltips, layouts, a command palette, charts, drag and drop, media, pagination, QR codes, and a carousel, a rating and a site menu for marketing pages. They are `.kay` sources the app compiles as its own, styled by one `theme.css` the app restyles from its own stylesheet.
 
 ## Install
 
