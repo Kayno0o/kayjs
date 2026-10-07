@@ -8,7 +8,7 @@ import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 const REACTIVE_MODULES = new Set(['kay'])
 // What `kay` exports that a static component may use and stay static.
-const STATIC_EXPORTS = new Set(['uid', 'sanitizeHtml', 'trustHtml'])
+const STATIC_EXPORTS = new Set(['uid', 'sanitizeHtml', 'trustHtml', 'defer'])
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
 export const SCRIPT_GLOBALS = ['signal', 'memo', 'effect', 'onMount']

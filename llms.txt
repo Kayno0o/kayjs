@@ -771,6 +771,21 @@ catch
 - The response stays open until the last value settles, an empty comment going out every 5 seconds meanwhile, so neither Bun, which closes a connection idle for 10 seconds by default, nor a proxy in front closes it under a slow value.
 - In an island, the server sends the pending block and the browser renders the rest once the value settles.
 
+## Rendering to a string
+
+`renderToString(Component, props)` from `kay/server` renders a component outside a page, for a mail, a feed or a file, and resolves with its markup:
+
+```ts
+import { renderToString } from 'kay/server'
+import Receipt from './receipt.kay'
+
+const html = await renderToString(Receipt, { order })
+```
+
+- Its `await` blocks are waited for and rendered in place, each `then` block or, once its value rejects, its `catch` block; a value rejecting with no `catch` block rejects the render, so nothing goes out with part of it missing.
+- Islands render their server markup, with no script to run them, and a `head` block sets nothing. The props argument is left out for a component taking no required prop.
+- Called while an action or a page runs, `t()` and `locale()` from `kay/i18n` read the request's locale; elsewhere, as in a job, they throw.
+
 ## Actions
 
 A page's or a layout's server fence exports actions: an Elysia schema and a handler. Each one becomes `POST /_kay/action/<file>/<name>`, with its input validated.

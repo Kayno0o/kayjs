@@ -1,3 +1,4 @@
+import type { JSX } from '../src/runtime/jsx'
 import type { Todo } from './fixtures/app/src/todo'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -7,6 +8,7 @@ import { kay } from '../src/build/plugin'
 import { mapStack } from '../src/build/sourcemap'
 import { transformKay } from '../src/build/transform'
 import { child } from '../src/runtime/html'
+import { renderToString } from '../src/server/string'
 
 plugin(kay())
 
@@ -304,5 +306,35 @@ describe('static server output', () => {
 
   it('renders a tag read off a default as the element it names', async () => {
     expect(await renderKay('---\nconst { Tag = \'section\' } = props<{ Tag?: unknown }>()\n---\nTag(id="x") hi')).toBe('<section id="x">hi</section>')
+  })
+})
+
+describe('renderToString', () => {
+  async function load<P extends object = object>(source: string): Promise<(props: P) => JSX.Element> {
+    const file = join(scratch, `case-${cases++}.kay`)
+
+    await Bun.write(file, source)
+
+    return (await import(file) as { default: (props: P) => JSX.Element }).default
+  }
+
+  it('renders a component with its props, waiting for its await blocks', async () => {
+    const view = await load<{ name: string, rows: Promise<string[]> }>('---\nimport { defer } from \'kay\'\n\nconst { name, rows } = props<{ name: string, rows: Promise<string[]> }>()\nconst list = defer(rows)\n---\np Hello {name}\nawait list\n  p Loading\nthen items\n  ul\n    for item of items\n      li {item}')
+
+    expect(await renderToString(view, { name: 'Ada', rows: Promise.resolve(['one', 'two']) })).toBe('<p>Hello Ada</p><ul><li>one</li><li>two</li></ul>')
+  })
+
+  it('renders the catch block of a value that rejects, and fails when there is none', async () => {
+    const caught = await load<{ value: Promise<string> }>('---\nimport { defer } from \'kay\'\n\nconst { value } = props<{ value: Promise<string> }>()\nconst shown = defer(value)\n---\nawait shown then text\n  p {text}\ncatch\n  p Unavailable')
+    const uncaught = await load<{ value: Promise<string> }>('---\nimport { defer } from \'kay\'\n\nconst { value } = props<{ value: Promise<string> }>()\nconst shown = defer(value)\n---\nawait shown then text\n  p {text}')
+
+    expect(await renderToString(caught, { value: Promise.reject(new Error('down')) })).toBe('<p>Unavailable</p>')
+    await expect(renderToString(uncaught, { value: Promise.reject(new Error('down')) })).rejects.toThrow('down')
+  })
+
+  it('takes no props argument for a component without required props', async () => {
+    const view = await load('p Static')
+
+    expect(await renderToString(view)).toBe('<p>Static</p>')
   })
 })

@@ -35,6 +35,7 @@ export type { Route } from './routes'
 export type { Session, SessionData, SessionOptions, SessionStore } from './session'
 export { memoryStore, session, sqliteStore } from './session'
 export type { Prefetch } from './speculation'
+export { renderToString } from './string'
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
