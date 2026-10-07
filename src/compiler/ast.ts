@@ -216,3 +216,46 @@ export interface KayFile {
   template: Node[]
   diagnostics: Diagnostic[]
 }
+
+// `Home.size-5`, with `Home` an icon `~icons/...` imports: the `svg` spreading it, as `svg({...Home} class="size-5")` would be written.
+export function drawIcons(nodes: Node[], icons: ReadonlySet<string>): void {
+  for (const node of nodes) {
+    switch (node.kind) {
+      case 'element':
+        if (node.component && icons.has(node.name)) {
+          node.attributes.unshift({ kind: 'spread', expression: node.tag })
+          node.name = 'svg'
+          node.component = false
+          node.tag = { start: node.tag.start, end: node.tag.start }
+        }
+
+        drawIcons(node.children, icons)
+
+        break
+      case 'text':
+        drawIcons(node.parts.filter(part => part.kind === 'element'), icons)
+
+        break
+      case 'slot':
+        drawIcons(node.children, icons)
+
+        break
+      case 'if':
+        drawIcons(node.branches.flatMap(branch => branch.children), icons)
+
+        break
+      case 'for':
+        drawIcons([...node.children, ...node.fallback ?? []], icons)
+
+        break
+      case 'await':
+        drawIcons(awaitBlocks(node).flat(), icons)
+
+        break
+      case 'try':
+        drawIcons(tryBlocks(node).flat(), icons)
+
+        break
+    }
+  }
+}

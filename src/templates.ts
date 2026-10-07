@@ -98,20 +98,20 @@ export function currentAccent(): Accent {
 }
 `,
   'src/components/accent-picker.kay': `---
-import check from '~icons/tabler/check'
-import palette from '~icons/tabler/palette'
+import Check from '~icons/tabler/check'
+import Palette from '~icons/tabler/palette'
 import { accent, ACCENTS, currentAccent } from '../theme'
 ---
 style {\`:root { --accent: var(--accent-\${currentAccent()}); }\`}
 details.relative
   summary.flex.cursor-pointer.list-none.items-center.gap-2.text-sm.text-subtext1
-    svg({...palette} class="size-5 text-accent")
+    Palette.size-5.text-accent
     | Accent
   div.absolute.right-0.mt-2.grid.grid-cols-7.gap-1.rounded.border-2.border-overlay0.bg-mantle.p-2.shadow-lg(role="radiogroup" aria-label="Accent colour")
     for name of ACCENTS
       button.grid.size-6.place-items-center.rounded.border-2.border-overlay0.p-0(type="button" role="radio" aria-label={name} aria-checked={currentAccent() === name ? 'true' : 'false'} style={\`background-color: var(--accent-\${name})\`} onClick={() => accent.set(name)})
         if currentAccent() === name
-          svg({...check} class="size-4 text-base")
+          Check.size-4.text-base
 `,
   'src/routes/_404.kay': `head
   title Nothing here
@@ -158,13 +158,13 @@ const HOME = `--- server
 const greeting = 'Hello from the server'
 ---
 ---
-import rocket from '~icons/tabler/rocket'
+import Rocket from '~icons/tabler/rocket'
 import Counter from '../components/counter.kay'
 ---
 head
   title Home
 section.flex.flex-col.items-center.gap-6.py-12
-  svg({...rocket} class="size-16 text-accent motion-safe:animate-bounce")
+  Rocket.size-16.text-accent.motion-safe:animate-bounce
   h1.text-3xl.font-bold {greeting}
   Counter(start={0})
 `

@@ -1,7 +1,9 @@
 ---
 import home from '~icons/tabler/home'
+import Home from '~icons/tabler/home'
 import twelve from '~icons/tabler/12-hours'
 ---
 nav
   svg({...home} class="icon")
   svg({...twelve})
+  Home.size-5(data-name="home")

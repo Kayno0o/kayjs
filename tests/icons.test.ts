@@ -41,6 +41,13 @@ describe('icons', () => {
     expect(html).toContain(`<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">${iconProps(installedIconSets(FIXTURE).get('tabler')!, 'hours-12')!.innerHTML}</svg>`)
   })
 
+  it('draws an icon imported under a capitalised name as a tag, as the svg spreading it', async () => {
+    const app = await pages({ routes: 'tests/fixtures/icons/src/routes', prebuilt: false })
+    const html = await (await app.handle(new Request('http://localhost/'))).text()
+
+    expect(html).toContain(`<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" data-name="home" class="size-5"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="${HOME_PATH}"/>`)
+  })
+
   it('bundles only the icons the browser code imports', async () => {
     const result = await bundle('import home from \'~icons/tabler/home\'\nconsole.log(home)\n')
     const code = await result.outputs[0]!.text()

@@ -5,7 +5,7 @@ import type { FoundRewrites } from './rewrite'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
-import { awaitBlocks, tryBlocks } from './ast'
+import { awaitBlocks, drawIcons, tryBlocks } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandMessages } from './codegen'
 import { formatReport } from './frame'
@@ -61,6 +61,8 @@ const ERROR_PAGE = '_error.kay'
 // Rendered by the server around or instead of a page, never inside an island.
 const ROUTE_FILES = new Set(['_layout.kay', '_404.kay', ERROR_PAGE])
 const BACKSLASH = /\\/g
+// An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
+const ICON_IMPORT = /^~icons\//
 
 export const ISLAND_TWIN = '?island'
 
@@ -82,6 +84,9 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const file = parseKay(source)
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
+
+  drawIcons(file.template, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
+
   // A name a fence uses may clash with the component's own; the template's reads are found once the code is generated.
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   let name = freeName(componentName(filename), fences)
