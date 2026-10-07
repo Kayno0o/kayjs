@@ -38,6 +38,7 @@ export function variantName(source: string, variant: number | ImageVariant): str
 // Written under a temporary name and moved into place, so a reader never sees a variant half written, nor one a crash cut short.
 export async function writeVariant(source: string, variant: number | ImageVariant, target: string, quality = DEFAULT_QUALITY): Promise<void> {
   const partial = `${target}.${crypto.randomUUID()}.tmp`
+
   // Read through Bun.file, which also reaches the files an executable embeds, where Bun.Image given a path does not.
   const file = Bun.file(source)
   const shape = typeof variant === 'number' ? { width: variant } : variant
@@ -244,7 +245,7 @@ export interface ProcessImageOptions {
   width?: number
   height?: number
   fit?: 'inside' | 'cover'
-  format?: 'webp' | 'jpeg' | 'png' | 'avif'
+  format?: 'webp' | 'jpeg' | 'png'
   // 1 to 100, 80 by default.
   quality?: number
   // Refused past that many pixels, read from the header before any is decoded: 50 million by default.

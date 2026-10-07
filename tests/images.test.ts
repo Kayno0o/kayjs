@@ -285,6 +285,21 @@ describe('crops and share cards', () => {
     expect(() => shareImage('/logo.svg')).toThrow('takes a PNG, JPEG or WebP')
   })
 
+  it('cuts a thin image before enlarging it, never blowing it up whole', async () => {
+    const header = new Uint8Array(13)
+
+    new DataView(header.buffer).setUint32(0, 1)
+    new DataView(header.buffer).setUint32(4, 200_000)
+    header.set([8, 0, 0, 0, 0], 8)
+    await Bun.write(join(uploads, 'thin.png'), new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...pngChunk('IHDR', header), ...pngChunk('IDAT', deflateSync(new Uint8Array(200_000 * 2))), ...pngChunk('IEND', new Uint8Array())]))
+
+    const card = await get(`/_kay/image?src=${encodeURIComponent('/uploads/thin.png')}&card`)
+
+    expect(card.status).toBe(200)
+    expect(await new Bun.Image(await card.bytes()).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
+    expect(await processImage(Bun.file(join(uploads, 'thin.png')), { width: 400, height: 400, fit: 'cover' })).toMatchObject({ width: 400, height: 400 })
+  })
+
   it('writes at build time the crops and cards pages asked for', async () => {
     const client = await mkdtemp(join(tmpdir(), 'kay-client-'))
 

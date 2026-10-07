@@ -1,6 +1,6 @@
 import { deflateSync, inflateSync } from 'node:zlib'
 
-// Bun.Image resizes but cannot cut: an image is resized to cover the box, written as a PNG this reads back row by row, and the middle of it written again.
+// Bun.Image resizes but cannot cut: an image is written as a PNG this reads back row by row, and the middle of it written again.
 const SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
 const CHANNELS: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }
 // Chunks a cut image keeps as they are: the palette and its transparency.
@@ -17,14 +17,22 @@ interface Png {
   kept: { type: string, data: Uint8Array }[]
 }
 
-// `source` resized to cover `width` by `height`, then its middle cut to that box, as a PNG.
-export async function coverImage(source: Blob | Uint8Array, width: number, height: number, maxPixels?: number): Promise<Uint8Array<ArrayBuffer>> {
-  const input = new Bun.Image(source, { maxPixels })
-  const own = await input.metadata()
+// `source` resized to cover `width` by `height`, its middle kept, as a PNG.
+// Shrunk, it is resized first, so the cut reads few pixels; enlarged, it is cut first, so a thin image is never blown up whole.
+export async function coverImage(source: Blob | Uint8Array, width: number, height: number, maxPixels?: number): Promise<Uint8Array> {
+  const own = await new Bun.Image(source, { maxPixels }).metadata()
   const scale = Math.max(width / own.width, height / own.height)
-  const resized = await new Bun.Image(source, { maxPixels }).resize(Math.max(width, Math.round(own.width * scale)), Math.max(height, Math.round(own.height * scale)), { fit: 'fill' }).png({ compressionLevel: 0 }).bytes()
 
-  return encodePng(cropPng(decodePng(resized), width, height))
+  if (scale <= 1) {
+    const resized = await new Bun.Image(source, { maxPixels }).resize(Math.max(width, Math.round(own.width * scale)), Math.max(height, Math.round(own.height * scale)), { fit: 'fill' }).png({ compressionLevel: 0 }).bytes()
+
+    return encodePng(cropPng(decodePng(resized), width, height))
+  }
+
+  const whole = await new Bun.Image(source, { maxPixels }).png({ compressionLevel: 0 }).bytes()
+  const cut = encodePng(cropPng(decodePng(whole), Math.min(own.width, Math.max(1, Math.round(width / scale))), Math.min(own.height, Math.max(1, Math.round(height / scale)))))
+
+  return new Bun.Image(cut).resize(width, height, { fit: 'fill' }).png({ compressionLevel: 0 }).bytes()
 }
 
 function decodePng(bytes: Uint8Array): Png {

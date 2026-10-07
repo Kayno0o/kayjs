@@ -166,7 +166,7 @@ function allowedAspect(text: string): Aspect {
   return aspect
 }
 
-// The URL of an image cut to the 1200x630 share card social sites show, as a JPEG, for `og:image`: `export const seo = { image: shareImage(hero) }`. Smaller images are enlarged to fill it.
+// The URL of an imported image, or one from `images.dirs`, cut to the 1200x630 share card social sites show, as a JPEG, for `og:image`: `meta(property="og:image" content={shareImage(hero)})` in a `head` block. Smaller images are enlarged to fill it.
 export function shareImage(src: string): string {
   if (!RESIZABLE.test(src))
     throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG or WebP`)
@@ -269,11 +269,13 @@ export function imageUrl(src: string, width: number, aspect?: Aspect): string {
 }
 
 function variantUrl(src: string, variant: ImageVariant): string {
-  if (src.startsWith(IMPORTED)) {
+  const cut = variant === 'card' || variant.aspect !== undefined
+
+  if (src.startsWith(IMPORTED) && (cut || variantFiles)) {
     const name = decodeURIComponent(src.slice(IMPORTED.length).replace(QUERY, ''))
 
     // The ladder is written for every imported image; a crop or a card only for those a page asks for.
-    if (variant === 'card' || variant.aspect)
+    if (cut)
       requested.set(name, (requested.get(name) ?? new Map()).set(variantSuffix(variant), variant))
 
     if (variantFiles)

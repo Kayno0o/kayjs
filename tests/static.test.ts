@@ -114,7 +114,7 @@ describe('kay build --static', () => {
 
     // The cut variants and the share card the page asks for are written too.
     const square = (/<img src="\/repo(\/_kay\/images\/[\w-]+-1x1\.webp)"/).exec(home)![1]!
-    const card = (/<a class="card" href="\/repo(\/_kay\/images\/[\w-]+-card\.jpg)"/).exec(home)![1]!
+    const card = (/<meta property="og:image" content="https:\/\/x\.example\/repo(\/_kay\/images\/[\w-]+-card\.jpg)">/).exec(home)![1]!
 
     expect((await get(square)).status).toBe(200)
     expect((await get(card)).status).toBe(200)
