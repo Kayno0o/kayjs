@@ -473,7 +473,7 @@ export interface Resource<T> {
 }
 
 // What a value is once it crossed as JSON: a Date arrives as its ISO text.
-export type Jsonified<T> = T extends Date ? string : T extends readonly (infer Item)[] ? Jsonified<Item>[] : T extends object ? { [Key in keyof T]: Jsonified<T[Key]> } : T
+export type Jsonified<T> = T extends Date | bigint ? string : T extends readonly (infer Item)[] ? Jsonified<Item>[] : T extends object ? { [Key in keyof T]: Jsonified<T[Key]> } : T
 
 type GetRoute<Module, Path> = NodeAt<Module, Path> extends { get: infer Route } ? Route : never
 

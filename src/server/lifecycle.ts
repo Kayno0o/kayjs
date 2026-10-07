@@ -127,3 +127,21 @@ export async function shutdown(app: AnyElysia): Promise<void> {
     }
   }
 }
+
+// What `<executable> --health` exits with: 0 when the server running beside it answers its health route, on `PORT` or 3000, else 1, for a container image with no curl.
+export async function probeHealth(config: HealthConfig | false | undefined, port = process.env.PORT ?? '3000'): Promise<number> {
+  if (config === false) {
+    console.error('kay: health is false in kay.config.ts, so the server has no health route to ask')
+
+    return 1
+  }
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}${config?.path ?? HEALTH_PATH}`, { signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) })
+
+    return response.ok ? 0 : 1
+  }
+  catch {
+    return 1
+  }
+}

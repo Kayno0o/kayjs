@@ -3,9 +3,9 @@ import type { Elysia, TSchema } from 'elysia'
 import type { ProxyConfig } from '../config'
 import type { ActionRateLimit, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
-import { Database } from 'bun:sqlite'
 import { honeypotField } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
+import { openSqlite } from '../runtime/sqlite.server'
 import { rewrittenAddress } from './rewrite'
 
 export interface ProtectionRefusal {
@@ -93,11 +93,8 @@ export function memoryRates(): { hit: (key: string, windowMs: number) => RateWin
 
 // Windows kept in a SQLite file, so every process of the machine opening it counts the same attempts.
 export function sqliteRates(path: string): RateStore {
-  const db = new Database(path, { create: true })
+  const db = openSqlite(path)
 
-  db.run('PRAGMA journal_mode = WAL')
-  // Another process writing waits its turn rather than failing the write.
-  db.run('PRAGMA busy_timeout = 5000')
   db.run('CREATE TABLE IF NOT EXISTS kay_rates (key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset_at INTEGER NOT NULL)')
 
   // The row's old values are what both cases read: a closed window opens afresh, an open one counts one more.

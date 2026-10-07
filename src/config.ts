@@ -30,7 +30,7 @@ export interface KayConfig {
   // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
   manifest?: ManifestConfig
   // Self-hosted fonts, declared on every page and preloaded where they ask for it.
-  fonts?: FontConfig[]
+  fonts?: (FontConfig | FontsourceConfig)[]
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
   security?: SecurityConfig | false
   // The proxies in front of the server, which the client's address that rate limits count is read through. Without it, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
@@ -127,6 +127,19 @@ export interface FontConfig {
   unicodeRange?: string
   // Fetched with the page rather than once the stylesheet asks for it; off by default, since a preload shares a slow link with the stylesheet and holds back the first paint.
   preload?: boolean
+}
+
+// Every face of a Fontsource family the site uses, its name and files read from the package.
+export interface FontsourceConfig {
+  // An installed package: `@fontsource/inter`, or `@fontsource-variable/inter`, whose one face per style spans every weight.
+  fontsource: string
+  // The weights a package of static faces declares, `[400, 600, 700]`; a variable one takes none.
+  weights?: number[]
+  // Defaults to `['normal']`.
+  styles?: ('normal' | 'italic')[]
+  // Defaults to the package's own, `latin` for most.
+  subset?: string
+  display?: FontConfig['display']
 }
 
 export interface ManifestConfig {

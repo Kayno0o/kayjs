@@ -80,7 +80,7 @@ describe('pages', () => {
     expect(status).toBe(200)
     expect(headers.get('content-type')).toBe('text/html; charset=utf-8')
     expect(html).toStartWith('<!doctype html><html lang="en"><head>')
-    expect(html).toContain('<header><a href="/">Kay demo</a></header><main>')
+    expect(html).toContain('<header><a href="/" aria-current="page">Kay demo</a></header><main>')
     expect(html).toContain('<article class="card"><h2>Todos</h2><p>1 open</p><ul>')
     expect(html).toContain('<li><a href="/todos/2">Serve pages</a></li>')
   })

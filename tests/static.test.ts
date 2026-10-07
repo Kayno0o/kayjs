@@ -78,7 +78,7 @@ describe('kay build --static', () => {
     const home = await get('/')
 
     expect(home.status).toBe(200)
-    expect(home.text).toContain('<a class="home" href="/repo/">Home</a><a class="about" href="/repo/about">About</a>')
+    expect(home.text).toContain('<a class="home" href="/repo/" aria-current="page">Home</a><a class="about" href="/repo/about">About</a>')
     expect((await get('/about')).text).toContain('<h1>About</h1>')
     expect((await get('/about/')).text).toContain('<h1>About</h1>')
     expect((await get('/posts/first')).text).toContain('<h1>Post first</h1>')
@@ -225,7 +225,7 @@ describe('base on a server', () => {
     const visit = async (path: string) => app.handle(new Request(`http://localhost${path}`))
     const about = await (await visit('/about')).text()
 
-    expect(about).toContain('<a class="about" href="/repo/about">About</a>')
+    expect(about).toContain('<a class="about" href="/repo/about" aria-current="page">About</a>')
     expect(about).toMatch(/<link rel="stylesheet" href="\/repo\/_kay\/[\w-]+\.css">/)
     expect((await visit('/old')).headers.get('location')).toBe('/repo/about')
     expect((await visit('/about/')).headers.get('location')).toBe('/repo/about')

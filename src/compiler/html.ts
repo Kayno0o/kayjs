@@ -6,7 +6,7 @@ import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'dynamic', 'element', 'head', 'imageAttributes', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'show', 'style']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'show', 'style']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -458,6 +458,8 @@ export class HtmlTemplate {
       })
     }
 
+    this.currentLink(element, markup)
+
     if (field && target) {
       const fieldArguments = () => void b.add('((').addSource(target).add(`), ${JSON.stringify(field.name)}`)
 
@@ -569,6 +571,19 @@ export class HtmlTemplate {
 
     this.formTarget = outerTarget
     markup.text(`</${name}>`)
+  }
+
+  // A link to the page being rendered says so, unless it says itself; an island's links are left to it, its markup claimed as the server wrote it.
+  private currentLink(element: ElementNode, markup: Markup): void {
+    if (element.name !== 'a' || this.options.hydratable || this.named(element, 'aria-current'))
+      return
+
+    const href = element.attributes.find(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'href')
+
+    if (href?.kind === 'static' && decodeEntities(href.text).startsWith('/'))
+      markup.dynamic(() => this.b.add(`${htmlAlias('currentPage')}(${JSON.stringify(decodeEntities(href.text))})`))
+    else if (href?.kind === 'expression')
+      markup.dynamic(() => this.b.add(`${htmlAlias('currentPage')}((`).addSource(href.expression).add('))'))
   }
 
   // A form posting to an action renders the action's honeypot field first; an island leaves it to the template, its markup claimed node by node as it hydrates.

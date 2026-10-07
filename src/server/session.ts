@@ -1,9 +1,9 @@
 import type { Duration } from '../runtime/duration'
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
-import { Database } from 'bun:sqlite'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { durationSeconds } from '../runtime/duration'
+import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
 
 export type SessionData = Record<string, unknown>
@@ -304,11 +304,8 @@ export function memoryStore(): SessionStore {
 
 // Sessions in a SQLite file, surviving restarts and shared by the processes on one machine.
 export function sqliteStore(path: string): SessionStore {
-  const db = new Database(path, { create: true })
+  const db = openSqlite(path)
 
-  db.run('PRAGMA journal_mode = WAL')
-  // Another process writing waits its turn rather than failing the write.
-  db.run('PRAGMA busy_timeout = 5000')
   db.run('CREATE TABLE IF NOT EXISTS kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
 
   const select = db.query<{ data: string }, [string, number]>('SELECT data FROM kay_sessions WHERE id = ? AND expires >= ?')

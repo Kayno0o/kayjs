@@ -14,6 +14,7 @@ import { decodeCall, failure, FORM_CALL, isAction, isFailure } from '../runtime/
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
+import { configuredSite } from '../runtime/site'
 import { FAILURE_HEADER, NAVIGATE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { sizeText } from './body'
@@ -303,9 +304,15 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
   return refusal ? stopped(refusal.error, request, state, options) : state
 }
 
-// Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http.
+// Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http. The host of `site` in kay.config.ts counts too, for a proxy that does not pass the browser's `Host` on.
 function sameHost(request: Request, url: string | null): url is string {
-  return url !== null && URL.canParse(url) && new URL(url).host === new URL(request.url).host
+  if (url === null || !URL.canParse(url))
+    return false
+
+  const { host } = new URL(url)
+  const site = configuredSite()
+
+  return host === new URL(request.url).host || (site !== undefined && host === new URL(site).host)
 }
 
 // A fetch from an island wants a result; a plain form post goes back to the page it came from.

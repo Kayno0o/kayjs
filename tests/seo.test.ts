@@ -102,6 +102,19 @@ describe('seo head', () => {
     expect(JSON.parse(jsonLd([{ '@type': 'WebSite' }, { '@type': 'Organization' }]))).toEqual({ '@context': 'https://schema.org', '@graph': [{ '@type': 'WebSite' }, { '@type': 'Organization' }] })
   })
 
+  it('asks search engines to leave out a page exporting noindex', async () => {
+    expect((await headOf('/legal')).head).toContain('<meta name="robots" content="noindex">')
+    expect((await headOf('/about')).head).not.toContain('name="robots"')
+  })
+
+  it('gives a breadcrumb trail its BreadcrumbList and the site\'s URLs from site, and marks the links to the page shown', async () => {
+    const html = await (await app.handle(new Request('http://localhost/trail'))).text()
+
+    expect(html).toContain('{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://example.com/"},{"@type":"ListItem","position":2,"name":"Trail","item":"https://example.com/trail"}]}')
+    expect(html).toContain('<p class="share">https://example.com/trail</p>')
+    expect(html).toContain('<nav><a href="/">Home</a><a href="/trail/" aria-current="page">Trail</a><a href="/trail?tab=2">Tab</a><a href="/trail#end">End</a><a href="/trail" aria-current="step">Step</a></nav>')
+  })
+
   it('gives an error page no canonical URL', async () => {
     const { status, head } = await headOf('/missing')
 
@@ -147,6 +160,7 @@ describe('sitemap and robots', () => {
       'https://example.com/docs/guide/start',
       'https://example.com/members',
       'https://example.com/missing',
+      'https://example.com/trail',
     ])
   })
 

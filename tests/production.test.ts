@@ -12,7 +12,8 @@ import { Elysia, t } from 'elysia'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { action } from '../src/runtime'
-import { inlineScriptHashes, invalidatePage, pages, shutdown } from '../src/server'
+import { sqliteCache } from '../src/runtime/cache.server'
+import { inlineScriptHashes, invalidatePage, pages, shutdown, sqliteJobs, sqliteStore } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
@@ -237,6 +238,15 @@ describe('action protection', () => {
     expect((await call('198.51.100.2')).status).toBe(200)
   })
 
+  it('takes a post from the site kay.config.ts names as its own, for a proxy that does not pass the browser\'s Host on', async () => {
+    const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, site: 'https://shop.example', proxy: { hops: 1 } })
+    const { send } = await import(CONTACT) as { send: Action<{ message: string }, number> }
+    const call = async (origin: string) => app.handle(new Request(`http://127.0.0.1:3000${send.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.60', origin }, body: stringify({ message: 'hi' }) }))
+
+    expect((await call('https://shop.example')).status).toBe(200)
+    expect((await call('https://evil.example')).status).toBe(403)
+  })
+
   it('refuses in the messages the action gives, in place of kay\'s English', async () => {
     const app = await pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: { hops: 1 } })
     const { write } = await import(CONTACT) as { write: Action<{ message: string }, number, 'website'> }
@@ -377,6 +387,39 @@ describe('action protection', () => {
     }
     finally {
       await rm(typo, { force: true })
+    }
+  })
+})
+
+describe('API routes', () => {
+  it('answer a bigint as JSON, written as its digits, keeping the status and headers the route set', async () => {
+    const app = await pages({ routes: 'tests/fixtures/production/src/routes', api: 'tests/fixtures/production/src/api', prebuilt: false })
+    const ledger = await app.handle(new Request('http://localhost/api/ledger'))
+    const created = await app.handle(new Request('http://localhost/api/ledger/created'))
+
+    expect(ledger.headers.get('content-type')).toStartWith('application/json')
+    expect(await ledger.text()).toBe('{"id":"9007199254740993","entries":["1",{"amount":"2"}]}')
+    expect(created.status).toBe(201)
+    expect(created.headers.get('x-ledger')).toBe('kept')
+    expect(await created.json()).toEqual(['3'])
+  })
+})
+
+describe('SQLite stores', () => {
+  it('create the directory of their file, as data/ is missing on a fresh checkout', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-stores-'))
+
+    try {
+      sqliteRates(join(dir, 'rates/rates.sqlite'))
+      sqliteStore(join(dir, 'sessions/sessions.sqlite'))
+      sqliteCache(join(dir, 'cache/cache.sqlite'))
+      sqliteJobs(join(dir, 'jobs/jobs.sqlite'))
+
+      for (const name of ['rates', 'sessions', 'cache', 'jobs'])
+        expect(await Bun.file(join(dir, name, `${name}.sqlite`)).exists()).toBe(true)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
     }
   })
 })

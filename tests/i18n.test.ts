@@ -42,9 +42,9 @@ describe('locale prefixes', () => {
     const { html } = await get('/en/about')
 
     expect(html).toContain('<a class="home" href="/en">Home</a>')
-    expect(html).toContain('<a class="about" href="/en/about">About</a>')
+    expect(html).toContain('<a class="about" href="/en/about" aria-current="page">About</a>')
     expect(html).toContain('<a class="fr" href="/about">FR</a>')
-    expect(html).toContain('<a class="en" href="/en/about">EN</a>')
+    expect(html).toContain('<a class="en" href="/en/about" aria-current="page">EN</a>')
   })
 
   it('format plurals, numbers and dates through Intl', async () => {
@@ -136,7 +136,7 @@ describe('locales by domain', () => {
 
     expect(english.html).toContain('<h1>About</h1>')
     expect(english.html).toContain('<a class="fr" href="//x.fr/about">FR</a>')
-    expect(english.html).toContain('<a class="en" href="/about">EN</a>')
+    expect(english.html).toContain('<a class="en" href="/about" aria-current="page">EN</a>')
     expect((await get('http://x.fr/about', domains)).html).toContain('<h1>À propos</h1>')
     expect((await get('http://elsewhere.example/about', domains)).html).toContain('<h1>À propos</h1>')
   })

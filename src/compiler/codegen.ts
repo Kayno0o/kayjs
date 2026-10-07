@@ -77,8 +77,8 @@ const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const QUERY = 'query'
 // `t('nav.home')`: a message key an island's source names as it is written.
 const MESSAGE_KEY = /\bt\(\s*(['"`])([\w.-]+)\1/g
-// The server exports that are no actions; `sitemap` lists the page in the sitemap, `revalidate` renders a prerendered page again once stale.
-const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap', 'revalidate', 'layouts'])
+// The server exports that are no actions; `sitemap` lists the page in the sitemap, `noindex` keeps it out of search engines, `revalidate` renders a prerendered page again once stale.
+const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap', 'noindex', 'revalidate', 'layouts'])
 // What only a static parent passes an island.
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.

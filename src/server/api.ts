@@ -116,6 +116,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           spans.set(request, span)
       })
       .onBeforeHandle(async context => inLocale(context.request, options, async () => admit(guards, context, options)))
+      .mapResponse(({ responseValue, set }) => withBigints(responseValue, set))
       .onError(({ request, error }) => {
         const span = spans.get(request)
 
@@ -142,6 +143,26 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   }
 
   return limits
+}
+
+// JSON has no bigint, which JSON.stringify throws on: a plain object or array holding one is answered with each written as its digits, as a database's bigint ids usually are.
+function withBigints(value: unknown, set: { status?: number | string, headers: Record<string, unknown> }): Response | undefined {
+  if (typeof value !== 'object' || value === null || (Object.getPrototypeOf(value) !== Object.prototype && !Array.isArray(value)) || !holdsBigint(value))
+    return undefined
+
+  set.headers['content-type'] = 'application/json'
+
+  return new Response(JSON.stringify(value, (_key, item: unknown) => typeof item === 'bigint' ? item.toString() : item), { status: typeof set.status === 'number' ? set.status : 200, headers: set.headers as Record<string, string> })
+}
+
+function holdsBigint(value: unknown): boolean {
+  if (typeof value === 'bigint')
+    return true
+
+  if (typeof value !== 'object' || value === null)
+    return false
+
+  return Object.values(value).some(holdsBigint)
 }
 
 function tooLarge(): Response {

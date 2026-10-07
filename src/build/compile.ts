@@ -54,9 +54,14 @@ export async function compileServer(root: string, config: KayConfig, options: Co
 
   await Bun.write(generated, [
     `import { join } from 'node:path'`,
-    `import { registerBundle } from 'kay/internal/server'`,
+    `import process from 'node:process'`,
+    `import { probeHealth, registerBundle } from 'kay/internal/server'`,
     ...modules.map((file, index) => `import * as module${index} from ${JSON.stringify(file)}`),
     existsSync(configFile) ? `import config from ${JSON.stringify(configFile)}` : 'const config = {}',
+    '',
+    // Asks the server running beside it, rather than starting one: a container's health check with nothing but the executable.
+    'if (process.argv.includes(\'--health\'))',
+    '  process.exit(await probeHealth(config.health))',
     '',
     'registerBundle({',
     `  root: ${JSON.stringify(root)},`,

@@ -25,6 +25,8 @@ export interface ServerScope {
   values: WeakMap<object, unknown>
   cookie: (name: string) => string | undefined
   report: (error: unknown) => void
+  // The path of the page being rendered, percent-encoded as requested.
+  path: string
 }
 
 const CLEAN = 0

@@ -1,0 +1,14 @@
+---
+import { breadcrumbList, jsonLd, siteUrl } from 'kay/seo'
+
+const trail = jsonLd(breadcrumbList([{ name: 'Home', path: '/' }, { name: 'Trail', path: '/trail' }]))
+---
+head
+  script(type="application/ld+json") {trail}
+nav
+  a(href="/") Home
+  a(href="/trail/") Trail
+  a(href="/trail?tab=2") Tab
+  a(href="/trail#end") End
+  a(href="/trail" aria-current="step") Step
+p.share {siteUrl('/trail')}

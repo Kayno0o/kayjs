@@ -1,6 +1,7 @@
 import type { KayConfig } from '../config'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
 import type { Outcome } from '../runtime/action'
+import type { HeadOptions } from '../runtime/head'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Encoding } from './compress'
 import type { Flash, SuccessFlash } from './flash'
@@ -43,6 +44,8 @@ interface PageModule {
   load?: (ctx: PageContext<Record<string, unknown>>) => Promise<Record<string, unknown>>
   // The page's schema for its search params.
   query?: unknown
+  // Kept out of search engines and the sitemap.
+  noindex?: boolean
 }
 
 type Loaded = PromiseSettledResult<Record<string, unknown>>
@@ -395,6 +398,14 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
   return undefined
 }
 
+// The head a page starts from, a page saying `noindex` asking search engines to leave it out; a layout or the page may still set its own `robots`.
+function pageHead(page: PageModule, head: HeadOptions | undefined): HeadOptions | undefined {
+  if (page.noindex !== true)
+    return head
+
+  return { ...head, defaults: [...head?.defaults ?? [], { tag: 'meta', props: { name: 'robots', content: 'noindex' } }] }
+}
+
 async function importAll(files: string[]): Promise<PageModule[]> {
   return Promise.all(files.map(async file => importModule<PageModule>(file)))
 }
@@ -418,7 +429,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
     } })
   }
 
-  const { result: { result: { html: body, islands, deferred }, head }, forms } = collectForms(() => collectHead(() => renderStatic(view), options.head?.(rendering.ctx.url, rendering.status)))
+  const { result: { result: { html: body, islands, deferred }, head }, forms } = collectForms(() => collectHead(() => renderStatic(view), pageHead(modules[page]!, options.head?.(rendering.ctx.url, rendering.status))))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither still ships no JavaScript, and links from it load pages, losing no state.

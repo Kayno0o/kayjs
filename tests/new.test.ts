@@ -181,6 +181,7 @@ describe('kay new', () => {
       expect(files).toEqual(expect.arrayContaining(['Dockerfile', 'compose.prod.yaml', 'src/components/accent-picker.kay']))
       expect(manifest.scripts.compile).toBe('kay build --compile server')
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
+      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
       expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.dependencies.kay).toBe('^1.0.0')

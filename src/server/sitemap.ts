@@ -20,6 +20,7 @@ const CACHE_MS = 60 * 60 * 1000
 interface PageExports {
   sitemap?: unknown
   prerender?: unknown
+  noindex?: boolean
 }
 
 export interface SitemapOptions {
@@ -68,6 +69,9 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
   const lists = await Promise.all(routes.map(async (route) => {
     const file = relative(process.cwd(), route.file)
     const module = await importModule<PageExports>(route.file)
+
+    if (module.noindex === true)
+      return []
 
     if (module.sitemap !== undefined)
       return listedParams(route, file, 'sitemap', module.sitemap)

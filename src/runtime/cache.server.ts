@@ -1,6 +1,6 @@
 import type { CacheStore } from './cache'
-import { Database } from 'bun:sqlite'
 import { trackStore } from './cache'
+import { openSqlite } from './sqlite.server'
 
 // How often a process reads what the others sharing a store invalidated, and how long a message is kept for one that reads late.
 const POLL_MS = 500
@@ -13,11 +13,8 @@ export { cached, invalidate } from './cache'
 
 // Values kept in a SQLite file: they survive restarts and deploys, and the processes on one machine share them. Each process keeps its own copy in memory, and hears within about half a second what another one's `invalidate` or `invalidatePage` dropped.
 export function sqliteCache(path: string): CacheStore {
-  const db = new Database(path, { create: true })
+  const db = openSqlite(path)
 
-  db.run('PRAGMA journal_mode = WAL')
-  // Another process writing waits its turn rather than failing the write.
-  db.run('PRAGMA busy_timeout = 5000')
   db.run('CREATE TABLE IF NOT EXISTS kay_cache (key TEXT PRIMARY KEY, value TEXT NOT NULL, fresh_until INTEGER NOT NULL)')
   db.run('CREATE TABLE IF NOT EXISTS kay_events (id INTEGER PRIMARY KEY AUTOINCREMENT, origin TEXT NOT NULL, message TEXT NOT NULL, at INTEGER NOT NULL)')
 

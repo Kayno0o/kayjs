@@ -1,0 +1,4 @@
+--- server
+export const noindex = true
+---
+h1 Legal

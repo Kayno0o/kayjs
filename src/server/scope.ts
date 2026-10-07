@@ -22,7 +22,7 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
     return cookies.get(name) ?? undefined
   }
 
-  return store.run({ values: new WeakMap(), cookie, report }, run)
+  return store.run({ values: new WeakMap(), cookie, report, path: new URL(request.url).pathname }, run)
 }
 
 const outcomes = new AsyncLocalStorage<() => Outcome | null>()

@@ -32,6 +32,7 @@ const SELECTED_ALL = /\sselected(?:="[^"]*")?(?=[\s>]|$)/g
 const TAGS = /<[^>]*>/g
 const SPACES = /\s+/g
 const HTML_ENTITY = /&(?:amp|lt|gt|quot|#39);/g
+const TRAILING_SLASH = /(?<=.)\/$/
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'' }
 
 // A child value's markup: text escaped, numbers as they are, `null`, `undefined` and booleans as nothing, arrays item by item, functions as what they return.
@@ -105,6 +106,16 @@ export function attribute(name: string, value: unknown): string {
     return ''
 
   return value === true ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, String(value)))}"`
+}
+
+// ` aria-current="page"` on a link to the page being rendered: the same path, a trailing slash or not; a link with a query or a fragment leads elsewhere on it.
+export function currentPage(href: unknown): string {
+  const path = currentServerScope()?.path
+
+  if (path === undefined || typeof href !== 'string' || !href.startsWith('/') || href.startsWith('//') || href.includes('?') || href.includes('#'))
+    return ''
+
+  return new URL(href, 'http://localhost').pathname.replace(TRAILING_SLASH, '') === path.replace(TRAILING_SLASH, '') ? ' aria-current="page"' : ''
 }
 
 // A `class` value: a string, or an array or object of classes, an object's keys kept when their value is truthy.

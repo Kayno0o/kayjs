@@ -13,6 +13,7 @@ import { mapBundleToKay } from '../build/sourcemap'
 import { projectCollections, serveFeeds } from '../content/server'
 import { localePath, splitLocale } from '../runtime/i18n'
 import { localeState, runInLocale } from '../runtime/locale-state'
+import { setSite } from '../runtime/site'
 import { overHttps, registerActionRoutes } from './actions'
 import { scanApi, serveApi } from './api'
 import { basePath, rebaseRedirects } from './base'
@@ -155,6 +156,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const maxDensity = applyMaxDensity(options.images)
 
   setTracer(options.tracer)
+  setSite(options.site === undefined ? undefined : siteOrigin(options.site) + base)
 
   const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base, maxDensity }
 

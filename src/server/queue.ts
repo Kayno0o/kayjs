@@ -1,12 +1,10 @@
 import type { Duration } from '../runtime/duration'
-import { mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
 import process from 'node:process'
-import { Database } from 'bun:sqlite'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { logError } from '../build/sourcemap'
 import { durationSeconds } from '../runtime/duration'
+import { openSqlite } from '../runtime/sqlite.server'
 
 // A job as a store keeps it, its payload as devalue text.
 export interface StoredJob {
@@ -88,13 +86,8 @@ let defaultStore: JobStore | undefined
 
 // Jobs kept in a SQLite file: they survive restarts and deploys, and every process of the machine opening it shares them, each job running in one of them.
 export function sqliteJobs(path: string): JobStore {
-  mkdirSync(dirname(path), { recursive: true })
+  const db = openSqlite(path)
 
-  const db = new Database(path, { create: true })
-
-  db.run('PRAGMA journal_mode = WAL')
-  // Another process writing waits its turn rather than failing the write.
-  db.run('PRAGMA busy_timeout = 5000')
   db.run('CREATE TABLE IF NOT EXISTS kay_jobs (id TEXT PRIMARY KEY, queue TEXT NOT NULL, payload TEXT NOT NULL, attempts INTEGER NOT NULL, run_at INTEGER NOT NULL, held_until INTEGER, failed INTEGER NOT NULL DEFAULT 0, error TEXT)')
   db.run('CREATE INDEX IF NOT EXISTS kay_jobs_due ON kay_jobs (queue, failed, run_at)')
   db.run('CREATE TABLE IF NOT EXISTS kay_locks (name TEXT NOT NULL, slot INTEGER NOT NULL, PRIMARY KEY (name, slot))')
