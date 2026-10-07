@@ -29,7 +29,8 @@ export function siteUrl(path = '/'): string {
   if (site === undefined)
     throw new Error('kay: siteUrl() reads site in kay.config.ts, the origin the site is public at, which it does not set')
 
-  return site + path
+  // As the canonical links are, under `trailingSlash: 'always'`.
+  return site.origin + (site.slashed && !path.endsWith('/') && !path.includes('?') && !path.includes('#') ? `${path}/` : path)
 }
 
 export interface Crumb {

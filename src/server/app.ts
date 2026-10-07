@@ -156,7 +156,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const maxDensity = applyMaxDensity(options.images)
 
   setTracer(options.tracer)
-  setSite(options.site === undefined ? undefined : siteOrigin(options.site) + base)
+  setSite(options.site === undefined ? undefined : siteOrigin(options.site) + base, options.trailingSlash)
 
   const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base, maxDensity }
 

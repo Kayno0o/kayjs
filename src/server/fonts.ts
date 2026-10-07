@@ -14,6 +14,7 @@ const FONTS_FILE = 'fonts.json'
 const FORMATS: Record<string, string> = { '.woff2': 'woff2', '.woff': 'woff', '.ttf': 'truetype', '.otf': 'opentype' }
 const QUOTE = /["\\]/g
 const RELATIVE = /^\.{1,2}\//
+const VARIABLE_SCOPE = '@fontsource-variable/'
 
 // Writes each font and the stylesheet declaring them as content-named assets, and records their URLs beside the client build for a server that only reads it.
 export async function prepareFonts(root: string, fonts: (FontConfig | FontsourceConfig)[], dir: string): Promise<FontAssets> {
@@ -80,17 +81,23 @@ interface FontsourceMetadata {
 // One face per weight and style, each the package's own file, or one per style spanning the weights of a variable package.
 function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
   const { fontsource, weights, styles = ['normal'], display } = font
-  let metadata: FontsourceMetadata
+  let file: string
 
   try {
-    metadata = JSON.parse(readFileSync(Bun.resolveSync(`${fontsource}/metadata.json`, root), 'utf8')) as FontsourceMetadata
+    file = Bun.resolveSync(`${fontsource}/metadata.json`, root)
   }
   catch {
     throw new Error(`kay: the fonts name ${fontsource}, which is no installed Fontsource package; bun add ${fontsource}`)
   }
 
+  const metadata = JSON.parse(readFileSync(file, 'utf8')) as FontsourceMetadata
   const subset = font.subset ?? metadata.defSubset
-  const variable = metadata.variable ? metadata.variable.wght : undefined
+  // A static package's metadata describes the family's variable axes too: only a `@fontsource-variable` package ships them.
+  const variable = fontsource.startsWith(VARIABLE_SCOPE) ? metadata.variable ? metadata.variable.wght : undefined : undefined
+
+  if (fontsource.startsWith(VARIABLE_SCOPE) && !variable)
+    throw new Error(`kay: ${fontsource} has no weight axis to declare`)
+
   const faces: FontConfig[] = []
 
   if (!metadata.subsets.includes(subset))

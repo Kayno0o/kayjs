@@ -312,7 +312,7 @@ function sameHost(request: Request, url: string | null): url is string {
   const { host } = new URL(url)
   const site = configuredSite()
 
-  return host === new URL(request.url).host || (site !== undefined && host === new URL(site).host)
+  return host === new URL(request.url).host || (site !== undefined && host === new URL(site.origin).host)
 }
 
 // A fetch from an island wants a result; a plain form post goes back to the page it came from.

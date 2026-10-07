@@ -56,12 +56,14 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     `import { join } from 'node:path'`,
     `import process from 'node:process'`,
     `import { probeHealth, registerBundle } from 'kay/internal/server'`,
-    ...modules.map((file, index) => `import * as module${index} from ${JSON.stringify(file)}`),
-    existsSync(configFile) ? `import config from ${JSON.stringify(configFile)}` : 'const config = {}',
     '',
-    // Asks the server running beside it, rather than starting one: a container's health check with nothing but the executable.
+    existsSync(configFile) ? `const { default: config } = await import(${JSON.stringify(configFile)})` : 'const config = {}',
+    '',
+    // Asks the server running beside it, rather than starting one, before any module of the app loads: a container's health check runs it every few seconds.
     'if (process.argv.includes(\'--health\'))',
     '  process.exit(await probeHealth(config.health))',
+    '',
+    ...modules.map((file, index) => `const module${index} = await import(${JSON.stringify(file)})`),
     '',
     'registerBundle({',
     `  root: ${JSON.stringify(root)},`,

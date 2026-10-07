@@ -15,6 +15,7 @@ import { action } from '../src/runtime'
 import { sqliteCache } from '../src/runtime/cache.server'
 import { inlineScriptHashes, invalidatePage, pages, shutdown, sqliteJobs, sqliteStore } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { probeHealth } from '../src/server/lifecycle'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
 import { testSite } from '../src/test'
@@ -799,6 +800,21 @@ describe('lifecycle', () => {
     expect(health.headers.get('cache-control')).toBe('no-store')
     expect((await unhealthy.handle(new Request('http://localhost/up'))).status).toBe(503)
     expect((await (await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, health: false })).handle(new Request('http://localhost/_kay/health'))).status).toBe(404)
+  })
+
+  it('probes the health route of a server beside it, as an executable run with --health does', async () => {
+    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, health: { path: '/up' } })).listen(0)
+    const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect(await probeHealth({ path: '/up' }, String(app.server!.port))).toBe(0)
+      expect(await probeHealth(undefined, String(app.server!.port))).toBe(1)
+      expect(await probeHealth(false, String(app.server!.port))).toBe(1)
+    }
+    finally {
+      quiet.mockRestore()
+      await app.stop()
+    }
   })
 
   it('on SIGTERM lets open requests finish, runs the stop hooks, and exits', async () => {

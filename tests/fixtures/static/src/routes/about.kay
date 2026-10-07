@@ -1,1 +1,5 @@
+---
+import { siteUrl } from 'kay/seo'
+---
 h1 About
+p.share {siteUrl('/about')}

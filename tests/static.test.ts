@@ -79,7 +79,7 @@ describe('kay build --static', () => {
 
     expect(home.status).toBe(200)
     expect(home.text).toContain('<a class="home" href="/repo/" aria-current="page">Home</a><a class="about" href="/repo/about">About</a>')
-    expect((await get('/about')).text).toContain('<h1>About</h1>')
+    expect((await get('/about')).text).toContain('<h1>About</h1><p class="share">https://x.example/repo/about</p>')
     expect((await get('/about/')).text).toContain('<h1>About</h1>')
     expect((await get('/posts/first')).text).toContain('<h1>Post first</h1>')
   })
@@ -221,7 +221,7 @@ describe('base on a server', () => {
   })
 
   it('puts the links, assets and redirects of every page under the mount point', async () => {
-    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, security: false, base: '/repo/', redirects: { '/old': '/about' } }))
+    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, security: false, site: 'https://x.example', base: '/repo/', redirects: { '/old': '/about' } }))
     const visit = async (path: string) => app.handle(new Request(`http://localhost${path}`))
     const about = await (await visit('/about')).text()
 

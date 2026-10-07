@@ -53,15 +53,16 @@ describe('fonts', () => {
   it('declares a Fontsource family once, a face per weight and style, or one per style spanning a variable package\'s weights', async () => {
     const root = join(scratch, 'fontsource')
     const display = Bun.file('tests/fixtures/seo/src/fonts/display.woff2')
-    const metadata = (id: string, family: string, variable: boolean) => JSON.stringify({ id, family, subsets: ['latin', 'latin-ext'], weights: [300, 400, 700], styles: ['italic', 'normal'], defSubset: 'latin', variable: variable && { wght: { default: '400', min: '300', max: '700', step: '1' } } })
+    // A static package describes the family's axes too, as Fontsource's do.
+    const metadata = (id: string, family: string) => JSON.stringify({ id, family, subsets: ['latin', 'latin-ext'], weights: [300, 400, 700], styles: ['italic', 'normal'], defSubset: 'latin', variable: { wght: { default: '400', min: '300', max: '700', step: '1' } } })
     const exports = { './metadata.json': './metadata.json', './files/*': './files/*' }
 
     await Promise.all([
       Bun.write(join(root, 'node_modules/@fontsource/open-sans/package.json'), JSON.stringify({ name: '@fontsource/open-sans', exports })),
-      Bun.write(join(root, 'node_modules/@fontsource/open-sans/metadata.json'), metadata('open-sans', 'Open Sans', false)),
+      Bun.write(join(root, 'node_modules/@fontsource/open-sans/metadata.json'), metadata('open-sans', 'Open Sans')),
       ...['400-normal', '700-normal', '400-italic', '700-italic'].map(async face => Bun.write(join(root, `node_modules/@fontsource/open-sans/files/open-sans-latin-${face}.woff2`), display)),
       Bun.write(join(root, 'node_modules/@fontsource-variable/figtree/package.json'), JSON.stringify({ name: '@fontsource-variable/figtree', exports })),
-      Bun.write(join(root, 'node_modules/@fontsource-variable/figtree/metadata.json'), metadata('figtree', 'Figtree', true)),
+      Bun.write(join(root, 'node_modules/@fontsource-variable/figtree/metadata.json'), metadata('figtree', 'Figtree')),
       Bun.write(join(root, 'node_modules/@fontsource-variable/figtree/files/figtree-latin-ext-wght-normal.woff2'), display),
     ])
 

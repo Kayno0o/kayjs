@@ -150,19 +150,30 @@ function withBigints(value: unknown, set: { status?: number | string, headers: R
   if (typeof value !== 'object' || value === null || (Object.getPrototypeOf(value) !== Object.prototype && !Array.isArray(value)) || !holdsBigint(value))
     return undefined
 
-  set.headers['content-type'] = 'application/json'
+  const headers = new Headers()
 
-  return new Response(JSON.stringify(value, (_key, item: unknown) => typeof item === 'bigint' ? item.toString() : item), { status: typeof set.status === 'number' ? set.status : 200, headers: set.headers as Record<string, string> })
+  // Several cookies stay several headers.
+  for (const [name, header] of Object.entries(set.headers)) {
+    for (const item of [header].flat())
+      headers.append(name, String(item))
+  }
+
+  headers.set('content-type', 'application/json')
+
+  return new Response(JSON.stringify(value, (_key, item: unknown) => typeof item === 'bigint' ? item.toString() : item), { status: typeof set.status === 'number' ? set.status : 200, headers })
 }
 
-function holdsBigint(value: unknown): boolean {
+// A value met twice is walked once, so a cycle reaches JSON.stringify, which names it.
+function holdsBigint(value: unknown, seen = new WeakSet<object>()): boolean {
   if (typeof value === 'bigint')
     return true
 
-  if (typeof value !== 'object' || value === null)
+  if (typeof value !== 'object' || value === null || seen.has(value))
     return false
 
-  return Object.values(value).some(holdsBigint)
+  seen.add(value)
+
+  return Object.values(value).some(item => holdsBigint(item, seen))
 }
 
 function tooLarge(): Response {
