@@ -51,7 +51,8 @@ describe('lint levels', () => {
   })
 
   it('documents every lint with an example it reports, and the same example written right', () => {
-    for (const [code, lint] of Object.entries(LINTS)) {
+    // One the types find is proved by `kay check`'s own tests.
+    for (const [code, lint] of Object.entries(LINTS).filter(([, lint]) => !('typed' in lint))) {
       expect(lints(lint.wrong).map(d => d.code)).toContain(code)
       expect(lints(lint.right).map(d => d.code)).not.toContain(code)
     }

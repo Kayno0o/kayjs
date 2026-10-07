@@ -13,7 +13,7 @@ import { findKayFiles, TSCONFIG } from '../build/files'
 import { TSGO, UNUSED_CODES, writeShadowTypes } from '../check'
 import { compileShadow, SHADOW_DIR, shadowPath } from '../check/shadow'
 import { formatKay } from '../compiler/format'
-import { lintLevels } from '../compiler/lints'
+import { lintLevels, typeLint } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
@@ -55,7 +55,7 @@ const NAMED_IMPORT = /^import \{([^}]*)\} from (['"][^'"]+['"])/
 const RESERVED_CHARACTER = /[!'()*]/g
 const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
-const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|Prop|FunctionProp|Children|PageContext|PrerenderedContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
+const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|Prop|FunctionProp|Children|IdentityKey|PageContext|PrerenderedContext|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
 const FULL_SYNC = 1
 const ERROR = 1 as const
 const WARNING = 2 as const
@@ -333,6 +333,14 @@ export class KayLanguageServer {
     const levelAt = lintLevels(document.source, this.projectAt(projectRoot(this.root, document.file)).options.lints)
     const typeErrors = (report?.items ?? []).flatMap(({ relatedInformation: _related, ...diagnostic }) => {
       const range = toSourceRange(document, diagnostic.range, true)
+      const lint = typeLint(diagnostic.message)
+
+      // A lint the types find, `identity-key` say, at its level as `kay check` reports it.
+      if (lint) {
+        const level = levelAt(lint.code, range ? toOffset(document.source, range.start) : 0)
+
+        return level === 'allow' ? [] : [{ ...diagnostic, code: lint.code, message: `${lint.message}: ${lint.help}`, severity: level === 'warn' ? WARNING : ERROR, range: range ?? zeroRange() }]
+      }
 
       if (!UNUSED_CODES.has(Number(diagnostic.code)))
         return [{ ...diagnostic, range: range ?? zeroRange() }]

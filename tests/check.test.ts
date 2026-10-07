@@ -1013,6 +1013,23 @@ describe('kay check, unused code', () => {
     }
   })
 
+  it('warns of an island\'s for over objects with no id and no key, and of no other list', async () => {
+    const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts\n    li {post.title}\n  // kay-allow identity-key\n  for post of posts\n    li {post.slug}\n  for todo of todos\n    li {todo.title}\n  for tag of tags\n    li {tag}\n  for post of posts key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
+    const root = await scratchProject({
+      'src/components/list.kay': list,
+      // A page renders once, so its rows are never matched again.
+      'src/routes/index.kay': '---\nimport List from \'../components/list.kay\'\n\nconst rows = [{ slug: \'a\' }]\n---\nList\nul\n  for row of rows\n    li {row.slug}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [basename(d.file), d.line, d.code, d.severity, d.help])).toEqual([['list.kay', 7, 'identity-key', 'warning', 'name what tells the rows apart, `for post of posts key={post.slug}`']])
+      expect(await check(root, { lints: { 'identity-key': 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a lint or a level the config names that kay does not have', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })
 

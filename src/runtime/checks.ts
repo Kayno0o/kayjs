@@ -125,6 +125,11 @@ type MissingDay<Day, Month extends string, Weekday> = Weekday extends '*'
   ? Day extends '30' | '31' ? Uppercase<Month> extends '2' | '02' | 'FEB' ? true : Day extends '31' ? Uppercase<Month> extends '4' | '04' | '6' | '06' | '9' | '09' | '11' | 'APR' | 'JUN' | 'SEP' | 'NOV' ? true : false : false : false
   : false
 
+type RowOf<Each> = Each extends Iterable<infer Item> ? Item : never
+
+// An island's `for` with no key matches its rows by `item.id`, else by the item itself: objects without an `id`, made afresh as the list is rebuilt, would make every row anew. `kay check` reports it as the `identity-key` lint.
+export type IdentityKeyed<Each> = [RowOf<Each>] extends [object] ? [RowOf<Each>] extends [{ id: unknown }] ? unknown : { kayLint: 'identity-key' } : unknown
+
 // A literal schedule has five fields or is a nickname, and comes some day; a computed one, or a field this does not read, is checked when the server starts.
 export type CronSchedule<Cron extends string> = string extends Cron
   ? unknown

@@ -1,7 +1,7 @@
 import type { KayLibrary, SettingsReplacement } from '../build/libraries'
 import type { Diagnostic, Fix } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
-import type { LintLevel, LintLevels } from '../compiler/lints'
+import type { LintLevel, LintLevels, TypeLint } from '../compiler/lints'
 import type { I18nConfig } from '../config'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
@@ -24,7 +24,7 @@ import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacement
 import { cacheEntry } from '../build/transform'
 import { componentName, rendersAsIsland, SourceMap } from '../compiler'
 import { formatReport } from '../compiler/frame'
-import { isLint, LEVELS, lintLevels } from '../compiler/lints'
+import { isLint, LEVELS, lintLevels, typeLint } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
@@ -388,7 +388,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
 
   return [
-    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ChildrenProp, FieldName, FunctionProp, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ChildrenProp, FieldName, FunctionProp, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
     '',
     'declare module \'kay\' {',
     `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules}${publicEnv} }`,
@@ -402,6 +402,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     '  function KayProp<Component>(component: Component): <Value>(value: Value & IslandProp<Component, Value>) => Value',
     '  function KayFunctionProp<Component>(component: Component): (attribute: FunctionProp<Component>) => Record<never, never>',
     '  function KayChildren<Component>(component: Component): (children: ChildrenProp<Component>) => Record<never, never>',
+    '  function KayIdentityKey<Each>(each: Each & IdentityKeyed<Each>): Each',
     '}',
     '',
   ].join('\n')
@@ -516,6 +517,21 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
     return levelAt('unread-name', shadow.map.toSource(offsetAt(shadow.tsx, diagnostic)) ?? 0)
   }
 
+  // A lint the types find, as `identity-key`, at its level where the source has it.
+  const typeLintLevel = (diagnostic: CheckDiagnostic): { lint: TypeLint, level: LintLevel } | undefined => {
+    const lint = typeLint(diagnostic.message)
+    const shadow = files.get(diagnostic.file)
+
+    if (!lint || !shadow)
+      return undefined
+
+    const levelAt = levels.get(shadow) ?? lintLevels(shadow.source, options.lints)
+
+    levels.set(shadow, levelAt)
+
+    return { lint, level: levelAt(lint.code, shadow.map.toSource(offsetAt(shadow.tsx, diagnostic)) ?? 0) }
+  }
+
   if (errors.trim() !== '')
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })
 
@@ -524,11 +540,14 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
       continue
 
     const unread = unreadLevel(diagnostic)
+    const typed = typeLintLevel(diagnostic)
 
-    if (unread === 'allow')
+    if (unread === 'allow' || typed?.level === 'allow')
       continue
 
-    const remapped = unread === undefined ? remap(diagnostic, files) : { ...remap(diagnostic, files), code: 'unread-name', severity: unread === 'warn' ? 'warning' as const : 'error' as const }
+    const remapped = typed !== undefined
+      ? { ...remap(diagnostic, files), ...typed.lint, severity: typed.level === 'warn' ? 'warning' as const : 'error' as const }
+      : unread === undefined ? remap(diagnostic, files) : { ...remap(diagnostic, files), code: 'unread-name', severity: unread === 'warn' ? 'warning' as const : 'error' as const }
     const setting = remapped.file === settingsFile ? settings.get(remapped.line) : undefined
     const exported = remapped.file === exportsFile ? exports.get(remapped.line) : undefined
     const used = remapped.file === contentFile ? props.lines.get(remapped.line) : undefined

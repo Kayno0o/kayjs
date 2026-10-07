@@ -789,8 +789,18 @@ class Generator {
     // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
     const positional = node.index !== undefined && node.key !== undefined && this.text(node.key).trim() === this.text(node.index)
 
+    // Only an island renders a list again, so only there do rows matched by their objects cost anything.
+    const identityChecked = this.options.check === true && (this.options.island !== undefined || this.options.insideIsland === true) && !node.key
+
     b.wrap(node, () => {
-      b.add(`<${tag} each={`).addSource(node.each).add('} keyed={')
+      b.add(`<${tag} each={`)
+
+      if (identityChecked)
+        b.add('KayIdentityKey((').addSource(node.each).add('))')
+      else
+        b.addSource(node.each)
+
+      b.add('} keyed={')
 
       if (positional)
         b.add('false')

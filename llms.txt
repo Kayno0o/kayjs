@@ -6,7 +6,7 @@
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
 - A signal or memo the script declares is read by its name in the template, `{count}`, and by calling it in the script, `count()`; it is written with `count.set(1)` or `count.set(c => c + 1)`. In the template, `count.set`, `bind:value={count}` and a call, `count()`, still take the signal itself, and a component handed `open={open}` gets the value, kept current; one that writes it takes `onToggle={open.set}`, or the signal under a name of its own, `const openState = open`. Only a signal or memo the script itself makes reads by name: one imported from a module, or a prop holding one, is called, `accent()`, and in the script a signal is always called, as `items.length` there is the function's. Rendered as text, `{accent}`, such a signal still shows its value; in a condition, an attribute or an expression, `kay check` reports it with the call to write. Props and server data are plain names everywhere: `{title}`, not `{title()}`.
-- A `for` matches its rows across renders by `item.id`, else by the item itself, so a list of objects with no `id`, made afresh on each render, names a key: `for post of posts key={post.slug}`.
+- A `for` matches its rows across renders by `item.id`, else by the item itself, so a list of objects with no `id`, made afresh on each render, names a key: `for post of posts key={post.slug}`; `kay check` warns of such a list in an island (`identity-key`).
 - A promise an `await` block renders by the name a server fence declares it under, `await comments`, is left unawaited and kay defers it; any other, such as `await data.comments` or one a component makes, is made with `defer()`.
 - The component script exports types only. Shared values live in `.ts` modules.
 - A page has no props: its data comes from its `--- server` fence.
@@ -1042,6 +1042,7 @@ it('counts the clicks', async () => {
 | `unreachable-click` | deny | An `onClick` on an element no keyboard reaches and no `role` names. |
 | `unbounded-string` | deny | A string field of an action's schema with no `maxLength`. |
 | `positional-key` | warn | `for todo, i of todos key={i}` whose rows read `todo.id`: keyed by position, a row added before others hands their markup and state to the wrong rows. The quick fix drops the key, so they are matched by `todo.id`. |
+| `identity-key` | warn | A `for` in an island over objects with no `id` and no `key`, matched by the objects themselves: a list rebuilt with new objects builds every row anew. Found by the type check, so by `kay check` and the editor. |
 | `constant-signal` | warn | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |
 
 ## Linting

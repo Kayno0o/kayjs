@@ -382,6 +382,13 @@ describe('kay lsp imports', () => {
     expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.severity, diagnostic.code])).toEqual([[5, 2, 'positional-key']])
   })
 
+  it('warns of an island\'s for over objects with no id and no key, as kay check does', async () => {
+    const source = '---\nconst posts = signal([{ slug: \'a\' }])\n---\nfor post of posts\n  button(onClick={() => posts.set([])}) {post.slug}\n'
+    const diagnostics = await editor.change(page, source, 10)
+
+    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.severity, diagnostic.code])).toEqual([[3, 2, 'identity-key']])
+  })
+
   it('reports nothing on the index of a positionally keyed for whose rows do not read it, and renames it with its key', async () => {
     const source = '---\nconst { todos } = props<{ todos: { id: number }[] }>()\n---\nfor todo, i of todos key={i}\n  p {todo.id}\n'
     const diagnostics = await editor.change(page, source, 9)

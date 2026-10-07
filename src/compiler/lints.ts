@@ -10,6 +10,8 @@ export interface Lint {
   summary: string
   wrong: string
   right: string
+  // Found by the type check, so by `kay check` and the editor, never by the compiler alone.
+  typed?: boolean
 }
 
 // What kay reports as advice rather than as an error in the code: each lint's level is set in `kay.config.ts`'s `lints`, and a `// kay-allow <lint>` comment allows it on the line it ends or the one after it.
@@ -49,6 +51,13 @@ export const LINTS = {
     summary: 'A `for` keyed by the row\'s index while its rows have an `id`: a row added or removed before others shifts every later one to another key, so their markup and state stay where the old rows were.',
     wrong: 'for todo, i of todos key={i}\n  TodoRow(id={todo.id} title={todo.title})',
     right: 'for todo of todos\n  TodoRow(id={todo.id} title={todo.title})',
+  },
+  'identity-key': {
+    level: 'warn',
+    typed: true,
+    summary: 'A `for` in an island over objects with no `id` and no `key`: its rows are matched by the objects themselves, so a list rebuilt with new objects, as a `.map` or a refresh makes, builds every row anew and drops their state.',
+    wrong: 'for post of posts\n  PostRow(slug={post.slug} title={post.title})',
+    right: 'for post of posts key={post.slug}\n  PostRow(slug={post.slug} title={post.title})',
   },
   'constant-signal': {
     level: 'warn',
@@ -183,6 +192,28 @@ function positionalKey(source: string, node: ForNode, found: Diagnostic[]) {
     fixes: [{ title: `Match the rows by \`${item}.id\``, edits }],
     checkOnly: true,
   })
+}
+
+// What a TypeScript error a check-only helper raises stands for: a lint only the types can find.
+export interface TypeLint {
+  code: LintName
+  message: string
+  note: string
+  help: string
+}
+
+const IDENTITY_KEY = 'kayLint: "identity-key"'
+
+export function typeLint(message: string): TypeLint | undefined {
+  if (!message.includes(IDENTITY_KEY))
+    return undefined
+
+  return {
+    code: 'identity-key',
+    message: 'These rows are matched by the objects themselves, which have no `id`',
+    note: 'a list rebuilt with new objects, as a `.map` or a refresh makes, builds every row anew, and their state goes with them',
+    help: 'name what tells the rows apart, `for post of posts key={post.slug}`',
+  }
 }
 
 const FIRST_SENTENCE = /^.*?\.(?=\s|$)/
