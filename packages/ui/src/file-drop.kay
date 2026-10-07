@@ -24,6 +24,9 @@ function open() {
   input?.click()
 }
 
+// Built in the script, where `dragging` is still the signal: the template would hand the slot its value.
+const zone = { open, dragging }
+
 function take(files: Iterable<File>): boolean {
   const matching = [...files].filter(file => acceptsFile(accept, file))
   const taken = multiple ? matching : matching.slice(0, 1)
@@ -91,4 +94,4 @@ onMount(() => {
 ---
 .kui-file-drop({...rest} role="group" class={className} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
   input.kui-file-drop-input(ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
-  | {content({ open, dragging })}
+  | {content(zone)}
