@@ -366,11 +366,12 @@ function moveFocus(swap: Swap): void {
   announce(document.title)
 }
 
+// Pinned to the top corner: left where it falls, after the page, it would add a pixel to a layout filling the screen and give it a scrollbar.
 function announce(text: string): void {
   const region = document.createElement('div')
 
   region.setAttribute('aria-live', 'polite')
-  region.setAttribute('style', 'position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)')
+  region.setAttribute('style', 'position:absolute;top:0;left:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)')
   document.body.append(region)
   setTimeout(() => {
     region.textContent = text

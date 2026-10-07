@@ -376,4 +376,29 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
     expect(await page.textContent('button.theme')).toBe('Theme dark')
     expect(warnings).toEqual([])
   })
+
+  it('announces the swapped page without making it any taller, so one filling the screen gets no scrollbar', async () => {
+    await page.goto(origin)
+    await page.click('a.second')
+    await page.waitForFunction(() => document.querySelector('body > [aria-live="polite"]')?.textContent)
+
+    // The page as a layout filling the screen renders it, the announcer after it, where a `min-h-dvh` wrapper ends.
+    const overflow = await page.evaluate(() => {
+      const filler = document.createElement('div')
+
+      document.body.style.margin = '0'
+
+      for (const child of document.body.children) {
+        if (!child.hasAttribute('aria-live'))
+          (child as HTMLElement).style.display = 'none'
+      }
+
+      filler.style.height = '100vh'
+      document.body.prepend(filler)
+
+      return document.documentElement.scrollHeight - innerHeight
+    })
+
+    expect(overflow).toBe(0)
+  })
 })
