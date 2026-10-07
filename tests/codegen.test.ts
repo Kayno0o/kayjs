@@ -43,6 +43,8 @@ describe('component shell', () => {
     expect(tsx('button(onClick={go}) Go')).toContain('export default KayIsland(')
     expect(tsx('input(bind:value={name})')).toContain('export default KayIsland(')
     expect(tsx('---\nimport type { JSX } from \'kay\'\n---\np x')).toContain('export default function Test()')
+    // Pure helpers, the same on both sides.
+    expect(tsx('---\nimport { sanitizeHtml, trustHtml, uid } from \'kay\'\nconst { a, b } = props<{ a: string, b: string }>()\n---\ndiv(id={uid()} innerHTML={trustHtml(a)})\ndiv(innerHTML={sanitizeHtml(b)})')).not.toContain('KayIsland')
   })
 
   it('names the component after its file', () => {
