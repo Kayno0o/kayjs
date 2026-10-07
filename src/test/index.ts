@@ -4,6 +4,7 @@ import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
 import type { BrowserOptions, TestPage } from './browser'
+import type { PageReading } from './page'
 import { join } from 'node:path'
 import { Elysia } from 'elysia'
 import { withConfig } from '../config'
@@ -15,14 +16,17 @@ import { basePath } from '../server/base'
 import { buildClient } from '../server/client'
 import { shutdown } from '../server/lifecycle'
 import { drainQueues } from '../server/queue'
+import { SITEMAP } from '../server/sitemap'
 import { servedThrough } from '../server/visit'
 import { browse } from './browser'
+import { readPage, sitemapUrls } from './page'
 import { testRoot } from './root'
 
 export type { BrowserOptions, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
 export type { Mounted } from './mount'
 export { mount, settle } from './mount'
+export type { Found, PageReading } from './page'
 
 export interface TestOptions extends PagesOptions {
   // The plugins the server entry uses before the pages, in order, such as `session()`: their derives reach `ctx.locals` and their cookies the next request.
@@ -33,7 +37,8 @@ export interface TestOptions extends PagesOptions {
   browser?: boolean | BrowserOptions
 }
 
-export interface Visit {
+// The page, with its head and its elements read from `html`.
+export interface Visit extends PageReading {
   // Where the last redirect led, path and query.
   url: string
   status: number
@@ -63,6 +68,8 @@ export interface TestSite {
   stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
   // A page loaded in a headless Chrome over a server the site starts on a free port, once `browser` is set; its cookies are the browser's, not `cookies`.
   open: (path: string, options?: BrowserOptions) => Promise<TestPage>
+  // The URLs the sitemap at `path` (default `/sitemap.xml`) lists, failing when it does not answer 200.
+  sitemap: (path?: string) => Promise<string[]>
   // Runs every job the queues hold whose time has come, those the jobs enqueue included, until none is left; resolves with how many ran.
   runJobs: () => Promise<number>
   cookies: Bun.CookieMap
@@ -157,7 +164,9 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       current = await send(path, { headers })
     }
 
-    return { url: path, status: current.status, headers: current.headers, html: await current.text() }
+    const html = await current.text()
+
+    return { url: path, status: current.status, headers: current.headers, html, ...readPage(html) }
   }
 
   let server: Bun.Server<unknown> | undefined
@@ -177,6 +186,14 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     cookies,
     handle,
     runJobs: drainQueues,
+    sitemap: async (path = SITEMAP) => {
+      const response = await send(path, {})
+
+      if (response.status !== 200)
+        throw new Error(`kay: ${path} answered ${response.status}`)
+
+      return sitemapUrls(await response.text())
+    },
     fetch: async (path, init = {}) => send(path, init),
     socket: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])

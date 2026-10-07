@@ -1,7 +1,10 @@
 import type { Action } from '../src/runtime'
+import type { TestSite } from '../src/test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { ActionError } from '../src/runtime'
 import { readActionResponse } from '../src/runtime/action'
 import { session } from '../src/server/session'
@@ -181,6 +184,83 @@ describe('kay/test', () => {
     }
     finally {
       await GlobalRegistrator.unregister()
+    }
+  })
+})
+
+describe('reading a page', () => {
+  afterAll(resetTodos)
+
+  const seo = { name: 'Kay & co', titleTemplate: '%s | Kay & co', description: 'A site built with kay', jsonLd: [{ '@type': 'WebSite', 'name': 'Kay </script>  site' }, { '@type': 'Organization', 'name': 'Kay & co' }] }
+  // Built once the tests before have built theirs, as the last site sets the origin siteUrl() reads.
+  let read: TestSite
+
+  beforeAll(async () => {
+    read = await testSite({ routes: 'tests/fixtures/seo/src/routes', publicDir: 'tests/fixtures/seo/public', site: 'https://example.com/', seo })
+  })
+
+  it('gives its title, meta, canonical URL and JSON-LD as a crawler reads them', async () => {
+    const page = await read.visit('/about')
+
+    expect(page.title()).toBe('About | Kay & co')
+    expect(page.meta('description')).toBe('Who we are')
+    expect(page.meta('og:site_name')).toBe('Kay & co')
+    expect(page.meta('og:image')).toBeUndefined()
+    expect(page.canonical()).toBe('https://example.com/about')
+    // A @graph's items one by one, a script's text read as written.
+    expect(page.jsonLd()).toEqual([{ '@context': 'https://schema.org', '@type': 'WebSite', 'name': 'Kay </script>  site' }, { '@context': 'https://schema.org', '@type': 'Organization', 'name': 'Kay & co' }])
+  })
+
+  it('gives its links and the elements a selector matches, their text squashed', async () => {
+    const page = await read.visit('/trail')
+
+    expect(page.links()).toEqual(['/', '/trail/', '/trail?tab=2', '/trail#end', '/trail'])
+    expect(page.find('a[aria-current="page"]')).toEqual([{ tag: 'a', attributes: { 'href': '/trail/', 'aria-current': 'page' }, text: 'Trail' }])
+    expect(page.find('nav')[0]!.text).toBe('HomeTrailTabEndStep')
+    expect(page.jsonLd()).toContainEqual(expect.objectContaining({ '@type': 'BreadcrumbList' }))
+    expect(page.find('h2')).toEqual([])
+  })
+
+  it('decodes entities and squashes whitespace in the text it gives', async () => {
+    const page = await site.submit(add, { title: 'Paint  <walls> &\n  doors' }, { from: '/' })
+
+    expect(page.find('li a').at(-1)!.text).toBe('Paint <walls> & doors')
+  })
+
+  it('lists the sitemap\'s URLs, and fails on one that does not answer', async () => {
+    expect(await read.sitemap()).toContain('https://example.com/about')
+    expect(await read.sitemap()).toContain('https://example.com/blog/a%20%26%20b')
+    await expect(read.sitemap('/nope.xml')).rejects.toThrow('/nope.xml answered 404')
+  })
+})
+
+describe('the test preload', () => {
+  it('drops what only the developer\'s .env sets, keeping the shell\'s and .env.test\'s', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-env-'))
+
+    try {
+      await Bun.write(join(dir, '.env'), 'SMTP_USER=me@example.com\nKAY_SHELL=from .env\nKAY_BOTH=dev\n')
+      await Bun.write(join(dir, '.env.test'), 'KAY_BOTH=test\n')
+      await Bun.write(join(dir, 'bunfig.toml'), `[test]\npreload = ["${join(import.meta.dir, '../src/test/preload.ts')}"]\n`)
+      const test = 'import { expect, it } from \'bun:test\'\nit(\'env\', () => expect([process.env.SMTP_USER, process.env.KAY_SHELL, process.env.KAY_BOTH]).toEqual([undefined, \'shell\', \'test\']))\n'
+
+      // Two files, so --parallel runs them in workers.
+      await Bun.write(join(dir, 'env.test.ts'), test)
+      await Bun.write(join(dir, 'env-again.test.ts'), test)
+
+      const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'NODE_ENV'))
+
+      // A --parallel worker starts with its coordinator's variables, `.env`'s included.
+      for (const args of [['test'], ['test', '--parallel=2']]) {
+        const child = Bun.spawn([process.execPath, ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, KAY_SHELL: 'shell' } })
+        const [code, output] = await Promise.all([child.exited, new Response(child.stderr).text()])
+
+        expect(output).toContain('2 pass')
+        expect(code).toBe(0)
+      }
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
     }
   })
 })
