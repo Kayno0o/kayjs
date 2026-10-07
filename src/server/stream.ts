@@ -27,16 +27,22 @@ export function renderStatic(view: () => unknown): Rendered {
   return { html, islands, deferred }
 }
 
+// Bun closes a connection idle for 10 s by default, and proxies after a minute or so: an empty comment now and then keeps a page whose blocks are slow open.
+export const KEEP_ALIVE_MS = 5000
+const KEEP_ALIVE = encoder.encode('<!---->')
+
 // Sends the page up to its last pending block at once, then each block as it settles, in whatever order they do.
 export function streamDocument(shell: string, deferred: PendingBlock[], client: ClientBuild, entryShipped: boolean, report: (error: unknown) => void): ReadableStream<Uint8Array> {
   let shipped = entryShipped
   let swapShipped = false
   // Once the browser goes away, blocks still settling render nothing.
   let cancelled = false
+  let keepAlive: ReturnType<typeof setInterval> | undefined
 
   return new ReadableStream({
     async start(controller) {
       controller.enqueue(encoder.encode(shell))
+      keepAlive = setInterval(() => controller.enqueue(KEEP_ALIVE), KEEP_ALIVE_MS)
 
       const send = async (block: PendingBlock): Promise<void> => {
         const rendered = await settle(block, () => cancelled, report)
@@ -63,6 +69,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
       }
 
       await Promise.all(deferred.map(send))
+      clearInterval(keepAlive)
 
       if (cancelled)
         return
@@ -72,6 +79,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
     },
     cancel() {
       cancelled = true
+      clearInterval(keepAlive)
     },
   })
 }

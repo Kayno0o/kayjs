@@ -18,6 +18,7 @@ import { prerenderPages } from '../src/server/prerender'
 import { renderPage } from '../src/server/render'
 import { refuseClashes, scanRoutes } from '../src/server/routes'
 import { speculationRules } from '../src/server/speculation'
+import { KEEP_ALIVE_MS, streamDocument } from '../src/server/stream'
 import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
 
@@ -505,6 +506,24 @@ describe('guards', () => {
 })
 
 describe('await blocks', () => {
+  it('keeps a page whose block is slow open past Bun\'s idle timeout, an empty comment at a time', async () => {
+    const slow = (async () => {
+      await Bun.sleep(KEEP_ALIVE_MS + 300)
+
+      return 'late'
+    })()
+    const stream = streamDocument('<html><body>', [{ id: 'k1', value: slow, ready: (value: string) => value }], { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: '' }, false, () => undefined)
+    const chunks: string[] = []
+
+    for await (const chunk of stream)
+      chunks.push(new TextDecoder().decode(chunk))
+
+    expect(chunks[0]).toBe('<html><body>')
+    expect(chunks[1]).toBe('<!---->')
+    expect(chunks[2]).toStartWith('<template data-kay-await="k1">late</template>')
+    expect(chunks.at(-1)).toBe('</body></html>')
+  }, KEEP_ALIVE_MS + 5000)
+
   async function chunksOf(path: string): Promise<string[]> {
     const response = await app.handle(new Request(`http://localhost${path}`))
     const decoder = new TextDecoder()

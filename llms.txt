@@ -738,7 +738,7 @@ catch
 - `await value then name` on one line has no pending block. `catch error` binds the rejection; without `catch`, a rejection removes the pending block and is logged. A `then` block that throws while rendering is a bug, not a rejection: it removes the pending block and is logged too, never showing `catch`.
 - A promise rejecting before the page renders it would crash the server, so kay handles one a server value holds where it is declared, as `defer()` from `kay` does: an `await` block naming it, `await comments`, needs nothing more. A promise reached any other way, `await data.comments` or a prop, is made with `defer()`, which `kay check` reports when it is not; a value that is no promise renders at once.
 - Status, headers and cookies are sent before the first block, so a streamed block cannot redirect or set them, and a `head` block inside one is ignored. A block renders on its own, outside its layouts, and an `await` inside a pending block renders its own pending block only.
-- The response stays open until the last value settles. Bun closes a connection idle for `idleTimeout` seconds, 10 by default, so a value slower than that needs `Bun.serve({ idleTimeout })` raised.
+- The response stays open until the last value settles, an empty comment going out every 5 seconds meanwhile, so neither Bun, which closes a connection idle for 10 seconds by default, nor a proxy in front closes it under a slow value.
 - In an island, the server sends the pending block and the browser renders the rest once the value settles.
 
 ## Actions
