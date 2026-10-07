@@ -1,7 +1,7 @@
 import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, errorKey, formFieldOf } from './ast'
+import { actionOf, describedByOf, formFieldOf } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
@@ -45,6 +45,11 @@ export function escapeText(text: string): string {
 }
 
 // A quoted attribute as JSX reads it, an entity standing for its character, then escaped for markup.
+// What follows `KayFormInvalid(...` for a refused field or form: the value naming its error, else the template's own or none.
+export function describedValue(described: { refused: string, own?: string }): string {
+  return `) ? ${JSON.stringify(described.refused)} : ${described.own === undefined ? 'undefined' : JSON.stringify(described.own)}`
+}
+
 export function escapeStaticAttribute(text: string): string {
   return text.replace(STATIC_ATTRIBUTE, char => ATTRIBUTE_ENTITY[char] ?? '&amp;')
 }
@@ -320,6 +325,8 @@ export class HtmlTemplate {
     const read = (expression: Span, call: boolean) => () => void b.add('(').addSource(expression).add(call ? ')()' : ')')
     const target = this.formTarget
     const field = target && formFieldOf(element, this.src)
+    const action = actionOf(element, this.src)
+    const described = field && target ? field.invalid ? describedByOf(element, this.src, this.options.errors, target, field.name) : undefined : action && describedByOf(element, this.src, this.options.errors, action.expression, '')
     // The attribute a refused post's value goes back in, and what the template gives it otherwise.
     const filled = field?.fill === 'value' || field?.fill === 'checked' ? field.fill : undefined
     let ownFill: (() => void) | undefined
@@ -377,7 +384,7 @@ export class HtmlTemplate {
         continue
       }
 
-      if (BEHAVIOUR.test(attributeName))
+      if (BEHAVIOUR.test(attributeName) || (described?.own !== undefined && attributeName === 'aria-describedby'))
         continue
 
       if (attributeName === filled) {
@@ -498,13 +505,11 @@ export class HtmlTemplate {
           b.add('))')
         })
 
-        const described = this.describedBy(element, target, field.name)
-
         if (described) {
           markup.dynamic(() => {
             b.add(`${htmlAlias('attribute')}("aria-describedby", KayFormInvalid`)
             fieldArguments()
-            b.add(`) && ${JSON.stringify(described)})`)
+            b.add(`${describedValue(described)})`)
           })
         }
       }
@@ -521,8 +526,6 @@ export class HtmlTemplate {
       }
     }
 
-    const action = actionOf(element, this.src)
-
     if (action) {
       if (!this.named(element, 'method'))
         markup.text(' method="post"')
@@ -531,10 +534,8 @@ export class HtmlTemplate {
       if (!this.named(element, 'enctype'))
         markup.text(' enctype="multipart/form-data"')
 
-      const described = this.describedBy(element, action.expression, '')
-
       if (described)
-        markup.dynamic(() => b.add(`${htmlAlias('attribute')}("aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), "") && ${JSON.stringify(described)})`))
+        markup.dynamic(() => b.add(`${htmlAlias('attribute')}("aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), ""${describedValue(described)})`))
     }
 
     markup.text('>')
@@ -881,11 +882,6 @@ export class HtmlTemplate {
 
   private named(element: ElementNode, name: string): boolean {
     return element.attributes.some(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === name)
-  }
-
-  // The element showing the error a refused post got for the field, `''` for the form's own message, unless the template describes it itself.
-  private describedBy(element: ElementNode, action: Span, field: string): string | undefined {
-    return this.named(element, 'aria-describedby') ? undefined : this.options.errors?.describing.get(errorKey(this.source(action), field))
   }
 
   private source(span: Span): string {

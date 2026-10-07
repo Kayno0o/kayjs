@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { chromium } from 'playwright-core'
+import { compileKay } from '../src/compiler'
 import { browserPath, testSite } from '../src/test'
 
 const site = await testSite({ routes: 'tests/fixtures/forms/src/routes' })
@@ -53,7 +54,8 @@ describe('a form posting to an action', () => {
     expect(status).toBe(422)
     expect(html).toContain('<input name="topic" value="ab" aria-invalid="true" aria-describedby="topic-problem">')
     expect(html).toContain('<p id="topic-problem">Too short</p>')
-    expect(html).toContain('<input name="note" aria-describedby="note-help" value="long" aria-invalid="true">')
+    expect(html).toContain('<input name="note" value="long" aria-invalid="true" aria-describedby="note-help busy-note-error">')
+    expect(html).toContain('<p id="busy-note-error" class="note-error">Too long</p>')
     expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy" method="post" enctype="multipart/form-data">')
   })
 
@@ -83,6 +85,54 @@ describe('a form posting to an action', () => {
     expect(taken.html).toContain('<input name="name" value="Ada">')
     expect(pinged.html).toContain('<p class="done">Saved</p>')
     expect((await site.visit('/')).html).not.toContain('class="done"')
+  })
+})
+
+describe('the messages a refused form is described by', () => {
+  const FORM = `form(action={add})
+  input(name="title" aria-describedby="help")
+  input(name="tag")
+  input(name="slug" aria-describedby={hint})
+  p {add.error('tag')}
+  if add.error('title') as message
+    p {message}
+  if add.error('slug') as message
+    p {message}
+  for row of rows
+    if add.error('tag') as message
+      p.row {message}
+  if add.error() as message
+    p(id="own-form") {message}
+  if other.error('x') as message
+    p.other {message}
+`
+
+  it('names the element an if block shows first, or one holding the error, after a description of the field\'s own', () => {
+    const { tsx } = compileKay(FORM, 'page.kay', { output: 'html' })
+
+    expect(tsx).toContain('"<input name=\\"title\\"" + KayAttribute("value", KayFormValue((add), "title")) + KayAttribute("aria-invalid", KayFormInvalid((add), "title")) + KayAttribute("aria-describedby", KayFormInvalid((add), "title") ? "help add-title-error" : "help")')
+    expect(tsx).toContain('KayAttribute("aria-describedby", KayFormInvalid((add), "tag") ? "add-tag-error" : undefined)')
+    expect(tsx).toContain('<p id=\\"add-tag-error\\">')
+    expect(tsx).toContain('<p id=\\"add-title-error\\">')
+    expect(tsx).toContain('KayAttribute("aria-describedby", KayFormInvalid((add), "") ? "own-form" : undefined)')
+  })
+
+  it('leaves a bound description, a row of a for and another action\'s message alone', () => {
+    const { tsx } = compileKay(FORM, 'page.kay', { output: 'html' })
+
+    expect(tsx).not.toContain('KayFormInvalid((add), "slug") ?')
+    expect(tsx).toContain('<p class=\\"row\\">')
+    expect(tsx).toContain('<p class=\\"other\\">')
+  })
+
+  it('describes the fields and the form of an island alike', () => {
+    const { tsx } = compileKay(FORM, 'page.kay', { output: 'dom' })
+
+    expect(tsx).toContain('"aria-describedby", KayFormInvalid((add), "title") ? "help add-title-error" : "help"));')
+    expect(tsx).toContain('"aria-describedby", KayFormInvalid((add), "tag") ? "add-tag-error" : undefined));')
+    expect(tsx).toContain('"aria-describedby", KayFormInvalid((add), "") ? "own-form" : undefined));')
+    expect(tsx).toContain('<p id=\\"add-tag-error\\">')
+    expect(tsx).not.toContain('KayFormInvalid((add), "slug") ?')
   })
 })
 

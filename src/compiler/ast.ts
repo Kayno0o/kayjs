@@ -196,85 +196,108 @@ const ERROR_READ = /^([\w$.]+)\.error\((?:(['"])([^'"]*)\2)?\)$/
 const WHITESPACE = /\s+/g
 const ID_UNSAFE = /[^\w-]+/g
 
-export function errorKey(action: string, field: string): string {
+function errorKey(action: string, field: string): string {
   return `${action.replace(WHITESPACE, '')}\n${field}`
 }
 
-// `if add.error('title') as message` and `p {add.error('title')}`: the element shown holds the message, outside a `for`, which would repeat its id.
+// `if add.error('title') as message` and `p {add.error('title')}`: the element shown holds the message, outside a `for`, which would repeat its id, for an action a form of the file posts to.
 export function errorMessages(nodes: Node[], source: string): ErrorMessages {
   const found: ErrorMessages = { ids: new Map(), describing: new Map() }
+  const posted = new Set<string>()
+  const shown: { element: ElementNode, action: string, field: string }[] = []
   const text = (span: Span) => source.slice(span.start, span.end)
-  const read = (span: Span) => ERROR_READ.exec(text(span).replace(WHITESPACE, ''))
 
-  const shows = (element: ElementNode | undefined, match: RegExpExecArray | null) => {
-    if (!element || !match || element.component || element.attributes.some(attribute => attribute.kind === 'spread'))
-      return
+  const shows = (element: ElementNode | undefined, span: Span, loop: boolean) => {
+    const match = ERROR_READ.exec(text(span).replace(WHITESPACE, ''))
 
-    const key = errorKey(match[1]!, match[3] ?? '')
-
-    if (found.describing.has(key))
-      return
-
-    const own = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && text(attribute.name) === 'id')
-    let id = element.id ? text(element.id) : own?.kind === 'static' ? own.text : undefined
-
-    if (own !== undefined && own.kind !== 'static')
-      return
-
-    if (id === undefined) {
-      id = `${match[1]!.replaceAll('.', '-')}-${match[3] ? `${match[3].replace(ID_UNSAFE, '-')}-` : ''}error`
-      found.ids.set(element, id)
-    }
-
-    found.describing.set(key, id)
+    if (element && match && !loop && !element.component && !element.attributes.some(attribute => attribute.kind === 'spread'))
+      shown.push({ element, action: match[1]!, field: match[3] ?? '' })
   }
 
-  const visit = (children: Node[]) => {
+  const visit = (children: Node[], loop: boolean) => {
     for (const node of children) {
       switch (node.kind) {
-        case 'element':
+        case 'element': {
+          const action = actionOf(node, source)
+
+          if (action)
+            posted.add(text(action.expression).replace(WHITESPACE, ''))
+
           for (const child of node.children) {
             if (child.kind === 'text') {
               for (const part of child.parts) {
                 if (part.kind === 'expression')
-                  shows(node, read(part.expression))
+                  shows(node, part.expression, loop)
               }
             }
           }
 
-          visit(node.children)
+          visit(node.children, loop)
 
           break
+        }
         case 'if':
           for (const branch of node.branches) {
             if (branch.test)
-              shows(branch.children.find((child): child is ElementNode => child.kind === 'element'), read(branch.test))
+              shows(branch.children.find((child): child is ElementNode => child.kind === 'element'), branch.test, loop)
 
-            visit(branch.children)
+            visit(branch.children, loop)
           }
+
+          break
+        case 'for':
+          visit([...node.children, ...node.fallback ?? []], true)
 
           break
         case 'await':
           for (const block of awaitBlocks(node))
-            visit(block)
+            visit(block, loop)
 
           break
         case 'try':
           for (const block of tryBlocks(node))
-            visit(block)
+            visit(block, loop)
 
           break
         case 'slot':
-          visit(node.children)
+          visit(node.children, loop)
 
           break
       }
     }
   }
 
-  visit(nodes)
+  visit(nodes, false)
+
+  for (const { element, action, field } of shown) {
+    const key = errorKey(action, field)
+    const own = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && text(attribute.name) === 'id')
+
+    if (!posted.has(action) || found.describing.has(key) || (own !== undefined && own.kind !== 'static'))
+      continue
+
+    let id = element.id ? text(element.id) : own?.text
+
+    if (id === undefined) {
+      id = `${action.replaceAll('.', '-')}-${field ? `${field.replace(ID_UNSAFE, '-')}-` : ''}error`
+      found.ids.set(element, id)
+    }
+
+    found.describing.set(key, id)
+  }
 
   return found
+}
+
+// What `aria-describedby` reads while a field, or the form for `''`, is refused, and what it reads otherwise: the error's id after the template's own static value, which then renders through this alone; nothing for a value the template binds.
+export function describedByOf(element: ElementNode, source: string, errors: ErrorMessages | undefined, action: Span, field: string): { refused: string, own?: string } | undefined {
+  const id = errors?.describing.get(errorKey(source.slice(action.start, action.end), field))
+  const own = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'aria-describedby')
+
+  if (id === undefined || (own !== undefined && own.kind !== 'static'))
+    return undefined
+
+  return own ? { refused: `${own.text} ${id}`, own: own.text } : { refused: id }
 }
 
 export function isHead(node: Node): node is ElementNode & { name: 'head' } {

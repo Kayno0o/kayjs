@@ -1,9 +1,9 @@
 import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, errorKey, formFieldOf } from './ast'
+import { actionOf, describedByOf, formFieldOf } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
-import { BEHAVIOUR, CONTENT_PROPERTIES, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
+import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
 import { childItems, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
@@ -422,10 +422,10 @@ export class DomTemplate {
         if (!this.named(element, 'enctype'))
           html += ' enctype="multipart/form-data"'
 
-        const described = this.describedBy(element, action.expression, '')
+        const described = describedByOf(element, this.src, this.errors, action.expression, '')
 
         if (described)
-          own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), "") && ${JSON.stringify(described)}));`))
+          own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), ""${describedValue(described)}));`))
       }
     }
 
@@ -436,10 +436,10 @@ export class DomTemplate {
 
       own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-invalid", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)})));`))
 
-      const described = this.describedBy(element, target, field.name)
+      const described = describedByOf(element, this.src, this.errors, target, field.name)
 
       if (described)
-        own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)}) && ${JSON.stringify(described)}));`))
+        own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)}${describedValue(described)}));`))
     }
 
     html += '>'
@@ -809,11 +809,6 @@ export class DomTemplate {
 
   private named(element: ElementNode, name: string): boolean {
     return element.attributes.some(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === name)
-  }
-
-  // The element showing the error a refused post got for the field, `''` for the form's own message, unless the template describes it itself.
-  private describedBy(element: ElementNode, action: Span, field: string): string | undefined {
-    return this.named(element, 'aria-describedby') ? undefined : this.errors?.describing.get(errorKey(this.source(action), field))
   }
 
   private staticAttribute(element: ElementNode, name: string): string | undefined {

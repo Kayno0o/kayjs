@@ -389,17 +389,17 @@ function moveFocus(swap: Swap): void {
   announce(document.title)
 }
 
-// A refused form's first invalid field takes the focus, read out with the error describing it; with none, what describes the form is announced and the control focused before, a submit button with no id or name too, is focused again.
+// Focuses the refused form's first invalid field, which a screen reader reads with its error. Without one, announces the form's own message and focuses the control that posted it again, found by its place in the form.
 function showRefusal(form: HTMLFormElement | undefined, control: number): boolean {
   if (!form)
     return false
 
-  const field = form.querySelector<HTMLElement>('[aria-invalid="true"]')
-
-  if (field) {
+  for (const field of form.querySelectorAll<HTMLElement>('[aria-invalid="true"]')) {
+    // Scrolled into view, unlike the other focus moves, as it may sit outside the kept scroll position.
     field.focus()
 
-    return true
+    if (document.activeElement === field)
+      return true
   }
 
   const message = form.getAttribute('aria-describedby')?.split(ID_LIST).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean).join(' ')
@@ -429,7 +429,7 @@ function announce(text: string): void {
   }, 50)
 }
 
-// The page's stylesheets opt in to view transitions between pages with `@view-transition { navigation: auto; }`, which a swap honours as a full load would, inside an `@media` or `@supports` that holds too; never for a visitor asking for less motion.
+// The page's stylesheets opt in with `@view-transition { navigation: auto; }`, as for full loads. A visitor asking for less motion gets none.
 function viewTransitions(): boolean {
   if (!('startViewTransition' in document) || matchMedia(REDUCED_MOTION).matches)
     return false
@@ -451,6 +451,7 @@ function viewTransitions(): boolean {
   return false
 }
 
+// An `@media` or `@supports` rule counts when it holds.
 function optsIn(rules: CSSRuleList): boolean {
   for (const rule of rules) {
     if (rule.constructor.name === 'CSSViewTransitionRule' && (rule as CSSRule & { navigation?: string }).navigation === 'auto')
