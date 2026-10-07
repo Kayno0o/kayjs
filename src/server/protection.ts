@@ -2,6 +2,7 @@ import type { Server } from 'bun'
 import type { Elysia, TSchema } from 'elysia'
 import type { ProxyConfig } from '../config'
 import type { ServerAction } from '../runtime/action'
+import type { Duration } from '../runtime/duration'
 import { durationSeconds } from '../runtime/duration'
 import { rewrittenAddress } from './rewrite'
 
@@ -31,6 +32,18 @@ const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[
 const proxies = new WeakMap<Request, ProxyConfig | null>()
 let warnedUnconfigured = false
 
+// Each rate limit's window in milliseconds, read once: `action()` refused one it cannot read.
+const windowLengths = new WeakMap<object, number>()
+
+function windowMs(rateLimit: { window: Duration }): number {
+  let ms = windowLengths.get(rateLimit)
+
+  if (ms === undefined)
+    windowLengths.set(rateLimit, ms = durationSeconds(rateLimit.window, 'rateLimit.window') * 1000)
+
+  return ms
+}
+
 // Why a post must not reach the handler, or undefined when it may.
 export function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined): ProtectionRefusal | undefined {
   const { honeypot, rateLimit } = action.protection ?? {}
@@ -45,7 +58,7 @@ export function protectionRefusal(action: ServerAction<TSchema, unknown>, reques
   if (!rateLimit)
     return undefined
 
-  const wait = overLimit(action, clientAddress(request, server), rateLimit.max, durationSeconds(rateLimit.window, 'rateLimit.window') * 1000)
+  const wait = overLimit(action, clientAddress(request, server), rateLimit.max, windowMs(rateLimit))
 
   return wait === undefined ? undefined : { status: 429, field: '', message: `Too many attempts; try again in ${wait} s`, headers: { 'retry-after': String(wait) } }
 }

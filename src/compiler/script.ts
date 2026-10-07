@@ -13,6 +13,8 @@ const STATIC_EXPORTS = new Set(['uid'])
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
 export const SCRIPT_GLOBALS = ['signal', 'memo', 'effect', 'onMount']
 export const SERVER_GLOBALS = ['action']
+// Each of those names written as a name of its own, not a member or part of a longer one.
+const GLOBAL_NAME = new Map([...SCRIPT_GLOBALS, ...SERVER_GLOBALS].map(name => [name, new RegExp(`(?<![\\w$.])${name}(?![\\w$])`)]))
 
 export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.
@@ -452,7 +454,7 @@ function findJsx(node: unknown): t.Node | undefined {
 
 // Which of `names` the fence reads with nothing in it declaring or importing them.
 function undeclared(ast: ParseResult<t.File>, code: string, names: string[]): string[] {
-  const mentioned = names.filter(name => new RegExp(`(?<![\\w$.])${name}(?![\\w$])`).test(code))
+  const mentioned = names.filter(name => GLOBAL_NAME.get(name)!.test(code))
   const found: string[] = []
 
   if (mentioned.length === 0)

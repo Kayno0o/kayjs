@@ -7,6 +7,7 @@ dist
 *.vsix
 /types
 tests/.dom-*
+tests/.schema-*
 tests/.canary-*
 .claude/scheduled_tasks.lock
 tests/fixtures/live/src/**/*.kay

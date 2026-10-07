@@ -222,6 +222,14 @@ describe('islands', () => {
     expect(compileKay('---\nconst label = \'signal\'\n---\np {label}\n', 'test.kay').island).toBeUndefined()
   })
 
+  it('reads a signal by name through optional chaining, a shorthand property and await blocks', () => {
+    const code = tsx('---\nconst user = signal<{ name: string }>()\nconst count = memo(() => 1)\nconst later = Promise.resolve(2)\n---\np(title={JSON.stringify({ count })}) {user?.name}\nawait later\n  p {count}\nthen value\n  p {count + value}\n')
+
+    expect(code).toContain('user()?.name')
+    expect(code).toContain('{ count: count() }')
+    expect(code.match(/count\(\)/g)).toHaveLength(3)
+  })
+
   it('leaves a name the file declares or imports itself', () => {
     expect(tsx('---\nfunction signal(value: number) {\n  return value\n}\n\nconst one = signal(1)\n---\np {one}\n')).not.toContain('from \'kay\'')
     expect(tsx('--- server\nimport { signal } from \'kay\'\n\nconst one = 1\n---\n---\nconst count = signal(one)\n---\np {count()}\n').match(/import \{ signal \} from 'kay'/g)).toHaveLength(1)
