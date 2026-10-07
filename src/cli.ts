@@ -21,6 +21,7 @@ import { ContentError } from './content/validate'
 import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
+import { migrateAstroProject } from './migrate/project'
 import { createProject, TEMPLATES } from './new'
 import { linkVariantFiles } from './runtime/image'
 import { basePath } from './server/base'
@@ -34,7 +35,7 @@ import { ExportError, prerenderPages } from './server/prerender'
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const toStderr: Paint = (styles, text) => styleText(styles, text, { stream: process.stderr })
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -100,6 +101,9 @@ async function main(args: string[]): Promise<number> {
 
   if (command === 'new')
     return scaffold(rest)
+
+  if (command === 'migrate')
+    return migrate(rest)
 
   if (command !== 'check') {
     console.error(USAGE)
@@ -407,6 +411,45 @@ async function scaffold(args: string[]): Promise<number> {
 
     return 1
   }
+}
+
+// Translates an Astro project's `.astro` files and content config, in place or into `--out`, and lists what is left to do by hand.
+async function migrate(args: string[]): Promise<number> {
+  const parsed = parseCommand(args, { out: { type: 'string' } }, 2)
+
+  if (typeof parsed === 'number')
+    return parsed
+
+  const [from, dir = '.'] = parsed.positionals
+
+  if (from !== 'astro') {
+    console.error(`kay migrate: ${from === undefined ? 'name what to migrate from' : `${from} is not something kay migrates from`}, as in \`kay migrate astro\``)
+
+    return 1
+  }
+
+  if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) {
+    console.error(`kay migrate: ${dir} is not a directory`)
+
+    return 1
+  }
+
+  const out = typeof parsed.values.out === 'string' ? resolve(parsed.values.out) : resolve(dir)
+  const { written, skipped, notes } = await migrateAstroProject(resolve(dir), out)
+  const shown = (file: string) => relative(process.cwd(), join(out, file)) || '.'
+
+  for (const file of written)
+    console.error(`wrote ${shown(file)}`)
+
+  for (const file of skipped)
+    console.error(`kept ${shown(file)}, which exists`)
+
+  if (notes.length > 0)
+    console.log(`\nLeft to do by hand, the code it concerns marked \`kay migrate:\` where it was commented out:\n${notes.map(each => `${relative(process.cwd(), join(dir, each.file))}:${each.line}${each.target === undefined ? '' : ` (${shown(each.target)})`}: ${each.message}`).join('\n')}`)
+
+  console.error(`\n${count(written.length, 'file')} written, ${count(notes.length, 'item')} left to do by hand`)
+
+  return 0
 }
 
 // A path pasted into a shell line, quoted when it holds anything the shell would read.
