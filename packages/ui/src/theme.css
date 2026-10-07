@@ -1273,7 +1273,8 @@
       @apply border-kui-accent text-kui-accent;
     }
 
-    &:where([aria-disabled='true']) {
+    /* Previous or Next at an end, drawn as text rather than a link. */
+    &:where(span) {
       @apply opacity-50 hover:text-kui-subtext0;
     }
   }

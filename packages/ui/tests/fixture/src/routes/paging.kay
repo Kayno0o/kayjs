@@ -15,3 +15,7 @@ main
     Pagination(page={1} pages={1} url="/posts")
   article#qr
     QrCode(value="https://kaynooo.fr" label="kaynooo.fr" size={160})
+  article#qr-other
+    QrCode(value="https://kaynooo.fr/t" label="Tier lists")
+  article#qr-styled
+    QrCode(value="https://kaynooo.fr" label="Styled" options={{ foreground: '#7aa2f7' }})

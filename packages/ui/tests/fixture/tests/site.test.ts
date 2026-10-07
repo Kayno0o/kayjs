@@ -296,7 +296,8 @@ describe('Pagination', () => {
     const first = await element('/paging', 'first')
 
     expect(first).toContain('<nav aria-label="Pagination" class="kui-pagination">')
-    expect(first).toContain('<span class="kui-pagination-step" aria-disabled="true">Previous</span>')
+    expect(first).toContain('<span class="kui-pagination-step">Previous</span>')
+    expect(first).toContain('<a class="kui-pagination-page" href="/posts?tag=kay&amp;page=2">2</a>')
     expect(first).toContain('<a class="kui-pagination-page" href="/posts?tag=kay" aria-current="page">1</a>')
     expect(first).toContain('<a class="kui-pagination-page" href="/posts?tag=kay&amp;page=3">3</a>')
     expect(first).toContain('<a class="kui-pagination-step" href="/posts?tag=kay&amp;page=2" rel="next">Next</a>')
@@ -311,12 +312,22 @@ describe('Pagination', () => {
     expect(middle).toContain('href="/paging?page=10" aria-current="page"')
     expect(await element('/paging', 'single')).not.toContain('kui-pagination')
   })
+
+  test('shows a page past the ends, or none at all, as the nearest that exists', async () => {
+    const strip = (html: string) => html.replaceAll(/<!--[^>]*-->/g, '')
+
+    expect(strip(await element('/paging?page=50', 'middle'))).toContain('href="/paging?page=20" aria-current="page"')
+    expect(strip(await element('/paging?page=50', 'middle'))).toContain('<span class="kui-pagination-step">Suivant</span>')
+    expect(strip(await element('/paging?page=abc', 'middle'))).toContain('href="/paging" aria-current="page"')
+  })
 })
 
-test('QrCode draws its value as an SVG image named for screen readers', async () => {
-  const qr = await element('/paging', 'qr')
-  const src = (/src="data:image\/svg\+xml,([^"]+)"/).exec(qr)![1]!
+test('QrCode draws its value as an SVG image named for screen readers, drawn as its options say', async () => {
+  const svg = async (id: string) => decodeURIComponent((/src="data:image\/svg\+xml,([^"]+)"/).exec(await element('/paging', id))![1]!)
 
-  expect(qr).toContain('alt="kaynooo.fr" width="160" height="160" class="kui-qr-code"')
-  expect(decodeURIComponent(src)).toStartWith('<svg')
+  expect(await element('/paging', 'qr')).toContain('alt="kaynooo.fr" width="160" height="160" class="kui-qr-code"')
+  expect(await svg('qr')).toStartWith('<svg')
+  expect(await svg('qr')).not.toBe(await svg('qr-other'))
+  expect(await svg('qr-styled')).toContain('#7aa2f7')
+  expect(await element('/paging', 'qr-other')).not.toContain('width=')
 })

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { pageHref, pageItems } from '../src/pagination'
+import { currentPage, pageHref, pageItems } from '../src/pagination'
 
 describe('pageItems', () => {
   test('shows the first and last pages and the current one\'s neighbours, a gap for the pages left out', () => {
@@ -12,6 +12,20 @@ describe('pageItems', () => {
     expect(pageItems(4, 7)).toEqual([1, 2, 3, 4, 5, 6, 7])
     expect(pageItems(1, 3)).toEqual([1, 2, 3])
     expect(pageItems(1, 1)).toEqual([1])
+  })
+})
+
+describe('currentPage', () => {
+  test('reads any page a query gives as one that exists', () => {
+    expect(currentPage(Number('abc'), 20)).toBe(1)
+    expect(currentPage(2.5, 20)).toBe(2)
+    expect(currentPage(50, 20)).toBe(20)
+    expect(currentPage(-3, 20)).toBe(1)
+    expect(currentPage(4, 0)).toBe(1)
+  })
+
+  test('shows no neighbour with siblings at 0', () => {
+    expect(pageItems(5, 9, 0)).toEqual([1, 'gap', 5, 'gap', 9])
   })
 })
 

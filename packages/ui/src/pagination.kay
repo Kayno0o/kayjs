@@ -1,9 +1,9 @@
 ---
 import type { JSX } from 'kay'
-import { pageHref, pageItems } from './pagination'
+import { currentPage, pageHref, pageItems } from './pagination'
 
 const { page, pages, url, param = 'page', siblings = 1, label = 'Pagination', previousLabel = 'Previous', nextLabel = 'Next', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
-  // The page on screen, from 1.
+  // The page on screen, from 1; one past the ends, or no whole number, such as `?page=abc` read as `NaN`, shows as the nearest that exists.
   page: number
   // How many pages there are; with one or none, nothing is drawn.
   pages: number
@@ -19,20 +19,23 @@ const { page, pages, url, param = 'page', siblings = 1, label = 'Pagination', pr
   nextLabel?: string
   class?: string
 }>()
+
+// The page as one that exists, whatever the query held.
+const shown = () => currentPage(page, pages)
 ---
 // Plain links through the query, so a page renders on the server, its pages crawlable, and needs no island.
 if pages > 1
   nav.kui-pagination({...rest} aria-label={label} class={className})
-    if page > 1
-      a.kui-pagination-step(href={pageHref(url, page - 1, param)} rel="prev") {previousLabel}
+    if shown() > 1
+      a.kui-pagination-step(href={pageHref(url, shown() - 1, param)} rel="prev") {previousLabel}
     else
-      span.kui-pagination-step(aria-disabled="true") {previousLabel}
-    for item, index of pageItems(page, pages, siblings) key={index}
+      span.kui-pagination-step {previousLabel}
+    for item, index of pageItems(shown(), pages, siblings) key={index}
       if item === 'gap'
         span.kui-pagination-gap(aria-hidden="true") …
       else
-        a.kui-pagination-page(href={pageHref(url, item, param)} aria-current={item === page ? 'page' : undefined}) {item}
-    if page < pages
-      a.kui-pagination-step(href={pageHref(url, page + 1, param)} rel="next") {nextLabel}
+        a.kui-pagination-page(href={pageHref(url, item, param)} aria-current={item === shown() ? 'page' : undefined}) {item}
+    if shown() < pages
+      a.kui-pagination-step(href={pageHref(url, shown() + 1, param)} rel="next") {nextLabel}
     else
-      span.kui-pagination-step(aria-disabled="true") {nextLabel}
+      span.kui-pagination-step {nextLabel}
