@@ -1,0 +1,132 @@
+# kayjs-mail
+
+> Mail for kay apps: SMTP configured from typed environment variables, mails written as `.kay` components rendered to html and text, an outbox in development and tests instead of a real server, and sending through kay's queue with retries. It works from kay pages, actions and jobs, and from a plain Elysia app.
+
+## Rules that are easy to get wrong
+
+- Mail clients drop stylesheets: a mail's styles live in `style` attributes. The components kayjs-mail ships already do, themed through kay's library settings; Tailwind classes do nothing in a mail.
+- `from` is the site's own address, whose domain the SMTP server signs for: a visitor's address goes in `replyTo`, never in `from`, or SPF and DKIM fail and the mail lands in spam.
+- In development (`NODE_ENV=development`) and under `bun test` (`NODE_ENV=test`) no mail leaves the process: they go to the outbox, which the development server lists at `/_kay/mail` and a test reads through `outbox`. Only another `NODE_ENV`, production, sends over SMTP.
+- `send()` throws when the server refuses the mail or cannot be reached. An action whose point is not the mail itself uses `enqueue()`, so a mail server outage never fails the visitor's action, and the queue retries it.
+- `enqueue()` renders the mail at once and queues the result: the queue runs only in a server that uses the mailer, `new Elysia().use(mail)`.
+
+## Setup
+
+kayjs-mail is published as `@kaynooo/kayjs-mail` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay and Elysia are peer dependencies.
+
+```ts
+// src/mail.ts
+import { mailer } from '@kaynooo/kayjs-mail'
+
+export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'fr' })
+```
+
+```ts
+// src/server.ts
+import { Elysia } from 'elysia'
+import { pages } from 'kay/server'
+import { mail } from './mail'
+
+export const app = new Elysia().use(mail).use(await pages()).listen(3000)
+```
+
+- `mailer(options)` returns an Elysia plugin: the server using it runs the queue `enqueue` fills and, in development, serves the outbox page. A script that only sends need not use it.
+- Options: `from`, the default sender, `SMTP_FROM` when left out; `fromName`, the name shown beside a bare `SMTP_FROM`; `lang`, the `<html lang>` of the mail documents, `en` by default; `transport`, where mails go in place of the default; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment.
+
+## Environment
+
+In production the mailer reads, as the server boots, through kay's `defineEnv`:
+
+| Variable | |
+| --- | --- |
+| `SMTP_HOST` | required |
+| `SMTP_PORT` | `465` by default: TLS from the start; another port upgrades with STARTTLS |
+| `SMTP_USER`, `SMTP_PASS` | both or neither, for a server needing no login; with a password and a port other than 465, a server not offering STARTTLS is refused |
+| `SMTP_FROM` | required unless `mailer({ from })` gives the sender: `Name <address>` or a bare address |
+
+A missing or refused variable stops the boot, naming each one. `kay build` runs without them and leaves them to the server. The client greets the server with the sender's domain, not the container's hostname, and gives up on a server silent for 10 seconds. Development and tests need none of them.
+
+`mailer({ optional: true })` boots without `SMTP_HOST` and `SMTP_FROM` instead, for a site whose mail can wait to be set up: `mail.configured` reads `false`, and `send` and `enqueue` throw `MailNotConfigured`, whose `missing` names the variables, before rendering or queueing anything, so a contact form can catch it and tell the visitor to write or call instead. An app throws it too for a setting of its own, `new MailNotConfigured(['CONTACT_TO'])`.
+
+## Writing a mail
+
+A mail is a `.kay` component like any other, rendered on the server with `renderToString` from `kay/server`, its `await` blocks waited for. kayjs-mail ships the pieces most mails need, each with inline styles:
+
+```kay
+---
+import Button from '@kaynooo/kayjs-mail/button.kay'
+import Heading from '@kaynooo/kayjs-mail/heading.kay'
+import Layout from '@kaynooo/kayjs-mail/layout.kay'
+import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+
+const { name, url } = props<{ name: string, url: string }>()
+---
+Layout(preheader="Your account is ready")
+  @footer
+    | Sent by Example
+  Heading Welcome, {name}
+  Paragraph Confirm your address to start.
+  Button(href={url}) Confirm my address
+  Paragraph(muted) Or paste #[a(href={url}) {url}] into your browser.
+```
+
+- `Layout` fills the window with the background colour and centres a card; `preheader` is the line clients show beside the subject, hidden in the mail itself; `@footer` sits under the card.
+- `Heading`, `Paragraph` (`muted` for the small print) and `Button(href)` take their text as children.
+- Their colours, font, radius and width come from the library's settings, which the app replaces in `kay.config.ts` as with any kay library: `settings: { '@kaynooo/kayjs-mail': './src/mail-settings.ts' }`, a module default-exporting `{ ...defaults, accent: '#0047ff' }`, `defaults` and the `Settings` type imported from `@kaynooo/kayjs-mail`.
+- A component's markup is wrapped in a whole html document, with the charset, the viewport and the subject as its title; markup that already starts with `<html>` or a doctype is kept as it is.
+
+## Sending
+
+```kay
+--- server
+import { t } from 'kay'
+import { mail } from '../mail'
+import Welcome from '../mails/welcome.kay'
+
+export const signUp = action(t.Object({ name: t.String({ maxLength: 100 }), email: t.String({ format: 'email', maxLength: 254 }) }), async ({ name, email }) => {
+  await mail.enqueue({ to: email, subject: `Welcome, ${name}`, view: Welcome, props: { name, url: 'https://example.com/confirm' } })
+})
+---
+```
+
+- A message takes `to`, `cc` and `bcc` (an address or a list), `replyTo`, `from`, `subject`, `headers` and `attachments` (`{ filename, content, contentType?, cid? }`, `content` a string or bytes), and its content: `view` and `props` for a component (`props` left out when it takes none required), `html` for markup made elsewhere, or `text` alone.
+- An address is `'Name <address>'`, a bare address, or `{ name, address }`, which needs no quoting of a name holding a comma.
+- Every mail with html goes out with a text part too: the one `text` gives, else one written from the html, links followed by their address, list items dashed, what the html hides, such as the preheader, left out. `htmlToText(html)` is exported.
+- `send(message)` renders and sends now, resolving with `{ messageId, accepted, rejected, response }`. `enqueue(message, { delay })` renders now and queues it, resolving with the job's id; a failed send is retried as kay's queues retry, 5 attempts by default, each wait twice the last from 10 seconds. `render(message)` gives the rendered `Mail` without sending it. `drain()` sends every queued mail due, here and now, for a script.
+
+## Testing
+
+Under `bun test` mails go to the outbox, with no SMTP server to stub:
+
+```ts
+import { outbox } from '@kaynooo/kayjs-mail'
+import { beforeEach, expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+import { signUp } from '../src/routes/index.kay'
+
+const site = await testSite()
+
+beforeEach(() => outbox.clear())
+
+it('welcomes a new account', async () => {
+  await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/' })
+  await site.runJobs()
+
+  expect(outbox.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
+})
+```
+
+- `outbox.mails` lists the mails sent, oldest first, each a `Mail` with `id` and `sentAt`; `last()`, `to(address)` (among `to`, `cc` and `bcc`, any case), `find(id)` and `clear()` read it. It keeps the last 500.
+- An enqueued mail reaches the outbox once the queue runs: `site.runJobs()` from `kay/test`, or the mailer's `drain()`.
+
+## Development
+
+With `NODE_ENV=development`, `kay dev`'s, each mail sent is logged with its subject and kept in the outbox, and `/_kay/mail` lists them, newest first, each with its headers, its html in a sandboxed frame and its text. The outbox lives in the server's process: a restart empties it.
+
+## Other transports
+
+`transport` takes any `{ send(mail) }` resolving with a `Delivery`, such as a provider's HTTP API. `smtp({ host, port, user, pass, name, timeout })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.
+
+## kayjs-auth
+
+kayjs-auth's `email.mailer` takes the mailer's `send` or `enqueue`: `email: { mailer: { send: mail.enqueue } }` queues its security mails and retries them.

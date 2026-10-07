@@ -1,0 +1,17 @@
+--- server
+import { t } from 'kay'
+import { mail } from '../mail'
+import Welcome from '../mails/welcome.kay'
+
+export const signUp = action(t.Object({ name: t.String({ minLength: 1, maxLength: 100 }), email: t.String({ format: 'email', maxLength: 254 }) }), async ({ name, email }) => {
+  await mail.enqueue({ to: email, subject: `Welcome, ${name}`, view: Welcome, props: { name, url: 'https://fixture.test/confirm?token=abc' } })
+})
+---
+form(action={signUp})
+  label
+    | Name
+    input(name="name")
+  label
+    | Email
+    input(name="email" type="email")
+  button Sign up

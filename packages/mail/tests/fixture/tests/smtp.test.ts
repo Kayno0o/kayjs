@@ -1,0 +1,65 @@
+import process from 'node:process'
+import { mailer, smtp } from '@kaynooo/kayjs-mail'
+import { afterAll, describe, expect, it } from 'bun:test'
+import { bodyText, startSmtp } from '../../helpers/smtp'
+import Welcome from '../src/mails/welcome.kay'
+
+const server = startSmtp()
+
+afterAll(() => server.stop())
+
+describe('smtp', () => {
+  it('sends text and html as one multipart mail, greeting the server with the name given', async () => {
+    const transport = smtp({ host: '127.0.0.1', port: server.port, name: 'fixture.test' })
+    const mail = mailer({ from: { name: 'Fixture', address: 'hello@fixture.test' }, transport })
+
+    const delivery = await mail.send({ to: 'ada@example.com', replyTo: { name: 'Visitor', address: 'visitor@example.com' }, subject: 'Welcome', view: Welcome, props: { name: 'Ada', url: 'https://fixture.test/confirm' } })
+    const received = server.received.at(-1)!
+
+    expect(delivery.accepted).toEqual(['ada@example.com'])
+    expect(server.greetings.at(-1)).toBe('fixture.test')
+    expect(received.from).toBe('<hello@fixture.test>')
+    expect(received.to).toEqual(['<ada@example.com>'])
+    expect(received.data).toContain('Reply-To: Visitor <visitor@example.com>')
+    expect(received.data).toContain('multipart/alternative')
+    expect(bodyText(received)).toContain('Confirm my address (https://fixture.test/confirm)')
+    expect(bodyText(received, 'text/html')).toContain('Welcome, Ada</h1>')
+  })
+
+  it('writes no header of a sender\'s own, from a name or a subject holding a line break', async () => {
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port }) })
+
+    await mail.send({ to: 'ada@example.com', replyTo: { name: 'Ada\r\nBcc: spam@example.com', address: 'ada@example.com' }, subject: 'Hi\r\nBcc: spam@example.com', text: 'Hello\r\nBcc: spam@example.com' })
+
+    const received = server.received.at(-1)!
+
+    expect(received.to).toEqual(['<ada@example.com>'])
+    expect(received.data.slice(0, received.data.indexOf('\n\n'))).not.toMatch(/^Bcc:/im)
+  })
+
+  it('never sends a password over a connection that did not upgrade to TLS', async () => {
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, user: 'site', pass: 'secret' }) })
+    const before = server.received.length
+
+    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow('STARTTLS')
+    expect(server.received).toHaveLength(before)
+  })
+
+  it('reads its settings from the environment in production, the greeting named after the sender\'s domain', async () => {
+    const saved = { ...process.env }
+
+    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_FROM: 'site@env.test' })
+
+    try {
+      await mailer({ fromName: 'Site, Env' }).send({ to: 'bob@example.com', subject: 'From env', text: 'Hello' })
+    }
+    finally {
+      process.env = saved
+    }
+
+    expect(server.greetings.at(-1)).toBe('env.test')
+    expect(server.received.at(-1)?.from).toBe('<site@env.test>')
+    expect(server.received.at(-1)?.data).toContain('From: "Site, Env" <site@env.test>')
+    expect(bodyText(server.received.at(-1)!)).toBe('Hello\n')
+  })
+})

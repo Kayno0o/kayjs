@@ -1,0 +1,70 @@
+import process from 'node:process'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { mailer } from '../src/mailer'
+import { outbox } from '../src/outbox'
+
+const saved = process.env.NODE_ENV
+
+beforeAll(() => {
+  process.env.NODE_ENV = 'development'
+})
+
+afterAll(() => {
+  process.env.NODE_ENV = saved
+})
+
+beforeEach(() => outbox.clear())
+
+async function get(app: { handle: (request: Request) => Promise<Response> }, path: string): Promise<Response> {
+  return app.handle(new Request(`http://localhost${path}`))
+}
+
+describe('the development outbox page', () => {
+  it('lists the mails sent, newest first, and shows each one\'s headers, html and text', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+
+    await mail.send({ to: 'ada@example.com', subject: 'First <one>', html: '<p>Hello <a href="https://example.com">there</a></p>' })
+    await mail.send({ to: 'bob@example.com', replyTo: 'visitor@example.com', subject: 'Second', text: 'Only text' })
+
+    const list = await (await get(mail, '/_kay/mail')).text()
+
+    expect(list.indexOf('Second')).toBeLessThan(list.indexOf('First &lt;one&gt;'))
+
+    const first = outbox.to('ada@example.com')[0]!
+    const detail = await get(mail, `/_kay/mail/${first.id}`)
+    const page = await detail.text()
+
+    expect(detail.status).toBe(200)
+    expect(page).toContain('<th>From</th><td>dev@example.com</td>')
+    expect(page).toContain(`src="/_kay/mail/${first.id}/html"`)
+    expect(page).toContain('<pre>Hello there (https://example.com)</pre>')
+
+    const html = await get(mail, `/_kay/mail/${first.id}/html`)
+
+    expect(await html.text()).toContain('<p>Hello <a href="https://example.com">there</a></p>')
+    expect(html.headers.get('content-security-policy')).toStartWith('sandbox')
+
+    const second = await (await get(mail, `/_kay/mail/${outbox.last()!.id}`)).text()
+
+    expect(second).toContain('<th>Reply-To</th><td>visitor@example.com</td>')
+    expect(second).not.toContain('<iframe')
+  })
+
+  it('answers 404 for a mail no longer kept', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+
+    expect((await get(mail, '/_kay/mail/gone')).status).toBe(404)
+    expect((await get(mail, '/_kay/mail/gone/html')).status).toBe(404)
+  })
+
+  it('is left out of a server that delivers, or under bun test', async () => {
+    process.env.NODE_ENV = 'test'
+
+    try {
+      expect((await get(mailer({ from: 'dev@example.com' }), '/_kay/mail')).status).toBe(404)
+    }
+    finally {
+      process.env.NODE_ENV = 'development'
+    }
+  })
+})

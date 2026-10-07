@@ -1,0 +1,15 @@
+---
+import Button from '@kaynooo/kayjs-mail/button.kay'
+import Heading from '@kaynooo/kayjs-mail/heading.kay'
+import Layout from '@kaynooo/kayjs-mail/layout.kay'
+import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+
+const { name, url } = props<{ name: string, url: string }>()
+---
+Layout(preheader="Your account is ready")
+  @footer
+    | Sent by the fixture site
+  Heading Welcome, {name}
+  Paragraph Your account is ready. Confirm your address to start.
+  Button(href={url}) Confirm my address
+  Paragraph(muted) Or paste #[a(href={url}) {url}] into your browser.

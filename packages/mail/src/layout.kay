@@ -1,0 +1,14 @@
+---
+import type { JSX } from 'kay'
+import settings from './settings'
+
+const { preheader, footer } = props<{ preheader?: string, footer?: JSX.Element }>()
+---
+div(style={`background:${settings.background};padding:24px 12px;font-family:${settings.font};color:${settings.text}`})
+  if preheader
+    div(style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0" aria-hidden="true") {preheader}
+  div(style={`max-width:${settings.width}px;margin:0 auto;background:${settings.surface};border:1px solid ${settings.border};border-radius:${settings.radius};padding:32px 28px`})
+    slot
+  if footer
+    div(style={`max-width:${settings.width}px;margin:16px auto 0;font-size:12px;line-height:1.5;color:${settings.muted};text-align:center`})
+      | {footer}

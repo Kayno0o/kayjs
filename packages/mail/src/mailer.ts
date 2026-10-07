@@ -1,0 +1,186 @@
+import type { EnqueueOptions, QueueOptions } from 'kay/server'
+import type { Address, Delivery, Mail, Message, Transport } from './types'
+import process from 'node:process'
+import { Elysia } from 'elysia'
+import { t } from 'kay'
+import { defineEnv, queue, renderToString } from 'kay/server'
+import { addressOf, outbox } from './outbox'
+import { preview } from './preview'
+import { smtp } from './smtp'
+import { htmlToText } from './text'
+
+export interface MailerOptions {
+  // The address mails are sent from unless one says otherwise, `SMTP_FROM` when left out.
+  from?: Address
+  // The name shown beside a bare `SMTP_FROM`, so the environment holds the address alone.
+  fromName?: string
+  // Where mails go: the outbox in development and under `bun test`, else SMTP configured from the environment.
+  transport?: Transport
+  // The `lang` of the html document a mail's markup is wrapped in. `en` by default.
+  lang?: string
+  // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are.
+  queue?: QueueOptions<Mail> & { name?: string }
+  // Lets a server lacking `SMTP_HOST` or `SMTP_FROM` boot anyway, each send then throwing `MailNotConfigured`, for a site whose mail can wait to be set up.
+  optional?: boolean
+}
+
+// Thrown by an `optional` mailer while the environment lacks what it needs to send, so a form can tell the visitor another way to reach the site.
+export class MailNotConfigured extends Error {
+  override name = 'MailNotConfigured'
+
+  constructor(readonly missing: string[]) {
+    super(`${missing.join(' and ')} must be set to send mail`)
+  }
+}
+
+export type Mailer = Elysia & {
+  // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfigured`.
+  configured: boolean
+  // Renders the message and sends it now, throwing when the server refuses it or cannot be reached.
+  send: <P extends object>(message: Message<P>) => Promise<Delivery>
+  // Renders the message now and leaves it to the queue to send, retrying a failure: the server using the mailer runs it.
+  enqueue: <P extends object>(message: Message<P>, options?: EnqueueOptions) => Promise<string>
+  render: <P extends object>(message: Message<P>) => Promise<Mail>
+  // Sends every queued mail whose time has come, here and now, as a script or a test does without the server running the queue.
+  drain: () => Promise<number>
+}
+
+const DOCTYPE = /^\s*<!doctype/i
+const HTML_ROOT = /^\s*<html[\s>]/i
+const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
+const HTML_SPECIAL = /[&<>"]/g
+
+function escape(text: string): string {
+  return text.replace(HTML_SPECIAL, char => HTML_ESCAPES[char]!)
+}
+
+function list(addresses: Address | Address[] | undefined): Address[] {
+  return addresses === undefined ? [] : Array.isArray(addresses) ? addresses : [addresses]
+}
+
+function domainOf(address: Address): string | undefined {
+  const plain = addressOf(address)
+  const at = plain.lastIndexOf('@')
+
+  return at === -1 ? undefined : plain.slice(at + 1)
+}
+
+// A whole document around a component's markup, which renders the body alone: clients read the charset and the viewport from it.
+function asDocument(html: string, subject: string, lang: string): string {
+  if (DOCTYPE.test(html))
+    return html
+
+  if (HTML_ROOT.test(html))
+    return `<!doctype html>${html}`
+
+  return `<!doctype html><html lang="${escape(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(subject)}</title></head><body style="margin:0;padding:0">${html}</body></html>`
+}
+
+function named(address: string, name: string | undefined): Address {
+  return name === undefined || address.includes('<') ? address : { name, address }
+}
+
+function delivering(): 'outbox' | 'smtp' {
+  return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? 'outbox' : 'smtp'
+}
+
+// SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
+function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, missing: () => string[] } {
+  const env = defineEnv(t.Object({
+    SMTP_HOST: optional ? t.Optional(t.String()) : t.String(),
+    SMTP_PORT: t.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
+    SMTP_USER: t.Optional(t.String()),
+    SMTP_PASS: t.Optional(t.String()),
+    SMTP_FROM: optional || from !== undefined ? t.Optional(t.String()) : t.String(),
+  }))
+  let transport: Transport | undefined
+  const sender = () => from ?? named(env.SMTP_FROM!, fromName)
+  const missing = () => [...env.SMTP_HOST === undefined ? ['SMTP_HOST'] : [], ...from === undefined && env.SMTP_FROM === undefined ? ['SMTP_FROM'] : []]
+
+  // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
+  return {
+    transport: {
+      send: async (mail) => {
+        transport ??= smtp({ host: env.SMTP_HOST!, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS, name: domainOf(sender()) })
+
+        return transport.send(mail)
+      },
+    },
+    get from() {
+      return sender()
+    },
+    missing,
+  }
+}
+
+// Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and in development lists the outbox at `/_kay/mail`.
+export function mailer(options: MailerOptions = {}): Mailer {
+  const lang = options.lang ?? 'en'
+  const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true) : undefined
+  const transport = options.transport ?? configured?.transport ?? outbox
+  const sender = (): Address => configured?.from ?? options.from ?? named(process.env.SMTP_FROM || 'kay@localhost', options.fromName)
+
+  // Before rendering, so a mail that cannot go is neither rendered nor queued to fail every retry.
+  const ready = (): void => {
+    const missing = configured?.missing() ?? []
+
+    if (missing.length > 0)
+      throw new MailNotConfigured(missing)
+  }
+
+  const render = async <P extends object>(message: Message<P>): Promise<Mail> => {
+    const markup = message.view ? await renderToString(message.view, ...[message.props] as never) : message.html
+    const html = markup === undefined ? undefined : asDocument(markup, message.subject, lang)
+    const to = list(message.to)
+
+    if (to.length === 0)
+      throw new Error(`kayjs-mail: "${message.subject}" has no recipient`)
+
+    return {
+      from: message.from ?? sender(),
+      to,
+      cc: list(message.cc),
+      bcc: list(message.bcc),
+      replyTo: message.replyTo,
+      subject: message.subject,
+      html,
+      text: message.text ?? htmlToText(html!),
+      headers: message.headers ?? {},
+      attachments: message.attachments ?? [],
+    }
+  }
+
+  const deliver = async (mail: Mail): Promise<Delivery> => {
+    const delivery = await transport.send(mail)
+
+    if (transport === outbox && process.env.NODE_ENV === 'development')
+      console.info(`kayjs-mail: "${mail.subject}" to ${mail.to.map(addressOf).join(', ')} kept in the outbox, shown at /_kay/mail`)
+
+    return delivery
+  }
+
+  const { name = 'mail', ...queueOptions } = options.queue ?? {}
+  const jobs = queue<Mail>(name, deliver, queueOptions)
+  const plugin = new Elysia().use(jobs)
+
+  if (transport === outbox && process.env.NODE_ENV === 'development')
+    plugin.use(preview)
+
+  const sending = Object.assign(plugin, {
+    send: async <P extends object>(message: Message<P>) => {
+      ready()
+
+      return deliver(await render(message))
+    },
+    enqueue: async <P extends object>(message: Message<P>, enqueueOptions?: EnqueueOptions) => {
+      ready()
+
+      return jobs.enqueue(await render(message), enqueueOptions)
+    },
+    render,
+    drain: jobs.drain,
+  })
+
+  // A getter, since `kay build` leaves a missing variable to throw where it is read.
+  return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 }) as Mailer
+}

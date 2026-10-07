@@ -1,0 +1,7 @@
+---
+import settings from './settings'
+
+const { muted = false } = props<{ muted?: boolean }>()
+---
+p(style={muted ? `font-size:13px;line-height:1.5;margin:0 0 12px;color:${settings.muted}` : `font-size:16px;line-height:1.6;margin:0 0 16px;color:${settings.text}`})
+  slot
