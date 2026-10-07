@@ -381,6 +381,14 @@ describe('kay lsp imports', () => {
 
     expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.severity, diagnostic.code])).toEqual([[5, 2, 'positional-key']])
   })
+
+  it('reports nothing on the index of a positionally keyed for whose rows do not read it, and renames it with its key', async () => {
+    const source = '---\nconst { todos } = props<{ todos: { id: number }[] }>()\n---\nfor todo, i of todos key={i}\n  p {todo.id}\n'
+    const diagnostics = await editor.change(page, source, 9)
+
+    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.code])).toEqual([[3, 'positional-key']])
+    expect(spots((await editor.rename(page, 3, 10, 'index'))[page]!)).toEqual([[3, 10, 11], [3, 26, 27]])
+  })
 })
 
 describe('kay lsp following files on disk', () => {

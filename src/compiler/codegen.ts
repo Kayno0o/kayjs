@@ -813,7 +813,17 @@ class Generator {
       }
 
       b.add(') => ')
-      this.emitRoot(node.children)
+
+      // A positional key reads the index, so the type check sees it read, and hover and rename reach the key's name.
+      if (positional && this.options.check) {
+        b.add('(void (').addSource(node.key).add('), ')
+        this.emitRoot(node.children)
+        b.add(')')
+      }
+      else {
+        this.emitRoot(node.children)
+      }
+
       b.add(`}</${tag}>`)
     })
   }
