@@ -12,6 +12,8 @@ import { buildClient } from '../src/server/client'
 
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/
+// A Postgres whose user may create databases, for the scaffolded app's tests: CI sets it, as pg-orm's own tests have one.
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
 const ACCENT_TEST = `import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { expect, it } from 'bun:test'
 import { mount, settle, testSite } from 'kay/test'
@@ -270,15 +272,15 @@ describe('kay new', () => {
     }
   }, 30_000)
 
-  it('scaffolds an app with sessions, a guarded section and a websocket island, which checks, tests and builds as it is', async () => {
+  it('scaffolds an app with sessions, members in Postgres, a guarded section and a websocket island, which checks, tests and builds as it is', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
       const files = await createProject(dir, { kay: '^1.0.0', template: 'app' })
 
-      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
-      expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\n$/)
+      expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
       expect(await Bun.file(join(dir, '.gitignore')).text()).toContain('.env')
       expect(await Bun.file(join(dir, 'compose.prod.yaml')).text()).toContain('SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}')
 
@@ -287,12 +289,16 @@ describe('kay new', () => {
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
       expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
-      // Signs in through the action and lands in the guarded section, and counts the visitors online over the websocket.
-      const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+      // Signs in through the action and lands in the guarded section, reads a seeded member, and counts the visitors online over the websocket, each test file on a database of its own.
+      // They need a Postgres the test user may create databases on, which CI always has.
+      if (TEST_DATABASE_URL || process.env.CI) {
+        const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...TEST_DATABASE_URL && { DATABASE_URL: TEST_DATABASE_URL } } })
+        const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
-      expect(report).toContain('3 pass')
-      expect(code).toBe(0)
+        expect(report).toContain('4 pass')
+        expect(code).toBe(0)
+      }
+
       expect(Object.keys((await buildClient(dir)).islands)).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay', 'src/components/online.kay'])
     }
     finally {
@@ -402,7 +408,8 @@ describe('kay build --compile', () => {
       const server = Bun.spawn([join(dir, 'server')], { cwd: tmpdir(), env: { PATH: process.env.PATH, PORT: '0' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
       try {
-        const origin = `http://localhost:${await listeningPort(server)}`
+        const port = await listeningPort(server)
+        const origin = `http://localhost:${port}`
         const get = async (path: string) => {
           const response = await fetch(`${origin}${path}`)
 
@@ -444,6 +451,12 @@ describe('kay build --compile', () => {
         expect((await get('/notes.xml')).text).toContain('<link>https://example.com/notes/first</link>')
         expect((await get('/tags')).text).toContain('<slot data-component="node_modules/kay-lib/src/tag.kay" data-props="[{&quot;label&quot;:1},&quot;kept&quot;]"><button class="tag">app:kept</button></slot>')
         expect((await get('/live-tags')).text).toContain('<button class="tag">app:live</button>')
+
+        // A container's health check runs the executable again, asking the server beside it.
+        const probe = async (on: string) => Bun.spawn([join(dir, 'server'), '--health'], { cwd: tmpdir(), env: { PATH: process.env.PATH, PORT: on }, stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }).exited
+
+        expect(await probe(String(port))).toBe(0)
+        expect(await probe('1')).toBe(1)
       }
       finally {
         server.kill()

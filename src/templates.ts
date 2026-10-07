@@ -387,21 +387,122 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
   '.dockerignore': 'node_modules\n.kay\ndist\n',
 }
 
-// The server template, plus what an app adds: sessions, a sign-in, a guarded section, an API module and a live island over its websocket.
+// The app's tests, on its CI runner: a Postgres service, which the tests copy a database per test file on.
+const APP_TEST_WORKFLOW = TEST_WORKFLOW.replace('    runs-on: debian\n', `    runs-on: debian
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app_test
+`).replace('      - name: Test\n        run: bun run test\n', `      - name: Test
+        run: bun run test
+        env:
+          DATABASE_URL: postgres://app:app@postgres:5432/app_test
+`)
+
+// The server template, plus what an app adds: sessions, a sign-in, members kept in Postgres through pg-orm, a guarded section, an API module and a live island over its websocket.
 const APP_FILES: Record<string, string> = {
   ...SERVER_FILES,
   '.gitignore': 'node_modules\n.kay\n.eslintcache\n/server\n.env\n',
-  '.env.example': 'SESSION_SECRET=at-least-32-characters-kept-out-of-the-repository\n',
-  // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret.
-  '.env.test': 'SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\n',
+  '.env.example': 'SESSION_SECRET=at-least-32-characters-kept-out-of-the-repository\nDATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n',
+  // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. Each test file gets a copy of this database, which need not exist.
+  '.env.test': 'SESSION_SECRET=only-for-tests-0123456789abcdefghijklmnop\nDATABASE_URL=postgres://app:app@127.0.0.1:5433/app_test\n',
+  '.forgejo/workflows/test.yml': APP_TEST_WORKFLOW,
+  // `kay/test/preload` lets test files import pages and their actions; `tests/database.ts` gives each test file a database of its own.
+  'bunfig.toml': '[test]\npreload = [\n  "kay/test/preload",\n  "./tests/database.ts",\n]\n',
   'src/env.ts': `import { t } from 'kay'
 import { defineEnv } from 'kay/server'
 
-// Read once as the server boots; \`kay new\` wrote a secret to .env, and production sets its own.
+// Read once as the server boots; \`kay new\` wrote a secret and the development database to .env, and production sets its own.
 export const env = defineEnv(t.Object({
   SESSION_SECRET: t.String({ minLength: 32 }),
+  DATABASE_URL: t.String(),
   PORT: t.Integer({ default: 3000 }),
 }))
+`,
+  'src/db/member.ts': `import type { InferEntity } from '@kaynooo/pg-orm'
+import { defineTable } from '@kaynooo/pg-orm'
+
+// Who signed in, and since when. A change here goes to the database as a migration: \`bun run db:generate\`, then \`bun run db:migrate\`.
+export const Member = defineTable('member', f => ({
+  id: f.serial().primaryKey(),
+  name: f.varchar(40).unique(),
+  joined_at: f.timestamptz().defaultRaw('now()'),
+}))
+
+export type MemberInterface = InferEntity<typeof Member>
+`,
+  'src/db/index.ts': `import { Database } from '@kaynooo/pg-orm'
+import { env } from '../env'
+import { Member } from './member'
+
+export const tables = [Member]
+
+// Connects on the first query; in a test, to the copy \`tests/database.ts\` made for the file.
+export const db = new Database({ url: env.DATABASE_URL, tables })
+`,
+  'pg-orm.config.ts': `import process from 'node:process'
+import { Database, defineConfig } from '@kaynooo/pg-orm'
+import { Member } from './src/db/member'
+
+// For the \`pg-orm\` command: \`bun run db:generate\` writes a migration from what the tables declare, \`bun run db:migrate\` applies the pending ones.
+export default defineConfig({
+  db: new Database({ url: process.env.DATABASE_URL, tables: [Member] }),
+  migrationsDir: 'migrations',
+})
+`,
+  'migrations/0001_member.sql': `-- migrate:up
+CREATE TABLE "member" (
+  "id" serial,
+  "name" varchar(40),
+  "joined_at" timestamptz DEFAULT now(),
+  PRIMARY KEY ("id"),
+  UNIQUE ("name")
+);
+
+-- migrate:down
+DROP TABLE IF EXISTS "member";
+`,
+  'tests/database.ts': `import process from 'node:process'
+import { testDatabase } from '@kaynooo/pg-orm'
+import { afterAll } from 'bun:test'
+import { Member } from '../src/db/member'
+
+// Before each test file, run with \`bun test --isolate\`: a copy of the database the migrations build, with what the seed adds, dropped once the file is done.
+const database = await testDatabase({
+  url: process.env.DATABASE_URL!,
+  migrationsDir: 'migrations',
+  tables: [Member],
+  seed: async (db) => {
+    await db.repo(Member).write.insertOne({ name: 'Ada', joined_at: new Date('2024-01-01T12:00:00Z') })
+  },
+})
+
+// Read by src/env.ts, which the test file imports after this.
+process.env.DATABASE_URL = database.url
+
+afterAll(async () => {
+  await database.drop()
+})
+`,
+  'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d\`, which .env points at this file. Tests copy a database per test file on it.
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - 127.0.0.1:5433:5432
+    volumes:
+      - db:/var/lib/postgresql
+
+volumes:
+  db:
 `,
   'src/session.ts': `import { session } from 'kay/server'
 import { env } from './env'
@@ -422,9 +523,12 @@ console.log(\`Listening on http://localhost:\${app.server?.port}\`)
   'src/components/header.kay': header('[{ href: \'/\', label: \'Home\' }, { href: \'/account\', label: \'Account\' }]'),
   'src/routes/login.kay': `--- server
 import { t } from 'kay'
+import { db } from '../db'
+import { Member } from '../db/member'
 
-// Anyone may sign in under any name: swap in real credentials, such as @kaynooo/kayjs-auth's.
+// Anyone may sign in under any name, which makes them a member the first time: swap in real credentials, such as @kaynooo/kayjs-auth's.
 export const signIn = action(t.Object({ name: t.String({ pattern: '\\\\S', maxLength: 40, error: 'Write a name' }) }), async ({ name }, ctx) => {
+  await db.repo(Member).write.findOrCreate({ name: name.trim() }, ['name'])
   await ctx.locals.session.regenerate()
   await ctx.locals.session.set('name', name.trim())
   ctx.redirect('/account')
@@ -451,6 +555,8 @@ export default guard(async ({ locals, redirect }) => {
 `,
   'src/routes/account/index.kay': `--- server
 import { t } from 'kay'
+import { db } from '../../db'
+import { Member } from '../../db/member'
 
 export const signOut = action(t.Object({}), async (_input, ctx) => {
   await ctx.locals.session.destroy()
@@ -458,6 +564,7 @@ export const signOut = action(t.Object({}), async (_input, ctx) => {
 })
 
 const name = await ctx.locals.session.get('name')
+const member = name === undefined ? null : await db.repo(Member).read.findOneBy({ name })
 ---
 ---
 import Online from '../../components/online.kay'
@@ -465,6 +572,8 @@ import Online from '../../components/online.kay'
 head
   title Account
 h1.text-2xl.font-bold Signed in as {name}
+if member
+  p.text-subtext1 Member since {member.joined_at.toLocaleDateString('en', { dateStyle: 'long' })}
 Online
 form.mt-4(action={signOut})
   button(type="submit") Sign out
@@ -511,7 +620,11 @@ afterAll(async () => {
 
 it('sends a visitor to sign in, then into their account', async () => {
   expect((await site.visit('/account')).url).toBe('/login')
-  expect((await site.submit(signIn, { name: 'Ada' }, { from: '/login' })).html).toContain('Signed in as Ada')
+  expect((await site.submit(signIn, { name: 'Grace' }, { from: '/login' })).html).toContain('Signed in as Grace')
+})
+
+it('knows a member from the seed, and since when', async () => {
+  expect((await site.submit(signIn, { name: 'Ada' }, { from: '/login' })).html).toContain('Member since January 1, 2024')
 })
 
 it('tells every visitor how many are online', async () => {
@@ -530,6 +643,32 @@ it('tells every visitor how many are online', async () => {
 })
 `,
   'compose.prod.yaml': `services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: app
+    volumes:
+      - db:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U app]
+      interval: 5s
+      retries: 10
+
+  # Applies the pending migrations before the app starts, from the build stage, which holds them and the pg-orm command.
+  migrate:
+    build:
+      context: .
+      target: build
+    command: [bun, run, db:migrate]
+    environment:
+      DATABASE_URL: postgres://app:\${POSTGRES_PASSWORD}@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
+
   app:
     build: .
     restart: unless-stopped
@@ -538,6 +677,13 @@ it('tells every visitor how many are online', async () => {
     environment:
       # At least 32 characters, kept out of the repository.
       SESSION_SECRET: \${SESSION_SECRET:?set SESSION_SECRET}
+      DATABASE_URL: postgres://app:\${POSTGRES_PASSWORD}@db:5432/app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  db:
 `,
 }
 

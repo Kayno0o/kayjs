@@ -37,7 +37,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 
 | Command | Does |
 | --- | --- |
-| `kay new <dir> [--template server\|site\|app] [--kay <dependency>]` | scaffold a project that checks, builds and runs: a server run as one executable, a static site, or an app with sessions; `--kay` sets its `kay` dependency |
+| `kay new <dir> [--template server\|site\|app] [--kay <dependency>]` | scaffold a project that checks, builds and runs: a server run as one executable, a static site, or an app with sessions and members in Postgres through pg-orm; `--kay` sets its `kay` dependency |
 | `kay dev [dir] [--entry <file>]` | run the server, restarting on change, errors shown in the browser |
 | `kay build [dir] [--no-check]` | bundle the browser code for production while checking the project as `kay check` does, keeping the last build when either fails; `--no-check` skips the check |
 | `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |

@@ -45,6 +45,15 @@ jobs:
           apk add --no-cache chromium ttf-freefont
           echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
 
+      # The app template's own tests copy a database per test file, here on the cluster the runner image holds, started as pg-orm's CI starts it.
+      - name: Start PostgreSQL
+        run: |
+          mkdir -p /run/postgresql
+          chown postgres:postgres /run/postgresql
+          su postgres -c "pg_ctl -D /var/lib/postgresql/data -o '-c listen_addresses=127.0.0.1 -c unix_socket_directories=/run/postgresql' -w start"
+          su postgres -c "psql -c \"CREATE USER test WITH PASSWORD 'test' SUPERUSER;\""
+          echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kay_app_test" >> "$GITHUB_ENV"
+
       - name: Tests
         run: bun test
 

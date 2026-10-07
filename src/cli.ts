@@ -402,7 +402,8 @@ async function scaffold(args: string[]): Promise<number> {
 
     const files = await createProject(dir, { kay: typeof parsed.values.kay === 'string' ? parsed.values.kay : undefined, template: template as Template | undefined })
 
-    console.error(`${files.map(file => `created ${join(dir, file)}`).join('\n')}\n\ncd ${shellQuote(dir)} && bun install && bun run dev`)
+    // An app's database runs in the container its compose.dev.yaml describes, migrated before the first start.
+    console.error(`${files.map(file => `created ${join(dir, file)}`).join('\n')}\n\ncd ${shellQuote(dir)} && bun install && ${template === 'app' ? 'docker compose up -d && bun run db:migrate && ' : ''}bun run dev`)
 
     return 0
   }
