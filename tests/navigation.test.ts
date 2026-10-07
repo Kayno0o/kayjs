@@ -128,6 +128,43 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
     await fresh.close()
   })
 
+  it('loads the swap once a link is pointed at or followed, and swaps a link clicked before it loaded', async () => {
+    const fresh = await browser.newPage()
+    const swapLoaded = (): Promise<boolean> => fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/page-swap-[^/]*\.js$/).test(entry.name)))
+
+    await fresh.goto(origin)
+    await Bun.sleep(200)
+
+    expect(await swapLoaded()).toBe(false)
+
+    // A click with no pointer before it, as a keyboard or a script makes.
+    await fresh.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+      document.querySelector<HTMLAnchorElement>('a.second')!.click()
+    })
+    await fresh.locator('h1', { hasText: 'Second' }).waitFor()
+
+    expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    expect(await swapLoaded()).toBe(true)
+    await fresh.close()
+  })
+
+  it('loads the next page fully when the swap cannot load', async () => {
+    const fresh = await browser.newPage()
+
+    await fresh.route(/\/page-swap-[^/]*\.js$/, route => route.abort())
+    await fresh.goto(origin)
+    await fresh.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    await fresh.click('a.second')
+    await fresh.locator('h1', { hasText: 'Second' }).waitFor()
+
+    expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBeUndefined()
+    expect(new URL(fresh.url()).pathname).toBe('/second')
+    await fresh.close()
+  })
+
   it('leaves a form to the server when its checks cannot load, reporting no error', async () => {
     const fresh = await browser.newPage()
     const posts: string[] = []
