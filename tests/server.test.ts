@@ -1285,6 +1285,16 @@ describe('tracing and timing in production', () => {
     }
   })
 
+  it('leaves a span ended by a redirect or a 404 unmarked, as the app meant it', async () => {
+    const { tracer, ended } = recordingTracer()
+    const traced = await pages({ routes: 'tests/fixtures/site/src/routes', tracer })
+
+    expect((await traced.handle(new Request('http://localhost/todos/abc'))).status).toBe(302)
+    expect((await traced.handle(new Request('http://localhost/todos/999'))).status).toBe(404)
+    expect(ended.map(span => span.name)).toContain('kay.load tests/fixtures/site/src/routes/todos/[id].kay')
+    expect(ended.filter(span => span.status !== undefined)).toEqual([])
+  })
+
   it('hands it a span per action call', async () => {
     const { tracer, ended } = recordingTracer()
     const traced = await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true, tracer })

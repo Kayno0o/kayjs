@@ -27,6 +27,8 @@ const RAW_BLOCK = /<(script|style)\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi
 const DOCTYPE = /<!doctype[^>]*>/gi
 const HTML_COMMENT = /<!--([\s\S]*?)-->/g
 const VOID_TAG = /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)\b((?:[^>"'{/]|"[^"]*"|'[^']*'|\{[^}]*\}|\/(?!>))*)(\/?)>/gi
+const BRACE = /[{}]/g
+const EVENT_ATTRIBUTE = /^on[a-z]+$/
 const OTHER_FRAMEWORK = /\.(?:svelte|vue|jsx|tsx)$/
 const RAW_TAG = /^kay-raw-(\d+)$/
 const WHITESPACE = /\s+/g
@@ -230,7 +232,7 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
       }
     })
 
-    edits.push(...astroEdits(statement, code, 0, options.role, hasProps, note))
+    edits.push(...astroEdits(statement, code, 0, options.role, hasProps ? 'typed' : 'untyped', note))
 
     // Astro awaits in any component, kay in the server fence of a page or a layout only.
     if (options.role === 'component') {
@@ -246,13 +248,13 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
   return applyEdits(code, edits)
 }
 
-// The `Astro.*` reads under `node`, as kay reads them: `Astro.props` through `props<Props>()`, a page's request through `ctx`.
-function astroEdits(node: t.Node, code: string, offset: number, role: Role, hasProps: boolean, note: (line: number, message: string) => void): Edit[] {
+// The `Astro.*` reads under `node`, as kay reads them: `Astro.props` through `props<Props>()`, which the template cannot call, a page's request through `ctx`.
+function astroEdits(node: t.Node, code: string, offset: number, role: Role, props: 'typed' | 'untyped' | 'template', note: (line: number, message: string) => void): Edit[] {
   const edits: Edit[] = []
   const at = (inner: t.Node, text: string) => edits.push({ start: inner.start! - offset, end: inner.end! - offset, text })
   const page = role === 'page'
 
-  walk(node, (inner, parent) => {
+  walk(node, (inner) => {
     // `return Astro.redirect('/login')` ends the frontmatter; `ctx.redirect` stops the render by itself.
     if (inner.type === 'ReturnStatement' && inner.argument?.type === 'CallExpression' && isAstro(inner.argument.callee, 'redirect') && page) {
       at(inner, code.slice(inner.argument.start! - offset, inner.argument.end! - offset).replace('Astro.redirect', 'ctx.redirect'))
@@ -266,10 +268,13 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, hasP
     const name = inner.property.name
     const line = inner.loc!.start.line
 
-    if (name === 'props') {
-      at(inner, hasProps ? 'props<Props>()' : 'props<Record<string, unknown>>()')
+    if (name === 'props' && props === 'template') {
+      note(line, 'Astro.props in the markup: destructure the prop in the fence, `const { title } = props<Props>()`, and read it by its name')
+    }
+    else if (name === 'props') {
+      at(inner, props === 'typed' ? 'props<Props>()' : 'props<Record<string, unknown>>()')
 
-      if (!hasProps)
+      if (props === 'untyped')
         note(line, 'Astro.props without a `Props` type: type `props<...>()`')
     }
     else if (name === 'generator') {
@@ -279,7 +284,7 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, hasP
       at(inner, `ctx.${name}`)
     }
     else {
-      note(line, `Astro.${name}${parent?.type === 'MemberExpression' ? '' : ''} has no kay counterpart ${page ? 'in a page' : 'in a component, which has no request: pass what it needs as a prop'}`)
+      note(line, `Astro.${name} has no kay counterpart ${page ? 'in a page' : 'in a component, which has no request: pass what it needs as a prop'}`)
     }
 
     return false
@@ -350,7 +355,7 @@ class Translator {
 
   // An expression as kay reads it: `Astro.*` rewritten, its JSX, if any, unreadable to kay.
   private expression(node: t.Node): string {
-    const edits = astroEdits(node, this.source.slice(node.start!, node.end!), node.start!, this.options.role, true, this.note)
+    const edits = astroEdits(node, this.source.slice(node.start!, node.end!), node.start!, this.options.role, 'template', this.note)
 
     return applyEdits(this.text(node), edits)
   }
@@ -422,7 +427,7 @@ class Translator {
   private child(child: Child): string[] {
     switch (child.type) {
       case 'JSXText':
-        return child.value.trim() === '' ? [] : [`| ${child.value.replace(WHITESPACE, ' ').trim()}`]
+        return child.value.trim() === '' ? [] : [`| ${text(child.value).trim()}`]
       case 'JSXElement':
         return this.element(child)
       case 'JSXFragment':
@@ -580,7 +585,7 @@ class Translator {
 
     for (const child of children) {
       if (child.type === 'JSXText') {
-        parts.push(child.value.replace(WHITESPACE, ' '))
+        parts.push(text(child.value))
       }
       else if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression' && !containsJsx(child.expression)) {
         parts.push(`{${this.expression(child.expression)}}`)
@@ -636,6 +641,10 @@ class Translator {
 
       if (name === 'key' || name === 'slot')
         continue
+
+      // `onclick="..."` is code in a string, where kay's `onClick={...}` takes a function.
+      if (EVENT_ATTRIBUTE.test(name) && value?.type === 'StringLiteral')
+        this.note(this.line(attribute), `${name} holds code as text: write it as \`on${name[2]!.toUpperCase()}${name.slice(3)}={() => ...}\` in an island`)
 
       if (DROPPED.has(name))
         continue
@@ -762,6 +771,11 @@ class Translator {
 
     return [`${head.replace('(is:global)', '').replace(' is:global', '')} {\`${escapeTemplate(block.content.trim())}\`}`]
   }
+}
+
+// Text as kay writes it on a line: its whitespace collapsed, and a brace, which would open an expression, written as one.
+function text(value: string): string {
+  return value.replace(WHITESPACE, ' ').replace(BRACE, brace => `{'${brace}'}`)
 }
 
 function containsJsx(node: t.Node): boolean {

@@ -7,6 +7,7 @@ import { Elysia } from 'elysia'
 import { joinBase } from '../src/runtime/base'
 import { pages } from '../src/server'
 import { rebaseHtml } from '../src/server/base'
+import { IMAGE_LINK } from '../src/server/prerender'
 
 const FIXTURE = resolve('tests/fixtures/static')
 const CLI = resolve('src/cli.ts')
@@ -81,6 +82,19 @@ describe('kay build --static', () => {
     expect((await get('/about')).text).toContain('<h1>About</h1>')
     expect((await get('/about/')).text).toContain('<h1>About</h1>')
     expect((await get('/posts/first')).text).toContain('<h1>Post first</h1>')
+  })
+
+  it('refuses a page linking the image route, which a static host lacks, in an attribute only', () => {
+    expect(IMAGE_LINK.test('<img src="/_kay/image?src=%2Fuploads%2Fa.png&amp;w=640">')).toBe(true)
+    expect(IMAGE_LINK.test('<img srcset="/a.webp 320w, /_kay/image?src=b&amp;w=640 640w">')).toBe(true)
+    expect(IMAGE_LINK.test('<p>Variants are served by <code>/_kay/image?src=...&amp;w=...</code></p>')).toBe(false)
+  })
+
+  it('caps image densities at the config\'s images.maxDensity, for the islands too', async () => {
+    const home = (await get('/')).text
+
+    expect(home).toContain('<meta name="kay-max-density" content="3">')
+    expect(home).toContain('(min-resolution: 4dppx) calc(100vw * 3 / 4)')
   })
 
   it('serves the islands, stylesheets and image variants from their files, compressed copies beside them', async () => {

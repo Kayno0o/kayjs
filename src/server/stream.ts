@@ -68,8 +68,12 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
         await Promise.all(rendered.deferred.map(send))
       }
 
-      await Promise.all(deferred.map(send))
-      clearInterval(keepAlive)
+      try {
+        await Promise.all(deferred.map(send))
+      }
+      finally {
+        clearInterval(keepAlive)
+      }
 
       if (cancelled)
         return

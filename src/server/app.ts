@@ -12,7 +12,6 @@ import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { projectCollections, serveFeeds } from '../content/server'
 import { localePath, splitLocale } from '../runtime/i18n'
-import { DEFAULT_MAX_DENSITY, setMaxDensity } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { overHttps, registerActionRoutes } from './actions'
 import { scanApi, serveApi } from './api'
@@ -28,7 +27,7 @@ import { FAVICON_DIR, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuards } from './guards'
 import { cookieLocale, hostLocale, loadI18n, localeCookie, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
-import { serveImages } from './image'
+import { applyMaxDensity, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
 import { logRequests } from './log'
@@ -153,12 +152,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     refuseLocaleClashes(i18n.settings, routes)
 
   const base = basePath(options.base)
-  const maxDensity = options.images?.maxDensity ?? DEFAULT_MAX_DENSITY
+  const maxDensity = applyMaxDensity(options.images)
 
-  if (!(maxDensity >= 1))
-    throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)
-
-  setMaxDensity(maxDensity)
   setTracer(options.tracer)
 
   const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base, maxDensity }

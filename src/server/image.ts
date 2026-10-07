@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
-import { IMAGE_ROUTE, IMAGE_WIDTHS, RESIZABLE } from '../runtime/image'
+import { DEFAULT_MAX_DENSITY, IMAGE_ROUTE, IMAGE_WIDTHS, RESIZABLE, setMaxDensity } from '../runtime/image'
 import { revalidated } from './public'
 import { decodePath } from './routes'
 
@@ -186,4 +186,16 @@ function sourceFile(src: string, options: ImageRouteOptions): { path: string, im
   }
 
   return undefined
+}
+
+// `images.maxDensity`, checked and set for every image this process renders, served or prerendered.
+export function applyMaxDensity(images: { maxDensity?: number } | undefined): number {
+  const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
+
+  if (!(maxDensity >= 1))
+    throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)
+
+  setMaxDensity(maxDensity)
+
+  return maxDensity
 }

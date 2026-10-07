@@ -766,7 +766,7 @@ function remap(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): Che
   const source = shadow.map.toSource(generated) ?? 0
   const remapped = { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, source) }
 
-  return remapped.help === undefined && unreadSignal(diagnostic) ? { ...remapped, help: signalHelp(signalName(diagnostic, shadow.source, source)) } : remapped
+  return remapped.help === undefined && unreadSignal(diagnostic) ? { ...remapped, help: signalHelp(diagnostic, signalName(diagnostic, shadow.source, source)) } : remapped
 }
 
 // A condition always true for a function, or a signal where its value goes: what reading an imported signal, or one a prop holds, by its name gives.
@@ -782,8 +782,11 @@ function signalName(diagnostic: CheckDiagnostic, source: string, offset: number)
   return diagnostic.code === MISSING_PROPERTY ? MEMBER_OF.exec(source.slice(0, offset))?.[1] : undefined
 }
 
-function signalHelp(name = 'name'): string {
-  return `only a signal or memo the script declares reads by its name; one imported or held by a prop is read by calling it, \`${name}()\``
+// A condition on any function is always true, a signal's or another's, so its help says so before naming signals.
+function signalHelp(diagnostic: CheckDiagnostic, name: string | undefined): string {
+  const call = name === undefined ? 'calling it' : `calling it, \`${name}()\``
+
+  return diagnostic.code === ALWAYS_DEFINED ? `a function is always true here, so its value is read by ${call}: only a signal or memo the script declares reads by its name` : `only a signal or memo the script declares reads by its name; one imported or held by a prop is read by ${call}`
 }
 
 // With a code frame when the file's source is given.

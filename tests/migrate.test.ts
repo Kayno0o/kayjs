@@ -197,6 +197,13 @@ svg({...rest}) {name}
 `)
   })
 
+  it('writes a brace in text as text, and lists a handler written as a string and Astro.props read in the markup', () => {
+    const { code, notes } = component(`<button onclick="go()">Set &#123;x&#125;</button>\n<p>{Astro.props.title}</p>\n`)
+
+    expect(code).toBe(`button(onclick="go()") Set {'{'}x{'}'}\np {Astro.props.title}\n`)
+    expect(notes.map(note => [note.line, lead(note.message)])).toEqual([[1, 'onclick holds code as text'], [2, 'Astro.props in the markup']])
+  })
+
   it('writes output kay fmt leaves alone, and markup it cannot read commented out whole', () => {
     const { code, notes } = page(`<div>{items.filter(Boolean).length > 2 && <p>{(() => <b>x</b>)()}</p>}</div>\n`)
 

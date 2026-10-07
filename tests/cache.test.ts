@@ -184,7 +184,7 @@ describe('cached with a store', () => {
     expect(value).toBe('new')
   })
 
-  it('marks a prerendered page stale when another process sharing a store invalidated it', async () => {
+  it('marks a prerendered page stale when another process sharing a store invalidated it, rendering it afresh with no one request\'s timings', async () => {
     const root = process.cwd()
     const manifest = (await readManifest(root))!
     const { news } = await import('./fixtures/production/src/news')
@@ -194,7 +194,7 @@ describe('cached with a store', () => {
 
     try {
       await prerenderPages(root, { routes: 'tests/fixtures/production/src/routes' }, (await readClient(root))!)
-      const app = await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: true, security: false })
+      const app = await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: true, security: false, serverTiming: true })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
       expect(await visit()).toContain('<h1>Edition 1</h1>')
@@ -212,6 +212,7 @@ describe('cached with a store', () => {
       }
 
       expect(html).toContain('<h1>Edition 7</h1>')
+      expect((await app.handle(new Request('http://localhost/news'))).headers.get('server-timing')).toBeNull()
     }
     finally {
       news.edition = 1

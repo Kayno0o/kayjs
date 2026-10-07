@@ -1,3 +1,5 @@
+import { Denied, NotFound, Redirect } from './signals'
+
 // The part of OpenTelemetry's `Tracer` kay calls: an app hands `trace.getTracer('my-site')` from its own @opentelemetry/api, its SDK exporting the spans, and kay depends on neither.
 export interface Tracer {
   startSpan: (name: string, options?: SpanOptions) => Span
@@ -27,7 +29,11 @@ export function setTracer(given: Tracer | undefined): void {
   tracer = given
 }
 
+// `ctx.redirect()`, `ctx.notFound()` and `ctx.deny()` end the work as the app meant to, so their span is no failure.
 export function failed(span: Span, error: unknown): void {
+  if (error instanceof Redirect || error instanceof NotFound || error instanceof Denied)
+    return
+
   span.recordException(error instanceof Error ? error : String(error))
   span.setStatus({ code: ERROR_STATUS, message: error instanceof Error ? error.message : String(error) })
 }

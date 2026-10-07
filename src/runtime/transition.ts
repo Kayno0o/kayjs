@@ -26,8 +26,9 @@ function classes(phases: Phases, phase: Phase, step: '' | '-from' | '-to'): stri
   return phases.name ? [`${phases.name}-${phase}${step || '-active'}`, ...own] : own
 }
 
-function reducedMotion(): boolean {
-  return typeof matchMedia === 'function' && matchMedia(REDUCED_MOTION).matches
+// No animation for a visitor asking for less motion, nor in a hidden tab, which draws no frames: a row leaving there would stay until the tab shows.
+function still(): boolean {
+  return (typeof matchMedia === 'function' && matchMedia(REDUCED_MOTION).matches) || document.hidden
 }
 
 function milliseconds(time: string): number {
@@ -91,7 +92,7 @@ function play(element: Element, phase: Phase, done: () => void): void {
 
 // As a block shows it: plays the element's enter phase.
 function enter(element: Element): void {
-  if (element.isConnected && !reducedMotion())
+  if (element.isConnected && !still())
     play(element, 'enter', () => undefined)
 }
 
@@ -99,7 +100,7 @@ function enter(element: Element): void {
 function leave(element: Element): void {
   const remove = () => void element.parentNode?.removeChild(element)
 
-  if (!element.isConnected || reducedMotion())
+  if (!element.isConnected || still())
     remove()
   else
     play(element, 'leave', remove)

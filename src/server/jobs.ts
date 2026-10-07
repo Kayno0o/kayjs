@@ -13,7 +13,7 @@ export interface ScheduleOptions {
   store?: JobStore
 }
 
-// A lock slot is the minute a run is due, the finest a cron schedule goes.
+// A lock slot is the minute a run is due, the finest a cron schedule goes: a run falls due at its first second, so the nearest minute names it for a process running it up to 30 s early or late, its clock skewed or its event loop busy.
 const SLOT_MS = 60_000
 
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
@@ -28,7 +28,7 @@ export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cr
 
   const run = async () => {
     try {
-      if (options.lock !== undefined && !await (options.store ?? defaultJobStore()).lock(options.lock, Math.floor(Date.now() / SLOT_MS)))
+      if (options.lock !== undefined && !await (options.store ?? defaultJobStore()).lock(options.lock, Math.round(Date.now() / SLOT_MS)))
         return
 
       await job()

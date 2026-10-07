@@ -532,6 +532,22 @@ describe('transitions', () => {
       await dispose()
     }
   })
+
+  it('removes a leaving element at once in a hidden tab, which draws no frames to play it in', async () => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+    const { root, dispose } = await mountKay({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
+
+    try {
+      root.querySelector('button')!.click()
+      await updated()
+      expect(root.querySelector('.panel')).toBeNull()
+    }
+    finally {
+      // The document's own getter, on its prototype, shows again.
+      delete (document as { hidden?: boolean }).hidden
+      await dispose()
+    }
+  })
 })
 
 describe('slots with parameters', () => {

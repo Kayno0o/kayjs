@@ -25,8 +25,8 @@ export interface RateLimiter {
   hit: (request: Request, server?: Server<unknown> | null) => Promise<number | undefined>
 }
 
-// The most windows the memory store keeps: past it, a new client makes room by dropping the expired windows, then the oldest ones.
-const MAX_WINDOWS = 100_000
+// The most windows a memory store keeps: past it, a new client makes room by dropping the expired windows, then the oldest ones.
+const MAX_WINDOWS = 10_000
 // How often the SQLite store sweeps the windows that closed.
 const SWEEP_MS = 60_000
 const ZONE = /%.*$/
@@ -37,7 +37,8 @@ const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[
 const proxies = new WeakMap<Request, ProxyConfig | null>()
 // The server each request came through, for `clientAddress` called where only the request is at hand, as in a guard.
 const servers = new WeakMap<Request, Server<unknown>>()
-const memory = memoryRates()
+// One memory store per limit, so clients flooding one never push another's windows out, such as a login form's.
+const memories = new Map<string, ReturnType<typeof memoryRates>>()
 let warnedUnconfigured = false
 
 // Each rate limit's window in milliseconds, read once: `action()` refused one it cannot read.
@@ -116,7 +117,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
   const ms = durationSeconds(limit.window, `rateLimit('${name}')'s window`) * 1000
 
   return {
-    hit: async (request, server) => waitFor(await (limit.store ?? memory).hit(limitKey(name, clientAddress(request, server)), ms), limit.max),
+    hit: async (request, server) => waitFor(await (limit.store ?? memoryOf(name)).hit(limitKey(name, clientAddress(request, server)), ms), limit.max),
   }
 }
 
@@ -144,7 +145,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
     return undefined
 
   // Counted under the action's URL, the same in every process.
-  const wait = waitFor(await (rateLimit.store ?? memory).hit(limitKey(action.url, clientAddress(request, server)), windowMs(rateLimit)), rateLimit.max)
+  const wait = waitFor(await (rateLimit.store ?? memoryOf(action.url)).hit(limitKey(action.url, clientAddress(request, server)), windowMs(rateLimit)), rateLimit.max)
 
   if (wait === undefined)
     return undefined
@@ -167,7 +168,16 @@ function filledIn(value: unknown): boolean {
 
 // Seconds until the client may try again under `name`, in this process's memory, or undefined while it is under the limit: for kay's own routes.
 export function overLimit(name: string, client: string, max: number, windowMs: number): number | undefined {
-  return waitFor(memory.hit(limitKey(name, client), windowMs), max)
+  return waitFor(memoryOf(name).hit(limitKey(name, client), windowMs), max)
+}
+
+function memoryOf(name: string): ReturnType<typeof memoryRates> {
+  let memory = memories.get(name)
+
+  if (!memory)
+    memories.set(name, memory = memoryRates())
+
+  return memory
 }
 
 // Expired windows sit first, so dropping them, then the oldest live ones when still full, costs each new window what it removes.

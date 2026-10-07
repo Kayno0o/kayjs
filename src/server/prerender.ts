@@ -14,6 +14,7 @@ import { scanApi } from './api'
 import { basePath } from './base'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { loadI18n, localeCopies, stateFor } from './i18n'
+import { applyMaxDensity } from './image'
 import { registerLoader } from './loader'
 import { loadMatchers, matchedParams } from './params'
 import { renderPage } from './render'
@@ -21,8 +22,9 @@ import { refuseClashes, scanRoutes } from './routes'
 import { configHead } from './seo'
 
 const KAY_PREFIX = /^kay: /
+
 // The image route in an attribute, `src`, `srcset` or a style's `url()`: a page whose text only names it, as documentation does, links nothing.
-const IMAGE_LINK = new RegExp(`="[^"]*${RegExp.escape(IMAGE_ROUTE)}\\?`)
+export const IMAGE_LINK = new RegExp(`="[^"]*${RegExp.escape(IMAGE_ROUTE)}\\?`)
 
 // The pages a static export cannot hold, each named: a message for the person building, with no stack to read past.
 export class ExportError extends Error {
@@ -45,6 +47,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   const dir = join(root, '.kay', 'client', PRERENDERED_DIR)
   const head = await configHead(root, config, client.dir)
+  const maxDensity = applyMaxDensity(config.images)
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
 
@@ -79,7 +82,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
       for (const copy of localeCopies(i18n?.settings, path)) {
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
-        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head, base: basePath(config.base) })
+        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head, base: basePath(config.base), maxDensity })
         const response = await (i18n && copy.locale !== undefined ? runInLocale(stateFor(i18n, copy.locale, path, request), render) : render())
 
         if (response.status >= 500)

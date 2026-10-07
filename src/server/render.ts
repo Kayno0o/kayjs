@@ -124,7 +124,8 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
     if (query !== undefined && !options.prerendering)
       rendering.ctx.query = readQuery(query, rendering.ctx.url)
 
-    const timings = options.serverTiming ? Array.from<number>({ length: files.length }) : undefined
+    // A prerendered page is stored with its headers and served to everyone, so it carries no one render's timings.
+    const timings = options.serverTiming && !options.prerendering ? Array.from<number>({ length: files.length }) : undefined
     const loads = await Promise.allSettled(modules.map(async (module, index) => runLoad(files[index]!, module, rendering.ctx, timings, index)))
 
     for (const [index, load] of loads.entries())

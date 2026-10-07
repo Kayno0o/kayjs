@@ -138,7 +138,7 @@ describe('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.help])).toEqual([
-        [5, 'TS2774', 'only a signal or memo the script declares reads by its name; one imported or held by a prop is read by calling it, `accent()`'],
+        [5, 'TS2774', 'a function is always true here, so its value is read by calling it, `accent()`: only a signal or memo the script declares reads by its name'],
         [7, 'TS2339', 'only a signal or memo the script declares reads by its name; one imported or held by a prop is read by calling it, `accent()`'],
       ])
     }
