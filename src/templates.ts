@@ -220,6 +220,7 @@ COPY --from=build /app/server ./server
 ENV NODE_ENV=production PORT=3000
 EXPOSE 3000
 USER nobody
+HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 `,
   '.dockerignore': 'node_modules\n.kay\nserver\n.env\n',
@@ -487,7 +488,7 @@ afterAll(async () => {
   await database.drop()
 })
 `,
-  'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d\`, which .env points at this file. Tests copy a database per test file on it.
+  'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d --wait\`, which .env points at this file. Tests copy a database per test file on it.
 services:
   db:
     image: postgres:18-alpine
@@ -500,6 +501,11 @@ services:
       - 127.0.0.1:5433:5432
     volumes:
       - db:/var/lib/postgresql
+    # What --wait waits for, so the migrations run on a database that answers.
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U app]
+      interval: 2s
+      retries: 15
 
 volumes:
   db:
