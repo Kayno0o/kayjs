@@ -126,6 +126,15 @@ export class SourceMap {
     this.bySource = [...mappings].sort((a, b) => a.source - b.source)
   }
 
+  // What a cached map is written as and read back from.
+  toJSON(): { mappings: Mapping[], ranges: RangeMapping[] } {
+    return { mappings: this.byGenerated, ranges: this.ranges }
+  }
+
+  static fromJSON({ mappings, ranges }: ReturnType<SourceMap['toJSON']>): SourceMap {
+    return new SourceMap(mappings, ranges)
+  }
+
   // The source offset a generated offset came from: exact when copied, else the start of the tightest construct around it.
   toSource(generated: number): number | undefined {
     const exact = findContaining(this.byGenerated, generated, mapping => mapping.generated)

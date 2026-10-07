@@ -11,16 +11,18 @@ import type { ApiModule } from '../server/api'
 import type { Redirects } from '../server/redirects'
 import type { Route } from '../server/routes'
 import type { ShadowFile } from './shadow'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { ASSET_EXTENSIONS } from '../build/assets'
+import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacements, throughNodeModules } from '../build/libraries'
-import { componentName } from '../compiler'
+import { cacheEntry } from '../build/transform'
+import { componentName, rendersAsIsland, SourceMap } from '../compiler'
 import { formatReport } from '../compiler/frame'
 import { isLint, LEVELS, lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -32,7 +34,7 @@ import { localePrefixes, localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
-import { patternShapes, scanRoutes } from '../server/routes'
+import { patternShapes, routeOf, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { bootProblems } from './boot'
 import { islandOnlyComponents } from './island-only'
@@ -105,7 +107,13 @@ const NOT_IN_URL = /[^\x21-\x7E]+/g
 // Stylesheets import for their effect, other assets for their URL. TypeScript matches a wildcard module case-sensitively, so both `.png` and `.PNG` are declared; a mixed case such as `.Png` is not.
 const ASSET_TYPES = ['declare module \'*.css\' {}\n', ...ASSET_EXTENSIONS.flatMap(extension => [extension, extension.toUpperCase()]).map(extension => `declare module '*.${extension}' {\n  const url: string\n  export default url\n}\n`)].join('\n')
 
-export const TSGO = join(dirname(fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))), 'bin', 'tsgo')
+const TSGO_PACKAGE = fileURLToPath(import.meta.resolve('@typescript/native-preview/package.json'))
+
+export const TSGO = join(dirname(TSGO_PACKAGE), 'bin', 'tsgo')
+// Where `kay check` keeps tsgo's build info and what its last clean run read.
+const CHECK_STATE = join('.kay', 'cache', 'check')
+// A filesystem stamps writes off a coarse clock, milliseconds behind on Linux and up to a second on some, so a file written that close before a run counts as written after it.
+const CLOCK_SLACK = 1000
 
 // Compiles every .kay file of the project at `root`, nested projects left to their own, to `.kay/types/<path>.kay.tsx`, the tree tsconfig `rootDirs` merges with the sources.
 export async function writeShadowTypes(projectRoot: string, options: CheckOptions = {}): Promise<ShadowTypes> {
@@ -123,11 +131,13 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const settingsFile = join(root, SHADOW_DIR, SHADOW_SETTINGS)
   const own = await findKayFiles(root, { project: true, ownOnly: true })
   const sources = new Map(await Promise.all(own.map(async file => [file, await Bun.file(file).text()] as const)))
-  const islandOnly = await islandOnlyComponents(root, routesDir, own, sources)
+  const cacheDir = join(root, '.kay', 'cache')
+  const islands = new Set((await Promise.all(own.map(async file => await rendersAsIslandCached(cacheDir, file, sources.get(file)!) ? [file] : []))).flat())
+  const islandOnly = await islandOnlyComponents(root, routesDir, own, sources, file => islands.has(file))
 
   for (const file of own) {
     const source = sources.get(file)!
-    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source, islandOnly.has(file), options.lints)
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDir, file, source, islandOnly.has(file), options.lints)
     const path = shadowPath(root, file)
 
     await writeIfChanged(path, shadow.tsx)
@@ -177,7 +187,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await Promise.all(libraries.flatMap(library => library.files).map(async (file) => {
     const source = await Bun.file(file).text()
-    const { shadow, diagnostics: compileDiagnostics } = compileShadow(root, routesDir, file, source, false, options.lints)
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDir, file, source, false, options.lints)
     const path = shadowPath(root, file)
 
     await writeIfChanged(path, shadow.tsx)
@@ -211,6 +221,38 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await Promise.all(stale.map(async path => rm(path)))
 
   return { files, diagnostics, unreached, libraries, settings: replaced.lines, exports: exported.lines, islandOnly }
+}
+
+// Whether a component renders as an island, through the build's cache of compiles.
+async function rendersAsIslandCached(cacheDir: string, file: string, source: string): Promise<boolean> {
+  const slot = cacheEntry(cacheDir, file, 'renders-island', source)
+  const cached = await readCacheEntry<boolean>(slot)
+
+  if (cached !== undefined)
+    return cached
+
+  const island = rendersAsIsland(source)
+
+  await writeCacheEntry(slot, island)
+
+  return island
+}
+
+// `compileShadow` through the build's cache of compiles. A page's params are typed by the matchers they name, so where each one is found, if anywhere, is part of the key.
+async function compileShadowCached(cacheDir: string, root: string, routesDir: string, file: string, source: string, insideIsland: boolean, lints?: LintLevels): Promise<ReturnType<typeof compileShadow>> {
+  const route = file.startsWith(routesDir + sep) ? routeOf(routesDir, file) : undefined
+  const matchers = Object.values(route?.matchers ?? {}).map(matcher => matcherSource(routesDir, matcher) ?? '')
+  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, insideIsland, lints ?? {}, matchers, source]))
+  const cached = await readCacheEntry<{ tsx: string, map: ReturnType<SourceMap['toJSON']>, diagnostics: Diagnostic[] }>(slot)
+
+  if (cached !== undefined)
+    return { shadow: { source, file, tsx: cached.tsx, map: SourceMap.fromJSON(cached.map) }, diagnostics: cached.diagnostics }
+
+  const compiled = compileShadow(root, routesDir, file, source, insideIsland, lints)
+
+  await writeCacheEntry(slot, { tsx: compiled.shadow.tsx, map: compiled.shadow.map, diagnostics: compiled.diagnostics })
+
+  return compiled
 }
 
 export interface ShadowTypes {
@@ -445,8 +487,9 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
   await writeIfChanged(contentFile, props.code)
 
-  const child = Bun.spawn([process.execPath, TSGO, '--noEmit', '--pretty', 'false', '--noUnusedLocals', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-  const [output, errors, code, messages, boot, projectUnused] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited, checkMessages(root, options.i18n), bootProblems(resolve(root), options), projectUnusedCodes(root, tsconfig)])
+  const shown = await resolvedConfig(root, tsconfig)
+  const projectUnused = unusedCodesOf(shown)
+  const [{ output, errors, code }, messages, boot] = await Promise.all([typecheck(root, tsconfig, shown), checkMessages(root, options.i18n), bootProblems(resolve(root), options)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
@@ -595,17 +638,91 @@ function parseTscOutput(output: string, config: string, root: string): CheckDiag
   return diagnostics
 }
 
-// The unused code the project's own tsconfig asks to be reported, in its .ts files too.
-async function projectUnusedCodes(root: string, tsconfig: string): Promise<Set<number>> {
+// The project's tsconfig as tsgo resolves it, its extends, options and root files, or undefined when tsgo cannot read it.
+async function resolvedConfig(root: string, tsconfig: string): Promise<string | undefined> {
   const child = Bun.spawn([process.execPath, TSGO, '--showConfig', '-p', tsconfig], { cwd: root, stdout: 'pipe', stderr: 'ignore' })
   const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
-  if (code !== 0)
+  return code === 0 ? output : undefined
+}
+
+// The unused code the project's own tsconfig asks to be reported, in its .ts files too.
+function unusedCodesOf(shown: string | undefined): Set<number> {
+  if (shown === undefined)
     return new Set()
 
-  const { compilerOptions } = JSON.parse(output) as { compilerOptions?: { noUnusedLocals?: boolean, noUnusedParameters?: boolean } }
+  const { compilerOptions } = JSON.parse(shown) as { compilerOptions?: { noUnusedLocals?: boolean, noUnusedParameters?: boolean } }
 
   return compilerOptions?.noUnusedLocals === true ? UNUSED_CODES : compilerOptions?.noUnusedParameters === true ? UNUSED_PARAMETER_CODES : new Set()
+}
+
+// Runs tsgo incrementally, or not at all when its last run was clean and nothing it read has changed since: tsgo's own incremental mode still parses every file, most of a warm run's time.
+async function typecheck(root: string, tsconfig: string, shown: string | undefined): Promise<{ output: string, errors: string, code: number }> {
+  const state = join(resolve(root), CHECK_STATE)
+  const shadowDir = join(resolve(root), SHADOW_DIR)
+  const buildInfo = join(state, 'tsbuildinfo')
+  const args = ['--noEmit', '--pretty', 'false', '--noUnusedLocals', '-p', tsconfig, '--incremental', '--tsBuildInfoFile', buildInfo]
+  // The resolved config lists the root files, so one added or removed changes it as an edited option does.
+  const slot = shown === undefined ? undefined : { file: join(state, 'clean.json'), key: JSON.stringify([(await Bun.file(TSGO_PACKAGE).json() as { version: string }).version, args, shown]) }
+  const last = slot && await readCacheEntry<CleanRun>(slot)
+
+  if (last && await stillClean(last, shadowDir))
+    return { output: '', errors: '', code: 0 }
+
+  const generated = await contentHashes(shadowDir)
+  const started = Date.now()
+  const child = Bun.spawn([process.execPath, TSGO, ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const read = slot && code === 0 && output === '' && errors === '' ? await filesRead(buildInfo) : undefined
+
+  if (slot && read)
+    await writeCacheEntry(slot, { started, ...read, files: read.files.filter(file => !Object.hasOwn(generated, file)), generated } satisfies CleanRun)
+
+  return { output, errors, code }
+}
+
+interface CleanRun {
+  started: number
+  // Every file the run read, packages' own included, by its times, and the package.json files it looked for and did not find.
+  files: string[]
+  missing: string[]
+  // What kay wrote to the shadow tree just before the run, by content: it rewrites a file there on every check that changes it, too close to the run for its times to tell.
+  generated: Record<string, string>
+}
+
+// What a run read, off its build info: TypeScript's own libraries are named bare there, and change only with tsgo's version.
+async function filesRead(buildInfo: string): Promise<Pick<CleanRun, 'files' | 'missing'> | undefined> {
+  try {
+    const info = await Bun.file(buildInfo).json() as { fileNames: string[], packageJsons?: string[], missingPackageJsons?: string[] }
+    const dir = dirname(buildInfo)
+
+    return { files: [...info.fileNames.filter(name => name.includes('/')), ...info.packageJsons ?? []].map(name => resolve(dir, name)), missing: (info.missingPackageJsons ?? []).map(name => resolve(dir, name)) }
+  }
+  catch {
+    return undefined
+  }
+}
+
+async function contentHashes(dir: string): Promise<Record<string, string>> {
+  const files = existsSync(dir) ? (await readdir(dir, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)) : []
+
+  return Object.fromEntries(await Promise.all(files.map(async file => [file, Bun.hash(await Bun.file(file).bytes()).toString(36)] as const)))
+}
+
+// A file's change time moves when it is written, replaced or linked anew, which a package manager hardlinking an older file into node_modules does while keeping its modification time.
+async function stillClean(run: CleanRun, shadowDir: string): Promise<boolean> {
+  const unchanged = run.files.every((file) => {
+    const stats = statSync(file, { throwIfNoEntry: false })
+
+    return stats !== undefined && Math.max(stats.mtimeMs, stats.ctimeMs) < run.started - CLOCK_SLACK
+  })
+
+  if (!unchanged || run.missing.some(file => existsSync(file)))
+    return false
+
+  const hashes = Object.entries(await contentHashes(shadowDir))
+
+  return hashes.length === Object.keys(run.generated).length && hashes.every(([file, hash]) => run.generated[file] === hash)
 }
 
 // A name kay generated, which the template reads in a way it does not spell out, rather than one the .kay file wrote.

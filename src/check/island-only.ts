@@ -5,9 +5,10 @@ import { rendersAsIsland } from '../compiler'
 
 // The static components of a project that only islands render, directly or through other such components: their children render inline with the island, so the props they pass are not serialized.
 // A page, a layout or a script importing a component renders it in a static context, as does a static component rendered there; a component no island reaches counts as static too.
-export async function islandOnlyComponents(root: string, routesDir: string, files: string[], sources: Map<string, string>): Promise<Set<string>> {
+// `isIsland` tells whether a component renders as an island, for a caller that knows it already.
+export async function islandOnlyComponents(root: string, routesDir: string, files: string[], sources: Map<string, string>, isIsland = (file: string) => rendersAsIsland(sources.get(file)!)): Promise<Set<string>> {
   const known = new Set(files)
-  const islands = new Set(files.filter(file => rendersAsIsland(sources.get(file)!)))
+  const islands = new Set(files.filter(isIsland))
   const importers = new Map<string, Set<string>>(files.map(file => [file, new Set()]))
   // Imported from a script, which may render it on the server.
   const fromScript = new Set<string>()

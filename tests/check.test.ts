@@ -1,5 +1,5 @@
 import type { CheckOptions } from '../src/check'
-import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
@@ -184,6 +184,47 @@ describe('kay check, edge cases', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('skips tsgo while nothing its last clean run read has changed, and runs it for a file added since', async () => {
+    const root = await scratchProject({ 'src/a.ts': 'export const a: number = 1\n', 'src/routes/index.kay': 'p hi\n' })
+    const buildInfo = join(root, '.kay/cache/check/tsbuildinfo')
+
+    try {
+      // A file written within a second before a run counts as changed since, but for the shadow tree kay writes then.
+      await Bun.sleep(1100)
+      expect(await check(root)).toEqual([])
+      await rm(buildInfo)
+      expect(await check(root)).toEqual([])
+      expect(await Bun.file(buildInfo).exists()).toBe(false)
+
+      await Bun.write(join(root, 'src/b.ts'), 'export const b: number = \'b\'\n')
+      expect((await check(root)).map(d => [basename(d.file), d.code])).toEqual([['b.ts', 'TS2322']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 15_000)
+
+  it('runs tsgo again when a package\'s types are replaced by an older file, as an install linking them from its cache does', async () => {
+    const root = await scratchProject({
+      'node_modules/dep/package.json': '{ "name": "dep", "types": "index.d.ts" }\n',
+      'node_modules/dep/index.d.ts': 'export declare const value: number\n',
+      'src/a.ts': 'import { value } from \'dep\'\n\nexport const a: number = value\n',
+    })
+    const types = join(root, 'node_modules/dep/index.d.ts')
+
+    try {
+      await Bun.sleep(1100)
+      expect(await check(root)).toEqual([])
+      await rm(types)
+      await Bun.write(types, 'export declare const value: string\n')
+      await utimes(types, new Date('2020-01-01'), new Date('2020-01-01'))
+      expect((await check(root)).map(d => [basename(d.file), d.code])).toEqual([['a.ts', 'TS2322']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 15_000)
 
   it('reports a file that did not compile with its own errors only, none TypeScript makes of the code around them', async () => {
     const root = await scratchProject({ 'src/a.kay': '---\nconst a = \n---\np {a}\n', 'src/b.kay': 'p {1 +}\n' })

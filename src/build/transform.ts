@@ -40,7 +40,7 @@ export interface Analysis {
 }
 
 // The packages a compile runs through, their versions part of every cache key.
-const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json']
+const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json', '@typescript/native-preview/package.json']
 let fingerprint: string | undefined
 
 export interface FileDiagnostic extends Diagnostic {
@@ -112,7 +112,7 @@ export async function analyzeKayCached(source: string, filename: string, root: s
 }
 
 // One slot per source file and kind of output, so an edit replaces its entry rather than adding one.
-function cacheEntry(cacheDir: string, filename: string, kind: string, inputs: string): CacheSlot {
+export function cacheEntry(cacheDir: string, filename: string, kind: string, inputs: string): CacheSlot {
   return {
     file: join(cacheDir, `${Bun.hash(filename).toString(36)}-${kind}.json`),
     key: Bun.hash(`${compilerFingerprint()}\0${inputs}`).toString(36),
@@ -153,11 +153,12 @@ function compilerFingerprint(): string {
   if (fingerprint === undefined) {
     const hasher = new Bun.CryptoHasher('sha256')
 
-    // What a compile depends on besides its source: kay's compiler, every file of it, and the packages it runs through.
+    // What a compile depends on besides its source: kay's compiler, every file of it, and the packages it runs through, tsgo's among them for the browser globals it declares.
     const compilerDir = join(import.meta.dir, '../compiler')
     const sources = [
       ...readdirSync(compilerDir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)).sort(),
       join(import.meta.dir, 'transform.ts'),
+      join(import.meta.dir, '../check/shadow.ts'),
       join(import.meta.dir, '../runtime/action.ts'),
       ...COMPILER_PACKAGES.map(manifest => Bun.resolveSync(manifest, compilerDir)),
     ]
