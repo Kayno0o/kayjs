@@ -100,6 +100,11 @@ const TS_EXTENSION = /\.ts$/
 const PARAM_SEGMENT = /:([^/]+)/g
 // A prop name TypeScript reads unquoted, so its errors name it as written.
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
+// A condition that is always true, a function standing in for its value.
+const ALWAYS_DEFINED = 'TS2774'
+const MISSING_PROPERTY = 'TS2339'
+const LEADING_NAME = /^[a-z_$][\w$]*/i
+const MEMBER_OF = /([a-z_$][\w$]*)\??\.$/i
 // What kay serves itself, whether or not the project turns it on.
 const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.
@@ -740,8 +745,26 @@ function remap(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): Che
 
   const generated = offsetAt(shadow.tsx, diagnostic)
   const source = shadow.map.toSource(generated) ?? 0
+  const remapped = { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, source) }
 
-  return { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, source) }
+  return remapped.help === undefined && unreadSignal(diagnostic) ? { ...remapped, help: signalHelp(signalName(diagnostic, shadow.source, source)) } : remapped
+}
+
+// A condition always true for a function, or a signal where its value goes: what reading an imported signal, or one a prop holds, by its name gives.
+function unreadSignal(diagnostic: CheckDiagnostic): boolean {
+  return diagnostic.code === ALWAYS_DEFINED || diagnostic.message.includes('\'Signal<')
+}
+
+// The signal the error is about where its position tells: the condition itself, or what a missing property was read on.
+function signalName(diagnostic: CheckDiagnostic, source: string, offset: number): string | undefined {
+  if (diagnostic.code === ALWAYS_DEFINED)
+    return LEADING_NAME.exec(source.slice(offset))?.[0]
+
+  return diagnostic.code === MISSING_PROPERTY ? MEMBER_OF.exec(source.slice(0, offset))?.[1] : undefined
+}
+
+function signalHelp(name = 'name'): string {
+  return `only a signal or memo the script declares reads by its name; one imported or held by a prop is read by calling it, \`${name}()\``
 }
 
 // With a code frame when the file's source is given.

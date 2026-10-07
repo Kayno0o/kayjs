@@ -130,6 +130,23 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('tells to call an imported signal read by name where its value goes, its text rendering as it is', async () => {
+    const root = await scratchProject({
+      'src/accent.ts': 'import { signal } from \'kay\'\n\nexport const accent = signal(\'red\')\n',
+      'src/routes/index.kay': '---\nimport { accent } from \'../accent\'\n---\np {accent}\nif accent\n  span on\np {accent.toUpperCase()}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code, d.help])).toEqual([
+        [5, 'TS2774', 'only a signal or memo the script declares reads by its name; one imported or held by a prop is read by calling it, `accent()`'],
+        [7, 'TS2339', 'only a signal or memo the script declares reads by its name; one imported or held by a prop is read by calling it, `accent()`'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types what the fences use of kay unimported', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { t } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title")\np {label}\n' })
 
