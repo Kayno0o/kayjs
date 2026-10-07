@@ -13,4 +13,4 @@ const entries: PaletteEntry[] = [
 ]
 ---
 CommandPalette(entries={entries} groups={['Actions', 'Pages']} recent={recent} hotkey={hotkey} onOpenChange={onOpenChange} onRecentChange={onRecentChange})
-input#outside
+input#outside(aria-label="Outside")

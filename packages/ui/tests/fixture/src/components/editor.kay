@@ -6,5 +6,5 @@ import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 const { value, onInput, onImage } = props<{ value: string, onInput: (value: string) => void, onImage?: (file: File) => Promise<string> }>()
 ---
 MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage})
-input#title
+input#title(aria-label="Title")
 Toaster
