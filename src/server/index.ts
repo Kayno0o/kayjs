@@ -29,6 +29,8 @@ export { clientAddress, memoryRates, rateKey, rateLimit, sqliteRates } from './p
 export type { EnqueueOptions, FailedJob, JobStore, Queue, QueueOptions, StoredJob } from './queue'
 export { memoryJobs, queue, sqliteJobs } from './queue'
 export { invalidatePage } from './revalidate'
+export type { CoalesceOptions, RoomConnection, Rooms, RoomsOptions, RoomStore } from './rooms'
+export { memoryRooms, rooms, sqliteRooms } from './rooms'
 export type { Route } from './routes'
 export type { Session, SessionData, SessionOptions, SessionStore } from './session'
 export { memoryStore, session, sqliteStore } from './session'

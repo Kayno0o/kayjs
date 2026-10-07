@@ -989,11 +989,52 @@ input(bind:value={text})
 button(onClick={() => messages.send({ text })}) Send
 ```
 
-- `socket(module, path, options)` opens one of the module's websocket routes, the path written as the module writes it, `params` and `query` filling it in, all typed from the route. `send` takes the route's `body`, `last()` reads the last message reactively, typed from its `response`, `on(listener)` gets each one and returns what stops it, and `status()` is `connecting`, `open` or `closed`. Messages travel as Elysia sends them, as JSON. What is sent before the connection opens goes once it does. A connection that drops reconnects, waiting longer each time up to 30 seconds, unless the server closed it with code 1000; `close()` closes it for good.
+- `socket(module, path, options)` opens one of the module's websocket routes, the path written as the module writes it, `params` and `query` filling it in, all typed from the route. `send` takes the route's `body`, `last()` reads the last message reactively, typed from its `response`, `on(listener)` gets each one and returns what stops it, and `status()` is `connecting`, `open` or `closed`. Messages travel as Elysia sends them, as JSON. What is sent before the connection opens goes once it does. A connection that drops reconnects, waiting longer each time up to 30 seconds, unless the server closed it with code 1000; `close()` closes it for good. `onOpen(listener)` is called each time the connection opens, a reconnect included, before what was queued goes: a client joining rooms by message joins them there, `messages.onOpen(() => messages.send({ type: 'join', room }))`, so it is back in them after a drop.
 - `stream(module, path, options)` reads one of its routes answering with `eventStream()`, with `last()`, `on()` and `status()` the same way, `status()` being `done` once the stream ran to its end and `failed` when a guard or the route refused it or its source threw. `{ method: 'post', body }` reads a route taking a body, such as an AI answer. A GET stream that drops reconnects; any other ends as failed.
 - `resource(module, path, options)` reads one of its GET routes answering a value, typed from the route's `response` as JSON leaves it, a Date as its ISO text. `value()` is the last answer, kept while the route is asked again, `status()` is `loading`, `ready` or `failed`, `error()` gives the `status` and `message` a route refused with, status 0 when no answer came, and `refresh()` asks again. Options given as a function, `() => ({ query: { prefix: search() } })`, are read reactively: a signal they read changing asks the route again, and an answer a newer request overtook is dropped.
 - All three open once the island is in the page, never on the server, where `resource()` renders `loading`, and close with the component that opened them. The browser build gives the island the module's mount and none of its code, so its other exports never reach the browser, and an island importing any other file under `src/api/`, such as a `_schemas.ts`, fails the build: code an island shares with a module lives outside it.
 - A refused upgrade looks like a dropped connection to the browser, so a socket a guard refuses keeps retrying, `connecting`, every 30 seconds at most.
+
+Rooms group a module's websocket connections, such as a game's players or a document's editors:
+
+```ts
+import { t } from 'elysia'
+import { dispatch } from 'kay'
+import { api, rooms } from 'kay/server'
+
+type Sent = { type: 'said', from: string, text: string } | { type: 'board', cells: string[] }
+
+const games = rooms<Sent, string>()
+const sendBoard = games.coalesce(room => ({ type: 'board', cells: boardOf(room) }))
+
+export default api()
+  .ws('/:room', {
+    body: t.Union([t.Object({ type: t.Literal('say'), text: t.String() }), t.Object({ type: t.Literal('play'), cell: t.Integer() })]),
+    open(ws) {
+      games.join(ws, ws.data.params.room, ws.data.user.name)
+    },
+    message(ws, body) {
+      const room = ws.data.params.room
+
+      dispatch(body, {
+        say: ({ text }) => games.publish(room, { type: 'said', from: ws.data.user.name, text }, { except: ws }),
+        play: ({ cell }) => {
+          play(room, cell)
+          sendBoard(room)
+        },
+      })
+    },
+    close(ws) {
+      games.leave(ws)
+    },
+  })
+```
+
+- `rooms<Message, Member>(options)` from `kay/server` keeps rooms of connections, `Message` what is sent to them and `Member` what each is listed as. `join(ws, room, member)` puts a connection in a room, joining again replacing its member; `leave(ws, room)` takes it out, and `leave(ws)` out of every room, as `close` does; `members(room)` lists the members, and `roomsOf(ws)` the rooms a connection is in. A room no one is in is gone.
+- `publish(room, message, { except })` sends a message to everyone in the room, as JSON as Elysia sends one, but the connection `except` names, such as the sender. Messages go out as given, not checked against the route's `response`.
+- `coalesce(read, { wait })` gives a function sending a room one snapshot `read(room)` makes when it goes, however many times it is called within `wait` milliseconds, 50 by default: a burst of moves sends the board once, as it stands.
+- `dispatch(message, handlers)` from `kay` calls the handler a message's `type` names with the message, typed to that variant, and gives what it returns; the handlers cover every type, as the compiler checks. It works on the server's `body` and on what an island's `socket` receives, `messages.on(message => dispatch(message, { ... }))`.
+- Rooms live in the process's memory by default. `rooms({ store: sqliteRooms('data/rooms.sqlite') })` shares them between every process of the machine opening the file, as `sqliteJobs` does: `members` lists those connected to any of them, and a message published in one reaches the others within `poll` milliseconds, 25 by default. A process that stops without its connections leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds. Rooms do not reach other machines.
 
 ## Testing
 

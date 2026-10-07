@@ -5,8 +5,9 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
-import { readEvents, resource, socket } from '../src/runtime/live'
+import { dispatch, readEvents, resource, socket } from '../src/runtime/live'
 import { apiStubs, scanApi } from '../src/server/api'
+import { rooms, sqliteRooms } from '../src/server/rooms'
 import { testSite } from '../src/test'
 
 const fixture = join(import.meta.dir, 'fixtures/live')
@@ -23,6 +24,7 @@ const site = await testSite({ routes: 'tests/fixtures/live/src/routes', api: 'te
 // Imported once the site is up: the modules it mounted, where their routes are served.
 const { default: chat } = await import(join(apiDir, 'chat.ts')) as typeof import('./fixtures/live/src/api/chat')
 const { default: secret } = await import(join(apiDir, 'private/index.ts')) as typeof import('./fixtures/live/src/api/private/index')
+const { default: party } = await import(join(apiDir, 'party.ts')) as typeof import('./fixtures/live/src/api/party')
 
 function upgrade(path: string, headers: Record<string, string> = {}): Request {
   return new Request(`http://localhost${path}`, { headers: { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13', ...headers } })
@@ -38,6 +40,7 @@ describe('API modules', () => {
     expect(await scanApi(apiDir)).toEqual([
       { file: join(apiDir, 'chat.ts'), mount: '/api/chat', guards: [] },
       { file: join(apiDir, 'index.ts'), mount: '/api', guards: [] },
+      { file: join(apiDir, 'party.ts'), mount: '/api/party', guards: [] },
       { file: join(apiDir, 'private/index.ts'), mount: '/api/private', guards: [join(apiDir, 'private/_guard.ts')] },
     ])
     expect(await (await site.fetch('/api')).json()).toEqual({ ok: true })
@@ -344,5 +347,105 @@ describe('kay check, API modules', () => {
     finally {
       await rm(project, { recursive: true, force: true })
     }
+  })
+})
+
+describe('rooms', () => {
+  const guest = (name: string) => site.socket(party, '/', { query: { name } })
+  const members = async (room: string) => (await site.fetch(`/api/party/members/${room}`)).json()
+
+  it('lists who joined a room, sends a message to everyone in it but who it came from, and drops the room once empty', async () => {
+    const ada = guest('ada')
+    const bob = guest('bob')
+
+    ada.send({ type: 'join', room: 'tea' })
+    expect(await ada.next()).toEqual({ type: 'joined', room: 'tea', members: ['ada'] })
+    bob.send({ type: 'join', room: 'tea' })
+    expect(await bob.next()).toEqual({ type: 'joined', room: 'tea', members: ['ada', 'bob'] })
+    expect(await ada.next()).toEqual({ type: 'joined', room: 'tea', members: ['ada', 'bob'] })
+
+    bob.send({ type: 'say', room: 'tea', text: 'hello' })
+    expect(await ada.next()).toEqual({ type: 'said', from: 'bob', text: 'hello' })
+
+    ada.send({ type: 'leave', room: 'tea' })
+    await Bun.sleep(30)
+    expect(await members('tea')).toEqual(['bob'])
+    bob.close()
+    await Bun.sleep(30)
+    expect(await members('tea')).toEqual([])
+    expect(bob.received).toEqual([{ type: 'joined', room: 'tea', members: ['ada', 'bob'] }])
+    ada.close()
+  })
+
+  it('sends a burst of changes as one snapshot, read when it goes', async () => {
+    const ada = guest('ada')
+
+    ada.send({ type: 'join', room: 'game' })
+    await ada.next()
+
+    for (let bump = 0; bump < 5; bump++)
+      ada.send({ type: 'bump', room: 'game' })
+
+    expect(await ada.next()).toEqual({ type: 'score', room: 'game', score: 5 })
+    await Bun.sleep(60)
+    expect(ada.received).toHaveLength(2)
+    ada.close()
+  })
+
+  it('joins its rooms again once a dropped connection is back', async () => {
+    const ada = guest('ada')
+
+    ada.onOpen(() => ada.send({ type: 'join', room: 'back' }))
+    expect(await ada.next()).toEqual({ type: 'joined', room: 'back', members: ['ada'] })
+
+    ada.send({ type: 'drop' })
+    expect(await ada.next()).toEqual({ type: 'joined', room: 'back', members: ['ada'] })
+    expect(await members('back')).toEqual(['ada'])
+    ada.close()
+  })
+
+  it('reaches the members other processes hold through a SQLite file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-rooms-'))
+    const connection = () => {
+      const received: string[] = []
+
+      return { received, raw: { sendText: (text: string) => void received.push(text) } }
+    }
+
+    try {
+      // Two stores on one file stand for two processes.
+      const first = rooms<{ text: string }, string>({ store: sqliteRooms(join(dir, 'rooms.sqlite'), { poll: 5 }) })
+      const second = rooms<{ text: string }, string>({ store: sqliteRooms(join(dir, 'rooms.sqlite'), { poll: 5 }) })
+      const [ada, bob] = [connection(), connection()]
+
+      first.join(ada, 'hall', 'ada')
+      second.join(bob, 'hall', 'bob')
+      expect(first.members('hall')).toEqual(['ada', 'bob'])
+
+      first.publish('hall', { text: 'hi' })
+      await Bun.sleep(50)
+      expect(ada.received).toEqual(['{"text":"hi"}'])
+      expect(bob.received).toEqual(['{"text":"hi"}'])
+
+      second.publish('hall', { text: 'back' }, { except: bob })
+      await Bun.sleep(50)
+      expect(ada.received).toEqual(['{"text":"hi"}', '{"text":"back"}'])
+      expect(bob.received).toEqual(['{"text":"hi"}'])
+
+      second.leave(bob)
+      expect(first.members('hall')).toEqual(['ada'])
+      expect(second.roomsOf(bob)).toEqual([])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('calls the handler a message\'s type names', () => {
+    type Message = { type: 'add', amount: number } | { type: 'reset' }
+    const handle = (message: Message) => dispatch(message, { add: ({ amount }) => amount, reset: () => 0 })
+
+    expect(handle({ type: 'add', amount: 3 })).toBe(3)
+    expect(handle({ type: 'reset' })).toBe(0)
   })
 })

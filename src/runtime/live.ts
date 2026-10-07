@@ -74,6 +74,8 @@ export interface Socket<Send, Receive> {
   status: () => SocketStatus
   // Called with every message received; returns what stops it.
   on: (listener: (message: Receive) => void) => () => void
+  // Called each time the connection opens, a reconnect included, before what was queued goes: where a client joins its rooms again. Returns what stops it.
+  onOpen: (listener: () => void) => () => void
   // Closes for good: no reconnecting after.
   close: () => void
 }
@@ -142,6 +144,11 @@ function readMessage(data: unknown): unknown {
   return data === 'true' ? true : data === 'false' ? false : data === 'null' ? null : data
 }
 
+// The handler a message's `type` names, given the message: one function per type in place of a `switch`, every type handled, as the compiler checks.
+export function dispatch<Message extends { type: string }, Handlers extends { [Type in Message['type']]: (message: Extract<Message, { type: Type }>) => unknown }>(message: Message, handlers: Handlers): ReturnType<Handlers[Message['type']]> {
+  return (handlers[message.type as Message['type']] as unknown as (message: Message) => ReturnType<Handlers[Message['type']]>)(message)
+}
+
 function backoff(attempt: number): number {
   return Math.min(RECONNECT_MS * 2 ** attempt, MAX_RECONNECT_MS)
 }
@@ -150,6 +157,7 @@ function backoff(attempt: number): number {
 export function openSocket<Send, Receive>(connect: () => WebSocket | undefined): Socket<Send, Receive> & { start: () => void } {
   const [status, setStatus] = createSignal<SocketStatus>('connecting', undefined, false)
   const messages = listeners<Receive>()
+  const opened = listeners<undefined>()
   const queued: string[] = []
   let current: WebSocket | undefined
   let closed = false
@@ -169,6 +177,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
     ws.addEventListener('open', () => {
       attempt = 0
       setStatus('open')
+      opened.receive(undefined)
 
       for (const message of queued.splice(0))
         ws.send(message)
@@ -202,6 +211,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
     last: messages.last,
     status,
     on: messages.on,
+    onOpen: listener => opened.on(listener),
     close: () => {
       closed = true
       clearTimeout(retry)
