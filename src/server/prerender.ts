@@ -21,6 +21,8 @@ import { refuseClashes, scanRoutes } from './routes'
 import { configHead } from './seo'
 
 const KAY_PREFIX = /^kay: /
+// The image route in an attribute, `src`, `srcset` or a style's `url()`: a page whose text only names it, as documentation does, links nothing.
+const IMAGE_LINK = new RegExp(`="[^"]*${RegExp.escape(IMAGE_ROUTE)}\\?`)
 
 // The pages a static export cannot hold, each named: a message for the person building, with no stack to read past.
 export class ExportError extends Error {
@@ -89,7 +91,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
         const html = await response.text()
 
-        if (options.exportAll && html.includes(`${IMAGE_ROUTE}?`))
+        if (options.exportAll && IMAGE_LINK.test(html))
           throw new Error(`kay: ${copy.path} links an image only the image route resizes, such as one from images.dirs, and no file of it is exported`)
 
         const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
