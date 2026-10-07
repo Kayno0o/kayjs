@@ -11,6 +11,10 @@ import { rebaseHtml } from '../src/server/base'
 const FIXTURE = resolve('tests/fixtures/static')
 const CLI = resolve('src/cli.ts')
 const BASE = '/repo'
+// The gzipped JS a page with one small island loads before anything is clicked, a little above what it is: a change growing it raises this in the same commit, on purpose.
+const EAGER_JS_BUDGET = 10_800
+const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
+const STATIC_IMPORT = /(?:from|import)\s*"([^"]+\.js)"/g
 
 let out: string
 let server: ReturnType<typeof Bun.serve>
@@ -105,6 +109,26 @@ describe('kay build --static', () => {
     // The counter's own chunk is among them, so its imports are too.
     expect(code.some(text => text.includes('<button>Count'))).toBe(true)
     expect(code.filter(text => text.includes('cannot name a cookie'))).toEqual([])
+  })
+
+  it('keeps the JS a page loads up front within its budget', async () => {
+    const pending = [...(await get('/')).text.matchAll(SCRIPT_URL)].map(match => match[1]!)
+    const loaded = new Map<string, number>()
+
+    // What the page links, and what those import statically; a dynamic `import()` waits for a visitor to need it.
+    for (let url = pending.pop(); url !== undefined; url = pending.pop()) {
+      if (loaded.has(url))
+        continue
+
+      const code = await Bun.file(join(out, url.slice(BASE.length))).text()
+
+      loaded.set(url, Bun.gzipSync(code).length)
+      pending.push(...[...code.matchAll(STATIC_IMPORT)].map(match => new URL(match[1]!, `http://x${url}`).pathname))
+    }
+
+    const total = loaded.values().reduce((sum, size) => sum + size, 0)
+
+    expect(total, `${total} bytes of gzipped JS load up front, over the ${EAGER_JS_BUDGET} budget: ${[...loaded].map(([url, size]) => `${url} ${size}`).join(', ')}`).toBeLessThanOrEqual(EAGER_JS_BUDGET)
   })
 
   it('writes the public files, the sitemap and robots.txt under the mount point, and 404.html', async () => {
