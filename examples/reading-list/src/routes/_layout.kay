@@ -1,0 +1,5 @@
+a.skip-link(href="#content") Skip to the content
+header
+  a(href="/") Reading list
+main#content
+  slot

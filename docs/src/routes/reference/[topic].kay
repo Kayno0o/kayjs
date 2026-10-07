@@ -1,0 +1,20 @@
+--- server
+import { reference } from '../../content.config'
+
+export const prerender = reference
+
+const topic = await reference.get(ctx.params.topic) ?? ctx.notFound()
+const { Content } = topic
+const sections = topic.headings.filter(heading => heading.depth === 2)
+---
+head
+  title {topic.data.title} · kay
+article
+  h1 {topic.data.title}
+  if sections.length > 0
+    nav.toc(aria-label="On this page")
+      ul
+        for section of sections key={section.id}
+          li
+            a(href={`#${section.id}`}) {section.text}
+  Content

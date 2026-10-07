@@ -1,0 +1,11 @@
+--- server
+import { findBook } from '../../books'
+
+const book = await findBook(ctx.params.id) ?? ctx.notFound()
+---
+head
+  title {book.title}
+h1 {book.title}
+p by {book.author}
+p {book.read ? 'Read' : 'Not read yet'}
+a(href="/") Back to the list

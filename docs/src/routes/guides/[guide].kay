@@ -1,0 +1,13 @@
+--- server
+import { guides } from '../../content.config'
+
+export const prerender = guides
+
+const guide = await guides.get(ctx.params.guide) ?? ctx.notFound()
+const { Content } = guide
+---
+head
+  title {guide.data.title} · kay
+article
+  h1 {guide.data.title}
+  Content

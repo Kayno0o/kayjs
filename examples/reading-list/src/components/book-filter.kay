@@ -1,0 +1,21 @@
+---
+import type { Book } from '../books'
+import { memo, signal } from 'kay'
+
+const { books } = props<{ books: Book[] }>()
+const query = signal('')
+const unreadOnly = signal(false)
+const shown = memo(() => books.filter(book => (!unreadOnly() || !book.read) && `${book.title} ${book.author}`.toLowerCase().includes(query().trim().toLowerCase())))
+---
+.filters
+  input(type="search" aria-label="Search the books" placeholder="Search" bind:value={query})
+  label
+    input(type="checkbox" bind:checked={unreadOnly})
+    |  Unread only
+ul
+  for book of shown
+    li
+      a(href={`/books/${book.id}`}) {book.title}
+      |  by {book.author}
+  else
+    li Nothing matches

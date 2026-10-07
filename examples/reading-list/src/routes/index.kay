@@ -1,0 +1,36 @@
+--- server
+import { t } from 'kay'
+import { addBook, listBooks } from '../books'
+
+export const add = action(t.Object({
+  title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+  author: t.String({ minLength: 1, maxLength: 100, error: 'Write the author' }),
+}), async ({ title, author }, ctx) => {
+  if ((await listBooks()).some(book => book.title === title))
+    return ctx.fail(409, { message: 'Already on the list' })
+
+  return (await addBook(title, author)).id
+})
+
+const books = await listBooks()
+---
+---
+import BookFilter from '../components/book-filter.kay'
+---
+head
+  title Books
+h1 Books
+BookFilter(books={books})
+h2 Add one
+form(action={add})
+  label Title
+    input(name="title")
+  if add.error('title') as message
+    p.error {message}
+  label Author
+    input(name="author")
+  if add.error('author') as message
+    p.error {message}
+  if add.failed()?.data as data
+    p.error {data.message}
+  button Add

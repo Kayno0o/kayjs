@@ -1,0 +1,11 @@
+--- server
+import { reference } from '../content.config'
+
+const overview = await reference.get('overview') ?? ctx.notFound()
+const { Content } = overview
+---
+head
+  title kay
+h1 kay
+Content
+p.next New to kay? Start with the #[a(href="/guides/tutorial") tutorial], then browse the reference on the left.
