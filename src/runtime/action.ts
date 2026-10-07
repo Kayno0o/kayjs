@@ -372,10 +372,15 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       shift(1)
       called(null)
 
-      const undo = options?.optimistic ? undoable(options.optimistic) : undefined
+      let undo: (() => void) | undefined
+      let posted = false
 
       try {
+        undo = options?.optimistic ? undoable(options.optimistic) : undefined
+
         const data = await post(url(), input)
+
+        posted = true
 
         called({ action: url(), succeeded: true, data })
 
@@ -389,7 +394,9 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
         return data
       }
       catch (error) {
-        undo?.()
+        // A redirect leaves the page as it is until the next one shows.
+        if (!posted && !(error instanceof ActionRedirect))
+          undo?.()
 
         if (error instanceof ActionError && !(error instanceof ActionRedirect))
           called({ action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })

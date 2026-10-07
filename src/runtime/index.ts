@@ -47,16 +47,22 @@ export function persisted<T>(name: string, value: PlainValue<T>, options?: Persi
 // A signal an island edits locally that takes `source`'s value again whenever it changes: `const tiers = linked(() => board.tiers)` follows the prop once the page brings a new board.
 export function linked<T>(source: () => T): Signal<T> {
   const from = memo(source)
-  // The edit, with the value of `source` it was made over: once that changes, the edit is out of date.
-  const [edit, write] = createSignal<{ over: T, value: T } | undefined>(undefined)
+  let changes = 0
+  // Counts the source's changes, so an edit made before one is out of date even when the source comes back to the value it was made over.
+  const generation = memo(() => {
+    from()
+
+    return ++changes
+  })
+  const [edit, write] = createSignal<{ at: number, value: T } | undefined>(undefined)
   const read = () => {
-    const over = from()
+    const at = generation()
     const own = edit()
 
-    return own !== undefined && own.over === over ? own.value : over
+    return own !== undefined && own.at === at ? own.value : from()
   }
 
-  return withSetter(read, value => write({ over: untrack(from), value }))
+  return withSetter(read, value => write({ at: untrack(generation), value }))
 }
 
 function withSetter<T>(read: () => T, write: (value: T) => void): Signal<T> {

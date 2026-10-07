@@ -122,28 +122,37 @@ export function createSignal<T>(value: T, options?: SignalOptions<T>, kept = tru
   return [read, write]
 }
 
-// Runs `change`, giving back what undoes it: each signal it wrote goes back to what it held, unless something wrote it since.
+// Runs `change`, giving back what undoes it: each signal it wrote goes back to what it held, unless something wrote it since. A change that throws is undone at once.
+// Two changes over one signal undone out of order may leave the first one's value, its undo seeing the second's and keeping it.
 export function undoable(change: () => void): () => void {
   const writes: NonNullable<typeof undoing> = new Map()
   const outer = undoing
+  let written: Map<SignalNode<unknown>, unknown> | undefined
+  const undo = () => batch(() => {
+    for (const [node, { before, write }] of writes) {
+      if (written === undefined || node.value === written.get(node))
+        write(before)
+    }
+  })
 
   undoing = writes
 
   try {
     batch(change)
   }
+  catch (error) {
+    undoing = outer
+    undo()
+
+    throw error
+  }
   finally {
     undoing = outer
   }
 
-  const written = new Map([...writes.keys()].map(node => [node, node.value]))
+  written = new Map([...writes.keys()].map(node => [node, node.value]))
 
-  return () => batch(() => {
-    for (const [node, { before, write }] of writes) {
-      if (node.value === written.get(node))
-        write(before)
-    }
-  })
+  return undo
 }
 
 // A component's call: an owner of its own, so what it provides reaches what it renders and nothing beside it. `detached`, as an island is, it reads nothing provided above.

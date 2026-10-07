@@ -265,7 +265,7 @@ function liveProps(initial: Record<string, unknown>): [props: object, update: (n
   const props = {}
   const writes = new Map<string, (value: unknown) => void>()
   const define = (key: string, value: unknown) => {
-    const [read, write] = createSignal(value, undefined, false)
+    const [read, write] = createSignal(value, { equals: sameData }, false)
 
     writes.set(key, write)
     Object.defineProperty(props, key, { get: read, enumerable: true, configurable: true })
@@ -285,6 +285,26 @@ function liveProps(initial: Record<string, unknown>): [props: object, update: (n
         define(key, value)
     }
   })]
+}
+
+// Whether two decoded props hold the same data, so a prop the next page gives unchanged keeps its value, and what reads it, a `linked` edit included, is left alone.
+function sameData(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b))
+    return true
+
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null || Object.getPrototypeOf(a) !== Object.getPrototypeOf(b))
+    return false
+
+  if (a instanceof Date)
+    return a.getTime() === (b as Date).getTime()
+
+  if (a instanceof RegExp || a instanceof URL)
+    return String(a) === String(b)
+
+  const entries = (value: object) => value instanceof Map || value instanceof Set ? [...value.entries()] : Object.entries(value)
+  const [left, right] = [entries(a), entries(b)]
+
+  return left.length === right.length && left.every(([key, value], index) => sameData(key, right[index]![0]) && sameData(value, right[index]![1]))
 }
 
 // Ends every island under `root`, as a page swap takes them away.

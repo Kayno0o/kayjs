@@ -298,6 +298,17 @@ describe('linked', () => {
     expect(title()).toBe('Second')
     expect(seen).toEqual(['First', 'Edited', 'Second'])
   })
+
+  it('drops an edit once the source changed, even when it comes back to the value the edit was made over', () => {
+    const page = signal('/')
+    const note = linked(() => page())
+
+    note.set('edited')
+    page.set('/second')
+    expect(note()).toBe('/second')
+    page.set('/')
+    expect(note()).toBe('/')
+  })
 })
 
 describe('optimistic changes', () => {
@@ -314,6 +325,28 @@ describe('optimistic changes', () => {
     undo()
     expect(count()).toBe(1)
     expect(label()).toBe('c')
+  })
+
+  it('undo what they wrote before throwing, the call never posting nor staying pending', async () => {
+    const move = actionStub('/_kay/action/test/throws') as unknown as Action<{ to: number }, number>
+    const at = signal(0)
+    const fetched = spyOn(globalThis, 'fetch')
+
+    try {
+      await expect(move({ to: 1 }, {
+        optimistic: () => {
+          at.set(1)
+
+          throw new Error('no such tier')
+        },
+      })).rejects.toThrow('no such tier')
+      expect(at()).toBe(0)
+      expect(move.pending()).toBe(false)
+      expect(fetched).not.toHaveBeenCalled()
+    }
+    finally {
+      fetched.mockRestore()
+    }
   })
 
   it('roll back when the action call fails, and stand once it went through', async () => {

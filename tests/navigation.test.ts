@@ -101,6 +101,13 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
     expect(await page.textContent('button.page-note')).toBe('/second')
     await page.click('button.player')
     expect(await page.textContent('button.player')).toBe('Played 3')
+    // Back on the first page, the edit made there is long out of date.
+    await page.click('a.home')
+    await page.locator('button.page-note', { hasText: /^\/$/ }).waitFor()
+    expect(await page.textContent('button.page-note')).toBe('/')
+    expect(await page.textContent('button.player')).toBe('Played 3')
+    await page.click('a.second')
+    await page.locator('h1', { hasText: 'Second' }).waitFor()
     expect(errors).toEqual([])
   })
 
