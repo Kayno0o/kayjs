@@ -111,6 +111,13 @@ describe('kay build --static', () => {
     expect((await get('/_kay/env.js')).text).toBe('export default {"KAY_TEST_STATIC_KEY":"static-key"}\n')
     expect((await get(stylesheet)).text).toContain('url(/repo/humans.txt)')
     expect((await get(image)).status).toBe(200)
+
+    // The cut variants and the share card the page asks for are written too.
+    const square = (/<img src="\/repo(\/_kay\/images\/[\w-]+-1x1\.webp)"/).exec(home)![1]!
+    const card = (/<a class="card" href="\/repo(\/_kay\/images\/[\w-]+-card\.jpg)"/).exec(home)![1]!
+
+    expect((await get(square)).status).toBe(200)
+    expect((await get(card)).status).toBe(200)
     expect(home).toContain('<slot data-component="src/components/counter.kay"')
     expect(await Bun.file(join(out, '_kay', `${entry.slice('/_kay/'.length)}.br`)).exists()).toBe(true)
     expect(await Bun.file(join(out, 'index.html.gz')).exists()).toBe(true)

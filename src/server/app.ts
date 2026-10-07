@@ -28,7 +28,7 @@ import { FAVICON_DIR, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuards } from './guards'
 import { cookieLocale, hostLocale, loadI18n, localeCookie, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
-import { applyMaxDensity, serveImages } from './image'
+import { applyImageConfig, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
 import { logRequests } from './log'
@@ -153,7 +153,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     refuseLocaleClashes(i18n.settings, routes)
 
   const base = basePath(options.base)
-  const maxDensity = applyMaxDensity(options.images)
+  const maxDensity = applyImageConfig(options.images)
 
   setTracer(options.tracer)
   setSite(options.site === undefined ? undefined : siteOrigin(options.site) + base, options.trailingSlash)
@@ -249,6 +249,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     cacheDir: bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', 'images'),
     dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(bundle ? process.cwd() : root, dir)])),
     quality: options.images?.quality,
+    aspects: options.images?.aspects,
   })
 
   serveFeeds(app, await projectCollections(root, options.content), options.site === undefined ? undefined : siteOrigin(options.site) + base, options.dev)

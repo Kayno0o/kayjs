@@ -1,8 +1,10 @@
 ---
-import { image } from 'kay/image'
+import { image, shareImage } from 'kay/image'
 import Counter from '../components/counter.kay'
 import hero from '../hero.png'
 ---
 h1 Home
 img({...image(hero)} alt="Hero")
+img.square({...image(hero, { aspect: '1/1' })} alt="Square")
+a.card(href={shareImage(hero)}) Share card
 Counter

@@ -2,9 +2,11 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { deflateSync, inflateSync } from 'node:zlib'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { cappedSizes, image, imageUrl, registerImage, setMaxDensity } from '../src/runtime/image'
-import { pages } from '../src/server'
+import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, shareImage } from '../src/runtime/image'
+import { imageSize, pages, processImage } from '../src/server'
+import { coverImage } from '../src/server/crop'
 import { variantName, writeImageVariants } from '../src/server/image'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
@@ -19,6 +21,18 @@ const heroUrl = decodeURIComponent((/src=%2F_kay%2Fassets%2F([^&]+)&amp;/).exec(
 afterAll(async () => {
   await rm(uploads, { recursive: true, force: true })
 })
+
+function pngChunk(type: string, data: Uint8Array): Uint8Array {
+  const bytes = new Uint8Array(12 + data.length)
+  const view = new DataView(bytes.buffer)
+
+  view.setUint32(0, data.length)
+  bytes.set(new TextEncoder().encode(type), 4)
+  bytes.set(data, 8)
+  view.setUint32(8 + data.length, Bun.hash.crc32(bytes.subarray(4, 8 + data.length)))
+
+  return bytes
+}
 
 async function get(path: string, headers: Record<string, string> = {}): Promise<Response> {
   return app.handle(new Request(`http://localhost${path}`, { headers }))
@@ -146,23 +160,12 @@ describe('image route', () => {
   })
 
   it('refuses a runtime image too large to decode safely, from its header alone', async () => {
-    const chunk = (type: string, data: Uint8Array) => {
-      const bytes = new Uint8Array(12 + data.length)
-      const view = new DataView(bytes.buffer)
-
-      view.setUint32(0, data.length)
-      bytes.set(new TextEncoder().encode(type), 4)
-      bytes.set(data, 8)
-      view.setUint32(8 + data.length, Bun.hash.crc32(bytes.subarray(4, 8 + data.length)))
-
-      return bytes
-    }
     const header = new Uint8Array(13)
 
     new DataView(header.buffer).setUint32(0, 10_000)
     new DataView(header.buffer).setUint32(4, 10_000)
     header.set([8, 6, 0, 0, 0], 8)
-    await Bun.write(join(uploads, 'huge.png'), new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...chunk('IHDR', header), ...chunk('IEND', new Uint8Array())]))
+    await Bun.write(join(uploads, 'huge.png'), new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...pngChunk('IHDR', header), ...pngChunk('IEND', new Uint8Array())]))
 
     expect((await get(`/_kay/image?src=${encodeURIComponent('/uploads/huge.png')}&w=320`)).status).toBe(413)
   })
@@ -217,5 +220,117 @@ describe('build variants', () => {
     finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('crops and share cards', () => {
+  const hero = registerImage('/_kay/assets/crop-abc.png', 1000, 600)
+  const heroSrc = () => `/_kay/assets/${heroUrl}`
+  const route = (query: string) => get(`/_kay/image?src=${encodeURIComponent(heroSrc())}&${query}`)
+
+  it('cuts an image to an aspect ratio, in lowest terms, each variant no wider than the cut', () => {
+    const square = image(hero, { aspect: '2/2' })
+
+    expect(square).toMatchObject({ width: 600, height: 600, src: imageUrl(hero, 600, [1, 1]) })
+    expect(square.srcset).toBe(`${imageUrl(hero, 320, [1, 1])} 320w, ${imageUrl(hero, 600, [1, 1])} 600w`)
+    expect(square.src).toBe('/_kay/image?src=%2F_kay%2Fassets%2Fcrop-abc.png&w=600&crop=1x1')
+    expect(image(hero, { aspect: '16/9' })).toMatchObject({ width: 1000, height: 563 })
+    expect(() => image(hero, { aspect: '5/1' })).toThrow('images.aspects in kay.config.ts does not list')
+    expect(() => image(hero, { aspect: 'wide' })).toThrow('two whole numbers from 1 to 100')
+  })
+
+  it('serves each cut variant at its width and the shape asked, and refuses a width past the cut or a shape not allowed', async () => {
+    const small = await route('w=320&crop=1x1')
+
+    expect(small.status).toBe(200)
+    expect(await new Bun.Image(await small.bytes()).metadata()).toEqual({ width: 320, height: 320, format: 'webp' })
+    expect(await new Bun.Image(await (await route('w=600&crop=1x1')).bytes()).metadata()).toEqual({ width: 600, height: 600, format: 'webp' })
+
+    for (const query of ['w=640&crop=1x1', 'w=1000&crop=1x1', 'w=320&crop=5x1', 'w=320&crop=0x1', 'w=320&crop=x'])
+      expect((await route(query)).status).toBe(400)
+  })
+
+  it('keeps the middle of the image when it cuts', async () => {
+    // A 300x100 image, red, green then blue thirds.
+    const rows = Array.from({ length: 100 }, () => [0, ...Array.from({ length: 300 }, (_, x) => x < 100 ? [255, 0, 0] : x < 200 ? [0, 255, 0] : [0, 0, 255]).flat()])
+    const header = new Uint8Array(13)
+
+    new DataView(header.buffer).setUint32(0, 300)
+    new DataView(header.buffer).setUint32(4, 100)
+    header.set([8, 2, 0, 0, 0], 8)
+    await Bun.write(join(uploads, 'thirds.png'), new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...pngChunk('IHDR', header), ...pngChunk('IDAT', deflateSync(new Uint8Array(rows.flat()))), ...pngChunk('IEND', new Uint8Array())]))
+
+    const cut = await coverImage(Bun.file(join(uploads, 'thirds.png')), 50, 50)
+    const view = new DataView(cut.buffer)
+    const pixels = inflateSync(cut.subarray(8 + 25 + 8, 8 + 25 + 8 + view.getUint32(8 + 25)))
+    const at = (x: number, y: number) => [...pixels.subarray(y * (50 * 4 + 1) + 1 + x * 4, y * (50 * 4 + 1) + 1 + x * 4 + 3)]
+
+    expect(await new Bun.Image(cut).metadata()).toEqual({ width: 50, height: 50, format: 'png' })
+
+    for (const [x, y] of [[25, 25], [5, 2], [44, 47]]) {
+      const [red, green, blue] = at(x!, y!)
+
+      expect(green).toBeGreaterThan(200)
+      expect(Math.max(red!, blue!)).toBeLessThan(60)
+    }
+  })
+
+  it('serves a 1200x630 JPEG share card of an image, enlarged when smaller', async () => {
+    const card = await route('card')
+
+    expect(shareImage(hero)).toBe('/_kay/image?src=%2F_kay%2Fassets%2Fcrop-abc.png&card')
+    expect(card.status).toBe(200)
+    expect(card.headers.get('content-type')).toBe('image/jpeg')
+    expect(await new Bun.Image(await card.bytes()).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
+    expect(() => shareImage('/logo.svg')).toThrow('takes a PNG, JPEG or WebP')
+  })
+
+  it('writes at build time the crops and cards pages asked for', async () => {
+    const client = await mkdtemp(join(tmpdir(), 'kay-client-'))
+
+    try {
+      await Bun.write(join(client, 'assets', 'crop-abc.png'), Bun.file(HERO))
+      image(hero, { aspect: '16/9' })
+      shareImage(hero)
+      await writeImageVariants(client)
+
+      expect(await readdir(join(client, 'images'))).toEqual(expect.arrayContaining(['crop-abc-320.webp', 'crop-abc-320-16x9.webp', 'crop-abc-1000-16x9.webp', 'crop-abc-card.jpg']))
+      expect(await new Bun.Image(Bun.file(join(client, 'images', 'crop-abc-640-16x9.webp'))).metadata()).toEqual({ width: 640, height: 360, format: 'webp' })
+      expect(await new Bun.Image(Bun.file(join(client, 'images', 'crop-abc-card.jpg'))).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
+    }
+    finally {
+      await rm(client, { recursive: true, force: true })
+    }
+  })
+
+  it('takes the aspect ratios images.aspects lists', async () => {
+    try {
+      const wide = await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { aspects: ['5/1'] } })
+
+      expect(image(hero, { aspect: '5/1' })).toMatchObject({ width: 1000, height: 200 })
+      expect(() => image(hero, { aspect: '1/1' })).toThrow('does not list')
+      expect((await wide.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(heroSrc())}&w=1000&crop=5x1`))).status).toBe(200)
+      await expect(pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { aspects: ['16:9'] } })).rejects.toThrow('images.aspects holds 16:9')
+    }
+    finally {
+      setAspects(DEFAULT_ASPECTS)
+    }
+  })
+})
+
+describe('uploads', () => {
+  it('resizes and encodes an uploaded image, squared when told to cover, and reads its size', async () => {
+    const upload = Bun.file(HERO)
+
+    expect(await imageSize(upload)).toEqual({ width: 1000, height: 600, format: 'png' })
+
+    const square = await processImage(upload, { width: 200, height: 200, fit: 'cover' })
+
+    expect({ width: square.width, height: square.height, type: square.type }).toEqual({ width: 200, height: 200, type: 'image/webp' })
+    expect(await new Bun.Image(square.bytes).metadata()).toEqual({ width: 200, height: 200, format: 'webp' })
+    expect(await processImage(await upload.arrayBuffer(), { width: 500, format: 'jpeg' })).toMatchObject({ width: 500, height: 300, type: 'image/jpeg' })
+    expect(await processImage(upload, { width: 4000, height: 4000 })).toMatchObject({ width: 1000, height: 600 })
+    await expect(processImage(upload, { width: 200, fit: 'cover' })).rejects.toThrow('both its width and its height')
+    await expect(imageSize(upload, { maxPixels: 1000 })).rejects.toThrow()
   })
 })

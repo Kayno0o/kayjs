@@ -7,6 +7,13 @@ const VARIANTS = '/_kay/images/'
 const EXTENSION = /\.[^.]+$/
 const QUERY = /\?.*$/
 const FUNCTION_NAME = /[a-z-]*$/i
+// An aspect ratio as `image()` takes it, `16/9`, or as the route does, `16x9`.
+const ASPECT = /^(\d{1,3})[/x](\d{1,3})$/
+
+// The share card social sites show, which they read best as a JPEG.
+export const CARD = { width: 1200, height: 630 } as const
+// The aspect ratios an image can be cut to unless `images.aspects` says otherwise: each one adds a variant per width, so the route makes only those asked for here.
+export const DEFAULT_ASPECTS = ['1/1', '3/2', '2/3', '4/3', '3/4', '16/9', '9/16']
 const LAST_WORD = /\S+$/
 
 // The density an image is loaded at past which a phone shows no difference, as `images.maxDensity` sets it.
@@ -28,17 +35,86 @@ export interface ImageOptions {
   // Its width and height for an image kay did not import, such as an upload: the variants stop at that width, and the page keeps its space while it loads.
   width?: number
   height?: number
+  // The shape it is cut to, its middle kept: `'1/1'` for a square, `'16/9'`. Each variant is cut on the server, so a phone loads none of the pixels cut away; `images.aspects` lists the ones allowed.
+  aspect?: string
 }
+
+// One file an image is turned into: a width of the ladder, cut to an aspect ratio or not, or the share card.
+export type ImageVariant = { width: number, aspect?: Aspect } | 'card'
+
+// An aspect ratio in lowest terms, `[16, 9]`.
+export type Aspect = readonly [number, number]
 
 // Imported images, by URL, with the size read when they were built.
 const sizes = new Map<string, { width: number, height: number }>()
 // The variant `src` falls back to for a browser that ignores `srcset`.
 const FALLBACK_WIDTH = 1280
 let maxDensity: number | undefined
+// `images.aspects` on the server, in lowest terms as `16x9`; the browser checks none.
+let aspects: ReadonlySet<string> | undefined
+// The variants of imported images that pages asked for beyond the ladder, by asset name, for `kay build` to write.
+const requested = new Map<string, Map<string, ImageVariant>>()
 
 // `images.maxDensity` on the server; the browser reads it off the page, where the server wrote it unless it is the default.
 export function setMaxDensity(density: number): void {
   maxDensity = density
+}
+
+export function setAspects(allowed: readonly string[]): void {
+  aspects = new Set(allowed.map((text) => {
+    const aspect = parseAspect(text)
+
+    if (!aspect)
+      throw new Error(`images.aspects holds ${text}: an aspect ratio is two whole numbers from 1 to 100, \`16/9\``)
+
+    return aspectKey(aspect)
+  }))
+}
+
+// `16/9` or `16x9` in lowest terms, or nothing when it is no ratio of whole numbers from 1 to 100.
+export function parseAspect(text: string): Aspect | undefined {
+  const match = ASPECT.exec(text)
+  const [width, height] = [Number(match?.[1]), Number(match?.[2])]
+
+  if (!match || width < 1 || width > 100 || height < 1 || height > 100)
+    return undefined
+
+  const divisor = gcd(width, height)
+
+  return [width / divisor, height / divisor]
+}
+
+export function aspectKey([width, height]: Aspect): string {
+  return `${width}x${height}`
+}
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b)
+}
+
+// The largest box of that shape inside the image.
+export function croppedSize(size: { width: number, height: number }, [width, height]: Aspect): { width: number, height: number } {
+  const cut = Math.max(1, Math.min(size.width, Math.floor(size.height * width / height)))
+
+  return { width: cut, height: variantHeight(cut, [width, height], size.height) }
+}
+
+// The height of a variant cut to a shape, at least 1 pixel and never past the image's own.
+export function variantHeight(width: number, [aspectWidth, aspectHeight]: Aspect, most = Infinity): number {
+  return Math.min(most, Math.max(1, Math.round(width * aspectHeight / aspectWidth)))
+}
+
+// What a variant's file name ends with, after the image's own name.
+export function variantSuffix(variant: ImageVariant): string {
+  if (variant === 'card')
+    return '-card.jpg'
+
+  return `-${variant.width}${variant.aspect ? `-${aspectKey(variant.aspect)}` : ''}.webp`
+}
+
+// The variants pages asked for of the imported image `name`, beyond its ladder.
+export function requestedVariants(name: string): ImageVariant[] {
+  return [...requested.get(name)?.values() ?? []]
 }
 
 function currentMaxDensity(): number {
@@ -60,20 +136,42 @@ export function registerImage(url: string, width: number, height: number): strin
 
 // An imported image, or one from a directory in `images.dirs` given its size, served as WebP variants at each width of the ladder up to its own.
 export function image(src: string, options: ImageOptions = {}): ImageProps {
-  const size = sizes.get(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
+  const own = sizes.get(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
 
-  if (!size || !RESIZABLE.test(src))
-    return Object.assign(options.sizes === undefined ? { src } : { src, sizes: options.sizes }, size)
+  if (!own || !RESIZABLE.test(src))
+    return Object.assign(options.sizes === undefined ? { src } : { src, sizes: options.sizes }, own)
 
+  const aspect = options.aspect === undefined ? undefined : allowedAspect(options.aspect)
+  const size = aspect ? croppedSize(own, aspect) : own
   const widths = [...IMAGE_WIDTHS.filter(width => width < size.width), size.width]
 
   return {
-    src: imageUrl(src, widths.findLast(width => width <= FALLBACK_WIDTH) ?? widths[0]!),
-    srcset: widths.map(width => `${imageUrl(src, width)} ${width}w`).join(', '),
+    src: imageUrl(src, widths.findLast(width => width <= FALLBACK_WIDTH) ?? widths[0]!, aspect),
+    srcset: widths.map(width => `${imageUrl(src, width, aspect)} ${width}w`).join(', '),
     sizes: cappedSizes(options.sizes ?? '100vw', currentMaxDensity()),
     width: size.width,
     height: size.height,
   }
+}
+
+function allowedAspect(text: string): Aspect {
+  const aspect = parseAspect(text)
+
+  if (!aspect)
+    throw new Error(`kay: image() was given aspect ${text}: an aspect ratio is two whole numbers from 1 to 100, \`16/9\``)
+
+  if (aspects && !aspects.has(aspectKey(aspect)))
+    throw new Error(`kay: image() was given aspect ${text}, which images.aspects in kay.config.ts does not list`)
+
+  return aspect
+}
+
+// The URL of an image cut to the 1200x630 share card social sites show, as a JPEG, for `og:image`: `export const seo = { image: shareImage(hero) }`. Smaller images are enlarged to fill it.
+export function shareImage(src: string): string {
+  if (!RESIZABLE.test(src))
+    throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG or WebP`)
+
+  return variantUrl(src, 'card')
 }
 
 // `sizes` with entries ahead of each for screens denser than `density`, showing the image narrower there so the browser picks the variant that density needs: a 3x phone loads a 100vw image as a 2x one would.
@@ -166,12 +264,23 @@ export function linkVariantFiles(): void {
   variantFiles = true
 }
 
-export function imageUrl(src: string, width: number): string {
-  if (variantFiles && src.startsWith(IMPORTED)) {
+export function imageUrl(src: string, width: number, aspect?: Aspect): string {
+  return variantUrl(src, aspect ? { width, aspect } : { width })
+}
+
+function variantUrl(src: string, variant: ImageVariant): string {
+  if (src.startsWith(IMPORTED)) {
     const name = decodeURIComponent(src.slice(IMPORTED.length).replace(QUERY, ''))
 
-    return `${VARIANTS}${encodeURIComponent(`${name.replace(EXTENSION, '')}-${width}.webp`)}`
+    // The ladder is written for every imported image; a crop or a card only for those a page asks for.
+    if (variant === 'card' || variant.aspect)
+      requested.set(name, (requested.get(name) ?? new Map()).set(variantSuffix(variant), variant))
+
+    if (variantFiles)
+      return `${VARIANTS}${encodeURIComponent(`${name.replace(EXTENSION, '')}${variantSuffix(variant)}`)}`
   }
 
-  return `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&w=${width}`
+  const query = variant === 'card' ? 'card' : `w=${variant.width}${variant.aspect ? `&crop=${aspectKey(variant.aspect)}` : ''}`
+
+  return `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&${query}`
 }

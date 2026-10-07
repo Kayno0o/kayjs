@@ -15,7 +15,7 @@ import { scanApi } from './api'
 import { basePath } from './base'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { loadI18n, localeCopies, stateFor } from './i18n'
-import { applyMaxDensity } from './image'
+import { applyImageConfig } from './image'
 import { registerLoader } from './loader'
 import { loadMatchers, matchedParams } from './params'
 import { renderPage } from './render'
@@ -50,7 +50,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   const head = await configHead(root, config, client.dir)
 
   setSite(config.site === undefined ? undefined : siteOrigin(config.site) + basePath(config.base), config.trailingSlash)
-  const maxDensity = applyMaxDensity(config.images)
+  const maxDensity = applyImageConfig(config.images)
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
 
