@@ -119,6 +119,21 @@ async function scratchProject(files: Record<string, string>): Promise<string> {
 }
 
 describe('kay check, edge cases', () => {
+  it('checks a project whose tsconfig only extends kay\'s, its .kay files and modules alike', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n',
+      'src/routes/index.kay': '---\nimport { label } from \'../label\'\n\nconst count: number = label\n---\np {count}\n',
+      'src/label.ts': 'export const label: string = 1\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.file.replace(`${root}/`, ''), d.line, d.code]).sort()).toEqual([['src/label.ts', 1, 'TS2322'], ['src/routes/index.kay', 4, 'TS2322']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('fails when tsgo reports an error without a position, or exits non-zero with nothing to say', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'empty/tsconfig.json': '{"include":["nothing"]}' })
 

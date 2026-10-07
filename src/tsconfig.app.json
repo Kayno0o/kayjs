@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ESNext",
+    "jsx": "preserve",
+    "jsxImportSource": "kay",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "rootDirs": ["${configDir}", "${configDir}/.kay/types"],
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "types": ["bun"],
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["${configDir}/src", "${configDir}/tests", "${configDir}/kay.config.ts", "${configDir}/eslint.config.ts", "${configDir}/.kay/types"]
+}

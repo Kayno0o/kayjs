@@ -112,7 +112,8 @@
     "./test/preload": {
       "types": "./types/test/preload.d.ts",
       "default": "./src/test/preload.ts"
-    }
+    },
+    "./tsconfig.json": "./src/tsconfig.app.json"
   },
   "bin": {
     "kay": "./src/cli.ts"

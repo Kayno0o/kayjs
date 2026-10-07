@@ -1040,21 +1040,13 @@ export default defineConfig({ routes: 'src/routes', lang: 'en', minify: true, pr
 
 Every page carries speculation rules, which the swap replaces on pages shipping its script (see Navigation): Chromium prefetches the page a link points at once it is hovered (`prefetch: 'moderate'`), on press with `'conservative'`, as soon as it can with `'eager'`, never with `false`. A link that changes something on GET, such as a logout, takes `data-no-prefetch`. A stylesheet holding `@view-transition { navigation: auto; }` animates from page to page where the browser supports it, swaps included; `kay new` writes one.
 
-`pages()` also takes `root`, `dev` (default: `NODE_ENV` is `development`) and `prebuilt` (default: `NODE_ENV` is `production`), which serves what `kay build` wrote instead of bundling at boot. A `.ts` file imports a component as `import Card from './card.kay'`, typed through the generated `.kay/types` tree. `.kay/` also holds the client build and the compile cache. List it in `.gitignore` and merge the tree in `tsconfig.json`:
+`pages()` also takes `root`, `dev` (default: `NODE_ENV` is `development`) and `prebuilt` (default: `NODE_ENV` is `production`), which serves what `kay build` wrote instead of bundling at boot. A `.ts` file imports a component as `import Card from './card.kay'`, typed through the generated `.kay/types` tree. `.kay/` also holds the client build and the compile cache. List it in `.gitignore`. `tsconfig.json` extends kay's, which merges that tree with the sources and is as strict as kay itself:
 
 ```json
-{
-  "compilerOptions": {
-    "jsx": "preserve",
-    "jsxImportSource": "kay",
-    "module": "Preserve",
-    "moduleResolution": "bundler",
-    "rootDirs": [".", ".kay/types"],
-    "strict": true
-  },
-  "include": ["src", ".kay/types"]
-}
+{ "extends": "kay/tsconfig.json" }
 ```
+
+It includes `src`, `tests`, `kay.config.ts`, `eslint.config.ts` and `.kay/types`, relative to the project's tsconfig. A project adds its own `compilerOptions` beside `extends`, and an `include` of its own replaces kay's, so it lists `.kay/types` again; one setting up its tsconfig by hand needs `"jsx": "preserve"`, `"jsxImportSource": "kay"`, `"module": "Preserve"`, `"moduleResolution": "bundler"` and `"rootDirs": [".", ".kay/types"]`.
 
 `kay/html`, `kay/dom`, `kay/island`, `kay/await`, `kay/client`, `kay/internal` and `kay/internal/server` are what compiled `.kay` files and kay's generated entries import: the compiler's output contract rather than API, free to change in any release, never imported by an app.
 

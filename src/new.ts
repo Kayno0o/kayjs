@@ -50,25 +50,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
       dependencies: { elysia: kay.dependencies.elysia, kay: dependency },
       devDependencies,
     }, null, 2)}\n`,
-    'tsconfig.json': `${JSON.stringify({
-      compilerOptions: {
-        target: 'ESNext',
-        jsx: 'preserve',
-        jsxImportSource: 'kay',
-        lib: ['ESNext', 'DOM', 'DOM.Iterable'],
-        rootDirs: ['.', '.kay/types'],
-        module: 'Preserve',
-        moduleResolution: 'bundler',
-        types: ['bun'],
-        strict: true,
-        noFallthroughCasesInSwitch: true,
-        noImplicitOverride: true,
-        noUncheckedIndexedAccess: true,
-        noEmit: true,
-        skipLibCheck: true,
-      },
-      include: ['src', 'tests', 'kay.config.ts', 'eslint.config.ts', '.kay/types'],
-    }, null, 2)}\n`,
+    'tsconfig.json': `${JSON.stringify({ extends: 'kay/tsconfig.json' }, null, 2)}\n`,
   }
 
   // The app's session secret, for development and its tests, never committed.
