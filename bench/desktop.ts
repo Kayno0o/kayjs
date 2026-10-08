@@ -23,6 +23,8 @@ interface Sample {
   processes: number
   rss: number
   pss: number
+  // PSS by process name, the webview's own processes apart from the app's.
+  byName: Map<string, { count: number, pss: number }>
 }
 
 interface Variant {
@@ -49,15 +51,20 @@ const variants: Variant[] = [
   ...headless ? [] : [{ name: '`--desktop`, window open', argv: [join(OUT, 'app')] }],
 ]
 const rows: string[][] = []
+const breakdowns: string[] = []
 
 for (const variant of variants) {
   const { idle, loaded } = await measure(variant)
 
   rows.push([variant.name, String(idle.processes), mb(idle.rss), mb(idle.pss), loaded ? mb(loaded.rss) : '-', loaded ? mb(loaded.pss) : '-'])
+
+  if (idle.processes > 1)
+    breakdowns.push(`\n${variant.name}, idle PSS by process:\n\n${table(['Process', 'Count', 'PSS'], [...idle.byName].sort(([, a], [, b]) => b.pss - a.pss).map(([name, { count, pss }]) => [name, String(count), mb(pss)]))}`)
 }
 
 console.log(`\nreading-list example, ${SAMPLES} samples ${SETTLE_MS / 1000} s after start, medians; loaded is after ${REQUESTS} requests to its home. PSS splits pages shared between processes, so it adds up across them where RSS counts shared libraries once per process.\n`)
 console.log(table(['Run', 'Processes', 'RSS idle', 'PSS idle', 'RSS loaded', 'PSS loaded'], rows))
+console.log(breakdowns.join('\n'))
 
 async function build(flags: string[]): Promise<void> {
   const child = Bun.spawn([process.execPath, join(REPO, 'src/cli.ts'), 'build', APP, '--no-check', ...flags], { stdout: 'ignore', stderr: 'pipe' })
@@ -127,7 +134,7 @@ async function sampled(pid: number): Promise<Sample> {
     await Bun.sleep(1000)
   }
 
-  return { processes: Math.max(...samples.map(sample => sample.processes)), rss: median(samples.map(sample => sample.rss)), pss: median(samples.map(sample => sample.pss)) }
+  return { processes: Math.max(...samples.map(sample => sample.processes)), rss: median(samples.map(sample => sample.rss)), pss: median(samples.map(sample => sample.pss)), byName: samples.at(-1)!.byName }
 }
 
 // The process and every one it started, the webview's own included, which WebKitGTK starts under a sandbox of its own.
@@ -146,10 +153,20 @@ function treeMemory(root: number): Sample {
   for (const pid of tree)
     tree.push(...children.get(pid) ?? [])
 
+  const byName = new Map<string, { count: number, pss: number }>()
+
+  for (const pid of tree) {
+    const name = readable(`/proc/${pid}/comm`).trim()
+    const entry = byName.get(name) ?? { count: 0, pss: 0 }
+
+    byName.set(name, { count: entry.count + 1, pss: entry.pss + kilobytes(PSS, `/proc/${pid}/smaps_rollup`) })
+  }
+
   return {
     processes: tree.length,
     rss: tree.reduce((sum, pid) => sum + kilobytes(VM_RSS, `/proc/${pid}/status`), 0),
     pss: tree.reduce((sum, pid) => sum + kilobytes(PSS, `/proc/${pid}/smaps_rollup`), 0),
+    byName,
   }
 }
 
