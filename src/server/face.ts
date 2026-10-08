@@ -697,7 +697,7 @@ function pairSubtable(gpos: Uint8Array, offset: number): PairLookup {
     const [first, second] = [firstClass(left), secondClass(right)]
 
     if (first >= firstCount || second >= secondCount)
-      return 0
+      return undefined
 
     return advance(offset + 16 + (first * secondCount + second) * recordSize)
   }

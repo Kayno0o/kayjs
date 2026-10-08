@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { registerImage, setCardMaker, shareCard } from '../src/runtime/image'
 import { pages } from '../src/server'
 import { setupCards, writeCards } from '../src/server/card'
+import { fitTitle, TEXT_WIDTH, textWidth } from '../src/server/card-draw'
 import { decodePng } from '../src/server/crop'
 import { readFace } from '../src/server/face'
 import { fillOutline } from '../src/server/raster'
@@ -234,6 +235,7 @@ describe('share cards', () => {
     const client = resolve('.kay/client/dist')
     const hero = registerImage('/_kay/assets/card-hero.png', 1000, 600)
     const cache = await mkdtemp(join(tmpdir(), 'kay-cards-'))
+    let name: string | undefined
 
     try {
       // Booting writes the fonts again, which a test before may have left out.
@@ -246,7 +248,7 @@ describe('share cards', () => {
       expect(new URL(url, 'http://localhost').searchParams.get('title')).toBe('Built at build time')
       expect(await writeCards(client, cache)).toBe(1)
 
-      const [name] = (await readdir(join(client, 'images'))).filter(file => file.startsWith('card-'))
+      name = (await readdir(join(client, 'images'))).find(file => file.startsWith('card-'))
 
       expect(await readdir(cache)).toEqual([name!])
       expect(await new Bun.Image(Bun.file(join(client, 'images', name!))).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
@@ -258,6 +260,51 @@ describe('share cards', () => {
     finally {
       await rm(cache, { recursive: true, force: true })
       await rm(join(client, 'assets', 'card-hero.png'), { force: true })
+
+      if (name !== undefined)
+        await rm(join(client, 'images', name), { force: true })
+    }
+  })
+
+  it('reads the face and makes its key only once a card is linked, the key readable by its owner alone', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-key-'))
+    const client = resolve('.kay/client/dist')
+
+    try {
+      await pages(config)
+      await Bun.write(join(dir, 'fonts.json'), Bun.file(join(client, '..', 'fonts.json')))
+      await setupCards({ dir, clientDir: client, fonts: true })
+
+      expect(await Bun.file(join(dir, 'card.key')).exists()).toBe(false)
+
+      const url = new URL(shareCard({ title: 'x'.repeat(300) }), 'http://localhost')
+
+      expect((await stat(join(dir, 'card.key'))).mode & 0o777).toBe(0o600)
+      expect(url.searchParams.get('title')).toBe('x'.repeat(200))
+      expect(() => shareCard({ title: null as unknown as string })).toThrow('takes its title as a string, and was given null')
+      expect(() => shareCard({ title: ' \n ' })).toThrow('an empty title')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('sets a short title large on one line, and a long one in three lines of the smallest size, cut with an ellipsis', () => {
+    const face = readFace(woff2)
+    const short = fitTitle(face, 'Hello cards')
+    const long = fitTitle(face, 'A much longer title that has to wrap over several lines and eventually be cut short with an ellipsis because it never ends at all')
+    const unspaced = fitTitle(face, `https://example.com/${'segment/'.repeat(8)}`)
+
+    expect(short).toEqual({ size: 76, lines: ['Hello cards'] })
+    expect(long.size).toBe(46)
+    expect(long.lines).toHaveLength(3)
+    expect(long.lines[2]).toEndWith('…')
+    expect(unspaced.lines.length).toBeGreaterThan(1)
+    expect(unspaced.lines.join('')).toBe(`https://example.com/${'segment/'.repeat(8)}`)
+
+    for (const { size, lines } of [long, unspaced]) {
+      for (const line of lines)
+        expect(textWidth(face, line, size)).toBeLessThanOrEqual(TEXT_WIDTH)
     }
   })
 

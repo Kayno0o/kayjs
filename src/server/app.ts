@@ -254,8 +254,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   }
 
   serveImages(app, imageRoute)
-  await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (options.fonts?.length ?? 0) > 0, config: options.images?.card, name: options.seo?.name, quality: options.images?.quality, bundled: bundle !== undefined })
-  serveCards(app, imageRoute)
+  const cards = await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (options.fonts?.length ?? 0) > 0, config: options.images?.card, name: options.seo?.name, quality: options.images?.quality, bundled: bundle !== undefined })
+
+  serveCards(app, cards, imageRoute)
 
   serveFeeds(app, await projectCollections(root, options.content), options.site === undefined ? undefined : siteOrigin(options.site) + base, options.dev)
 

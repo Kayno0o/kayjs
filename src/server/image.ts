@@ -29,7 +29,7 @@ const LADDER = new Set<number>(IMAGE_WIDTHS)
 
 // About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
 export const MAX_UPLOAD_PIXELS = 50_000_000
-const DEFAULT_QUALITY = 80
+export const DEFAULT_QUALITY = 80
 
 // The file name of one variant of an image the build or the route wrote, a width of the ladder by default.
 export function variantName(source: string, variant: number | ImageVariant): string {

@@ -55,7 +55,7 @@ export function fillOutline(canvas: Canvas, contours: OutlinePoint[][], placemen
   }
 }
 
-export function blend(canvas: Canvas, at: number, color: Color, alpha: number): void {
+function blend(canvas: Canvas, at: number, color: Color, alpha: number): void {
   for (let channel = 0; channel < 3; channel++)
     canvas.pixels[at + channel] = Math.round(canvas.pixels[at + channel]! + (color[channel]! - canvas.pixels[at + channel]!) * alpha)
 }
