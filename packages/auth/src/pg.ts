@@ -94,7 +94,8 @@ export function pgStore(db: Database): AuthStore {
       async delete(id) {
         await users.write.deleteById(id)
       },
-      advanceTotpStep: async (id, step) => await users.write.updateOne({ totp_last_step: step }, e => e.and(e.eq('id', id), e.lt('totp_last_step', step))) !== null,
+      // updateMany on the key, as updateOne's LIMIT 1 subquery is not rechecked against a concurrent step: two codes for one step would both pass.
+      advanceTotpStep: async (id, step) => (await users.write.updateMany({ totp_last_step: step }, e => e.and(e.eq('id', id), e.lt('totp_last_step', step)), { pk: true })).length > 0,
     },
     identities: {
       find: async (provider, providerId) => toIdentity(await identities.read.findOne({ provider, provider_id: providerId })),
