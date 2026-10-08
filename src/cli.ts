@@ -37,7 +37,7 @@ import { remoteImages, remotePatterns } from './server/remote'
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const toStderr: Paint = (styles, text) => styleText(styles, text, { stream: process.stderr })
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable> | --desktop <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -194,14 +194,15 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
 // It checks the project as `kay check` does while it bundles for the browser, runs no page, API module or guard until that passed, and leaves the last build in place when either fails, unless `--no-check` says not to check.
-// With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server.
+// With `--compile`, also bundles the server and all of it into one executable, and with `--desktop` into one opening the app in a native window; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server.
 async function build(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'project': { type: 'string', short: 'p' } }, 1)
+  const parsed = parseCommand(args, { 'compile': { type: 'string' }, 'desktop': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'project': { type: 'string', short: 'p' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
 
-  const { compile, entry, outdir, project } = parsed.values
+  const { desktop, entry, outdir, project } = parsed.values
+  const compile = parsed.values.compile ?? desktop
   const exported = parsed.values.static === true
   const skipCheck = parsed.values['no-check'] === true
 
@@ -211,14 +212,20 @@ async function build(args: string[]): Promise<number> {
     return 1
   }
 
+  if (typeof parsed.values.compile === 'string' && typeof desktop === 'string') {
+    console.error(`kay: --compile writes a server, and --desktop an app opening its own window; pick one\n${USAGE}`)
+
+    return 1
+  }
+
   if (typeof entry === 'string' && typeof compile !== 'string') {
-    console.error(`kay: --entry names the server an executable runs, so it goes with --compile\n${USAGE}`)
+    console.error(`kay: --entry names the server an executable runs, so it goes with --compile or --desktop\n${USAGE}`)
 
     return 1
   }
 
   if (exported && typeof compile === 'string') {
-    console.error(`kay: --static writes files for a host with no server, and --compile a server; pick one\n${USAGE}`)
+    console.error(`kay: --static writes files for a host with no server, and --${typeof desktop === 'string' ? 'desktop' : 'compile'} a server; pick one\n${USAGE}`)
 
     return 1
   }
@@ -296,7 +303,7 @@ async function build(args: string[]): Promise<number> {
 
     if (typeof compile === 'string') {
       const compiled = performance.now()
-      const executable = await compileServer(root, config, { outfile: resolve(compile), entry: typeof entry === 'string' ? resolve(entry) : undefined })
+      const executable = await compileServer(root, config, { outfile: resolve(compile), entry: typeof entry === 'string' ? resolve(entry) : undefined, desktop: typeof desktop === 'string' })
 
       console.error(`compiled ${relative(process.cwd(), executable)} in ${Math.round(performance.now() - compiled)} ms`)
     }

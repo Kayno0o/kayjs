@@ -22,6 +22,7 @@ import { bundled } from './bundle'
 import { serveCards, setupCards } from './card'
 import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from './compress'
+import { desktopSession, guardDesktop } from './desktop'
 import { DEV_EVENTS, devEvents, hotSwap } from './dev'
 import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
@@ -167,6 +168,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const security = securityHeaders(options)
+  const desktop = desktopSession()
+
+  // First, so a request lacking the window's secret reaches nothing else.
+  if (desktop)
+    guardDesktop(app, desktop)
 
   trustProxy(app, options.proxy)
 

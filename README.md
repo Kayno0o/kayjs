@@ -41,6 +41,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | `kay dev [dir] [--entry <file>]` | run the server, restarting on change, errors shown in the browser |
 | `kay build [dir] [--no-check]` | bundle the browser code for production while checking the project as `kay check` does, keeping the last build when either fails; `--no-check` skips the check |
 | `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |
+| `kay build [dir] --desktop <file> [--entry <file>]` | the same, the executable opening the app in a native window on the system's webview, its server answering that window alone |
 | `kay build [dir] --static [--outdir dist]` | the same, then the whole site as static files for a host with no server |
 | `kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]` | type-check the project, `.kay` files included, `-p` naming another tsconfig and `--entry` the server entry whose `app` types `ctx.locals`; warnings fail it only with `--deny-warnings`, and `--fix` applies the fixes that change nothing else first |
 | `kay explain [lint]` | list the lints, or explain one with an example it reports and the same written right |
