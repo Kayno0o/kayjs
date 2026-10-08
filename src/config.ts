@@ -103,6 +103,10 @@ export interface HealthConfig {
 export interface SecurityConfig {
   // Directives merged over kay's Content-Security-Policy, `{ 'img-src': ["'self'"] }`, one given `false` left out, or `false` for no policy; `script-src` keeps the hashes of kay's inline scripts.
   csp?: Record<string, string[] | false> | false
+  // Directives merged over the enforced policy and sent as `Content-Security-Policy-Report-Only`, to see what a stricter policy would block before enforcing it.
+  reportOnly?: Record<string, string[] | false>
+  // Where browsers report what either policy blocks: `true` for kay's own route, which logs each violation and hands it to `onError` as a `CspViolation`, or a collector's URL.
+  reports?: true | string
   // Headers merged over kay's, one given `false` not sent: `{ 'strict-transport-security': 'max-age=63072000; includeSubDomains' }`.
   headers?: Record<string, string | false>
 }

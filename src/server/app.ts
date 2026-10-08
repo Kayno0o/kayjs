@@ -46,6 +46,7 @@ import { securityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
 import { serveSitemap } from './sitemap'
 import { answered, SERVER_SPAN, setTracer, traced } from './trace'
+import { serveViolationReports } from './violations'
 
 // Every slash at either end of a path.
 const EDGE_SLASHES = /^\/+|\/+$/g
@@ -243,6 +244,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, await serveApi(app, apiModules, actionOptions))
   serveErrorReports(app, options.onError)
+
+  if (options.security && options.security.reports === true)
+    serveViolationReports(app, options.onError)
 
   const imageRoute = {
     clientDir: client.dir,

@@ -45,7 +45,7 @@ export function serveErrorReports(app: Elysia, onError: KayConfig['onError']): v
     if (overLimit(REPORTS, clientAddress(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined)
       return new Response(null, { status: 429 })
 
-    const text = await readCapped(request)
+    const text = await readCapped(request, MAX_REPORT_BYTES)
 
     if (text === undefined)
       return new Response(null, { status: 413 })
@@ -61,15 +61,15 @@ export function serveErrorReports(app: Elysia, onError: KayConfig['onError']): v
   }, { parse: 'none' })
 }
 
-// The body, read only up to the cap, whatever `content-length` claims or when it is missing; undefined past it.
-async function readCapped(request: Request): Promise<string | undefined> {
+// The body, read only up to `max` bytes, whatever `content-length` claims or when it is missing; undefined past it.
+export async function readCapped(request: Request, max: number): Promise<string | undefined> {
   const chunks: Uint8Array[] = []
   let size = 0
 
   for await (const chunk of request.body ?? []) {
     size += chunk.byteLength
 
-    if (size > MAX_REPORT_BYTES)
+    if (size > max)
       return undefined
 
     chunks.push(chunk)

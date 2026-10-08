@@ -1308,7 +1308,7 @@ export default defineConfig({
 
 ## Security headers
 
-Every response the app sends, its own routes included, carries a Content-Security-Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: SAMEORIGIN`. The policy:
+Every response the app sends, its own routes included, carries a Content-Security-Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: SAMEORIGIN`, `Cross-Origin-Opener-Policy: same-origin`, `X-Permitted-Cross-Domain-Policies: none` and `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()`. The policy:
 
 ```text
 default-src 'self'; script-src 'self' <kay's hashes>; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
@@ -1322,13 +1322,17 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({
   security: {
     csp: { 'img-src': ['\'self\'', 'https://images.example.com'], 'frame-ancestors': false },
+    reportOnly: { 'style-src': ['\'self\''] },
+    reports: true,
     headers: { 'strict-transport-security': 'max-age=63072000; includeSubDomains', 'x-frame-options': false },
   },
 })
 ```
 
 - `csp` merges directives over kay's, one given `false` left out; `script-src`, and `script-src-elem` when the app sets one, keep kay's hashes whatever they list. `'script-src': false` leaves kay's inline scripts to `default-src`, which blocks them, islands and streamed blocks with them. `csp: false` sends no policy, `security: false` none of these headers.
-- `headers` merges headers over kay's, one given `false` not sent. HSTS is not sent by default: it binds the domain to https for its `max-age`, so it is the app's call.
+- `reports: true` has browsers report what the policy blocks to kay's own route, `/_kay/csp` under the site's `base`, through `report-to` and its `Reporting-Endpoints` header, and `report-uri` for browsers that predate them. The route takes both formats, logs each violation once per process for its directive, what it blocked and the page, and hands it to `onError` as a `CspViolation` from `kay/server`, with `directive`, `blocked`, a URL or `inline` or `eval`, `url`, the page without query or hash, `disposition`, `enforce` or `report`, and, when the browser says, `source`, the script that tried as `file:line:column`, and `sample`, the start of a blocked inline script or style when the directive lists `'report-sample'`. A client posting more than 30 reports a minute or 64 KB at once is refused. `reports: 'https://...'` sends them to that collector instead, and kay serves no route.
+- `reportOnly` merges directives over the enforced policy and sends the result as `Content-Security-Policy-Report-Only`: the browser blocks nothing it allows, but reports what that stricter policy would have blocked, with `disposition: 'report'`, to try it before moving it into `csp`. With `csp: false`, it merges over kay's directives.
+- `headers` merges headers over kay's, one given `false` not sent. HSTS is not sent by default: it binds the domain to https for its `max-age`, so it is the app's call. `Cross-Origin-Opener-Policy: same-origin` cuts a page off from a window of another site it opened, or that opened it, so a sign-in or payment popup that answers through `window.opener` needs `'cross-origin-opener-policy': 'same-origin-allow-popups'`; a site using a feature `Permissions-Policy` refuses, such as geolocation for a map, sends its own, `'permissions-policy': 'geolocation=(self)'`, which replaces kay's.
 - A header the app sets itself, in an Elysia `onRequest` or a handler, wins over kay's.
 - `inlineScriptHashes({ prefetch, dev })` from `kay/server` gives the hashes, for a policy written elsewhere, such as by a proxy.
 - Whatever the policy, a `javascript:`, `vbscript:` or `data:text/html` URL bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data`, as a user-supplied link would be, goes out prefixed with `unsafe:`, on the server and in islands, so following it does nothing. One written out as text in the template is left as it is.

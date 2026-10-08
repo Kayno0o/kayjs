@@ -18,6 +18,7 @@ import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { probeHealth } from '../src/server/lifecycle'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
+import { CspViolation } from '../src/server/violations'
 import { testSite } from '../src/test'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -54,6 +55,11 @@ describe('security headers', () => {
       expect(response.headers.get('x-content-type-options')).toBe('nosniff')
       expect(response.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin')
       expect(response.headers.get('x-frame-options')).toBe('SAMEORIGIN')
+      expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin')
+      expect(response.headers.get('permissions-policy')).toBe('camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()')
+      expect(response.headers.get('x-permitted-cross-domain-policies')).toBe('none')
+      expect(response.headers.has('content-security-policy-report-only')).toBe(false)
+      expect(response.headers.has('reporting-endpoints')).toBe(false)
     }
   })
 
@@ -70,7 +76,7 @@ describe('security headers', () => {
       prebuilt: false,
       security: {
         csp: { 'img-src': ['\'self\''], 'frame-ancestors': false, 'script-src': ['\'self\'', 'https://cdn.example.com'] },
-        headers: { 'Strict-Transport-Security': 'max-age=63072000', 'x-frame-options': false },
+        headers: { 'Strict-Transport-Security': 'max-age=63072000', 'x-frame-options': false, 'permissions-policy': 'geolocation=(self)', 'cross-origin-opener-policy': false },
       },
     })
     const response = await app.handle(new Request('http://localhost/about'))
@@ -81,6 +87,8 @@ describe('security headers', () => {
     expect(policy.get('script-src')).toEqual(['\'self\'', 'https://cdn.example.com', ...inlineScriptHashes()])
     expect(response.headers.get('strict-transport-security')).toBe('max-age=63072000')
     expect(response.headers.has('x-frame-options')).toBe(false)
+    expect(response.headers.get('permissions-policy')).toBe('geolocation=(self)')
+    expect(response.headers.has('cross-origin-opener-policy')).toBe(false)
   })
 
   it('keeps a header a route sets, on its Response or through set.headers', async () => {
@@ -109,6 +117,71 @@ describe('security headers', () => {
     expect((await own.handle(new Request('http://localhost/about'))).headers.get('content-security-policy')).toBe('default-src *')
     expect(offResponse.headers.has('content-security-policy')).toBe(false)
     expect(offResponse.headers.has('x-content-type-options')).toBe(false)
+  })
+
+  it('sends report directives and a report-only policy beside the enforced one, for kay\'s route or a collector', async () => {
+    const own = await pages({ routes: ROUTES, prebuilt: false, base: '/docs', security: { reports: true, reportOnly: { 'style-src': ['\'self\''] } } })
+    const response = await own.handle(new Request('http://localhost/about'))
+    const enforced = directives(response.headers.get('content-security-policy'))
+    const trial = directives(response.headers.get('content-security-policy-report-only'))
+
+    expect(response.headers.get('reporting-endpoints')).toBe('csp="/docs/_kay/csp"')
+    expect(enforced.get('style-src')).toEqual(['\'self\'', '\'unsafe-inline\''])
+    expect(enforced.get('report-uri')).toEqual(['/docs/_kay/csp'])
+    expect(enforced.get('report-to')).toEqual(['csp'])
+    expect(trial.get('style-src')).toEqual(['\'self\''])
+    expect(trial.get('script-src')).toEqual(['\'self\'', ...inlineScriptHashes({ base: '/docs' })])
+    expect(trial.get('report-to')).toEqual(['csp'])
+
+    const collector = await pages({ routes: ROUTES, prebuilt: false, security: { csp: false, reports: 'https://reports.example.com/csp', reportOnly: { 'img-src': ['\'self\''] } } })
+    const collected = await collector.handle(new Request('http://localhost/about'))
+
+    expect(collected.headers.get('reporting-endpoints')).toBe('csp="https://reports.example.com/csp"')
+    expect(collected.headers.has('content-security-policy')).toBe(false)
+    expect(directives(collected.headers.get('content-security-policy-report-only')).get('report-uri')).toEqual(['https://reports.example.com/csp'])
+    expect((await collector.handle(new Request('http://localhost/_kay/csp', { method: 'POST', body: '{}' }))).status).toBe(404)
+  })
+
+  it('logs each violation a browser reports once, in either format, and hands it to onError', async () => {
+    const caught: unknown[] = []
+    const app = await pages({ routes: ROUTES, prebuilt: false, security: { reports: true }, proxy: { header: 'x-real-ip' }, onError: error => void caught.push(error) })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const post = async (body: string, address = '10.0.0.1') => (await app.handle(new Request('http://localhost/_kay/csp', { method: 'POST', headers: { 'content-type': 'application/reports+json', 'x-real-ip': address }, body }))).status
+    const batch = JSON.stringify([
+      { type: 'csp-violation', url: 'https://site.example/about?token=1', body: { documentURL: 'https://site.example/about?token=1', blockedURL: 'https://evil.example/x.js?q=1', effectiveDirective: 'script-src-elem', disposition: 'enforce', sourceFile: 'https://site.example/_kay/a.js?v=2', lineNumber: 3, columnNumber: 7 } },
+      { type: 'deprecation', url: 'https://site.example/about', body: {} },
+    ])
+    const legacy = JSON.stringify({ 'csp-report': { 'document-uri': 'https://site.example/\nfake line', 'blocked-uri': 'inline', 'violated-directive': 'style-src-attr \'self\'', 'disposition': 'report', 'script-sample': 'color: red' } })
+
+    try {
+      expect(await post(batch)).toBe(204)
+      expect(await post(batch)).toBe(204)
+      expect(await post(legacy)).toBe(204)
+
+      const [script, style] = caught as CspViolation[]
+
+      expect(script).toBeInstanceOf(CspViolation)
+      expect(script).toMatchObject({ directive: 'script-src-elem', blocked: 'https://evil.example/x.js', url: 'https://site.example/about', disposition: 'enforce', source: 'https://site.example/_kay/a.js:3:7' })
+      expect(script!.message).toBe('script-src-elem blocked https://evil.example/x.js on https://site.example/about')
+      expect(style).toMatchObject({ directive: 'style-src-attr', blocked: 'inline', url: 'https://site.example/ fake line', disposition: 'report', sample: 'color: red' })
+      expect(style!.message).toEndWith('(report only)')
+      expect(logged).toHaveBeenCalledTimes(2)
+
+      expect(await post('not json')).toBe(400)
+      expect(await post('{"csp-report":{}}')).toBe(400)
+      expect(await post('x'.repeat(65 * 1024))).toBe(413)
+
+      const statuses = []
+
+      for (let i = 0; i < 31; i++)
+        statuses.push(await post('[]', '10.0.0.2'))
+
+      expect(statuses.at(-2)).toBe(204)
+      expect(statuses.at(-1)).toBe(429)
+    }
+    finally {
+      logged.mockRestore()
+    }
   })
 })
 
