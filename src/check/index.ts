@@ -134,7 +134,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const settingsPath = join(root, SHADOW_DIR, SETTINGS_CHECK)
   const exportsPath = join(root, SHADOW_DIR, EXPORTS_CHECK)
   const settingsFile = join(root, SHADOW_DIR, SHADOW_SETTINGS)
-  const own = await findKayFiles(root, { project: true, ownOnly: true })
+  const own = await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true })
   const sources = new Map(await Promise.all(own.map(async file => [file, await Bun.file(file).text()] as const)))
   const cacheDir = join(root, '.kay', 'cache')
   const islands = new Set((await Promise.all(own.map(async file => await rendersAsIslandCached(cacheDir, file, sources.get(file)!) ? [file] : []))).flat())

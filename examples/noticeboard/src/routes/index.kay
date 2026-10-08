@@ -17,9 +17,9 @@ export const post = action(t.Object({
 
   const notice = await db.repo(Notice).write.insertOne({ author_id: user.id, title: title.trim(), body: body.trim() }, { full: true })
 
-  // Every open board hears of it now; the members' mails go out from the queue.
-  board.publish(BOARD, { type: 'posted', notice: { id: notice.id, title: notice.title, author: user.username ?? 'A member' } })
+  // The members' mails go out from the queue; every open board hears of it now.
   await announcements.enqueue({ noticeId: notice.id })
+  board.publish(BOARD, { type: 'posted', notice: { id: notice.id, title: notice.title, author: user.username ?? 'A member' } })
 
   return { id: notice.id }
 })

@@ -130,6 +130,21 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('leaves a kay project nested inside, holding its own kay.config.ts, to its own check', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p Home\n',
+      'src/demo/kay.config.ts': 'export default {}\n',
+      'src/demo/src/routes/index.kay': '---\nconst count: number = \'no\'\n---\np {count}\n',
+    })
+
+    try {
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('tells to call an imported signal read by name where its value goes, its text rendering as it is', async () => {
     const root = await scratchProject({
       'src/accent.ts': 'import { signal } from \'kay\'\n\nexport const accent = signal(\'red\')\n',

@@ -12,7 +12,7 @@ export async function islandOnlyComponents(root: string, routesDir: string, file
   const importers = new Map<string, Set<string>>(files.map(file => [file, new Set()]))
   // Imported from a script, which may render it on the server.
   const fromScript = new Set<string>()
-  const scripts = await findProjectFiles(root, SCRIPT_FILE, { project: true, ownOnly: true })
+  const scripts = await findProjectFiles(root, SCRIPT_FILE, { project: true, ownOnly: true, ownKayOnly: true })
 
   await Promise.all([...files, ...scripts].map(async (file) => {
     // A component is imported with its extension, so no other specifier can name one.

@@ -9,6 +9,9 @@ on:
     paths-ignore:
       - '**.md'
   workflow_dispatch:
+  # Daily, so a library release that breaks the example with kay shows here before a site meets it, kay commit or not.
+  schedule:
+    - cron: '17 5 * * *'
 
 # Pinned so the cache step and bun agree on one folder, whatever HOME the runner image sets.
 env:
@@ -57,12 +60,6 @@ jobs:
       - name: Tests
         run: bun test
 
-      # The lockfile holds the libraries the last bump tested; their newest releases go through the example too, so one that breaks it with kay fails here first.
-      - name: Test the example app on the latest library releases
-        run: |
-          bun update --latest @kaynooo/kayjs-auth @kaynooo/kayjs-mail @kaynooo/kayjs-ui @kaynooo/pg-orm
-          bun test ./tests/examples.test.ts
-
       # The Solid and Svelte apps the benchmark compares against are packages of their own.
       - name: Check the benchmark apps
         run: |
@@ -72,3 +69,9 @@ jobs:
 
       - name: Check that kay's bench pages leave hydration markers to islands
         run: bun test ./bench -t 'leave hydration markers'
+
+      # Last, as it moves the lockfile: the libraries the last bump tested pass above, their newest releases go through the example here.
+      - name: Test the example app on the latest library releases
+        run: |
+          bun update --latest @kaynooo/kayjs-auth @kaynooo/kayjs-mail @kaynooo/kayjs-ui @kaynooo/pg-orm
+          bun test ./tests/examples.test.ts

@@ -28,7 +28,7 @@ export interface ShadowSettings {
   islandOnly: Set<string>
 }
 
-// A file outside the project, such as a library a workspace installs in a `node_modules` above it, goes under one folder per level climbed, so it stays inside the tree and its sibling components still resolve beside it.
+// A file outside the project, such as a library a workspace installs in a `node_modules` above it, goes under one `__` folder per level climbed, so it stays inside the tree and its sibling components still resolve beside it. A project folder named `__` would share that path.
 export function shadowPath(root: string, file: string): string {
   return join(root, SHADOW_DIR, `${relative(root, file).split(sep).map(part => part === PARENT ? OUTSIDE : part).join(sep)}.tsx`)
 }
