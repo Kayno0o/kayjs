@@ -4,7 +4,6 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG } from '../content/server'
-import { desktopPort, refuseDesktopConfig, webviewLibrary, windowSettings } from '../desktop/library'
 import { scanApi } from '../server/api'
 import { messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
@@ -17,8 +16,6 @@ export interface CompileOptions {
   // The server entry, `src/server.ts` under the root by default.
   entry?: string
   outfile: string
-  // Opens the app in a native window, its server answering the window alone, rather than only listening.
-  desktop?: boolean
 }
 
 // Bun embeds an asset directory under its last path component, beside the executable's entry.
@@ -35,9 +32,6 @@ export async function compileServer(root: string, config: KayConfig, options: Co
 
   if (!existsSync(entry))
     throw new Error(`kay: no server entry at ${entry}; pass --entry`)
-
-  if (options.desktop)
-    refuseDesktopConfig(root, config)
 
   if (basename(publicDir) === CLIENT_ASSETS)
     throw new Error(`kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
@@ -56,15 +50,13 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   const modules = [...new Set([...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...api.flatMap(module => [module.file, ...module.guards])])]
   const configFile = join(root, CONFIG_FILE)
   const generated = join(root, '.kay', 'compile', 'entry.ts')
-  const window = join(root, '.kay', 'compile', 'window.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
 
   await Bun.write(generated, [
     `import { join } from 'node:path'`,
     `import process from 'node:process'`,
-    `import { probeHealth, registerBundle${options.desktop ? ', startDesktopServer' : ''} } from 'kay/internal/server'`,
+    `import { probeHealth, registerBundle } from 'kay/internal/server'`,
     '',
-    ...options.desktop ? [`startDesktopServer(${desktopPort(root)})`, ''] : [],
     existsSync(configFile) ? `const { default: config } = await import(${JSON.stringify(configFile)})` : 'const config = {}',
     '',
     // Asks the server running beside it, rather than starting one, before any module of the app loads: a container's health check runs it every few seconds.
@@ -88,9 +80,6 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     '',
   ].join('\n'))
 
-  if (options.desktop)
-    await writeWindowEntry(root, config, window, generated)
-
   const configSource = existsSync(configFile) ? await Bun.file(configFile).text() : undefined
   const runtime = configSource === undefined ? undefined : withoutPlugins(configSource)
 
@@ -99,10 +88,9 @@ export async function compileServer(root: string, config: KayConfig, options: Co
 
   const configPlugins = runtime === undefined ? [] : [runtimeConfig(configFile, runtime)]
   const build = await Bun.build({
-    // The window runs on the main thread, and the server in a worker the executable carries as a second entry.
-    entrypoints: options.desktop ? [window, generated] : [generated],
+    entrypoints: [generated],
     target: 'bun',
-    compile: { outfile, assets: [clientBase, publicDir].filter(dir => existsSync(dir)), ...options.desktop && { windows: { hideConsole: true } } },
+    compile: { outfile, assets: [clientBase, publicDir].filter(dir => existsSync(dir)) },
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
@@ -113,18 +101,6 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     throw new AggregateError(build.logs, 'kay: compiling the server failed')
 
   return outfile
-}
-
-// The main thread of a desktop executable, which opens the window on the server the worker entry runs.
-// It embeds the webview library for the platform the executable is built on, which is the one it runs on.
-async function writeWindowEntry(root: string, config: KayConfig, window: string, worker: string): Promise<void> {
-  await Bun.write(window, [
-    `import { openWindow } from 'kay/internal/desktop'`,
-    `import library from ${JSON.stringify(webviewLibrary(root))} with { type: 'file' }`,
-    '',
-    `await openWindow({ worker: new URL(${JSON.stringify(`./${basename(worker)}`)}, import.meta.url).href, library, ...${JSON.stringify(windowSettings(root, config))} })`,
-    '',
-  ].join('\n'))
 }
 
 // Every module a route renders or runs: its page, layouts, special pages and guards.

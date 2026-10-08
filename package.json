@@ -105,10 +105,6 @@
       "types": "./types/server/internal.d.ts",
       "default": "./src/server/internal.ts"
     },
-    "./internal/desktop": {
-      "types": "./types/desktop/window.d.ts",
-      "default": "./src/desktop/window.ts"
-    },
     "./test": {
       "types": "./types/test/index.d.ts",
       "default": "./src/test/index.ts"
@@ -145,19 +141,12 @@
     "bench": "bun bench/run.ts",
     "bench:origins": "bun bench/origins.ts",
     "bench:sites": "bun bench/sites/run.ts",
-    "bench:desktop": "bun bench/desktop.ts",
     "bench:test": "bun test ./bench",
     "docs:build": "bun docs/split.ts && bun src/cli.ts build docs --static",
     "bench:check": "bun src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte"
   },
   "peerDependencies": {
-    "@types/bun": "^1.4.2",
-    "webview-bun": "^2.4.0"
-  },
-  "peerDependenciesMeta": {
-    "webview-bun": {
-      "optional": true
-    }
+    "@types/bun": "^1.4.2"
   },
   "dependencies": {
     "@babel/parser": "^7.29.7",
@@ -182,7 +171,6 @@
     "mitata": "1.0.34",
     "playwright-core": "1.62.0",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3",
-    "webview-bun": "^2.4.0"
+    "typescript": "^6.0.3"
   }
 }

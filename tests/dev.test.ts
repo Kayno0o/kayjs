@@ -181,26 +181,6 @@ describe('kay dev', () => {
     expect(children.at(-1)!.killed).toBe(true)
   })
 
-  it('reports the port each server listens on, for kay dev --desktop to open its window on', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
-    const ports: number[] = []
-
-    await Bun.write(join(root, 'src/server.ts'), 'Bun.serve({ port: 0, fetch: () => new Response(\'up\') })\n')
-    const stop = await dev(root, { onListen: port => ports.push(port) })
-
-    try {
-      await until(() => ports.length === 1)
-      expect(await (await fetch(`http://localhost:${ports[0]}/`)).text()).toBe('up')
-
-      await Bun.write(join(root, 'src/other.ts'), 'export {}\n')
-      await until(() => ports.length === 2)
-    }
-    finally {
-      await stop()
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('runs from the command line on the project a directory names, or with the entry --entry names', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const seen = join(root, 'seen.txt')

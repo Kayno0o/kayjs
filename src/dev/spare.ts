@@ -6,19 +6,6 @@ import '../server'
 // Bun runs the entry once this resolves, as the main module, when `kay dev` writes a line.
 loadTraverse()
 
-// `kay dev --desktop` opens its window on the port the server listens on, whichever the entry chose.
-if (process.env.KAY_DEV_LISTEN) {
-  const serve = Bun.serve.bind(Bun)
-
-  Bun.serve = ((options) => {
-    const server = serve(options)
-
-    process.send?.(server.port)
-
-    return server
-  }) as typeof Bun.serve
-}
-
 const START_LINE = /^start (\d+)(?: (\d+) ([^\n]*))?/
 
 const reader = Bun.stdin.stream().getReader()

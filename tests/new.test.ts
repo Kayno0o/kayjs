@@ -307,59 +307,6 @@ describe('kay new', () => {
     }
   }, 30_000)
 
-  it('scaffolds a desktop app that checks and builds into one executable opening its window', async () => {
-    const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-notes')
-
-    try {
-      const files = await createProject(dir, { kay: '^1.0.0', template: 'desktop' })
-      const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, scripts: Record<string, string> }
-
-      expect(files).not.toContain('Dockerfile')
-      expect(manifest.scripts).toMatchObject({ dev: 'kay dev --desktop', build: 'kay build --desktop app' })
-      expect(manifest.dependencies['webview-bun']).toBeDefined()
-      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('  desktop: { width: 1024, height: 768 },\n})\n')
-
-      await installKay(dir)
-      expect(await check(dir)).toEqual([])
-      expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
-
-      const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--desktop', 'app'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
-
-      expect(report).toContain('compiled app in ')
-      expect(code).toBe(0)
-
-      const app = Bun.spawn([join(dir, 'app'), '--no-window'], { cwd: tmpdir(), env: { PATH: process.env.PATH }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
-
-      try {
-        const reader = app.stdout.getReader()
-        let output = ''
-
-        while (!output.includes('\n')) {
-          const { value, done } = await reader.read()
-
-          if (done)
-            throw new Error(`the app exited: ${await new Response(app.stderr).text()}`)
-
-          output += new TextDecoder().decode(value)
-        }
-
-        const url = (/Open (\S+)/).exec(output)![1]!
-        const first = await fetch(url, { redirect: 'manual' })
-        const cookie = first.headers.get('set-cookie')!
-        const home = await fetch(new URL('/', url), { headers: { cookie: cookie.slice(0, cookie.indexOf(';')) } })
-
-        expect(await home.text()).toContain('<title>Home | my-notes</title>')
-      }
-      finally {
-        app.kill()
-      }
-    }
-    finally {
-      await rm(join(dir, '..'), { recursive: true, force: true })
-    }
-  }, 60_000)
-
   it('refuses a directory that already holds files', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-new-'))
 

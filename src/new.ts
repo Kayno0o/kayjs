@@ -13,12 +13,12 @@ const NAME_EDGES = /^[-._~]+|[-._~]+$/g
 
 export type { Template }
 
-export const TEMPLATES: readonly Template[] = ['server', 'site', 'app', 'desktop']
+export const TEMPLATES: readonly Template[] = ['server', 'site', 'app']
 
 export interface NewOptions {
   // The \`kay\` dependency: by default the published kay running this command, or a packed copy of the checkout running it.
   kay?: string
-  // `server` by default, an Elysia app serving the pages, run in production as one executable; `site`, a static site built to files; `app`, the server with sessions, a sign-in, members in Postgres through pg-orm, a guarded section and a websocket; `desktop`, the server opening its own window, built into one executable.
+  // `server` by default, an Elysia app serving the pages, run in production as one executable; `site`, a static site built to files; `app`, the server with sessions, a sign-in, members in Postgres through pg-orm, a guarded section and a websocket.
   template?: Template
 }
 
@@ -39,7 +39,6 @@ export async function createProject(target: string, options: NewOptions = {}): P
   const template = options.template ?? 'server'
   const site = template === 'site'
   const app = template === 'app'
-  const desktop = template === 'desktop'
   // An app's tests run each file in modules of its own, so each gets the database tests/database.ts copies for it.
   const scripts = { 'check': 'kay check', 'lint': 'keslint --cache', 'lint:fix': 'keslint --fix --cache', 'fmt': 'kay fmt', 'test': app ? 'bun test --isolate' : 'bun test', ...app && { 'db:generate': 'pg-orm generate', 'db:migrate': 'pg-orm apply' } }
   const devDependencies = Object.fromEntries(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'].map(name => [name, kay.devDependencies[name]!]))
@@ -49,8 +48,8 @@ export async function createProject(target: string, options: NewOptions = {}): P
       name,
       type: 'module',
       private: true,
-      scripts: site ? { dev: 'kay dev', build: 'kay build --static', ...scripts } : desktop ? { dev: 'kay dev --desktop', build: 'kay build --desktop app', ...scripts } : { dev: 'kay dev', build: 'kay build', compile: 'kay build --compile server', start: 'NODE_ENV=production bun src/server.ts', ...scripts },
-      dependencies: { ...app && { '@kaynooo/pg-orm': kay.devDependencies['@kaynooo/pg-orm'] }, elysia: kay.dependencies.elysia, kay: dependency, ...desktop && { 'webview-bun': kay.devDependencies['webview-bun'] } },
+      scripts: site ? { dev: 'kay dev', build: 'kay build --static', ...scripts } : { dev: 'kay dev', build: 'kay build', compile: 'kay build --compile server', start: 'NODE_ENV=production bun src/server.ts', ...scripts },
+      dependencies: { ...app && { '@kaynooo/pg-orm': kay.devDependencies['@kaynooo/pg-orm'] }, elysia: kay.dependencies.elysia, kay: dependency },
       devDependencies,
     }, null, 2)}\n`,
     'tsconfig.json': `${JSON.stringify({ extends: 'kay/tsconfig.json' }, null, 2)}\n`,

@@ -79,16 +79,6 @@ export interface KayConfig {
   preview?: PreviewConfig
   // Receives every error a load, a render, a guard or an action throws, as it is logged: the place to send them to an error tracker.
   onError?: (error: unknown, request: Request) => void | Promise<void>
-  // The window `kay build --desktop` opens the app in.
-  desktop?: DesktopConfig
-}
-
-export interface DesktopConfig {
-  // The window's title until a page sets its own, `seo.name` by default.
-  title?: string
-  // 1024 by 768 by default.
-  width?: number
-  height?: number
 }
 
 // What every page's head starts from; a layout or the page setting the same tag wins.

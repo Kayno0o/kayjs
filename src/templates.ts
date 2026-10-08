@@ -1,6 +1,6 @@
 // The files `kay new` writes, `__NAME__` standing for the package name. Written as strings rather than template files, which the repository's own `.kay` scans would pick up.
 
-export type Template = 'server' | 'site' | 'app' | 'desktop'
+export type Template = 'server' | 'site' | 'app'
 
 const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
 
@@ -709,21 +709,4 @@ volumes:
 `,
 }
 
-// An app opening its own window, which `kay build --desktop` makes one executable of; its server answers that window alone.
-const DESKTOP_FILES: Record<string, string> = {
-  ...COMMON_FILES,
-  '.forgejo/workflows/test.yml': TEST_WORKFLOW,
-  '.gitignore': 'node_modules\n.kay\n.eslintcache\n/app\n',
-  'kay.config.ts': CONFIG.replace('\n})\n', '\n  desktop: { width: 1024, height: 768 },\n})\n'),
-  'src/server.ts': `import process from 'node:process'
-import { Elysia } from 'elysia'
-import { pages } from 'kay/server'
-
-// Exported for \`kay check\`, which checks links against the routes it serves besides the pages and types \`ctx.locals\` from its plugins.
-// The executable \`kay build --desktop\` makes binds it to a free loopback port instead, which its window alone reaches.
-export const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 3000))
-`,
-  'src/components/header.kay': header('[{ href: \'/\', label: \'Home\' }]'),
-}
-
-export const TEMPLATE_FILES: Record<Template, Record<string, string>> = { server: SERVER_FILES, site: SITE_FILES, app: APP_FILES, desktop: DESKTOP_FILES }
+export const TEMPLATE_FILES: Record<Template, Record<string, string>> = { server: SERVER_FILES, site: SITE_FILES, app: APP_FILES }
