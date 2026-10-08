@@ -10,6 +10,7 @@ const QUERY = /\?.*$/
 const FUNCTION_NAME = /[a-z-]*$/i
 // An aspect ratio as `image()` takes it, `16/9`, or as the route does, `16x9`.
 const ASPECT = /^(\d{1,3})[/x](\d{1,3})$/
+const REMOTE = /^https?:\/\//i
 
 // The share card social sites show, which they read best as a JPEG.
 export const CARD = { width: 1200, height: 630 } as const
@@ -55,10 +56,24 @@ let maxDensity: number | undefined
 let aspects: ReadonlySet<string> | undefined
 // The variants of imported images that pages asked for beyond the ladder, by asset name, for `kay build` to write.
 const requested = new Map<string, Map<string, ImageVariant>>()
+// The variants of images on other hosts that a static export's pages link, by URL, for `kay build` to download and write.
+const requestedRemote = new Map<string, Map<string, ImageVariant>>()
+// Whether `images.remote` covers a URL, on the server; the browser checks none.
+let remoteListed: ((src: string) => boolean) | undefined
 
 // `images.maxDensity` on the server; the browser reads it off the page, where the server wrote it unless it is the default.
 export function setMaxDensity(density: number): void {
   maxDensity = density
+}
+
+export function setRemoteImages(listed: (src: string) => boolean): void {
+  remoteListed = listed
+}
+
+// An image on another host goes through the image route only from a host `images.remote` lists.
+function refuseUnlisted(src: string, caller: string): void {
+  if (remoteListed && REMOTE.test(src) && !remoteListed(src))
+    throw new Error(`kay: ${caller} was given ${src}, on a host images.remote in kay.config.ts does not list`)
 }
 
 export function setAspects(allowed: readonly string[]): void {
@@ -118,6 +133,34 @@ export function requestedVariants(name: string): ImageVariant[] {
   return [...requested.get(name)?.values() ?? []]
 }
 
+// The variants of remote images a static export's pages link, each with the file name they link.
+export function requestedRemoteVariants(): { src: string, name: string, variant: ImageVariant }[] {
+  return [...requestedRemote].flatMap(([src, variants]) => [...variants.values()].map(variant => ({ src, name: remoteVariantName(src, variant), variant })))
+}
+
+// Named after a hash of the URL, which the browser computes as the build did.
+export function remoteVariantName(src: string, variant: ImageVariant): string {
+  return `remote-${urlHash(src)}${variantSuffix(variant)}`
+}
+
+// cyrb53, 53 bits of a string's hash in base 36: Bun.hash is not in the browser.
+function urlHash(text: string): string {
+  let h1 = 0xDEADBEEF
+  let h2 = 0x41C6CE57
+
+  for (let index = 0; index < text.length; index++) {
+    const code = text.charCodeAt(index)
+
+    h1 = Math.imul(h1 ^ code, 2654435761)
+    h2 = Math.imul(h2 ^ code, 1597334677)
+  }
+
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)
+}
+
 function currentMaxDensity(): number {
   if (maxDensity === undefined && typeof document !== 'undefined')
     maxDensity = Number(document.querySelector<HTMLMetaElement>(DENSITY_META)?.content ?? DEFAULT_MAX_DENSITY)
@@ -135,12 +178,14 @@ export function registerImage(url: string, width: number, height: number): strin
   return url
 }
 
-// An imported image, or one from a directory in `images.dirs` given its size, served as WebP variants at each width of the ladder up to its own.
+// An imported image, or one from a directory in `images.dirs` or a host in `images.remote` given its size, served as WebP variants at each width of the ladder up to its own.
 export function image(src: string, options: ImageOptions = {}): ImageProps {
   const own = sizes.get(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
 
   if (!own || !RESIZABLE.test(src))
     return Object.assign(options.sizes === undefined ? { src } : { src, sizes: options.sizes }, own)
+
+  refuseUnlisted(src, 'image()')
 
   const aspect = options.aspect === undefined ? undefined : allowedAspect(options.aspect)
   const size = aspect ? croppedSize(own, aspect) : own
@@ -167,10 +212,12 @@ function allowedAspect(text: string): Aspect {
   return aspect
 }
 
-// The URL of an imported image, or one from `images.dirs`, cut to the 1200x630 share card social sites show, as a JPEG, for `og:image`: `meta(property="og:image" content={shareImage(hero)})` in a `head` block. Smaller images are enlarged to fill it.
+// The URL of an imported image, or one from `images.dirs` or `images.remote`, cut to the 1200x630 share card social sites show, as a JPEG, for `og:image`: `meta(property="og:image" content={shareImage(hero)})` in a `head` block. Smaller images are enlarged to fill it.
 export function shareImage(src: string): string {
   if (!RESIZABLE.test(src))
     throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG or WebP`)
+
+  refuseUnlisted(src, 'shareImage()')
 
   return variantUrl(src, 'card')
 }
@@ -271,7 +318,7 @@ export function variantFilesLinked(): boolean {
 
 export interface ShareCardOptions {
   title: string
-  // An imported image, or one from `images.dirs`, covering the card behind the title.
+  // An imported image, or one from `images.dirs` or `images.remote`, covering the card behind the title.
   image?: string
 }
 
@@ -287,6 +334,9 @@ export function shareCard(card: ShareCardOptions): string {
   if (card.image !== undefined && !RESIZABLE.test(card.image))
     throw new Error(`kay: shareCard() cannot draw on ${card.image}: it takes a PNG, JPEG or WebP`)
 
+  if (card.image !== undefined)
+    refuseUnlisted(card.image, 'shareCard()')
+
   if (!cardMaker)
     throw new Error('kay: shareCard() draws on the server, in a page\'s head')
 
@@ -299,6 +349,12 @@ export function imageUrl(src: string, width: number, aspect?: Aspect): string {
 
 function variantUrl(src: string, variant: ImageVariant): string {
   const cut = variant === 'card' || variant.aspect !== undefined
+
+  if (variantFiles && REMOTE.test(src)) {
+    requestedRemote.set(src, (requestedRemote.get(src) ?? new Map()).set(variantSuffix(variant), variant))
+
+    return `${VARIANTS}${remoteVariantName(src, variant)}`
+  }
 
   if (src.startsWith(IMPORTED) && (cut || variantFiles)) {
     const name = decodeURIComponent(src.slice(IMPORTED.length).replace(QUERY, ''))

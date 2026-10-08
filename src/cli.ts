@@ -30,8 +30,9 @@ import { buildClient, PRERENDERED_DIR } from './server/client'
 import { compressFiles } from './server/compress'
 import { buildingWithoutEnv } from './server/env'
 import { FAVICON_DIR, writeFavicons } from './server/favicon'
-import { writeImageVariants } from './server/image'
+import { writeImageVariants, writeRemoteVariants } from './server/image'
 import { ExportError, prerenderPages } from './server/prerender'
+import { remoteImages, remotePatterns } from './server/remote'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
@@ -352,8 +353,12 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
 
   const prerendered = await prerenderPages(root, config, client, { exportAll: exported })
 
+  // Remote originals are kept between builds, revalidated as the image route does.
+  const remote = remoteImages(join(root, '.kay', 'cache', 'remote'), remotePatterns(config.images?.remote))
+
   await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'))
-  await writeCards(client.dir, join(root, '.kay', 'cache', 'cards'))
+  await writeRemoteVariants(client.dir, remote, config.images?.quality)
+  await writeCards(client.dir, join(root, '.kay', 'cache', 'cards'), remote)
 
   if (config.favicon !== undefined)
     await writeFavicons(resolve(root, config.favicon), join(client.dir, '..', FAVICON_DIR))

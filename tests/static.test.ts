@@ -19,9 +19,11 @@ const STATIC_IMPORT = /(?:from|import)\s*"([^"]+\.js)"/g
 
 let out: string
 let server: ReturnType<typeof Bun.serve>
+// The host a page links an image of, which the export downloads.
+const remoteHost = Bun.serve({ port: 0, fetch: () => new Response(Bun.file(join(FIXTURE, 'src/hero.png'))) })
 
 async function exportSite(outdir: string): Promise<{ code: number, errors: string }> {
-  const child = Bun.spawn([process.execPath, CLI, 'build', FIXTURE, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, CLI, 'build', FIXTURE, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_TEST_REMOTE_ORIGIN: `http://127.0.0.1:${remoteHost.port}` } })
   const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
   return { code, errors }
@@ -70,6 +72,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await server.stop(true)
+  await remoteHost.stop(true)
   await rm(out, { recursive: true, force: true })
 })
 
@@ -117,6 +120,13 @@ describe('kay build --static', () => {
     const card = (/<meta property="og:image" content="https:\/\/x\.example\/repo(\/_kay\/images\/[\w-]+-card\.jpg)">/).exec(home)![1]!
 
     expect((await get(square)).status).toBe(200)
+
+    // A remote image's variants are downloaded and written as files, named after its URL.
+    const remote = (/<img src="\/repo(\/_kay\/images\/remote-\w+-1000\.webp)" srcset="([^"]+)"/).exec(home)!
+    const variant = await fetch(new URL(`${BASE}${remote[1]}`, server.url))
+
+    expect(remote[2]).toContain('-320.webp 320w')
+    expect(await new Bun.Image(await variant.bytes()).metadata()).toEqual({ width: 1000, height: 600, format: 'webp' })
     expect((await get(card)).status).toBe(200)
     expect(home).toContain('<slot data-component="src/components/counter.kay"')
     expect(await Bun.file(join(out, '_kay', `${entry.slice('/_kay/'.length)}.br`)).exists()).toBe(true)

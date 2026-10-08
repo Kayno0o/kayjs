@@ -1,12 +1,14 @@
 import type { Elysia } from 'elysia'
 import type { Aspect, ImageVariant } from '../runtime/image'
+import type { RemoteOriginal } from './remote'
 import { existsSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
-import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedVariants, RESIZABLE, setAspects, setMaxDensity, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, variantHeight, variantSuffix } from '../runtime/image'
 import { coverImage } from './crop'
 import { revalidated } from './public'
+import { remoteAllowed, remotePatterns } from './remote'
 import { decodePath } from './routes'
 
 export interface ImageRouteOptions {
@@ -19,6 +21,8 @@ export interface ImageRouteOptions {
   quality?: number
   // The aspect ratios variants are cut to, `images.aspects`.
   aspects?: readonly string[]
+  // Downloads an image from a host `images.remote` lists.
+  remote?: (src: string) => Promise<RemoteOriginal>
 }
 
 export const VARIANTS_DIR = 'images'
@@ -26,6 +30,7 @@ const ASSETS_PATH = `${ASSET_PREFIX}assets/`
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 const LADDER = new Set<number>(IMAGE_WIDTHS)
+const REMOTE_URL = /^https?:\/\//i
 
 // About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
 export const MAX_UPLOAD_PIXELS = 50_000_000
@@ -97,7 +102,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
   return encoded
 }
 
-// `/_kay/image?src=...&w=640` answers a WebP of an imported image, or of one in a directory of runtime images, at a width of the ladder or its own; `&crop=16x9` cuts it to an aspect ratio `images.aspects` allows, and `?src=...&card` answers its 1200x630 JPEG share card.
+// `/_kay/image?src=...&w=640` answers a WebP of an imported image, or of one in a directory of runtime images or on a host `images.remote` lists, at a width of the ladder or its own; `&crop=16x9` cuts it to an aspect ratio `images.aspects` allows, and `?src=...&card` answers its 1200x630 JPEG share card.
 export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const pending = new Map<string, Promise<void>>()
   const allowed = new Set((options.aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!)))
@@ -105,10 +110,13 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   app.get(IMAGE_ROUTE, async ({ request }) => {
     const url = new URL(request.url)
     const src = url.searchParams.get('src') ?? ''
-    const source = sourceFile(src, options)
+    const source = await findSource(src, options)
 
     if (!source)
       return new Response('Not found', { status: 404, headers: TEXT })
+
+    if ('status' in source)
+      return new Response(source.message, { status: source.status, headers: TEXT })
 
     let stats: { size: number, mtimeMs: number }
 
@@ -199,6 +207,18 @@ function requestedVariant(url: URL, own: { width: number, height: number }, allo
   return aspect ? { width, aspect } : { width }
 }
 
+// The file a `src` names, a remote image's downloaded copy included, or why the remote one is refused.
+export async function findSource(src: string, options: ImageRouteOptions): Promise<{ path: string, immutable: boolean } | { status: number, message: string } | undefined> {
+  const local = sourceFile(src, options)
+
+  if (local || !options.remote || !REMOTE_URL.test(src) || !RESIZABLE.test(src))
+    return local
+
+  const original = await options.remote(src)
+
+  return 'path' in original ? { path: original.path, immutable: false } : original
+}
+
 // The file a `src` names, never one outside the built assets or the directories of runtime images.
 export function sourceFile(src: string, options: ImageRouteOptions): { path: string, immutable: boolean } | undefined {
   const decoded = decodePath(src)
@@ -228,17 +248,43 @@ export function sourceFile(src: string, options: ImageRouteOptions): { path: str
   return undefined
 }
 
-// `images.maxDensity` and `images.aspects`, checked and set for every image this process renders, served or prerendered; returns the density.
-export function applyImageConfig(images: { maxDensity?: number, aspects?: string[] } | undefined): number {
+// `images.maxDensity`, `images.aspects` and `images.remote`, checked and set for every image this process renders, served or prerendered; returns the density.
+export function applyImageConfig(images: { maxDensity?: number, aspects?: string[], remote?: string[] } | undefined): number {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
   if (!(maxDensity >= 1))
     throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)
 
+  const patterns = remotePatterns(images?.remote)
+
   setMaxDensity(maxDensity)
   setAspects(images?.aspects ?? DEFAULT_ASPECTS)
+  setRemoteImages(src => remoteAllowed(src, patterns))
 
   return maxDensity
+}
+
+// The variants of remote images a static export's pages link, downloaded and written beside the others; returns how many were encoded. One the host fails to give fails the build, since no route would make it later.
+export async function writeRemoteVariants(clientDir: string, remote: (src: string) => Promise<RemoteOriginal>, quality = DEFAULT_QUALITY): Promise<number> {
+  let encoded = 0
+
+  for (const { src, name, variant } of requestedRemoteVariants()) {
+    const target = join(clientDir, VARIANTS_DIR, name)
+
+    if (await Bun.file(target).exists())
+      continue
+
+    const original = await remote(src)
+
+    if ('status' in original)
+      throw new Error(`kay: a page links ${src}, which the build could not download: ${original.message}`)
+
+    await imageSize(Bun.file(original.path))
+    await writeVariant(original.path, variant, target, quality)
+    encoded++
+  }
+
+  return encoded
 }
 
 export interface ProcessImageOptions {

@@ -2,10 +2,14 @@
 import { image, shareImage } from 'kay/image'
 import Counter from '../components/counter.kay'
 import hero from '../hero.png'
+
+const remote = process.env.KAY_TEST_REMOTE_ORIGIN
 ---
 head
   meta(property="og:image" content={shareImage(hero)})
 h1 Home
 img({...image(hero)} alt="Hero")
 img.square({...image(hero, { aspect: '1/1' })} alt="Square")
+if remote
+  img.remote({...image(`${remote}/photos/hero.png`, { width: 1000, height: 600 })} alt="Remote")
 Counter

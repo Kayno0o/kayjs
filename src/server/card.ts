@@ -5,6 +5,7 @@ import type { Face } from './face'
 import type { FontAssets } from './fonts'
 import type { ImageRouteOptions } from './image'
 import type { Color } from './raster'
+import type { RemoteOriginal } from './remote'
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
@@ -15,7 +16,7 @@ import { drawCard } from './card-draw'
 import { coverImage } from './crop'
 import { readFace } from './face'
 import { builtFonts } from './fonts'
-import { DEFAULT_QUALITY, MAX_UPLOAD_PIXELS, sourceFile, VARIANTS_DIR } from './image'
+import { DEFAULT_QUALITY, findSource, MAX_UPLOAD_PIXELS, VARIANTS_DIR } from './image'
 import { revalidated } from './public'
 
 export interface CardSetup {
@@ -61,6 +62,7 @@ const DRAWING = 1
 const DEFAULT_WEIGHT = 700
 // Past this many characters a title is cut before it is signed: three lines of the smallest size hold far fewer.
 const MAX_TITLE = 200
+const REMOTE = /^https?:\/\//i
 
 // The setup pages link cards with, and the cards prerendered pages asked for, by file name, for `kay build` to write.
 let current: Cards | undefined
@@ -205,9 +207,10 @@ function cardUrl(cards: Cards, title: unknown, image: string | undefined): strin
   const spec = cardSpec(text, image)
   const linked = variantFilesLinked()
 
-  if (image !== undefined && !image.startsWith(IMPORTED)) {
+  // A static export downloads a remote image to draw its card; a server draws it on request, from the copy the image route keeps fresh.
+  if (image !== undefined && !image.startsWith(IMPORTED) && !(linked && REMOTE.test(image))) {
     if (linked)
-      throw new Error(`kay: shareCard() was given ${image}, which a static export holds no file of: only an imported image's card is written at build`)
+      throw new Error(`kay: shareCard() was given ${image}, which a static export holds no file of: only the card of an imported image, or one images.remote lists, is written at build`)
   }
   else if (cards.collect) {
     requested.set(cardFile(cards, spec), { title: text, image })
@@ -257,8 +260,11 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
     if (!key || cards.font instanceof Error || !signed(key, spec, url.searchParams.get('sig') ?? ''))
       return new Response('Not found', { status: 404, headers: TEXT })
 
-    const source = src === undefined ? undefined : sourceFile(src, options)
+    const source = src === undefined ? undefined : await findSource(src, options)
     let version = ''
+
+    if (source && 'status' in source)
+      return new Response(source.message, { status: source.status, headers: TEXT })
 
     if (src !== undefined) {
       if (!source)
@@ -320,7 +326,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
 }
 
 // The cards prerendered pages asked for, written beside the image variants for the route or a static host to serve as files; returns how many were drawn. A card an earlier build drew is copied from the cache, which keeps only this build's.
-export async function writeCards(clientDir: string, cacheDir?: string): Promise<number> {
+export async function writeCards(clientDir: string, cacheDir?: string, remote?: (src: string) => Promise<RemoteOriginal>): Promise<number> {
   let drawn = 0
 
   for (const [name, card] of requested) {
@@ -331,9 +337,12 @@ export async function writeCards(clientDir: string, cacheDir?: string): Promise<
       continue
 
     if (!cached || !await Bun.file(cached).exists()) {
-      const source = card.image === undefined ? undefined : sourceFile(card.image, { clientDir, cacheDir: '' })
+      const source = card.image === undefined ? undefined : await findSource(card.image, { clientDir, cacheDir: '', remote })
 
-      await writeCard(current!, cached || target, card.title, source && { path: source.path })
+      if (source && 'status' in source)
+        throw new Error(`kay: a page's share card is drawn on ${card.image}, which the build could not download: ${source.message}`)
+
+      await writeCard(current!, cached || target, card.title, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS })
       drawn++
     }
 

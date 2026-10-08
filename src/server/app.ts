@@ -37,6 +37,7 @@ import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } 
 import { trustProxy } from './protection'
 import { servePublic } from './public'
 import { readRedirects, refuseRedirectClashes, serveRedirects } from './redirects'
+import { remoteImages, remotePatterns } from './remote'
 import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './render'
 import { reportServerError } from './report'
 import { revalidateStale, trackPrerendered } from './revalidate'
@@ -248,13 +249,15 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (options.security && options.security.reports === true)
     serveViolationReports(app, options.onError)
 
+  // An executable runs from wherever it was copied, away from the project it was built in.
+  const imageCache = bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', 'images')
   const imageRoute = {
     clientDir: client.dir,
-    // An executable runs from wherever it was copied, away from the project it was built in.
-    cacheDir: bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', 'images'),
+    cacheDir: imageCache,
     dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(bundle ? process.cwd() : root, dir)])),
     quality: options.images?.quality,
     aspects: options.images?.aspects,
+    remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote)),
   }
 
   serveImages(app, imageRoute)

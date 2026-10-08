@@ -3,11 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { deflateSync, inflateSync } from 'node:zlib'
-import { afterAll, describe, expect, it } from 'bun:test'
-import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, shareImage } from '../src/runtime/image'
+import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test'
+import { Elysia } from 'elysia'
+import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, setRemoteImages, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
 import { coverImage } from '../src/server/crop'
-import { variantName, writeImageVariants } from '../src/server/image'
+import { serveImages, variantName, writeImageVariants } from '../src/server/image'
+import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 const uploads = await mkdtemp(join(tmpdir(), 'kay-uploads-'))
@@ -347,5 +349,168 @@ describe('uploads', () => {
     expect(await processImage(upload, { width: 4000, height: 4000 })).toMatchObject({ width: 1000, height: 600 })
     await expect(processImage(upload, { width: 200, fit: 'cover' })).rejects.toThrow('both its width and its height')
     await expect(imageSize(upload, { maxPixels: 1000 })).rejects.toThrow()
+  })
+})
+
+describe('remote images', () => {
+  const hits: string[] = []
+  let photo = Bun.file(HERO) as Blob
+  let failing = false
+  const host = Bun.serve({
+    port: 0,
+    async fetch(request) {
+      const { pathname } = new URL(request.url)
+
+      hits.push(`${request.headers.has('if-none-match') ? 'conditional ' : ''}${pathname}`)
+
+      if (failing)
+        return new Response('Down', { status: 500 })
+
+      if (pathname === '/photos/hop.png')
+        return Response.redirect(new URL('/photos/hero.png', request.url), 302)
+
+      if (pathname === '/photos/away.png')
+        return Response.redirect(`http://localhost:${new URL(request.url).port}/photos/hero.png`, 302)
+
+      // Streamed with no length, so only counting what arrives finds it too big.
+      if (pathname === '/photos/huge.png')
+        return new Response(new ReadableStream({ pull: controller => controller.enqueue(new Uint8Array(1024 * 1024)) }))
+
+      const etag = `"${Bun.hash(await photo.bytes()).toString(36)}"`
+
+      if (request.headers.get('if-none-match') === etag)
+        return new Response(null, { status: 304, headers: { etag } })
+
+      return new Response(photo, { headers: { etag, 'content-type': 'image/png' } })
+    },
+  })
+  const origin = `http://127.0.0.1:${host.port}`
+  let cache: string
+  let remote: Elysia
+
+  const at = (path: string, width: number | string = 320) => remote.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(`${origin}${path}`)}&w=${width}`))
+
+  beforeAll(async () => {
+    cache = await mkdtemp(join(tmpdir(), 'kay-remote-'))
+    remote = new Elysia()
+    serveImages(remote, { clientDir: join(cache, 'client'), cacheDir: cache, remote: remoteImages(join(cache, 'remote'), remotePatterns([`${origin}/photos/`])) })
+  })
+
+  afterAll(async () => {
+    setSystemTime()
+    await host.stop(true)
+    await rm(cache, { recursive: true, force: true })
+  })
+
+  it('reads images.remote as origins with an optional path and subdomain wildcard, refusing anything else', () => {
+    const patterns = remotePatterns(['https://cms.example.com/uploads/', 'https://*.cdn.example.com', 'http://127.0.0.1:8080'])
+
+    expect(remoteAllowed('https://cms.example.com/uploads/a.jpg', patterns)).toBe(true)
+    expect(remoteAllowed('https://cms.example.com/private/a.jpg', patterns)).toBe(false)
+    expect(remoteAllowed('http://cms.example.com/uploads/a.jpg', patterns)).toBe(false)
+    expect(remoteAllowed('https://eu.cdn.example.com/a.jpg', patterns)).toBe(true)
+    expect(remoteAllowed('https://cdn.example.com/a.jpg', patterns)).toBe(false)
+    expect(remoteAllowed('https://evilcdn.example.com/a.jpg', patterns)).toBe(false)
+    expect(remoteAllowed('https://user:pass@cms.example.com/uploads/a.jpg', patterns)).toBe(false)
+    expect(remoteAllowed('http://127.0.0.1:8080/a.jpg', patterns)).toBe(true)
+    expect(remoteAllowed('http://127.0.0.1:8081/a.jpg', patterns)).toBe(false)
+
+    for (const entry of ['cms.example.com', 'ftp://cms.example.com', 'https://cms.*.com', 'https://cms.example.com/a?b'])
+      expect(() => remotePatterns([entry])).toThrow(`images.remote holds ${entry}`)
+  })
+
+  it('gives a listed remote image its variants through the route, and refuses an unlisted one as the server renders it', async () => {
+    try {
+      await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { remote: ['https://cms.example.com/uploads/'] } })
+
+      const props = image('https://cms.example.com/uploads/a.jpg', { width: 1000, height: 600 })
+
+      expect(props.srcset).toBe(['320', '640', '960', '1000'].map(width => `/_kay/image?src=${encodeURIComponent('https://cms.example.com/uploads/a.jpg')}&w=${width} ${width}w`).join(', '))
+      expect(() => image('https://elsewhere.example.com/a.jpg', { width: 1000, height: 600 })).toThrow('kay: image() was given https://elsewhere.example.com/a.jpg, on a host images.remote in kay.config.ts does not list')
+      expect(() => shareImage('https://elsewhere.example.com/a.jpg')).toThrow('shareImage() was given')
+      expect(image('https://elsewhere.example.com/a.svg', { width: 10, height: 10 })).toEqual({ src: 'https://elsewhere.example.com/a.svg', width: 10, height: 10 })
+      await expect(pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { remote: ['cms.example.com'] } })).rejects.toThrow('images.remote holds cms.example.com')
+    }
+    finally {
+      setRemoteImages(() => false)
+    }
+  })
+
+  it('downloads a listed image once for every variant, and refuses a host or a redirect the list does not cover', async () => {
+    hits.length = 0
+
+    const small = await at('/photos/hero.png')
+    const wide = await at('/photos/hero.png', 1000)
+
+    expect(small.status).toBe(200)
+    expect(small.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+    expect(await new Bun.Image(await small.bytes()).metadata()).toEqual({ width: 320, height: 192, format: 'webp' })
+    expect((await new Bun.Image(await wide.bytes()).metadata()).width).toBe(1000)
+    expect((await at('/photos/hero.png', 1280)).status).toBe(400)
+    expect(hits).toEqual(['/photos/hero.png'])
+
+    const unlisted = await remote.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(`${origin}/private/hero.png`)}&w=320`))
+
+    expect(unlisted.status).toBe(403)
+    expect(await unlisted.text()).toBe(`${origin}/private/hero.png is on a host images.remote in kay.config.ts does not list`)
+    expect((await at('/photos/hop.png')).status).toBe(200)
+    expect((await at('/photos/away.png')).status).toBe(502)
+    expect(hits).toEqual(['/photos/hero.png', '/photos/hop.png', '/photos/hero.png', '/photos/away.png'])
+  })
+
+  it('asks the host again once the copy is stale, and serves a changed image under a new ETag', async () => {
+    await at('/photos/hero.png')
+    hits.length = 0
+
+    const etag = (await at('/photos/hero.png')).headers.get('etag')
+
+    setSystemTime(new Date(Date.now() + 2 * 60 * 60_000))
+    expect((await at('/photos/hero.png')).headers.get('etag')).toBe(etag)
+    expect(hits).toEqual(['conditional /photos/hero.png'])
+
+    photo = new Blob([new Uint8Array(await new Bun.Image(HERO).resize(800, 480).png().bytes())])
+    setSystemTime(new Date(Date.now() + 2 * 60 * 60_000))
+
+    const changed = await at('/photos/hero.png')
+
+    expect(changed.headers.get('etag')).not.toBe(etag)
+    expect((await new Bun.Image(await (await at('/photos/hero.png', 800)).bytes()).metadata()).width).toBe(800)
+  })
+
+  it('keeps serving the last copy while the host fails, and asks a failing host again only a minute later', async () => {
+    await at('/photos/hero.png')
+    failing = true
+
+    try {
+      setSystemTime(new Date(Date.now() + 2 * 60 * 60_000))
+      expect((await at('/photos/hero.png')).status).toBe(200)
+
+      hits.length = 0
+
+      expect((await at('/photos/new.png')).status).toBe(502)
+      expect((await at('/photos/new.png')).status).toBe(502)
+      expect(hits).toEqual(['/photos/new.png'])
+
+      failing = false
+      setSystemTime(new Date(Date.now() + 61_000))
+      expect((await at('/photos/new.png')).status).toBe(200)
+    }
+    finally {
+      failing = false
+    }
+  })
+
+  it('cuts off a download past its size cap, and refuses an image too large to decode', async () => {
+    expect((await at('/photos/huge.png')).status).toBe(413)
+    expect((await readdir(join(cache, 'remote'))).filter(name => name.endsWith('.tmp'))).toEqual([])
+
+    const header = new Uint8Array(13)
+
+    new DataView(header.buffer).setUint32(0, 10_000)
+    new DataView(header.buffer).setUint32(4, 10_000)
+    header.set([8, 6, 0, 0, 0], 8)
+    photo = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...pngChunk('IHDR', header), ...pngChunk('IEND', new Uint8Array())])])
+
+    expect((await at('/photos/bomb.png')).status).toBe(413)
   })
 })
