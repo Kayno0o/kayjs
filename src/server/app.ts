@@ -264,7 +264,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(bundle ? process.cwd() : root, dir)])),
     quality: options.images?.quality,
     aspects: options.images?.aspects,
-    remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote)),
+    remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache),
   }
 
   serveImages(app, imageRoute)

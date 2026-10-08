@@ -5,7 +5,7 @@ import type { Face } from './face'
 import type { FontAssets } from './fonts'
 import type { ImageRouteOptions } from './image'
 import type { Color } from './raster'
-import type { RemoteOriginal } from './remote'
+import type { RemoteImages } from './remote'
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
@@ -326,7 +326,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
 }
 
 // The cards prerendered pages asked for, written beside the image variants for the route or a static host to serve as files; returns how many were drawn. A card an earlier build drew is copied from the cache, which keeps only this build's.
-export async function writeCards(clientDir: string, cacheDir?: string, remote?: (src: string) => Promise<RemoteOriginal>): Promise<number> {
+export async function writeCards(clientDir: string, cacheDir?: string, remote?: RemoteImages): Promise<number> {
   let drawn = 0
 
   for (const [name, card] of requested) {

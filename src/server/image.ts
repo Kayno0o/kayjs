@@ -1,12 +1,13 @@
 import type { Elysia } from 'elysia'
 import type { Aspect, ImageVariant } from '../runtime/image'
-import type { RemoteOriginal } from './remote'
+import type { RemoteImages } from './remote'
 import { existsSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, variantHeight, variantSuffix } from '../runtime/image'
 import { coverImage } from './crop'
+import { clientAddress } from './protection'
 import { revalidated } from './public'
 import { remoteAllowed, remotePatterns } from './remote'
 import { decodePath } from './routes'
@@ -22,7 +23,7 @@ export interface ImageRouteOptions {
   // The aspect ratios variants are cut to, `images.aspects`.
   aspects?: readonly string[]
   // Downloads an image from a host `images.remote` lists.
-  remote?: (src: string) => Promise<RemoteOriginal>
+  remote?: RemoteImages
 }
 
 export const VARIANTS_DIR = 'images'
@@ -107,10 +108,10 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const pending = new Map<string, Promise<void>>()
   const allowed = new Set((options.aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!)))
 
-  app.get(IMAGE_ROUTE, async ({ request }) => {
+  app.get(IMAGE_ROUTE, async ({ request, server }) => {
     const url = new URL(request.url)
     const src = url.searchParams.get('src') ?? ''
-    const source = await findSource(src, options)
+    const source = await findSource(src, options, clientAddress(request, server))
 
     if (!source)
       return new Response('Not found', { status: 404, headers: TEXT })
@@ -144,8 +145,9 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if (typeof variant === 'string' && variant !== 'card')
       return new Response(variant, { status: 400, headers: TEXT })
 
-    // An imported image is named after its content; a runtime one may change in place, so its size and time go in the name.
-    const name = source.immutable ? variantName(source.path, variant) : `${Bun.hash(`${source.path}\n${stats.size}\n${stats.mtimeMs}`).toString(36)}${variantSuffix(variant)}`
+    // An imported image is named after its content; a runtime one may change in place, so its size and time go in the name, after its key for a remote one, whose variants go when its original does.
+    const version = Bun.hash(`${source.path}\n${stats.size}\n${stats.mtimeMs}`).toString(36)
+    const name = source.immutable ? variantName(source.path, variant) : `${source.key === undefined ? '' : `remote-${source.key}-`}${version}${variantSuffix(variant)}`
     const built = join(options.clientDir, VARIANTS_DIR, name)
     const cached = join(options.cacheDir, name)
     let file = source.immutable && await Bun.file(built).exists() ? built : cached
@@ -208,15 +210,15 @@ function requestedVariant(url: URL, own: { width: number, height: number }, allo
 }
 
 // The file a `src` names, a remote image's downloaded copy included, or why the remote one is refused.
-export async function findSource(src: string, options: ImageRouteOptions): Promise<{ path: string, immutable: boolean } | { status: number, message: string } | undefined> {
+export async function findSource(src: string, options: ImageRouteOptions, client?: string): Promise<{ path: string, immutable: boolean, key?: string } | { status: number, message: string } | undefined> {
   const local = sourceFile(src, options)
 
   if (local || !options.remote || !REMOTE_URL.test(src) || !RESIZABLE.test(src))
     return local
 
-  const original = await options.remote(src)
+  const original = await options.remote(src, client)
 
-  return 'path' in original ? { path: original.path, immutable: false } : original
+  return 'path' in original ? { path: original.path, immutable: false, key: original.key } : original
 }
 
 // The file a `src` names, never one outside the built assets or the directories of runtime images.
@@ -265,7 +267,7 @@ export function applyImageConfig(images: { maxDensity?: number, aspects?: string
 }
 
 // The variants of remote images a static export's pages link, downloaded and written beside the others; returns how many were encoded. One the host fails to give fails the build, since no route would make it later.
-export async function writeRemoteVariants(clientDir: string, remote: (src: string) => Promise<RemoteOriginal>, quality = DEFAULT_QUALITY): Promise<number> {
+export async function writeRemoteVariants(clientDir: string, remote: RemoteImages, quality = DEFAULT_QUALITY): Promise<number> {
   let encoded = 0
 
   for (const { src, name, variant } of requestedRemoteVariants()) {

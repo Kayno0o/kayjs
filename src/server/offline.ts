@@ -13,7 +13,9 @@ const PRECACHED = /\.(?:js|css|woff2?|ttf)$/
 const SKIPPED = /\.(?:br|gz|map)$/
 const BACKSLASH = /\\/g
 // Bumped whenever the worker's own code changes, so every site installs it again.
-const WORKER_VERSION = 1
+const WORKER_VERSION = 2
+// Past this many pages kept by default, the boot says to list the ones worth it.
+const MANY_PAGES = 100
 
 // The worker itself, plain JavaScript for every browser that has one: the build's files from the cache first, pages from the network first with the cached copy or the fallback offline, and kay's routes and the API always from the network.
 const WORKER = `const FILES = new Set(KAY.files)
@@ -53,7 +55,8 @@ self.addEventListener('fetch', (event) => {
   const request = event.request
   const url = new URL(request.url)
 
-  if (request.method !== 'GET' || url.origin !== location.origin)
+  // A range, as a video or an audio file asks for, goes to the network: the cache holds whole files only.
+  if (request.method !== 'GET' || url.origin !== location.origin || request.headers.has('range'))
     return
 
   if (FILES.has(url.pathname))
@@ -78,10 +81,15 @@ async function fromCache(request) {
 
   const response = await fetch(request)
 
-  if (response.ok)
+  if (whole(response))
     await cache.put(request, response.clone())
 
   return response
+}
+
+// A response kept as it is for anyone: a full 200 for the URL asked, not one a redirect led to, nor one for a single visitor.
+function whole(response) {
+  return response.status === 200 && !response.redirected && !/private|no-store/.test(response.headers.get('cache-control') || '')
 }
 
 async function fromNetwork(request, key) {
@@ -90,7 +98,7 @@ async function fromNetwork(request, key) {
   try {
     const response = await fetch(request)
 
-    if (response.ok && !/private|no-store/.test(response.headers.get('cache-control') || ''))
+    if (whole(response))
       await cache.put(key, response.clone())
 
     return response
@@ -172,6 +180,11 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     .map(entry => `${base}${ASSET_PREFIX}${join(entry.parentPath, entry.name).slice(client.dir.length + 1).replace(BACKSLASH, '/')}`)
     .sort()
   const pages = (config.pages ?? options.publicPages).map(path => `${base}${path}`).sort()
+
+  // Each one is fetched on every deploy's install, by every visitor who has the worker.
+  if (config.pages === undefined && pages.length > MANY_PAGES)
+    console.warn(`[kay] offline keeps every prerendered page, ${pages.length} of them, which each visitor downloads on every deploy; list the ones worth reading offline in offline.pages`)
+
   const fallback = config.fallback === undefined ? undefined : `${base}${config.fallback}`
   // Changes with the build, its prerendered pages and the worker, so a deploy installs a new one, which drops the old cache.
   const version = Bun.hash(JSON.stringify([WORKER_VERSION, files, pages, fallback, [...client.pages].map(([path, page]) => [path, page.etag])])).toString(36)

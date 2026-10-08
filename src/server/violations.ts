@@ -18,7 +18,7 @@ const MINUTE_MS = 60_000
 const REPORTS = 'kay:csp-reports'
 // Past this many distinct violations, the oldest are forgotten and may be logged again.
 const MAX_SEEN = 1000
-const CONTROL_CHARACTERS = /\p{Cc}+/gu
+const CONTROL_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}]+/gu
 const QUERY_OR_HASH = /[?#].*$/
 
 // A violation of the site's policy as a browser reported it: what `onError` gets from kay's report route.
@@ -46,7 +46,7 @@ export class CspViolation extends Error {
 
 const seen = new Set<string>()
 
-// Takes the browser's violation reports, in the Reporting API's format or `report-uri`'s, logging each distinct one once per process and handing it to `onError`; a flood from one client or anything too big is refused.
+// Takes the browser's violation reports, in the Reporting API's format or `report-uri`'s, logging each distinct one once per process, the enforced policy's apart from the report-only one's, and handing it to `onError`; a flood from one client or anything too big is refused.
 export function serveViolationReports(app: Elysia, onError: KayConfig['onError']): void {
   app.post(CSP_REPORTS, async ({ request, server }) => {
     if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY_BYTES)
@@ -66,7 +66,7 @@ export function serveViolationReports(app: Elysia, onError: KayConfig['onError']
       return new Response(null, { status: 400 })
 
     for (const violation of violations) {
-      const key = `${violation.directive} ${violation.blocked} ${violation.url}`
+      const key = `${violation.disposition} ${violation.directive} ${violation.blocked} ${violation.url}`
 
       if (seen.has(key))
         continue

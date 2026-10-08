@@ -167,6 +167,11 @@ describe('security headers', () => {
       expect(style!.message).toEndWith('(report only)')
       expect(logged).toHaveBeenCalledTimes(2)
 
+      // The report-only policy's copy of a violation the enforced one logged is logged too.
+      expect(await post(batch.replace('"disposition":"enforce"', '"disposition":"report"'))).toBe(204)
+      expect(caught).toHaveLength(3)
+      expect((caught[2] as CspViolation).disposition).toBe('report')
+
       expect(await post('not json')).toBe(400)
       expect(await post('{"csp-report":{}}')).toBe(400)
       expect(await post('x'.repeat(65 * 1024))).toBe(413)

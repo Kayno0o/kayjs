@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { deflateSync, inflateSync } from 'node:zlib'
-import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, setRemoteImages, shareImage } from '../src/runtime/image'
+import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
 import { coverImage } from '../src/server/crop'
 import { serveImages, variantName, writeImageVariants } from '../src/server/image'
@@ -393,7 +393,7 @@ describe('remote images', () => {
   beforeAll(async () => {
     cache = await mkdtemp(join(tmpdir(), 'kay-remote-'))
     remote = new Elysia()
-    serveImages(remote, { clientDir: join(cache, 'client'), cacheDir: cache, remote: remoteImages(join(cache, 'remote'), remotePatterns([`${origin}/photos/`])) })
+    serveImages(remote, { clientDir: join(cache, 'client'), cacheDir: cache, remote: remoteImages(join(cache, 'remote'), remotePatterns([`${origin}/photos/`]), cache, 4) })
   })
 
   afterAll(async () => {
@@ -403,7 +403,7 @@ describe('remote images', () => {
   })
 
   it('reads images.remote as origins with an optional path and subdomain wildcard, refusing anything else', () => {
-    const patterns = remotePatterns(['https://cms.example.com/uploads/', 'https://*.cdn.example.com', 'http://127.0.0.1:8080'])
+    const patterns = remotePatterns(['https://cms.example.com/uploads/', 'https://*.cdn.example.com', 'http://127.0.0.1:8080', 'https://media.example.com:443/files', 'https://CAFÉ.example.com'])
 
     expect(remoteAllowed('https://cms.example.com/uploads/a.jpg', patterns)).toBe(true)
     expect(remoteAllowed('https://cms.example.com/private/a.jpg', patterns)).toBe(false)
@@ -414,6 +414,9 @@ describe('remote images', () => {
     expect(remoteAllowed('https://user:pass@cms.example.com/uploads/a.jpg', patterns)).toBe(false)
     expect(remoteAllowed('http://127.0.0.1:8080/a.jpg', patterns)).toBe(true)
     expect(remoteAllowed('http://127.0.0.1:8081/a.jpg', patterns)).toBe(false)
+    expect(remoteAllowed('https://media.example.com/files/a.jpg', patterns)).toBe(true)
+    expect(remoteAllowed('https://media.example.com/files-private/a.jpg', patterns)).toBe(false)
+    expect(remoteAllowed('https://café.example.com/a.jpg', patterns)).toBe(true)
 
     for (const entry of ['cms.example.com', 'ftp://cms.example.com', 'https://cms.*.com', 'https://cms.example.com/a?b'])
       expect(() => remotePatterns([entry])).toThrow(`images.remote holds ${entry}`)
@@ -426,13 +429,24 @@ describe('remote images', () => {
       const props = image('https://cms.example.com/uploads/a.jpg', { width: 1000, height: 600 })
 
       expect(props.srcset).toBe(['320', '640', '960', '1000'].map(width => `/_kay/image?src=${encodeURIComponent('https://cms.example.com/uploads/a.jpg')}&w=${width} ${width}w`).join(', '))
-      expect(() => image('https://elsewhere.example.com/a.jpg', { width: 1000, height: 600 })).toThrow('kay: image() was given https://elsewhere.example.com/a.jpg, on a host images.remote in kay.config.ts does not list')
-      expect(() => shareImage('https://elsewhere.example.com/a.jpg')).toThrow('shareImage() was given')
+      const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+      try {
+        expect(image('https://elsewhere.example.com/a.jpg', { width: 1000, height: 600 })).toEqual({ src: 'https://elsewhere.example.com/a.jpg', width: 1000, height: 600 })
+        expect(image('https://elsewhere.example.com/b.jpg', { width: 10, height: 10 }).srcset).toBeUndefined()
+        expect(shareImage('https://elsewhere.example.com/a.jpg')).toBe('https://elsewhere.example.com/a.jpg')
+        expect(warned.mock.calls.map(call => call[0])).toEqual(['[kay] image() was given https://elsewhere.example.com/a.jpg, on a host images.remote in kay.config.ts does not list, so it is not resized'])
+      }
+      finally {
+        warned.mockRestore()
+      }
+
+      expect(() => shareCard({ title: 'x', image: 'https://elsewhere.example.com/a.jpg' })).toThrow('so the card cannot be drawn on it')
       expect(image('https://elsewhere.example.com/a.svg', { width: 10, height: 10 })).toEqual({ src: 'https://elsewhere.example.com/a.svg', width: 10, height: 10 })
       await expect(pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { remote: ['cms.example.com'] } })).rejects.toThrow('images.remote holds cms.example.com')
     }
     finally {
-      setRemoteImages(() => false)
+      setRemoteImages(undefined)
     }
   })
 
@@ -452,7 +466,7 @@ describe('remote images', () => {
     const unlisted = await remote.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(`${origin}/private/hero.png`)}&w=320`))
 
     expect(unlisted.status).toBe(403)
-    expect(await unlisted.text()).toBe(`${origin}/private/hero.png is on a host images.remote in kay.config.ts does not list`)
+    expect(await unlisted.text()).toBe('The image is on a host images.remote in kay.config.ts does not list')
     expect((await at('/photos/hop.png')).status).toBe(200)
     expect((await at('/photos/away.png')).status).toBe(502)
     expect(hits).toEqual(['/photos/hero.png', '/photos/hop.png', '/photos/hero.png', '/photos/away.png'])
@@ -512,5 +526,32 @@ describe('remote images', () => {
     photo = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...pngChunk('IHDR', header), ...pngChunk('IEND', new Uint8Array())])])
 
     expect((await at('/photos/bomb.png')).status).toBe(413)
+  })
+
+  it('keeps only the originals used last, their variants going with them, and caps the downloads one client starts', async () => {
+    photo = Bun.file(HERO)
+    setSystemTime(new Date(Date.now() + 10 * 60_000))
+
+    const key = (n: number) => Bun.hash(`${origin}/photos/hero.png?n=${n}`).toString(36)
+
+    for (let n = 1; n <= 5; n++)
+      expect((await at(`/photos/hero.png?n=${n}`)).status).toBe(200)
+
+    const originals = (await readdir(join(cache, 'remote'))).filter(name => !name.endsWith('.json'))
+    const variants = await readdir(cache)
+
+    expect(originals.toSorted()).toEqual([2, 3, 4, 5].map(key).toSorted())
+    expect(variants.some(name => name.startsWith(`remote-${key(1)}-`))).toBe(false)
+    expect(variants.some(name => name.startsWith(`remote-${key(5)}-`))).toBe(true)
+
+    const statuses: number[] = []
+
+    for (let n = 6; n <= 40; n++)
+      statuses.push((await at(`/photos/hero.png?n=${n}`)).status)
+
+    expect(statuses.filter(status => status === 200)).toHaveLength(25)
+    expect(statuses.at(-1)).toBe(429)
+    // A kept one is still served.
+    expect((await at('/photos/hero.png?n=30')).status).toBe(200)
   })
 })

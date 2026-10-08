@@ -15,7 +15,7 @@ import { news } from './fixtures/cms/src/content.config'
 
 const FIXTURE = 'tests/fixtures/cms'
 const SECRET = 'a-preview-secret-long-enough-for-kay-0123456789'
-const options = { routes: `${FIXTURE}/src/routes`, content: `${FIXTURE}/src/content.config.ts`, api: `${FIXTURE}/src/api`, security: false as const, preview: { secret: SECRET } }
+const options = { routes: `${FIXTURE}/src/routes`, content: `${FIXTURE}/src/content.config.ts`, api: `${FIXTURE}/src/api`, site: 'https://news.example', security: false as const, preview: { secret: SECRET } }
 const app = await pages({ ...options, prebuilt: false })
 const COOKIE = /^kay_preview=([^;]+);/
 
@@ -126,6 +126,16 @@ describe('a CMS behind a collection', () => {
     expect((await get('/news')).html).toContain('<li>Launch day</li>')
     expect((await app.handle(new Request('http://localhost/api/hook', { method: 'POST' }))).status).toBe(204)
     expect((await get('/news')).html).toContain('<li>Launch moved</li>')
+  })
+
+  it('lists its published entries in the sitemap and the feed, drafts left out', async () => {
+    const sitemap = (await get('/sitemap.xml')).html
+    const feed = (await get('/news/rss.xml')).html
+
+    expect(sitemap).toContain('<loc>https://news.example/news/launch</loc>')
+    expect(sitemap).not.toContain('roadmap')
+    expect(feed).toContain('<title>Launch day</title>')
+    expect(feed).not.toContain('Next year')
   })
 })
 

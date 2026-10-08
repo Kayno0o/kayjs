@@ -66,14 +66,26 @@ export function setMaxDensity(density: number): void {
   maxDensity = density
 }
 
-export function setRemoteImages(listed: (src: string) => boolean): void {
+export function setRemoteImages(listed: ((src: string) => boolean) | undefined): void {
   remoteListed = listed
 }
 
-// An image on another host goes through the image route only from a host `images.remote` lists.
-function refuseUnlisted(src: string, caller: string): void {
-  if (remoteListed && REMOTE.test(src) && !remoteListed(src))
-    throw new Error(`kay: ${caller} was given ${src}, on a host images.remote in kay.config.ts does not list`)
+// Hosts already warned about, once each per process.
+const warnedHosts = new Set<string>()
+
+// An image on another host goes through the image route only from a host `images.remote` lists; any other keeps its own URL, which content from a CMS may hold, with a warning naming the host once.
+function unlisted(src: string, caller: string): boolean {
+  if (!remoteListed || !REMOTE.test(src) || remoteListed(src))
+    return false
+
+  const host = URL.parse(src)?.host ?? src
+
+  if (!warnedHosts.has(host)) {
+    warnedHosts.add(host)
+    console.warn(`[kay] ${caller} was given ${src}, on a host images.remote in kay.config.ts does not list, so it is not resized`)
+  }
+
+  return true
 }
 
 export function setAspects(allowed: readonly string[]): void {
@@ -182,10 +194,8 @@ export function registerImage(url: string, width: number, height: number): strin
 export function image(src: string, options: ImageOptions = {}): ImageProps {
   const own = sizes.get(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
 
-  if (!own || !RESIZABLE.test(src))
+  if (!own || !RESIZABLE.test(src) || unlisted(src, 'image()'))
     return Object.assign(options.sizes === undefined ? { src } : { src, sizes: options.sizes }, own)
-
-  refuseUnlisted(src, 'image()')
 
   const aspect = options.aspect === undefined ? undefined : allowedAspect(options.aspect)
   const size = aspect ? croppedSize(own, aspect) : own
@@ -217,7 +227,8 @@ export function shareImage(src: string): string {
   if (!RESIZABLE.test(src))
     throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG or WebP`)
 
-  refuseUnlisted(src, 'shareImage()')
+  if (unlisted(src, 'shareImage()'))
+    return src
 
   return variantUrl(src, 'card')
 }
@@ -334,8 +345,8 @@ export function shareCard(card: ShareCardOptions): string {
   if (card.image !== undefined && !RESIZABLE.test(card.image))
     throw new Error(`kay: shareCard() cannot draw on ${card.image}: it takes a PNG, JPEG or WebP`)
 
-  if (card.image !== undefined)
-    refuseUnlisted(card.image, 'shareCard()')
+  if (card.image !== undefined && remoteListed && REMOTE.test(card.image) && !remoteListed(card.image))
+    throw new Error(`kay: shareCard() was given ${card.image}, on a host images.remote in kay.config.ts does not list, so the card cannot be drawn on it`)
 
   if (!cardMaker)
     throw new Error('kay: shareCard() draws on the server, in a page\'s head')

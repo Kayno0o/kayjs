@@ -1,5 +1,6 @@
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { overLimit } from './protection'
 
 // One entry of `images.remote`: the origin, a `*.` subdomain wildcard allowed, and the path every URL starts with.
 export interface RemotePattern {
@@ -9,8 +10,11 @@ export interface RemotePattern {
   path: string
 }
 
-// A remote original kept on disk, or why the route answers without one.
-export type RemoteOriginal = { path: string } | { status: number, message: string }
+// A remote original kept on disk, with the key its variants are named after, or why the route answers without one.
+export type RemoteOriginal = { path: string, key: string } | { status: number, message: string }
+
+// Downloads the original `src` names, counting a download against `client` when given.
+export type RemoteImages = (src: string, client?: string) => Promise<RemoteOriginal>
 
 interface Stored {
   etag?: string
@@ -33,6 +37,12 @@ const MIN_FRESH_MS = 60_000
 const MAX_FRESH_MS = 7 * 24 * 60 * 60_000
 // A host that failed is not asked again before this, so a broken image cannot have the server fetch it on every request.
 const RETRY_MS = 60_000
+// Any URL on a listed host may be asked for, a new query string each time, so the originals kept are capped, the least recently used going first with their variants, and so is how many new downloads one client starts a minute.
+const MAX_ORIGINALS = 500
+const DOWNLOADS_PER_MINUTE = 30
+const MINUTE_MS = 60_000
+const DOWNLOADS = 'kay:remote-images'
+const JSON_FILE = /\.json$/
 
 // `images.remote`, read once as the server boots, each entry refused with what is wrong with it.
 export function remotePatterns(entries: readonly string[] = []): RemotePattern[] {
@@ -42,7 +52,14 @@ export function remotePatterns(entries: readonly string[] = []): RemotePattern[]
     if (!match)
       throw new Error(`images.remote holds ${entry}: an entry is an http or https origin, its host maybe starting with *. for any subdomain, and maybe a path: https://cms.example.com/uploads/`)
 
-    return { protocol: match[1]!.toLowerCase(), host: match[3]!.toLowerCase(), wildcard: match[2] !== undefined, path: match[4] ?? '/' }
+    // Read as a URL is, so a default port, a letter case or a host outside ASCII compares as the URLs asked for do.
+    const wildcard = match[2] !== undefined
+    const url = URL.parse(`${match[1]}//${wildcard ? 'x.' : ''}${match[3]}${match[4] ?? '/'}`)
+
+    if (!url)
+      throw new Error(`images.remote holds ${entry}, which is no URL`)
+
+    return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname }
   })
 }
 
@@ -55,44 +72,90 @@ export function remoteAllowed(src: string | URL, patterns: readonly RemotePatter
 
   const host = url.host.toLowerCase()
 
-  return patterns.some(pattern => url.protocol === pattern.protocol && (pattern.wildcard ? host.endsWith(`.${pattern.host}`) : host === pattern.host) && url.pathname.startsWith(pattern.path))
+  // A path without its final slash covers itself and what is below it, never `/uploads-private` for `/uploads`.
+  return patterns.some(pattern => url.protocol === pattern.protocol && (pattern.wildcard ? host.endsWith(`.${pattern.host}`) : host === pattern.host) && (url.pathname === pattern.path || url.pathname.startsWith(pattern.path.endsWith('/') ? pattern.path : `${pattern.path}/`)))
 }
 
 // Downloads an image another host serves, or keeps the copy `dir` holds while it is fresh, asking the host whether it changed once it is not. A host that fails leaves the last copy served, and is asked again a minute later.
-export function remoteImages(dir: string, patterns: readonly RemotePattern[]): (src: string) => Promise<RemoteOriginal> {
+// `variantsDir` holds what the image route made of the originals, `remote-<key>-...`, removed with the original they came from.
+export function remoteImages(dir: string, patterns: readonly RemotePattern[], variantsDir?: string, maxOriginals = MAX_ORIGINALS): RemoteImages {
   const stored = new Map<string, Stored>()
   const failedUntil = new Map<string, number>()
   const pending = new Map<string, Promise<RemoteOriginal>>()
+  // Every key in use, least recently used first, read from the disk on first use so a restart keeps the cap.
+  let used: Promise<Map<string, true>> | undefined
 
-  async function load(src: string, key: string): Promise<RemoteOriginal> {
+  async function load(src: string, key: string, client: string | undefined): Promise<RemoteOriginal> {
     const path = join(dir, key)
     const meta = stored.get(key) ?? await readStored(`${path}.json`)
     const kept = meta !== undefined && await Bun.file(path).exists()
 
     if (kept && meta.freshUntil > Date.now())
-      return { path }
+      return { path, key }
 
     if ((failedUntil.get(key) ?? 0) > Date.now())
-      return kept ? { path } : { status: 502, message: `Could not fetch ${src}` }
+      return kept ? { path, key } : { status: 502, message: 'The host did not give the image' }
+
+    if (client !== undefined && overLimit(DOWNLOADS, client, DOWNLOADS_PER_MINUTE, MINUTE_MS) !== undefined)
+      return kept ? { path, key } : { status: 429, message: 'Too many new images at once; try again in a minute' }
 
     const result = await download(src, path, kept ? meta : undefined)
 
     if ('status' in result) {
+      // Each failing URL is remembered a minute, so what a flood of them leaves is dropped once it is past.
+      if (failedUntil.size >= maxOriginals) {
+        for (const [failed, until] of failedUntil) {
+          if (until <= Date.now())
+            failedUntil.delete(failed)
+        }
+      }
+
       failedUntil.set(key, Date.now() + RETRY_MS)
 
-      return kept ? { path } : result
+      return kept ? { path, key } : result
     }
 
     failedUntil.delete(key)
     stored.set(key, result)
     await Bun.write(`${path}.json`, JSON.stringify(result))
 
-    return { path }
+    return { path, key }
   }
 
-  return async (src) => {
+  async function touch(key: string): Promise<void> {
+    const keys = await (used ??= keptKeys(dir))
+
+    keys.delete(key)
+    keys.set(key, true)
+
+    for (const [oldest] of keys) {
+      if (keys.size <= maxOriginals)
+        break
+
+      keys.delete(oldest)
+      stored.delete(oldest)
+      failedUntil.delete(oldest)
+      await evict(oldest)
+    }
+  }
+
+  async function evict(key: string): Promise<void> {
+    await Promise.all([rm(join(dir, key), { force: true }), rm(join(dir, `${key}.json`), { force: true })])
+
+    if (variantsDir === undefined)
+      return
+
+    try {
+      const prefix = `remote-${key}-`
+
+      await Promise.all((await readdir(variantsDir)).filter(name => name.startsWith(prefix)).map(async name => rm(join(variantsDir, name), { force: true })))
+    }
+    catch {}
+  }
+
+  return async (src, client) => {
     if (!remoteAllowed(src, patterns))
-      return { status: 403, message: `${src} is on a host images.remote in kay.config.ts does not list` }
+      return { status: 403, message: 'The image is on a host images.remote in kay.config.ts does not list' }
 
     const key = Bun.hash(src).toString(36)
     let loading = pending.get(key)
@@ -101,7 +164,12 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[]): (
     if (!loading) {
       loading = (async () => {
         try {
-          return await load(src, key)
+          const original = await load(src, key, client)
+
+          if ('path' in original)
+            await touch(key)
+
+          return original
         }
         finally {
           pending.delete(key)
@@ -142,7 +210,7 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[]): (
         await response.body?.cancel()
 
         if (!next || hops === MAX_REDIRECTS || !remoteAllowed(next, patterns))
-          return { status: 502, message: `${src} redirects to ${location}, on a host images.remote does not list` }
+          return { status: 502, message: 'The host redirects to one images.remote does not list' }
 
         url = next.href
       }
@@ -153,22 +221,22 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[]): (
       if (!response.ok) {
         await response.body?.cancel()
 
-        return { status: 502, message: `${src} answered ${response.status}` }
+        return { status: 502, message: `The host answered ${response.status}` }
       }
 
       if (Number(response.headers.get('content-length') ?? 0) > MAX_REMOTE_BYTES) {
         await response.body?.cancel()
 
-        return { status: 413, message: `${src} is over ${MAX_REMOTE_BYTES} bytes` }
+        return { status: 413, message: `The image is over ${MAX_REMOTE_BYTES} bytes` }
       }
 
       await mkdir(dir, { recursive: true })
 
       if (!await saveCapped(response, path))
-        return { status: 413, message: `${src} is over ${MAX_REMOTE_BYTES} bytes` }
+        return { status: 413, message: `The image is over ${MAX_REMOTE_BYTES} bytes` }
     }
     catch {
-      return { status: 502, message: `Could not fetch ${src}` }
+      return { status: 502, message: 'The host did not give the image' }
     }
 
     return { etag: response.headers.get('etag') ?? undefined, lastModified: response.headers.get('last-modified') ?? undefined, freshUntil: freshUntil(response.headers) }
@@ -216,6 +284,19 @@ function freshUntil(headers: Headers): number {
   const fresh = NO_CACHE.test(control) ? 0 : maxAge ? Number(maxAge[1]) * 1000 : DEFAULT_FRESH_MS
 
   return Date.now() + Math.min(MAX_FRESH_MS, Math.max(MIN_FRESH_MS, fresh))
+}
+
+// The originals a directory holds, least recently written first.
+async function keptKeys(dir: string): Promise<Map<string, true>> {
+  try {
+    const names = (await readdir(dir)).filter(name => JSON_FILE.test(name))
+    const times = await Promise.all(names.map(async name => ({ key: name.slice(0, -5), time: (await stat(join(dir, name))).mtimeMs })))
+
+    return new Map(times.toSorted((a, b) => a.time - b.time).map(({ key }) => [key, true]))
+  }
+  catch {
+    return new Map()
+  }
 }
 
 async function readStored(path: string): Promise<Stored | undefined> {

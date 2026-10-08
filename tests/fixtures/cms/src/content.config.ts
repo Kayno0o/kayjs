@@ -12,4 +12,5 @@ export const news = collection({
 }, {
   schema: t.Object({ title: t.String(), published: t.Boolean() }),
   draft: entry => !entry.data.published,
+  feed: { path: '/news/rss.xml', title: 'News', item: entry => ({ title: entry.data.title, path: `/news/${entry.slug}`, date: new Date(0) }) },
 })
