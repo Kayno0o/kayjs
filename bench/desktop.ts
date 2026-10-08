@@ -34,7 +34,18 @@ interface Variant {
   ready?: (output: string) => string | undefined
   // The cookie a request needs, traded for the secret the URL carries.
   cookie?: boolean
+  // Set over the environment, to try what GTK and WebKit read from it.
+  env?: Record<string, string>
 }
+
+// The renderers GTK and WebKitGTK document switching through the environment, each costing GPU driver memory in the process using it.
+const WINDOW_ENVS: Record<string, string>[] = [
+  {},
+  { GSK_RENDERER: 'cairo' },
+  { WEBKIT_SKIA_ENABLE_CPU_RENDERING: '1' },
+  { WEBKIT_DISABLE_DMABUF_RENDERER: '1' },
+  { GSK_RENDERER: 'cairo', WEBKIT_SKIA_ENABLE_CPU_RENDERING: '1', WEBKIT_DISABLE_DMABUF_RENDERER: '1' },
+]
 
 const headless = process.argv.includes('--headless')
 
@@ -48,7 +59,7 @@ await build(['--desktop', join(OUT, 'app')])
 const variants: Variant[] = [
   { name: '`--compile` server', argv: [join(OUT, 'server')], ready: output => LISTENING.test(output) ? `http://localhost:${LISTENING.exec(output)![1]}/` : undefined },
   { name: '`--desktop --no-window`', argv: [join(OUT, 'app'), '--no-window'], ready: output => OPEN.exec(output)?.[1], cookie: true },
-  ...headless ? [] : [{ name: '`--desktop`, window open', argv: [join(OUT, 'app')] }],
+  ...headless ? [] : WINDOW_ENVS.map(env => ({ name: `\`--desktop\`, window open${Object.keys(env).length === 0 ? '' : `, ${Object.entries(env).map(([name, value]) => `${name}=${value}`).join(' ')}`}`, argv: [join(OUT, 'app')], env })),
 ]
 const rows: string[][] = []
 const breakdowns: string[] = []
@@ -74,7 +85,7 @@ async function build(flags: string[]): Promise<void> {
 }
 
 async function measure(variant: Variant): Promise<{ idle: Sample, loaded?: Sample }> {
-  const child = Bun.spawn(variant.argv, { cwd: OUT, env: { ...process.env, PORT: '0', NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit' })
+  const child = Bun.spawn(variant.argv, { cwd: OUT, env: { ...process.env, PORT: '0', NODE_ENV: 'production', ...variant.env }, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit' })
 
   try {
     const url = variant.ready ? await readyUrl(child, variant.ready) : undefined
