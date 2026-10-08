@@ -88,7 +88,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
       for (const copy of localeCopies(i18n?.settings, path)) {
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
-        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head, base: basePath(config.base), maxDensity })
+        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head, base: basePath(config.base), maxDensity, offline: config.offline !== undefined })
         const response = await (i18n && copy.locale !== undefined ? runInLocale(stateFor(i18n, copy.locale, path, request), render) : render())
 
         if (response.status >= 500)

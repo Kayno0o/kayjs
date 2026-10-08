@@ -268,6 +268,23 @@ export default defineConfig({
 
 The manifest is named after `seo.name`, `shortName` defaulting to it, and described by `seo.description`; `themeColor` is also every page's `theme-color`.
 
+### Offline
+
+`offline: true` in `kay.config.ts` turns on a service worker, which keeps the site's files and some of its pages for a visitor who lost their connection or opens the installed site with none:
+
+```ts
+export default defineConfig({
+  offline: { pages: ['/', '/menu'], fallback: '/offline' },
+})
+```
+
+- Every page carries a script registering `/sw.js`, under the site's `base`, once it has loaded; the policy allows it by hash as kay's other inline scripts. Off, nothing is added to a page.
+- On its install the worker fetches the build's scripts, stylesheets and fonts, every page `pages` lists, as paths of the site, every prerendered page no guard covers without it, and the `fallback` page. The build's other files, such as images, are kept as they are first loaded. It answers the build's files from what it keeps, so islands hydrate offline.
+- A page is fetched from the network first, a kept page's copy refreshed each time, unless its response says `private` or `no-store`; offline, the kept copy answers, then the `fallback` page, then a plain page kay writes saying the page needs a connection, with status 503. A page swap fetches through it too, so following a link between kept pages works offline.
+- Actions, API routes and every other path under `/_kay/` always go to the network, as does any request other than GET or to another site. `/_kay/env.js` is fetched from the network first and kept for offline islands.
+- The worker's cache is named after the build and the prerendered pages, so a deploy changes `/sw.js`, which the browser checks as a page loads; the new worker takes over at once, drops the old cache, and the page swap goes on fetching through it. Nothing has to be cleared by hand.
+- `kay dev` adds no script, and its `/sw.js` removes a worker a production run left on the same origin. Turning `offline` off does the same for visitors who had it. A public file or a page at `/sw.js` wins over kay's.
+
 ### Fonts
 
 `fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by one `@font-face` stylesheet every page links, and preloaded only with `preload: true`.
@@ -1264,7 +1281,7 @@ export default defineConfig({
 `kay build --static` writes the site to `dist`, or `--outdir`, for any static host: Forgejo Pages, a CDN, plain nginx.
 
 - Every page is rendered: one without params as it is, one with params for the values its `prerender` lists. A page a guard covers, one exporting an action, one with params and no list, one exporting `prerender = false`, one that redirects or answers another status than 200, one linking an image only the image route makes, and one whose render fails cannot be served without a server, nor can a module under `src/api/`, and the build fails naming each of them.
-- Each page is written as `about.html` and `about/index.html`, so a host finds it at `/about` and `/about/` alike, `/` as `index.html`; the browser build goes under `_kay/`, the public files at the root, with the sitemap, `robots.txt`, feeds, favicons and `404.html` from `_404.kay`. Every compressible file has its `.br` and `.gz` copy beside it, for a server sending them as they are (nginx's `gzip_static`), and asset names carry their hash, so `_kay/` can be cached forever.
+- Each page is written as `about.html` and `about/index.html`, so a host finds it at `/about` and `/about/` alike, `/` as `index.html`; the browser build goes under `_kay/`, the public files at the root, with the sitemap, `robots.txt`, feeds, favicons, `sw.js` (see Offline) and `404.html` from `_404.kay`. Every compressible file has its `.br` and `.gz` copy beside it, for a server sending them as they are (nginx's `gzip_static`), and asset names carry their hash, so `_kay/` can be cached forever.
 - Imported images link the variants the build writes, `/_kay/images/hero-640.webp`, `hero-640-16x9.webp` cut and `hero-card.jpg` for the share card, since no image route answers; an image from `images.dirs` is not exported, and one from `images.remote` is downloaded by the build, its variants written as `/_kay/images/remote-<hash of its URL>-640.webp`, the build failing if the host does not answer.
 - A redirect without params becomes a page sending the browser on with `<meta http-equiv="refresh">`; every redirect also goes to `_redirects`, read by hosts such as Netlify and Cloudflare Pages. With `i18n.prefixDefault`, each unprefixed path sends the browser to the default locale's copy. Locales by domain need a server.
 - The directory is cleared first, only when the last export wrote it: kay refuses one holding other files, and the project itself.
@@ -1375,7 +1392,7 @@ Every response the app sends, its own routes included, carries a Content-Securit
 default-src 'self'; script-src 'self' <kay's hashes>; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
 ```
 
-Every inline script kay writes is the same on every page: the hydration bootstrap, the speculation rules, the swap of streamed blocks and, in development, live reload and the problems panel. The policy allows them by hash, with no `'unsafe-inline'` and no nonce. `security` in `kay.config.ts` adjusts it:
+Every inline script kay writes is the same on every page: the hydration bootstrap, the speculation rules, the swap of streamed blocks, with `offline` the service worker's registration, and, in development, live reload and the problems panel. The policy allows them by hash, with no `'unsafe-inline'` and no nonce. `security` in `kay.config.ts` adjusts it:
 
 ```ts
 import { defineConfig } from 'kay/server'

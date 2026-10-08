@@ -29,6 +29,7 @@ import { formsScript } from './forms'
 import { runGuards } from './guards'
 import { hydrationScript } from './hydration'
 import { messagesScript } from './i18n'
+import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { matchesEtag } from './public'
 import { readQuery } from './query'
@@ -74,6 +75,8 @@ export interface RenderOptions {
   maxDensity?: number
   // Times each load and the render in a `Server-Timing` header, as development always does.
   serverTiming?: boolean
+  // Registers the service worker `offline` turns on.
+  offline?: boolean
 }
 
 // What Elysia hands a route handler, derived and resolved values included; pages see it whole as `ctx.locals`.
@@ -437,7 +440,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shipsEntry = hasIslands || posts
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') : ''
   const locale = localeState()
-  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) : ''}${options.base ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${speculationRules(options.prefetch, options.base)}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS : ''}</head><body>${body}`
+  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) : ''}${options.base ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS : ''}</head><body>${body}`
 
   if (!streamed)
     return `${start}</body></html>`

@@ -29,6 +29,8 @@ export interface KayConfig {
   favicon?: string
   // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
   manifest?: ManifestConfig
+  // A service worker keeping the build's files and some pages for a visitor offline, `true` or what it keeps; off by default.
+  offline?: true | OfflineConfig
   // Self-hosted fonts, declared on every page and preloaded where they ask for it.
   fonts?: (FontConfig | FontsourceConfig)[]
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
@@ -162,6 +164,13 @@ export interface ManifestConfig {
   themeColor?: string
   backgroundColor?: string
   display?: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser'
+}
+
+export interface OfflineConfig {
+  // The pages read offline once the worker installed, as paths of the site: every prerendered page no guard covers by default.
+  pages?: string[]
+  // The page shown offline for any other, such as `/offline`, a page of the site; a plain one kay writes by default.
+  fallback?: string
 }
 
 export interface ImagesConfig {

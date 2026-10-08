@@ -33,6 +33,7 @@ import { applyImageConfig, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
 import { logRequests } from './log'
+import { serveServiceWorker } from './offline'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
 import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
 import { trustProxy } from './protection'
@@ -162,7 +163,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   setTracer(options.tracer)
   setSite(options.site === undefined ? undefined : siteOrigin(options.site) + base, options.trailingSlash)
 
-  const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base, maxDensity }
+  const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base, maxDensity, offline: options.offline !== undefined && !options.dev }
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const security = securityHeaders(options)
@@ -280,6 +281,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     serveFavicons(app, new Set([...publicUrls, ...servedPaths(routes)]), { source: resolve(root, options.favicon), builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
+  const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
+
+  await serveServiceWorker(app, new Set([...publicUrls, ...servedPaths(routes)]), { client, offline: options.dev ? undefined : options.offline, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern)).map(([path]) => path) })
 
   for (const pages of prerendered.values())
     trackPrerendered(pages)

@@ -17,6 +17,7 @@ import { compressPaths } from '../server/compress'
 import { PUBLIC_ENV_PATH } from '../server/env'
 import { FAVICON_PATHS } from '../server/favicon'
 import { localeSettings } from '../server/i18n'
+import { SERVICE_WORKER } from '../server/offline'
 import { publicFiles } from '../server/public'
 import { siteOrigin } from '../server/seo'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
@@ -78,7 +79,7 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
 
   // What kay serves itself comes from the app, as a server would answer it.
   const app = new Elysia().use(await servePages({ ...config, root, prebuilt: true, log: false, health: false, security: false, compress: false }))
-  const fetched = [...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...config.favicon === undefined ? [] : FAVICON_PATHS, ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => collection.options.feed ? [collection.options.feed.path] : [])]
+  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...config.favicon === undefined ? [] : FAVICON_PATHS, ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => collection.options.feed ? [collection.options.feed.path] : [])]
 
   for (const path of fetched) {
     const response = await app.handle(new Request(`http://localhost${path}`))
