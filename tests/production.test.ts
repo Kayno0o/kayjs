@@ -216,9 +216,9 @@ describe('action protection', () => {
     const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
     const page = await site.visit('/contact')
 
-    expect(page.html).toContain('enctype="multipart/form-data"><div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert><input name="website" type="text" tabindex="-1" autocomplete="off"></div><input name="message"')
+    expect(page.html).toContain('enctype="multipart/form-data"><div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert><input name="website" type="text" tabindex="-1" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore></div><input name="message"')
     expect(page.html.match(/name="website"/g)).toHaveLength(1)
-    expect((await site.visit('/enquiry')).html).toContain('<input name="nectar" type="text" tabindex="-1" autocomplete="off">')
+    expect((await site.visit('/enquiry')).html).toContain('<input name="nectar" type="text" tabindex="-1" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore>')
 
     const form = 'form(action={send})\n  input(name="message" aria-label="Message")\n'
 

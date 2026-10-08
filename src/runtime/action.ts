@@ -302,11 +302,11 @@ export function formValue(target: unknown, name: string): string | undefined {
   return untrack((target as FormTarget).failed)?.values[name]
 }
 
-// The honeypot field a form posting to `target` renders, out of sight and out of reach of the keyboard and screen readers; empty for an action with none.
+// The honeypot field a form posting to `target` renders, out of sight and out of reach of the keyboard, screen readers and password managers, whose autofill would otherwise refuse a person; empty for an action with none.
 export function formHoneypot(target: unknown): string {
   const field = isAction(target) ? honeypotField(target.protection) : undefined
 
-  return field === undefined ? '' : `<div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert><input name="${escapeAttribute(field)}" type="text" tabindex="-1" autocomplete="off"></div>`
+  return field === undefined ? '' : `<div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert><input name="${escapeAttribute(field)}" type="text" tabindex="-1" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore></div>`
 }
 
 export function honeypotField(protection: ActionProtection<string> | undefined): string | undefined {
