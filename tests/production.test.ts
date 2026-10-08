@@ -492,7 +492,8 @@ describe('SQLite stores', () => {
       sqliteRates(join(dir, 'rates/rates.sqlite'))
       sqliteStore(join(dir, 'sessions/sessions.sqlite'))
       sqliteCache(join(dir, 'cache/cache.sqlite'))
-      sqliteJobs(join(dir, 'jobs/jobs.sqlite'))
+      // The job store opens its file on the first write, so a server whose queue never gets a job writes nothing.
+      await sqliteJobs(join(dir, 'jobs/jobs.sqlite')).lock('report', 0)
 
       for (const name of ['rates', 'sessions', 'cache', 'jobs'])
         expect(await Bun.file(join(dir, name, `${name}.sqlite`)).exists()).toBe(true)

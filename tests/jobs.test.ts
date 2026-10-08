@@ -191,6 +191,28 @@ describe('queue', () => {
     }
   })
 
+  it('leaves a missing SQLite file alone until a job is enqueued, then runs it', async () => {
+    const path = await jobsPath()
+    const errors = spyOn(console, 'error')
+    const sent: string[] = []
+    const mail = queue('mail', (to: string) => void sent.push(to), { store: sqliteJobs(path) })
+    const app = new Elysia().use(mail).listen(0)
+
+    try {
+      await Bun.sleep(50)
+      expect(await Bun.file(path).exists()).toBe(false)
+      expect(errors).not.toHaveBeenCalled()
+      // Another process's store, creating the file the worker then opens.
+      await queue('mail', () => undefined, { store: sqliteJobs(path) }).enqueue('ada@example.com')
+      await until(() => sent.length > 0)
+      expect(sent).toEqual(['ada@example.com'])
+    }
+    finally {
+      errors.mockRestore()
+      await shutdown(app)
+    }
+  })
+
   it('wakes its worker for a job enqueued in the same process, and waits for the run in progress on stop', async () => {
     const steps: string[] = []
     const work = queue('work', async (step: string) => {

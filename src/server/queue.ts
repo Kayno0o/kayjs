@@ -1,4 +1,6 @@
+import type { Database } from 'bun:sqlite'
 import type { Duration } from '../runtime/duration'
+import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
@@ -85,51 +87,38 @@ const drains = new Set<() => Promise<number>>()
 let defaultStore: JobStore | undefined
 
 // Jobs kept in a SQLite file: they survive restarts and deploys, and every process of the machine opening it shares them, each job running in one of them.
+// The file is created by the first job enqueued or schedule locked, so a server whose queue never gets one, an app only sending its mails say, writes nothing.
 export function sqliteJobs(path: string): JobStore {
-  const db = openSqlite(path)
-
-  db.run('CREATE TABLE IF NOT EXISTS kay_jobs (id TEXT PRIMARY KEY, queue TEXT NOT NULL, payload TEXT NOT NULL, attempts INTEGER NOT NULL, run_at INTEGER NOT NULL, held_until INTEGER, failed INTEGER NOT NULL DEFAULT 0, error TEXT)')
-  db.run('CREATE INDEX IF NOT EXISTS kay_jobs_due ON kay_jobs (queue, failed, run_at)')
-  db.run('CREATE TABLE IF NOT EXISTS kay_locks (name TEXT NOT NULL, slot INTEGER NOT NULL, PRIMARY KEY (name, slot))')
-
-  interface Row { id: string, queue: string, payload: string, attempts: number, run_at: number, error: string | null }
-  const toJob = (row: Row): StoredJob => ({ id: row.id, queue: row.queue, payload: row.payload, attempts: row.attempts, runAt: row.run_at, ...row.error !== null && { error: row.error } })
-  const insert = db.query('INSERT INTO kay_jobs (id, queue, payload, attempts, run_at) VALUES (?, ?, ?, ?, ?)')
-  const claim = db.query<Row, [number, string, number, number]>('UPDATE kay_jobs SET held_until = ?, attempts = attempts + 1 WHERE id = (SELECT id FROM kay_jobs WHERE queue = ? AND failed = 0 AND run_at <= ? AND (held_until IS NULL OR held_until <= ?) ORDER BY run_at LIMIT 1) RETURNING id, queue, payload, attempts, run_at, error')
-  const remove = db.query('DELETE FROM kay_jobs WHERE id = ?')
-  const retry = db.query('UPDATE kay_jobs SET run_at = ?, held_until = NULL, error = ? WHERE id = ?')
-  const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ? WHERE id = ?')
-  const failed = db.query<Row, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at')
-  // A held job counts from when its hold ends, as it runs again then if its process died.
-  const next = db.query<{ at: number | null }, [string]>('SELECT min(max(run_at, coalesce(held_until, 0))) AS at FROM kay_jobs WHERE queue = ? AND failed = 0')
-  const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
-  const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
+  let statements: ReturnType<typeof prepareJobs> | undefined
+  // A read before the file exists finds no job rather than creating it, then opens it once another process did.
+  const open = (create: boolean) => statements ??= create || existsSync(path) ? prepareJobs(openSqlite(path)) : undefined
 
   return {
     add(job) {
-      insert.run(job.id, job.queue, job.payload, job.attempts, job.runAt)
+      open(true)!.insert.run(job.id, job.queue, job.payload, job.attempts, job.runAt)
     },
     claim(queue, now, until) {
-      const row = claim.get(until, queue, now, now)
+      const row = open(false)?.claim.get(until, queue, now, now)
 
       return row ? toJob(row) : undefined
     },
     complete(id) {
-      remove.run(id)
+      open(true)!.remove.run(id)
     },
     retry(id, runAt, error) {
-      retry.run(runAt, error, id)
+      open(true)!.retry.run(runAt, error, id)
     },
     fail(id, error) {
-      fail.run(error, id)
+      open(true)!.fail.run(error, id)
     },
     failed(queue) {
-      return failed.all(queue).map(toJob)
+      return open(false)?.failed.all(queue).map(toJob) ?? []
     },
     nextRunAt(queue) {
-      return next.get(queue)?.at ?? undefined
+      return open(false)?.next.get(queue)?.at ?? undefined
     },
     lock(name, slot) {
+      const { lock, pruneLocks } = open(true)!
       const won = lock.run(name, slot).changes === 1
 
       // A slot is a minute, so a day of them is far past any process still deciding one.
@@ -138,6 +127,31 @@ export function sqliteJobs(path: string): JobStore {
       return won
     },
   }
+}
+
+interface JobRow { id: string, queue: string, payload: string, attempts: number, run_at: number, error: string | null }
+
+function toJob(row: JobRow): StoredJob {
+  return { id: row.id, queue: row.queue, payload: row.payload, attempts: row.attempts, runAt: row.run_at, ...row.error !== null && { error: row.error } }
+}
+
+function prepareJobs(db: Database) {
+  db.run('CREATE TABLE IF NOT EXISTS kay_jobs (id TEXT PRIMARY KEY, queue TEXT NOT NULL, payload TEXT NOT NULL, attempts INTEGER NOT NULL, run_at INTEGER NOT NULL, held_until INTEGER, failed INTEGER NOT NULL DEFAULT 0, error TEXT)')
+  db.run('CREATE INDEX IF NOT EXISTS kay_jobs_due ON kay_jobs (queue, failed, run_at)')
+  db.run('CREATE TABLE IF NOT EXISTS kay_locks (name TEXT NOT NULL, slot INTEGER NOT NULL, PRIMARY KEY (name, slot))')
+
+  const insert = db.query('INSERT INTO kay_jobs (id, queue, payload, attempts, run_at) VALUES (?, ?, ?, ?, ?)')
+  const claim = db.query<JobRow, [number, string, number, number]>('UPDATE kay_jobs SET held_until = ?, attempts = attempts + 1 WHERE id = (SELECT id FROM kay_jobs WHERE queue = ? AND failed = 0 AND run_at <= ? AND (held_until IS NULL OR held_until <= ?) ORDER BY run_at LIMIT 1) RETURNING id, queue, payload, attempts, run_at, error')
+  const remove = db.query('DELETE FROM kay_jobs WHERE id = ?')
+  const retry = db.query('UPDATE kay_jobs SET run_at = ?, held_until = NULL, error = ? WHERE id = ?')
+  const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ? WHERE id = ?')
+  const failed = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at')
+  // A held job counts from when its hold ends, as it runs again then if its process died.
+  const next = db.query<{ at: number | null }, [string]>('SELECT min(max(run_at, coalesce(held_until, 0))) AS at FROM kay_jobs WHERE queue = ? AND failed = 0')
+  const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
+  const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
+
+  return { insert, claim, remove, retry, fail, failed, next, lock, pruneLocks }
 }
 
 // Jobs kept in this process's memory, gone with it: what tests run on.
