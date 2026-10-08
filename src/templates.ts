@@ -461,8 +461,8 @@ export default defineConfig({
   'migrations/0001_member.sql': `-- migrate:up
 CREATE TABLE "member" (
   "id" serial,
-  "name" varchar(40),
-  "joined_at" timestamptz DEFAULT now(),
+  "name" varchar(40) NOT NULL,
+  "joined_at" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("id"),
   UNIQUE ("name")
 );
