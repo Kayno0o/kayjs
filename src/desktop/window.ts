@@ -1,15 +1,13 @@
 import type { DesktopMessage } from '../server/desktop'
+import type { WindowSettings } from './library'
 import process from 'node:process'
 import { createWebview } from './webview'
 
-export interface WindowOptions {
+export interface WindowOptions extends WindowSettings {
   // The module running the app's server, the worker entry `kay build --desktop` generates.
   worker: string
   // The webview library the executable embeds for its platform.
   library: string
-  title: string
-  width: number
-  height: number
 }
 
 // Run with it, the executable prints the URL a browser opens the app at rather than opening its window, to debug it in the browser's devtools.
@@ -51,14 +49,17 @@ export async function openWindow(options: WindowOptions): Promise<void> {
     return
   }
 
-  // Opened only now, so a run without a window needs no webview on the machine.
-  const webview = createWebview(options.library, options)
+  showWindow(options.library, listening, options)
+  await stop()
+}
 
-  webview.setTitle(options.title)
+// Opens a window on `url` and returns once it is closed; `devtools` lets the page be inspected, as `kay dev --desktop` does.
+export function showWindow(library: string, url: string, settings: WindowSettings, devtools = false): void {
+  const webview = createWebview(library, settings, devtools)
+
+  webview.setTitle(settings.title)
   webview.bind(TITLE_BINDING, (title: string) => webview.setTitle(title))
   webview.init(FOLLOW_TITLE)
-  webview.navigate(listening)
-  // Returns once the window is closed.
+  webview.navigate(url)
   webview.run()
-  await stop()
 }

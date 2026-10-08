@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG } from '../content/server'
+import { webviewLibrary, windowSettings } from '../desktop/library'
 import { scanApi } from '../server/api'
 import { messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
@@ -112,38 +113,15 @@ export async function compileServer(root: string, config: KayConfig, options: Co
 }
 
 // The main thread of a desktop executable, which opens the window on the server the worker entry runs.
+// It embeds the webview library for the platform the executable is built on, which is the one it runs on.
 async function writeWindowEntry(root: string, config: KayConfig, window: string, worker: string): Promise<void> {
-  const library = webviewLibrary()
-  let path: string
-
-  try {
-    path = Bun.resolveSync(`webview-bun/build/${library}`, root)
-  }
-  catch {
-    throw new Error('kay: a desktop build opens its window through the webview library webview-bun ships, and this project does not depend on it: bun add webview-bun')
-  }
-
-  const desktop = config.desktop ?? {}
-  const options = { title: desktop.title ?? config.seo?.name ?? basename(root), width: desktop.width ?? 1024, height: desktop.height ?? 768 }
-
   await Bun.write(window, [
     `import { openWindow } from 'kay/internal/desktop'`,
-    `import library from ${JSON.stringify(path)} with { type: 'file' }`,
+    `import library from ${JSON.stringify(webviewLibrary(root))} with { type: 'file' }`,
     '',
-    `await openWindow({ worker: new URL(${JSON.stringify(`./${basename(worker)}`)}, import.meta.url).href, library, ...${JSON.stringify(options)} })`,
+    `await openWindow({ worker: new URL(${JSON.stringify(`./${basename(worker)}`)}, import.meta.url).href, library, ...${JSON.stringify(windowSettings(root, config))} })`,
     '',
   ].join('\n'))
-}
-
-// The build of the webview library for the platform the executable is built on, which is the one it runs on.
-function webviewLibrary(): string {
-  if (process.platform === 'win32')
-    return 'libwebview.dll'
-
-  if (process.platform === 'darwin')
-    return 'libwebview.dylib'
-
-  return `libwebview-${process.arch}.so`
 }
 
 // Every module a route renders or runs: its page, layouts, special pages and guards.

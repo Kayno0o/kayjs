@@ -17,6 +17,8 @@ export interface DevOptions {
   settings?: Record<string, string>
   // Called with each server process once it is spawned.
   onRestart?: (child: Subprocess) => void
+  // Called with the port each server process listens on.
+  onListen?: (port: number) => void
 }
 
 // Long enough to gather the few events one save makes.
@@ -52,7 +54,15 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let changedFiles = new Set<string>()
 
   const env = await environmentWithoutDotenv()
-  const spawn = () => Bun.spawn([process.execPath, '--preload', SPARE, entry], { cwd: root, env: { ...env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
+  const { onListen } = options
+  const spawn = () => Bun.spawn([process.execPath, '--preload', SPARE, entry], {
+    cwd: root,
+    env: { ...env, NODE_ENV: 'development', ...onListen && { KAY_DEV_LISTEN: '1' } },
+    stdin: 'pipe',
+    stdout: 'inherit',
+    stderr: 'inherit',
+    ipc: onListen && ((port: number) => onListen(port)),
+  })
   // Each restart takes the process waiting with kay loaded, and readies the next one.
   const start = () => {
     if (startupChanged || spare === undefined || spare.exitCode !== null) {

@@ -30,9 +30,9 @@ export interface Webview {
   run: () => void
 }
 
-export function createWebview(library: string, size: { width: number, height: number }): Webview {
+export function createWebview(library: string, size: { width: number, height: number }, devtools = false): Webview {
   const { symbols } = openLibrary(library)
-  const handle = symbols.webview_create(0, null)
+  const handle = symbols.webview_create(devtools ? 1 : 0, null)
 
   if (handle === null)
     throw new Error(`kay: the webview could not open a window: ${MISSING}`)

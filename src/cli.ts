@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import type { Subprocess } from 'bun'
 import type { ParseArgsOptionsConfig } from 'node:util'
 import type { Paint } from './compiler/frame'
 import type { KayConfig } from './config'
@@ -18,6 +19,7 @@ import { explainLint, isLint, lintList } from './compiler/lints'
 import { loadConfig } from './config'
 import { writeContentManifests } from './content/server'
 import { ContentError } from './content/validate'
+import { webviewLibrary, windowSettings } from './desktop/library'
 import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
@@ -35,9 +37,10 @@ import { ExportError, prerenderPages } from './server/prerender'
 import { remoteImages, remotePatterns } from './server/remote'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
+const DEV_WINDOW = join(import.meta.dir, 'desktop', 'dev-window.ts')
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const toStderr: Paint = (styles, text) => styleText(styles, text, { stream: process.stderr })
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable> | --desktop <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>] [--desktop]\n       kay build [dir] [--compile <executable> | --desktop <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -472,9 +475,9 @@ function shellQuote(path: string): string {
   return SHELL_SAFE.test(path) ? path : `'${path.replaceAll('\'', '\'\\\'\'')}'`
 }
 
-// Restarts the server on every change until interrupted.
+// Restarts the server on every change until interrupted, or with `--desktop` until its window is closed.
 async function runDev(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { entry: { type: 'string' } }, 1)
+  const parsed = parseCommand(args, { entry: { type: 'string' }, desktop: { type: 'boolean' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
@@ -498,16 +501,36 @@ async function runDev(args: string[]): Promise<number> {
 
   const root = resolve(inDir ? path : '.')
   const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
-  const { routes, publicDir, api, settings } = await loadConfig(root)
-  const stop = await dev(root, { entry, routes, publicDir, api, settings })
+  const config = await loadConfig(root)
+  const { routes, publicDir, api, settings } = config
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
+  const library = parsed.values.desktop === true ? webviewLibrary(root) : undefined
+  let window: Subprocess | undefined
+
+  // One window for the whole session, on the first server's port; the page reloads itself across restarts.
+  const onListen = library === undefined
+    ? undefined
+    : (port: number) => {
+      if (window)
+        return
+
+      window = Bun.spawn([process.execPath, DEV_WINDOW, JSON.stringify({ library, url: `http://localhost:${port}/`, settings: windowSettings(root, config) })], { stdio: ['ignore', 'inherit', 'inherit'] })
+      void closedWindow(window, interrupted)
+    }
+  const stop = await dev(root, { entry, routes, publicDir, api, settings, onListen })
 
   process.once('SIGINT', interrupted)
   process.once('SIGTERM', interrupted)
   await promise
+  window?.kill()
   await stop()
 
   return 0
+}
+
+async function closedWindow(window: Subprocess, then: () => void): Promise<void> {
+  await window.exited
+  then()
 }
 
 // A diagnostic can point at a file that is gone by now, such as a tsconfig tsgo could not read.

@@ -82,7 +82,7 @@ describe('llms.txt', () => {
     expect(Object.keys(await import('kay/image'))).toEqual(['image', 'shareCard', 'shareImage'])
     expect(Object.keys(await import('kay/internal')).sort()).toEqual(['actionStub', 'autoDefer', 'formAction', 'formChecked', 'formHoneypot', 'formInvalid', 'formValue', 'isAction', 'registerActions', 'registerImage'])
     expect(Object.keys(await import('kay/internal/server')).sort()).toEqual(['probeHealth', 'registerBundle', 'startDesktopServer'])
-    expect(Object.keys(await import('kay/internal/desktop'))).toEqual(['openWindow'])
+    expect(Object.keys(await import('kay/internal/desktop')).sort()).toEqual(['openWindow', 'showWindow'])
     expect(['actionStub', 'formAction', 'isAction', 'registerActions'].filter(name => name in runtime)).toEqual([])
     expect(['registerBundle', 'startDesktopServer', 'shutDown', 'events'].filter(name => name in server)).toEqual([])
     expect(server).toMatchObject({ shutdown: expect.any(Function), eventStream: expect.any(Function) })

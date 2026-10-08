@@ -106,7 +106,7 @@ describe('kay build --desktop', () => {
         return { report, code }
       }
 
-      expect(await build()).toMatchObject({ code: 1, report: expect.stringContaining('opens its window through the webview library webview-bun ships, and this project does not depend on it: bun add webview-bun') })
+      expect(await build()).toMatchObject({ code: 1, report: expect.stringContaining('a desktop app opens its window through the webview library webview-bun ships, and this project does not depend on it: bun add webview-bun') })
 
       await symlink(join(repo, 'node_modules/webview-bun'), join(dir, 'node_modules/webview-bun'))
 
