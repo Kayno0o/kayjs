@@ -105,6 +105,36 @@ describe.each(['@kaynooo/kayjs', '@kaynooo/kay'] as const)('a linked kay library
   })
 })
 
+// A workspace installs its packages once, in a `node_modules` above each app.
+describe('a kay library hoisted above the project', () => {
+  let workspace: string
+  let project: string
+
+  beforeAll(async () => {
+    workspace = await mkdtemp(join(import.meta.dir, '.dom-'))
+    project = join(workspace, 'apps/site')
+    await write(project, { ...PROJECT, 'kay.config.ts': 'export default {}\n', 'src/routes/index.kay': '---\nimport Framed from \'kay-lib/framed.kay\'\n---\nmain\n  Framed(label="hi")\n' })
+    await write(join(workspace, 'node_modules/kay-lib'), { ...LIBRARY, 'src/framed.kay': '---\nimport Badge from \'./badge.kay\'\n\nconst { label } = props<{ label: string }>()\n---\ndiv.frame\n  Badge(label={label})\n' })
+  })
+
+  afterAll(async () => {
+    await rm(workspace, { recursive: true, force: true })
+  })
+
+  it('types its components, a component it imports beside one included, keeping their shadows inside the project\'s tree', async () => {
+    expect(await run('check', project)).toEqual({ code: 0, output: '' })
+    expect(await Bun.file(join(project, '.kay/types/__/__/node_modules/kay-lib/src/framed.kay.tsx')).exists()).toBe(true)
+    expect(await Bun.file(join(project, 'node_modules')).exists()).toBe(false)
+
+    await write(project, { 'src/routes/typed.kay': '---\nimport Framed from \'kay-lib/framed.kay\'\n---\nFramed(label={1})\n' })
+
+    const { code, output } = await run('check', project)
+
+    expect(reported(output)).toEqual([`${relative(process.cwd(), join(project, 'src/routes/typed.kay'))}:4:8 error[TS2322]: Type 'number' is not assignable to type 'string'.`])
+    expect(code).toBe(1)
+  })
+})
+
 describe('throughLinks', () => {
   it('names a file of a linked package by its path under node_modules, scoped ones included, and leaves any other file as it is', async () => {
     const tree = await mkdtemp(join(import.meta.dir, '.dom-'))

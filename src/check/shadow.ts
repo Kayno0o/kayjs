@@ -12,6 +12,9 @@ export const SHADOW_DIR = join('.kay', 'types')
 // What the shadow tree was last compiled with, for tools that compile one file at a time without reading kay.config.ts, such as the ESLint processor.
 export const SHADOW_SETTINGS = 'kay-shadow.json'
 const TS_EXTENSION = /\.ts$/
+const KAY_EXTENSION = /\.kay$/
+const PARENT = '..'
+const OUTSIDE = '__'
 
 export interface ShadowFile {
   source: string
@@ -25,8 +28,9 @@ export interface ShadowSettings {
   islandOnly: Set<string>
 }
 
+// A file outside the project, such as a library a workspace installs in a `node_modules` above it, goes under one folder per level climbed, so it stays inside the tree and its sibling components still resolve beside it.
 export function shadowPath(root: string, file: string): string {
-  return join(root, SHADOW_DIR, `${relative(root, file)}.tsx`)
+  return join(root, SHADOW_DIR, `${relative(root, file).split(sep).map(part => part === PARENT ? OUTSIDE : part).join(sep)}.tsx`)
 }
 
 export function serializeShadowSettings(root: string, settings: ShadowSettings): string {
@@ -56,7 +60,11 @@ export function compileShadow(root: string, routesDir: string, file: string, sou
 
     const target = resolve(dirname(file), specifier)
 
-    return target.startsWith(root + sep) ? undefined : relative(shadowDir, target)
+    // A component beside a file outside the project has its shadow beside this one.
+    if (target.startsWith(root + sep) || (KAY_EXTENSION.test(target) && !file.startsWith(root + sep)))
+      return undefined
+
+    return relative(shadowDir, target)
   }
   const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, insideIsland, relocateImport, lints })
   // Reported as the server reports it, rather than as a type error in the shadow file.
