@@ -73,6 +73,8 @@ export interface KayConfig {
   publicEnv?: EnvSchema
   // The level of each lint `kay check`, `kay dev` and the editor report, over its default: `{ 'positional-key': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels
+  // Lets an editor see drafts on the live site: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
+  preview?: PreviewConfig
   // Receives every error a load, a render, a guard or an action throws, as it is logged: the place to send them to an error tracker.
   onError?: (error: unknown, request: Request) => void | Promise<void>
 }
@@ -92,6 +94,13 @@ export interface SeoConfig {
   locale?: string
   // Structured data every page carries, such as the site's `WebSite` or `Organization`.
   jsonLd?: JsonLd[]
+}
+
+export interface PreviewConfig {
+  // Signs preview links and the preview cookie, and is what a CMS's preview link carries, `/_kay/preview?secret=...&path=/blog/draft`: at least 32 random characters, read from the environment.
+  secret: string
+  // How long a visitor stays in preview mode once in, seconds or a string such as '2h'; an hour by default.
+  maxAge?: Duration
 }
 
 export interface HealthConfig {

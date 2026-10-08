@@ -60,11 +60,14 @@ async function namedCollections(root: string, config?: string): Promise<[string,
   return Object.entries(module).filter((entry): entry is [string, Collection<unknown>] => isCollection(entry[1]))
 }
 
-// Compiles every collection from its files and writes what the server reads in production, failing on the first collection with a bad entry.
+// Compiles every collection from its files and writes what the server reads in production, failing on the first collection with a bad entry. A loader's collection is read when the server runs.
 export async function writeContentManifests(root: string, clientBase: string, config?: string): Promise<number> {
   let count = 0
 
   for (const collection of await projectCollections(root, config)) {
+    if (collection.dir === undefined)
+      continue
+
     const entries = await loadEntries(collection.dir, collection.options.highlight, true)
 
     decodeEntries(entries, collection.options.schema, collection.options.components ?? {})
@@ -75,7 +78,7 @@ export async function writeContentManifests(root: string, clientBase: string, co
   return count
 }
 
-// Every entry that fails to compile or to match its schema, across the project's collections, and the components their Markdown uses, for `kay check`.
+// Every entry that fails to compile or to match its schema, across the project's collections, and the components their Markdown uses, for `kay check`. A loader's entries are read only when the server runs.
 // `site` says whether the config sets the site's URL, which a collection's feed needs.
 export async function contentProblems(root: string, config?: string, site = true): Promise<{ problems: ContentProblem[], uses: ComponentUse[] }> {
   const problems: ContentProblem[] = []
@@ -84,6 +87,9 @@ export async function contentProblems(root: string, config?: string, site = true
   for (const [name, collection] of await namedCollections(root, config)) {
     if (collection.options.feed && !site)
       problems.push({ file: relative(root, resolve(root, config ?? CONTENT_CONFIG)), line: 1, message: feedNeedsSite(collection).message })
+
+    if (collection.dir === undefined)
+      continue
 
     try {
       const entries = await loadEntries(collection.dir, collection.options.highlight, true)
@@ -112,7 +118,7 @@ function componentUses(collection: string, components: object, file: string, seg
 }
 
 function feedNeedsSite(collection: Collection<unknown>): Error {
-  return new Error(`kay: the collection ${collection.dir} has a feed, whose links need the site's URL: set \`site\` in kay.config.ts`)
+  return new Error(`kay: the collection ${collection.name} has a feed, whose links need the site's URL: set \`site\` in kay.config.ts`)
 }
 
 // Serves each collection's feed at its path; one stays cached for an hour in production.

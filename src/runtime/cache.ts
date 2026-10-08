@@ -2,6 +2,7 @@ import type { PositiveDuration } from './checks'
 import type { Duration } from './duration'
 import { parse, stringify } from 'devalue'
 import { durationSeconds } from './duration'
+import { previewing } from './preview'
 
 // Where `cached` also keeps a value, so it outlives the process: read when a key is missing from memory, written on each load. Synchronous, so `invalidate` is done when it returns.
 // A key belongs to one store: once in memory, its value is read and written there, whatever store a later call names.
@@ -46,6 +47,11 @@ const RETRY_MS = 60_000
 // A first load that throws throws to its callers and keeps nothing; a refresh that throws is logged and keeps the stale value.
 export async function cached<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions = {}): Promise<T> {
   const seconds = durationSeconds(ttl, `cached('${key}')'s ttl`)
+
+  // A visitor in preview mode sees what the load gives now, which no other visitor gets.
+  if (previewing())
+    return load()
+
   const { store } = options
   let entry = entries.get(key)
 

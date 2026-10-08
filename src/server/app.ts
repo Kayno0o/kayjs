@@ -34,6 +34,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
 import { logRequests } from './log'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
+import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
 import { trustProxy } from './protection'
 import { servePublic } from './public'
 import { readRedirects, refuseRedirectClashes, serveRedirects } from './redirects'
@@ -249,6 +250,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (options.security && options.security.reports === true)
     serveViolationReports(app, options.onError)
 
+  setupPreview(options.preview, base)
+
+  if (options.preview)
+    servePreview(app)
+
   // An executable runs from wherever it was copied, away from the project it was built in.
   const imageCache = bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', 'images')
   const imageRoute = {
@@ -287,6 +293,16 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   serveRedirects(app, redirects)
 
   async function servePage(route: ServedRoute, params: Record<string, unknown>, context: RequestContext, url: URL): Promise<Response> {
+    // Rendered for this visitor alone, drafts shown, past any prerendered or cached copy, and kept by no cache.
+    if (previewRequested(context.request)) {
+      const response = await inPreview(async () => renderPage(route, context, params, client, renderOptions))
+
+      response.headers.set('cache-control', 'private, no-store')
+      response.headers.delete('etag')
+
+      return response
+    }
+
     // A path `kay build` rendered is served from its file; any other path of the route renders per request.
     const page = prerendered.get(route.pattern)?.get(prerenderKey(i18n?.settings, localeState()?.locale, canonicalPath(withoutSlash(url.pathname))))
 

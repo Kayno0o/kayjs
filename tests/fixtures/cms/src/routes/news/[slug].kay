@@ -1,0 +1,12 @@
+--- server
+import { news } from '../../content.config'
+
+export const prerender = news
+
+const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
+const { Content } = entry
+---
+h1 {entry.data.title}
+p.headings {entry.headings.map(heading => heading.text).join(', ')}
+article
+  Content
