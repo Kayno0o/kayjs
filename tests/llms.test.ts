@@ -79,7 +79,7 @@ describe('llms.txt', () => {
     const server = await import('kay/server')
 
     expect(Object.keys(await import('kay/compiler')).sort()).toEqual(['compileKay', 'formatDiagnostic'])
-    expect(Object.keys(await import('kay/image'))).toEqual(['image', 'shareImage'])
+    expect(Object.keys(await import('kay/image'))).toEqual(['image', 'shareCard', 'shareImage'])
     expect(Object.keys(await import('kay/internal')).sort()).toEqual(['actionStub', 'autoDefer', 'formAction', 'formChecked', 'formHoneypot', 'formInvalid', 'formValue', 'isAction', 'registerActions', 'registerImage'])
     expect(Object.keys(await import('kay/internal/server'))).toEqual(['probeHealth', 'registerBundle'])
     expect(['actionStub', 'formAction', 'isAction', 'registerActions'].filter(name => name in runtime)).toEqual([])

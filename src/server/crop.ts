@@ -6,7 +6,7 @@ const CHANNELS: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }
 // Chunks a cut image keeps as they are: the palette and its transparency.
 const KEPT_CHUNKS = new Set(['PLTE', 'tRNS'])
 
-interface Png {
+export interface Png {
   width: number
   height: number
   depth: number
@@ -35,7 +35,7 @@ export async function coverImage(source: Blob | Uint8Array, width: number, heigh
   return new Bun.Image(cut).resize(width, height, { fit: 'fill' }).png({ compressionLevel: 0 }).bytes()
 }
 
-function decodePng(bytes: Uint8Array): Png {
+export function decodePng(bytes: Uint8Array): Png {
   if (!SIGNATURE.every((byte, index) => bytes[index] === byte))
     throw new Error('kay: not a PNG')
 
@@ -127,7 +127,7 @@ function cropPng(png: Png, width: number, height: number): Png {
   return { ...png, width, height, rows: png.rows.slice(y, y + height).map(row => row.subarray(x, x + width * png.bpp)) }
 }
 
-function encodePng(png: Png): Uint8Array<ArrayBuffer> {
+export function encodePng(png: Png): Uint8Array<ArrayBuffer> {
   const header = new Uint8Array(13)
   const view = new DataView(header.buffer)
 

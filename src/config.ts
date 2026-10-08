@@ -160,6 +160,17 @@ export interface ImagesConfig {
   maxDensity?: number
   // The aspect ratios `image(src, { aspect })` may cut to, each one adding a variant per width the route makes on request: `['1/1', '3/2', '2/3', '4/3', '3/4', '16/9', '9/16']` by default.
   aspects?: string[]
+  // How `shareCard()` draws a page's card.
+  card?: CardConfig
+}
+
+export interface CardConfig {
+  // The face the title is drawn in, among `fonts`: the first family listed, at the weight nearest 700 it has, by default. A variable face draws at its default weight.
+  font?: { family: string, weight?: number }
+  // `#rrggbb` behind a card with no image, and what an image fades into below the title: `#111111` by default.
+  background?: string
+  // The text's `#rrggbb`, `#ffffff` by default.
+  color?: string
 }
 
 export type TrailingSlash = 'never' | 'always' | 'ignore'

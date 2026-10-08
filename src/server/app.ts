@@ -19,6 +19,7 @@ import { scanApi, serveApi } from './api'
 import { basePath, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { bundled } from './bundle'
+import { serveCards, setupCards } from './card'
 import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents, hotSwap } from './dev'
@@ -243,14 +244,18 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, await serveApi(app, apiModules, actionOptions))
   serveErrorReports(app, options.onError)
 
-  serveImages(app, {
+  const imageRoute = {
     clientDir: client.dir,
     // An executable runs from wherever it was copied, away from the project it was built in.
     cacheDir: bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', 'images'),
     dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(bundle ? process.cwd() : root, dir)])),
     quality: options.images?.quality,
     aspects: options.images?.aspects,
-  })
+  }
+
+  serveImages(app, imageRoute)
+  await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (options.fonts?.length ?? 0) > 0, config: options.images?.card, name: options.seo?.name, quality: options.images?.quality, bundled: bundle !== undefined })
+  serveCards(app, imageRoute)
 
   serveFeeds(app, await projectCollections(root, options.content), options.site === undefined ? undefined : siteOrigin(options.site) + base, options.dev)
 

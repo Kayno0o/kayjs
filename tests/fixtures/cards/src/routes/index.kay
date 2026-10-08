@@ -1,0 +1,8 @@
+---
+import { shareCard } from 'kay/image'
+import hero from '../hero.png'
+---
+head
+  title Home
+  meta(property="og:image" content={shareCard({ title: 'Hello cards', image: hero })})
+h1 Home

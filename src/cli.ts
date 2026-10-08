@@ -25,6 +25,7 @@ import { migrateAstroProject } from './migrate/project'
 import { createProject, TEMPLATES } from './new'
 import { linkVariantFiles } from './runtime/image'
 import { basePath } from './server/base'
+import { writeCards } from './server/card'
 import { buildClient, PRERENDERED_DIR } from './server/client'
 import { compressFiles } from './server/compress'
 import { buildingWithoutEnv } from './server/env'
@@ -352,6 +353,7 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   const prerendered = await prerenderPages(root, config, client, { exportAll: exported })
 
   await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'))
+  await writeCards(client.dir, join(root, '.kay', 'cache', 'cards'))
 
   if (config.favicon !== undefined)
     await writeFavicons(resolve(root, config.favicon), join(client.dir, '..', FAVICON_DIR))

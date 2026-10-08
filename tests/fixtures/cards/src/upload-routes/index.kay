@@ -1,0 +1,7 @@
+---
+import { shareCard } from 'kay/image'
+---
+head
+  title Upload
+  meta(property="og:image" content={shareCard({ title: 'An uploaded image', image: '/uploads/photo.png' })})
+h1 Upload

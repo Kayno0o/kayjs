@@ -1,0 +1,7 @@
+---
+import { shareCard } from 'kay/image'
+---
+head
+  title Plain
+  meta(property="og:image" content={shareCard({ title: 'A card with no image' })})
+h1 Plain

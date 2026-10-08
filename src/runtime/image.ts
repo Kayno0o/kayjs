@@ -1,9 +1,10 @@
 // The widths an image is resized to, the only ones the image route makes: a fixed ladder keeps how many files one image can turn into bounded.
 export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560, 3840] as const
 export const IMAGE_ROUTE = '/_kay/image'
+export const CARD_ROUTE = '/_kay/card'
 // Where imported images are served, and the variants `kay build` writes of them.
-const IMPORTED = '/_kay/assets/'
-const VARIANTS = '/_kay/images/'
+export const IMPORTED = '/_kay/assets/'
+export const VARIANTS = '/_kay/images/'
 const EXTENSION = /\.[^.]+$/
 const QUERY = /\?.*$/
 const FUNCTION_NAME = /[a-z-]*$/i
@@ -262,6 +263,34 @@ let variantFiles = false
 
 export function linkVariantFiles(): void {
   variantFiles = true
+}
+
+export function variantFilesLinked(): boolean {
+  return variantFiles
+}
+
+export interface ShareCardOptions {
+  title: string
+  // An imported image, or one from `images.dirs`, covering the card behind the title.
+  image?: string
+}
+
+// Set by the server, which holds the face and the key a card is drawn and signed with.
+let cardMaker: ((title: string, image: string | undefined) => string) | undefined
+
+export function setCardMaker(maker: typeof cardMaker): void {
+  cardMaker = maker
+}
+
+// The URL of a 1200x630 share card drawn for the page, its title over the image if one is given, for `og:image`: `meta(property="og:image" content={shareCard({ title: post.title, image: post.cover })})` in a `head` block.
+export function shareCard(card: ShareCardOptions): string {
+  if (card.image !== undefined && !RESIZABLE.test(card.image))
+    throw new Error(`kay: shareCard() cannot draw on ${card.image}: it takes a PNG, JPEG or WebP`)
+
+  if (!cardMaker)
+    throw new Error('kay: shareCard() draws on the server, in a page\'s head')
+
+  return cardMaker(card.title, card.image)
 }
 
 export function imageUrl(src: string, width: number, aspect?: Aspect): string {

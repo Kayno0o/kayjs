@@ -13,6 +13,7 @@ import { runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
 import { scanApi } from './api'
 import { basePath } from './base'
+import { setupCards } from './card'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { loadI18n, localeCopies, stateFor } from './i18n'
 import { applyImageConfig } from './image'
@@ -48,6 +49,8 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   const dir = join(root, '.kay', 'client', PRERENDERED_DIR)
   const head = await configHead(root, config, client.dir)
+
+  await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (config.fonts?.length ?? 0) > 0, config: config.images?.card, name: config.seo?.name, quality: config.images?.quality, collect: true })
 
   setSite(config.site === undefined ? undefined : siteOrigin(config.site) + basePath(config.base), config.trailingSlash)
   const maxDensity = applyImageConfig(config.images)

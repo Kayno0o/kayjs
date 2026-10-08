@@ -26,8 +26,9 @@ const ASSETS_PATH = `${ASSET_PREFIX}assets/`
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 const LADDER = new Set<number>(IMAGE_WIDTHS)
+
 // About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
-const MAX_UPLOAD_PIXELS = 50_000_000
+export const MAX_UPLOAD_PIXELS = 50_000_000
 const DEFAULT_QUALITY = 80
 
 // The file name of one variant of an image the build or the route wrote, a width of the ladder by default.
@@ -199,7 +200,7 @@ function requestedVariant(url: URL, own: { width: number, height: number }, allo
 }
 
 // The file a `src` names, never one outside the built assets or the directories of runtime images.
-function sourceFile(src: string, options: ImageRouteOptions): { path: string, immutable: boolean } | undefined {
+export function sourceFile(src: string, options: ImageRouteOptions): { path: string, immutable: boolean } | undefined {
   const decoded = decodePath(src)
 
   if (decoded === undefined || decoded.includes('\0') || !RESIZABLE.test(decoded))

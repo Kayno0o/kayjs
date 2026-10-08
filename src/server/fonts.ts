@@ -8,6 +8,8 @@ import { writeAsset, writeAssetBytes } from '../build/assets'
 export interface FontAssets {
   stylesheet: string
   preload: { href: string, type: string }[]
+  // Each face's file, which share cards are drawn in; a build from before cards has none.
+  faces?: { family: string, weight: string, style: string, url: string }[]
 }
 
 const FONTS_FILE = 'fonts.json'
@@ -20,6 +22,7 @@ const VARIABLE_SCOPE = '@fontsource-variable/'
 export async function prepareFonts(root: string, fonts: (FontConfig | FontsourceConfig)[], dir: string): Promise<FontAssets> {
   const rules: string[] = []
   const preload: FontAssets['preload'] = []
+  const faces: NonNullable<FontAssets['faces']> = []
 
   for (const font of fonts.flatMap(font => 'fontsource' in font ? fontsourceFaces(root, font) : [font])) {
     const file = fontFile(root, font.src)
@@ -41,12 +44,13 @@ export async function prepareFonts(root: string, fonts: (FontConfig | Fontsource
       declarations.push(`unicode-range:${font.unicodeRange}`)
 
     rules.push(`@font-face{${declarations.join(';')}}`)
+    faces.push({ family: font.family, weight: String(font.weight ?? 400), style: font.style ?? 'normal', url })
 
     if (font.preload === true)
       preload.push({ href: url, type: `font/${format === 'truetype' ? 'ttf' : format === 'opentype' ? 'otf' : format}` })
   }
 
-  const assets = { stylesheet: await writeAssetBytes('fonts', '.css', `${rules.join('\n')}\n`, root), preload }
+  const assets = { stylesheet: await writeAssetBytes('fonts', '.css', `${rules.join('\n')}\n`, root), preload, faces }
 
   await Bun.write(join(dir, FONTS_FILE), JSON.stringify(assets))
 
