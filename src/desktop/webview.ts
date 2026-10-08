@@ -24,7 +24,7 @@ export interface Webview {
   navigate: (url: string) => void
   // Runs before each page's own scripts.
   init: (script: string) => void
-  // A global function of each page calling `callback` with its arguments, which resolves to what it returns.
+  // A global function of each page calling `callback` with its arguments, which resolves to what it returns; the window's loop holds the thread, so `callback` answers at once, never through a promise.
   bind: (name: string, callback: (...args: never[]) => unknown) => void
   // Runs the window's loop, blocking the thread until it is closed.
   run: () => void
@@ -35,7 +35,7 @@ export function createWebview(library: string, size: { width: number, height: nu
   const handle = symbols.webview_create(devtools ? 1 : 0, null)
 
   if (handle === null)
-    throw new Error(`kay: the webview could not open a window: ${MISSING}`)
+    throw new Error('kay: the webview could not open a window: no display to open it on, or on Windows 10 no WebView2 runtime')
 
   // The library calls back into them for as long as the window lives.
   const callbacks: JSCallback[] = []

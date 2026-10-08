@@ -2,8 +2,10 @@ import type { AnyElysia, Elysia } from 'elysia'
 import type { HealthConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import process from 'node:process'
+import { parentPort } from 'node:worker_threads'
 import { logError } from '../build/sourcemap'
 import { durationSeconds } from '../runtime/duration'
+import { desktopSession, STOP_MESSAGE } from './desktop'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
@@ -45,7 +47,7 @@ export function shutdownSeconds(timeout: Duration): number {
   return durationSeconds(timeout, 'shutdownTimeout')
 }
 
-// On SIGTERM or SIGINT, the server stops taking connections, lets the open requests and streams finish, runs the app's `onStop` hooks, then the process exits.
+// On SIGTERM or SIGINT, or a desktop app's window closing, the server stops taking connections, lets the open requests and streams finish, runs the app's `onStop` hooks, then the process exits.
 // Past `wait` whatever is still open is closed and the process exits with 1.
 export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration = DEFAULT_SHUTDOWN_TIMEOUT): void {
   const timeout = shutdownSeconds(wait)
@@ -59,12 +61,12 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
 
     signalsTaken = true
 
-    const stop = async (signal: string) => {
+    const stop = async (reason: string) => {
       if (lifecycle.draining)
         return
 
       lifecycle.draining = true
-      console.error(`kay: ${signal} received; finishing open requests`)
+      console.error(`kay: ${reason}; finishing open requests`)
 
       const forced = setTimeout(() => {
         console.error(`kay: requests still open after ${timeout} s; closing them`)
@@ -77,11 +79,19 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
       process.exit()
     }
 
-    const onTerm = () => void stop('SIGTERM')
-    const onInt = () => void stop('SIGINT')
+    const onTerm = () => void stop('SIGTERM received')
+    const onInt = () => void stop('SIGINT received')
 
     process.once('SIGTERM', onTerm)
     process.once('SIGINT', onInt)
+
+    // The server worker of a desktop app, which its window tells to stop once closed.
+    if (desktopSession()) {
+      parentPort?.on('message', (message) => {
+        if (message === STOP_MESSAGE)
+          void stop('the window closed')
+      })
+    }
 
     // A server stopped another way gives the signals back, to the next app that starts.
     release = () => {

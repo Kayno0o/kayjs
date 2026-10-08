@@ -1,6 +1,7 @@
 import type { DesktopMessage } from '../server/desktop'
 import type { WindowSettings } from './library'
 import process from 'node:process'
+import { STOP_MESSAGE } from '../server/desktop'
 import { createWebview } from './webview'
 
 export interface WindowOptions extends WindowSettings {
@@ -27,19 +28,27 @@ const FOLLOW_TITLE = `addEventListener('DOMContentLoaded', () => {
 export async function openWindow(options: WindowOptions): Promise<void> {
   const worker = new Worker(options.worker)
   const closed = new Promise(resolve => worker.addEventListener('close', resolve))
+  let stopping = false
   const listening = await new Promise<string>((resolve, reject) => {
-    worker.addEventListener('message', (event: MessageEvent<DesktopMessage>) => {
-      if (event.data.kind === 'listening')
-        resolve(event.data.url)
-    })
-    worker.addEventListener('error', event => reject(new Error(event.message)))
-    worker.addEventListener('close', () => reject(new Error('kay: the server stopped before it listened')))
+    worker.addEventListener('message', (event: MessageEvent<DesktopMessage>) => resolve(event.data.url), { once: true })
+    worker.addEventListener('error', event => reject(event.error instanceof Error ? event.error : new Error(event.message)))
+    worker.addEventListener('close', () => reject(new Error('kay: the server stopped before it listened; does its entry call .listen()?')))
   })
   const stop = async () => {
-    worker.postMessage('stop')
+    stopping = true
+    worker.postMessage(STOP_MESSAGE)
     await closed
     process.exit()
   }
+
+  // A server that stops by itself, crashing or exiting, ends the app; with the window open its loop holds the thread, so that waits for the window to close.
+  worker.addEventListener('close', () => {
+    if (stopping)
+      return
+
+    console.error('kay: the server stopped by itself')
+    process.exit(1)
+  })
 
   if (process.argv.includes(NO_WINDOW)) {
     console.log(`Open ${listening}`)

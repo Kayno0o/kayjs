@@ -19,7 +19,7 @@ import { explainLint, isLint, lintList } from './compiler/lints'
 import { loadConfig } from './config'
 import { writeContentManifests } from './content/server'
 import { ContentError } from './content/validate'
-import { webviewLibrary, windowSettings } from './desktop/library'
+import { refuseDesktopConfig, webviewLibrary, windowSettings } from './desktop/library'
 import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
@@ -247,6 +247,16 @@ async function build(args: string[]): Promise<number> {
   buildingWithoutEnv()
 
   const config = await loadConfig(root)
+
+  try {
+    if (typeof desktop === 'string')
+      refuseDesktopConfig(root, config)
+  }
+  catch (error) {
+    console.error(error instanceof Error ? error.message : error)
+
+    return 1
+  }
 
   const output = join(root, '.kay', 'client')
   const previous = `${output}-previous`
@@ -504,8 +514,20 @@ async function runDev(args: string[]): Promise<number> {
   const config = await loadConfig(root)
   const { routes, publicDir, api, settings } = config
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
-  const library = parsed.values.desktop === true ? webviewLibrary(root) : undefined
+  let library: string | undefined
+
+  try {
+    library = parsed.values.desktop === true ? webviewLibrary(root) : undefined
+  }
+  catch (error) {
+    console.error(error instanceof Error ? error.message : error)
+
+    return 1
+  }
+
   let window: Subprocess | undefined
+  let windowCode = 0
+  let closing = false
 
   // One window for the whole session, on the first server's port; the page reloads itself across restarts.
   const onListen = library === undefined
@@ -515,22 +537,28 @@ async function runDev(args: string[]): Promise<number> {
         return
 
       window = Bun.spawn([process.execPath, DEV_WINDOW, JSON.stringify({ library, url: `http://localhost:${port}/`, settings: windowSettings(root, config) })], { stdio: ['ignore', 'inherit', 'inherit'] })
-      void closedWindow(window, interrupted)
+      void closedWindow(window, (code) => {
+        if (!closing)
+          windowCode = code
+
+        interrupted()
+      })
     }
   const stop = await dev(root, { entry, routes, publicDir, api, settings, onListen })
 
   process.once('SIGINT', interrupted)
   process.once('SIGTERM', interrupted)
   await promise
+  closing = true
   window?.kill()
   await stop()
 
-  return 0
+  // A window that could not open, as on a machine without WebKitGTK, fails the command.
+  return windowCode === 0 ? 0 : 1
 }
 
-async function closedWindow(window: Subprocess, then: () => void): Promise<void> {
-  await window.exited
-  then()
+async function closedWindow(window: Subprocess, then: (code: number) => void): Promise<void> {
+  then(await window.exited)
 }
 
 // A diagnostic can point at a file that is gone by now, such as a tsconfig tsgo could not read.

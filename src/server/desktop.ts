@@ -1,15 +1,18 @@
-import type { AnyElysia, Elysia } from 'elysia'
+import type { Elysia } from 'elysia'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import process from 'node:process'
 import { parentPort } from 'node:worker_threads'
-import { shutdown } from './lifecycle'
 
-// The query parameter the window's first URL carries the secret in, and the cookie it then lives in.
+// The query parameter the window's first URL carries the secret in, and the start of the cookie's name it then lives in.
 export const DESKTOP_SECRET = 'kay-desktop'
+// What the window sends its server worker once closed.
+export const STOP_MESSAGE = 'stop'
 const LOOPBACK = '127.0.0.1'
 
-// What the server worker tells the window: the URL to open once listening, or why it could not boot.
-export type DesktopMessage = { kind: 'listening', url: string } | { kind: 'stopped' }
+// What the server worker tells the window: the URL to open once listening.
+export interface DesktopMessage {
+  kind: 'listening'
+  url: string
+}
 
 interface DesktopSession {
   secret: Buffer
@@ -18,12 +21,25 @@ interface DesktopSession {
 let session: DesktopSession | undefined
 
 // Called by the server worker `kay build --desktop` generates, before the server entry runs.
-// Whatever the entry passes to `.listen()`, the server binds a free port of the loopback interface alone, which no other machine reaches.
-export function startDesktopServer(): void {
+// Whatever the entry passes to `.listen()`, the server binds the loopback interface alone, which no other machine reaches, on `port` while it is free so the app keeps one origin, and its storage, from launch to launch.
+export function startDesktopServer(port: number): void {
   const serve = Bun.serve.bind(Bun)
 
   session = { secret: randomBytes(32) }
-  Bun.serve = (options => serve({ ...options, hostname: LOOPBACK, port: 0, reusePort: false } as typeof options)) as typeof Bun.serve
+  Bun.serve = ((options) => {
+    const local = { ...options, hostname: LOOPBACK, reusePort: false }
+
+    try {
+      return serve({ ...local, port } as typeof options)
+    }
+    catch (error) {
+      if ((error as { code?: string }).code !== 'EADDRINUSE')
+        throw error
+
+      // Another launch of the app, or another program, holds it.
+      return serve({ ...local, port: 0 } as typeof options)
+    }
+  }) as typeof Bun.serve
 }
 
 export function desktopSession(): DesktopSession | undefined {
@@ -32,35 +48,31 @@ export function desktopSession(): DesktopSession | undefined {
 
 // Answers no request lacking the secret, so another program or user of the machine, or a page of a browser, cannot reach the app on its loopback port.
 // The window's first URL carries it in its query; a redirect moves it into a cookie its later requests send, websocket upgrades included.
+// Cookies are shared by every port of a host, so the cookie is named after the port, which another app or launch sharing the webview's storage never overwrites.
 export function guardDesktop(app: Elysia, desktop: DesktopSession): void {
   const expected = desktop.secret.toString('base64url')
+  const given = `${DESKTOP_SECRET}=`
 
   app.onRequest(({ request }) => {
     const url = new URL(request.url)
-    const given = url.searchParams.get(DESKTOP_SECRET)
+    const cookieName = `${DESKTOP_SECRET}-${url.port}`
+    const query = url.search.slice(1).split('&')
+    const secret = query.find(part => part.startsWith(given))
 
-    if (given !== null && matches(given, expected)) {
-      url.searchParams.delete(DESKTOP_SECRET)
+    if (secret !== undefined && matches(secret.slice(given.length), expected)) {
+      const rest = query.filter(part => part !== secret).join('&')
 
-      return new Response(null, { status: 303, headers: { 'location': `${url.pathname}${url.search}`, 'set-cookie': `${DESKTOP_SECRET}=${expected}; Path=/; HttpOnly; SameSite=Strict`, 'cache-control': 'no-store' } })
+      return new Response(null, { status: 303, headers: { 'location': `${url.pathname}${rest === '' ? '' : `?${rest}`}`, 'set-cookie': `${cookieName}=${expected}; Path=/; HttpOnly; SameSite=Strict`, 'cache-control': 'no-store' } })
     }
 
-    const cookie = new Bun.CookieMap(request.headers.get('cookie') ?? '').get(DESKTOP_SECRET)
+    const cookie = new Bun.CookieMap(request.headers.get('cookie') ?? '').get(cookieName)
 
     if (cookie === null || !matches(cookie, expected))
       return new Response('Forbidden', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } })
   })
 
-  // The worker reports the URL once the server listens, and stops it when the window closes, as a signal would, running the app's `onStop` hooks.
-  app.onStart((root: AnyElysia) => {
-    const port = root.server?.port
-
-    parentPort?.postMessage({ kind: 'listening', url: `http://${LOOPBACK}:${port}/?${DESKTOP_SECRET}=${expected}` } satisfies DesktopMessage)
-    parentPort?.once('message', async () => {
-      await shutdown(root)
-      parentPort?.postMessage({ kind: 'stopped' } satisfies DesktopMessage)
-      process.exit()
-    })
+  app.onStart(({ server }) => {
+    parentPort?.postMessage({ kind: 'listening', url: `http://${LOOPBACK}:${server?.port}/?${given}${expected}` } satisfies DesktopMessage)
   })
 }
 

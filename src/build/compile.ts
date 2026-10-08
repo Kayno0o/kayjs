@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG } from '../content/server'
-import { webviewLibrary, windowSettings } from '../desktop/library'
+import { desktopPort, refuseDesktopConfig, webviewLibrary, windowSettings } from '../desktop/library'
 import { scanApi } from '../server/api'
 import { messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
@@ -36,6 +36,9 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   if (!existsSync(entry))
     throw new Error(`kay: no server entry at ${entry}; pass --entry`)
 
+  if (options.desktop)
+    refuseDesktopConfig(root, config)
+
   if (basename(publicDir) === CLIENT_ASSETS)
     throw new Error(`kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
 
@@ -61,7 +64,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     `import process from 'node:process'`,
     `import { probeHealth, registerBundle${options.desktop ? ', startDesktopServer' : ''} } from 'kay/internal/server'`,
     '',
-    ...options.desktop ? ['startDesktopServer()', ''] : [],
+    ...options.desktop ? [`startDesktopServer(${desktopPort(root)})`, ''] : [],
     existsSync(configFile) ? `const { default: config } = await import(${JSON.stringify(configFile)})` : 'const config = {}',
     '',
     // Asks the server running beside it, rather than starting one, before any module of the app loads: a container's health check runs it every few seconds.
