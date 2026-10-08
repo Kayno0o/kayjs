@@ -83,13 +83,13 @@ export function pgStore(db: Database): AuthStore {
   return {
     users: {
       get: async id => toUser(await users.read.findById(id)),
-      findByEmail: async email => toUser(await users.read.findOneBy({ email })),
-      findByUsername: async username => toUser(await users.read.findOneBy({ username_key: username.toLowerCase() })),
+      findByEmail: async email => toUser(await users.read.findOne({ email })),
+      findByUsername: async username => toUser(await users.read.findOne({ username_key: username.toLowerCase() })),
       async create(user) {
         await users.write.insertOne(fromUser(user))
       },
       async update(id, patch) {
-        return toUser(await users.write.updateById(id, fromUser(patch), { full: true }))
+        return toUser(await users.write.updateById(id, fromUser(patch)))
       },
       async delete(id) {
         await users.write.deleteById(id)
@@ -97,8 +97,8 @@ export function pgStore(db: Database): AuthStore {
       advanceTotpStep: async (id, step) => await users.write.updateOne({ totp_last_step: step }, e => e.and(e.eq('id', id), e.lt('totp_last_step', step))) !== null,
     },
     identities: {
-      find: async (provider, providerId) => toIdentity(await identities.read.findOneBy({ provider, provider_id: providerId })),
-      listByUser: async userId => (await identities.read.findManyBy({ user_id: userId })).map(row => toIdentity(row)!),
+      find: async (provider, providerId) => toIdentity(await identities.read.findOne({ provider, provider_id: providerId })),
+      listByUser: async userId => (await identities.read.findMany({ user_id: userId })).map(row => toIdentity(row)!),
       async create(identity) {
         await identities.write.insertOne({ provider: identity.provider, provider_id: identity.providerId, user_id: identity.userId, access_token: identity.accessToken, refresh_token: identity.refreshToken, token_expires_at: identity.tokenExpiresAt, created_at: identity.createdAt })
       },
@@ -115,7 +115,7 @@ export function pgStore(db: Database): AuthStore {
       },
       async consume(digest, type) {
         // One DELETE ... RETURNING, so of two requests spending the token only one gets it back.
-        const row = await tokens.write.deleteOne({ digest, type }, { full: true })
+        const row = await tokens.write.deleteOne({ digest, type })
 
         return row && row.expires_at.getTime() > Date.now() ? toToken(row) : undefined
       },
@@ -127,7 +127,7 @@ export function pgStore(db: Database): AuthStore {
       async create(token) {
         await bearerTokens.write.insertOne({ id: token.id, user_id: token.userId, label: token.label, digest: token.digest, created_at: token.createdAt, last_used_at: token.lastUsedAt })
       },
-      findByDigest: async digest => toBearerToken(await bearerTokens.read.findOneBy({ digest })),
+      findByDigest: async digest => toBearerToken(await bearerTokens.read.findOne({ digest })),
       listByUser: async userId => (await bearerTokens.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toBearerToken(row)!),
       async touch(id, at) {
         await bearerTokens.write.updateById(id, { last_used_at: at })
