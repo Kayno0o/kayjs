@@ -1,5 +1,5 @@
 import type { AnyElysia } from 'elysia'
-import type { Action, Success } from '../runtime/action'
+import type { Action, ResultOf, Success } from '../runtime/action'
 import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
@@ -53,13 +53,15 @@ export interface VisitInit {
 // A text field, or a file input's `File`.
 export type FormValue = string | Blob
 
+type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : never
+
 export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
   // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser.
   submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot, FormValue | FormValue[]>>, init?: VisitInit & { from?: string }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
-  call: <Input, Output>(action: Action<Input, Output>, input: Input | FormData, init?: VisitInit) => Promise<Success<Output>>
+  call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit) => Promise<Success<ResultOf<Target>>>
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
   fetch: (path: string, init?: Omit<RequestInit, 'headers'> & VisitInit) => Promise<Response>
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
@@ -272,7 +274,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     call: async (action, input, init = {}) => {
       const { headers, body } = encodeCall(input)
 
-      return readActionResponse(await send(action.url, { method: 'POST', headers: { ...headers, origin: ORIGIN, ...init.headers }, body }))
+      return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...headers, origin: ORIGIN, ...init.headers }, body }))
     },
   }
 }

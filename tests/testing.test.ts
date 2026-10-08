@@ -1,4 +1,4 @@
-import type { Action } from '../src/runtime'
+import type { Action, Failure, ServerAction, t } from '../src/runtime'
 import type { TestSite } from '../src/test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -12,6 +12,9 @@ import { testSite } from '../src/test'
 import { resetTodos } from './fixtures/site/src/data'
 
 const routes = 'tests/fixtures/site/src/routes'
+
+// The schema of the admin page's actions, which take a name.
+type Named = ReturnType<typeof t.Object<{ name: ReturnType<typeof t.String> }>>
 const MARKERS = /<!--[$/]-->/g
 // A 1x1 PNG, which Elysia's `t.File({ type: 'image/png' })` recognises from its bytes.
 const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
@@ -96,12 +99,17 @@ describe('kay/test', () => {
   })
 
   it('calls an action as an island does', async () => {
-    const { promote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as { promote: Action<{ name: string }, string> }
+    const { promote, demote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as {
+      promote: Action<{ name: string }, string>
+      demote: ServerAction<Named, Failure<{ error: string }> | undefined>
+    }
 
     expect(await site.call(add, { title: 'Called from a test' })).toBeNumber()
     await expect(site.call(add, { title: '' })).rejects.toThrow(ActionError)
     expect(await site.call(promote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).toBe('bob is an admin')
     await expect(site.call(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirect', status: 303, location: '/about' })
+    expect(await site.call(demote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).toBeUndefined()
+    await expect(site.call(demote, { name: 'ada' }, { headers: { 'x-user': 'ada' } })).rejects.toMatchObject({ status: 422, data: { error: 'ada stays an admin' } })
   })
 
   it('uploads files from a form and from a call, nested ones included', async () => {

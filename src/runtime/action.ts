@@ -124,7 +124,7 @@ export interface FormFailure<Input, Data, Honeypot extends string = never> {
 }
 
 // Read off the phantom directly: `infer Output` through `Action` drops the `undefined` of a handler ending without a return.
-type ResultOf<Target> = Target extends { readonly [RESULT]?: infer Output } ? Output : never
+export type ResultOf<Target> = Target extends { readonly [RESULT]?: infer Output } ? Output : never
 
 export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailureData<ResultOf<Target>>, Extract<HoneypotOf<Target>, string>> : never
 

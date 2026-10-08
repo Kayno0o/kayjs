@@ -3,5 +3,11 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 export const promote = action(t.Object({ name: t.String({ maxLength: 200, minLength: 1 }) }), ({ name }) => `${name} is an admin`)
+
+// Returns nothing once it succeeded.
+export const demote = action(t.Object({ name: t.String({ maxLength: 200, minLength: 1 }) }), ({ name }, ctx) => {
+  if (name === 'ada')
+    return ctx.fail(422, { error: 'ada stays an admin' })
+})
 ---
 h1 Admin
