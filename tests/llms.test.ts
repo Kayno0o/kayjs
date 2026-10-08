@@ -1,4 +1,4 @@
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { compileKay, formatDiagnostic } from '../src/compiler'
@@ -6,7 +6,9 @@ import { LINTS } from '../src/compiler/lints'
 import { formatKay } from '../src/format'
 
 const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
-const spec = await Bun.file(join(import.meta.dir, '..', 'llms.txt')).text()
+const root = join(import.meta.dir, '..')
+// llms.txt and every doc of llms/, read as one.
+const spec = (await Promise.all(['llms.txt', ...(await readdir(join(root, 'llms'))).map(name => `llms/${name}`)].map(async file => Bun.file(join(root, file)).text()))).join('\n')
 const examples = [...spec.matchAll(KAY_BLOCK)].map(match => match[1]!)
 const IMPORT = /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+'(kay(?:\/[^']*)?)'/g
 // A name the prose places, as "`shutdown(app)` from `kay/server`".
@@ -31,7 +33,7 @@ function documentedImports(): Map<string, Set<string>> {
 }
 
 // The spec's examples are what an LLM copies, so each one has to compile and already be formatted.
-describe('llms.txt', () => {
+describe('llms.txt and its docs', () => {
   it('has examples', () => {
     expect(examples.length).toBeGreaterThan(5)
   })

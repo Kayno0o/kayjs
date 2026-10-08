@@ -1,0 +1,47 @@
+# Testing
+
+`kay/test` serves the project's pages and actions inside the test process, with no server and, unless asked for, no browser build:
+
+```ts
+import { expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+import { add } from '../src/routes/index.kay'
+
+const site = await testSite({ locals: () => ({ user: { id: 1, admin: true } }) })
+
+it('shows why a todo was refused', async () => {
+  const page = await site.submit(add, { title: '' }, { from: '/' })
+
+  expect(page.html).toContain('Write a title')
+})
+```
+
+- `site.visit(path)` GETs a page and follows redirects, stopping at one to another site. `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page, or reads the page a refused post renders. Both resolve with `{ url, status, headers, html }`, which also reads the page as a crawler does (see below). `site.call(action, input)` calls an action as an island does, `input` its typed input or a `FormData`, resolving with its result, throwing `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
+- A visit reads its page without a regex: `page.title()`, `page.meta(key)` the `content` of the `meta` whose `name` or `property` is `key`, such as `description` or `og:image`, `page.canonical()`, `page.jsonLd()` each thing the JSON-LD scripts describe, parsed, the items of a `@graph` one by one, `page.links()` every `a`'s `href` in page order, and `page.find(selector)` every element a CSS selector matches, as `{ tag, attributes, text }`: `expect(page.find('a[aria-current="page"]')[0]?.attributes.href).toBe('/pricing')`. Text and attributes come decoded, `&amp;` read as `&`, text with each run of whitespace one space and trimmed, and what the page lacks reads `undefined`. `site.sitemap()` resolves with the URLs `/sitemap.xml` lists, or the sitemap at another path, failing when it does not answer 200.
+- `site.fetch(path, init)` sends any request, an API route's included, with the cookies so far, and resolves with the response as it is, redirects not followed.
+- `site.runJobs()` runs every job the app's queues hold whose time has come, those the jobs enqueue included, and resolves with how many ran: an action enqueues, the test runs the jobs, then checks what they did. Queues keep their jobs in memory under `bun test` unless one names a store.
+- `site.socket(module, path, options)` opens a websocket route and `site.stream(module, path, options)` reads an event stream as an island does, the options taking `headers` too. Both keep every message in `received` and resolve `next()` with the oldest one not read yet, waiting for one if need be; a stream's `finished()` resolves with all its values once it ended. `site.socket` starts the site on a free port the first time, which `site.close()` stops.
+- Cookies a response sets go with the next request and read as `site.cookies`. `use` takes the plugins the server entry uses before the pages, in order, so an app on `session()` signs in through `site.submit` and stays signed in: `testSite({ use: [sessions] })`. `locals` stands in for the app's Elysia `derive`, called with each request, after those plugins.
+- `mount(file, props)` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click. `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build; props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop; a library's settings apply as `kay.config.ts` sets them. The test registers the DOM itself, such as `GlobalRegistrator.register()` from `@happy-dom/global-registrator`. After an interaction, `await settle()` lets effects land before the DOM is read.
+- kay holds no database code: an app keeps its data with `@kaynooo/pg-orm`, as `kay new --template app` does, and its tests get a database each from pg-orm's `testDatabase()`. A preload listed after `kay/test/preload` copies, for each test file, a database migrated from `migrations/` and seeded once, points `DATABASE_URL` at the copy before the app's modules read it, and drops it in `afterAll`; `bun test --isolate` runs each file in modules of its own, so each reads its own copy, and files never see each other's rows; the app's `bun run test` passes it, while a plain `bun test` runs the preload once and every file shares one copy. The test database in `.env.test` need not exist, its server's user only needs `CREATEDB`.
+- Without `browser`, pages render their islands' markup without scripts. Test files import `.kay` files directly, `import { add } from '../src/routes/index.kay'`, through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test; they are typed through `.kay/types` as any `.ts` file's imports are, so `kay check` passes them, and a bare `tsgo` resolves them only once `kay check` has written that tree, which a check script runs first.
+- `bun test` loads the project's `.env` as well as `.env.test` and `.env.test.local`, whatever `NODE_ENV` says. The preload drops every variable only `.env` sets, so a test never reaches the mail server or database a developer's `.env` names: tests see the shell's and the CI's variables and the test files', and `.env.test` need not blank what `.env` holds. The preload serves the project in the working directory, or the one `KAY_ROOT` names when it is nested, such as a library's fixture app run as `KAY_ROOT=tests/fixture bun test`, which `testSite()` then serves too.
+- `testSite({ browser: true })` also builds the islands for the browser, into `.kay/client` as `kay dev` does, and `site.open(path)` loads a page in a headless Chrome over a server the site starts on a free port, resolving with a page once it loaded and its islands hydrating on load are done; `browse(url, options)` is the same for a server already running, such as one the test started itself, rather than one `testSite` serves. The page clicks as a user does, `click(selector)` scrolling the element to the middle of the view, then waiting for it to be visible, still and not covered (a click on an island not hydrated yet is replayed once it is), and `fill(selector, text)` replaces a field's text as typing does; `type(text)` and `press(key)` go to the focused element. `text`, `value` and `count` read the page at once, `text` and `value` null when nothing matches; `waitFor(selector, { text, gone })` and `waitUntil(fn)` poll until they hold, 5 seconds at most unless `timeout` gives other milliseconds, and fail naming what they waited for. `evaluate(fn, ...args)` runs a function in the page, its arguments and result crossing as JSON; only its source crosses, so it sees no variable or helper of the test, only its arguments, and `waitUntil` runs its function the same way. A wait whose function keeps throwing names the last error when it times out. `goto`, `back`, `forward` and `reload` resolve once the page settled, a swapped page included, and `path()` reads where it is. `errors` holds the page's console errors and uncaught exceptions; once it logs a problem kay recovers from in production, such as an island that did not match its server markup or had no client chunk, or a message no locale has, the page's next call fails naming it, unless `strict: false` was given to `open` or `browse`, which leaves it in `errors`. `view` is the `Bun.WebView` behind it, for a `screenshot()` or a raw `cdp()` call. Each page opened starts with no cookie or storage for the site, and pages opened at once share them, the browser's own rather than `site.cookies`. `site.close()` closes the pages it opened.
+- The browser is `Bun.WebView` on its Chrome backend, young in Bun and marked experimental, so kay keeps to the part of it these helpers use. It runs the executable given as `path`, to `testSite({ browser: { path } })` or `open`, else `BUN_CHROME_PATH`, else the first Chrome or Chromium on the `PATH` or where it usually installs; with none, `open` fails saying so, and `describe.skipIf(!browserPath())` skips a suite instead. In an Alpine CI image, `apk add chromium` and `BUN_CHROME_PATH=$(command -v chromium)`; as root, as in a container, Chrome runs without its sandbox.
+
+```ts
+import { afterAll, expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+
+const site = await testSite({ browser: true })
+
+afterAll(async () => site.close())
+
+it('counts the clicks', async () => {
+  const page = await site.open('/')
+
+  await page.click('button.counter')
+  await page.waitFor('button.counter', { text: 'Clicked 1' })
+  expect(page.errors).toEqual([])
+})
+```

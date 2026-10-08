@@ -122,6 +122,7 @@
     "LICENSE",
     "README.md",
     "dist",
+    "llms",
     "llms.txt",
     "src",
     "types"
@@ -142,7 +143,7 @@
     "bench:origins": "bun bench/origins.ts",
     "bench:sites": "bun bench/sites/run.ts",
     "bench:test": "bun test ./bench",
-    "docs:build": "bun docs/split.ts && bun src/cli.ts build docs --static",
+    "docs:build": "bun src/cli.ts build docs --static",
     "bench:check": "bun src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte"
   },
   "peerDependencies": {
