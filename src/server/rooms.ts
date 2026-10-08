@@ -54,6 +54,8 @@ export interface Rooms<Message, Member = undefined> {
 }
 
 const DEFAULT_WAIT = 50
+// How a connection joined without a member is written, apart from one joined as `null`, which is JSON.
+const NO_MEMBER = ''
 // How often a process says it is alive, and how long after its last word its members stop counting.
 const HEARTBEAT = 2_000
 const EXPIRY = 10_000
@@ -64,7 +66,7 @@ const KEPT = 30_000
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
 export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): Rooms<Message, Member> {
   const store = options.store ?? memoryRooms()
-  // The connections of this process in each room, by their id, with their member as JSON.
+  // The connections of this process in each room, by their id, with their member as JSON, or empty without one.
   const local = new Map<string, Map<string, { raw: RoomConnection['raw'], member: string }>>()
   const ids = new WeakMap<object, string>()
   const joined = new WeakMap<object, Set<string>>()
@@ -102,7 +104,7 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
   return {
     join(ws, room, ...[member]) {
       const id = idOf(ws.raw)
-      const written = JSON.stringify(member ?? null)
+      const written = member === undefined ? NO_MEMBER : JSON.stringify(member)
 
       if (!subscribed) {
         store.subscribe(deliver)
@@ -118,7 +120,7 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
         leaveOne(ws.raw, name)
     },
     roomsOf: ws => [...joined.get(ws.raw) ?? []],
-    members: room => store.members(room).map(member => (JSON.parse(member) ?? undefined) as Member),
+    members: room => store.members(room).map(member => (member === NO_MEMBER ? undefined : JSON.parse(member)) as Member),
     publish(room, message, { except, to } = {}) {
       store.publish(room, messageText(message), { ...except && { except: idOf(except.raw) }, ...to !== undefined && { to: JSON.stringify(to) } })
     },

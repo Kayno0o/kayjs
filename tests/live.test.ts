@@ -496,6 +496,27 @@ describe('rooms', () => {
       }
     })
 
+    it('keeps a member joined as null apart from a connection joined without one, in every process', async () => {
+      const { stores, close } = processes('nullable')
+      const [first, second] = stores.map(store => rooms<{ text: string }, string | null | undefined>({ store }))
+      const [guest, anonymous, ada] = [connection(), connection(), connection()]
+
+      try {
+        first!.join(guest, 'hall', null)
+        first!.join(anonymous, 'hall')
+        second!.join(ada, 'hall', 'ada')
+        expect(second!.members('hall')).toEqual([null, undefined, 'ada'])
+
+        second!.publish('hall', { text: 'guests' }, { to: null })
+        await until(() => guest.received.length === 1)
+        await Bun.sleep(20)
+        expect([anonymous.received, ada.received]).toEqual([[], []])
+      }
+      finally {
+        close()
+      }
+    })
+
     it('sends a process only what is published once it listens, not what came before', async () => {
       const { first, second, close } = processes('fresh')
       const ada = connection()
