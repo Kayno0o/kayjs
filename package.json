@@ -145,6 +145,7 @@
     "bench": "bun bench/run.ts",
     "bench:origins": "bun bench/origins.ts",
     "bench:sites": "bun bench/sites/run.ts",
+    "bench:desktop": "bun bench/desktop.ts",
     "bench:test": "bun test ./bench",
     "docs:build": "bun docs/split.ts && bun src/cli.ts build docs --static",
     "bench:check": "bun src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte"
