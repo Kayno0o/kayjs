@@ -8,6 +8,8 @@ const ALWAYS_IGNORED = new Set(['node_modules', '.kay', '.git'])
 const ROOT_IGNORED = new Set(['dist'])
 
 export const TSCONFIG = 'tsconfig.json'
+// What marks a directory as a kay project of its own, which kay reads at its root only.
+const KAY_CONFIG = 'kay.config.ts'
 
 const TYPESCRIPT = /\.[cm]?ts$/
 const TSX = /\.tsx$/
@@ -42,6 +44,8 @@ export interface FindOptions {
   project?: boolean
   // Whether a directory holding its own tsconfig.json, another project, is left out.
   ownOnly?: boolean
+  // Whether a directory holding its own kay.config.ts, another kay project, is left out.
+  ownKayOnly?: boolean
 }
 
 // Every .kay file under `root`, skipping dependencies and generated output without walking into them.
@@ -50,12 +54,12 @@ export async function findKayFiles(root: string, options: FindOptions = {}): Pro
 }
 
 // Every file under `root` whose name `matches`, skipping as findKayFiles does.
-export async function findProjectFiles(root: string, matches: RegExp, { project = false, ownOnly = false }: FindOptions = {}): Promise<string[]> {
+export async function findProjectFiles(root: string, matches: RegExp, { project = false, ownOnly = false, ownKayOnly = false }: FindOptions = {}): Promise<string[]> {
   const files: string[] = []
   const walk = async (dir: string) => {
     const entries = await readable(dir)
 
-    if (ownOnly && dir !== root && entries.some(entry => entry.isFile() && entry.name === TSCONFIG))
+    if (dir !== root && entries.some(entry => entry.isFile() && ((ownOnly && entry.name === TSCONFIG) || (ownKayOnly && entry.name === KAY_CONFIG))))
       return
 
     await Promise.all(entries.map(async (entry) => {

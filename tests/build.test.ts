@@ -45,6 +45,26 @@ describe('kay build', () => {
     }
   })
 
+  it('leaves the islands of a kay project nested inside to that project, whose API modules are its own', async () => {
+    const island = (api: string) => `---\nimport { signal, socket } from 'kay'\nimport live from '${api}'\n\nconst n = signal(0)\nconst feed = socket(live, '/')\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {feed.status()} {n()}\n`
+    const root = await scratchProject({
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+      // An example app beside the outer one's sources: its island reaches a server module the outer project serves no API from.
+      'examples/chat/kay.config.ts': 'export default {}\n',
+      'examples/chat/src/api/live.ts': 'import { Database } from \'bun:sqlite\'\nimport { Elysia } from \'elysia\'\n\nconst db = new Database(\':memory:\')\n\nexport default new Elysia().ws(\'/\', { message: ws => void ws.send(String(db.query(\'select 1\').get())) })\n',
+      'examples/chat/src/live.kay': island('./api/live'),
+    })
+
+    try {
+      expect(Object.keys((await buildClient(root)).islands)).toEqual(['src/counter.kay'])
+      expect(Object.keys((await buildClient(join(root, 'examples/chat'))).islands)).toEqual(['src/live.kay'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('refuses a client build where an island builds a schema with kay\'s t, naming the module taking it from kay', async () => {
     const root = await scratchProject({
       // A schema module shared by an action and an island's own check.

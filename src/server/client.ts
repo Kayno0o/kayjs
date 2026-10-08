@@ -106,8 +106,8 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   const islands = new Map<string, string>()
   const classes = new Set<string>()
   const diagnostics: FileDiagnostic[] = []
-  // A library's components the app reaches compile with its own.
-  const own = await findKayFiles(root, { project: true })
+  // A library's components the app reaches compile with its own; a kay project nested inside, such as an example, builds on its own.
+  const own = await findKayFiles(root, { project: true, ownKayOnly: true })
   const libraries = await findKayLibraries(root)
   const fromLibraries = await reachableLibraryFiles(root, libraries, own)
   const files = [...own, ...fromLibraries.components]

@@ -524,7 +524,7 @@ Using one:
 - `kay check` reports a type error inside a library component the app uses once, at the component's own line; one the app never imports reports nothing. Errors inside the library's own `.ts` modules are the library's, as `skipLibCheck` leaves a declaration file's, so an optional peer the app has not installed reports nothing there, while the app's own calls into those modules are checked.
 - A library imports an optional peer with `import()` inside a `try` block, or followed by `.catch`: Bun builds an app without the peer then, and fails on a bare `import()` of a package it cannot find.
 - `settings` in `kay.config.ts` replaces a library's settings module with the app's, by the library's name, on the server and in the browser: `settings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`, a module default-exporting the library's `Settings`, which may spread the library's defaults to change a few: `export default { ...defaults, tone: 'text-red-500' }`. `kay check` checks it against the defaults it replaces. One process renders with one set of settings: `kay test`, the server and `kay build` all read them from `kay.config.ts`.
-- A library linked rather than installed, `"@kaynooo/kayjs-ui": "link:../kayjs-ui"`, works the same.
+- A library linked rather than installed, `"@kaynooo/kayjs-ui": "link:../kayjs-ui"`, works the same, and so does one installed in a `node_modules` above the project, as a workspace hoists it: the app's own `package.json` names it either way.
 
 ## Pages and routing
 
@@ -1244,6 +1244,8 @@ import { defineConfig } from 'kay/server'
 
 export default defineConfig({ routes: 'src/routes', lang: 'en', minify: true, prefetch: 'moderate', plugins: [] })
 ```
+
+A directory inside the project holding a `kay.config.ts` of its own, such as an example app or a documentation site, is another project: its components are never the outer one's islands, and it checks and builds from its own root.
 
 `minify` is on for `kay build` unless set to `false`, and off for `kay dev` and a server bundling at boot unless set to `true`. `lang`, the `<html lang>` of every page when `i18n` is not set, defaults to `en`.
 
