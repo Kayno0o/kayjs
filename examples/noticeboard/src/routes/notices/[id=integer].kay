@@ -1,0 +1,14 @@
+--- server
+import { findNotice } from '../../notices'
+
+const notice = await findNotice(Number(ctx.params.id)) ?? ctx.notFound()
+---
+---
+import Card from '@kaynooo/kayjs-ui/card.kay'
+---
+head
+  title {notice.title}
+Card(title={notice.title})
+  p.whitespace-pre-line {notice.body}
+  p.mt-2.text-sm.text-kui-muted {notice.author}, {notice.posted_at.toLocaleDateString('en', { dateStyle: 'long' })}
+a.mt-4.inline-block(href="/") Back to the board

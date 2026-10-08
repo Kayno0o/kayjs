@@ -1,0 +1,5 @@
+[test]
+preload = [
+  "kay/test/preload",
+  "./tests/database.ts",
+]

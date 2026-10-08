@@ -1,0 +1,16 @@
+---
+import { toast } from '@kaynooo/kayjs-ui'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import { signal } from 'kay'
+import { post } from '../routes/index.kay'
+
+const writing = signal(false)
+---
+Button#pin-notice(label="Pin a notice" variant="accent" icon="plus" onClick={() => writing.set(true)})
+FormDialog(open={writing()} title="Pin a notice" action={post} submitLabel="Pin it" failure="Could not pin the notice" refused={(data: { error: string }) => data.error} onSaved={() => toast.success('Pinned')} onClose={() => writing.set(false)})
+  FormField(label="Title" name="title" required)
+    input(name="title" maxlength="120" required)
+  FormField(label="Notice" name="body" required)
+    textarea(name="body" rows="5" maxlength="4000" required)

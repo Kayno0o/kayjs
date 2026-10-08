@@ -1,0 +1,26 @@
+{
+  "name": "noticeboard",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "kay dev",
+    "check": "kay check",
+    "test": "bun test --isolate",
+    "compile": "kay build --compile server",
+    "db:generate": "pg-orm generate",
+    "db:migrate": "pg-orm apply"
+  },
+  "dependencies": {
+    "@iconify-json/tabler": "*",
+    "@kaynooo/kayjs-auth": "*",
+    "@kaynooo/kayjs-mail": "*",
+    "@kaynooo/kayjs-ui": "*",
+    "@kaynooo/pg-orm": "*",
+    "elysia": "*",
+    "kay": "file:../.."
+  },
+  "devDependencies": {
+    "bun-plugin-tailwind": "*",
+    "tailwindcss": "*"
+  }
+}

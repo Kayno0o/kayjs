@@ -1,0 +1,27 @@
+@import 'tailwindcss';
+@import '@kaynooo/kayjs-ui/theme.css';
+
+@theme {
+  --color-kui-accent: light-dark(#2f6496, #8fb8de);
+  --color-kui-accent-hi: light-dark(#24507a, #b0cde8);
+}
+
+@layer base {
+  body {
+    @apply flex min-h-screen flex-col bg-kui-canvas font-sans text-kui-text;
+  }
+
+  a {
+    @apply text-kui-accent underline underline-offset-4 hover:text-kui-accent-hi;
+  }
+}
+
+@layer components {
+  .skip-link {
+    @apply absolute top-0 left-0 z-100 -translate-y-full bg-kui-canvas px-2 py-1 transition-transform focus:translate-y-0;
+  }
+
+  .page-form {
+    @apply mt-4 flex max-w-sm flex-col items-start gap-3;
+  }
+}

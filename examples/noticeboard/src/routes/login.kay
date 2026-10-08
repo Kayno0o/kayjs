@@ -1,0 +1,62 @@
+--- server
+import { t } from 'kay'
+import { FAILURE_WORDS } from '../words'
+
+export const signIn = action(t.Object({
+  identifier: t.String({ maxLength: 254 }),
+  password: t.String({ maxLength: 128 }),
+  redirect: t.Optional(t.String({ maxLength: 2000 })),
+}), async (input, ctx) => {
+  const result = await ctx.locals.auth.signInWithPassword(input)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+// Answers alike whether or not an account has the address, so the form tells no one which addresses are members.
+export const mailLink = action(t.Object({
+  email: t.String({ maxLength: 254 }),
+  redirect: t.Optional(t.String({ maxLength: 2000 })),
+}), async ({ email, redirect }, ctx) => {
+  const result = await ctx.locals.auth.requestMagicLink(email, redirect)
+
+  if (!result.ok)
+    return ctx.fail(result.error === 'limited' ? 429 : 503, { error: result.error })
+
+  return { sent: true }
+})
+
+const redirect = ctx.url.searchParams.get('redirect') ?? '/'
+const signInFailure = ctx.failed(signIn)?.data?.error
+const linkFailure = ctx.failed(mailLink)?.data?.error
+---
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+---
+head
+  title Sign in
+h1.text-2xl.font-bold Sign in
+form.page-form(action={signIn})
+  input(type="hidden" name="redirect" value={redirect})
+  FormField(label="Name or email" required)
+    input(name="identifier" autocomplete="username" required)
+  FormField(label="Password" required)
+    input(name="password" type="password" autocomplete="current-password" required)
+  if signInFailure
+    p.text-kui-error {FAILURE_WORDS[signInFailure]}
+  Button(label="Sign in" variant="accent" type="submit")
+h2.mt-8.text-lg.font-bold Or get a link by mail
+form.page-form(action={mailLink})
+  input(type="hidden" name="redirect" value={redirect})
+  FormField(label="Email" required)
+    input(name="email" type="email" autocomplete="email" required)
+  if mailLink.succeeded()
+    p.text-kui-success If a member has this address, a link to sign in is on its way.
+  if linkFailure
+    p.text-kui-error {FAILURE_WORDS[linkFailure]}
+  Button(label="Mail me a link" type="submit")
+p.mt-4
+  a(href="/reset") Forgot your password?

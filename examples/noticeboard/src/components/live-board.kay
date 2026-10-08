@@ -1,0 +1,27 @@
+---
+import { toast } from '@kaynooo/kayjs-ui'
+import { dispatch, refresh, signal, socket } from 'kay'
+import board from '../api/board'
+
+const { me } = props<{ me: string | null }>()
+const live = socket(board, '/')
+const present = signal({ names: [] as string[], guests: 0 })
+
+// A notice someone pinned shows on this page at once: the page is rendered afresh around this island, which keeps its connection.
+live.on(message => dispatch(message, {
+  posted: ({ notice }) => {
+    if (notice.author !== me)
+      toast.info(`${notice.author} pinned "${notice.title}"`)
+
+    void refresh()
+  },
+  present: ({ names, guests }) => present.set({ names, guests }),
+}))
+
+function readers({ names, guests }: { names: string[], guests: number }): string {
+  const who = [...names, ...guests === 0 ? [] : [guests === 1 ? 'a guest' : `${guests} guests`]]
+
+  return who.length === 0 ? 'Nobody is reading' : `Reading now: ${who.join(', ')}`
+}
+---
+p.mt-2.text-sm.text-kui-muted(aria-live="polite") {live.status() === 'open' ? readers(present()) : 'Connecting...'}

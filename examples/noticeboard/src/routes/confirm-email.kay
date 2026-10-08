@@ -1,0 +1,27 @@
+--- server
+import { t } from 'kay'
+
+export const query = t.Object({ token: t.Optional(t.String()) })
+
+export const confirm = action(t.Object({ token: t.String() }), async ({ token }, ctx) => {
+  const result = await ctx.locals.auth.confirmEmailChange(token)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect('/account')
+})
+
+const token = ctx.query.token ?? ''
+---
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+---
+head
+  title Confirm your new address
+h1.text-2xl.font-bold Confirm your new address
+form.page-form(action={confirm})
+  input(type="hidden" name="token" value={token})
+  Button(label="Move my account to it" variant="accent" type="submit")
+if confirm.failed()
+  p.text-kui-error This link has expired or was already used.

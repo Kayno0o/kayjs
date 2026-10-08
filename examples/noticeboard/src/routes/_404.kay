@@ -1,0 +1,4 @@
+head
+  title Nothing here
+h1.text-2xl.font-bold Nothing here
+a(href="/") Back to the board

@@ -8,4 +8,4 @@ head
   title kay
 h1 kay
 Content
-p.next New to kay? Start with the #[a(href="/guides/tutorial") tutorial], then browse the reference on the left.
+p.next New to kay? Start with the #[a(href="/guides/tutorial") tutorial], see #[a(href="/guides/example-app") an app using its libraries], then browse the reference on the left.

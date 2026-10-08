@@ -1,0 +1,35 @@
+--- server
+import { t } from 'kay'
+
+export const query = t.Object({ token: t.Optional(t.String()) })
+
+// Confirms the address without signing in: in another browser than the one that joined, the password proves who confirms.
+export const confirm = action(t.Object({ token: t.String(), password: t.Optional(t.String({ maxLength: 128 })) }), async ({ token, password }, ctx) => {
+  const result = await ctx.locals.auth.verifyEmail(token, password)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+const failure = ctx.failed(confirm)?.data?.error
+const token = ctx.query.token ?? ''
+---
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+---
+head
+  title Confirm your address
+h1.text-2xl.font-bold Confirm your address
+form.page-form(action={confirm})
+  input(type="hidden" name="token" value={token})
+  if failure === 'confirm'
+    FormField(label="Password" hint="This browser is not signed in to the account: its password confirms it is yours" required)
+      input(name="password" type="password" autocomplete="current-password" required)
+  Button(label="Confirm" variant="accent" type="submit")
+if failure === 'invalid'
+  p.text-kui-error This link has expired or was already used.
+else if failure === 'limited'
+  p.text-kui-error Too many tries; wait a few minutes.

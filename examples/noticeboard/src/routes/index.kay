@@ -1,0 +1,51 @@
+--- server
+import { t } from 'kay'
+import { BOARD, board } from '../board'
+import { db } from '../db'
+import { Notice } from '../db/notice'
+import { announcements } from '../jobs'
+import { latestNotices } from '../notices'
+
+export const post = action(t.Object({
+  title: t.String({ pattern: '\\S', maxLength: 120, error: 'Write a title' }),
+  body: t.String({ pattern: '\\S', maxLength: 4000, error: 'Write the notice' }),
+}), async ({ title, body }, ctx) => {
+  const user = await ctx.locals.auth.user()
+
+  if (!user)
+    return ctx.fail(401, { error: 'Sign in to pin a notice' })
+
+  const notice = await db.repo(Notice).write.insertOne({ author_id: user.id, title: title.trim(), body: body.trim() }, { full: true })
+
+  // Every open board hears of it now; the members' mails go out from the queue.
+  board.publish(BOARD, { type: 'posted', notice: { id: notice.id, title: notice.title, author: user.username ?? 'A member' } })
+  await announcements.enqueue({ noticeId: notice.id })
+
+  return { id: notice.id }
+})
+
+const user = await ctx.locals.auth.user()
+const notices = await latestNotices()
+---
+---
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import LiveBoard from '../components/live-board.kay'
+import NewNotice from '../components/new-notice.kay'
+---
+head
+  title Board
+div.flex.flex-wrap.items-center.justify-between.gap-4
+  h1.text-2xl.font-bold Board
+  if user
+    NewNotice
+LiveBoard(me={user?.username ?? null})
+div.mt-4.flex.flex-col.gap-4
+  for notice of notices key={notice.id}
+    Card(title={notice.title})
+      p.whitespace-pre-line {notice.body}
+      p.mt-2.text-sm.text-kui-muted
+        | {notice.author},
+        a(href={`/notices/${notice.id}`}) {notice.posted_at.toLocaleDateString('en', { dateStyle: 'long' })}
+  else
+    EmptyState(title="Nothing pinned yet" description="Sign in to pin the first notice.")

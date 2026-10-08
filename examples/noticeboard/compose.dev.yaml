@@ -1,0 +1,20 @@
+# The database for development and tests: `docker compose up -d --wait`. Tests copy a database per test file on it.
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: noticeboard
+    ports:
+      - 127.0.0.1:5433:5432
+    volumes:
+      - db:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -h 127.0.0.1 -U app]
+      interval: 2s
+      retries: 15
+
+volumes:
+  db:

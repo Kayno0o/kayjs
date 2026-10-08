@@ -1,0 +1,87 @@
+import type { Subprocess } from 'bun'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import process from 'node:process'
+import { describe, expect, it } from 'bun:test'
+import { check } from '../src/check'
+
+const CLI = join(import.meta.dir, '../src/cli.ts')
+const APP = join(import.meta.dir, '../examples/noticeboard')
+const LISTENING = /localhost:(\d+)/
+// A Postgres whose user may create databases, as the app template's tests take: CI sets it.
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
+const SECRETS = { SESSION_SECRET: 'only-for-tests-0123456789abcdefghijklmnop', AUTH_SECRET: 'only-for-tests-too-abcdefghijklmnop0123456789' }
+
+// The example runs kay from this checkout with kayjs-auth, kayjs-mail and kayjs-ui as the root installs them, so a change on either side that breaks the other fails here before it reaches a site.
+describe('the noticeboard example', () => {
+  it('passes kay check, the libraries\' components typed from the node_modules above it', async () => {
+    expect(await check(APP)).toEqual([])
+  }, 60_000)
+
+  // Signs in, mails links, pins notices over the rooms, runs the queue and drives the islands in a browser, each test file on a database of its own.
+  it.skipIf(!TEST_DATABASE_URL && !process.env.CI)('passes its own tests', async () => {
+    const database = new URL(TEST_DATABASE_URL!)
+
+    database.pathname = '/noticeboard_test'
+
+    const tests = Bun.spawn([process.execPath, 'test', '--isolate'], { cwd: APP, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, DATABASE_URL: database.href } })
+    const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+
+    expect(report).toMatch(/ [1-9]\d* pass/)
+    expect(report).toContain(' 0 fail')
+    expect(code).toBe(0)
+  }, 120_000)
+
+  it('compiles to one executable serving its pages with the libraries\' components and styles', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-noticeboard-'))
+
+    try {
+      const build = Bun.spawn([process.execPath, CLI, 'build', '--compile', join(dir, 'server')], { cwd: APP, stdout: 'pipe', stderr: 'pipe' })
+      const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+
+      expect(report).toContain('compiled ')
+      expect(code).toBe(0)
+
+      // Nothing reaches the database or a mail server until a page asks: the sign-in page needs neither.
+      const server = Bun.spawn([join(dir, 'server')], { cwd: dir, env: { PATH: process.env.PATH, PORT: '0', ...SECRETS, DATABASE_URL: 'postgres://app:app@127.0.0.1:1/none', SMTP_HOST: 'localhost' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+
+      try {
+        const origin = `http://localhost:${await listeningPort(server)}`
+        const login = await (await fetch(`${origin}/login`)).text()
+        const stylesheet = (/<link rel="stylesheet" href="(\/_kay\/[^"]+\.css)"/).exec(login)![1]!
+
+        expect(login).toContain('<title>Sign in | Noticeboard</title>')
+        expect(login).toContain('class="kui-form-field')
+        expect(await (await fetch(`${origin}${stylesheet}`)).text()).toContain('.kui-btn')
+        expect(await Bun.spawn([join(dir, 'server'), '--health'], { cwd: dir, env: { PATH: process.env.PATH, PORT: new URL(origin).port }, stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0)
+      }
+      finally {
+        server.kill()
+        await server.exited
+      }
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 120_000)
+})
+
+// The port the server prints once it listens.
+async function listeningPort(child: Subprocess<'ignore', 'pipe', 'pipe'>): Promise<string> {
+  const reader = child.stdout.getReader()
+  let output = ''
+
+  for (let match = LISTENING.exec(output); !match; match = LISTENING.exec(output)) {
+    const { value, done } = await reader.read()
+
+    if (done)
+      throw new Error(`the executable exited without listening: ${await new Response(child.stderr).text()}`)
+
+    output += new TextDecoder().decode(value)
+  }
+
+  reader.releaseLock()
+
+  return LISTENING.exec(output)![1]!
+}

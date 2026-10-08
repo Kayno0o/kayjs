@@ -1,0 +1,29 @@
+--- server
+import { t } from 'kay'
+
+export const query = t.Object({ token: t.Optional(t.String()) })
+
+// The link only opens this page; the button spends it, so a mail scanner opening the link signs no one in.
+export const spend = action(t.Object({ token: t.String() }), async ({ token }, ctx) => {
+  const result = await ctx.locals.auth.signInWithMagicLink(token)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+const token = ctx.query.token ?? ''
+---
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+---
+head
+  title Sign in
+h1.text-2xl.font-bold Sign in
+form.page-form(action={spend})
+  input(type="hidden" name="token" value={token})
+  Button(label="Sign in to the board" variant="accent" type="submit")
+if spend.failed()
+  p.text-kui-error This link has expired or was already used.
+  a(href="/login") Ask for another

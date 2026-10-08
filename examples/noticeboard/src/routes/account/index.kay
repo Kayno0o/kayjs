@@ -1,0 +1,69 @@
+--- server
+import { t } from 'kay'
+import { EMAIL_WORDS, FAILURE_WORDS } from '../../words'
+
+export const resend = action(t.Object({}), async (_input, ctx) => {
+  const result = await ctx.locals.auth.sendVerification()
+
+  if (!result.ok)
+    return ctx.fail(result.error === 'limited' ? 429 : 400, { error: result.error })
+
+  return { sent: true }
+})
+
+// Mails a link to the new address; the account moves once that link is followed.
+export const changeEmail = action(t.Object({ email: t.String({ maxLength: 254 }), password: t.String({ maxLength: 128 }) }), async ({ email, password }, ctx) => {
+  const result = await ctx.locals.auth.changeEmail({ password }, email)
+
+  if (!result.ok)
+    return ctx.fail(400, 'errors' in result ? { errors: result.errors } : { error: result.error })
+
+  return { sent: true }
+})
+
+export const signOut = action(t.Object({}), async (_input, ctx) => {
+  await ctx.locals.auth.signOut()
+
+  return ctx.redirect('/')
+})
+
+const user = (await ctx.locals.auth.user())!
+const refused = ctx.failed(changeEmail)?.data
+const emailIssue = refused?.errors?.email && EMAIL_WORDS[refused.errors.email]
+const changeFailure = refused?.error && FAILURE_WORDS[refused.error]
+---
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+---
+head
+  title Account
+h1.text-2xl.font-bold {user.username}
+div.mt-4.flex.flex-col.gap-4
+  Card(title="Address")
+    p.flex.flex-wrap.items-center.gap-2
+      | {user.email}
+      if user.emailVerified
+        Badge(label="Confirmed" tone="success")
+      else
+        Badge(label="Not confirmed" tone="warning")
+    if !user.emailVerified
+      form.page-form(action={resend})
+        if resend.succeeded()
+          p.text-kui-success A new link is on its way.
+        Button(label="Mail the link again" type="submit")
+  Card(title="Change the address")
+    form.page-form(action={changeEmail})
+      FormField(label="New email" issue={emailIssue} required)
+        input(name="email" type="email" autocomplete="email" required)
+      FormField(label="Password" required)
+        input(name="password" type="password" autocomplete="current-password" required)
+      if changeEmail.succeeded()
+        p.text-kui-success A link to confirm the new address is on its way to it.
+      if changeFailure
+        p.text-kui-error {changeFailure}
+      Button(label="Change" type="submit")
+form.mt-6(action={signOut})
+  Button(label="Sign out" variant="danger" type="submit")

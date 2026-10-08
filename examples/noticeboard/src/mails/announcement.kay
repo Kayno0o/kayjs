@@ -1,0 +1,14 @@
+---
+import Button from '@kaynooo/kayjs-mail/button.kay'
+import Heading from '@kaynooo/kayjs-mail/heading.kay'
+import Layout from '@kaynooo/kayjs-mail/layout.kay'
+import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+
+const { title, author, url } = props<{ title: string, author: string, url: string }>()
+---
+Layout(preheader={`${author} pinned a notice`})
+  @footer
+    | Sent by the Noticeboard to members with a verified address.
+  Heading {title}
+  Paragraph {author} pinned a new notice to the board.
+  Button(href={url}) Read it
