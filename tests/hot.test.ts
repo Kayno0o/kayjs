@@ -15,7 +15,8 @@ const scratch = join(import.meta.dir, '../node_modules/.cache')
 const todos = (label: string) => `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(list => list.slice(1))}) ${label}\nul.todos\n  for item of items() key={item}\n    li {item}\n`
 const counter = (label: string) => `---\nimport { signal } from 'kay'\n\nconst count = signal(0)\nconst note = signal('')\n---\nbutton.count(onClick={() => count.set(n => n + 1)}) ${label} {count()}\ninput.note(bind:value={note})\n`
 
-const home = (text: string) => `---\nimport Counter from '../components/counter.kay'\nimport Panel from '../components/panel.kay'\nimport Todos from '../components/todos.kay'\n---\nh1 Home\ndiv.solo\n  Counter\nPanel\nTodos\np.static ${text}\n`
+const extra = '---\nimport { signal } from \'kay\'\n\nconst on = signal(false)\n---\nbutton.extra(onClick={() => on.set(!on())}) Extra {on() ? \'on\' : \'off\'}\n'
+const home = (text: string, withExtra = false) => `---\nimport Counter from '../components/counter.kay'\n${withExtra ? 'import Extra from \'../components/extra.kay\'\n' : ''}import Panel from '../components/panel.kay'\nimport Todos from '../components/todos.kay'\n---\nh1 Home\ndiv.solo\n  Counter\nPanel\nTodos\np.static ${text}\n${withExtra ? 'Extra\n' : ''}div(style="height: 3000px")\n`
 
 let root: string
 let stop: () => Promise<void>
@@ -109,11 +110,37 @@ describe.skipIf(!browserInstalled && !process.env.CI)('kay dev in Chromium', () 
     expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
   }, 60_000)
 
-  it('reloads the page for any other change', async () => {
+  it('refreshes the page through the swap for a page edit, the islands, their state and the scroll kept', async () => {
+    await page.evaluate(() => window.scrollTo(0, 400))
     await Bun.write(join(root, 'src/routes/index.kay'), home('Edited'))
     await page.locator('p.static', { hasText: 'Edited' }).waitFor({ timeout: 30_000 })
 
+    expect(await sameDocument()).toBe(true)
+    expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
+    expect(await page.inputValue('.solo input.note')).toBe('kept')
+    expect(await page.evaluate(() => window.scrollY)).toBe(400)
+  }, 60_000)
+
+  it('refreshes it the same for a change to a server module, the server restarted', async () => {
+    await Bun.write(join(root, 'src/greeting.ts'), 'export const greeting = \'Hello\'\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), `--- server\nimport { greeting } from '../greeting'\n---\n${home('{greeting}')}`)
+    await page.locator('p.static', { hasText: 'Hello' }).waitFor({ timeout: 30_000 })
+    await Bun.write(join(root, 'src/greeting.ts'), 'export const greeting = \'Welcome\'\n')
+    await page.locator('p.static', { hasText: 'Welcome' }).waitFor({ timeout: 30_000 })
+
+    expect(await sameDocument()).toBe(true)
+    expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
+  }, 60_000)
+
+  it('loads the page fully when the swap cannot apply the edit, as when a new island makes a new browser build', async () => {
+    await Bun.write(join(root, 'src/components/extra.kay'), extra)
+    await Bun.write(join(root, 'src/routes/index.kay'), home('Grown', true))
+    await page.locator('button.extra').waitFor({ timeout: 30_000 })
+
     expect(await sameDocument()).toBe(false)
-    expect(await page.textContent('.solo button.count')).toBe('Pressed 0')
+    expect(await page.textContent('p.static')).toBe('Grown')
+
+    await page.click('button.extra')
+    await page.locator('button.extra', { hasText: 'Extra on' }).waitFor()
   }, 60_000)
 })
