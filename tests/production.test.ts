@@ -1004,6 +1004,11 @@ describe('lifecycle', () => {
 
 describe('request logging', () => {
   const routes = 'tests/fixtures/production/src/routes'
+  // Elysia runs the hook writing a line once the event loop gets to it, after the response and even the shutdown, later still on a loaded machine.
+  const written = async (count: () => number, expected: number) => {
+    for (const start = Date.now(); count() < expected && Date.now() - start < 5000;)
+      await Bun.sleep(10)
+  }
 
   it('logs one line per request with its status and duration, leaving kay\'s own routes out', async () => {
     const lines = spyOn(console, 'log').mockImplementation(() => undefined)
@@ -1019,6 +1024,7 @@ describe('request logging', () => {
         await (await fetch(`http://localhost:${app.server!.port}${path}`)).text()
 
       await shutdown(app)
+      await written(() => lines.mock.calls.length, 3)
       expect(lines.mock.calls.map(call => String(call[0]).replace(/\d+ms$/, 'Nms'))).toEqual(['GET /contact 200 Nms', 'GET /api/fail 418 Nms', 'GET /missing 404 Nms'])
     }
     finally {
@@ -1035,10 +1041,11 @@ describe('request logging', () => {
       const custom = await pages({ routes, prebuilt: false, log: entry => entries.push(entry) })
       const quiet = await pages({ routes, prebuilt: false })
 
-      for (const app of [json, custom, quiet]) {
+      for (const [app, expected] of [[json, 1], [custom, 2], [quiet, 2]] as const) {
         app.listen(0)
         await (await fetch(`http://localhost:${app.server!.port}/contact`)).text()
         await shutdown(app)
+        await written(() => lines.mock.calls.length + entries.length, expected)
       }
 
       expect(lines.mock.calls).toHaveLength(1)
