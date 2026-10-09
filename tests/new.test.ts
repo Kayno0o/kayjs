@@ -142,14 +142,14 @@ describe('kay command line', () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
 
     try {
-      const { stderr, code } = await kay(['new', 'my app {x}', '--kay', '^1.0.0'], dir)
+      const { stdout, code } = await kay(['new', 'my app {x}', '--kay', '^1.0.0'], dir)
       const manifest = await Bun.file(join(dir, 'my app {x}/package.json')).json() as { name: string }
 
       expect(code).toBe(0)
       expect(manifest.name).toBe('my-app-x')
       expect(await Bun.file(join(dir, 'my app {x}/src/components/header.kay')).text()).toContain('(href="/") my-app-x\n')
       expect(await Bun.file(join(dir, 'my app {x}/kay.config.ts')).text()).toContain('seo: { name: \'my-app-x\', titleTemplate: \'%s | my-app-x\'')
-      expect(stderr).toContain('cd \'my app {x}\' && bun install')
+      expect(stdout).toContain('cd \'my app {x}\' && bun install')
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -342,7 +342,7 @@ describe('kay new', () => {
       }
 
       const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', '--static'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, SITE_URL: 'https://pages.example', SITE_BASE: '/me/my-site' } })
-      const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+      const [report, code] = await Promise.all([new Response(build.stdout).text(), build.exited])
 
       expect(report).toContain('exported 1 page')
       expect(code).toBe(0)
@@ -416,7 +416,7 @@ describe('kay new', () => {
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
 
       const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--static'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+      const [report, code] = await Promise.all([new Response(build.stdout).text(), build.exited])
 
       expect(report).toContain('exported 1 page')
       expect(code).toBe(0)
@@ -583,7 +583,7 @@ describe('kay build --compile', () => {
       await Bun.write(join(dir, 'package.json'), JSON.stringify({ ...manifest, dependencies: { ...manifest.dependencies, 'kay-lib': '1.0.0' } }))
 
       const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--compile', 'server'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+      const [report, code] = await Promise.all([new Response(build.stdout).text(), build.exited])
 
       expect(report).toContain('compiled server in ')
       expect(code).toBe(0)

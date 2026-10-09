@@ -41,7 +41,7 @@ describe('the noticeboard example', () => {
 
     try {
       const build = Bun.spawn([process.execPath, CLI, 'build', '--compile', join(dir, 'server')], { cwd: APP, stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+      const [report, code] = await Promise.all([new Response(build.stdout).text(), build.exited])
 
       expect(report).toContain('compiled ')
       expect(code).toBe(0)

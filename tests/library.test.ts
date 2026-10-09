@@ -100,7 +100,7 @@ describe.each(['@kaynooo/kayjs', '@kaynooo/kay'] as const)('a linked kay library
     expect(html).toContain('data-component="node_modules/kay-lib/src/counter.kay"')
     expect((await Promise.all((await readdir(join(out, '_kay'))).filter(name => name.endsWith('.js')).map(async name => Bun.file(join(out, '_kay', name)).text()))).join('\n')).toContain('"node_modules/kay-lib/src/counter.kay"')
     expect(built.output).toContain('built 1 island')
-    expect(checked.output).toBe('')
+    expect(checked.output).toMatch(/^checked with no problems in \d+ ms\n$/)
     expect(checked.code).toBe(0)
   })
 })
@@ -122,7 +122,7 @@ describe('a kay library hoisted above the project', () => {
   })
 
   it('types its components, a component it imports beside one included, keeping their shadows inside the project\'s tree', async () => {
-    expect(await run('check', project)).toEqual({ code: 0, output: '' })
+    expect(await run('check', project)).toEqual({ code: 0, output: expect.stringMatching(/^checked with no problems in \d+ ms\n$/) })
     expect(await Bun.file(join(project, '.kay/types/__/__/node_modules/kay-lib/src/framed.kay.tsx')).exists()).toBe(true)
     expect(await Bun.file(join(project, 'node_modules')).exists()).toBe(false)
 

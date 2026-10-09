@@ -40,6 +40,7 @@ import { remoteImages, remotePatterns } from './server/remote'
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const toStderr: Paint = (styles, text) => styleText(styles, text, { stream: process.stderr })
+const toStdout = (styles: Parameters<typeof styleText>[0], text: string) => styleText(styles, text, { stream: process.stdout })
 const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
 
 interface Parsed {
@@ -161,19 +162,25 @@ async function runCheck(args: string[]): Promise<number> {
   // The checking machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
   buildingWithoutEnv()
 
-  return await checkProject(root, await loadConfig(root), tsconfig, typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: parsed.values['deny-warnings'] === true, fix: parsed.values.fix === true }) > 0 ? 1 : 0
+  const started = performance.now()
+  const { failing, found } = await checkProject(root, await loadConfig(root), tsconfig, typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: parsed.values['deny-warnings'] === true, fix: parsed.values.fix === true })
+
+  if (found === 0)
+    done('checked', 'with no problems', started)
+
+  return failing > 0 ? 1 : 0
 }
 
-// Prints what `kay check` finds in the project, as it finds it, and answers how many of those problems fail it: the errors, and the warnings too with `denyWarnings`.
+// Prints what `kay check` finds in the project, as it finds it, and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
 // With `fix`, applies the safe fixes first, then checks again and prints what is left.
-async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string, { denyWarnings = false, fix = false } = {}): Promise<number> {
+async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string, { denyWarnings = false, fix = false } = {}): Promise<{ failing: number, found: number }> {
   const { routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints } = config
   const options = { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints }
   let diagnostics = await check(root, options)
   const fixed = fix ? await applySafeFixes(root, diagnostics) : 0
 
   if (fixed > 0) {
-    console.error(`kay check: fixed ${count(fixed, 'problem')}\n`)
+    done('fixed', count(fixed, 'problem'))
     diagnostics = await check(root, options)
   }
 
@@ -192,7 +199,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
   if (diagnostics.length > 0)
     console.error([errors > 0 ? count(errors, 'error') : '', warnings > 0 ? `${count(warnings, 'warning')}${denyWarnings ? ', failing the check under --deny-warnings' : ''}` : ''].filter(part => part !== '').join(', '))
 
-  return errors + (denyWarnings ? warnings : 0)
+  return { failing: errors + (denyWarnings ? warnings : 0), found: diagnostics.length }
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
@@ -252,9 +259,9 @@ async function build(args: string[]): Promise<number> {
     await rm(previous, { recursive: true, force: true })
 
   const started = performance.now()
-  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined) : 0, bundleClient(root, config, exported)])
+  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined) : { failing: 0, found: 0 }, bundleClient(root, config, exported)])
 
-  if (checked.status === 'rejected' || checked.value > 0) {
+  if (checked.status === 'rejected' || checked.value.failing > 0) {
     await putBack(output, previous)
 
     if (checked.status === 'rejected')
@@ -275,7 +282,7 @@ async function build(args: string[]): Promise<number> {
 
     const { prerendered, entries } = await finishOutput(root, config, exported, client)
 
-    console.error(`built ${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''} in ${Math.round(performance.now() - started)} ms`)
+    done('built', `${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''}`, started)
   }
   catch (error) {
     if (checking)
@@ -294,14 +301,14 @@ async function build(args: string[]): Promise<number> {
       const target = resolve(typeof outdir === 'string' ? outdir : join(root, 'dist'))
       const site = await exportStatic(root, config, client, target)
 
-      console.error(`exported ${count(site.pages, 'page')} and ${count(site.files, 'other file')} to ${relative(process.cwd(), target) || '.'} in ${Math.round(performance.now() - written)} ms`)
+      done('exported', `${count(site.pages, 'page')} and ${count(site.files, 'other file')} to ${relative(process.cwd(), target) || '.'}`, written)
     }
 
     if (typeof compile === 'string') {
       const compiled = performance.now()
       const executable = await compileServer(root, config, { outfile: resolve(compile), entry: typeof entry === 'string' ? resolve(entry) : undefined })
 
-      console.error(`compiled ${relative(process.cwd(), executable)} in ${Math.round(performance.now() - compiled)} ms`)
+      done('compiled', relative(process.cwd(), executable), compiled)
     }
 
     return 0
@@ -390,6 +397,11 @@ function projectRoot(command: string, path = '.'): string | undefined {
   return undefined
 }
 
+// What a command did, on stdout so a terminal does not take it for an error: the verb in green, the timing dimmed.
+function done(verb: string, rest: string, started?: number): void {
+  console.log(`${toStdout(['bold', 'green'], verb)} ${rest}${started === undefined ? '' : toStdout('dim', ` in ${Math.round(performance.now() - started)} ms`)}`)
+}
+
 function count(amount: number, noun: string): string {
   return `${amount} ${noun}${amount === 1 ? '' : 's'}`
 }
@@ -456,8 +468,9 @@ async function scaffold(args: string[]): Promise<number> {
 
     const files = await createProject(dir, { kay: typeof parsed.values.kay === 'string' ? parsed.values.kay : undefined, features })
 
+    done('created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
     // An app's database runs in the container its compose.dev.yaml describes, migrated before the first start.
-    console.error(`${files.map(file => `created ${join(dir, file)}`).join('\n')}\n\ncd ${shellQuote(dir)} && bun install && ${features.includes('auth') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)
+    console.log(`\n  ${toStdout('cyan', `cd ${shellQuote(dir)} && bun install && ${features.includes('auth') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)}`)
 
     return 0
   }
@@ -494,15 +507,15 @@ async function migrate(args: string[]): Promise<number> {
   const shown = (file: string) => relative(process.cwd(), join(out, file)) || '.'
 
   for (const file of written)
-    console.error(`wrote ${shown(file)}`)
+    done('wrote', shown(file))
 
   for (const file of skipped)
-    console.error(`kept ${shown(file)}, which exists`)
+    console.log(`${toStdout(['bold', 'yellow'], 'kept')} ${shown(file)}, which exists`)
 
   if (notes.length > 0)
     console.log(`\nLeft to do by hand, the code it concerns marked \`kay migrate:\` where it was commented out:\n${notes.map(each => `${relative(process.cwd(), join(dir, each.file))}:${each.line}${each.target === undefined ? '' : ` (${shown(each.target)})`}: ${each.message}`).join('\n')}`)
 
-  console.error(`\n${count(written.length, 'file')} written, ${count(notes.length, 'item')} left to do by hand`)
+  console.log(`\n${count(written.length, 'file')} written, ${count(notes.length, 'item')} left to do by hand`)
 
   return 0
 }
@@ -587,8 +600,15 @@ async function fmt(args: string[]): Promise<number> {
       console.error(`${formatDiagnostic(source, relative(process.cwd(), file), diagnostic, toStderr)}\n`)
   }
 
-  for (const file of changed)
-    console.error(`${write ? 'formatted' : 'not formatted'}: ${relative(process.cwd(), file)}`)
+  for (const file of changed) {
+    if (write)
+      done('formatted', relative(process.cwd(), file))
+    else
+      console.error(`not formatted: ${relative(process.cwd(), file)}`)
+  }
+
+  if (changed.length === 0 && errors.length === 0)
+    done('checked', 'every file is formatted')
 
   return errors.length > 0 || (!write && changed.length > 0) ? 1 : 0
 }

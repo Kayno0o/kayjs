@@ -237,13 +237,13 @@ describe('kay build', () => {
   it('bundles the islands for production and writes the manifest a server boots from', async () => {
     try {
       const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
-      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+      const [report, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
       const manifest = await Bun.file(join(root, '.kay/client/manifest.json')).json() as { entry: string, islands: Record<string, string[]> }
       const entryFile = join(root, '.kay/client/dist', manifest.entry.slice('/_kay/'.length))
       const entry = await Bun.file(entryFile).text()
 
       expect(code).toBe(0)
-      expect(errors).toStartWith('built 9 islands, 0 stylesheets and 0 prerendered pages in ')
+      expect(report).toStartWith('built 9 islands, 0 stylesheets and 0 prerendered pages in ')
       expect(Object.keys(manifest.islands).sort()).toEqual(['counter.kay', 'greeting.kay', 'joined.kay', 'picker.kay', 'plain.kay', 'rich.kay', 'slow.kay', 'tally.kay', 'typed.kay'])
       // Minified: no line of the bundle is indented.
       expect(entry).not.toContain('\n  ')
@@ -380,7 +380,7 @@ describe('kay build without the server environment', () => {
     })
     const build = async () => {
       const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', '--no-check'], { cwd: root, env: { PATH: process.env.PATH }, stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+      const [report, code] = await printed(child)
 
       return { report, code }
     }
@@ -410,7 +410,7 @@ describe('kay build checks the project first', () => {
   })
   const build = async (root: string, ...args: string[]) => {
     const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe' })
-    const [report, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+    const [report, code] = await printed(child)
 
     return { report, code }
   }
@@ -615,4 +615,11 @@ function sourceLines(mappings: string, source: number): number[] {
   }
 
   return lines
+}
+
+// What a command printed, its reports on stdout then its problems on stderr, and its exit code.
+async function printed(child: { stdout: ReadableStream<Uint8Array>, stderr: ReadableStream<Uint8Array>, exited: Promise<number> }): Promise<[string, number]> {
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  return [stdout + stderr, code]
 }

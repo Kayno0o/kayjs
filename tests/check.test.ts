@@ -103,11 +103,12 @@ const tsconfig = JSON.stringify({
 
 // A project under the checkout's node_modules, so `kay` and the types resolve without installing anything.
 // Runs `kay check` on the project as a user would, answering its exit code and what it printed.
-async function runCheck(root: string, ...flags: string[]): Promise<{ code: number, output: string }> {
+// What `kay check` reports: what it did on stdout, the problems it found on stderr.
+async function runCheck(root: string, ...flags: string[]): Promise<{ code: number, output: string, report: string }> {
   const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, ...flags], { stdout: 'pipe', stderr: 'pipe' })
-  const output = await new Response(child.stderr).text()
+  const [report, output, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
-  return { code: await child.exited, output }
+  return { code, output, report }
 }
 
 async function scratchProject(files: Record<string, string>): Promise<string> {
@@ -1039,7 +1040,7 @@ describe('kay check, unused code', () => {
       expect(warned.output).toStartWith('warning[positional-key]: These rows are keyed by their position, though each has an `id`\n --> ')
       expect(warned.output.trim().split('\n').at(-1)).toBe('1 warning')
       expect(warned.code).toBe(0)
-      expect(await runCheck(root, '--deny-warnings')).toEqual({ code: 1, output: expect.stringContaining('\n1 warning, failing the check under --deny-warnings\n') })
+      expect(await runCheck(root, '--deny-warnings')).toEqual({ code: 1, output: expect.stringContaining('\n1 warning, failing the check under --deny-warnings\n'), report: '' })
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -1100,11 +1101,12 @@ describe('kay check, unused code', () => {
     })
 
     try {
-      const { code, output } = await runCheck(root, '--fix')
+      const { code, output, report } = await runCheck(root, '--fix')
 
       expect(await Bun.file(join(root, 'src/card.kay')).text()).toBe('---\nconst { title } = props<{ title: string, subtitle?: string }>()\n---\np {title}\niframe(src="https://example.com")\n')
       expect(await Bun.file(join(root, 'src/button.kay')).text()).toBe('---\nfunction go() {}\n---\nbutton(onClick={go}) x\n')
-      expect(output).toStartWith('kay check: fixed 2 problems\n\nerror[missing-title]: An `iframe` needs a `title`\n')
+      expect(report).toBe('fixed 2 problems\n')
+      expect(output).toStartWith('error[missing-title]: An `iframe` needs a `title`\n')
       expect(code).toBe(1)
     }
     finally {
