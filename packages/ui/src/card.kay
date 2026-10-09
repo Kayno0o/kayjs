@@ -5,7 +5,7 @@ const { title, head, bare = false, class: className, ...rest } = props<Omit<JSX.
   // Engraved along the top, on a rule of its own.
   title?: string | undefined
   // The rest of the title's line, held at its far end: a count, a control, a link out.
-  head?: JSX.Element | undefined
+  head?: JSX.Element
   // No inset body, for content that runs to the card's edge: a chart, a table, a console.
   bare?: boolean | undefined
   class?: string | undefined

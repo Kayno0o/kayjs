@@ -8,10 +8,10 @@ const { title, icon, actions, isEmpty = false, empty, class: className, ...rest 
   title?: string | undefined
   icon?: IconSlot | IconProps | undefined
   // The end of the head line: a link, a button, a row of actions.
-  actions?: JSX.Element | undefined
+  actions?: JSX.Element
   // Whether the data behind the widget is empty. With an `@empty` block, the frame and its head stay while the body shows the block; without one, an empty widget renders nothing at all.
   isEmpty?: boolean | undefined
-  empty?: JSX.Element | undefined
+  empty?: JSX.Element
   class?: string | undefined
 }>()
 ---

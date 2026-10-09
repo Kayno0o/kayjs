@@ -3,11 +3,11 @@ import type { JSX } from 'kay'
 
 const { left, right, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class'> & {
   // The leading element: a toggle, an icon, a colour dot.
-  left?: JSX.Element | undefined
+  left?: JSX.Element
   // A trailing readout, always shown.
-  right?: JSX.Element | undefined
+  right?: JSX.Element
   // Controls at the end of the row, dimmed until the row is hovered or focused.
-  actions?: JSX.Element | undefined
+  actions?: JSX.Element
   class?: string | undefined
 }>()
 ---

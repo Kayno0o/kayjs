@@ -23,7 +23,7 @@ const { open, title, action, submitLabel, failure, refused, onSaved, onClose, ex
   // Called however the dialog closes, saved or not.
   onClose: () => void
   // The left end of the footer, for a delete button.
-  extra?: JSX.Element | undefined
+  extra?: JSX.Element
   // Pairs the footer's submit button with the form; one unique on the page is drawn when none is given.
   id?: string | undefined
   class?: string | undefined

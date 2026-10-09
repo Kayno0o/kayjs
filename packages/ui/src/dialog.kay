@@ -10,7 +10,7 @@ const { open, title, dirty = false, onClose, footer, class: className, ...rest }
   dirty?: boolean | undefined
   // Called however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
   onClose: (event: Event) => void
-  footer?: JSX.Element | undefined
+  footer?: JSX.Element
   class?: string | undefined
 }>()
 

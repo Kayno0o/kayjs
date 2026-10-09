@@ -8,10 +8,10 @@ const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
 const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = 'Resize list', backLabel = 'Back', class: className, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
   list: JSX.Element
   detail: JSX.Element
-  listHead?: JSX.Element | undefined
-  detailHead?: JSX.Element | undefined
+  listHead?: JSX.Element
+  detailHead?: JSX.Element
   // A navigation column left of the list, from `md` up; below it, an overlay `sidebarOpen` shows.
-  sidebar?: JSX.Element | undefined
+  sidebar?: JSX.Element
   sidebarTitle?: string | undefined
   // Below `md`, whether the detail pane takes the list's place.
   detailOpen?: boolean | undefined

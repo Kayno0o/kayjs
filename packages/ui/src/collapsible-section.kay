@@ -9,7 +9,7 @@ const { title, open = true, boxed = false, meta, class: className, ...rest } = p
   // Draws the section as a card: the title becomes a band over a padded body, so a stack of them reads as separate blocks.
   boxed?: boolean | undefined
   // Sits in the band before the chevron, for a count or a state the folded section would otherwise hide.
-  meta?: JSX.Element | undefined
+  meta?: JSX.Element
   class?: string | undefined
 }>()
 ---

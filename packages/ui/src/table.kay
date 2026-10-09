@@ -18,7 +18,7 @@ const { columns, rows, rowKey, sort, serverSort = false, onSort, cell, empty, cl
   // Draws the cells of the columns marked `cell: true`.
   cell?: ((row: Row, column: Column<Row>) => JSX.Element) | undefined
   // Shown in place of the rows when there are none.
-  empty?: JSX.Element | undefined
+  empty?: JSX.Element
   class?: string | undefined
 }>()
 

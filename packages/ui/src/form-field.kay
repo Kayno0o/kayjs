@@ -14,7 +14,7 @@ const { label, name, issue, hint, required = false, group = false, action, class
   // A control made of several inputs, such as a picker, is a labelled group rather than one label.
   group?: boolean | undefined
   // Sits on the label's line, pushed right: a preset button, a unit, a count.
-  action?: JSX.Element | undefined
+  action?: JSX.Element
   class?: string | undefined
 }>()
 
