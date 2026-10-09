@@ -126,11 +126,24 @@ function offsetOf(body: Buffer, text: FixedText): number {
   return -1
 }
 
-async function deflateRaw(bytes: Uint8Array, last: boolean): Promise<Buffer> {
+type Deflate = (bytes: Uint8Array, last: boolean) => Buffer | Promise<Buffer>
+
+const deflateRaw: Deflate = async (bytes, last) => {
   const { constants, deflateRaw: deflate } = nodeZlib()
 
   return new Promise((resolve, reject) => deflate(bytes, { level: GZIP_LEVEL, finishFlush: last ? constants.Z_FINISH : constants.Z_FULL_FLUSH }, (error, result) => error ? reject(error) : resolve(result)))
 }
+
+const deflateRawHere: Deflate = (bytes, last) => {
+  const { constants, deflateRawSync } = nodeZlib()
+
+  return deflateRawSync(bytes, { level: GZIP_LEVEL, finishFlush: last ? constants.Z_FINISH : constants.Z_FULL_FLUSH })
+}
+
+// Bun answers far fewer requests a second with a body over about 24 KB once the reply waited on a macrotask, a zlib callback included, its main thread left partly idle; so up to this much left to deflate, about 200 µs of it, deflates on the main thread, and a short inlined page serves four times the requests.
+const SPLICE_HERE_BYTES = 64 * 1024
+
+interface Found { text: FixedText, at: number }
 
 // A gzip of the body that deflates only what lies around the fixed texts it holds, theirs deflated once already; undefined when it holds none.
 async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): Promise<Uint8Array<ArrayBuffer> | undefined> {
@@ -140,35 +153,39 @@ async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): 
   if (found.length === 0)
     return undefined
 
-  return compressing(async () => {
-    const parts: Uint8Array[] = [GZIP_HEADER]
-    let cursor = 0
+  const left = body.length - found.reduce((total, { text }) => total + text.bytes.length, 0)
 
-    for (const { text, at } of found) {
-      if (at < cursor)
-        continue
+  return left <= SPLICE_HERE_BYTES ? splice(body, found, deflateRawHere) : compressing(async () => splice(body, found, deflateRaw))
+}
 
-      parts.push(await deflateRaw(body.subarray(cursor, at), false), text.deflated)
-      cursor = at + text.bytes.length
-    }
+async function splice(body: Buffer, found: Found[], deflate: Deflate): Promise<Uint8Array<ArrayBuffer>> {
+  const parts: Uint8Array[] = [GZIP_HEADER]
+  let cursor = 0
 
-    const trailer = new Uint8Array(8)
-    const view = new DataView(trailer.buffer)
+  for (const { text, at } of found) {
+    if (at < cursor)
+      continue
 
-    parts.push(await deflateRaw(body.subarray(cursor), true), trailer)
-    view.setUint32(0, nodeZlib().crc32(body), true)
-    view.setUint32(4, body.length % 2 ** 32, true)
+    parts.push(await deflate(body.subarray(cursor, at), false), text.deflated)
+    cursor = at + text.bytes.length
+  }
 
-    const gzip = new Uint8Array(parts.reduce((total, part) => total + part.length, 0))
-    let written = 0
+  const trailer = new Uint8Array(8)
+  const view = new DataView(trailer.buffer)
 
-    for (const part of parts) {
-      gzip.set(part, written)
-      written += part.length
-    }
+  parts.push(await deflate(body.subarray(cursor), true), trailer)
+  view.setUint32(0, nodeZlib().crc32(body), true)
+  view.setUint32(4, body.length % 2 ** 32, true)
 
-    return gzip
-  })
+  const gzip = new Uint8Array(parts.reduce((total, part) => total + part.length, 0))
+  let written = 0
+
+  for (const part of parts) {
+    gzip.set(part, written)
+    written += part.length
+  }
+
+  return gzip
 }
 
 // The size of each body kay made whole, so compression judges it and reads it without a stream: opening a reader on a body costs Bun about 6 µs, more than a small response costs in all.

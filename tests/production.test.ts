@@ -842,7 +842,7 @@ describe('compression', () => {
     expect(await ok.text()).toBe('ok')
   })
 
-  it('splices fixed texts into the gzip of a page, wherever they sit, and compresses anything else as before', async () => {
+  it('splices fixed texts into the gzip of a page, wherever they sit and however much lies around them, and compresses anything else as before', async () => {
     const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
     const a = `<style>.a{color:red}${'.x{margin:0}'.repeat(40)}</style>`
     const b = `<style>.b{color:blue}${'.y{padding:0}'.repeat(40)}</style>`
@@ -857,8 +857,8 @@ describe('compression', () => {
 
     expect(fixed).toHaveLength(2)
 
-    // Side by side, leading, trailing, alone, twice, and in another order than given.
-    for (const page of [`<head>${a}${b}</head>${text}`, `${a}${text}`, `${text}${b}`, a, `${a}${text}${a}`, `${b}${a}`]) {
+    // Side by side, leading, trailing, alone, twice, in another order than given, and around more than deflates on the main thread.
+    for (const page of [`<head>${a}${b}</head>${text}`, `${a}${text}`, `${text}${b}`, a, `${a}${text}${a}`, `${b}${a}`, `${a}${text.repeat(200)}${b}`]) {
       const response = await send(page, 'br, gzip')
 
       expect(response.headers.get('content-encoding')).toBe('gzip')
