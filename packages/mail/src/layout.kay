@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import settings from './settings'
 
-const { preheader, footer } = props<{ preheader?: string, footer?: JSX.Element }>()
+const { preheader, footer } = props<{ preheader?: string | undefined, footer?: JSX.Element }>()
 ---
 div(style={`background:${settings.background};padding:24px 12px;font-family:${settings.font};color:${settings.text}`})
   if preheader

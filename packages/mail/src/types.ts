@@ -6,21 +6,21 @@ export type Address = string | { name: string, address: string }
 export interface Attachment {
   filename: string
   content: string | Uint8Array
-  contentType?: string
+  contentType?: string | undefined
   // Lets the html show it inline as `img(src="cid:<cid>")`.
-  cid?: string
+  cid?: string | undefined
 }
 
 export interface Envelope {
   to: Address | Address[]
-  cc?: Address | Address[]
-  bcc?: Address | Address[]
-  replyTo?: Address
+  cc?: Address | Address[] | undefined
+  bcc?: Address | Address[] | undefined
+  replyTo?: Address | undefined
   // The mailer's own address unless given; another domain than the server's fails SPF and DKIM, so a visitor's address goes in `replyTo`.
-  from?: Address
+  from?: Address | undefined
   subject: string
-  headers?: Record<string, string>
-  attachments?: Attachment[]
+  headers?: Record<string, string> | undefined
+  attachments?: Attachment[] | undefined
 }
 
 // A `.kay` component renders the html, given its props unless it takes none required; `text` replaces the one written from the html.
@@ -28,14 +28,14 @@ export type ViewContent<P extends object> = { view: (props: P) => JSX.Element, t
 
 export interface HtmlContent {
   html: string
-  text?: string
-  view?: never
+  text?: string | undefined
+  view?: never | undefined
 }
 
 export interface TextContent {
   text: string
-  html?: never
-  view?: never
+  html?: never | undefined
+  view?: never | undefined
 }
 
 export type Message<P extends object = object> = Envelope & (ViewContent<P> | HtmlContent | TextContent)
@@ -46,9 +46,9 @@ export interface Mail {
   to: Address[]
   cc: Address[]
   bcc: Address[]
-  replyTo?: Address
+  replyTo?: Address | undefined
   subject: string
-  html?: string
+  html?: string | undefined
   text: string
   headers: Record<string, string>
   attachments: Attachment[]
@@ -56,10 +56,10 @@ export interface Mail {
 
 // What the server answered: the addresses it took and refused, and its last reply.
 export interface Delivery {
-  messageId?: string
+  messageId?: string | undefined
   accepted: string[]
   rejected: string[]
-  response?: string
+  response?: string | undefined
 }
 
 export interface Transport {

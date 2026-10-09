@@ -8,7 +8,7 @@ export interface Received {
 
 interface Session {
   buffer: string
-  mail?: Received
+  mail?: Received | undefined
   reading: boolean
 }
 

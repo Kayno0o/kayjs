@@ -12,17 +12,17 @@ import { htmlToText } from './text'
 
 export interface MailerOptions {
   // The address mails are sent from unless one says otherwise, `SMTP_FROM` when left out.
-  from?: Address
+  from?: Address | undefined
   // The name shown beside a bare `SMTP_FROM`, so the environment holds the address alone.
-  fromName?: string
+  fromName?: string | undefined
   // Where mails go: the outbox in development and under `bun test`, else SMTP configured from the environment.
-  transport?: Transport
+  transport?: Transport | undefined
   // The `lang` of the html document a mail's markup is wrapped in. `en` by default.
-  lang?: string
+  lang?: string | undefined
   // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are.
-  queue?: QueueOptions<Mail> & { name?: string }
+  queue?: QueueOptions<Mail> & { name?: string } | undefined
   // Lets a server lacking `SMTP_HOST` or `SMTP_FROM` boot anyway, each send then throwing `MailNotConfigured`, for a site whose mail can wait to be set up.
-  optional?: boolean
+  optional?: boolean | undefined
 }
 
 // Thrown by an `optional` mailer while the environment lacks what it needs to send, so a form can tell the visitor another way to reach the site.

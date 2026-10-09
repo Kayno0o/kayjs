@@ -5,13 +5,13 @@ import { createTransport } from 'nodemailer'
 export interface SmtpSettings {
   host: string
   // 465 by default, which speaks TLS from the start; any other port upgrades through STARTTLS.
-  port?: number
-  user?: string
-  pass?: string
+  port?: number | undefined
+  user?: string | undefined
+  pass?: string | undefined
   // The name the client greets the server with, best the sending domain: a container's hostname is none, and spam filters score a greeting as `[127.0.0.1]` against the mail.
-  name?: string
+  name?: string | undefined
   // How long a server may take to connect, greet or answer before the send fails. 10 seconds by default.
-  timeout?: Duration
+  timeout?: Duration | undefined
 }
 
 const DEFAULT_PORT = 465

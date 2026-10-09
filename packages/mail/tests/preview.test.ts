@@ -10,7 +10,10 @@ beforeAll(() => {
 })
 
 afterAll(() => {
-  process.env.NODE_ENV = saved
+  if (saved === undefined)
+    delete process.env.NODE_ENV
+  else
+    process.env.NODE_ENV = saved
 })
 
 beforeEach(() => outbox.clear())
