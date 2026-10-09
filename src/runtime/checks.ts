@@ -15,8 +15,8 @@ export interface IslandBrand { readonly [ISLAND]: true }
 // What an interactive component's default export is; only islands take `hydrate`.
 // What a static parent passes an island besides its props: when it hydrates, and whether it lives on across navigations, `persist` keeping it by its component, `persist="key"` by a key of its own.
 export interface IslandOptions {
-  hydrate?: HydrateWhen
-  persist?: boolean | string
+  hydrate?: HydrateWhen | undefined
+  persist?: boolean | string | undefined
 }
 
 export type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand
@@ -181,9 +181,9 @@ export type AwaitValue<T> = [Exclude<Extract<T, PromiseLike<unknown>>, { readonl
 // What a template's `await` block compiles to: the value, then a function per block.
 export interface AwaitProps<T> {
   value: T & AwaitValue<T>
-  pending?: () => JSX.Element
+  pending?: (() => JSX.Element) | undefined
   ready: (value: Awaited<T>) => JSX.Element
-  failed?: (error: unknown) => JSX.Element
+  failed?: ((error: unknown) => JSX.Element) | undefined
 }
 
 type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicElements[Tag] : Tag extends Component<infer Props> ? Props : Record<string, unknown>

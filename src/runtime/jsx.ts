@@ -83,15 +83,15 @@ type HandlerName<Name extends string> = `on${Name extends keyof EventWords ? Eve
 // A handler sees the element it is set on as `currentTarget`.
 export type EventHandler<Target, E extends Event> = (event: E & { currentTarget: Target, target: globalThis.Element }) => void
 
-type Handlers<Target, Events> = { [Name in keyof Events & string as HandlerName<Name>]?: Events[Name] extends Event ? EventHandler<Target, Events[Name]> : never }
+type Handlers<Target, Events> = { [Name in keyof Events & string as HandlerName<Name>]?: (Events[Name] extends Event ? EventHandler<Target, Events[Name]> : never) | undefined }
 
 // What every element takes, whatever its tag.
 interface CommonAttributes<Target> {
   'children'?: JSX.Element
-  'ref'?: (element: Target) => void
-  'innerHTML'?: string
-  'textContent'?: string
-  'innerText'?: string
+  'ref'?: ((element: Target) => void) | undefined
+  'innerHTML'?: string | undefined
+  'textContent'?: string | undefined
+  'innerText'?: string | undefined
   'class'?: ClassValue
   'style'?: StyleValue
   'id'?: AttributeValue
@@ -124,14 +124,14 @@ interface CommonAttributes<Target> {
   'itemtype'?: AttributeValue
   'writingsuggestions'?: AttributeValue
   // Animates the element in an island as an `if`, a `for` row or an `await` shows it and before it goes: `fade` adds `fade-enter-from`, `fade-enter-active`, `fade-enter-to`, and `fade-leave-` likewise.
-  'transition'?: string
+  'transition'?: string | undefined
   // Classes of each phase besides or instead of the named ones, Tailwind's included: `enter` and `leave` throughout, `-from` for the first frame, `-to` after it.
-  'transition:enter'?: string
-  'transition:enter-from'?: string
-  'transition:enter-to'?: string
-  'transition:leave'?: string
-  'transition:leave-from'?: string
-  'transition:leave-to'?: string
+  'transition:enter'?: string | undefined
+  'transition:enter-from'?: string | undefined
+  'transition:enter-to'?: string | undefined
+  'transition:leave'?: string | undefined
+  'transition:leave-from'?: string | undefined
+  'transition:leave-to'?: string | undefined
   [data: `data-${string}`]: AttributeValue
   [aria: `aria-${string}`]: AttributeValue
 }
@@ -155,7 +155,7 @@ interface SpelledAttributes {
 
 // kay's own, never written out: a `head` title marked `raw` is left out of `seo.titleTemplate`.
 interface KayAttributes {
-  title: { raw?: boolean }
+  title: { raw?: boolean | undefined }
 }
 
 type HtmlAttributes<Tag extends keyof HTMLElementTagNameMap> = CommonAttributes<HTMLElementTagNameMap[Tag]>
