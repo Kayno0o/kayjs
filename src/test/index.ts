@@ -58,8 +58,8 @@ type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : nev
 export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
-  // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser.
-  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string }) => Promise<Visit>
+  // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser. A `Visit` as `from` posts where its form does, from the URL the browser shows it at, the action's own for a page a refused post answered.
+  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
   call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit) => Promise<Success<ResultOf<Target>>>
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
@@ -171,6 +171,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return { url: path, status: current.status, headers: current.headers, html, ...readPage(html) }
   }
 
+  // The URL the browser shows a page at that answered a post in place: the one posted to.
+  const answeredAt = new WeakMap<Visit, string>()
   let server: Bun.Server<unknown> | undefined
   const opened = new Set<TestPage>()
 
@@ -253,7 +255,11 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     },
     visit: async (path, init = {}) => follow(await send(path, { headers: init.headers }), path, init.headers),
     submit: async (action, fields, init = {}) => {
-      const from = init.from ?? '/'
+      const page = typeof init.from === 'object' ? init.from : undefined
+      const from = typeof init.from === 'object' ? init.from.url : init.from ?? '/'
+      const target = page?.find('form').map(form => form.attributes.action).find(url => url !== undefined && new URL(url, ORIGIN).pathname.endsWith(action.url))
+      const url = target === undefined ? undefined : new URL(target, ORIGIN)
+      const posted = url === undefined ? action.url : url.pathname + url.search
       const form = new FormData()
 
       for (const [name, value] of Object.entries(fields as Record<string, FormValue | FormValue[] | undefined>)) {
@@ -263,13 +269,17 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         }
       }
 
-      const response = await send(action.url, {
+      const response = await send(posted, {
         method: 'POST',
-        headers: { origin: ORIGIN, referer: new URL(from, ORIGIN).href, ...init.headers },
+        headers: { origin: ORIGIN, referer: new URL((page && answeredAt.get(page)) ?? from, ORIGIN).href, ...init.headers },
         body: form,
       })
+      const visit = await follow(response, from, init.headers)
 
-      return follow(response, from, init.headers)
+      if (!response.headers.has('location'))
+        answeredAt.set(visit, posted)
+
+      return visit
     },
     call: async (action, input, init = {}) => {
       const { headers, body } = encodeCall(input)

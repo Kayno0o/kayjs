@@ -128,12 +128,10 @@ export function cookieLocale(request: Request): string | undefined {
   return new Bun.CookieMap(request.headers.get('cookie') ?? '').get(LOCALE_COOKIE) ?? undefined
 }
 
-// The locale an action runs in: its host's, its page's, as the Referer names it, or the visitor's preferred one.
-export function requestLocale(settings: LocaleSettings, request: Request): string {
+// The locale an action runs in: its host's, its page's, as the `Referer` or the form names it, or the visitor's preferred one.
+export function requestLocale(settings: LocaleSettings, request: Request, referer = request.headers.get('referer')): string {
   if (settings.hosts)
     return hostLocale(settings, request)
-
-  const referer = request.headers.get('referer')
 
   if (referer !== null && URL.canParse(referer) && new URL(referer).host === new URL(request.url).host) {
     const { locale } = splitLocale(settings, new URL(referer).pathname)

@@ -37,6 +37,7 @@ const SCRIPT = /<script(?! type="speculationrules")/
 const INLINE_SCRIPTS = /<script>([\s\S]*?)<\/script>/g
 const EVERY_INLINE_SCRIPT = /<script(?: type="speculationrules")?>([\s\S]*?)<\/script>/g
 const SPECULATION = /<script type="speculationrules">(.*?)<\/script>/
+const FORM_ACTION = /<form\b[^>]*\saction="([^"]*)"/
 // happy-dom swaps in its own Request, which Elysia cannot read headers from.
 const NativeRequest = Request
 
@@ -1106,6 +1107,30 @@ describe('failed actions', () => {
     expect(html).toContain('<base href="http://localhost/repo/">')
     expect(html).toContain('<p class="error">Write a title</p>')
     expect(html).toContain('<a href="/repo/todos/1">')
+  })
+
+  it('renders the page again for a post refused again from the page a refusal answered, and goes back to it once one goes through', async () => {
+    const mounted = new Elysia().use(await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false, security: false, base: '/repo' }))
+    // The browser shows the action's URL, so the next post sends it as its `Referer`, to where the page's form says, the mount point a proxy takes off.
+    const post = async (url: string, referer: string, title: string) => mounted.handle(new Request(new URL(url.replace('/repo/', '/'), 'http://localhost'), { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', referer }, body: new URLSearchParams({ title }) }))
+    const actionOf = (html: string) => FORM_ACTION.exec(html)![1]!.replaceAll('&amp;', '&')
+    const shown = 'http://localhost/repo/_kay/action/tests/fixtures/site/src/routes/index.kay/add'
+    const first = await post(ADD, 'http://localhost/repo/?sort=new', '')
+    const second = await post(actionOf(await first.text()), shown, '')
+    const html = await second.text()
+
+    expect(second.status).toBe(422)
+    expect(html).toContain('<base href="http://localhost/repo/?sort=new">')
+    expect(html).toContain('<p class="error">Write a title</p>')
+
+    const third = await post(actionOf(html), shown, '')
+    const through = await post(actionOf(await third.text()), shown, `Refused twice ${Bun.randomUUIDv7()}`)
+
+    expect(third.status).toBe(422)
+    expect(through.status).toBe(303)
+    expect(through.headers.get('location')).toBe('http://localhost/repo/?sort=new')
+    // A page on another site named in the action's URL is not one to go back to.
+    expect((await post(`${ADD}?kay_back=${encodeURIComponent('https://evil.example/')}`, 'http://localhost/repo/', `Elsewhere ${Bun.randomUUIDv7()}`)).headers.get('location')).toBe('http://localhost/repo/')
   })
 
   it('marks the success cookie Secure when the browser came over https, through a proxy too', async () => {

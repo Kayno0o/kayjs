@@ -56,14 +56,14 @@ describe('a form posting to an action', () => {
     expect(html).toContain('<p id="topic-problem">Too short</p>')
     expect(html).toContain('<input name="note" value="long" aria-invalid="true" aria-describedby="note-help busy-note-error">')
     expect(html).toContain('<p id="busy-note-error" class="note-error">Too long</p>')
-    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy" method="post" enctype="multipart/form-data">')
+    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy?kay_back=%2F" method="post" enctype="multipart/form-data">')
   })
 
   it('describes a form by its own message once the handler refused it', async () => {
     const { status, html } = await site.submit(busy, { topic: 'abc' }, { from: '/' })
 
     expect(status).toBe(503)
-    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy" method="post" enctype="multipart/form-data" aria-describedby="busy-error">')
+    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy?kay_back=%2F" method="post" enctype="multipart/form-data" aria-describedby="busy-error">')
     expect(html).toContain('<p id="busy-error" class="busy-error">Try later</p>')
     expect(html).toContain('<input name="topic" value="abc">')
   })

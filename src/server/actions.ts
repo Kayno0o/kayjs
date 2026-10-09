@@ -51,6 +51,10 @@ const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
 const POST_HEADERS = ['content-type', 'content-length', 'transfer-encoding', 'accept-encoding', 'x-kay-action', 'origin']
 const HTML = /^text\/html\b/
 const HEAD_START = /<head\b[^>]*>/i
+// The `action` of a form posting to an action, the site's `base` before it if any.
+const FORM_ACTION = /(<form\b[^>]*?\saction=")([^"]*\/_kay\/action\/[^"#]*)/gi
+// Names the page a refused post was answered with, on the forms that page holds: the browser then shows the action's URL, which their next post sends as its `Referer`.
+const BACK_PARAMETER = 'kay_back'
 
 // The top-level field of a validation path such as `/address/street`.
 const FIELD = /^\/([^/]*)/
@@ -257,7 +261,7 @@ export function inLocale<T>(request: Request, options: ActionOptions, run: () =>
   if (!options.i18n)
     return run()
 
-  const locale = requestLocale(options.i18n.settings, request)
+  const locale = requestLocale(options.i18n.settings, request, postedFrom(request) ?? null)
 
   return runInLocale(stateFor(options.i18n, locale, new URL(request.url).pathname, request), run)
 }
@@ -324,10 +328,20 @@ function isFormCall(request: Request): boolean {
   return request.headers.get('x-kay-action') === FORM_CALL
 }
 
-function backTo(request: Request): string {
+// The page a form post came from on this site: the one its form names when a refused post rendered it, else its `Referer`.
+function postedFrom(request: Request): string | undefined {
+  const named = new URL(request.url).searchParams.get(BACK_PARAMETER)
+  const back = named !== null && URL.canParse(named, request.url) ? new URL(named, request.url).href : null
   const referer = request.headers.get('referer')
 
-  return sameHost(request, referer) ? referer : '/'
+  if (sameHost(request, back))
+    return back
+
+  return sameHost(request, referer) ? referer : undefined
+}
+
+function backTo(request: Request): string {
+  return postedFrom(request) ?? '/'
 }
 
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
@@ -508,7 +522,14 @@ async function renderBack(app: Elysia, base: string, request: Request, headers: 
   answer.set('cache-control', 'private, no-store')
   answer.set(FAILURE_HEADER, '1')
 
-  return new Response(swapped ? html : html.replace(HEAD_START, tag => `${tag}<base href="${escapeAttribute(from.href)}">`), { status: flash.status, headers: answer })
+  return new Response(swapped ? html : backedForms(html, from).replace(HEAD_START, tag => `${tag}<base href="${escapeAttribute(from.href)}">`), { status: flash.status, headers: answer })
+}
+
+// Each form posting to an action names the page, so a post refused again renders it again, and one that goes through goes back to it.
+function backedForms(html: string, from: URL): string {
+  const back = encodeURIComponent(from.pathname + from.search)
+
+  return html.replace(FORM_ACTION, (_, start: string, url: string) => `${start}${url}${url.includes('?') ? '&amp;' : '?'}${BACK_PARAMETER}=${back}`)
 }
 
 // What the browser sent that a visit would send too, the post's body aside.

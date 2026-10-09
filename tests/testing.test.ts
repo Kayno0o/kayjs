@@ -98,6 +98,19 @@ describe('kay/test', () => {
     expect((await site.submit(add, { title: 'Tested without a server' })).html).toContain('Tested without a server</a></li>')
   })
 
+  it('submits again from the page a refused post answered, refused or not', async () => {
+    const failed = await site.submit(add, { title: '' }, { from: '/' })
+    const again = await site.submit(add, { title: '' }, { from: failed })
+
+    expect(again).toMatchObject({ url: '/', status: 422 })
+    expect(again.html).toContain('<p class="error">Write a title</p>')
+
+    const through = await site.submit(add, { title: 'Refused twice first' }, { from: await site.submit(add, { title: '' }, { from: again }) })
+
+    expect(through).toMatchObject({ url: '/', status: 200 })
+    expect(through.html).toContain('Refused twice first</a></li>')
+  })
+
   it('calls an action as an island does', async () => {
     const { promote, demote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as {
       promote: Action<{ name: string }, string>
