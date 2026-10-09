@@ -13,7 +13,7 @@ import { createProject } from '../src/new'
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/
 // Top-level imports of the Node modules a compiled server loads only once a feature needs them.
-const EAGER_BUILTINS = ['zlib', 'crypto', 'http'].flatMap(name => [`from "${name}"`, `from "node:${name}"`])
+const EAGER_BUILTINS = [...['zlib', 'crypto', 'http'].flatMap(name => [`from "${name}"`, `from "node:${name}"`]), 'from "bun:sqlite"']
 // A Postgres whose user may create databases, for the scaffolded app's tests: CI sets it, as pg-orm's own tests have one.
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
 const ACCENT_TEST = `import { GlobalRegistrator } from '@happy-dom/global-registrator'
@@ -407,7 +407,7 @@ describe('kay build --compile', () => {
 
       expect(report).toContain('compiled server in ')
       expect(code).toBe(0)
-      // Serving the build it embeds, it carries neither kay's compiler nor Babel, and loads zlib, crypto and http only once a feature needs them.
+      // Serving the build it embeds, it carries neither kay's compiler nor Babel, and loads zlib, crypto, http and SQLite only once a feature needs them.
       const executable = Buffer.from(await Bun.file(join(dir, 'server')).bytes())
 
       expect(executable.includes('compiler/codegen.ts')).toBe(false)
