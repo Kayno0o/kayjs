@@ -20,7 +20,7 @@ export interface MailerOptions {
   // The `lang` of the html document a mail's markup is wrapped in. `en` by default.
   lang?: string | undefined
   // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are.
-  queue?: QueueOptions<Mail> & { name?: string } | undefined
+  queue?: QueueOptions<Mail> & { name?: string | undefined } | undefined
   // Lets a server lacking `SMTP_HOST` or `SMTP_FROM` boot anyway, each send then throwing `MailNotConfigured`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }
