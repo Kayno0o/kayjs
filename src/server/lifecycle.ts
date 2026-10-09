@@ -4,6 +4,7 @@ import type { Duration } from '../runtime/duration'
 import process from 'node:process'
 import { logError } from '../build/sourcemap'
 import { durationSeconds } from '../runtime/duration'
+import { wholeResponse } from './compress'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
@@ -24,20 +25,20 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, config: HealthCon
 
   app.get(config.path ?? HEALTH_PATH, async ({ request }) => {
     if (lifecycle.draining)
-      return new Response('stopping', { status: 503, headers })
+      return wholeResponse('stopping', { status: 503, headers })
 
     try {
       if (config.check && await withTimeout(config.check()) === false)
-        return new Response('unhealthy', { status: 503, headers })
+        return wholeResponse('unhealthy', { status: 503, headers })
     }
     catch (error) {
       console.error(`kay: the health check failed for ${request.url}`)
       logError(error)
 
-      return new Response('unhealthy', { status: 503, headers })
+      return wholeResponse('unhealthy', { status: 503, headers })
     }
 
-    return new Response('ok', { headers })
+    return wholeResponse('ok', { headers })
   })
 }
 

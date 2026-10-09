@@ -110,14 +110,27 @@ async function compressBytes(bytes: Uint8Array, encoding: Encoding): Promise<Uin
   }
 }
 
+// The size of each body kay made whole, so compression judges it and reads it without a stream: opening a reader on a body costs Bun about 6 µs, more than a small response costs in all.
+const wholeSizes = new WeakMap<Response, number>()
+
+// A response whose body is a string or bytes, its size known to compression.
+export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: ResponseInit): Response {
+  const response = new Response(body, init)
+
+  wholeSizes.set(response, typeof body === 'string' ? Buffer.byteLength(body) : body.length)
+
+  return response
+}
+
 // The response compressed on the fly for a browser that takes brotli or gzip, or undefined when it is not worth it: already encoded, not text, too small, or asked to be left alone.
 // A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length; a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
 // A response left alone is answered synchronously: Elysia sends an empty body for a `mapResponse` promise resolving to undefined.
 export function compressResponse(request: Request, response: Response): Response | undefined | Promise<Response> {
   const { headers, status } = response
   const length = headers.get('content-length')
+  const size = length === null ? wholeSizes.get(response) : Number(length)
 
-  if (!response.body || request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (length !== null && Number(length) < MIN_SIZE))
+  if (!response.body || request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE))
     return undefined
 
   const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
@@ -129,7 +142,7 @@ export function compressResponse(request: Request, response: Response): Response
     return undefined
   }
 
-  return compressBody(response, response.body, encoding)
+  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding)
 }
 
 function varyOnEncoding(headers: Headers): void {
@@ -137,9 +150,9 @@ function varyOnEncoding(headers: Headers): void {
     headers.append('vary', 'accept-encoding')
 }
 
-async function compressBody({ headers, status, statusText }: Response, stream: ReadableStream<Uint8Array>, encoding: Encoding): Promise<Response> {
+async function compressBody({ headers, status, statusText }: Response, source: Response | ReadableStream<Uint8Array>, encoding: Encoding): Promise<Response> {
   // From here on the body is read off the response, so every path answers a new one.
-  const body = await readWithinTick(stream)
+  const body: ReadBody = source instanceof Response ? { whole: true, bytes: await source.bytes() } : await readWithinTick(source)
 
   if (body.whole && body.bytes.length < MIN_SIZE)
     return new Response(body.bytes, { status, statusText, headers })

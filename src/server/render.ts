@@ -21,7 +21,7 @@ import { localeState } from '../runtime/locale-state'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule } from './bundle'
-import { preferredEncoding } from './compress'
+import { preferredEncoding, wholeResponse } from './compress'
 import { cookieJar } from './cookies'
 import { DEV_PROBLEMS, LIVE_RELOAD, problemsBlock } from './dev'
 import { FLASH_COOKIE, handedOverFlash, readFlash } from './flash'
@@ -335,7 +335,8 @@ export function hasFlash(request: Request): boolean {
 function respond(rendering: Rendering, body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>): Response {
   rendering.writeCookies()
 
-  const response = new Response(body, { status: rendering.status, headers: rendering.headers })
+  const init = { status: rendering.status, headers: rendering.headers }
+  const response = body instanceof ReadableStream ? new Response(body, init) : wholeResponse(body, init)
 
   return rendering.base !== '' && !(body instanceof Uint8Array) ? rebaseHtml(response, rendering.base) : response
 }

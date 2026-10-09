@@ -857,6 +857,20 @@ describe('compression', () => {
     expect(response.headers.get('vary')).toBe('accept-encoding')
   })
 
+  it('judges a body kay made whole by its size, a small one left unread', async () => {
+    const { compressResponse, wholeResponse } = await import('../src/server/compress')
+    const request = new Request('http://localhost/', { headers: { 'accept-encoding': 'br' } })
+    const small = wholeResponse('ok', { headers: { 'content-type': 'text/plain' } })
+
+    expect(compressResponse(request, small)).toBeUndefined()
+    expect(small.bodyUsed).toBe(false)
+
+    const page = (await compressResponse(request, wholeResponse(`<p>${'é page '.repeat(100)}</p>`, { headers: { 'content-type': 'text/html' } })))!
+
+    expect(page.headers.get('content-encoding')).toBe('br')
+    expect(new TextDecoder().decode(brotliDecompressSync(await page.bytes()))).toBe(`<p>${'é page '.repeat(100)}</p>`)
+  })
+
   it('leaves responses alone unless compress is on', async () => {
     const app = await pages({ routes, prebuilt: false })
 

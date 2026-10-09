@@ -172,8 +172,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   // onRequest runs for every route of the app, its own included; a header the app set before is kept.
   if (security) {
+    const headers = Object.entries(security)
+
     app.onRequest(({ set }) => {
-      for (const [name, value] of Object.entries(security))
+      for (const [name, value] of headers)
         set.headers[name] ??= value
     })
   }

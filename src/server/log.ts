@@ -12,6 +12,14 @@ export interface RequestLog {
 
 export type RequestLogger = boolean | 'json' | ((entry: RequestLog) => void)
 
+// The path of a request's absolute URL, cut out rather than parsed: a request's URL comes normalized already, and parsing one costs more than logging it.
+function pathOf(url: string): string {
+  const start = url.indexOf('/', url.indexOf('//') + 2)
+  const query = url.indexOf('?', start)
+
+  return url.slice(start, query === -1 ? undefined : query)
+}
+
 // Logs one line per request to stdout, `GET /blog/hello 200 12ms`, or one JSON object with `json`, or hands each entry to a function; kay's own `/_kay/` routes and the health route are left out.
 // A hook, so it reaches the app's routes registered after `pages()`.
 export function logRequests(app: Elysia, logger: Exclude<RequestLogger, false>, healthPath?: string): void {
@@ -19,7 +27,7 @@ export function logRequests(app: Elysia, logger: Exclude<RequestLogger, false>, 
   const write = typeof logger === 'function' ? logger : logger === 'json' ? (entry: RequestLog) => console.log(JSON.stringify({ time: new Date().toISOString(), ...entry })) : (entry: RequestLog) => console.log(`${entry.method} ${entry.path} ${entry.status} ${entry.duration}ms`)
 
   app.onRequest(({ request }) => {
-    const { pathname } = new URL(request.url)
+    const pathname = pathOf(request.url)
 
     if (!pathname.startsWith(ASSET_PREFIX) && pathname !== healthPath)
       started.set(request, { at: performance.now(), method: request.method, path: pathname })
