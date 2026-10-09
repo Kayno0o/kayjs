@@ -784,6 +784,8 @@ describe('compression', () => {
       .get('/api/tiny', () => new Response('{}', { headers: { 'content-type': 'application/json', 'content-length': '2' } }))
       .get('/api/ok', () => new Response('ok', { headers: { 'content-type': 'text/plain' } }))
       .get('/api/raw', () => new Response('x'.repeat(1000), { headers: { 'content-type': 'text/plain', 'cache-control': 'no-transform' } }))
+      .get('/api/photo', () => new Response(new Uint8Array(1000), { headers: { 'content-type': 'image/webp' } }))
+      .get('/api/encoded', () => new Response('already', { headers: { 'content-type': 'text/css', 'content-encoding': 'br' } }))
     const fetch = async (path: string, encoding: string) => app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': encoding } }))
     const page = await fetch('/contact', 'gzip, deflate, br, zstd')
     const plain = await fetch('/contact', 'identity')
@@ -800,8 +802,15 @@ describe('compression', () => {
     expect(report.headers.get('content-encoding')).toBe('gzip')
     expect(report.headers.get('set-cookie')).toBe('seen=1')
     expect(JSON.parse(new TextDecoder().decode(Bun.gunzipSync(await report.bytes())))).toMatchObject({ rows: expect.any(Array) })
-    expect((await fetch('/api/tiny', 'br')).headers.get('content-encoding')).toBeNull()
-    expect((await fetch('/api/raw', 'br')).headers.get('content-encoding')).toBeNull()
+    expect(plain.headers.get('vary')).toBe('accept-encoding')
+
+    // Left alone, each keeps its body.
+    for (const [path, body] of [['/api/tiny', '{}'], ['/api/raw', 'x'.repeat(1000)], ['/api/photo', '\0'.repeat(1000)], ['/api/encoded', 'already']] as const) {
+      const response = await fetch(path, 'br')
+
+      expect(response.headers.get('content-encoding')).toBe(path === '/api/encoded' ? 'br' : null)
+      expect(await response.text()).toBe(body)
+    }
 
     // Too small to gain, its length unknown until read: sent as it is.
     const ok = await fetch('/api/ok', 'br')

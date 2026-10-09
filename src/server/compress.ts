@@ -26,6 +26,7 @@ const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manife
 // Statuses with no body to compress, or a partial one.
 const BODILESS = new Set([101, 204, 205, 206, 304])
 const NO_TRANSFORM = /\bno-transform\b/i
+const VARY_ENCODING = /\baccept-encoding\b/i
 
 // Writes a brotli and a gzip copy beside every compressible file under the directory, at the strongest levels since it happens once, at build time; a copy saving little is not written.
 export async function compressFiles(dir: string): Promise<void> {
@@ -111,21 +112,27 @@ async function compressBytes(bytes: Uint8Array, encoding: Encoding): Promise<Uin
 
 // The response compressed on the fly for a browser that takes brotli or gzip, or undefined when it is not worth it: already encoded, not text, too small, or asked to be left alone.
 // A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length; a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
-export async function compressResponse(request: Request, response: Response): Promise<Response | undefined> {
-  const { headers, status, statusText } = response
+// A response left alone is answered synchronously: Elysia sends an empty body for a `mapResponse` promise resolving to undefined.
+export function compressResponse(request: Request, response: Response): Response | undefined | Promise<Response> {
+  const { headers, status } = response
   const length = headers.get('content-length')
 
   if (!response.body || request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (length !== null && Number(length) < MIN_SIZE))
     return undefined
 
+  return compressBody(request, response, response.body)
+}
+
+async function compressBody(request: Request, { headers, status, statusText }: Response, stream: ReadableStream<Uint8Array>): Promise<Response> {
   // From here on the body is read off the response, so every path answers a new one.
-  const body = await readWithinTick(response.body)
+  const body = await readWithinTick(stream)
 
   if (body.whole && body.bytes.length < MIN_SIZE)
     return new Response(body.bytes, { status, statusText, headers })
 
   // Whatever the browser takes, a shared cache keeps one copy per encoding.
-  headers.append('vary', 'accept-encoding')
+  if (!VARY_ENCODING.test(headers.get('vary') ?? ''))
+    headers.append('vary', 'accept-encoding')
 
   const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
   const plain = () => new Response(body.whole ? body.bytes : body.stream, { status, statusText, headers })
