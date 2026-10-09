@@ -1,6 +1,7 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { loadComponents, loadLibraries } from '../docs/src/libraries'
 import { loadReference } from '../docs/src/reference'
 import { check } from '../src/check'
 import { renderMarkdown } from '../src/content/markdown'
@@ -46,6 +47,21 @@ describe('the documentation site', () => {
     expect(pages.find(page => page.slug === 'server')!.data.title).toBe('Locals, sessions and guards')
     expect(pages.flatMap(page => [...page.body.matchAll(LINK)].filter(([, path]) => path !== undefined))).toEqual([])
     expect(pages.find(page => page.slug === 'project')!.body).toContain('](/reference/server#locals)')
+  })
+
+  it('gives each library a page, and each kayjs-ui component one with its docs, its example and the props it declares', async () => {
+    const components = await loadComponents()
+    const button = components.find(component => component.slug === 'button')!
+    const props = new Map(button.data.props.map(prop => [prop.name, prop]))
+
+    expect((await loadLibraries()).map(library => library.slug)).toEqual(['kayjs-auth', 'kayjs-mail', 'kayjs-ui'])
+    expect(components.filter(component => component.data.section === undefined).map(component => component.slug)).toEqual([])
+    expect(button.data).toMatchObject({ title: 'Button', section: 'Icon, Button, IconButton', anchor: 'icon-button-iconbutton' })
+    expect(button.data.example).toContain('Button(label=')
+    expect(props.get('href')).toMatchObject({ type: 'string', optional: true })
+    expect(props.get('variant')).toMatchObject({ type: '"accent" | "danger" | "default"', default: '\'default\'' })
+    expect(props.has('disabled')).toBe(false)
+    expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => void')
   })
 
   it('passes kay check, and so does the tutorial\'s example app', async () => {

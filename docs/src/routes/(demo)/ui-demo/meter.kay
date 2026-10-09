@@ -1,0 +1,7 @@
+---
+import Meter from '@kaynooo/kayjs-ui/meter.kay'
+---
+.flex.max-w-sm.flex-col.gap-3
+  Meter(value={35} label="Memory")
+  Meter(value={82} label="Disk" fillClass="bg-kui-warning")
+  Meter(value={97} label="Quota" fillClass="bg-kui-error")

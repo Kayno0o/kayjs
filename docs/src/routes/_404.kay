@@ -1,8 +1,18 @@
+--- server
+import { navigation } from '../pages'
+
+const nav = await navigation()
+---
+---
+import Shell from '../components/shell.kay'
+import '../styles.css'
+---
 head
   title Not found · kay
-.page
-  header.page-head
-    p.eyebrow 404
-    h1 Not found
-  article.prose
-    p No page here. Search with #[kbd Ctrl K], or start from the #[a(href="/") home page].
+Shell(nav={nav} current="")
+  .page
+    header.page-head
+      p.eyebrow 404
+      h1 Not found
+    article.prose
+      p No page here. Search with #[kbd Ctrl K], or start from the #[a(href="/") home page].

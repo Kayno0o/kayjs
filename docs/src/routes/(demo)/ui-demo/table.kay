@@ -1,0 +1,36 @@
+---
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import type { Column, SortState } from '@kaynooo/kayjs-ui'
+
+interface Moon {
+  id: number
+  name: string
+  radius: number
+  discovered: number
+}
+
+const moons: Moon[] = [
+  { id: 1, name: 'Io', radius: 1822, discovered: 1610 },
+  { id: 2, name: 'Europa', radius: 1561, discovered: 1610 },
+  { id: 3, name: 'Amalthea', radius: 84, discovered: 1892 },
+  { id: 4, name: 'Himalia', radius: 70, discovered: 1904 },
+]
+
+const columns: Column<Moon>[] = [
+  { key: 'name', header: 'Name', sortValue: true, cell: true },
+  { key: 'radius', header: 'Radius (km)', sortValue: true, align: 'end' },
+  { key: 'discovered', header: 'Discovered', sortValue: moon => moon.discovered, defaultDirection: 'asc', align: 'end' },
+]
+
+const sort = signal<SortState>()
+---
+Table(columns={columns} rows={moons} rowKey={moon => moon.id} onSort={sort.set})
+  @cell(moon)
+    strong {moon.name}
+  @empty
+    EmptyState(title="No moons yet")
+if sort as current
+  p.mt-2.text-kui-subtext0 Sorted by {current.key}, {current.direction === 'asc' ? 'ascending' : 'descending'}.
+else
+  p.mt-2.text-kui-subtext0 Click a header to sort.

@@ -1,0 +1,9 @@
+---
+import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
+import type { RangeValue } from '@kaynooo/kayjs-ui'
+
+const hours = signal<RangeValue>([2, null])
+---
+.flex.flex-col.items-start.gap-2
+  RangeInput(label="Hours" min={0} max={24} unit="h" value={hours} onChange={hours.set})
+  p.text-kui-subtext0 From {hours[0] ?? 'any'} to {hours[1] ?? 'any'}.

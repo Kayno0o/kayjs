@@ -1,0 +1,11 @@
+---
+import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
+
+const rows = [
+  { key: 'fr', label: 'France', value: 420, display: '420 visits' },
+  { key: 'de', label: 'Germany', value: 260, display: '260 visits' },
+  { key: 'jp', label: 'Japan', value: 120, display: '120 visits' },
+]
+---
+.max-w-md
+  BarList(rows={rows})

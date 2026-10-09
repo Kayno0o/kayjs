@@ -1,0 +1,8 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+---
+.flex.flex-wrap.gap-2
+  Button(label="Success" onClick={() => toast.success('Saved')})
+  Button(label="Error" onClick={() => toast.error('Could not save')})
+  Button(label="Info" onClick={() => toast.info('Copied')})

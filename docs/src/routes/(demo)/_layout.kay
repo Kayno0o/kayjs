@@ -1,0 +1,10 @@
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import '../../ui-demo.css'
+---
+head
+  meta(name="robots" content="noindex")
+slot
+Toaster
+TooltipHost

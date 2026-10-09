@@ -1,0 +1,8 @@
+---
+import Select from '@kaynooo/kayjs-ui/select.kay'
+
+const kind = signal('')
+---
+.flex.max-w-sm.flex-col.gap-2
+  Select(value={kind} options={[{ value: 'post', label: 'Post' }, { value: 'page', label: 'Page' }, { value: 'note', label: 'Note' }]} onChange={kind.set} emptyOption="Any kind" aria-label="Kind")
+  p.text-kui-subtext0 Kind: {kind || 'any'}.

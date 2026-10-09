@@ -1,0 +1,4 @@
+---
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+---
+CopyButton(text="bun add @kaynooo/kayjs-ui" label="Copy the install command")

@@ -1,14 +1,14 @@
 ---
 import { memo, signal } from 'kay'
 
-const { topics, current } = props<{ topics: { href: string, title: string }[], current: string }>()
+const { links, current, label } = props<{ links: { href: string, title: string }[], current: string, label: string }>()
 const query = signal('')
-const shown = memo(() => topics.filter(topic => topic.title.toLowerCase().includes(query().trim().toLowerCase())))
+const shown = memo(() => links.filter(link => link.title.toLowerCase().includes(query().trim().toLowerCase())))
 ---
-input(type="search" aria-label="Filter the reference" placeholder="Filter" bind:value={query})
+input(type="search" aria-label={label} placeholder="Filter" bind:value={query})
 ul
-  for topic of shown key={topic.href}
+  for link of shown key={link.href}
     li
-      a(href={topic.href} aria-current={topic.href === current ? 'page' : undefined}) {topic.title}
+      a(href={link.href} aria-current={link.href === current ? 'page' : undefined}) {link.title}
   else
     li.none Nothing matches

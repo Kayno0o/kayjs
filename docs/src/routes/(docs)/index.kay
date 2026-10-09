@@ -1,6 +1,6 @@
 --- server
-import { guides, reference } from '../content.config'
-import { FORGE } from '../pages'
+import { guides, reference } from '../../content.config'
+import { FORGE } from '../../pages'
 
 const overview = await reference.get('overview') ?? ctx.notFound()
 const { Content } = overview
@@ -10,8 +10,8 @@ const topic = (await reference.all()).find(entry => entry.slug !== 'overview')
 const next = first && { href: `/guides/${first.slug}`, title: first.data.title }
 ---
 ---
-import Pager from '../components/pager.kay'
-import Toc from '../components/toc.kay'
+import Pager from '../../components/pager.kay'
+import Toc from '../../components/toc.kay'
 ---
 head
   title kay

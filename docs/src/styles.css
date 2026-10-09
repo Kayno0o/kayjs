@@ -676,6 +676,50 @@ pre code {
   font-size: inherit;
 }
 
+/* A kayjs-ui component's page: its example running in a frame over its source, then its props. */
+.import {
+  margin: 0.75rem 0 0;
+}
+
+.covered,
+.spread {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.example {
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.demo {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  border: none;
+  background: var(--mantle);
+}
+
+.example .code {
+  border-radius: 0;
+}
+
+.props td:first-child {
+  white-space: nowrap;
+}
+
+.required {
+  margin-left: 0.4rem;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+}
+
+.prop-comment {
+  margin: 0.3rem 0 0;
+  color: var(--subtext);
+}
+
 .page-foot {
   margin-top: 4rem;
 }

@@ -1,0 +1,9 @@
+---
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Pencil from '~icons/tabler/pencil'
+---
+.flex.flex-wrap.items-center.gap-2
+  IconButton(icon="plus" label="Add" variant="solid")
+  IconButton(icon={Pencil} label="Edit" variant="ghost")
+  IconButton(icon="delete" label="Delete" variant="danger")
+  IconButton(icon="close" label="Close" size="sm")

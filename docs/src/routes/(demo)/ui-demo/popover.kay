@@ -1,0 +1,13 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Popover from '@kaynooo/kayjs-ui/popover.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+---
+.h-40
+  Popover(placement="bottom-start")
+    @trigger(attributes)
+      IconButton({...attributes} icon="plus" label="More")
+    .flex.flex-col.gap-1.p-2
+      Button(label="Duplicate" onClick={() => toast.info('Duplicated')})
+      Button(label="Archive" onClick={() => toast.info('Archived')})

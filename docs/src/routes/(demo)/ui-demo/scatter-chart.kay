@@ -1,0 +1,13 @@
+---
+import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
+
+const points = [
+  { key: 'a', label: 'Outer Wilds', x: 22, y: 95, weight: 3 },
+  { key: 'b', label: 'Celeste', x: 9, y: 90, weight: 2 },
+  { key: 'c', label: 'Hades', x: 60, y: 92, weight: 4 },
+  { key: 'd', label: 'A long one', x: 140, y: 61, weight: 1 },
+  { key: 'e', label: 'A short one', x: 3, y: 55, weight: 1 },
+]
+---
+.max-w-xl
+  ScatterChart(label="Games" points={points} x={{ label: 'Hours', scale: 'log' }} y={{ label: 'Score', domain: [0, 100] }} quadrant={{ x: 20, y: 80 }} corners={{ topRight: 'Long and loved', topLeft: 'Short and sweet' }})

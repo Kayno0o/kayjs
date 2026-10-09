@@ -1,0 +1,12 @@
+---
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+
+const tabs = [{ value: 'details', label: 'Details' }, { value: 'reviews', label: 'Reviews' }]
+const shown = signal('details')
+---
+Tabs(tabs={tabs} value={shown} label="Product" onChange={shown.set})
+  @panel(tab)
+    if tab === 'details'
+      p A telescope with a 70 mm lens.
+    else
+      p Rated 4.6 out of 5 by 120 buyers.

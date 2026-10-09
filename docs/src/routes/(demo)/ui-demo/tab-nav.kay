@@ -1,0 +1,6 @@
+---
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+
+const links = [{ href: '/ui-demo/tab-nav', label: 'Profile' }, { href: '/ui-demo/tab-nav/keys', label: 'Keys' }, { href: '/ui-demo/tab-nav/sessions', label: 'Sessions' }]
+---
+TabNav(links={links} current="/ui-demo/tab-nav" label="Settings")

@@ -1,6 +1,6 @@
 --- server
-import { guides } from '../../content.config'
-import { FORGE, neighbours } from '../../pages'
+import { guides } from '../../../content.config'
+import { FORGE, neighbours } from '../../../pages'
 
 export const prerender = guides
 
@@ -10,8 +10,8 @@ const sections = guide.headings.filter(heading => heading.depth === 2 || heading
 const { previous, next } = neighbours(await guides.all(), guide.slug, slug => `/guides/${slug}`)
 ---
 ---
-import Pager from '../../components/pager.kay'
-import Toc from '../../components/toc.kay'
+import Pager from '../../../components/pager.kay'
+import Toc from '../../../components/toc.kay'
 ---
 head
   title {guide.data.title} · kay

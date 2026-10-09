@@ -2,6 +2,7 @@
   "name": "kay-docs",
   "private": true,
   "devDependencies": {
-    "@iconify-json/tabler": "^1.2.41"
+    "@iconify-json/tabler": "^1.2.41",
+    "@kaynooo/kayjs-ui": "^0.4.17"
   }
 }

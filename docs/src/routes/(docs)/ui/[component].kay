@@ -1,0 +1,68 @@
+--- server
+import { highlightCode } from 'kay/content'
+import { components, libraries } from '../../../content.config'
+import { highlight } from '../../../highlight'
+import { neighbours } from '../../../pages'
+
+export const prerender = components
+
+const component = await components.get(ctx.params.component) ?? ctx.notFound()
+const { Content } = component
+const { title, section, anchor, example, props } = component.data
+const version = (await libraries.get('kayjs-ui'))?.data.version
+const source = example === undefined ? undefined : await highlightCode(example.trimEnd(), 'kay', { highlight })
+const sections = [
+  ...component.headings.filter(heading => heading.depth === 2 || heading.depth === 3),
+  ...example === undefined ? [] : [{ id: 'example', text: 'Example', depth: 2 }],
+  { id: 'props', text: 'Props', depth: 2 },
+]
+const { previous, next } = neighbours(await components.all(), component.slug, slug => `/ui/${slug}`)
+---
+---
+import Demo from '../../../components/demo.kay'
+import Pager from '../../../components/pager.kay'
+import Toc from '../../../components/toc.kay'
+---
+head
+  title {title} · kayjs-ui
+.page
+  header.page-head
+    p.eyebrow kayjs-ui · {version}
+    h1 {title}
+    p.import: code import {title} from '@kaynooo/kayjs-ui/{component.slug}.kay'
+  Toc(sections={sections})
+  article.prose
+    if section as heading
+      p.covered Documented with #[a(href={`/libraries/kayjs-ui#${anchor}`}) {heading}].
+    Content
+    if source as html
+      h2#example: a(href="#example") Example
+      .example
+        Demo(src={`/ui-demo/${component.slug}`} title={`${title} example`})
+        div(innerHTML={html})
+    h2#props: a(href="#props") Props
+    if props.length > 0
+      table.props
+        thead
+          tr
+            th Prop
+            th Type
+            th Default
+        tbody
+          for prop of props key={prop.name}
+            tr
+              td
+                code {prop.name}
+                if !prop.optional && prop.default === undefined
+                  span.required required
+              td
+                code {prop.type}
+                if prop.comment as comment
+                  p.prop-comment {comment}
+              td
+                if prop.default as value
+                  code {value}
+      p.spread Attributes it does not declare go onto its root element, #[code id], #[code aria-*] and #[code data-*] included.
+    else
+      p It takes no props.
+  Pager(previous={previous} next={next} source={`https://git.kaynooo.fr/kaynooo/kayjs-ui/src/branch/main/src/${component.slug}.kay`})

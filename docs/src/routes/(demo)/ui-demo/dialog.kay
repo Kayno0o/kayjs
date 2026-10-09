@@ -1,0 +1,13 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+
+const editing = signal(false)
+---
+.min-h-80
+  Button(label="Rename" onClick={() => editing.set(true)})
+  Dialog(open={editing} title="Rename" onClose={() => editing.set(false)})
+    @footer
+      Button(label="Cancel" onClick={() => editing.set(false)})
+      Button(label="Rename" variant="accent" onClick={() => editing.set(false)})
+    input.kui-field-input(name="name" aria-label="Name")

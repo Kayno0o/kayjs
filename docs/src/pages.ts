@@ -1,3 +1,5 @@
+import { components, guides, libraries, reference } from './content.config'
+
 export interface PageLink {
   href: string
   title: string
@@ -17,4 +19,21 @@ export function neighbours(entries: { slug: string, data: { title: string } }[],
   }
 
   return { previous: at > 0 ? link(at - 1) : undefined, next: link(at + 1) }
+}
+
+export interface Navigation {
+  guides: PageLink[]
+  reference: PageLink[]
+  libraries: PageLink[]
+  components: PageLink[]
+}
+
+// The sidebar's links, every page but the overview, which the brand links.
+export async function navigation(): Promise<Navigation> {
+  return {
+    guides: (await guides.all()).map(guide => ({ href: `/guides/${guide.slug}`, title: guide.data.title })),
+    reference: (await reference.all()).filter(topic => topic.slug !== 'overview').map(topic => ({ href: topicHref(topic.slug), title: topic.data.title })),
+    libraries: (await libraries.all()).map(library => ({ href: `/libraries/${library.slug}`, title: library.data.title })),
+    components: (await components.all()).map(component => ({ href: `/ui/${component.slug}`, title: component.data.title })),
+  }
 }

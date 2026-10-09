@@ -1,6 +1,6 @@
 --- server
-import { reference } from '../../content.config'
-import { FORGE, neighbours, topicHref } from '../../pages'
+import { reference } from '../../../content.config'
+import { FORGE, neighbours, topicHref } from '../../../pages'
 
 export const prerender = reference
 
@@ -10,8 +10,8 @@ const sections = topic.headings.filter(heading => heading.depth === 2 || heading
 const { previous, next } = neighbours(await reference.all(), topic.slug, topicHref)
 ---
 ---
-import Pager from '../../components/pager.kay'
-import Toc from '../../components/toc.kay'
+import Pager from '../../../components/pager.kay'
+import Toc from '../../../components/toc.kay'
 ---
 head
   title {topic.data.title} · kay

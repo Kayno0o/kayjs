@@ -1,0 +1,16 @@
+---
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import type { MenuEntry } from '@kaynooo/kayjs-ui'
+import Pencil from '~icons/tabler/pencil'
+
+const picked = signal('nothing yet')
+const items: MenuEntry[] = [
+  { label: 'Rename', icon: Pencil, onSelect: () => picked.set('Rename') },
+  { label: 'Duplicate', onSelect: () => picked.set('Duplicate') },
+  'separator',
+  { label: 'Delete', icon: 'delete', danger: true, onSelect: () => picked.set('Delete') },
+]
+---
+.flex.h-48.items-start.gap-3
+  Menu(label="Actions" icon="plus" items={items})
+  p.text-kui-subtext0 Picked: {picked}.

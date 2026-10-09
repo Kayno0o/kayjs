@@ -1,0 +1,38 @@
+---
+import type { Navigation } from '../pages'
+import Menu from '~icons/tabler/menu-2'
+import CodeCopy from './code-copy.kay'
+import LinkFilter from './link-filter.kay'
+import Search from './search.kay'
+
+const { nav, current } = props<{ nav: Navigation, current: string }>()
+---
+a.skip-link(href="#content") Skip to the content
+.shell
+  aside.side
+    header.bar
+      a.brand(href="/")
+        img(src="/icon-192.png" alt="" width="28" height="28")
+        span kay
+      Search(persist)
+      button.menu(type="button" popovertarget="sidebar")
+        Menu
+        | Menu
+    nav#sidebar.sidebar(popover aria-label="Documentation")
+      p.group Guides
+      ul
+        for link of nav.guides key={link.href}
+          li
+            a(href={link.href}) {link.title}
+      p.group Reference
+      LinkFilter(links={nav.reference} current={current} label="Filter the reference")
+      p.group Libraries
+      ul
+        for link of nav.libraries key={link.href}
+          li
+            a(href={link.href}) {link.title}
+      p.group kayjs-ui components
+      LinkFilter(links={nav.components} current={current} label="Filter the components")
+  main#content
+    slot
+CodeCopy(persist)

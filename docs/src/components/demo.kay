@@ -1,0 +1,22 @@
+---
+import { onCleanup, signal } from 'kay'
+
+const { src, title } = props<{ src: string, title: string }>()
+const height = signal(120)
+let observer: ResizeObserver | undefined
+
+// The example page is of this site, so the frame grows to whatever it renders, and again as it changes.
+function measure(frame: HTMLIFrameElement) {
+  const body = frame.contentDocument?.body
+
+  if (!body)
+    return
+
+  observer?.disconnect()
+  observer = new ResizeObserver(() => height.set(Math.ceil(body.getBoundingClientRect().height)))
+  observer.observe(body)
+}
+
+onCleanup(() => observer?.disconnect())
+---
+iframe.demo(src={src} title={title} loading="lazy" style={`height: ${height}px`} onLoad={event => measure(event.currentTarget)})

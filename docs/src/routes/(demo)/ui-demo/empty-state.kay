@@ -1,0 +1,4 @@
+---
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+---
+EmptyState(title="No posts yet" description="Write the first one, and it shows here.")
