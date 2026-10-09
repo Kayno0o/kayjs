@@ -1,7 +1,7 @@
 import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, describedByOf, formFieldOf, SERVER_ISLAND_ATTRIBUTE } from './ast'
+import { actionOf, describedByOf, formFieldOf, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
 import { childItems, soleDynamic } from './items'
@@ -699,7 +699,7 @@ export class DomTemplate {
       const name = this.source(attribute.name)
 
       // Inside an island a server island is a component as any other.
-      if (element.component && name === SERVER_ISLAND_ATTRIBUTE)
+      if (marksServerIsland(element, name, this.src))
         continue
 
       if (attribute.kind === 'boolean')

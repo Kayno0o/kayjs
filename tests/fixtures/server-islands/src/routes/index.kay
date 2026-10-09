@@ -1,7 +1,12 @@
 --- server
+import { t } from 'elysia'
+import { action } from 'kay'
 import { stamp } from '../renders'
 
+export const send = action(t.Object({ stamp: t.String({ pattern: '^stamp-' }) }), async () => 'sent')
+
 const current = stamp()
+const failure = ctx.failed(send)
 ---
 ---
 import Contact from '../components/contact.kay'
@@ -10,6 +15,8 @@ import Stamped from '../components/stamped.kay'
 ---
 h1 Home
 Hero
-Stamped(server stamp={current})
+Stamped(server stamp={current} to={send})
+if failure
+  p.failed Not sent
 Contact(stamp={current})
 p.after After

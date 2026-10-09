@@ -1,7 +1,9 @@
 ---
-const { stamp } = props<{ stamp: string }>()
+import type { Action } from 'kay'
+
+const { stamp, to = '/contact' } = props<{ stamp: string, to?: string | Action<{ stamp: string }, unknown> }>()
 ---
-form(method="post" action="/contact")
+form(method="post" action={to})
   input(type="hidden" name="stamp" value={stamp})
   button(type="submit" formaction="/elsewhere") Send
   p.stamp {stamp}

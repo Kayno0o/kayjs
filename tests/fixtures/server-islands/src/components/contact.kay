@@ -6,4 +6,4 @@ const { stamp } = props<{ stamp: string }>()
 ---
 Section(title="Contact")
   p Write to us
-  Stamped(server="defer" stamp={stamp})
+  Stamped(server="defer" noscript="Show the form" stamp={stamp})

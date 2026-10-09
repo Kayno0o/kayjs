@@ -1,7 +1,7 @@
 import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, describedByOf, formFieldOf, SERVER_ISLAND_ATTRIBUTE, serverIslandOf } from './ast'
+import { actionOf, describedByOf, formFieldOf, marksServerIsland, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
@@ -709,6 +709,11 @@ export class HtmlTemplate {
     if (island)
       b.add(`, ${JSON.stringify(island.mode ?? 'inline')}`)
 
+    if (island?.noscript?.kind === 'static')
+      b.add(`, ${JSON.stringify(decodeEntities(island.noscript.text))}`)
+    else if (island?.noscript?.kind === 'expression')
+      b.add(', (').addSource(island.noscript.expression).add(')')
+
     b.add('))')
   }
 
@@ -766,7 +771,7 @@ export class HtmlTemplate {
 
       const name = this.source(attribute.name)
 
-      if (element.component ? name === SERVER_ISLAND_ATTRIBUTE : BEHAVIOUR.test(name))
+      if (element.component ? marksServerIsland(element, name, this.src) : BEHAVIOUR.test(name))
         continue
 
       separate()

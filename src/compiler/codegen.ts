@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { LintName } from './lints'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
@@ -979,11 +979,15 @@ class Generator {
     })
   }
 
-  private checkServerIsland({ attribute, mode }: NonNullable<ReturnType<typeof serverIslandOf>>): void {
+  private checkServerIsland({ attribute, mode, noscript }: ServerIslandMark): void {
     if (this.options.island !== undefined || this.options.insideIsland)
       this.error(attribute.name, '`server` has no effect inside an island', { note: 'an island renders in the browser too, as a whole' })
     else if (mode === undefined)
       this.error(attribute.name, '`server` takes no value, or "defer"', { help: '`server` renders it per request inside the prerendered page, `server="defer"` once the browser fetches it on approach' })
+    else if (noscript && mode !== 'defer')
+      this.error(noscript.name, '`noscript` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it needs no JavaScript' })
+    else if (noscript?.kind === 'boolean')
+      this.error(noscript.name, '`noscript` takes the text of its link', { help: 'such as `noscript="Show the contact form"`' })
   }
 
   private emitAttributes(element: ElementNode) {
@@ -1018,6 +1022,14 @@ class Generator {
 
       if (attribute === serverIsland?.attribute) {
         this.checkServerIsland(serverIsland)
+
+        continue
+      }
+
+      // Not a prop: what it reads is checked on its own.
+      if (attribute === serverIsland?.noscript) {
+        if (attribute.kind === 'expression')
+          b.add(' {...(void (').addSource(attribute.expression).add('), {})}')
 
         continue
       }

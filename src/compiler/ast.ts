@@ -143,21 +143,41 @@ export function actionOf(element: ElementNode, source: string): Extract<Attribut
 // `Card(server)` renders per request inside a prerendered page, `Card(server="defer")` once the browser fetches it on approach.
 export const SERVER_ISLAND_ATTRIBUTE = 'server'
 export const SERVER_ISLAND_MODES = new Set(['defer'])
+// Beside `server="defer"`, the text of a link to the page with the island in place, for a browser without JavaScript.
+export const SERVER_ISLAND_NOSCRIPT = 'noscript'
 
-// The mark making a component call a server island, with how it renders: undefined for a value no mode answers to.
-export function serverIslandOf(element: ElementNode, source: string): { attribute: NamedAttribute, mode: 'inline' | 'defer' | undefined } | undefined {
+export interface ServerIslandMark {
+  attribute: NamedAttribute
+  // Undefined for a value no mode answers to.
+  mode: 'inline' | 'defer' | undefined
+  noscript: NamedAttribute | undefined
+}
+
+// The mark making a component call a server island, with how it renders.
+export function serverIslandOf(element: ElementNode, source: string): ServerIslandMark | undefined {
   if (!element.component)
     return undefined
 
-  const attribute = element.attributes.find((candidate): candidate is NamedAttribute => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === SERVER_ISLAND_ATTRIBUTE)
+  const named = (name: string) => element.attributes.find((candidate): candidate is NamedAttribute => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === name)
+  const attribute = named(SERVER_ISLAND_ATTRIBUTE)
 
   if (!attribute)
     return undefined
 
-  if (attribute.kind === 'boolean')
-    return { attribute, mode: 'inline' }
+  const noscript = named(SERVER_ISLAND_NOSCRIPT)
 
-  return { attribute, mode: attribute.kind === 'static' && SERVER_ISLAND_MODES.has(attribute.text) ? attribute.text as 'defer' : undefined }
+  if (attribute.kind === 'boolean')
+    return { attribute, mode: 'inline', noscript }
+
+  return { attribute, mode: attribute.kind === 'static' && SERVER_ISLAND_MODES.has(attribute.text) ? attribute.text as 'defer' : undefined, noscript }
+}
+
+// Whether an attribute of a component call belongs to its server island mark rather than to its props.
+export function marksServerIsland(element: ElementNode, name: string, source: string): boolean {
+  if (name === SERVER_ISLAND_ATTRIBUTE)
+    return element.component
+
+  return name === SERVER_ISLAND_NOSCRIPT && serverIslandOf(element, source) !== undefined
 }
 
 // Every element of a template, nested ones included, in source order.

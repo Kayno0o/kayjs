@@ -24,7 +24,7 @@ Each topic is a file of its own: read the one a task touches before writing code
 - [Head and site metadata](llms/head.md): `head` in templates, site-wide SEO defaults and social cards, sitemap and robots.txt, favicon and web manifest, offline service worker, self-hosted fonts
 - [Styles and assets](llms/styles-and-assets.md): component styles and Tailwind, `public/`, imported images, fonts and files, responsive images, Iconify icons
 - [Islands and navigation](llms/islands.md): what runs in the browser: islands, shared and persisted state, transitions, error fallbacks, context, unique ids, browser-only components, and in-place page navigation
-- [Pages and routing](llms/routing.md): file-based routes, params, layouts, the server fence and `ctx`, prerendering, redirects, rewrites, base path, static export
+- [Pages and routing](llms/routing.md): file-based routes, params, layouts, the server fence and `ctx`, prerendering and server islands, redirects, rewrites, base path, static export
 - [Content collections](llms/content.md): Markdown, JSON and YAML collections read against a schema, loaders for a CMS or a database, preview mode for drafts
 - [Locales](llms/locales.md): i18n: locale prefixes, typed messages, number and date formatting, redirecting a visitor to their locale
 - [Caching and streaming](llms/rendering.md): caching rendered pages and data, streaming deferred values with `await` blocks, `renderToString` for mails and feeds

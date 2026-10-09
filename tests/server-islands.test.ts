@@ -15,7 +15,8 @@ import { renders } from './fixtures/server-islands/src/renders'
 const routes = 'tests/fixtures/server-islands/src/routes'
 const STAMP = /<p class="stamp">(stamp-\d+)<\/p>/g
 const INLINE = '<!--kay-server:0--><!--/kay-server:0-->'
-const DEFERRED = /<!--kay-server:1--><slot data-kay-server="1" inert>[\s\S]*?<\/slot><!--\/kay-server:1-->/
+const ACTION = /<form method="post" action="([^"]+)"/
+const DEFERRED = /<!--kay-server:1--><slot data-kay-server="1" inert>[\s\S]*?<!--\/kay-server:1-->/
 
 function stamps(html: string): string[] {
   return [...html.matchAll(STAMP)].map(match => match[1]!)
@@ -44,6 +45,8 @@ describe('server islands', () => {
       expect(placeholder).toContain('<p class="stamp">stamp-')
       expect(placeholder).not.toContain('name=')
       expect(placeholder).not.toContain('action=')
+      // Opted in with `noscript`, a link leads a browser without JavaScript to the page with the island in place.
+      expect(placeholder).toEndWith('</slot><noscript><a href="?kay_island" rel="nofollow">Show the form</a></noscript><!--/kay-server:1-->')
 
       const app = await pages({ routes, prebuilt: true, security: false })
       const visit = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
@@ -61,7 +64,9 @@ describe('server islands', () => {
 
       // Only the island changed, rendered for this request.
       expect(spliced.startsWith(before) && spliced.endsWith(after)).toBe(true)
-      expect(spliced.slice(before.length, spliced.length - after.length)).toBe(`<form method="post" action="/contact"><input type="hidden" name="stamp" value="${stamp}"><button type="submit" formaction="/elsewhere">Send</button><p class="stamp">${stamp}</p></form>`)
+      const posted = ACTION.exec(spliced)![1]!
+
+      expect(spliced.slice(before.length, spliced.length - after.length)).toBe(`<form method="post" action="${posted}" enctype="multipart/form-data"><input type="hidden" name="stamp" value="${stamp}"><button type="submit" formaction="/elsewhere">Send</button><p class="stamp">${stamp}</p></form>`)
       expect(stamps(built)).not.toContain(stamp)
 
       // The first request rendered the whole page to find the way to its islands; the next renders that way alone.
@@ -76,14 +81,27 @@ describe('server islands', () => {
       const island = await fetched.text()
 
       expect(fetched.headers.get('cache-control')).toBe('private, no-store')
-      expect(island).toStartWith('<form method="post" action="/contact"><input type="hidden" name="stamp" value="stamp-')
+      expect(island).toStartWith('<form method="post" action="/contact" enctype="multipart/form-data"><input type="hidden" name="stamp" value="stamp-')
       expect((await visit('/?kay_island=7', { [ISLAND_HEADER]: '1' })).status).toBe(404)
 
       // Visited rather than fetched, the same URL answers the page with every island in place, as a browser without JavaScript gets it.
-      const whole = await (await visit('/?kay_island')).text()
+      const visited = await visit('/?kay_island')
+      const whole = await visited.text()
+
+      expect(visited.headers.get('x-robots-tag')).toBe('noindex')
 
       expect(whole).not.toContain('data-kay-server')
+      expect(whole).not.toContain('<noscript>')
       expect(stamps(whole)).toHaveLength(2)
+
+      // A post its action refuses renders the whole page for its sender, islands in place.
+      const refused = await app.handle(new Request(`http://localhost${posted}`, { method: 'POST', body: new URLSearchParams({ stamp: 'forged' }), headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/' } }))
+      const again = await refused.text()
+
+      expect(refused.headers.get('cache-control')).toBe('private, no-store')
+      expect(again).toContain('<p class="failed">Not sent</p>')
+      expect(again).not.toContain('data-kay-server')
+      expect(stamps(again)).toHaveLength(2)
 
       // A page whose islands are all deferred goes out as any prerendered page.
       const deferred = await visit('/deferred')
@@ -106,7 +124,7 @@ describe('server islands', () => {
       const exporting = prerenderPages(root, { routes }, (await readClient(root))!, { exportAll: true })
 
       await expect(exporting).rejects.toThrow(ExportError)
-      await expect(exporting).rejects.toThrow('index.kay: it holds 2 server islands, which only a server renders per request')
+      await expect(exporting).rejects.toThrow('deferred.kay: it holds a server island, which only a server renders per request')
     }
     finally {
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
@@ -115,14 +133,19 @@ describe('server islands', () => {
   })
 
   it('compiles the mark to a server island on the server, a plain component in an island', () => {
-    const source = '---\nimport Card from \'./card.kay\'\n---\nCard(server title="a")\nCard(server="defer")\n'
+    const source = '---\nimport Card from \'./card.kay\'\n---\nCard(server title="a")\nCard(server="defer" noscript="More")\n'
     const html = compileKay(source, 'src/routes/index.kay', { output: 'html' }).tsx
     const dom = compileKay(source, 'src/components/twin.kay', { output: 'dom' }).tsx
 
     expect(html).toContain('KayServerIsland(Card, { "title": "a" }, "inline")')
-    expect(html).toContain('KayServerIsland(Card, {}, "defer")')
+    expect(html).toContain('KayServerIsland(Card, {}, "defer", "More")')
     expect(dom).not.toContain('server')
-    expect(compileKay('---\nimport Card from \'./card.kay\'\n---\nCard(server="later")\n', 'src/routes/index.kay', { check: true }).diagnostics.map(diagnostic => diagnostic.message)).toContain('`server` takes no value, or "defer"')
+    const messages = (call: string) => compileKay(`---\nimport Card from './card.kay'\n---\n${call}\n`, 'src/routes/index.kay', { check: true }).diagnostics.map(diagnostic => diagnostic.message)
+
+    expect(dom).not.toContain('More')
+    expect(messages('Card(server="later")')).toContain('`server` takes no value, or "defer"')
+    expect(messages('Card(server noscript="More")')).toContain('`noscript` only goes with `server="defer"`')
+    expect(messages('Card(server="defer" noscript)')).toContain('`noscript` takes the text of its link')
   })
 })
 

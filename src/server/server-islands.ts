@@ -97,6 +97,10 @@ export async function serveServerIslands(route: ServedRoute, page: ServedPage, p
 
   rendered.headers.append('vary', 'accept-encoding')
 
+  // The copy a `noscript` link leads to is the page search engines already have.
+  if (all)
+    rendered.headers.set('x-robots-tag', 'noindex')
+
   const parts = await partsOf(page, all)
   const between = all ? rendered.html : rendered.html.filter((_, index) => page.islands?.[index] === 'inline')
 

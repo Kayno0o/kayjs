@@ -5,6 +5,7 @@ import { flattenClasses } from './classes'
 import { escape, escapeAttribute } from './escape'
 import { imageSource } from './image'
 import { currentServerScope, scope } from './reactive'
+import { ISLAND_PARAM } from './server-islands'
 import { failedIds, idMark } from './uid'
 import { safeUrl } from './url'
 
@@ -300,7 +301,8 @@ const POSTING_ATTRIBUTE = /\s(?:name|action|formaction)="[^"]*"/g
 
 // A component the server renders per request inside a prerendered page: spliced into it for `inline`, fetched by the browser on approach for `defer`.
 // Outside a page looking for them, as when the whole page renders per request, it renders as any component does.
-export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: ServerIslandMode): unknown {
+// `noscript` is the text of a link to the page with a deferred island in place, for a browser without JavaScript.
+export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: ServerIslandMode, noscript?: unknown): unknown {
   const state = islands
 
   if (!state || state.inside > 0)
@@ -334,7 +336,7 @@ export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: Serve
   state.modes.push(mode)
 
   // The copy a deferred island shows until the browser fetches its own has its size, inert and with nothing it could post, as what it holds is from the build.
-  const placeholder = mode === 'defer' ? `<slot data-kay-server="${index}" inert>${html.replace(POSTING_TAG, tag => tag.replace(POSTING_ATTRIBUTE, ''))}</slot>` : ''
+  const placeholder = mode === 'defer' ? `<slot data-kay-server="${index}" inert>${html.replace(POSTING_TAG, tag => tag.replace(POSTING_ATTRIBUTE, ''))}</slot>${noscript == null ? '' : `<noscript><a href="?${ISLAND_PARAM}" rel="nofollow">${child(noscript)}</a></noscript>`}` : ''
 
   return { t: `<!--kay-server:${index}-->${placeholder}<!--/kay-server:${index}-->` }
 }
