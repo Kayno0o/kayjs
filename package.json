@@ -113,7 +113,8 @@
       "types": "./types/test/preload.d.ts",
       "default": "./src/test/preload.ts"
     },
-    "./tsconfig.json": "./src/tsconfig.app.json"
+    "./tsconfig.json": "./src/tsconfig.app.json",
+    "./kay.tmLanguage.json": "./editors/vscode/syntaxes/kay.tmLanguage.json"
   },
   "bin": {
     "kay": "./src/cli.ts"
@@ -122,6 +123,7 @@
     "LICENSE",
     "README.md",
     "dist",
+    "editors/vscode/syntaxes/kay.tmLanguage.json",
     "llms",
     "llms.txt",
     "src",

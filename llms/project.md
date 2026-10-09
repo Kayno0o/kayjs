@@ -51,3 +51,5 @@ It includes `src`, `tests`, the `*.config.ts` files beside it, such as `kay.conf
 - `kay lsp --stdio`: the language server behind the editor extension in `editors/vscode`: errors, hover, completion with auto-import, signatures, definitions, references, rename, quick fixes and formatting in `.kay` files. An import it adds goes in the fence the name is used from, the server fence for server code and the component script otherwise, made if missing. Renaming a server value renames its reads in the template, and renaming a destructured prop renames it in every parent passing it.
 
 Every command prints its usage for `--help` or `-h`, and refuses an option or argument it does not take. `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.
+
+The TextMate grammar the extension highlights `.kay` files with ships as `kay/kay.tmLanguage.json`, for a highlighter such as Shiki: register it as `{ ...grammar, name: 'kay', embeddedLangs: ['typescript'] }`.
