@@ -31,6 +31,11 @@ const LEADING_SLASH = /^\//
 const TRAILING_SLASH = /\/$/
 // A pattern naming anything but one plain directory at the root.
 const GLOB_OR_DEEPER = /[*?[\]/]/
+// The root files a server reads: what Bun reads as it starts, the lockfile, and what a module can import. A README, a licence or a justfile is none of them.
+const SERVER_ROOT_FILE = /^(?:\.env.*|bun\.lockb?)$|\.(?:[cm]?[jt]sx?|json[c5]?|toml|ya?ml|kay|css)$/
+// Tests, which no server imports.
+const TEST_DIRS = new Set(['tests', 'test', '__tests__', 'e2e'])
+const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/
 // Past this, as after a checkout, the files changed are not passed on, and open pages reload.
 const MAX_CHANGED_FILES = 200
 
@@ -168,9 +173,9 @@ function gitIgnoredNames(root: string): Set<string> {
   return names
 }
 
-// A directory or file at the project root worth reacting to; dependencies, build output and hidden entries, `.env` files apart, are not.
+// A directory or file at the project root worth reacting to; dependencies, build output, tests and hidden entries, `.env` files apart, are not.
 function watchedName(name: string): boolean {
-  return !IGNORED_DIRS.has(name) && (!name.startsWith('.') || name.startsWith('.env'))
+  return !IGNORED_DIRS.has(name) && !TEST_DIRS.has(name) && (!name.startsWith('.') || name.startsWith('.env'))
 }
 
 function isDirectory(path: string): boolean {
@@ -197,7 +202,10 @@ export function watchProject(root: string, onChange: (file: string) => void): ()
 
     // The directory may go between the check and the watch, or the system run out of watchers: `kay dev` keeps going without it.
     try {
-      const watcher = watch(join(root, name), { recursive: true }, (_event, file) => onChange(`${name}/${file ?? ''}`))
+      const watcher = watch(join(root, name), { recursive: true }, (_event, file) => {
+        if (file === null || !TEST_FILE.test(file))
+          onChange(`${name}/${file ?? ''}`)
+      })
 
       watcher.on('error', () => undefined)
       directories.set(name, watcher)
@@ -210,8 +218,13 @@ export function watchProject(root: string, onChange: (file: string) => void): ()
     if (name === null || !watched(name))
       return
 
+    // A directory gone is still one the server read from.
+    const directory = directories.has(name)
+
     watchDirectory(name)
-    onChange(name)
+
+    if (directory || isDirectory(join(root, name)) || SERVER_ROOT_FILE.test(name))
+      onChange(name)
   })
 
   rootWatcher.on('error', error => console.error(error))

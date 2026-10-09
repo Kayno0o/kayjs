@@ -113,6 +113,25 @@ describe('the dev watcher', () => {
     }
   })
 
+  it('ignores tests and the root files no server reads, and keeps what it reads', async () => {
+    const { root, sees, cleanup } = await watched({ 'src/server.ts': '', 'src/a.test.ts': '', 'tests/a.test.ts': '', 'README.md': '', 'LICENSE': '', 'kay.config.ts': '', 'package.json': '{}', 'bun.lock': '', 'public/a.txt': '' })
+
+    try {
+      expect(await sees('tests/a.test.ts', async attempt => Bun.write(join(root, 'tests/a.test.ts'), String(attempt)), 300)).toBe(false)
+      expect(await sees('src/a.test.ts', async attempt => Bun.write(join(root, 'src/a.test.ts'), String(attempt)), 300)).toBe(false)
+      expect(await sees('README.md', async attempt => Bun.write(join(root, 'README.md'), String(attempt)), 300)).toBe(false)
+      expect(await sees('LICENSE', async attempt => Bun.write(join(root, 'LICENSE'), String(attempt)), 300)).toBe(false)
+
+      for (const file of ['kay.config.ts', 'package.json', 'bun.lock', 'src/server.ts', 'public/a.txt'])
+        expect(await sees(file, async attempt => Bun.write(join(root, file), String(attempt)))).toBe(true)
+
+      expect(await sees('public', async () => rm(join(root, 'public'), { recursive: true }))).toBe(true)
+    }
+    finally {
+      await cleanup()
+    }
+  })
+
   it('ignores a root directory the project itself ignores, as a database bind-mounted into it is', async () => {
     const { root, sees, cleanup } = await watched({ 'src/server.ts': '', '.gitignore': '# data\n/data-dev/\ndata\n*.log\nsrc/generated\n', 'data-dev/postgres/base/1': '', 'data/x': '', 'src/generated/a.ts': '' })
 
