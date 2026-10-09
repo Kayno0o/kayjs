@@ -2,6 +2,8 @@ import type { AvifResult, AvifTask } from './avif-worker'
 import { fileURLToPath } from 'node:url'
 
 export const DEFAULT_AVIF_QUALITY = 50
+// libavif's speed, 0 to 10: on photos 640 to 1600 pixels wide, 9 encodes 16 times faster than its default of 6 for the same size, at a luma SSIM 0.008 lower (0.961 against 0.969); 10 writes the same bytes as 9, 7 and 8 save little time.
+export const AVIF_SPEED = 9
 
 // The worker's source, which `kay build --compile` adds as an entry of the executable, named after its file.
 export const AVIF_WORKER_SOURCE = fileURLToPath(new URL('./avif-worker.ts', import.meta.url))
@@ -36,7 +38,7 @@ export async function encodeAvif(image: Bun.Image, quality: number): Promise<Uin
 
   return new Promise((resolve, reject) => {
     encoder.tasks.set(id, { resolve, reject })
-    encoder.worker.postMessage({ id, png, quality } satisfies AvifTask, [png.buffer])
+    encoder.worker.postMessage({ id, png, quality, speed: AVIF_SPEED } satisfies AvifTask, [png.buffer])
   })
 }
 

@@ -26,6 +26,14 @@ export function decodePng(png: Uint8Array): { pixels: Uint8Array, width: number,
     const filter = filtered[y * (stride + 1)]
     const line = filtered.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1))
     const row = pixels.subarray(y * stride, (y + 1) * stride)
+
+    // Bun.Image writes every row of an uncompressed PNG unfiltered, copied whole rather than byte by byte.
+    if (filter === 0) {
+      row.set(line)
+
+      continue
+    }
+
     const up = y > 0 ? pixels.subarray((y - 1) * stride, y * stride) : undefined
 
     for (let x = 0; x < stride; x++) {

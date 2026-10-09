@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 
 import { Elysia } from 'elysia'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
+import { AVIF_SPEED } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
 import { avifQuality, drawing, serveImages, variantName, writeImageVariants } from '../src/server/image'
 import { decodePng } from '../src/server/png'
@@ -339,7 +340,7 @@ describe('build variants', () => {
 })
 
 describe('AVIF', () => {
-  it('writes an AVIF beside each WebP variant given its quality, cached under it', async () => {
+  it('writes an AVIF beside each WebP variant given its quality, cached under it and the encoder speed', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-avif-'))
     const client = join(dir, 'client')
     const cache = join(dir, 'cache')
@@ -347,10 +348,12 @@ describe('AVIF', () => {
 
     try {
       await Bun.write(join(client, 'assets', 'hero-abc.png'), Bun.file(HERO))
+      // One an earlier encoder speed wrote, which is encoded again and pruned.
+      await Bun.write(join(cache, `50-${variantName('hero-abc.png', 640, 'avif')}`), 'stale')
 
       expect(await writeImageVariants(client, undefined, cache, { avif: 50 })).toBe(8)
       expect((await readdir(join(client, 'images'))).sort()).toEqual(widths.flatMap(width => [variantName('hero-abc.png', width), variantName('hero-abc.png', width, 'avif')]).sort())
-      expect((await readdir(cache)).sort()).toEqual(widths.flatMap(width => [`80-${variantName('hero-abc.png', width)}`, `50-${variantName('hero-abc.png', width, 'avif')}`]).sort())
+      expect((await readdir(cache)).sort()).toEqual(widths.flatMap(width => [`80-${variantName('hero-abc.png', width)}`, `50s${AVIF_SPEED}-${variantName('hero-abc.png', width, 'avif')}`]).sort())
       expect(isAvif(await Bun.file(join(client, 'images', 'hero-abc-640.avif')).bytes())).toBe(true)
     }
     finally {

@@ -88,6 +88,9 @@ export function decodePng(bytes: Uint8Array): Png {
 
 // A row as it was before the encoder's filter, given the row above it.
 function unfilter(filter: number, filtered: Uint8Array, above: Uint8Array, bpp: number): Uint8Array {
+  if (filter === 0)
+    return filtered.slice()
+
   const row = new Uint8Array(filtered.length)
 
   for (let x = 0; x < filtered.length; x++) {

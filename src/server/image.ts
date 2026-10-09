@@ -7,7 +7,7 @@ import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, variantHeight, variantSuffix } from '../runtime/image'
-import { DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
+import { AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
@@ -49,6 +49,8 @@ export const MAX_UPLOAD_PIXELS = 50_000_000
 export const DEFAULT_QUALITY = 80
 // Variants and cards drawn on request, each holding its source's decoded pixels, at most this many at once, so a burst of new images cannot take the memory of all of them.
 export const drawing = limiter(4)
+// Images a build decodes at once, each held whole while its variants are written from it.
+const DECODED_AT_ONCE = 4
 
 export type VariantFormat = 'webp' | 'avif'
 
@@ -76,11 +78,12 @@ function acceptsAvif(accept: string | null): boolean {
 }
 
 // Written under a temporary name and moved into place, so a reader never sees a variant half written, nor one a crash cut short.
-export async function writeVariant(source: string, variant: number | ImageVariant, target: string, quality = DEFAULT_QUALITY, format: VariantFormat = 'webp'): Promise<void> {
+// `source` is a path, or an image already decoded to an uncompressed PNG.
+export async function writeVariant(source: string | Uint8Array, variant: number | ImageVariant, target: string, quality = DEFAULT_QUALITY, format: VariantFormat = 'webp'): Promise<void> {
   const partial = `${target}.${crypto.randomUUID()}.tmp`
 
   // Read through Bun.file, which also reaches the files an executable embeds, where Bun.Image given a path does not.
-  const file = Bun.file(source)
+  const file = typeof source === 'string' ? Bun.file(source) : source
   const shape = typeof variant === 'number' ? { width: variant } : variant
 
   if (shape === 'card') {
@@ -106,35 +109,48 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
     return encoded
 
   const names = await readdir(assets)
+  const decoding = limiter(DECODED_AT_ONCE)
 
-  await Promise.all(names.filter(name => RESIZABLE.test(name)).map(async (name) => {
+  await Promise.all(names.filter(name => RESIZABLE.test(name)).map(async name => decoding(async () => {
     const source = join(assets, name)
     const { width } = await new Bun.Image(source).metadata()
 
     const variants = [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name)]
     // The share card stays a JPEG, which social sites read best.
-    const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: quality }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: avif }]])
+    const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(quality) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${avif}s${AVIF_SPEED}` }]])
+    const missing: { variant: number | ImageVariant, format: VariantFormat, target: string, cached: string | undefined }[] = []
 
-    for (const { variant, format, level } of encodings) {
+    await Promise.all(encodings.map(async ({ variant, format, level }) => {
       const target = join(clientDir, VARIANTS_DIR, variantName(name, variant, format))
-      // Asset names carry a hash of their content, so a cached variant only goes stale when the quality changes.
+      // Asset names carry a hash of their content, so a cached variant only goes stale when the quality or the AVIF encoder speed changes.
       const cachedName = `${level}-${variantName(name, variant, format)}`
       const cached = cacheDir !== undefined && cacheDir !== '' ? join(cacheDir, cachedName) : undefined
 
       used.add(cachedName)
 
       if (await Bun.file(target).exists())
-        continue
+        return
 
-      if (cached === undefined || !await Bun.file(cached).exists()) {
-        await writeVariant(source, variant, cached ?? target, level, format)
-        encoded++
-      }
+      if (cached !== undefined && await Bun.file(cached).exists())
+        await Bun.write(target, Bun.file(cached))
+      else
+        missing.push({ variant, format, target, cached })
+    }))
+
+    if (missing.length === 0)
+      return
+
+    // Decoded once for all its variants, each width and format resizing these pixels rather than decoding the source again.
+    const decoded = await new Bun.Image(Bun.file(source)).png({ compressionLevel: 0 }).bytes()
+
+    await Promise.all(missing.map(async ({ variant, format, target, cached }) => {
+      await writeVariant(decoded, variant, cached ?? target, format === 'avif' ? avif : quality, format)
+      encoded++
 
       if (cached !== undefined)
         await Bun.write(target, Bun.file(cached))
-    }
-  }))
+    }))
+  })))
 
   if (prune && cacheDir !== undefined && cacheDir !== '' && existsSync(cacheDir))
     await Promise.all((await readdir(cacheDir)).filter(name => !used.has(name)).map(async name => rm(join(cacheDir, name), { force: true })))

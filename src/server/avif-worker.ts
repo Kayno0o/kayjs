@@ -10,10 +10,11 @@ export interface AvifTask {
   // An 8-bit RGBA PNG, as Bun.Image writes every PNG.
   png: Uint8Array
   quality: number
+  speed: number
 }
 
 interface AvifEncoder {
-  encode: (data: Uint8Array, width: number, height: number, options: typeof defaultOptions & { quality: number }) => Uint8Array<ArrayBuffer> | null
+  encode: (data: Uint8Array, width: number, height: number, options: typeof defaultOptions) => Uint8Array<ArrayBuffer> | null
 }
 
 export type AvifResult = { id: number, bytes: Uint8Array } | { id: number, error: string }
@@ -24,10 +25,10 @@ const encoder = loadEncoder()
 
 // Encodes AVIF off the main thread: libavif in wasm holds the thread it runs on for up to a second per image.
 // Set before anything is awaited, or the first task, posted while the module loads, would be dropped.
-self.onmessage = async ({ data: { id, png, quality } }: MessageEvent<AvifTask>) => {
+self.onmessage = async ({ data: { id, png, quality, speed } }: MessageEvent<AvifTask>) => {
   try {
     const { pixels, width, height } = decodePng(png)
-    const bytes = (await encoder).encode(pixels, width, height, { ...defaultOptions, quality })
+    const bytes = (await encoder).encode(pixels, width, height, { ...defaultOptions, quality, speed })
 
     if (!bytes)
       throw new Error('libavif gave no output')
