@@ -43,6 +43,8 @@ const REMOTE_URL = /^https?:\/\//i
 const WEBP_EXTENSION = /\.webp$/
 // How many imported variants are kept by the URL that asked for them; a URL can be spelled many ways, so past this the lot is dropped.
 const MOST_ANSWERED = 1024
+// A longer URL is answered without being kept, so junk query strings cannot pin megabytes.
+const LONGEST_ANSWERED = 2048
 
 // About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
 export const MAX_UPLOAD_PIXELS = 50_000_000
@@ -165,7 +167,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   // An imported image is named after its content, so its size and the variants already found never change: a request for one waits on no file system call.
   const importedSizes = new Map<string, { width: number, height: number }>()
   const importedVariants = new Map<string, Bun.BunFile>()
-  // An imported variant by the URL and `Accept` that asked for it, so a repeated request skips parsing either.
+  // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
   const answered = new Map<string, { file: Bun.BunFile, headers: HeaderCopies }>()
   const text = headerCopies(TEXT, options.security)
   const immutable = headerCopies({ 'cache-control': IMMUTABLE }, options.security)
@@ -174,13 +176,13 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const negotiatedRevalidated = headerCopies({ vary: 'accept' }, options.security)
 
   app.get(IMAGE_ROUTE, async ({ request, server, set }) => {
-    const key = options.avif === undefined ? request.url : `${request.url}\n${request.headers.get('accept')}`
+    const key = options.avif === undefined ? request.url : `${request.url}\n${acceptsAvif(request.headers.get('accept'))}`
     const known = answered.get(key)
 
     if (known)
-      return new Response(known.file, { headers: ownHeaders(set, options.security, known.headers) })
+      return new Response(known.file, { headers: ownHeaders(set, known.headers) })
 
-    const fail = (body: string, status: number) => new Response(body, { status, headers: ownHeaders(set, options.security, text) })
+    const fail = (body: string, status: number) => new Response(body, { status, headers: ownHeaders(set, text) })
 
     const url = new URL(request.url)
     const src = url.searchParams.get('src') ?? ''
@@ -265,16 +267,18 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       return remembered(key, variantFile, headers, set)
     }
 
-    return revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, options.security, negotiated ? negotiatedRevalidated : revalidatedAs))
+    return revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, negotiated ? negotiatedRevalidated : revalidatedAs))
   })
 
   function remembered(key: string, file: Bun.BunFile, headers: HeaderCopies, set: Context['set']): Response {
-    if (answered.size >= MOST_ANSWERED)
-      answered.clear()
+    if (key.length <= LONGEST_ANSWERED) {
+      if (answered.size >= MOST_ANSWERED)
+        answered.clear()
 
-    answered.set(key, { file, headers })
+      answered.set(key, { file, headers })
+    }
 
-    return new Response(file, { headers: ownHeaders(set, options.security, headers) })
+    return new Response(file, { headers: ownHeaders(set, headers) })
   }
 }
 

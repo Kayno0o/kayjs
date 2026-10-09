@@ -22,7 +22,7 @@ const variant = VARIANTS.find(candidate => candidate.site.name === 'jb-peinture'
 
 const low = (tag: string): string => tag.replace('<link ', '<link fetchpriority="low" ')
 
-// The `@font-face` rules in a `<style>` of the head rather than a stylesheet of their own.
+// The `@font-face` rules in a `<style>` of the head rather than a stylesheet of their own, as kay writes them since ae86448: only a build from before, `KAY_REF`, still has one to inline.
 function fontsInline(html: string): string {
   return html.replace(FONTS_STYLESHEET, (_, name: string) => `<style>${readFileSync(join(variant.dir, '.kay/client/dist/assets', name), 'utf8')}</style>`)
 }

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { pages } from '../src/server'
+import { sourceHash } from '../src/server/csp'
 import { builtFonts, prepareFonts } from '../src/server/fonts'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -40,6 +41,22 @@ describe('fonts', () => {
 
     expect(html).not.toContain('rel="preload"')
     expect(html).toMatch(/<style>@font-face\{font-family:"Display \\"One\\""/)
+  })
+
+  it('lets its rules through a style-src without unsafe-inline by their hash, leaving one with it untouched', async () => {
+    const policy = async (styleSrc?: string[]) => {
+      const app = await pages({ routes: ROUTES, prebuilt: false, fonts: FONTS, ...styleSrc ? { security: { csp: { 'style-src': styleSrc } } } : {} })
+      const response = await app.handle(new Request('http://localhost/about'))
+      const css = (/<style>([^<]+)<\/style>/).exec(await response.text())![1]!
+
+      return { header: response.headers.get('content-security-policy')!, hash: sourceHash(css) }
+    }
+    const strict = await policy(['\'self\''])
+    const loose = await policy()
+
+    expect(strict.header).toContain(`style-src 'self' ${strict.hash}`)
+    expect(loose.header).toContain('style-src \'self\' \'unsafe-inline\';')
+    expect(loose.header).not.toContain(loose.hash)
   })
 
   it('records what it wrote for an executable, which reads it back', async () => {

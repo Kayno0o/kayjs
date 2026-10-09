@@ -48,7 +48,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
     throw new Error('kay: no client build to add prerendered pages to; run buildClient first')
 
   const dir = join(root, '.kay', 'client', PRERENDERED_DIR)
-  const head = await configHead(root, config, client.dir)
+  const { head } = await configHead(root, config, client.dir)
 
   await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (config.fonts?.length ?? 0) > 0, config: config.images?.card, name: config.seo?.name, quality: config.images?.quality, collect: true })
 

@@ -23,5 +23,10 @@ export function inlineScriptHashes(options: ScriptHashOptions = {}): string[] {
   const html = hydrationScript + speculationRules(options.prefetch, options.base) + (options.dev ? LIVE_RELOAD + DEV_PROBLEMS : '') + (options.offline ? registerScript(options.base ?? '') : '')
   const scripts = [...[...html.matchAll(SCRIPT_BODY)].map(match => match[1]!), SWAP_SCRIPT, SWAP_CALL]
 
-  return scripts.map(script => `'sha256-${new Bun.CryptoHasher('sha256').update(script).digest('base64')}'`)
+  return scripts.map(sourceHash)
+}
+
+// The `'sha256-...'` source allowing one inline script or style.
+export function sourceHash(text: string): string {
+  return `'sha256-${new Bun.CryptoHasher('sha256').update(text).digest('base64')}'`
 }

@@ -261,10 +261,17 @@ describe('image route', () => {
   it('answers an imported image\'s URL again in the format each request\'s Accept names', async () => {
     const formats = []
 
-    for (const accept of ['image/avif,image/webp', 'image/webp', 'image/avif,image/webp', 'image/webp'])
+    for (const accept of ['image/avif,image/webp', 'image/webp', 'image/avif,image/webp', 'image/webp', 'image/avif;q=0', 'image/avif'])
       formats.push((await get(heroAt(320), { accept })).headers.get('content-type'))
 
-    expect(formats).toEqual(['image/avif', 'image/webp', 'image/avif', 'image/webp'])
+    expect(formats).toEqual(['image/avif', 'image/webp', 'image/avif', 'image/webp', 'image/webp', 'image/avif'])
+  })
+
+  it('answers a URL too long to keep, again and again', async () => {
+    const long = `${heroAt(320)}&pad=${'x'.repeat(3000)}`
+
+    for (let round = 0; round < 2; round++)
+      expect((await get(long, { accept: 'image/webp' })).status).toBe(200)
   })
 
   it('serves WebP alone, varying on nothing, with images.avif off', async () => {

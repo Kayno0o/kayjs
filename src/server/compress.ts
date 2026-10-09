@@ -112,8 +112,7 @@ export function compressResponse(request: Request, response: Response): Response
   const length = headers.get('content-length')
   const size = length === null ? wholeSizes.get(response) : Number(length)
 
-  // The body is looked at last: asking a file response for it makes a stream of the file, which Bun sends slower than the file itself.
-  if (request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE) || !response.body)
+  if (request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE))
     return undefined
 
   const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
@@ -124,6 +123,10 @@ export function compressResponse(request: Request, response: Response): Response
 
     return undefined
   }
+
+  // The body is looked at last: asking a file response for it makes a stream of the file, which Bun sends slower than the file itself.
+  if (!response.body)
+    return undefined
 
   return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding)
 }

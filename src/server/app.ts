@@ -169,10 +169,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   setTracer(options.tracer)
   setSite(options.site === undefined ? undefined : siteOrigin(options.site) + base, options.trailingSlash)
 
-  const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head: await configHead(root, options, client.dir, bundle !== undefined), base, maxDensity, offline: options.offline !== undefined && !options.dev }
+  const { head, styles } = await configHead(root, options, client.dir, bundle !== undefined)
+  const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head, base, maxDensity, offline: options.offline !== undefined && !options.dev }
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
-  const security = securityHeaders(options)
+  const security = securityHeaders({ ...options, styles })
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])
 
@@ -256,12 +257,12 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     if (path.endsWith(SOURCE_MAP)) {
       await mapBundleToKay(path)
 
-      return new Response(file, { headers: ownHeaders(set, security, sourceMapHeaders) })
+      return new Response(file, { headers: ownHeaders(set, sourceMapHeaders) })
     }
 
     const copies = assetCopies.get(path)
     const encoding = preferredEncoding(request.headers.get('accept-encoding'), copies)
-    const headers = ownHeaders(set, security, copies ? encodedFileHeaders : fileHeaders)
+    const headers = ownHeaders(set, copies ? encodedFileHeaders : fileHeaders)
 
     if (!encoding)
       return new Response(file, { headers })

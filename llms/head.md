@@ -18,6 +18,7 @@ h1 {todo.title}
 - The page wins over its layouts: one `title`, and one `meta` per `name`, `property` or `http-equiv`. A `link` is one per `rel` and `href`.
 - Head elements hold text only. The default charset and viewport tags can be replaced the same way.
 - A `link(rel="canonical")` is one per page, the page's replacing its layouts'.
+- The head opens with the charset and viewport, then the stylesheets and `style` elements of `head` blocks and of `fonts`, then the stylesheets of the components, which win a tie with them, then everything else, so the first paint waits on no other tag.
 
 ## Site defaults and social cards
 
@@ -107,7 +108,7 @@ export default defineConfig({
 
 ## Fonts
 
-`fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by `@font-face` rules in a `<style>` of every page's head, which spares the first paint a request of their own, and preloaded only with `preload: true`.
+`fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by `@font-face` rules in a `<style>` of every page's head, which spares the first paint a request of their own at the cost of a few hundred bytes per face in every page, and preloaded only with `preload: true`.
 
 ```ts
 import { defineConfig } from 'kay/server'

@@ -13,10 +13,11 @@ import { slashedPath } from './routes'
 // The head options of one response, from its URL and status.
 export type SeoHead = (url: URL, status: number) => HeadOptions
 
-// Everything kay.config.ts gives every page's head: the fonts, the favicon, then `site` and `seo`.
+// Everything kay.config.ts gives every page's head: the fonts, the favicon, then `site` and `seo`, with the inline styles among them for the content security policy.
 // An executable reads the fonts `kay build` recorded, its project being elsewhere; anything else writes them from their files.
-export async function configHead(root: string, config: KayConfig, clientDir: string, bundled = false): Promise<SeoHead | undefined> {
+export async function configHead(root: string, config: KayConfig, clientDir: string, bundled = false): Promise<{ head: SeoHead | undefined, styles: string[] }> {
   const extra: HeadTag[] = []
+  const styles: string[] = []
   const dir = join(clientDir, '..')
 
   if (config.fonts !== undefined && config.fonts.length > 0) {
@@ -26,12 +27,13 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
       throw new Error('kay: this executable holds no fonts; build it again with kay build --compile')
 
     extra.push(...fontTags(fonts))
+    styles.push(fonts.css)
   }
 
   if (config.favicon !== undefined)
     extra.push(...faviconTags(config.manifest))
 
-  return seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base))
+  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base)), styles }
 }
 
 // What `site`, `seo` and other settings such as the favicon give every page's head, or undefined when the project sets none and pages keep only their own tags.

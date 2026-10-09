@@ -18,6 +18,8 @@ export interface HeadOptions {
 export interface RenderedHead {
   // The page's own charset, base and viewport, which go before anything else.
   prelude: string
+  // Its stylesheets and inline styles, ahead of the ones kay links for its components, so these still win a tie.
+  styles: string
   html: string
   // Whether the page set its own charset or viewport, which then replace the defaults.
   charset: boolean
@@ -68,6 +70,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   const winners = new Map<string, HeadTag[]>()
   let unique = 0
   let resourcesHtml = ''
+  let styles = ''
   let titleGroup = -1
 
   for (const [index, group] of collected.entries()) {
@@ -82,7 +85,11 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
 
         if (!resources.has(identity)) {
           resources.add(identity)
-          resourcesHtml += tagMarkup(tag)
+
+          if (tag.props.rel === 'stylesheet')
+            styles += tagMarkup(tag)
+          else
+            resourcesHtml += tagMarkup(tag)
         }
 
         continue
@@ -132,7 +139,9 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
         prelude += tagMarkup(tag)
       else if (identity === VIEWPORT)
         viewportTag += tagMarkup(tag)
-      else if (tag.tag === 'link' || tag.tag === 'style')
+      else if (tag.tag === 'style')
+        styles += tagMarkup(tag)
+      else if (tag.tag === 'link')
         links += tagMarkup(tag)
       else if (tag.tag === 'meta')
         metas += tagMarkup(tag)
@@ -143,7 +152,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
     }
   }
 
-  return { prelude: prelude + viewportTag, html: resourcesHtml + links + metas + others + scripts + title, charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
+  return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
 }
 
 // Open Graph and Twitter read their own tags only, so the title, description and canonical URL a page sets are repeated there unless it sets those too.
