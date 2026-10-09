@@ -32,7 +32,7 @@ const TRAILING_SLASH = /\/$/
 // A pattern naming anything but one plain directory at the root.
 const GLOB_OR_DEEPER = /[*?[\]/]/
 // The root files a server reads: what Bun reads as it starts, the lockfile, and what a module can import. A README, a licence or a justfile is none of them.
-const SERVER_ROOT_FILE = /^(?:\.env.*|bun\.lockb?)$|\.(?:[cm]?[jt]sx?|json[c5]?|toml|ya?ml|kay|css)$/
+const SERVER_ROOT_FILE = /^(?:\.env.*|bun\.lockb?)$|\.(?:[cm]?[jt]sx?|json[c5]?|toml|ya?ml|kay|css|txt|html|sql|graphql|gql|wasm|node)$/
 // Tests, which no server imports.
 const TEST_DIRS = new Set(['tests', 'test', '__tests__', 'e2e'])
 const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/

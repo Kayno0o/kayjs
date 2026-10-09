@@ -100,7 +100,7 @@ interface Entries<Data> {
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
 // File entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production. Loaded entries are read when first asked for, and kept as `cached` keeps a value.
-export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = never>(source: string | ContentLoader, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined }): Collection<Static<Schema>, Components, FeedPath> {
+export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string>(source: string | ContentLoader, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined }): Collection<Static<Schema>, Components, FeedPath> {
   type Data = Static<Schema>
   let loading: Promise<Entries<Data>> | undefined
   const components = options.components ?? {}
