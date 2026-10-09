@@ -90,6 +90,9 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   const build = await Bun.build({
     entrypoints: [generated],
     target: 'bun',
+    // Parsed at build time: the server starts in a third of the time, for a few more megabytes of executable.
+    bytecode: true,
+    format: 'esm',
     compile: { outfile, assets: [clientBase, publicDir].filter(dir => existsSync(dir)) },
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
