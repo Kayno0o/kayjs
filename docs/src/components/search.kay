@@ -1,6 +1,11 @@
 ---
 import type { SearchSection } from '../../search-index'
 import { effect, memo, navigate, onCleanup, onMount, signal } from 'kay'
+import ArrowDown from '~icons/tabler/arrow-down'
+import ArrowUp from '~icons/tabler/arrow-up'
+import ChevronRight from '~icons/tabler/chevron-right'
+import CornerDownLeft from '~icons/tabler/corner-down-left'
+import SearchIcon from '~icons/tabler/search'
 
 interface Match {
   section: SearchSection
@@ -140,18 +145,21 @@ effect(() => {
 
 onMount(() => {
   if (navigator.platform.startsWith('Mac'))
-    shortcut.set('⌘ K')
+    shortcut.set('Cmd K')
   window.addEventListener('keydown', onShortcut)
 })
 
 onCleanup(() => window.removeEventListener('keydown', onShortcut))
 ---
 button.search-trigger(type="button" aria-haspopup="dialog" onClick={open})
+  SearchIcon
   span Search
   kbd {shortcut}
 dialog.palette(aria-label="Search the documentation" closedby="any" ref={el => dialog = el})
   .palette-box
-    input.palette-input(type="search" placeholder="Search the docs" aria-controls="search-results" aria-activedescendant={activeId()} ref={el => input = el} bind:value={query} onKeyDown={onKeyDown})
+    .palette-field
+      SearchIcon
+      input.palette-input(type="search" placeholder="Search the docs" aria-controls="search-results" aria-activedescendant={activeId()} ref={el => input = el} bind:value={query} onKeyDown={onKeyDown})
     if failed
       p.palette-empty The search index could not load.
     else if loading()
@@ -163,6 +171,7 @@ dialog.palette(aria-label="Search the documentation" closedby="any" ref={el => d
             span.palette-where
               span {match.section.page}
               if match.section.heading as heading
+                ChevronRight
                 span.palette-heading {heading}
             if match.snippet.length > 0
               span.palette-snippet
@@ -174,9 +183,10 @@ dialog.palette(aria-label="Search the documentation" closedby="any" ref={el => d
         else
           li.palette-empty Nothing matches “{query}”
     p.palette-help
-      kbd ↑↓
+      kbd: ArrowUp
+      kbd: ArrowDown
       | to move,
-      kbd ↵
+      kbd: CornerDownLeft
       | to open,
       kbd esc
       | to close

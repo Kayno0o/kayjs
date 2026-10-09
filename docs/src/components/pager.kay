@@ -1,4 +1,7 @@
 ---
+import ArrowLeft from '~icons/tabler/arrow-left'
+import ArrowRight from '~icons/tabler/arrow-right'
+
 interface Link {
   href: string
   title: string
@@ -10,10 +13,14 @@ footer.page-foot
   nav.pager(aria-label="Previous and next pages")
     if previous as link
       a.pager-previous(href={link.href})
-        span.pager-label Previous
+        span.pager-label
+          ArrowLeft
+          | Previous
         span {link.title}
     if next as link
       a.pager-next(href={link.href})
-        span.pager-label Next
+        span.pager-label
+          | Next
+          ArrowRight
         span {link.title}
   a.source(href={source}) Edit this page on the forge

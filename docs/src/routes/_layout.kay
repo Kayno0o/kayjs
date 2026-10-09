@@ -6,6 +6,7 @@ const tutorials = (await guides.all()).map(guide => ({ href: `/guides/${guide.sl
 const current = ctx.url.pathname.replace(/\/$/, '') || '/'
 ---
 ---
+import Menu from '~icons/tabler/menu-2'
 import CodeCopy from '../components/code-copy.kay'
 import Search from '../components/search.kay'
 import TopicFilter from '../components/topic-filter.kay'
@@ -19,7 +20,9 @@ a.skip-link(href="#content") Skip to the content
         img(src="/icon-192.png" alt="" width="28" height="28")
         span kay
       Search(persist)
-      button.menu(type="button" popovertarget="sidebar" aria-label="Open the menu") Menu
+      button.menu(type="button" popovertarget="sidebar")
+        Menu
+        | Menu
     nav#sidebar.sidebar(popover aria-label="Documentation")
       p.group Guides
       ul

@@ -5,7 +5,7 @@ import { createHighlighter } from 'shiki'
 const kay: LanguageRegistration = { ...kayGrammar, name: 'kay', embeddedLangs: ['typescript'] }
 
 const highlighter = await createHighlighter({
-  themes: ['catppuccin-latte', 'catppuccin-mocha'],
+  themes: ['ayu-light', 'ayu-mirage'],
   langs: [kay, 'typescript', 'javascript', 'json', 'bash', 'css', 'html', 'toml', 'diff'],
 })
 
@@ -37,5 +37,5 @@ export function highlight(code: string, language: string | undefined): string {
     },
   }
 
-  return highlighter.codeToHtml(code, { lang, themes: { light: 'catppuccin-latte', dark: 'catppuccin-mocha' }, defaultColor: 'light-dark()', transformers: [framed] })
+  return highlighter.codeToHtml(code, { lang, themes: { light: 'ayu-light', dark: 'ayu-mirage' }, defaultColor: 'light-dark()', transformers: [framed] })
 }

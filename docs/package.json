@@ -1,0 +1,7 @@
+{
+  "name": "kay-docs",
+  "private": true,
+  "devDependencies": {
+    "@iconify-json/tabler": "^1.2.41"
+  }
+}
