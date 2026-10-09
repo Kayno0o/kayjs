@@ -107,6 +107,9 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
 export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const pending = new Map<string, Promise<void>>()
   const allowed = new Set((options.aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!)))
+  // An imported image is named after its content, so its size and the variants already found never change: a request for one waits on no file system call.
+  const importedSizes = new Map<string, { width: number, height: number }>()
+  const importedVariants = new Map<string, Bun.BunFile>()
 
   app.get(IMAGE_ROUTE, async ({ request, server }) => {
     const url = new URL(request.url)
@@ -119,25 +122,23 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if ('status' in source)
       return new Response(source.message, { status: source.status, headers: TEXT })
 
-    let stats: { size: number, mtimeMs: number }
+    let stats: { size: number, mtimeMs: number } | undefined
+    let own = source.immutable ? importedSizes.get(source.path) : undefined
 
-    try {
-      stats = await stat(source.path)
-    }
-    catch {
-      return new Response('Not found', { status: 404, headers: TEXT })
-    }
+    if (!own) {
+      try {
+        stats = await stat(source.path)
+        own = await new Bun.Image(Bun.file(source.path), { maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }).metadata()
+      }
+      catch (error) {
+        if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
+          return new Response(`Image over ${MAX_UPLOAD_PIXELS} pixels`, { status: 413, headers: TEXT })
 
-    let own: { width: number, height: number }
+        return stats ? new Response('Not an image kay can resize', { status: 415, headers: TEXT }) : new Response('Not found', { status: 404, headers: TEXT })
+      }
 
-    try {
-      own = await new Bun.Image(Bun.file(source.path), { maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }).metadata()
-    }
-    catch (error) {
-      if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
-        return new Response(`Image over ${MAX_UPLOAD_PIXELS} pixels`, { status: 413, headers: TEXT })
-
-      return new Response('Not an image kay can resize', { status: 415, headers: TEXT })
+      if (source.immutable)
+        importedSizes.set(source.path, own)
     }
 
     const variant = requestedVariant(url, own, allowed)
@@ -145,9 +146,13 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if (typeof variant === 'string' && variant !== 'card')
       return new Response(variant, { status: 400, headers: TEXT })
 
-    // An imported image is named after its content; a runtime one may change in place, so its size and time go in the name, after its key for a remote one, whose variants go when its original does.
-    const version = Bun.hash(`${source.path}\n${stats.size}\n${stats.mtimeMs}`).toString(36)
-    const name = source.immutable ? variantName(source.path, variant) : `${source.key === undefined ? '' : `remote-${source.key}-`}${version}${variantSuffix(variant)}`
+    // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after its key for a remote one, whose variants go when its original does.
+    const name = source.immutable ? variantName(source.path, variant) : `${source.key === undefined ? '' : `remote-${source.key}-`}${Bun.hash(`${source.path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`
+    const found = source.immutable ? importedVariants.get(name) : undefined
+
+    if (found)
+      return new Response(found, { headers: { 'cache-control': IMMUTABLE } })
+
     const built = join(options.clientDir, VARIANTS_DIR, name)
     const cached = join(options.cacheDir, name)
     let file = source.immutable && await Bun.file(built).exists() ? built : cached
@@ -178,8 +183,13 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       file = cached
     }
 
-    if (source.immutable)
-      return new Response(Bun.file(file), { headers: { 'cache-control': IMMUTABLE } })
+    if (source.immutable) {
+      const variantFile = Bun.file(file)
+
+      importedVariants.set(name, variantFile)
+
+      return new Response(variantFile, { headers: { 'cache-control': IMMUTABLE } })
+    }
 
     return revalidated(request, `W/"${name}"`, () => Bun.file(file))
   })

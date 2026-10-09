@@ -213,20 +213,30 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   }
 
   const assetCopies = await encodedCopies(client.dir)
+  // Outside development the build's files never change, so each is looked up once: a lookup costs more than sending the file, in an executable most of all.
+  const assets = new Map<string, Bun.BunFile>()
 
   app.get(`${ASSET_PREFIX}*`, async ({ params, status, request }) => {
     const name = decodePath(params['*'])
     // A NUL byte makes Bun.file throw, with the server path in its message.
     const path = name === undefined || name.includes('\0') ? '' : normalize(resolve(client.dir, name))
+    let file = assets.get(path)
 
-    if (!path.startsWith(client.dir + sep) || !await Bun.file(path).exists())
-      return status(404)
+    if (!file) {
+      file = Bun.file(path)
+
+      if (!path.startsWith(client.dir + sep) || !await file.exists())
+        return status(404)
+
+      if (!options.dev)
+        assets.set(path, file)
+    }
 
     // Only development writes maps, and a `.kay` edit can move lines without changing the chunk the map is named after.
     if (path.endsWith(SOURCE_MAP)) {
       await mapBundleToKay(path)
 
-      return new Response(Bun.file(path), { headers: { 'cache-control': 'no-cache' } })
+      return new Response(file, { headers: { 'cache-control': 'no-cache' } })
     }
 
     const copies = assetCopies.get(path)
@@ -237,9 +247,19 @@ export async function servePages(root: string, options: PagesOptions, loadClient
       headers.vary = 'accept-encoding'
 
     if (!encoding)
-      return new Response(Bun.file(path), { headers })
+      return new Response(file, { headers })
 
-    return new Response(Bun.file(encodedPath(path, encoding)), { headers: { ...headers, 'content-encoding': encoding, 'content-type': Bun.file(path).type } })
+    const copy = encodedPath(path, encoding)
+    let encoded = assets.get(copy)
+
+    if (!encoded) {
+      encoded = Bun.file(copy)
+
+      if (!options.dev)
+        assets.set(copy, encoded)
+    }
+
+    return new Response(encoded, { headers: { ...headers, 'content-encoding': encoding, 'content-type': file.type } })
   })
 
   const actionOptions = { dev: options.dev, onError: options.onError, i18n, base }

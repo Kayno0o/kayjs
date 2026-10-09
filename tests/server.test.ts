@@ -700,6 +700,19 @@ describe('prerendering', () => {
       expect(gzip.headers.get('content-encoding')).toBe('gzip')
       expect(Bun.gunzipSync(await gzip.bytes())).toEqual(bytes)
 
+      // Each file was looked up once: the build's files never change outside development.
+      const lookup = spyOn(Bun, 'file')
+
+      try {
+        const again = await fetch(manifest.entry!, { 'accept-encoding': 'br' })
+
+        expect(lookup).not.toHaveBeenCalled()
+        expect(new Uint8Array(brotliDecompressSync(await again.bytes()))).toEqual(bytes)
+      }
+      finally {
+        lookup.mockRestore()
+      }
+
       const file = await Bun.file(join(root, '.kay/client/pages/docs/guide/intro.html')).text()
       const page = await fetch('/docs/guide/intro', { 'accept-encoding': 'br' })
       const etag = page.headers.get('etag')!

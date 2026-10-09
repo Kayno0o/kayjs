@@ -120,6 +120,23 @@ describe('image route', () => {
     expect(await (await get(heroAt(640))).bytes()).toEqual(bytes)
   })
 
+  it('answers an imported image\'s variant again without reading its source or looking the variant up', async () => {
+    await get(heroAt(320))
+
+    const file = spyOn(Bun, 'file')
+
+    try {
+      const again = await get(heroAt(320))
+
+      expect(file).not.toHaveBeenCalled()
+      expect(again.status).toBe(200)
+      expect((await new Bun.Image(await again.bytes()).metadata()).width).toBe(320)
+    }
+    finally {
+      file.mockRestore()
+    }
+  })
+
   it('takes the image\'s own width, and refuses one off the ladder or above it', async () => {
     expect((await new Bun.Image(await (await get(heroAt(1000))).bytes()).metadata()).width).toBe(1000)
 
