@@ -139,13 +139,13 @@ const deflateRaw: Deflate = async (bytes, last) => new Promise((resolve, reject)
 
 const deflateRawHere: Deflate = (bytes, last) => nodeZlib().deflateRawSync(bytes, runOptions(last))
 
-// Bun answers far fewer requests a second with a body over about 24 KB once the reply waited on a macrotask, a zlib callback included, its main thread left partly idle (#141). So up to this much left to deflate, about 200 µs of work, deflates on the main thread, where a short inlined page serves four times the requests.
-const SPLICE_HERE_BYTES = 64 * 1024
+// Up to this much left to deflate, the main thread deflates it sooner than it hands it to zlib's threads and takes it back: a short inlined page serves 15 to 20% more requests, one with 40 KB left 10% fewer (#141).
+const SPLICE_HERE_BYTES = 32 * 1024
 
 interface Found { text: FixedText, at: number }
 
-// A gzip of the body that deflates only what lies around the fixed texts it holds, theirs deflated once already; undefined when it holds none.
-async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): Promise<Uint8Array<ArrayBuffer> | undefined> {
+// A gzip of the body that deflates only what lies around the fixed texts it holds, theirs deflated once already, and whether it waited on a zlib callback; undefined when it holds none.
+async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): Promise<{ gzip: Uint8Array<ArrayBuffer>, late: boolean } | undefined> {
   const body = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length)
   const found: Found[] = []
   let end = 0
@@ -163,7 +163,7 @@ async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): 
 
   const left = body.length - found.reduce((total, { text }) => total + text.bytes.length, 0)
 
-  return left <= SPLICE_HERE_BYTES ? gzipAround(body, found, deflateRawHere) : compressing(async () => gzipAround(body, found, deflateRaw))
+  return left <= SPLICE_HERE_BYTES ? { gzip: await gzipAround(body, found, deflateRawHere), late: false } : { gzip: await compressing(async () => gzipAround(body, found, deflateRaw)), late: true }
 }
 
 async function gzipAround(body: Buffer, found: Found[], deflate: Deflate): Promise<Uint8Array<ArrayBuffer>> {
@@ -206,7 +206,7 @@ export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: Res
 }
 
 // The response compressed on the fly for a browser that takes brotli or gzip, or undefined when it is not worth it: already encoded, not text, too small, or asked to be left alone.
-// A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length; a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
+// A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length unless zlib's threads compressed it past 15 KB (`lateBody`); a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
 // A response left alone is answered synchronously: Elysia sends an empty body for a `mapResponse` promise resolving to undefined.
 // A whole page holding `fixed` texts goes as gzip to a browser taking it, whatever weight it gives brotli: only the rest of it is compressed, where brotli would compress it all, as its streams cannot be joined.
 export function compressResponse(request: Request, response: Response, fixed?: FixedText[]): Response | undefined | Promise<Response> {
@@ -249,8 +249,6 @@ async function compressBody({ headers, status, statusText }: Response, source: R
 
   varyOnEncoding(headers)
 
-  const plain = () => new Response(body.whole ? body.bytes : body.stream, { status, statusText, headers })
-
   const compressedHeaders = (used: Encoding) => {
     const compressed = new Headers(headers)
     const etag = compressed.get('etag')
@@ -269,10 +267,23 @@ async function compressBody({ headers, status, statusText }: Response, source: R
     return new Response(compressedStream(body.stream, encoding), { status, statusText, headers: compressedHeaders(encoding) })
 
   const spliced = fixed && await splicedGzip(body.bytes, fixed)
-  const used = spliced ? 'gzip' : encoding
-  const copy = spliced ?? await compressBytes(body.bytes, encoding)
+  const copy = spliced?.gzip ?? await compressBytes(body.bytes, encoding)
+  const reply = (bytes: Uint8Array<ArrayBuffer>) => spliced?.late === false ? bytes : lateBody(bytes)
 
-  return copy.length < body.bytes.length * 0.9 ? new Response(copy, { status, statusText, headers: compressedHeaders(used) }) : plain()
+  return copy.length < body.bytes.length * 0.9 ? new Response(reply(copy), { status, statusText, headers: compressedHeaders(spliced ? 'gzip' : encoding) }) : new Response(reply(body.bytes), { status, statusText, headers })
+}
+
+// Bun writes a reply resolved after a macrotask, a zlib callback included, uncorked once its body reaches this size: each header name, value and separator goes as its own send(), some forty segments a reply (#141, oven-sh/bun#41341).
+const UNCORKED_BYTES = 15 * 1024
+
+// Bytes past that go as a stream already holding them, whose head Bun corks: it serves about as fast as bytes answered within the request's tick, with no content-length.
+function lateBody(bytes: Uint8Array<ArrayBuffer>): BodyInit {
+  return bytes.length < UNCORKED_BYTES
+    ? bytes
+    : new ReadableStream({ start(controller) {
+      controller.enqueue(bytes)
+      controller.close()
+    } })
 }
 
 type ReadBody = { whole: true, bytes: Uint8Array<ArrayBuffer> } | { whole: false, stream: ReadableStream<Uint8Array> }

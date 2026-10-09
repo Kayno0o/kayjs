@@ -873,6 +873,33 @@ describe('compression', () => {
     }
   })
 
+  it('sends a page zlib\'s threads compressed past 15 KB as a stream, which Bun writes corked, and one compressed within the request\'s tick with its length', async () => {
+    const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
+    // Hashed numbers compress to about half their size, well past what Bun corks once a reply waited on a zlib callback.
+    const words = (count: number, from = 0) => Array.from({ length: count }, (_, i) => ((i + from) * 2654435761 % 1e9).toString(36)).join(' ')
+    const style = `<style>${words(6000, 1)}</style>`
+    const fixed = fixedTexts([style])
+    const pages: Record<string, string> = { '/pool': `<p>${words(12000)}</p>`, '/spliced': `${style}<p>${words(12000)}</p>`, '/here': `${style}<p>${words(100)}</p>` }
+    const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: async (request) => {
+      const response = wholeResponse(pages[new URL(request.url).pathname]!, { headers: { 'content-type': 'text/html' } })
+
+      return await compressResponse(request, response, fixed) ?? response
+    } })
+
+    try {
+      for (const [path, accept, encoding] of [['/pool', 'br', 'br'], ['/spliced', 'br, gzip', 'gzip'], ['/here', 'br, gzip', 'gzip']] as const) {
+        const response = await fetch(`http://127.0.0.1:${server.port}${path}`, { headers: { 'accept-encoding': accept } })
+
+        expect(response.headers.get('content-encoding')).toBe(encoding)
+        expect(response.headers.get('transfer-encoding')).toBe(path === '/here' ? null : 'chunked')
+        expect(await response.text()).toBe(pages[path]!)
+      }
+    }
+    finally {
+      await server.stop(true)
+    }
+  })
+
   it('sends a streamed page\'s early chunks before the stream ends', async () => {
     const { compressResponse } = await import('../src/server/compress')
     let push!: (text: string) => void
