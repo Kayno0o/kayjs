@@ -120,25 +120,33 @@ export function compressResponse(request: Request, response: Response): Response
   if (!response.body || request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (length !== null && Number(length) < MIN_SIZE))
     return undefined
 
-  return compressBody(request, response, response.body)
+  const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
+
+  // Whatever the browser takes, a shared cache keeps one copy per encoding; one taking none gets the response as it is, its body never read.
+  if (!encoding) {
+    varyOnEncoding(headers)
+
+    return undefined
+  }
+
+  return compressBody(response, response.body, encoding)
 }
 
-async function compressBody(request: Request, { headers, status, statusText }: Response, stream: ReadableStream<Uint8Array>): Promise<Response> {
+function varyOnEncoding(headers: Headers): void {
+  if (!VARY_ENCODING.test(headers.get('vary') ?? ''))
+    headers.append('vary', 'accept-encoding')
+}
+
+async function compressBody({ headers, status, statusText }: Response, stream: ReadableStream<Uint8Array>, encoding: Encoding): Promise<Response> {
   // From here on the body is read off the response, so every path answers a new one.
   const body = await readWithinTick(stream)
 
   if (body.whole && body.bytes.length < MIN_SIZE)
     return new Response(body.bytes, { status, statusText, headers })
 
-  // Whatever the browser takes, a shared cache keeps one copy per encoding.
-  if (!VARY_ENCODING.test(headers.get('vary') ?? ''))
-    headers.append('vary', 'accept-encoding')
+  varyOnEncoding(headers)
 
-  const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
   const plain = () => new Response(body.whole ? body.bytes : body.stream, { status, statusText, headers })
-
-  if (!encoding)
-    return plain()
 
   const compressed = new Headers(headers)
   const etag = compressed.get('etag')

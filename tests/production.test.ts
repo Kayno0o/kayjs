@@ -848,6 +848,15 @@ describe('compression', () => {
     expect(new TextDecoder().decode(brotliDecompressSync(Buffer.concat(parts)))).toEndWith('<p>later</p>')
   })
 
+  it('leaves the body unread for a client taking no encoding, telling caches the response varies', async () => {
+    const { compressResponse } = await import('../src/server/compress')
+    const response = new Response('x'.repeat(1000), { headers: { 'content-type': 'text/html' } })
+
+    expect(compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': 'identity' } }), response)).toBeUndefined()
+    expect(response.bodyUsed).toBe(false)
+    expect(response.headers.get('vary')).toBe('accept-encoding')
+  })
+
   it('leaves responses alone unless compress is on', async () => {
     const app = await pages({ routes, prebuilt: false })
 
