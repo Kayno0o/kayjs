@@ -18,9 +18,9 @@ export interface RegisterInput {
 
 // Why a field was refused, by field, as codes a form turns into messages in its own words and language.
 export interface RegisterErrors {
-  email?: EmailProblem | 'taken'
-  password?: PasswordProblem
-  username?: UsernameProblem | 'taken'
+  email?: EmailProblem | 'taken' | undefined
+  password?: PasswordProblem | undefined
+  username?: UsernameProblem | 'taken' | undefined
 }
 
 // `signedIn` is false when the app wants the address verified first.

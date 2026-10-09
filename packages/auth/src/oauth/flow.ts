@@ -28,7 +28,7 @@ export interface OAuthFlow {
 }
 
 // The provider's authorize URL, the flow parked in the session; undefined for a provider the app has not configured.
-export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string, link?: boolean }): Promise<string | { error: OAuthFailure } | undefined> {
+export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string | undefined, link?: boolean | undefined }): Promise<string | { error: OAuthFailure } | undefined> {
   const entry = state.core.oauth.get(provider)
 
   if (!entry)
@@ -54,7 +54,7 @@ export async function startOAuth(state: RequestState, provider: string, options:
 }
 
 // Where to send the browser once the provider sent it back: the flow is spent whatever happens, so a callback URL replayed later finds none.
-export async function finishOAuth(state: RequestState, provider: string, query: { code?: string, state?: string, error?: string }): Promise<{ redirect: string } | { error: OAuthFailure }> {
+export async function finishOAuth(state: RequestState, provider: string, query: { code?: string | undefined, state?: string | undefined, error?: string | undefined }): Promise<{ redirect: string } | { error: OAuthFailure }> {
   const { core } = state
   const flow = await state.session.get('authOAuth')
 

@@ -55,22 +55,22 @@ export interface User {
 export interface Core {
   store: AuthStore
   keys: Keys
-  url?: string
+  url?: string | undefined
   prefix: string
   signInPage: string
   twoFactorPage: string
   // The site's name, as mails and authenticators show it.
   site: string
   limits: Limits
-  email?: EmailCore
+  email?: EmailCore | undefined
   oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<any, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
-  allow?: (profile: Profile) => boolean | Promise<boolean>
+  allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
   defaultRoles: string[]
-  onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
-  onProviderProfile?: (user: User, profile: Profile) => void | Promise<void>
-  onDelete?: (user: User) => void | Promise<void>
-  onEvent?: (event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>
+  onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
+  onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
+  onDelete?: ((user: User) => void | Promise<void>) | undefined
+  onEvent?: ((event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>) | undefined
 }
 
 // What a provider token refresh works on: the identity, and its tokens opened.

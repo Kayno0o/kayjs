@@ -51,39 +51,39 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   secret: string | string[]
   store: AuthStore
   // The site's public origin, such as `https://example.com`: OAuth callbacks are built on it.
-  url?: string
+  url?: string | undefined
   // Where kayjs-auth's routes live, `/auth` by default: `/auth/discord` starts a Discord sign-in.
-  prefix?: Prefix
+  prefix?: Prefix | undefined
   // The site's name, as mails and authenticator apps show it; the URL's host by default.
-  site?: string
+  site?: string | undefined
   // Where a sign-in that failed goes, with `?error=` saying why; `/` by default.
-  signInPage?: string
+  signInPage?: string | undefined
   // Where a sign-in goes to ask for the second factor, `/two-factor` by default: a page whose form posts the code to an action calling `verifyTwoFactor`.
-  twoFactorPage?: string
+  twoFactorPage?: string | undefined
   // Mail for email verification, password resets, magic links and email changes.
-  email?: EmailOptions
+  email?: EmailOptions | undefined
   // OAuth apps by the name their routes take: `{ discord: { provider: discordProvider(), clientId, clientSecret } }`.
-  oauth?: Record<string, OAuthApp>
+  oauth?: Record<string, OAuthApp> | undefined
   // Asked with every provider account before any user is touched; false refuses the sign-in, as an allowlist does.
-  allow?: (profile: Profile) => boolean | Promise<boolean>
+  allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
   // Called once a new user exists, to create the app's own records for them.
-  onSignUp?: (user: User, profile: Profile | undefined) => void | Promise<void>
+  onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar.
-  onProviderProfile?: (user: User, profile: Profile) => void | Promise<void>
+  onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   // Called once a user is deleted, to delete the app's own records for them.
-  onDelete?: (user: User) => void | Promise<void>
+  onDelete?: ((user: User) => void | Promise<void>) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, for an audit log of the app's own.
-  onEvent?: (event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>
+  onEvent?: ((event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>) | undefined
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
-  roles?: Record<Role, NoInfer<Role>[]>
+  roles?: Record<Role, NoInfer<Role>[]> | undefined
   // The roles every new user starts with, by password or by provider, such as a site's `user`. An unverified account holding only these counts as given none: see `requireVerified`.
-  defaultRoles?: NoInfer<Role>[]
+  defaultRoles?: NoInfer<Role>[] | undefined
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
-  limits?: Partial<Limits>
+  limits?: Partial<Limits> | undefined
   // The proxies in front, read as kay.config.ts's `proxy` is, for a plain Elysia app that kay's `pages()` does not serve; a kay app sets it in kay.config.ts instead.
-  proxy?: KayConfig['proxy']
+  proxy?: KayConfig['proxy'] | undefined
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
-  authorize?: (user: User | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>
+  authorize?: ((user: User | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.

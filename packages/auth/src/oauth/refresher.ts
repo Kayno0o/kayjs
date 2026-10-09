@@ -7,9 +7,9 @@ const REFUSED_STATUSES = new Set([400, 401])
 
 /** The currently-stored credential for a subject; `expiresAt` null/undefined = non-expiring. */
 export interface StoredCredential {
-  accessToken?: string | null
-  refreshToken?: string | null
-  expiresAt?: number | null
+  accessToken?: string | null | undefined
+  refreshToken?: string | null | undefined
+  expiresAt?: number | null | undefined
 }
 
 export interface TokenRefresherDeps<K, S> {
@@ -18,9 +18,9 @@ export interface TokenRefresherDeps<K, S> {
   /** Reads the subject's stored credential. */
   load: (subject: S) => StoredCredential
   /** Performs the refresh + persistence; returns the new token, or `null` when refresh failed. */
-  exchange: (subject: S) => Promise<{ accessToken: string, expiresAt?: number } | null>
+  exchange: (subject: S) => Promise<{ accessToken: string, expiresAt?: number | undefined } | null>
   /** How long before expiry to refresh (default 5 min). */
-  marginMs?: number
+  marginMs?: number | undefined
 }
 
 /** Wraps a token `exchange` with per-subject caching + in-flight dedup; non-expiring credentials pass through. Feeds `GrantStore.hasCredential` (non-null = live). */
@@ -107,9 +107,9 @@ export interface OAuthTokenRefresherDeps<K, S> {
   /** Persists the outcome. `tokens` is `null` when the provider refused the refresh token, the credential revoked upstream: write nulls so the stale access token stops being treated as live. Keep `refreshToken` when a rotation response omits it. */
   save: (subject: S, tokens: OAuthTokens | null) => Promise<void>
   /** Notified when a step throws; the refresher itself never rejects. */
-  onError?: (error: unknown, stage: RefreshStage) => void
+  onError?: ((error: unknown, stage: RefreshStage) => void) | undefined
   /** How long before expiry to refresh (default 5 min). */
-  marginMs?: number
+  marginMs?: number | undefined
 }
 
 /**

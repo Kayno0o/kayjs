@@ -28,8 +28,8 @@ export interface Mailer {
 export interface MailData {
   site: string
   email: string
-  url?: string
-  detail?: string
+  url?: string | undefined
+  detail?: string | undefined
 }
 
 export type Templates = Record<MailKind, (data: MailData) => MailContent>

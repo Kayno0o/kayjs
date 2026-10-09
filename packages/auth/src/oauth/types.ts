@@ -1,19 +1,19 @@
 /** Normalized OAuth credentials. `expiresAt` is absolute ms; `undefined` = non-expiring (e.g. GitHub classic tokens). */
 export interface OAuthTokens {
   accessToken: string
-  refreshToken?: string
-  expiresAt?: number
-  scope?: string
-  tokenType?: string
+  refreshToken?: string | undefined
+  expiresAt?: number | undefined
+  scope?: string | undefined
+  tokenType?: string | undefined
 }
 
 /** The normalized provider identity both presets map onto. */
 export interface OAuthUser {
   providerId: string
   username: string
-  displayName?: string
-  avatar?: string | null
-  email?: string | null
+  displayName?: string | undefined
+  avatar?: string | null | undefined
+  email?: string | null | undefined
 }
 
 /** A provider's OAuth endpoints plus how to parse its token/user responses. */

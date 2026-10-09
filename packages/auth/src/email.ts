@@ -27,9 +27,9 @@ export interface EmailOptions {
   mailer: Mailer
   // The app's page each link opens, the token in `?token=`. Each shows a button, or the new password's form, posting the token to an action, so a mail scanner opening the link spends nothing.
   links: Record<TokenType, string>
-  templates?: Partial<Templates>
+  templates?: Partial<Templates> | undefined
   // Refuses password sign-in until the address is verified, and signs no one in on registering.
-  requireVerified?: boolean
+  requireVerified?: boolean | undefined
 }
 
 export type EmailCore = Required<Omit<EmailOptions, 'templates'>> & { templates: Templates }

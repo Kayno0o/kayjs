@@ -4,7 +4,7 @@ import { discordProvider, githubProvider } from '../src/oauth/providers'
 
 const CONFIG = { clientId: 'cid', clientSecret: 'sec', redirectUri: 'https://app.test/cb' }
 
-interface FetchCall { url: string, init?: RequestInit }
+interface FetchCall { url: string, init?: RequestInit | undefined }
 
 const realFetch = globalThis.fetch
 
