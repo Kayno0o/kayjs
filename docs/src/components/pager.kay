@@ -1,0 +1,19 @@
+---
+interface Link {
+  href: string
+  title: string
+}
+
+const { previous, next, source } = props<{ previous?: Link | undefined, next?: Link | undefined, source: string }>()
+---
+footer.page-foot
+  nav.pager(aria-label="Previous and next pages")
+    if previous as link
+      a.pager-previous(href={link.href})
+        span.pager-label Previous
+        span {link.title}
+    if next as link
+      a.pager-next(href={link.href})
+        span.pager-label Next
+        span {link.title}
+  a.source(href={source}) Edit this page on the forge

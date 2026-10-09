@@ -146,7 +146,7 @@
     "bench:origins": "bun bench/origins.ts",
     "bench:sites": "bun bench/sites/run.ts",
     "bench:test": "bun test ./bench",
-    "docs:build": "bun src/cli.ts build docs --static",
+    "docs:build": "bun docs/search-index.ts && bun src/cli.ts build docs --static",
     "bench:check": "bun src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte"
   },
   "peerDependencies": {
@@ -175,6 +175,7 @@
     "kay": "link:.",
     "mitata": "1.0.34",
     "playwright-core": "1.62.0",
+    "shiki": "^4.5.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }

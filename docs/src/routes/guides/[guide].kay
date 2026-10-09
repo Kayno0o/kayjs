@@ -1,13 +1,26 @@
 --- server
 import { guides } from '../../content.config'
+import { FORGE, neighbours } from '../../pages'
 
 export const prerender = guides
 
 const guide = await guides.get(ctx.params.guide) ?? ctx.notFound()
 const { Content } = guide
+const sections = guide.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
+const { previous, next } = neighbours(await guides.all(), guide.slug, slug => `/guides/${slug}`)
+---
+---
+import Pager from '../../components/pager.kay'
+import Toc from '../../components/toc.kay'
 ---
 head
   title {guide.data.title} · kay
-article
-  h1 {guide.data.title}
-  Content
+.page
+  header.page-head
+    p.eyebrow Guide
+    h1 {guide.data.title}
+  if sections.length > 0
+    Toc(sections={sections})
+  article.prose
+    Content
+  Pager(previous={previous} next={next} source={`${FORGE}/docs/src/content/guides/${guide.slug}.md`})

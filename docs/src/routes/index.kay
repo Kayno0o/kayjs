@@ -1,11 +1,29 @@
 --- server
-import { reference } from '../content.config'
+import { guides, reference } from '../content.config'
+import { FORGE } from '../pages'
 
 const overview = await reference.get('overview') ?? ctx.notFound()
 const { Content } = overview
+const sections = overview.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
+const first = (await guides.all())[0]
+const topic = (await reference.all()).find(entry => entry.slug !== 'overview')
+const next = first && { href: `/guides/${first.slug}`, title: first.data.title }
+---
+---
+import Pager from '../components/pager.kay'
+import Toc from '../components/toc.kay'
 ---
 head
   title kay
-h1 kay
-Content
-p.next New to kay? Start with the #[a(href="/guides/tutorial") tutorial], see #[a(href="/guides/example-app") an app using its libraries], then browse the reference on the left.
+.page
+  header.page-head.hero
+    h1 kay
+    p.lede A Bun web framework: one #[code .kay] file per component, pages rendered to plain HTML on the server, islands hydrated by kay's own signals, everything typed down to the template line.
+    .hero-actions
+      a.button.primary(href={next?.href ?? "/"}) Start the tutorial
+      a.button(href={topic ? `/reference/${topic.slug}` : "/"}) Browse the reference
+  if sections.length > 0
+    Toc(sections={sections})
+  article.prose
+    Content
+  Pager(next={next} source={`${FORGE}/llms.txt`})

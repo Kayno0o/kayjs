@@ -1,20 +1,26 @@
 --- server
 import { reference } from '../../content.config'
+import { FORGE, neighbours, topicHref } from '../../pages'
 
 export const prerender = reference
 
 const topic = await reference.get(ctx.params.topic) ?? ctx.notFound()
 const { Content } = topic
-const sections = topic.headings.filter(heading => heading.depth === 2)
+const sections = topic.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
+const { previous, next } = neighbours(await reference.all(), topic.slug, topicHref)
+---
+---
+import Pager from '../../components/pager.kay'
+import Toc from '../../components/toc.kay'
 ---
 head
   title {topic.data.title} · kay
-article
-  h1 {topic.data.title}
+.page
+  header.page-head
+    p.eyebrow Reference
+    h1 {topic.data.title}
   if sections.length > 0
-    nav.toc(aria-label="On this page")
-      ul
-        for section of sections key={section.id}
-          li
-            a(href={`#${section.id}`}) {section.text}
-  Content
+    Toc(sections={sections})
+  article.prose
+    Content
+  Pager(previous={previous} next={next} source={`${FORGE}/llms/${topic.slug}.md`})

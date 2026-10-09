@@ -1,0 +1,36 @@
+---
+import { onCleanup, onMount, signal } from 'kay'
+
+const said = signal('')
+
+// The copy buttons come with the highlighted code blocks; one listener on the document answers them all, pages swapped in later included.
+async function copy(event: MouseEvent) {
+  const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-copy]') : null
+  const code = button?.closest('.code')?.querySelector('code')
+
+  if (!button || !code)
+    return
+
+  try {
+    await navigator.clipboard.writeText(code.textContent ?? '')
+    button.textContent = 'Copied'
+    said.set('Code copied')
+  }
+  catch {
+    button.textContent = 'Failed'
+    said.set('The code could not be copied')
+  }
+
+  setTimeout(() => {
+    button.textContent = 'Copy'
+    said.set('')
+  }, 1500)
+}
+
+const onClick = (event: MouseEvent) => void copy(event)
+
+onMount(() => document.addEventListener('click', onClick))
+
+onCleanup(() => document.removeEventListener('click', onClick))
+---
+p.sr-only(aria-live="polite") {said}
