@@ -1,4 +1,4 @@
 [test]
 root = "./tests"
 # One run at a time in a checkout, as the suite shares its .kay/client.
-preload = ["./tests/one-run.ts"]
+preload = [ "./tests/one-run.ts" ]
