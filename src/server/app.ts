@@ -5,13 +5,14 @@ import type { ServedRoute } from './guards'
 import type { RouterShape } from './params'
 import type { RequestContext, ServedPage } from './render'
 import { tmpdir } from 'node:os'
-import { join, normalize, resolve, sep } from 'node:path'
+import { join, normalize, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { projectCollections, serveFeeds } from '../content/server'
 import { localePath, splitLocale } from '../runtime/i18n'
+import { IMAGE_ROUTE } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
 import { overHttps, registerActionRoutes } from './actions'
@@ -21,7 +22,7 @@ import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { bundled } from './bundle'
 import { serveCards, setupCards } from './card'
 import { PRERENDERED_DIR } from './client'
-import { compressResponse, encodedCopies, encodedPath, preferredEncoding } from './compress'
+import { compressResponse, encodedCopies, encodedPath, filesUnder, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents, hotSwap } from './dev'
 import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
@@ -32,7 +33,7 @@ import { cookieLocale, hostLocale, loadI18n, localeCookie, localePrefixes, prefe
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
-import { logRequests } from './log'
+import { logRequests, pathOf } from './log'
 import { serveServiceWorker } from './offline'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
 import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
@@ -45,7 +46,7 @@ import { reportServerError } from './report'
 import { revalidateStale, trackPrerendered } from './revalidate'
 import { rewriteRequests } from './rewrite'
 import { decodePath, refuseClashes, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
-import { securityHeaders } from './security'
+import { headerCopies, ownHeaders, securityHeaders, setSecurityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
 import { serveSitemap } from './sitemap'
 import { answered, SERVER_SPAN, setTracer, traced } from './trace'
@@ -69,7 +70,7 @@ export interface PagesOptions extends KayConfig {
 async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<string, ServedPage>>> {
   const byRoute = new Map<string, Map<string, ServedPage>>()
   const dir = join(client.dir, '..', PRERENDERED_DIR)
-  const copies = await encodedCopies(dir)
+  const copies = encodedCopies(await filesUnder(dir))
 
   const loaded = await Promise.all([...client.pages.values()].map(async (page) => {
     const file = join(dir, page.file)
@@ -167,6 +168,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   const security = securityHeaders(options)
+  // The paths of the build's files and the image route, whose responses carry the security headers themselves.
+  const filePaths = new Set<string>([IMAGE_ROUTE])
 
   trustProxy(app, options.proxy)
 
@@ -174,9 +177,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (security) {
     const headers = Object.entries(security)
 
-    app.onRequest(({ set }) => {
-      for (const [name, value] of headers)
-        set.headers[name] ??= value
+    app.onRequest(({ request, set }) => {
+      if (!filePaths.has(pathOf(request.url)))
+        setSecurityHeaders(set, headers)
     })
   }
 
@@ -215,11 +218,20 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     app.get(DEV_EVENTS, () => devEvents(false, hot))
   }
 
-  const assetCopies = await encodedCopies(client.dir)
+  const clientFiles = await filesUnder(client.dir)
+  const assetCopies = encodedCopies(clientFiles)
+  const immutable = { 'cache-control': 'public, max-age=31536000, immutable' }
+  const fileHeaders = headerCopies(immutable, security)
+  const encodedFileHeaders = headerCopies({ ...immutable, vary: 'accept-encoding' }, security)
+  const sourceMapHeaders = headerCopies({ 'cache-control': 'no-cache' }, security)
+
+  for (const file of clientFiles)
+    filePaths.add(`${ASSET_PREFIX}${relative(client.dir, file).split(sep).map(encodeURIComponent).join('/')}`)
+
   // Outside development the build's files never change, so each is looked up once: a lookup costs more than sending the file, in an executable most of all.
   const assets = new Map<string, Bun.BunFile>()
 
-  app.get(`${ASSET_PREFIX}*`, async ({ params, status, request }) => {
+  app.get(`${ASSET_PREFIX}*`, async ({ params, status, request, set }) => {
     const name = decodePath(params['*'])
     // A NUL byte makes Bun.file throw, with the server path in its message.
     const path = name === undefined || name.includes('\0') ? '' : normalize(resolve(client.dir, name))
@@ -239,15 +251,12 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     if (path.endsWith(SOURCE_MAP)) {
       await mapBundleToKay(path)
 
-      return new Response(file, { headers: { 'cache-control': 'no-cache' } })
+      return new Response(file, { headers: ownHeaders(set, security, sourceMapHeaders) })
     }
 
     const copies = assetCopies.get(path)
     const encoding = preferredEncoding(request.headers.get('accept-encoding'), copies)
-    const headers: Record<string, string> = { 'cache-control': 'public, max-age=31536000, immutable' }
-
-    if (copies)
-      headers.vary = 'accept-encoding'
+    const headers = ownHeaders(set, security, copies ? encodedFileHeaders : fileHeaders)
 
     if (!encoding)
       return new Response(file, { headers })
@@ -290,6 +299,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     avif: options.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
     remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache),
+    security,
   }
 
   serveImages(app, imageRoute)

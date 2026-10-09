@@ -49,10 +49,10 @@ export function matchesEtag(header: string | null, etag: string): boolean {
 
 // One route per file found at boot: no file system lookup per request, and no path a request could steer outside the directory.
 // Files keep their names, so browsers revalidate them every time and get a 304 while they are unchanged.
-// The body, or a 304 when the browser already holds the version the ETag names.
+// The body, or a 304 when the browser already holds the version the ETag names, carrying the same headers.
 export function revalidated(request: Request, etag: string, body: () => BodyInit, headers: Record<string, string> = {}): Response {
   if (matchesEtag(request.headers.get('if-none-match'), etag))
-    return new Response(null, { status: 304, headers: { etag, 'cache-control': REVALIDATE } })
+    return new Response(null, { status: 304, headers: { ...headers, etag, 'cache-control': REVALIDATE } })
 
   return new Response(body(), { headers: { ...headers, etag, 'cache-control': REVALIDATE } })
 }

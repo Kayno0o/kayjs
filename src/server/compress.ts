@@ -138,7 +138,8 @@ export function compressResponse(request: Request, response: Response): Response
   const length = headers.get('content-length')
   const size = length === null ? wholeSizes.get(response) : Number(length)
 
-  if (!response.body || request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE))
+  // The body is looked at last: asking a file response for it makes a stream of the file, which Bun sends slower than the file itself.
+  if (request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE) || !response.body)
     return undefined
 
   const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
@@ -287,11 +288,11 @@ function compressedStream(body: ReadableStream<Uint8Array>, encoding: Encoding):
   })
 }
 
-// The copies `compressFiles` wrote, by the path of the file they copy.
-export async function encodedCopies(dir: string): Promise<Map<string, Set<Encoding>>> {
+// The copies `compressFiles` wrote among the files, by the path of the file they copy.
+export function encodedCopies(files: string[]): Map<string, Set<Encoding>> {
   const copies = new Map<string, Set<Encoding>>()
 
-  for (const path of await filesUnder(dir)) {
+  for (const path of files) {
     if (!ENCODED_COPY.test(path))
       continue
 
@@ -326,7 +327,7 @@ export function preferredEncoding(accept: string | null, available: ReadonlySet<
   return ENCODINGS.filter(encoding => available.has(encoding) && weight(encoding) > 0).sort((a, b) => weight(b) - weight(a))[0]
 }
 
-async function filesUnder(dir: string): Promise<string[]> {
+export async function filesUnder(dir: string): Promise<string[]> {
   if (!existsSync(dir))
     return []
 

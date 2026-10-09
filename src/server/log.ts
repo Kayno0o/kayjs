@@ -13,7 +13,7 @@ export interface RequestLog {
 export type RequestLogger = boolean | 'json' | ((entry: RequestLog) => void)
 
 // The path of a request's absolute URL, cut out rather than parsed: a request's URL comes normalized already, and parsing one costs more than logging it.
-function pathOf(url: string): string {
+export function pathOf(url: string): string {
   const start = url.indexOf('/', url.indexOf('//') + 2)
   const query = url.indexOf('?', start)
 

@@ -63,6 +63,28 @@ describe('security headers', () => {
     }
   })
 
+  it('sends them on the build\'s files and image variants too, under a header the app set itself', async () => {
+    const routes = 'tests/fixtures/images/src/routes'
+    const stock = await pages({ routes, prebuilt: false })
+    const own = new Elysia()
+      .onRequest(({ set }) => {
+        set.headers['content-security-policy'] = 'default-src *'
+      })
+      .use(await pages({ routes, prebuilt: false }))
+    const hero = (/src=(%2F_kay%2Fassets%2F[^&]+)&amp;/).exec(await (await stock.handle(new Request('http://localhost/'))).text())![1]!
+    const paths = [decodeURIComponent(hero), `/_kay/image?src=${hero}&w=320`, `/_kay/image?src=${hero}&w=7`]
+
+    for (const app of [stock, own]) {
+      for (const path of paths) {
+        const response = await app.handle(new Request(`http://localhost${path}`, { headers: { accept: 'image/avif' } }))
+
+        expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+        expect(response.headers.get('x-frame-options')).toBe('SAMEORIGIN')
+        expect(response.headers.get('content-security-policy')?.startsWith(app === own ? 'default-src *' : 'default-src \'self\'')).toBe(true)
+      }
+    }
+  })
+
   it('allows the live-reload script in development', async () => {
     const app = await pages({ routes: ROUTES, prebuilt: false, dev: true })
     const policy = directives((await app.handle(new Request('http://localhost/about'))).headers.get('content-security-policy'))

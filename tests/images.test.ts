@@ -236,7 +236,19 @@ describe('image route', () => {
     expect(webp.headers.get('content-type')).toBe('image/webp')
     expect([avif.headers.get('vary'), webp.headers.get('vary')]).toEqual(['accept', 'accept'])
     expect(webp.headers.get('etag')).not.toBe(etag)
-    expect((await get(path, { 'accept': 'image/avif', 'if-none-match': etag })).status).toBe(304)
+    const unchanged = await get(path, { 'accept': 'image/avif', 'if-none-match': etag })
+
+    expect(unchanged.status).toBe(304)
+    expect(unchanged.headers.get('vary')).toBe('accept')
+  })
+
+  it('answers an imported image\'s URL again in the format each request\'s Accept names', async () => {
+    const formats = []
+
+    for (const accept of ['image/avif,image/webp', 'image/webp', 'image/avif,image/webp', 'image/webp'])
+      formats.push((await get(heroAt(320), { accept })).headers.get('content-type'))
+
+    expect(formats).toEqual(['image/avif', 'image/webp', 'image/avif', 'image/webp'])
   })
 
   it('serves WebP alone, varying on nothing, with images.avif off', async () => {

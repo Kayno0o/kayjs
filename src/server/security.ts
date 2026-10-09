@@ -1,3 +1,4 @@
+import type { Context } from 'elysia'
 import type { KayConfig, SecurityConfig } from '../config'
 import type { Prefetch } from './speculation'
 import { basePath } from './base'
@@ -70,6 +71,35 @@ export function securityHeaders(options: SecurityOptions): Record<string, string
   }
 
   return headers
+}
+
+// One set of a file route's headers, as it is and with the security headers, which such a route sends itself: set on the context instead, they make Elysia copy its response into a second one.
+export interface HeaderCopies {
+  plain: Record<string, string>
+  secured: Record<string, string>
+}
+
+export function headerCopies(headers: Record<string, string>, security: Record<string, string> | undefined): HeaderCopies {
+  return { plain: headers, secured: security ? { ...security, ...headers } : headers }
+}
+
+// The security headers set on the context, under any the app set there first.
+export function setSecurityHeaders(set: Context['set'], security: [name: string, value: string][]): void {
+  for (const [name, value] of security)
+    set.headers[name] ??= value
+}
+
+// The copy a file route answers with: the secured one when the context holds no header, since the response's own would win over the app's; else the plain one, the security headers going on the context as on every other route.
+export function ownHeaders(set: Context['set'], security: Record<string, string> | undefined, copies: HeaderCopies): Record<string, string> {
+  // eslint-disable-next-line no-unreachable-loop, unused-imports/no-unused-vars -- whether the context holds any header, without listing them
+  for (const _ in set.headers) {
+    if (security)
+      setSecurityHeaders(set, Object.entries(security))
+
+    return copies.plain
+  }
+
+  return copies.secured
 }
 
 // kay's directives with each layer of the app's merged over them in turn, a directive given `false` left out; `script-src` and `script-src-elem` always keep the hashes of kay's inline scripts.

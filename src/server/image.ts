@@ -1,6 +1,7 @@
-import type { Elysia } from 'elysia'
+import type { Context, Elysia } from 'elysia'
 import type { Aspect, ImageVariant } from '../runtime/image'
 import type { RemoteImages } from './remote'
+import type { HeaderCopies } from './security'
 import { existsSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
@@ -12,6 +13,7 @@ import { clientAddress } from './protection'
 import { revalidated } from './public'
 import { remoteAllowed, remotePatterns } from './remote'
 import { decodePath } from './routes'
+import { headerCopies, ownHeaders } from './security'
 
 export interface ImageRouteOptions {
   // The built client, where imported images and the variants `kay build` made live.
@@ -27,6 +29,8 @@ export interface ImageRouteOptions {
   aspects?: readonly string[] | undefined
   // Downloads an image from a host `images.remote` lists.
   remote?: RemoteImages | undefined
+  // The security headers, which the route's answers carry themselves.
+  security?: Record<string, string> | undefined
 }
 
 export const VARIANTS_DIR = 'images'
@@ -36,6 +40,8 @@ const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 const LADDER = new Set<number>(IMAGE_WIDTHS)
 const REMOTE_URL = /^https?:\/\//i
 const WEBP_EXTENSION = /\.webp$/
+// How many imported variants are kept by the URL that asked for them; a URL can be spelled many ways, so past this the lot is dropped.
+const MOST_ANSWERED = 1024
 
 // About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
 export const MAX_UPLOAD_PIXELS = 50_000_000
@@ -140,17 +146,32 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   // An imported image is named after its content, so its size and the variants already found never change: a request for one waits on no file system call.
   const importedSizes = new Map<string, { width: number, height: number }>()
   const importedVariants = new Map<string, Bun.BunFile>()
+  // An imported variant by the URL and `Accept` that asked for it, so a repeated request skips parsing either.
+  const answered = new Map<string, { file: Bun.BunFile, headers: HeaderCopies }>()
+  const text = headerCopies(TEXT, options.security)
+  const immutable = headerCopies({ 'cache-control': IMMUTABLE }, options.security)
+  const negotiatedImmutable = headerCopies({ 'cache-control': IMMUTABLE, 'vary': 'accept' }, options.security)
+  const revalidatedAs = headerCopies({}, options.security)
+  const negotiatedRevalidated = headerCopies({ vary: 'accept' }, options.security)
 
-  app.get(IMAGE_ROUTE, async ({ request, server }) => {
+  app.get(IMAGE_ROUTE, async ({ request, server, set }) => {
+    const key = options.avif === undefined ? request.url : `${request.url}\n${request.headers.get('accept')}`
+    const known = answered.get(key)
+
+    if (known)
+      return new Response(known.file, { headers: ownHeaders(set, options.security, known.headers) })
+
+    const fail = (body: string, status: number) => new Response(body, { status, headers: ownHeaders(set, options.security, text) })
+
     const url = new URL(request.url)
     const src = url.searchParams.get('src') ?? ''
     const source = await findSource(src, options, clientAddress(request, server))
 
     if (!source)
-      return new Response('Not found', { status: 404, headers: TEXT })
+      return fail('Not found', 404)
 
     if ('status' in source)
-      return new Response(source.message, { status: source.status, headers: TEXT })
+      return fail(source.message, source.status)
 
     let stats: { size: number, mtimeMs: number } | undefined
     let own = source.immutable ? importedSizes.get(source.path) : undefined
@@ -162,9 +183,9 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       }
       catch (error) {
         if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
-          return new Response(`Image over ${MAX_UPLOAD_PIXELS} pixels`, { status: 413, headers: TEXT })
+          return fail(`Image over ${MAX_UPLOAD_PIXELS} pixels`, 413)
 
-        return stats ? new Response('Not an image kay can resize', { status: 415, headers: TEXT }) : new Response('Not found', { status: 404, headers: TEXT })
+        return stats ? fail('Not an image kay can resize', 415) : fail('Not found', 404)
       }
 
       if (source.immutable)
@@ -174,18 +195,18 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     const variant = requestedVariant(url, own, allowed)
 
     if (typeof variant === 'string' && variant !== 'card')
-      return new Response(variant, { status: 400, headers: TEXT })
+      return fail(variant, 400)
 
     // Both formats answer the same URL, so a cache keeps one per `Accept`.
     const negotiated = options.avif !== undefined && variant !== 'card'
     const format = negotiated && acceptsAvif(request.headers.get('accept')) ? 'avif' : 'webp'
-    const headers: Record<string, string> = negotiated ? { 'cache-control': IMMUTABLE, 'vary': 'accept' } : { 'cache-control': IMMUTABLE }
+    const headers = negotiated ? negotiatedImmutable : immutable
     // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after its key for a remote one, whose variants go when its original does.
     const name = source.immutable ? variantName(source.path, variant, format) : inFormat(`${source.key === undefined ? '' : `remote-${source.key}-`}${Bun.hash(`${source.path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`, format)
     const found = source.immutable ? importedVariants.get(name) : undefined
 
     if (found)
-      return new Response(found, { headers })
+      return remembered(key, found, headers, set)
 
     const built = join(options.clientDir, VARIANTS_DIR, name)
     const cached = join(options.cacheDir, name)
@@ -211,7 +232,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
         await writing
       }
       catch {
-        return new Response('Not an image kay can resize', { status: 415, headers: TEXT })
+        return fail('Not an image kay can resize', 415)
       }
 
       file = cached
@@ -222,11 +243,20 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
       importedVariants.set(name, variantFile)
 
-      return new Response(variantFile, { headers })
+      return remembered(key, variantFile, headers, set)
     }
 
-    return revalidated(request, `W/"${name}"`, () => Bun.file(file), negotiated ? { vary: 'accept' } : {})
+    return revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, options.security, negotiated ? negotiatedRevalidated : revalidatedAs))
   })
+
+  function remembered(key: string, file: Bun.BunFile, headers: HeaderCopies, set: Context['set']): Response {
+    if (answered.size >= MOST_ANSWERED)
+      answered.clear()
+
+    answered.set(key, { file, headers })
+
+    return new Response(file, { headers: ownHeaders(set, options.security, headers) })
+  }
 }
 
 // The variant a request asks for, or why it is refused: a width of the ladder below the image's own, or its own, cut or not to an allowed aspect ratio, or the share card.
