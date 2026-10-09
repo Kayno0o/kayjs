@@ -14,7 +14,7 @@ import { registerScript, serveServiceWorker } from '../src/server/offline'
 const ROUTES = 'tests/fixtures/static/src/routes'
 const LISTENING = /port (\d+)/
 const SETTINGS = /^const KAY = (.+)$/m
-const executablePath = process.env.BUN_CHROME_PATH || chromium.executablePath()
+const executablePath = process.env.BUN_CHROME_PATH !== undefined && process.env.BUN_CHROME_PATH !== '' ? process.env.BUN_CHROME_PATH : chromium.executablePath()
 const browserInstalled = existsSync(executablePath)
 
 interface WorkerSettings {
@@ -106,7 +106,7 @@ describe('service worker', () => {
   })
 })
 
-describe.skipIf(!browserInstalled && !process.env.CI)('offline in Chromium', () => {
+describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('offline in Chromium', () => {
   let server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
   let browser: Browser
   let context: BrowserContext

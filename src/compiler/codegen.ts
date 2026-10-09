@@ -194,13 +194,13 @@ class Generator {
     if (used.includes('For') && !runnable)
       declared.push(staticLoops ? ['KayStaticFor', 'staticFor'] : ['KayLoopFor', 'For'])
 
-    if (this.options.island)
+    if (this.options.island !== undefined)
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
 
     if (this.options.twin !== undefined)
       b.add(`import { insideIsland as KayInsideIsland } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
 
-    if (this.options.island && this.genericComponent)
+    if (this.options.island !== undefined && this.genericComponent)
       b.add(`import type { IslandBrand as KayIslandBrand, IslandOptions as KayIslandOptions } from 'kay'\n`)
 
     if (usesAwait(this.file.template) && !dom)
@@ -227,7 +227,7 @@ class Generator {
     if (includeServer)
       this.emitLoad(server, query)
 
-    b.add(`\n${this.options.island || this.options.twin !== undefined ? '' : 'export default '}function ${this.options.name}`)
+    b.add(`\n${this.options.island !== undefined || this.options.twin !== undefined ? '' : 'export default '}function ${this.options.name}`)
 
     if (this.file.typeParameters) {
       if (server)
@@ -286,7 +286,7 @@ class Generator {
     if (this.options.twin !== undefined)
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${this.options.name}(props)) as typeof ${this.options.name}\n`)
 
-    if (this.options.island)
+    if (this.options.island !== undefined)
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''}${islandMessages(this.src, this.options.client)})${this.genericIslandType()}\n`)
 
     return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
@@ -508,7 +508,7 @@ class Generator {
 
       if (head)
         this.error(node.tag, 'A template has one `head` block', { related: [{ ...head.tag, label: 'the first one' }] })
-      else if (this.options.island)
+      else if (this.options.island !== undefined)
         this.error(node.tag, 'An island cannot set the document head', { note: 'an island also renders in the browser', help: 'move the `head` block to its page' })
       else if (node.attributes.length > 0 || node.classes.length > 0 || node.id)
         this.error(node, 'A `head` block takes no attributes')
@@ -776,7 +776,7 @@ class Generator {
 
   // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops hand each row its item rather than an accessor to it.
   private get staticLoops(): boolean {
-    if (this.options.check || this.options.island)
+    if (this.options.check || this.options.island !== undefined)
       return false
 
     return this.options.output === 'html' || this.options.twin !== undefined || (this.server !== undefined && this.options.includeServer !== false)
@@ -908,7 +908,7 @@ class Generator {
       const children = element.children.filter(child => child.kind !== 'slot')
 
       // A static parent cannot hand an island markup: it renders on the server alone. `0` stands for the lines under the tag.
-      if (children.length > 0 && element.component && this.options.check && !this.options.island && !this.options.insideIsland) {
+      if (children.length > 0 && element.component && this.options.check && this.options.island === undefined && !this.options.insideIsland) {
         b.add(' {...KayChildren(').addSource(element.tag).add(')(')
         b.wrap(children[0]!, () => b.add('0'))
         b.add(')}')
@@ -936,7 +936,7 @@ class Generator {
         passed.set(name, { ...slot.name, label: `passed by this \`@${name}\`` })
 
         // `@row(todo)` passes a function the component calls per item, its parameters typed from the prop.
-        if (slot.params && this.options.check && !this.options.island && !this.options.insideIsland) {
+        if (slot.params && this.options.check && this.options.island === undefined && !this.options.insideIsland) {
           b.add(' ')
           this.emitFunctionPropCheck(element, slot.name)
         }
@@ -1005,7 +1005,7 @@ class Generator {
       if ((element.classes.length > 0 || merged) && attribute === classAttributes[0])
         continue
 
-      if (element.component && (this.options.island || this.options.insideIsland) && attribute.kind !== 'spread' && ISLAND_OPTIONS.has(this.text(attribute.name)))
+      if (element.component && (this.options.island !== undefined || this.options.insideIsland) && attribute.kind !== 'spread' && ISLAND_OPTIONS.has(this.text(attribute.name)))
         this.error(attribute.name, `\`${this.text(attribute.name)}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
 
       b.add(' ')
@@ -1227,7 +1227,7 @@ class Generator {
 
     // Spread props reach an island serialized as the others do, so the object is checked as one prop would be.
     if (attribute.kind === 'spread') {
-      if (!element.component || this.options.island || this.options.insideIsland)
+      if (!element.component || this.options.island !== undefined || this.options.insideIsland)
         return false
 
       b.add('{...KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
@@ -1256,7 +1256,7 @@ class Generator {
       return true
     }
 
-    if (!element.component || this.options.island || this.options.insideIsland || attribute.kind !== 'expression' || name.startsWith('bind:'))
+    if (!element.component || this.options.island !== undefined || this.options.insideIsland || attribute.kind !== 'expression' || name.startsWith('bind:'))
       return false
 
     // A function never reaches an island, and left unwrapped it takes its parameter types from a generic component's other props.

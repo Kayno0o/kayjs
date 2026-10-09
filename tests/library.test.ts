@@ -237,7 +237,7 @@ describe('kay libraries', () => {
     const library = layout === 'installed' ? undefined : await mkdtemp(join(import.meta.dir, '.dom-'))
     const project = layout === 'linked around the app' ? join(library!, 'playground') : await newProject()
 
-    if (library) {
+    if (library !== undefined) {
       projects.push(library)
       await write(library, LIBRARY)
     }
@@ -245,7 +245,7 @@ describe('kay libraries', () => {
     if (layout === 'linked around the app')
       await write(project, PROJECT)
 
-    if (library) {
+    if (library !== undefined) {
       await rm(join(project, 'node_modules/kay-lib'), { recursive: true, force: true })
       await Bun.write(join(project, 'node_modules/.keep'), '')
       await symlink(library, join(project, 'node_modules/kay-lib'))

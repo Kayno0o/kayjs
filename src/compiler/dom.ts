@@ -266,7 +266,7 @@ export class DomTemplate {
     b.add(`(() => { const ${root.variable} = KayT${index}(); `)
 
     const variable = (node: TemplateNode): string => {
-      if (node.variable)
+      if (node.variable !== undefined)
         return node.variable
 
       let access: string
@@ -320,7 +320,7 @@ export class DomTemplate {
 
       if (element.id)
         html += ` id="${escapeStaticAttribute(this.source(element.id))}"`
-      else if (errorId)
+      else if (errorId !== undefined)
         html += ` id="${escapeStaticAttribute(errorId)}"`
 
       const classAttribute = this.classAttribute(element)

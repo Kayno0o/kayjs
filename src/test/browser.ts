@@ -76,13 +76,13 @@ const SETTLED = `document.readyState === 'complete' && !document.documentElement
 export function browserPath(path?: string): string | undefined {
   const given = path ?? process.env.BUN_CHROME_PATH
 
-  if (given)
+  if (given !== undefined && given !== '')
     return existsSync(given) ? given : Bun.which(given) ?? undefined
 
   for (const name of EXECUTABLES) {
     const found = Bun.which(name)
 
-    if (found)
+    if (found !== null && found !== '')
       return found
   }
 
@@ -93,10 +93,10 @@ export function browserPath(path?: string): string | undefined {
 export async function browse(url: string, options: BrowserOptions = {}): Promise<TestPage> {
   const executable = browserPath(options.path)
 
-  if (!executable) {
+  if (executable === undefined) {
     const given = options.path ?? process.env.BUN_CHROME_PATH
 
-    throw new Error(given ? `kay: no browser at ${given}` : 'kay: browser tests need Chrome or Chromium, and none was found; install one, or give its path as the `path` option or `BUN_CHROME_PATH`')
+    throw new Error(given !== undefined && given !== '' ? `kay: no browser at ${given}` : 'kay: browser tests need Chrome or Chromium, and none was found; install one, or give its path as the `path` option or `BUN_CHROME_PATH`')
   }
 
   const timeout = options.timeout ?? TIMEOUT_MS
@@ -154,7 +154,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         const answer = await within(view.evaluate(expression), until - Date.now())
 
         if (answer !== TIMED_OUT) {
-          if (answer)
+          const settled = Boolean(answer)
+
+          if (settled)
             return
 
           failure = undefined

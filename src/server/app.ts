@@ -85,7 +85,7 @@ async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<str
     let paths = byRoute.get(page.pattern)
 
     if (!paths)
-      byRoute.set(page.pattern, paths = new Map())
+      byRoute.set(page.pattern, paths = new Map<string, ServedPage>())
 
     paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, ...loaded[index]! })
   }
@@ -182,12 +182,13 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   // Scoped, so the app's own routes are compressed too; what is encoded already, as the build's copies are, goes as it is.
   if (options.compress) {
+    // eslint-disable-next-line ts/promise-function-async -- Elysia sends an empty body when a mapResponse promise resolves to undefined
     app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue) : undefined)
   }
 
   const log = options.log ?? process.env.NODE_ENV === 'production'
 
-  if (log)
+  if (log !== false)
     logRequests(app, log, options.health === false ? undefined : options.health?.path ?? HEALTH_PATH)
 
   if (options.rewrite)
@@ -270,7 +271,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, await serveApi(app, apiModules, actionOptions))
   serveErrorReports(app, options.onError)
 
-  if (options.security && options.security.reports === true)
+  if (options.security !== undefined && options.security !== false && options.security.reports === true)
     serveViolationReports(app, options.onError)
 
   setupPreview(options.preview, base)

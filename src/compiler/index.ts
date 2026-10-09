@@ -89,7 +89,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const client = file.client !== undefined || (options.clientOnly === true && !routeFile)
   const island = client || isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
-  const twin = hydratableServer && !options.twinBuild && !island && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
+  const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const generateOptions = { island, client, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, insideIsland: options.insideIsland, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
@@ -127,7 +127,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const reported = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).sort((a, b) => a.start - b.start)
 
   // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.
-  if (client && options.output === 'html' && island)
+  if (client && options.output === 'html' && island !== undefined)
     return { tsx: `import { island as KayIsland } from 'kay/island'\n\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true)})\n`, map: new SourceMap([], []), island, classes: shorthandClasses(file.template, source), diagnostics: reported }
 
   return {

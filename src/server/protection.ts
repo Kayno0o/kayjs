@@ -296,7 +296,7 @@ export function clientAddress(request: Request, server: Server<unknown> | null |
   if (trusted && fromProxy) {
     const forwarded = forwardedAddress(request, trusted)
 
-    if (forwarded)
+    if (forwarded !== undefined && forwarded !== '')
       return forwarded
   }
 
@@ -308,8 +308,11 @@ export function clientAddress(request: Request, server: Server<unknown> | null |
 
 // Each proxy appends the address it was reached from to `X-Forwarded-For`, so the client is `hops` entries from the end; with fewer, the request skipped an outer proxy and the first entry is who reached the inner one.
 function forwardedAddress(request: Request, { hops = 1, header }: ProxyConfig): string | undefined {
-  if (header !== undefined)
-    return request.headers.get(header)?.trim() || undefined
+  if (header !== undefined) {
+    const value = request.headers.get(header)?.trim()
+
+    return value === '' ? undefined : value
+  }
 
   const entries = request.headers.get('x-forwarded-for')?.split(',').map(entry => entry.trim()).filter(entry => entry !== '') ?? []
 

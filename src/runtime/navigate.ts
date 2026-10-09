@@ -91,7 +91,7 @@ export function startNavigation(given: NavigationHooks): void {
   if (eagerness === 'conservative') {
     document.addEventListener('pointerdown', onPrefetchHint, { passive: true })
   }
-  else if (eagerness) {
+  else if (eagerness !== false) {
     document.addEventListener('pointerover', onHover, { passive: true })
     document.addEventListener('focusin', onPrefetchHint)
   }
@@ -128,7 +128,7 @@ export async function refresh(): Promise<void> {
   await follow(new URL(location.href), { history: 'none', scroll: 'keep', refresh: true, focus: document.activeElement })
 }
 
-function loadSwap(): Promise<typeof import('./page-swap')> {
+async function loadSwap(): Promise<typeof import('./page-swap')> {
   return swapModule ??= import('./page-swap')
 }
 
@@ -278,7 +278,7 @@ function onHover(event: PointerEvent): void {
   const link = linkOf(event)
 
   if (link)
-    hoverTimer = setTimeout(prefetch, eagerness === 'eager' ? 0 : HOVER_DELAY_MS, link)
+    hoverTimer = setTimeout((target: HTMLAnchorElement) => void prefetch(target), eagerness === 'eager' ? 0 : HOVER_DELAY_MS, link)
 }
 
 function onPrefetchHint(event: Event): void {

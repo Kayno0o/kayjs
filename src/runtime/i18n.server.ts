@@ -27,6 +27,7 @@ export const t = ((key: string, params?: Record<string, MessageValue>) => {
 }) as Translate
 
 export function locale(): Locale {
+  // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them
   return current('locale()').locale as Locale
 }
 

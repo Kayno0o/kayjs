@@ -44,5 +44,5 @@ function fieldRules(field: unknown): FieldRules {
     rules[keyword] = keyword === 'items' ? fieldRules(value) : keyword === 'anyOf' ? (value as unknown[]).map(fieldRules) : value
   }
 
-  return rules as FieldRules
+  return rules
 }

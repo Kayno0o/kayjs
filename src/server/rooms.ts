@@ -111,7 +111,7 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
         subscribed = true
       }
 
-      local.set(room, (local.get(room) ?? new Map()).set(id, { raw: ws.raw, member: written }))
+      local.set(room, (local.get(room) ?? new Map<string, { raw: RoomConnection['raw'], member: string }>()).set(id, { raw: ws.raw, member: written }))
       joined.set(ws.raw, (joined.get(ws.raw) ?? new Set()).add(room))
       store.add(room, id, written)
     },
@@ -166,7 +166,7 @@ export function memoryRooms(): RoomStore {
 
   return {
     add(room, connection, member) {
-      byRoom.set(room, (byRoom.get(room) ?? new Map()).set(connection, member))
+      byRoom.set(room, (byRoom.get(room) ?? new Map<string, string>()).set(connection, member))
     },
     remove(room, connection) {
       const members = byRoom.get(room)

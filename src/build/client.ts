@@ -2,7 +2,6 @@ import type { BunPlugin } from 'bun'
 import type { LintLevels } from '../compiler/lints'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { KayLibrary } from './libraries'
-import type { BundleInputs } from './server-only'
 import type { FileDiagnostic } from './transform'
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
@@ -90,7 +89,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
         problems.push(formatDiagnostic(source, relative(root, file), diagnostic))
     }
 
-    if (compiled.island)
+    if (compiled.island !== undefined)
       islands.set(compiled.island, file)
 
     for (const name of compiled.classes)
@@ -143,12 +142,12 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   const publicEnv = options.publicEnv ? `${options.base ?? ''}${PUBLIC_ENV_PATH}` : undefined
 
   await Bun.write(bootFile, [
-    ...publicEnv ? [`import kayPublicEnv from ${JSON.stringify(publicEnv)}`] : [],
+    ...publicEnv !== undefined ? [`import kayPublicEnv from ${JSON.stringify(publicEnv)}`] : [],
     `import { ${[...navigation ? ['disposeIslands'] : [], ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
     // Development: `kay dev`'s page script refreshes the page through the swap for an edit no island swap covers.
     ...options.hot && navigation ? ['import { refresh } from \'kay\''] : [],
     '',
-    ...publicEnv ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
+    ...publicEnv !== undefined ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
     `const islands = {\n${registry}\n}`,
     'const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)',
     '',
@@ -168,7 +167,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
   const define = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') }
-  const external = publicEnv ? [publicEnv] : []
+  const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = async (anchor?: string) => [withoutStyles(), apiStubs(apiDir, await scanApi(apiDir)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings, anchor }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
@@ -202,12 +201,12 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     throw new AggregateError(build.logs, 'kay: client build failed')
   }
 
-  await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs as Outputs)
+  await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs)
 
-  const manifest = islandManifest(root, build.metafile!.outputs as Outputs, islands, entryFile, options.hot === true)
+  const manifest = islandManifest(root, build.metafile!.outputs, islands, entryFile, options.hot === true)
 
   // Preloaded with the entry's own chunks, as the entry waits for it before hydrating.
-  if (publicEnv)
+  if (publicEnv !== undefined)
     manifest.entryImports.push(PUBLIC_ENV_PATH)
 
   return { ...manifest, navigation }
@@ -222,7 +221,7 @@ async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'],
     return
 
   const probe = await Bun.build({ ...config, external: [...config.external ?? [], ...BUILTINS], throw: false })
-  const chains = probe.success ? builtinChains(root, probe.metafile!.inputs as BundleInputs, islands.values(), builtins) : []
+  const chains = probe.success ? builtinChains(root, probe.metafile!.inputs, islands.values(), builtins) : []
 
   if (chains.length > 0)
     throw new Error(`kay: a browser has no ${builtins.join(', ')}, and islands import modules reaching ${builtins.length === 1 ? 'it' : 'them'}: ${chains.join('; ')}. An island bundles every module it imports, the database or environment one opens as it loads included: move what the island needs to a module importing none of it, or pass it as a prop.`)
@@ -250,16 +249,16 @@ async function buildStyles(root: string, dir: string, pages: string[], libraries
   const styles: Record<string, string> = {}
 
   for (const meta of Object.values(build.metafile!.outputs as Outputs)) {
-    const file = meta.cssBundle && meta.entryPoint !== undefined ? entryFile(root, meta.entryPoint, pageFiles) : undefined
+    const file = meta.cssBundle !== undefined && meta.entryPoint !== undefined ? entryFile(root, meta.entryPoint, pageFiles) : undefined
 
-    if (file)
+    if (file !== undefined)
       styles[relative(root, file)] = assetUrl(meta.cssBundle!)
   }
 
   // The code the entries shrank to is only a vehicle for their stylesheets.
   await Promise.all(build.outputs.filter(output => output.kind === 'entry-point' && JS_OUTPUT.test(output.path)).map(async output => rm(output.path)))
 
-  if (options.base) {
+  if (options.base !== undefined && options.base !== '') {
     const base = options.base
 
     await Promise.all(build.outputs.filter(output => CSS_OUTPUT.test(output.path)).map(async output => Bun.write(output.path, rebaseCss(await Bun.file(output.path).text(), base))))
@@ -293,7 +292,7 @@ function islandManifest(root: string, outputs: Outputs, islands: Map<string, str
 
     const file = entryFile(root, meta.entryPoint, files)
 
-    if (file) {
+    if (file !== undefined) {
       const chunks = [...closure(output)]
       const id = idByFile.get(file)!
 
@@ -309,12 +308,12 @@ function islandManifest(root: string, outputs: Outputs, islands: Map<string, str
     }
 
     // Any other entry point is a chunk some code imports dynamically, loaded when it asks for it.
-    if (!entryFile(root, meta.entryPoint, entries))
+    if (entryFile(root, meta.entryPoint, entries) === undefined)
       continue
 
     // An entry holding nothing but the import of the runtime's chunk is a request the page saves by loading that chunk itself.
     const statics = meta.imports.filter(imported => imported.kind === 'import-statement')
-    const loaded = statics.length === 1 && Object.values(meta.inputs ?? {}).every(input => !input.bytesInOutput) ? statics[0]!.path : output
+    const loaded = statics.length === 1 && Object.values(meta.inputs ?? {}).every(input => (input.bytesInOutput ?? 0) === 0) ? statics[0]!.path : output
 
     manifest.entry = assetUrl(loaded)
     manifest.entryImports = [...closure(loaded)].filter(chunk => chunk !== loaded).map(assetUrl)

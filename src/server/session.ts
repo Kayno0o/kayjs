@@ -76,9 +76,9 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   const config = { name: options.cookie ?? 'session', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : durationSeconds(options.maxAge, 'the session maxAge'), domain, store: options.store, keys }
 
   return new Elysia({ name: 'kay/session', seed: config.name })
-    .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) as Session<Data> }))
+    .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
     .onAfterHandle({ as: 'scoped' }, async (context) => {
-      const cookie = await (context.session as RequestSession<Data>).commit()
+      const cookie = await context.session.commit()
 
       if (cookie === undefined)
         return
@@ -92,9 +92,9 @@ export function session<Data extends object = SessionData>(options: SessionOptio
         return
       }
 
-      const before = context.set.headers['set-cookie'] as string | string[] | undefined
+      const before = context.set.headers['set-cookie']
 
-      context.set.headers['set-cookie'] = [before ?? []].flat().concat(cookie) as unknown as string
+      context.set.headers['set-cookie'] = [before ?? []].flat().concat(cookie)
     })
 }
 
@@ -200,18 +200,18 @@ class RequestSession<Data extends object> implements Session<Data> {
 
   private async read(): Promise<void> {
     const value = new Bun.CookieMap(this.request.headers.get('cookie') ?? '').get(this.config.name)
-    const opening = value ? opened(value, this.config.keys, this.config.name) : undefined
+    const opening = value !== null && value !== '' ? opened(value, this.config.keys, this.config.name) : undefined
     const sealed = opening?.sealed
 
     if (!sealed || sealed.issued + this.config.maxAge < Date.now() / 1000) {
       // An expired or forged cookie is cleared with the next write.
-      this.issued = value ? 0 : undefined
+      this.issued = value !== null && value !== '' ? 0 : undefined
 
       return
     }
 
     this.issued = sealed.issued
-    this.oldKey = opening!.oldKey
+    this.oldKey = opening.oldKey
 
     if (!this.config.store) {
       this.data = sealed.data ?? {}

@@ -41,7 +41,7 @@ async function stylesheet(variant: Variant): Promise<string> {
   return sizes.toSorted((a, b) => b.size - a.size)[0]!.href
 }
 
-if (!process.env.SKIP_PREPARE) {
+if ((process.env.SKIP_PREPARE ?? '') === '') {
   console.error('exporting, installing and building the sites')
   await prepare()
 }

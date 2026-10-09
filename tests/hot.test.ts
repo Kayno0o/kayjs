@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core'
 import { dev } from '../src/dev'
 
 // CI installs Chromium and names it in BUN_CHROME_PATH, where a missing browser fails rather than skipping.
-const executablePath = process.env.BUN_CHROME_PATH || chromium.executablePath()
+const executablePath = process.env.BUN_CHROME_PATH !== undefined && process.env.BUN_CHROME_PATH !== '' ? process.env.BUN_CHROME_PATH : chromium.executablePath()
 const browserInstalled = existsSync(executablePath)
 // Inside the repository, so the project resolves `kay` to it.
 const scratch = join(import.meta.dir, '../node_modules/.cache')
@@ -35,7 +35,7 @@ async function sameDocument(): Promise<boolean> {
   return page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)
 }
 
-describe.skipIf(!browserInstalled && !process.env.CI)('kay dev in Chromium', () => {
+describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in Chromium', () => {
   beforeAll(async () => {
     await mkdir(scratch, { recursive: true })
     root = await mkdtemp(join(scratch, 'hot-'))

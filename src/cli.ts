@@ -64,7 +64,7 @@ function parseCommand(args: string[], options: ParseArgsOptionsConfig, maxPositi
     return { values, positionals }
   }
   catch (error) {
-    console.error(`kay: ${error instanceof Error ? error.message : error}\n${USAGE}`)
+    console.error(`kay: ${error instanceof Error ? error.message : String(error)}\n${USAGE}`)
 
     return 1
   }
@@ -400,7 +400,7 @@ async function scaffold(args: string[]): Promise<number> {
 
   const dir = parsed.positionals[0]
 
-  if (!dir) {
+  if (dir === undefined || dir === '') {
     console.error(USAGE)
 
     return 1
@@ -528,7 +528,7 @@ async function fmt(args: string[]): Promise<number> {
   if (typeof parsed === 'number')
     return parsed
 
-  const write = !parsed.values.check
+  const write = parsed.values.check !== true
   const { positionals: paths } = parsed
   let result: Awaited<ReturnType<typeof formatFiles>>
 

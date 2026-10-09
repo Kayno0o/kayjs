@@ -80,7 +80,7 @@ describe('icons', () => {
     expect(iconProps(file, 'wide')).toEqual({ 'viewBox': '0 0 32 16', 'width': '2em', 'height': '1em', 'aria-hidden': 'true', 'innerHTML': trustHtml('<path d="M0 0h32v16"/>') })
     expect(String(iconProps(file, 'flipped')!.innerHTML)).toBe('<g transform="translate(32 0) scale(-1 1)"><path d="M0 0h32v16"/></g>')
     expect(String(iconProps(file, 'turned')!.innerHTML)).toBe('<g transform="rotate(90 16 8)"><path d="M0 0h32v16"/></g>')
-    expect(setIconProps(await Bun.file(file).json() as IconSet, 'turned')).toEqual(iconProps(file, 'turned')!)
+    expect(setIconProps(await Bun.file(file).json() as IconSet, 'turned')).toEqual(iconProps(file, 'turned'))
     expect(iconProps(file, 'loop')).toBeUndefined()
     expect(iconProps(file, 'nothing')).toBeUndefined()
   })
@@ -91,9 +91,9 @@ describe('icons', () => {
     const tabler: IconSet = imported
     const file = Bun.resolveSync('@iconify-json/tabler/icons.json', process.cwd())
 
-    expect(setIconProps(tabler, 'home')).toEqual(iconProps(file, 'home')!)
+    expect(setIconProps(tabler, 'home')).toEqual(iconProps(file, 'home'))
     // `123` is an alias of `number-123`.
-    expect(setIconProps(tabler, '123')).toEqual(setIconProps(tabler, 'number-123')!)
+    expect(setIconProps(tabler, '123')).toEqual(setIconProps(tabler, 'number-123'))
     expect(setIconProps(tabler, 'nothing')).toBeUndefined()
     expect(iconNames(tabler)).toEqual(expect.arrayContaining(['home', '123']))
   })

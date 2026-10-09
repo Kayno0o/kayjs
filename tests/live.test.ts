@@ -71,7 +71,7 @@ describe('API modules', () => {
   })
 
   it('refuses a post another site\'s page sends, and lets one with no browser behind it through', async () => {
-    const answer = (headers: Record<string, string>) => site.fetch('/api/chat/answer', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ prompt: 'hi' }) })
+    const answer = async (headers: Record<string, string>) => site.fetch('/api/chat/answer', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ prompt: 'hi' }) })
 
     expect((await answer({ origin: 'https://evil.example' })).status).toBe(403)
     expect((await answer({})).status).toBe(200)
@@ -315,7 +315,7 @@ describe('resource()', () => {
       // @ts-expect-error: a number crosses as bare text, typed nowhere
       resource(chat, '/count')
       // @ts-expect-error: a value from JSON has no Date
-      resource(chat, '/rooms').value()?.[0]?.opened.getTime()
+      resource(chat, '/rooms').value()?.[0]?.opened.getTime() // eslint-disable-line ts/no-unsafe-call -- the line is a type test: it must fail to type, which leaves the call unresolved
     }
 
     expect(typed).toBeFunction()
@@ -353,7 +353,7 @@ describe('kay check, API modules', () => {
 
 describe('rooms', () => {
   const guest = (name: string) => site.socket(party, '/', { query: { name } })
-  const members = async (room: string) => (await site.fetch(`/api/party/members/${room}`)).json()
+  const members = async (room: string) => (await site.fetch(`/api/party/members/${room}`)).json() as Promise<string[]>
 
   it('lists who joined a room, sends a message to everyone in it but who it came from, and drops the room once empty', async () => {
     const ada = guest('ada')
@@ -567,7 +567,9 @@ describe('rooms', () => {
     expect(handle({ type: 'add', amount: 3 })).toBe(3)
     expect(handle({ type: 'reset' })).toBe(0)
     expect(() => handle({ type: 'toString' } as never)).toThrow('no handler for a message of type toString')
+    const reset = { type: 'reset' } as Message
+
     // @ts-expect-error every type is handled
-    dispatch({ type: 'reset' } as Message, { reset: () => 0 })
+    dispatch(reset, { reset: () => 0 })
   })
 })

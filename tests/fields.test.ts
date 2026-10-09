@@ -110,7 +110,7 @@ describe('readQuery', () => {
   const query = (search: string, schema?: unknown) => readQuery(schema, new URL(`http://localhost/${search}`))
 
   it('reads each parameter as text, a repeated one as a list, whatever its name', () => {
-    expect(query('?a=1&b=x&b=y&constructor=c&__proto__=p&__proto__=q')).toEqual(Object.fromEntries([['a', '1'], ['b', ['x', 'y']], ['constructor', 'c'], ['__proto__', ['p', 'q']]]))
+    expect(query('?a=1&b=x&b=y&constructor=c&__proto__=p&__proto__=q')).toEqual((Object.fromEntries([['a', '1'], ['b', ['x', 'y']], ['constructor', 'c'], ['__proto__', ['p', 'q']]])) as Readonly<Record<string, unknown>>)
   })
 
   it('fills defaults, a boolean or list one included, reads unticked checkboxes as false and decodes dates', () => {

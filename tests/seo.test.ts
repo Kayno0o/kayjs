@@ -98,7 +98,7 @@ describe('seo head', () => {
 
   it('puts JSON-LD in the schema.org context unless it names its own, several things in one graph', () => {
     expect(JSON.parse(jsonLd({ '@type': 'Person', 'name': 'Ada' }))).toEqual({ '@context': 'https://schema.org', '@type': 'Person', 'name': 'Ada' })
-    expect(JSON.parse(jsonLd({ '@context': 'https://example.com/vocab', '@type': 'Thing' }))['@context']).toBe('https://example.com/vocab')
+    expect((JSON.parse(jsonLd({ '@context': 'https://example.com/vocab', '@type': 'Thing' })) as Record<string, unknown>)['@context']).toBe('https://example.com/vocab')
     expect(JSON.parse(jsonLd([{ '@type': 'WebSite' }, { '@type': 'Organization' }]))).toEqual({ '@context': 'https://schema.org', '@graph': [{ '@type': 'WebSite' }, { '@type': 'Organization' }] })
   })
 

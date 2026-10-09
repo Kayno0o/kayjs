@@ -379,7 +379,7 @@ export function builtinChains(root: string, inputs: BundleInputs, islands: Itera
 
       shown.push(name ?? file)
 
-      if (name)
+      if (name !== undefined)
         break
     }
 

@@ -294,8 +294,8 @@ describe('kay new', () => {
 
       // Signs in through the action and lands in the guarded section, reads a seeded member, and counts the visitors online over the websocket, each test file on a database of its own.
       // They need a Postgres the test user may create databases on, which CI always has.
-      if (TEST_DATABASE_URL || process.env.CI) {
-        const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...TEST_DATABASE_URL && { DATABASE_URL: TEST_DATABASE_URL } } })
+      if ((TEST_DATABASE_URL ?? '') !== '' || (process.env.CI ?? '') !== '') {
+        const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...TEST_DATABASE_URL !== undefined && TEST_DATABASE_URL !== '' && { DATABASE_URL: TEST_DATABASE_URL } } })
         const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
         expect(report).toContain('5 pass')

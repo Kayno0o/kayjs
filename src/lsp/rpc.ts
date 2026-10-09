@@ -40,7 +40,7 @@ export class Connection {
     this.closed = this.listen(input)
   }
 
-  request<Result>(method: string, params?: unknown): Promise<Result> {
+  async request<Result>(method: string, params?: unknown): Promise<Result> {
     const id = ++this.nextId
 
     return new Promise<Result>((resolve, reject) => {
@@ -54,11 +54,11 @@ export class Connection {
   }
 
   onRequest<Params>(method: string, handler: (params: Params) => unknown): void {
-    this.requests.set(method, handler as RequestHandler)
+    this.requests.set(method, handler)
   }
 
   onNotification<Params>(method: string, handler: (params: Params) => void): void {
-    this.notifications.set(method, handler as NotificationHandler)
+    this.notifications.set(method, handler)
   }
 
   onUnhandledRequest(handler: (method: string, params: unknown) => unknown): void {

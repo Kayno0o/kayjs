@@ -20,8 +20,8 @@ describe('the noticeboard example', () => {
   }, 60_000)
 
   // Signs in, mails links, pins notices over the rooms, runs the queue and drives the islands in a browser, each test file on a database of its own.
-  it.skipIf(!TEST_DATABASE_URL && !process.env.CI)('passes its own tests', async () => {
-    if (!TEST_DATABASE_URL)
+  it.skipIf((TEST_DATABASE_URL ?? '') === '' && (process.env.CI ?? '') === '')('passes its own tests', async () => {
+    if (TEST_DATABASE_URL === undefined || TEST_DATABASE_URL === '')
       throw new Error('set TEST_DATABASE_URL to a Postgres whose user may create databases')
 
     const database = new URL(TEST_DATABASE_URL)

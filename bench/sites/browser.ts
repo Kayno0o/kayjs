@@ -71,14 +71,14 @@ export async function vitals(browser: Browser, variant: Variant, path: string, p
     const page = await context.newPage()
     const session = await context.newCDPSession(page)
 
-    await context.route(url => url.hostname !== 'localhost', route => route.abort())
+    await context.route(url => url.hostname !== 'localhost', async route => route.abort())
     await page.addInitScript(OBSERVE)
     await session.send('Network.enable')
     await session.send('Network.setCacheDisabled', { cacheDisabled: true })
     await session.send('Network.emulateNetworkConditions', { offline: false, latency: profile.latency, downloadThroughput: profile.down, uploadThroughput: profile.up })
     await session.send('Emulation.setCPUThrottlingRate', { rate: profile.cpu })
     await page.goto(`https://localhost:${variant.ports.https}${path}`, { waitUntil: 'load' })
-    runs.push(await page.evaluate(COLLECT) as Vitals)
+    runs.push(await page.evaluate<Vitals>(COLLECT))
     await context.close()
   }
 

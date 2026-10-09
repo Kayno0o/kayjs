@@ -59,8 +59,8 @@ class SchemaTranslator {
       if (option === 'format')
         options.push(`format: '${name === 'url' ? 'uri' : 'email'}'`)
       else if (option === 'pattern' && call.arguments[0]?.type === 'RegExpLiteral')
-        options.push(`pattern: ${JSON.stringify((call.arguments[0]).pattern)}`)
-      else if (option && call.arguments[0])
+        options.push(`pattern: ${JSON.stringify(call.arguments[0].pattern)}`)
+      else if (option !== undefined && call.arguments[0])
         options.push(`${option}: ${this.text(call.arguments[0])}`)
       else if (kind === 'number' && name === 'int')
         integer = true
@@ -199,7 +199,7 @@ function collectionsOf(object: t.ObjectExpression, declared: Map<string, t.CallE
     const value = property.type === 'ObjectProperty' ? property.value : undefined
     const call = value?.type === 'Identifier' ? declared.get(value.name) : value?.type === 'CallExpression' ? value : undefined
 
-    if (!name || !call || call.arguments[0]?.type !== 'ObjectExpression') {
+    if (name === undefined || name === '' || !call || call.arguments[0]?.type !== 'ObjectExpression') {
       notes.push({ line: property.loc!.start.line, message: `the collection ${name ?? source.slice(property.start!, property.end!)} is not a \`defineCollection({...})\` kay migrate reads: write it by hand` })
 
       continue

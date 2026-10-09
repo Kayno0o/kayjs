@@ -209,7 +209,7 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
     if (!document.querySelector(`${ISLAND}[data-component="${CSS.escape(id)}"]`)) {
       // Not on this page: a later one rendering it loads the new chunk, unless that would bring code the page runs again.
       if (fits(chunks))
-        registry[id] = async () => import(chunk)
+        registry[id] = async () => import(chunk) as ReturnType<IslandRegistry[string]>
 
       continue
     }
@@ -223,7 +223,7 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
   const modules = await Promise.all(shown.map(async ([id, chunk]) => [id, chunk, await import(chunk) as Awaited<ReturnType<IslandRegistry[string]>>] as const))
 
   for (const [id, chunk, module] of modules) {
-    registry[id] = async () => import(chunk)
+    registry[id] = async () => import(chunk) as ReturnType<IslandRegistry[string]>
 
     for (const element of document.querySelectorAll<HTMLElement>(`${ISLAND}[data-component="${CSS.escape(id)}"]`)) {
       const dispose = disposers.get(element)
@@ -254,7 +254,7 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
     }
   }
 
-  if (swap.entry)
+  if (swap.entry !== undefined && swap.entry !== '')
     document.querySelector('script[type="module"][src]')?.setAttribute('src', withBase(swap.entry))
 
   return true

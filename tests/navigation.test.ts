@@ -6,7 +6,7 @@ import { chromium } from 'playwright-core'
 
 const LISTENING = /port (\d+)/
 // CI installs Chromium and names it in BUN_CHROME_PATH, where a missing browser fails rather than skipping.
-const executablePath = process.env.BUN_CHROME_PATH || chromium.executablePath()
+const executablePath = process.env.BUN_CHROME_PATH !== undefined && process.env.BUN_CHROME_PATH !== '' ? process.env.BUN_CHROME_PATH : chromium.executablePath()
 const browserInstalled = existsSync(executablePath)
 
 let server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
@@ -42,7 +42,7 @@ function pageError(message: ConsoleMessage): boolean {
   return message.type() === 'error' && !message.location().url.endsWith('/favicon.ico')
 }
 
-describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', () => {
+describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap in Chromium', () => {
   beforeAll(async () => {
     server = Bun.spawn(['bun', 'tests/fixtures/navigation/server.ts'], { env: { ...process.env, NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
     origin = `http://localhost:${await listeningPort(server)}`
@@ -121,7 +121,7 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
 
   it('loads the form checks once a form is used, and checks a form submitted before they loaded', async () => {
     const fresh = await browser.newPage()
-    const checksLoaded = (): Promise<boolean> => fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/validate-[^/]*\.js$/).test(entry.name)))
+    const checksLoaded = async (): Promise<boolean> => fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/validate-[^/]*\.js$/).test(entry.name)))
 
     await fresh.goto(`${origin}/second`)
     await fresh.locator('form').waitFor()
@@ -142,7 +142,7 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
 
   it('loads the swap once a link is pointed at or followed, and swaps a link clicked before it loaded', async () => {
     const fresh = await browser.newPage()
-    const swapLoaded = (): Promise<boolean> => fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/page-swap-[^/]*\.js$/).test(entry.name)))
+    const swapLoaded = async (): Promise<boolean> => fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/page-swap-[^/]*\.js$/).test(entry.name)))
 
     await fresh.goto(origin)
     await Bun.sleep(200)
@@ -164,7 +164,7 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
   it('loads the next page fully when the swap cannot load', async () => {
     const fresh = await browser.newPage()
 
-    await fresh.route(/\/page-swap-[^/]*\.js$/, route => route.abort())
+    await fresh.route(/\/page-swap-[^/]*\.js$/, async route => route.abort())
     await fresh.goto(origin)
     await fresh.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
@@ -185,7 +185,7 @@ describe.skipIf(!browserInstalled && !process.env.CI)('page swap in Chromium', (
       if (request.method() === 'POST')
         posts.push(new URL(request.url()).pathname.replace(/\/_kay\/action\/.*/, '/_kay/action'))
     })
-    await fresh.route(/\/validate-[^/]*\.js$/, route => route.abort())
+    await fresh.route(/\/validate-[^/]*\.js$/, async route => route.abort())
     await fresh.goto(`${origin}/second`)
     await fresh.focus('input[name="title"]')
     await fresh.fill('input[name="title"]', 'ab')

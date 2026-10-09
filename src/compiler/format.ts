@@ -146,22 +146,25 @@ function lineEnd(source: string, from: number): number {
 // Spans that may run over several lines: attribute lists and braced expressions.
 function multiLineSpans(nodes: Node[]): Span[] {
   return nodes.flatMap((node): Span[] => {
-    switch (node.kind) {
-      case 'element':
-        return [...(node.parens ? [node.parens] : []), ...multiLineSpans(node.children)]
-      case 'text':
-        return node.parts.flatMap(part => part.kind === 'chunk' ? [] : part.kind === 'expression' ? [part] : multiLineSpans([part]))
-      case 'if':
-        return node.branches.flatMap(branch => [...(branch.test ? [branch.test] : []), ...multiLineSpans(branch.children)])
-      case 'for':
-        return [node.each, ...node.key ? [{ start: node.key.start - 1, end: node.key.end + 1 }] : [], ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]
-      case 'await':
-        return [node.value, ...multiLineSpans(awaitBlocks(node).flat())]
-      case 'try':
-        return multiLineSpans(tryBlocks(node).flat())
-      default:
-        return [...(node.params ? [node.params] : []), ...multiLineSpans(node.children)]
-    }
+    if (node.kind === 'element')
+      return [...(node.parens ? [node.parens] : []), ...multiLineSpans(node.children)]
+
+    if (node.kind === 'text')
+      return node.parts.flatMap(part => part.kind === 'chunk' ? [] : part.kind === 'expression' ? [part] : multiLineSpans([part]))
+
+    if (node.kind === 'if')
+      return node.branches.flatMap(branch => [...(branch.test ? [branch.test] : []), ...multiLineSpans(branch.children)])
+
+    if (node.kind === 'for')
+      return [node.each, ...node.key ? [{ start: node.key.start - 1, end: node.key.end + 1 }] : [], ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]
+
+    if (node.kind === 'await')
+      return [node.value, ...multiLineSpans(awaitBlocks(node).flat())]
+
+    if (node.kind === 'try')
+      return multiLineSpans(tryBlocks(node).flat())
+
+    return [...(node.params ? [node.params] : []), ...multiLineSpans(node.children)]
   })
 }
 
@@ -209,7 +212,7 @@ function trailingTextEnds(nodes: Node[]): Set<number> {
           ends.add(end)
 
         break
-      default:
+      case 'slot':
         for (const end of trailingTextEnds(node.children))
           ends.add(end)
     }
@@ -253,22 +256,25 @@ function attributeText(source: string, attribute: Attribute): string {
 
 function elementsOf(nodes: Node[]): ElementNode[] {
   return nodes.flatMap((node): ElementNode[] => {
-    switch (node.kind) {
-      case 'element':
-        return [node, ...elementsOf(node.children)]
-      case 'text':
-        return elementsOf(node.parts.filter(part => part.kind === 'element'))
-      case 'if':
-        return node.branches.flatMap(branch => elementsOf(branch.children))
-      case 'for':
-        return [...elementsOf(node.children), ...elementsOf(node.fallback ?? [])]
-      case 'await':
-        return elementsOf(awaitBlocks(node).flat())
-      case 'try':
-        return elementsOf(tryBlocks(node).flat())
-      default:
-        return elementsOf(node.children)
-    }
+    if (node.kind === 'element')
+      return [node, ...elementsOf(node.children)]
+
+    if (node.kind === 'text')
+      return elementsOf(node.parts.filter(part => part.kind === 'element'))
+
+    if (node.kind === 'if')
+      return node.branches.flatMap(branch => elementsOf(branch.children))
+
+    if (node.kind === 'for')
+      return [...elementsOf(node.children), ...elementsOf(node.fallback ?? [])]
+
+    if (node.kind === 'await')
+      return elementsOf(awaitBlocks(node).flat())
+
+    if (node.kind === 'try')
+      return elementsOf(tryBlocks(node).flat())
+
+    return elementsOf(node.children)
   })
 }
 

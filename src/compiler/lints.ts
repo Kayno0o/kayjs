@@ -190,7 +190,7 @@ function positionalKey(source: string, node: ForNode, found: Diagnostic[]) {
   const index = node.index && text(node.index)
   const first = node.children[0]
 
-  if (!index || !first || !node.key || text(node.key).trim() !== index || !IDENTIFIER.test(item))
+  if (index === undefined || index === '' || !first || !node.key || text(node.key).trim() !== index || !IDENTIFIER.test(item))
     return
 
   const rows = source.slice(first.start, node.children.at(-1)!.end)

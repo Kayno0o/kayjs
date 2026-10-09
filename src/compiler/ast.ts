@@ -263,6 +263,8 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
           visit(node.children, loop)
 
           break
+        case 'text':
+          break
       }
     }
   }

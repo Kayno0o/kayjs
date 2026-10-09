@@ -135,7 +135,7 @@ describe('page swap, on the server', () => {
   })
 
   it('marks an island kept across navigations, under its component or a key of its own', () => {
-    const Player = island('player.kay', () => ({ t: '<button>Play</button>' }) as never)
+    const Player = island('player.kay', () => ({ t: '<button>Play</button>' }))
 
     expect(child(Player({ persist: true }))).toContain('<slot data-component="player.kay" data-props="[{}]" data-persist="player.kay">')
     expect(child(Player({ persist: 'radio' }))).toContain('data-persist="radio"')

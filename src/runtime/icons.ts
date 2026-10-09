@@ -43,7 +43,7 @@ export function iconNames(set: IconSet): string[] {
 export function iconProps(set: IconSet, name: string): IconProps | undefined {
   const icon = resolveIcon(set, name, 0)
 
-  if (!icon?.body)
+  if (icon?.body === undefined || icon.body === '')
     return undefined
 
   const width = icon.width ?? set.width ?? DEFAULT_SIZE
@@ -58,7 +58,7 @@ export function iconProps(set: IconSet, name: string): IconProps | undefined {
   if (icon.vFlip)
     transforms.push(`translate(0 ${top * 2 + height}) scale(1 -1)`)
 
-  if (icon.rotate)
+  if (icon.rotate !== undefined && icon.rotate !== 0)
     transforms.push(`rotate(${(icon.rotate % 4) * 90} ${left + width / 2} ${top + height / 2})`)
 
   return {
@@ -79,7 +79,7 @@ function resolveIcon(set: IconSet, name: string, depth: number): IconifyIcon | u
 
   const alias = set.aliases?.[name]
 
-  if (!alias?.parent || depth > 8)
+  if (alias?.parent === undefined || alias.parent === '' || depth > 8)
     return undefined
 
   const parent = resolveIcon(set, alias.parent, depth + 1)

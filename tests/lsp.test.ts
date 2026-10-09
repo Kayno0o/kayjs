@@ -18,7 +18,7 @@ class Editor {
 
   constructor(readonly root: string, private readonly vscode = false) {
     this.connection = new Connection(this.process.stdout, (data) => {
-      this.process.stdin.write(data)
+      void this.process.stdin.write(data)
       void this.process.stdin.flush()
     })
     this.connection.onNotification<{ uri: string, diagnostics: Diagnostic[] }>('textDocument/publishDiagnostics', ({ uri, diagnostics }) => this.waiting.get(uri)?.(diagnostics))
@@ -84,7 +84,7 @@ class Editor {
   }
 
   write(data: string) {
-    this.process.stdin.write(data)
+    void this.process.stdin.write(data)
     void this.process.stdin.flush()
   }
 

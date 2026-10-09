@@ -166,7 +166,7 @@ export async function serveServiceWorker(app: Elysia, taken: ReadonlySet<string>
   if (taken.has(SERVICE_WORKER))
     return
 
-  const script = options.offline ? await workerScript(options, options.offline) : UNREGISTER
+  const script = options.offline !== undefined ? await workerScript(options, options.offline) : UNREGISTER
   const headers = { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }
 
   app.get(SERVICE_WORKER, () => new Response(script, { headers }))

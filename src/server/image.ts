@@ -110,24 +110,24 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
       const target = join(clientDir, VARIANTS_DIR, variantName(name, variant, format))
       // Asset names carry a hash of their content, so a cached variant only goes stale when the quality changes.
       const cachedName = `${level}-${variantName(name, variant, format)}`
-      const cached = cacheDir && join(cacheDir, cachedName)
+      const cached = cacheDir !== undefined && cacheDir !== '' ? join(cacheDir, cachedName) : undefined
 
       used.add(cachedName)
 
       if (await Bun.file(target).exists())
         continue
 
-      if (!cached || !await Bun.file(cached).exists()) {
-        await writeVariant(source, variant, cached || target, level, format)
+      if (cached === undefined || !await Bun.file(cached).exists()) {
+        await writeVariant(source, variant, cached ?? target, level, format)
         encoded++
       }
 
-      if (cached)
+      if (cached !== undefined)
         await Bun.write(target, Bun.file(cached))
     }
   }))
 
-  if (prune && cacheDir && existsSync(cacheDir))
+  if (prune && cacheDir !== undefined && cacheDir !== '' && existsSync(cacheDir))
     await Promise.all((await readdir(cacheDir)).filter(name => !used.has(name)).map(async name => rm(join(cacheDir, name), { force: true })))
 
   return encoded

@@ -147,6 +147,7 @@ function refusal(name: string, field: FieldRules, value: unknown): string | unde
         return `Expected array length to be greater or equal to ${field.minItems}`
 
       return field.maxItems !== undefined && value.length > field.maxItems ? `Expected array length to be less or equal to ${field.maxItems}` : undefined
+    case undefined:
     default:
       return undefined
   }

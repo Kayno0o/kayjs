@@ -31,7 +31,7 @@ async function until(condition: () => boolean, timeout = 5000): Promise<void> {
 // Bun.cron stood in for, so a test fires the job itself instead of waiting for the minute.
 function fakeCron() {
   const fired: { handler: () => unknown, stopped: boolean }[] = []
-  const { parse } = Bun.cron
+  const parse = Bun.cron.parse.bind(Bun.cron)
   const cron = spyOn(Bun, 'cron').mockImplementation(((_: string, handler: () => unknown) => {
     const entry = { handler, stopped: false }
 

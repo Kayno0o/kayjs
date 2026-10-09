@@ -8,7 +8,7 @@ const DIST = join(import.meta.dir, 'dist')
 
 // The same page shell as kay's: module entry in the head, the app straight in the body.
 export async function createApp() {
-  plugin(sveltePlugin('server'))
+  await plugin(sveltePlugin('server'))
 
   const [{ default: App }, { render }, { PRODUCTS }, build] = await Promise.all([
     import('./src/App.svelte'),

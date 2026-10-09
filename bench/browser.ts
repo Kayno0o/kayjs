@@ -163,7 +163,7 @@ export async function assertHydrated(browser: Browser, url: string): Promise<voi
 // The result is checked after each microtask first: Chromium may render a frame before the next task, and whether it does depends on where the click falls in the frame, not on the framework.
 export async function timeClick(page: Page, operation: Operation): Promise<number> {
   return page.evaluate(async ({ click, done, timeout, microtasks }) => {
-    // eslint-disable-next-line no-new-func -- the completion check is data, written as an expression over the document
+    // eslint-disable-next-line no-new-func, ts/no-implied-eval -- the completion check is data, written as an expression over the document
     const finished = new Function(`return ${done}`) as () => boolean
     const tick = async () => new Promise<void>((resolve) => {
       const channel = new MessageChannel()

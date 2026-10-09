@@ -296,7 +296,7 @@ describe('loops', () => {
     })
     const setList = (globalThis as unknown as { setList: (next: number[]) => void }).setList
     const items = () => [...root.querySelectorAll('li:not(.first, .last)')]
-    const keyOf = (item: Element) => item.textContent!.slice(0, item.textContent!.indexOf(':'))
+    const keyOf = (item: Element) => item.textContent.slice(0, item.textContent.indexOf(':'))
     const byKey = new Map(items().map(item => [keyOf(item), item]))
 
     try {
@@ -338,8 +338,8 @@ describe('loops', () => {
       const items = [...root.querySelectorAll('li')]
 
       expect(items.map(item => item.textContent)).toEqual(['B', 'A', 'c'])
-      expect(items[0]).toBe(b!)
-      expect(items[1]).toBe(a!)
+      expect(items[0]).toBe(b)
+      expect(items[1]).toBe(a)
     }
     finally {
       await dispose()
@@ -620,7 +620,7 @@ describe('the problems panel', () => {
 
     try {
       // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
-      new Function(script)()
+      (new Function(script) as () => void)()
       document.dispatchEvent(new Event('DOMContentLoaded', { bubbles: true }))
 
       expect(document.querySelector('kay-problems')!.shadowRoot!.textContent).toBe(`1 kay problemDismiss${problem}`)
@@ -662,7 +662,7 @@ describe('the live reload script', () => {
 
     try {
       // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
-      new Function(script)()
+      (new Function(script) as () => void)()
       await onBoot({ data: `${boot} 3` })
       expect(fetched).toEqual([])
 

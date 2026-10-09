@@ -28,7 +28,7 @@ export async function prepareFonts(root: string, fonts: (FontConfig | Fontsource
     const file = fontFile(root, font.src)
     const format = FORMATS[extname(file).toLowerCase()]
 
-    if (!format)
+    if (format === undefined)
       throw new Error(`kay: the font ${font.src} is no .woff2, .woff, .ttf or .otf file`)
 
     const url = await writeAsset(file, root)
@@ -97,7 +97,7 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
   const metadata = JSON.parse(readFileSync(file, 'utf8')) as FontsourceMetadata
   const subset = font.subset ?? metadata.defSubset
   // A static package's metadata describes the family's variable axes too: only a `@fontsource-variable` package ships them.
-  const variable = fontsource.startsWith(VARIABLE_SCOPE) ? metadata.variable ? metadata.variable.wght : undefined : undefined
+  const variable = fontsource.startsWith(VARIABLE_SCOPE) ? metadata.variable !== undefined && metadata.variable !== false ? metadata.variable.wght : undefined : undefined
 
   if (fontsource.startsWith(VARIABLE_SCOPE) && !variable)
     throw new Error(`kay: ${fontsource} has no weight axis to declare`)

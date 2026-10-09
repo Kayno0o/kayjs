@@ -10,7 +10,7 @@ import { transformKay } from '../src/build/transform'
 import { child } from '../src/runtime/html'
 import { renderToString } from '../src/server/string'
 
-plugin(kay())
+await plugin(kay())
 
 // An island's hydratable markup separates dynamic text with comment markers; the assertions read the text alone.
 const MARKERS = /<!--[[\]]-->/g
@@ -196,7 +196,7 @@ describe('class shorthand with a spread', () => {
 
   it('hands a component the merged class as one string, or none when nothing is set', async () => {
     await Bun.write(join(scratch, 'tagged.kay'), '---\nconst { class: className } = props<{ class?: string }>()\n---\np(title={`[${className}]`})\n')
-    const tagged = (call: string) => renderKay(`---\nimport Tagged from './tagged.kay'\n\nconst { sp, c } = props<{ sp: Record<string, string>, c?: string }>()\n---\n${call}`, { sp: spread, c: 'z' })
+    const tagged = async (call: string) => renderKay(`---\nimport Tagged from './tagged.kay'\n\nconst { sp, c } = props<{ sp: Record<string, string>, c?: string }>()\n---\n${call}`, { sp: spread, c: 'z' })
 
     expect(await tagged('Tagged({...sp} class={c})')).toBe('<p title="[FROM z]"></p>')
     expect(await tagged('Tagged.a(class={c})')).toBe('<p title="[a z]"></p>')

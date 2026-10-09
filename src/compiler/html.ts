@@ -326,7 +326,7 @@ export class HtmlTemplate {
     const target = this.formTarget
     const field = target && formFieldOf(element, this.src)
     const action = actionOf(element, this.src)
-    const described = field && target ? field.invalid ? describedByOf(element, this.src, this.options.errors, target, field.name) : undefined : action && describedByOf(element, this.src, this.options.errors, action.expression, '')
+    const described = field ? field.invalid ? describedByOf(element, this.src, this.options.errors, target, field.name) : undefined : action && describedByOf(element, this.src, this.options.errors, action.expression, '')
     // The attribute a refused post's value goes back in, and what the template gives it otherwise.
     const filled = field?.fill === 'value' || field?.fill === 'checked' ? field.fill : undefined
     let ownFill: (() => void) | undefined
@@ -339,7 +339,7 @@ export class HtmlTemplate {
 
     if (element.id)
       markup.text(` id="${escapeStaticAttribute(this.source(element.id))}"`)
-    else if (errorId)
+    else if (errorId !== undefined)
       markup.text(` id="${escapeStaticAttribute(errorId)}"`)
 
     if (element.classes.length > 0) {
@@ -473,7 +473,7 @@ export class HtmlTemplate {
 
     this.currentLink(element, markup)
 
-    if (field && target) {
+    if (field) {
       const fieldArguments = () => void b.add('((').addSource(target).add(`), ${JSON.stringify(field.name)}`)
 
       if (filled) {

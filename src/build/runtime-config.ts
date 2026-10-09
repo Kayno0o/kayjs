@@ -106,7 +106,7 @@ function parseModule(source: string, tokens: boolean): ReturnType<typeof parse> 
 function exportedObject(program: NodePath<t.Program>): t.ObjectExpression | undefined {
   const exported = program.node.body.find(statement => statement.type === 'ExportDefaultDeclaration')
 
-  return exported && objectOf(exported.declaration as t.Node, program)
+  return exported && objectOf(exported.declaration, program)
 }
 
 function objectOf(node: t.Node | null | undefined, program: NodePath<t.Program>): t.ObjectExpression | undefined {
@@ -157,7 +157,7 @@ function withTrailingComma(tokens: Token[], node: t.Node): Range {
   const next = tokens.find(token => token.start >= node.end! && !(typeof token.type === 'string' && COMMENTS.has(token.type)))
   const comma = typeof next?.type === 'object' && next.type.label === ','
 
-  return { start: node.start!, end: comma ? next!.end : node.end! }
+  return { start: node.start!, end: comma ? next.end : node.end! }
 }
 
 function withLineEnd(source: string, node: t.Node): Range {

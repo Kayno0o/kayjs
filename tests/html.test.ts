@@ -61,7 +61,7 @@ describe('props', () => {
 
 describe('loop', () => {
   it('renders each row with its index, and the fallback when there is nothing to list', () => {
-    expect(loop(['a', 'b'], (item, index) => `${item}${index}`)).toBe('a0b1')
+    expect(loop(['a', 'b'], (item, index) => `${item as string}${index as number}`)).toBe('a0b1')
     expect(loop(null, () => 'x', () => 'none')).toBe('none')
     expect(loop([], () => 'x')).toBe('')
   })

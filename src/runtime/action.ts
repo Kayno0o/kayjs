@@ -467,7 +467,7 @@ export function decodeCall(body: unknown): unknown {
   const input = parts[INPUT_PART]
 
   // Elysia may already have parsed the input part as JSON.
-  return typeof input === 'string' ? decodeValue(input, revivers) : unflattenValue(input as number, revivers)
+  return typeof input === 'string' ? decodeValue(input, revivers) : unflattenValue(input, revivers)
 }
 
 // What a call got back: the handler's result, or an `ActionError` with the refused fields and the failure data.

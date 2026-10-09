@@ -215,7 +215,7 @@ describe('pages', () => {
 
     try {
       // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
-      new Function(INLINE_SCRIPT.exec(html)![1]!)()
+      (new Function(INLINE_SCRIPT.exec(html)![1]!) as () => void)()
       document.body.innerHTML = BODY.exec(html)![1]!
       const button = document.querySelector('slot button')!
       const card = document.querySelector('article.card')!
@@ -281,7 +281,7 @@ describe('pages', () => {
   })
 
   it('refuses actions posted from another site and never redirects to one', async () => {
-    const post = (headers: Record<string, string>) => app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add', {
+    const post = async (headers: Record<string, string>) => app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
       body: new URLSearchParams({ title: 'Elsewhere' }),
@@ -302,7 +302,7 @@ describe('pages', () => {
   })
 
   it('answers a fetch call with the result and rejects input the schema refuses', async () => {
-    const call = (body: unknown) => app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add', {
+    const call = async (body: unknown) => app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kay-action': '1' },
       body: stringify(body),
@@ -335,7 +335,7 @@ describe('pages', () => {
 
     try {
       // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
-      new Function(INLINE_SCRIPT.exec(html)![1]!)()
+      (new Function(INLINE_SCRIPT.exec(html)![1]!) as () => void)()
       document.body.innerHTML = BODY.exec(html)![1]!
       await hydrateFrom(html)
       const input = document.querySelector<HTMLInputElement>('form.quick input')!
@@ -366,7 +366,7 @@ describe('request context', () => {
     .use(auth)
     .onBeforeHandle(({ user, path, status }) => user === undefined && path.includes('account') ? status(401, 'Sign in first') : undefined)
     .use(app)
-  const request = (path: string, init: RequestInit = {}) => guarded.handle(new Request(`http://localhost${path}`, init))
+  const request = async (path: string, init: RequestInit = {}) => guarded.handle(new Request(`http://localhost${path}`, init))
 
   it('passes what the app derives to pages as ctx.locals, behind its guard', async () => {
     expect((await request('/account')).status).toBe(401)
@@ -374,7 +374,7 @@ describe('request context', () => {
   })
 
   it('passes ctx.locals to actions behind the same guard and sends the cookies they set', async () => {
-    const post = (headers: Record<string, string>) => guarded.handle(new Request(ACCOUNT_ACTION, {
+    const post = async (headers: Record<string, string>) => guarded.handle(new Request(ACCOUNT_ACTION, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...headers },
       body: stringify({ theme: 'dark' }),
@@ -443,8 +443,8 @@ describe('page query', () => {
 describe('guards', () => {
   const PROMOTE = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/admin/index.kay/promote'
   const signedIn = new Elysia().use(auth).use(app)
-  const visit = (user?: string) => signedIn.handle(new NativeRequest('http://localhost/admin', { headers: user === undefined ? {} : { 'x-user': user } }))
-  const promote = (body: unknown, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest(PROMOTE, {
+  const visit = async (user?: string) => signedIn.handle(new NativeRequest('http://localhost/admin', { headers: user === undefined ? {} : { 'x-user': user } }))
+  const promote = async (body: unknown, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest(PROMOTE, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...headers },
     body: stringify(body),
@@ -627,7 +627,7 @@ describe('prerendering', () => {
       expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(4)
       const file = await Bun.file(join(root, '.kay/client/pages/admin/report.html')).text()
       const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
-      const visit = (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
+      const visit = async (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
       const served = await visit('ada')
       const etag = served.headers.get('etag')!
 
@@ -944,7 +944,7 @@ describe('route scan', () => {
 
 describe('failed actions', () => {
   const ADD = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/index.kay/add'
-  const postForm = (title: string, headers: Record<string, string> = {}) => app.handle(new Request(ADD, {
+  const postForm = async (title: string, headers: Record<string, string> = {}) => app.handle(new Request(ADD, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/', ...headers },
     body: new URLSearchParams({ title, password: 'hunter2' }),
@@ -984,7 +984,7 @@ describe('failed actions', () => {
   })
 
   it('answers a call with the failure as JSON', async () => {
-    const call = (title: string) => app.handle(new Request(ADD, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({ title }) }))
+    const call = async (title: string) => app.handle(new Request(ADD, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({ title }) }))
     const refused = await call('')
     const duplicate = await call('Serve pages')
 
@@ -1331,7 +1331,7 @@ describe('tracing and timing in production', () => {
 
 describe('action input', () => {
   const SURVEY = 'http://localhost/_kay/action/tests/fixtures/bare/src/routes/survey.kay'
-  const post = (name: string, body: URLSearchParams | FormData | string, headers: Record<string, string> = {}) => bare.handle(new Request(`${SURVEY}/${name}`, { method: 'POST', headers: { referer: 'http://localhost/survey', ...headers }, body }))
+  const post = async (name: string, body: URLSearchParams | FormData | string, headers: Record<string, string> = {}) => bare.handle(new Request(`${SURVEY}/${name}`, { method: 'POST', headers: { referer: 'http://localhost/survey', ...headers }, body }))
   const answered = async (body: URLSearchParams | FormData) => {
     const response = await post('answer', body)
 
@@ -1399,7 +1399,7 @@ describe('action input', () => {
 
   it('fails a call with the status ctx.fail gives, refusing one that is no error status', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
-    const fail = (status: number) => post('fails', stringify({ status }), { 'content-type': 'application/json', 'x-kay-action': '1' })
+    const fail = async (status: number) => post('fails', stringify({ status }), { 'content-type': 'application/json', 'x-kay-action': '1' })
 
     try {
       expect((await fail(418)).status).toBe(418)

@@ -516,7 +516,7 @@ export function branches(element: Node | null, start: Node | null, end: Node | n
     for (const [index, [test]] of list.entries()) {
       const value = test ? test() : true
 
-      if (value)
+      if (Boolean(value) !== false)
         return [index, value]
     }
 
@@ -602,7 +602,8 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
   let started = false
 
   renderEffect(() => {
-    const list = each() || []
+    const items = each()
+    const list = items === false || items == null ? [] : items
 
     untrack(() => {
       if (!started) {
@@ -1102,7 +1103,7 @@ export function className(value: unknown): string {
   if (typeof value === 'number')
     return String(value)
 
-  if (!value)
+  if (value == null || value === false || value === '')
     return ''
 
   if (typeof value === 'string')
@@ -1112,7 +1113,7 @@ export function className(value: unknown): string {
   let result = ''
 
   for (const key of Object.keys(classes)) {
-    if (key && key !== 'undefined' && classes[key])
+    if (key && key !== 'undefined' && Boolean(classes[key]))
       result += result ? ` ${key}` : key
   }
 
@@ -1139,7 +1140,7 @@ export function setClass(element: Element, value: unknown): void {
 }
 
 export function setStyle(element: Element, value: unknown): void {
-  if (!value) {
+  if (Boolean(value) === false) {
     element.removeAttribute('style')
 
     return

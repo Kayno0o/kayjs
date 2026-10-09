@@ -15,7 +15,7 @@ function errors(source: string): string[] {
 
 // Each diagnostic as rustc would print its parts: the message, the text it and each related span cover, and the help.
 function reports(source: string) {
-  return compileKay(source, 'test.kay').diagnostics.map(d => ({ message: d.message, at: source.slice(d.start, d.end), ...d.label && { label: d.label }, ...d.related && { related: d.related.map(span => [source.slice(span.start, span.end), span.label]) }, ...d.note && { note: d.note }, ...d.help && { help: d.help } }))
+  return compileKay(source, 'test.kay').diagnostics.map(d => ({ message: d.message, at: source.slice(d.start, d.end), ...d.label !== undefined && d.label !== '' && { label: d.label }, ...d.related && { related: d.related.map(span => [source.slice(span.start, span.end), span.label]) }, ...d.note !== undefined && d.note !== '' && { note: d.note }, ...d.help !== undefined && d.help !== '' && { help: d.help } }))
 }
 
 // The returned JSX alone, which is where most assertions look.

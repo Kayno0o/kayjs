@@ -57,7 +57,7 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
   try {
     const markup: Html = { t: `<!--kay-await:${id}-->${child(props.pending?.())}<!--/kay-await:${id}-->` }
 
-    return markup as unknown as JSX.Element
+    return markup
   }
   finally {
     deferred = blocks

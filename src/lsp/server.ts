@@ -123,7 +123,7 @@ export class KayLanguageServer {
   private async initialize(params: InitializeParams) {
     const rootUri = params.rootUri ?? params.workspaceFolders?.[0]?.uri
 
-    this.root = rootUri ? resolve(fileURLToPath(rootUri)) : resolve(params.rootPath ?? process.cwd())
+    this.root = rootUri !== undefined && rootUri !== '' ? resolve(fileURLToPath(rootUri)) : resolve(params.rootPath ?? process.cwd())
     this.routesSetting = params.initializationOptions?.routes
     // A client that writes URIs the way Node does keeps getting them that way, any other the way VS Code does.
     this.nodeUris = rootUri !== undefined && rootUri !== vscodeUri(this.root) && rootUri === pathToFileURL(this.root).href
@@ -133,7 +133,7 @@ export class KayLanguageServer {
 
     const child = Bun.spawn([process.execPath, TSGO, '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
     const connection = new Connection(child.stdout, (data) => {
-      child.stdin.write(data)
+      void child.stdin.write(data)
       void child.stdin.flush()
     })
 
@@ -320,7 +320,7 @@ export class KayLanguageServer {
       severity: diagnostic.severity === 'warning' ? WARNING : ERROR,
       source: 'kay',
       ...diagnostic.code !== undefined && { code: diagnostic.code },
-      message: [diagnostic.label ? `${diagnostic.message} (${diagnostic.label})` : diagnostic.message, ...[['note', diagnostic.note], ['help', diagnostic.help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n'),
+      message: [diagnostic.label !== undefined && diagnostic.label !== '' ? `${diagnostic.message} (${diagnostic.label})` : diagnostic.message, ...[['note', diagnostic.note], ['help', diagnostic.help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n'),
       ...diagnostic.related && { relatedInformation: diagnostic.related.map(span => ({ location: { uri: document.uri, range: rangeOf(span) }, message: span.label })) },
       ...diagnostic.code === 'unread-name' && { tags: [UNNECESSARY] },
     }))
@@ -422,7 +422,7 @@ export class KayLanguageServer {
     const offset = toOffset(document.source, params.range.start)
 
     return [...own, ...(actions ?? []).flatMap((action): CodeAction[] => {
-      const changes = action.edit && !action.command ? fileEdits(action.edit) : undefined
+      const changes = action.edit && action.command == null ? fileEdits(action.edit) : undefined
       const edits = changes?.length === 1 && changes[0]![0] === document.shadowUri ? sourceEdits(document, changes[0]![1], offset) : undefined
 
       return edits ? [{ title: action.title, kind: action.kind, isPreferred: action.isPreferred, edit: { changes: { [document.uri]: edits } } }] : []
@@ -583,7 +583,7 @@ export class KayLanguageServer {
       let edits = byFile.get(file.uri)
 
       if (!edits)
-        byFile.set(file.uri, edits = new Map())
+        byFile.set(file.uri, edits = new Map<string, TextEdit>())
 
       edits.set(rangeKey(range), { range, newText: params.newName })
     }
@@ -776,7 +776,7 @@ function sourceEdits(document: ShadowFile, edits: TextEdit[], offset: number): T
     else {
       const declaration = IMPORT_DECLARATION.test(edit.newText) ? edit.newText.trim() : mergedImport(document.tsx, edit)
 
-      if (!declaration)
+      if (declaration === undefined || declaration === '')
         return undefined
 
       mapped.push(importEdit(document.source, offset, declaration))

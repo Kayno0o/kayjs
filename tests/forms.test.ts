@@ -136,7 +136,7 @@ describe('the messages a refused form is described by', () => {
   })
 })
 
-describe.skipIf(!path && !process.env.CI)('an island form posting to an action', () => {
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island form posting to an action', () => {
   let browser: TestSite
 
   beforeAll(async () => {

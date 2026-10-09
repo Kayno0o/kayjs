@@ -59,6 +59,9 @@ export function child(value: unknown): string {
       }
 
       return rendered(value)
+    case 'boolean':
+    case 'symbol':
+    case 'undefined':
     default:
       return ''
   }
@@ -89,6 +92,9 @@ export function raw(value: unknown): string {
       }
 
       return rendered(value)
+    case 'boolean':
+    case 'symbol':
+    case 'undefined':
     default:
       return ''
   }
@@ -123,7 +129,7 @@ export function className(value: unknown): string {
   if (typeof value === 'number')
     return String(value)
 
-  if (!value)
+  if (value == null || value === false || value === '')
     return ''
 
   if (typeof value === 'string')
@@ -133,7 +139,7 @@ export function className(value: unknown): string {
   let result = ''
 
   for (const key of Object.keys(classes)) {
-    if (!key || key === 'undefined' || !classes[key])
+    if (key === '' || key === 'undefined' || Boolean(classes[key]) === false)
       continue
 
     result += result ? ` ${escapeAttribute(key)}` : escapeAttribute(key)
@@ -144,7 +150,7 @@ export function className(value: unknown): string {
 
 // A `style` value: a string, or an object of properties, each kept unless `null` or `undefined`.
 export function style(value: unknown): string {
-  if (!value)
+  if (Boolean(value) === false)
     return ''
 
   if (typeof value === 'string')
@@ -277,7 +283,7 @@ export function attempt(render: () => string, fallback?: (error: unknown) => str
 
 // An `if` naming its value: the branch reads it through a function, as the island build of the same template does.
 export function show<T>(value: T, render: (value: () => NonNullable<T>) => string, fallback?: () => string): string {
-  if (!value)
+  if (Boolean(value) === false)
     return fallback?.() ?? ''
 
   return render(() => value as NonNullable<T>)
@@ -286,7 +292,7 @@ export function show<T>(value: T, render: (value: () => NonNullable<T>) => strin
 // A `for`: each row's markup, or the fallback's when there is nothing to list.
 // In an island a row reads its item, and a keyed row its index, through functions, as the browser build of the same template does.
 export function loop<T>(each: readonly T[] | null | undefined | false, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: () => string, accessors?: 'keyed' | 'positional'): string {
-  if (!each || each.length === 0)
+  if (each == null || each === false || each.length === 0)
     return fallback?.() ?? ''
 
   let markup = ''

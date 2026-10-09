@@ -12,7 +12,7 @@ import { parseKay } from '../src/compiler/parser'
 import { analyzeScript } from '../src/compiler/script'
 import { child } from '../src/runtime/html'
 
-plugin(kay())
+await plugin(kay())
 
 // A package touching `window` as it loads, as CodeMirror or hls.js do.
 const DOM_ONLY = {

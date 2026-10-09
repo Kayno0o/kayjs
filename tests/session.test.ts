@@ -23,7 +23,7 @@ function browser(app: { handle: (request: Request) => Promise<Response> }) {
     const response = await app.handle(new Request(`http://localhost${path}`, { ...init, headers: { cookie, ...init.headers as Record<string, string> } }))
     const set = response.headers.getSetCookie().find(header => header.startsWith('session='))
 
-    if (set)
+    if (set !== undefined)
       cookie = Number((/Max-Age=(\d+)/i).exec(set)?.[1]) === 0 ? '' : `session=${COOKIE_VALUE.exec(set)![1]}`
 
     return { response, text: await response.text(), set, cookie: () => cookie }

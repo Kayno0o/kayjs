@@ -10,7 +10,7 @@ import { collectIslands } from '../src/runtime/island.server'
 import { uid, withIds } from '../src/runtime/uid'
 import { settle } from '../src/test'
 
-plugin(kay())
+await plugin(kay())
 
 const ID = /\bid="([^"]+)"/g
 

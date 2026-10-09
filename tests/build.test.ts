@@ -440,7 +440,7 @@ describe('kay build checks the project first', () => {
     const root = await scratchProject({ 'tsconfig.json': tsconfig })
     const ran = join(root, 'ran')
     // A prerendered page that records it ran, which the build does once the check passed.
-    const page = (text: string, code = '') => Bun.write(join(root, 'src/routes/index.kay'), `--- server\nexport const prerender = true\nawait Bun.write(${JSON.stringify(ran)}, '${text}')\n${code}---\np ${text}\n`)
+    const page = async (text: string, code = '') => Bun.write(join(root, 'src/routes/index.kay'), `--- server\nexport const prerender = true\nawait Bun.write(${JSON.stringify(ran)}, '${text}')\n${code}---\np ${text}\n`)
     const prerendered = join(root, '.kay/client/pages/index.html')
     const output = join(root, '.kay/client')
     const previous = join(root, '.kay/client-previous')

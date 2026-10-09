@@ -31,7 +31,7 @@ export function codeFrame(source: string, start: number, end = start + 1): strin
 export function formatReport(report: Report, paint: Paint = plain): string {
   const severity = report.severity ?? 'error'
   const colour: Style = severity === 'error' ? 'red' : 'yellow'
-  const heading = `${paint(['bold', colour], `${severity}${report.code ? `[${report.code}]` : ''}`)}${paint(['bold'], `: ${report.message}`)}`
+  const heading = `${paint(['bold', colour], `${severity}${report.code !== undefined && report.code !== '' ? `[${report.code}]` : ''}`)}${paint(['bold'], `: ${report.message}`)}`
   const frame = report.frame && frameRows(report.frame.source, { start: report.frame.start, end: report.frame.end, label: report.label ?? '', primary: true }, report.related ?? [], paint, colour)
   const width = frame?.width ?? String(report.line).length
   const gutter = paint(['bold', 'blue'], `${' '.repeat(width)} |`)

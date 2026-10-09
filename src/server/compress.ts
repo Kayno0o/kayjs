@@ -26,11 +26,11 @@ const NO_TRANSFORM = /\bno-transform\b/i
 const VARY_ENCODING = /\baccept-encoding\b/i
 
 // One body through brotli or gzip, off the main thread.
-function compressBrotli(bytes: Uint8Array, params: Record<number, number>): Promise<Uint8Array<ArrayBuffer>> {
+async function compressBrotli(bytes: Uint8Array, params: Record<number, number>): Promise<Uint8Array<ArrayBuffer>> {
   return new Promise((resolve, reject) => nodeZlib().brotliCompress(bytes, { params }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))
 }
 
-function compressGzip(bytes: Uint8Array, level: number): Promise<Uint8Array<ArrayBuffer>> {
+async function compressGzip(bytes: Uint8Array, level: number): Promise<Uint8Array<ArrayBuffer>> {
   return new Promise((resolve, reject) => nodeZlib().gzip(bytes, { level }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))
 }
 
@@ -206,7 +206,7 @@ async function readWithinTick(body: ReadableStream<Uint8Array>): Promise<ReadBod
     }
 
     if (result.done)
-      return { whole: true, bytes: Buffer.concat(chunks) as Uint8Array<ArrayBuffer> }
+      return { whole: true, bytes: Buffer.concat(chunks) }
 
     chunks.push(result.value)
   }
@@ -309,7 +309,7 @@ export function encodedPath(path: string, encoding: Encoding): string {
 
 // The best of the encodings at hand the request accepts, read off `Accept-Encoding` with its `q` weights; `q=0` refuses one.
 export function preferredEncoding(accept: string | null, available: ReadonlySet<Encoding> | undefined): Encoding | undefined {
-  if (!accept || !available || available.size === 0)
+  if (accept === null || accept === '' || !available || available.size === 0)
     return undefined
 
   const weights = new Map<string, number>()

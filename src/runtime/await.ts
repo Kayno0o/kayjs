@@ -8,5 +8,5 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
     const [start, end] = markers(parent)
 
     awaited(null, start, end, () => props.value, props.pending && (() => props.pending!()), value => props.ready(value as Awaited<T>), props.failed && (error => props.failed!(error)))
-  }) as unknown as JSX.Element
+  })
 }

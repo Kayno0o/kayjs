@@ -69,7 +69,7 @@ async function load(browser: Browser, path: string, rewrite: (html: string) => s
   const page = await context.newPage()
   const session = await context.newCDPSession(page)
 
-  await context.route(url => url.hostname !== 'localhost', route => route.abort())
+  await context.route(url => url.hostname !== 'localhost', async route => route.abort())
   await page.route(url => url.pathname === path, async (route) => {
     const response = await route.fetch()
 
@@ -82,7 +82,7 @@ async function load(browser: Browser, path: string, rewrite: (html: string) => s
   await session.send('Emulation.setCPUThrottlingRate', { rate: profile.cpu })
   await page.goto(`https://localhost:${variant.ports.https}${path}`, { waitUntil: 'load' })
 
-  const sample = await page.evaluate(COLLECT) as Sample
+  const sample = await page.evaluate<Sample>(COLLECT)
 
   await context.close()
 

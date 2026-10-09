@@ -9,7 +9,7 @@ const STYLE = 'body{margin:0;padding:2rem;font:14px/1.5 ui-monospace,monospace;b
 
 // Development only: what a thrown error looks like when the app has no `_error.kay`.
 export function errorPage(error: PageError): string {
-  const stack = error.stack ? `<pre>${Bun.escapeHTML(error.stack)}</pre>` : ''
+  const stack = error.stack !== undefined && error.stack !== '' ? `<pre>${Bun.escapeHTML(error.stack)}</pre>` : ''
 
   return document(`${error.status} ${error.message}`, `<h1>${Bun.escapeHTML(error.message)}</h1>${stack}`)
 }

@@ -42,15 +42,14 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   // Whether what an element holds gives a screen reader something to read: text, a value, or something that may render either.
   function hasContent(nodes: Node[]): boolean {
     return nodes.some((node) => {
-      switch (node.kind) {
-        case 'text':
-          return node.parts.some(part => part.kind === 'expression' || (part.kind === 'chunk' ? part.text.trim() !== '' : elementHasContent(part)))
-        case 'element':
-          return elementHasContent(node)
-        // A block may render anything.
-        default:
-          return true
-      }
+      if (node.kind === 'text')
+        return node.parts.some(part => part.kind === 'expression' || (part.kind === 'chunk' ? part.text.trim() !== '' : elementHasContent(part)))
+
+      if (node.kind === 'element')
+        return elementHasContent(node)
+
+      // A block may render anything.
+      return true
     })
   }
 

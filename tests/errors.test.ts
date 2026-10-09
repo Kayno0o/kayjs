@@ -72,7 +72,7 @@ describe('compile errors', () => {
       expect(diagnostics.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.message])).toEqual([
         ['src/a.kay', 'Malformed `for`'],
         ['src/b.kay', expect.stringContaining('must directly follow')],
-      ])
+      ] as string[][])
       expect(message).toContain('error: Malformed `for`\n --> ')
       expect(message).toContain('src/a.kay:1:1\n  |\n1 | for of list\n  | ^^^^^^^^^^^\n  |\n')
       expect(message).toContain('  = help: `for <item> of <list>`')

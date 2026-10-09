@@ -35,7 +35,7 @@ export function sendValue(value: unknown, reducers: Record<string, Reducer> = {}
     for (const [type, reduce] of custom) {
       const reduced = reduce(thing)
 
-      if (reduced)
+      if (Boolean(reduced) !== false)
         return `[${JSON.stringify(type)},${flatten(reduced)}]`
     }
 

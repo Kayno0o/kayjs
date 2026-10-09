@@ -75,7 +75,7 @@ export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts' 
       params.push(maybe[1]!)
       optional.push(maybe[1]!)
 
-      if (maybe[2])
+      if (maybe[2] !== undefined)
         matchers[maybe[1]!] = maybe[2]
 
       return `:${maybe[1]}?`
@@ -88,10 +88,10 @@ export function routeOf(routesDir: string, file: string): Omit<Route, 'layouts' 
 
     params.push(match[2]!)
 
-    if (match[3])
+    if (match[3] !== undefined)
       matchers[match[2]!] = match[3]
 
-    if (!match[1])
+    if (match[1] === undefined)
       return `:${match[2]}`
 
     catchAll = match[2]
@@ -229,7 +229,7 @@ export function specialPagesOf(routesDir: string, dir: string, read: LayoutsRead
   const nearest = (name: string): SpecialPage | undefined => {
     const file = directoriesUp(routesDir, dir).map(ancestor => join(ancestor, name)).find(path => existsSync(path))
 
-    return file ? { file, layouts: layoutsOf(routesDir, file, read) } : undefined
+    return file !== undefined ? { file, layouts: layoutsOf(routesDir, file, read) } : undefined
   }
 
   return { notFound: nearest(NOT_FOUND), error: nearest(ERROR) }

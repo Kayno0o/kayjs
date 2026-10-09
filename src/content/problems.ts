@@ -8,7 +8,7 @@ const [root, config, site] = process.argv.slice(2)
 // The checking machine lacks the server's environment, as `kay build` does.
 buildingWithoutEnv()
 
-const { problems, uses } = await contentProblems(root!, config || undefined, site === 'site')
+const { problems, uses } = await contentProblems(root!, config === undefined || config === '' ? undefined : config, site === 'site')
 
 console.log(`${PROBLEMS_MARKER}${JSON.stringify(problems)}`)
 console.log(`${USES_MARKER}${JSON.stringify(uses)}`)

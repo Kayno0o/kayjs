@@ -74,7 +74,7 @@ export async function cached<T, const Ttl extends Duration = Duration>(key: stri
     entries.set(key, pending)
     trim()
 
-    return (pending.loading = firstLoad(key, seconds, pending, load, store)) as Promise<T>
+    return (pending.loading = firstLoad(key, seconds, pending, load, store))
   }
 
   if (!entry.loaded)

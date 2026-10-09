@@ -57,7 +57,7 @@ export function previewRequested(request: Request): boolean {
   const value = new Bun.CookieMap(request.headers.get('cookie') ?? '').get(PREVIEW_COOKIE)
   const dot = value?.indexOf('.') ?? -1
 
-  if (!value || dot === -1)
+  if (value === null || value === '' || dot === -1)
     return false
 
   const until = value.slice(0, dot)

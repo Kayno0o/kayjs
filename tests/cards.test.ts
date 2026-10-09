@@ -174,7 +174,7 @@ describe('share cards', () => {
 
   it('refuses a title, an image or a signature it did not sign', async () => {
     const url = new URL(await cardPath('/'), 'http://localhost')
-    const changed = (name: string, value: string | undefined) => {
+    const changed = async (name: string, value: string | undefined) => {
       const copy = new URL(url)
 
       if (value === undefined)

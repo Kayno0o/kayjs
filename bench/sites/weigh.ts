@@ -77,7 +77,7 @@ function condition(entry: string, viewport: Viewport): { holds: boolean, length:
     const limit = Number(amount) * (unit === 'rem' || unit === 'em' ? ROOT_FONT_PX : 1)
 
     holds &&= bound === 'min' ? actual >= limit : actual <= limit
-    rest = rest.slice(whole!.length)
+    rest = rest.slice(whole.length)
   }
 
   return rest.startsWith('(') ? undefined : { holds, length: rest }
@@ -176,7 +176,7 @@ export function slotWidth(sizes: string | null, viewport: Viewport): number {
 
 // The candidate a browser picks: the smallest covering the slot at the device pixel ratio, else the widest.
 export function pickImage(src: string | null, srcset: string | null, sizes: string | null, viewport: Viewport): string | null {
-  if (!srcset)
+  if (srcset === null || srcset === '')
     return src
 
   const candidates = srcset.split(SRCSET_SEPARATOR).map((candidate) => {
@@ -195,13 +195,13 @@ export function latinFontUrls(css: string, base: string): string[] {
   for (const [, body] of css.matchAll(FONT_FACE)) {
     const range = UNICODE_RANGE.exec(body!)?.[1]
 
-    if (range && !BASIC_LATIN.test(range))
+    if (range !== undefined && range !== '' && !BASIC_LATIN.test(range))
       continue
 
     const sources = [...body!.matchAll(CSS_URL)].map(([, url]) => url!)
     const file = sources.find(url => url.includes('.woff2')) ?? sources[0]
 
-    if (file)
+    if (file !== undefined && file !== '')
       urls.push(resolve(file, base))
   }
 
@@ -250,10 +250,10 @@ export async function weigh(variant: Variant, path: string): Promise<Weight> {
         const src = el.getAttribute('src')
         const type = el.getAttribute('type')
 
-        if (src) {
+        if (src !== null && src !== '') {
           scripts.push(resolve(src, path))
         }
-        else if (!type || type === 'module') {
+        else if (type === null || type === '' || type === 'module') {
           script = ''
           el.onEndTag(() => {
             inline.push(script!)
@@ -271,7 +271,7 @@ export async function weigh(variant: Variant, path: string): Promise<Weight> {
       element(el) {
         const chunk = islands.get(el.getAttribute('data-component')!)
 
-        if (chunk)
+        if (chunk !== undefined && chunk !== '')
           scripts.push(chunk)
       },
     })

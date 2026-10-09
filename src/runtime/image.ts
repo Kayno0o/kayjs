@@ -362,7 +362,7 @@ function variantUrl(src: string, variant: ImageVariant): string {
   const cut = variant === 'card' || variant.aspect !== undefined
 
   if (variantFiles && REMOTE.test(src)) {
-    requestedRemote.set(src, (requestedRemote.get(src) ?? new Map()).set(variantSuffix(variant), variant))
+    requestedRemote.set(src, (requestedRemote.get(src) ?? new Map<string, ImageVariant>()).set(variantSuffix(variant), variant))
 
     return `${VARIANTS}${remoteVariantName(src, variant)}`
   }
@@ -372,7 +372,7 @@ function variantUrl(src: string, variant: ImageVariant): string {
 
     // The ladder is written for every imported image; a crop or a card only for those a page asks for.
     if (cut)
-      requested.set(name, (requested.get(name) ?? new Map()).set(variantSuffix(variant), variant))
+      requested.set(name, (requested.get(name) ?? new Map<string, ImageVariant>()).set(variantSuffix(variant), variant))
 
     if (variantFiles)
       return `${VARIANTS}${encodeURIComponent(`${name.replace(EXTENSION, '')}${variantSuffix(variant)}`)}`

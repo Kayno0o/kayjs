@@ -35,7 +35,7 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
   const read = readFields(schema, input, false)
 
   if (!('refused' in read))
-    return read.value as Static<Schema>
+    return read.value
 
   if (!building())
     throw new Error(`kay: the environment does not match its schema\n${[...read.refused].map(([name, message]) => `  ${name}: ${message}`).join('\n')}`)
@@ -56,7 +56,7 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
     })
   }
 
-  return env as Static<Schema>
+  return env
 }
 
 // The module the island entry imports the public variables from, served from the environment the server runs in, so an executable or a prerendered page reads today's values rather than those of the build.

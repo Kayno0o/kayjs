@@ -10,7 +10,7 @@ import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
 import { HYDRATION_SCRIPT } from '../src/server/hydration'
 
-plugin(kay())
+await plugin(kay())
 
 const fixtures = join(import.meta.dir, 'fixtures/islands')
 
@@ -78,7 +78,7 @@ describe('islands', () => {
     } as unknown as typeof IntersectionObserver
 
     // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
-    new Function(HYDRATION_SCRIPT)()
+    (new Function(HYDRATION_SCRIPT) as () => void)()
     document.body.innerHTML = pageHtml
     const button = document.querySelector('slot button')!
     const { ready } = await import(join(outdir, 'client.js')) as { ready: Promise<void> }
@@ -129,7 +129,7 @@ describe('islands', () => {
 
   it('replays a click made before its island hydrated, once it has, and only once', async () => {
     // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
-    new Function(HYDRATION_SCRIPT)()
+    (new Function(HYDRATION_SCRIPT) as () => void)()
     document.body.innerHTML = pageHtml
     const button = document.querySelector('slot button')!
 
@@ -149,7 +149,7 @@ describe('islands', () => {
     const { default: Typed } = await import(join(fixtures, 'typed.kay')) as { default: (props: object) => unknown }
 
     // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
-    new Function(HYDRATION_SCRIPT)()
+    (new Function(HYDRATION_SCRIPT) as () => void)()
     document.body.innerHTML = child(Typed({}))
     const name = document.querySelector<HTMLInputElement>('input.name')!
     const agree = document.querySelector<HTMLInputElement>('input.agree')!

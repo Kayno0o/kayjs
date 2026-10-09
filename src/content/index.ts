@@ -167,7 +167,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     [COLLECTION]: true,
     name,
     dir: loader ? undefined : name,
-    options: options as unknown as CollectionOptions<TSchema>,
+    options,
     components: components as Components,
     all: async () => (await loaded()).list.filter(entry => !hidden(entry)),
     get: async (slug) => {
@@ -241,7 +241,7 @@ function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, C
     slug: entry.slug,
     data,
     headings: entry.headings ?? [],
-    Content: () => render(segments, components, entry.file) as never,
+    Content: () => render(segments, components, entry.file),
     file: entry.file,
   }
 }

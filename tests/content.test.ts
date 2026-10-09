@@ -74,7 +74,7 @@ describe('feeds', () => {
   })
 
   it('write Atom, escaping what they carry', () => {
-    const xml = feedXml([{ slug: 'a', data: {}, headings: [], Content: () => ({ t: '' }) as never, file: 'a.md' }], { path: '/feed.xml', title: 'Fish & chips', format: 'atom', item: () => ({ title: 'A <b>bold</b> move', path: '/a', date: new Date('2026-01-02') }) }, 'https://x.example')
+    const xml = feedXml([{ slug: 'a', data: {}, headings: [], Content: () => ({ t: '' }), file: 'a.md' }], { path: '/feed.xml', title: 'Fish & chips', format: 'atom', item: () => ({ title: 'A <b>bold</b> move', path: '/a', date: new Date('2026-01-02') }) }, 'https://x.example')
 
     expect(xml).toContain('<feed xmlns="http://www.w3.org/2005/Atom">')
     expect(xml).toContain('<title>Fish &amp; chips</title>')

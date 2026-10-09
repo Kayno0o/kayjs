@@ -72,7 +72,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
     const own = new Map<string, HeadTag[]>()
 
     for (const tag of group) {
-      if (!tag || !HEAD_TAGS.has(tag.tag))
+      if (tag == null || !HEAD_TAGS.has(tag.tag))
         continue
 
       if (isResource(tag)) {
@@ -108,7 +108,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   const useDefault = (options.defaults !== undefined && titleGroup === 0) || (titleTag !== undefined && text(titleTag).trim() === '' && defaultTitle !== undefined)
   const ownTitle = titleTag && text(useDefault && defaultTitle ? defaultTitle : titleTag)
   const raw = Boolean(titleTag?.props.raw)
-  const titleText = ownTitle !== undefined && options.titleTemplate && !useDefault && !raw ? options.titleTemplate.replaceAll('%s', () => ownTitle) : ownTitle
+  const titleText = ownTitle !== undefined && options.titleTemplate !== undefined && options.titleTemplate !== '' && !useDefault && !raw ? options.titleTemplate.replaceAll('%s', () => ownTitle) : ownTitle
 
   // Social cards show the site name on their own, so they take the title without the template.
   if (options.social)

@@ -59,7 +59,7 @@ export function iconModule(sets: Map<string, string>, specifier: string): string
   const [, prefix, name] = ICON_IMPORT.exec(specifier) ?? []
   const file = prefix === undefined ? undefined : sets.get(prefix)
 
-  if (!file)
+  if (file === undefined)
     throw new Error(`kay: ${specifier} names no installed icon set; add it with \`bun add -d ${ICONIFY_PACKAGE}${prefix ?? '<prefix>'}\``)
 
   const props = iconProps(file, name!)

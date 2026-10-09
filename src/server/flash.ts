@@ -86,7 +86,7 @@ function setFlash(cookies: CookieMap, value: SuccessFlash, secure: boolean): str
 export function readFlash(cookies: CookieMap): SuccessFlash | undefined {
   const value = cookies.get(FLASH_COOKIE)
 
-  if (!value)
+  if (value === null || value === '')
     return undefined
 
   try {

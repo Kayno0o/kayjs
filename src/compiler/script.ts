@@ -159,7 +159,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
 
   const { ast, shift } = parsed
   const local = bodyTypes(ast.program.body, [], shift, analysis.diagnostics)
-  const exported = ast.program.body.filter(statement => !isHoisted(statement, local) && statement.type === 'ExportNamedDeclaration' && statement.declaration)
+  const exported = ast.program.body.filter(statement => !isHoisted(statement, local) && statement.type === 'ExportNamedDeclaration' && statement.declaration !== null && statement.declaration !== undefined)
   const perRequest = ast.program.body.filter(statement => !isHoisted(statement, local) && !isExport(statement))
   const shared = sharedWithExports(ast, exported, perRequest, shift, analysis.diagnostics)
   let cursor = server.start
@@ -609,7 +609,7 @@ function schemaStrings(node: t.Node | null | undefined, field: string | undefine
     const value = node[key] as unknown
 
     for (const child of Array.isArray(value) ? value : [value]) {
-      if (child && typeof child === 'object')
+      if (child !== null && typeof child === 'object')
         schemaStrings(child as t.Node, field, found)
     }
   }
@@ -638,7 +638,7 @@ function eachNode(node: t.Node | null | undefined, visit: (node: t.Node) => void
       for (const child of value)
         eachNode(child as t.Node, visit)
     }
-    else if (value && typeof value === 'object') {
+    else if (value !== null && typeof value === 'object') {
       eachNode(value as t.Node, visit)
     }
   }
@@ -797,7 +797,7 @@ function reportMisplacedProps(ast: t.File, analysis: ScriptAnalysis, shift: (nod
         for (const child of value)
           visit(child as t.Node)
       }
-      else if (value && typeof value === 'object') {
+      else if (value !== null && typeof value === 'object') {
         visit(value as t.Node)
       }
     }

@@ -441,7 +441,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shipsEntry = hasIslands || posts
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') : ''
   const locale = localeState()
-  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) : ''}${options.base ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS : ''}</head><body>${body}`
+  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.viewport ? '' : VIEWPORT}${head.html}${stylesheets(client, files)}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) : ''}${options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS : ''}</head><body>${body}`
 
   if (!streamed)
     return `${start}</body></html>`
@@ -479,7 +479,7 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   let cached = stylesCache.get(client)
 
   if (!cached)
-    stylesCache.set(client, cached = new Map())
+    stylesCache.set(client, cached = new Map<string, string>())
 
   let html = cached.get(key)
 
@@ -498,7 +498,7 @@ function islandScripts(client: ClientBuild, islands: Set<string>, streamed: bool
   let cached = scriptsCache.get(client)
 
   if (!cached)
-    scriptsCache.set(client, cached = new Map())
+    scriptsCache.set(client, cached = new Map<string, string>())
 
   let html = cached.get(key)
 
@@ -524,7 +524,8 @@ function describeError(error: unknown, dev = false): PageError {
   if (!(error instanceof Error))
     return { status: 500, message: String(error) }
 
-  const stack = error.stack && mapStack(error.stack)
+  const stack = error.stack === undefined || error.stack === '' ? error.stack : mapStack(error.stack)
+  const hint = stack !== undefined && stack !== '' ? browserOnlyHint(error, stack) : undefined
 
-  return { status: 500, message: (stack && browserOnlyHint(error, stack)) || error.message, stack }
+  return { status: 500, message: hint !== undefined && hint !== '' ? hint : error.message, stack }
 }

@@ -115,7 +115,7 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
     ast = parse(code, { sourceType: 'module', plugins: ['typescript'], allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true })
   }
   catch (error) {
-    note(0, `the frontmatter does not parse (${error instanceof Error ? error.message : error}): kept as written`)
+    note(0, `the frontmatter does not parse (${error instanceof Error ? error.message : String(error)}): kept as written`)
 
     return code
   }
@@ -190,11 +190,11 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
 
   for (const statement of statements) {
     walk(statement, (node) => {
-      if (imageMetadata && node.type === 'Identifier' && node.name === imageMetadata)
+      if (imageMetadata !== undefined && node.type === 'Identifier' && node.name === imageMetadata)
         edits.push({ start: node.start!, end: node.end!, text: 'string' })
 
       // `HTMLAttributes<'svg'>`, the attributes of an element, is kay's `JSX.IntrinsicElements['svg']`.
-      if (htmlAttributes && node.type === 'TSTypeReference' && node.typeName.type === 'Identifier' && node.typeName.name === htmlAttributes) {
+      if (htmlAttributes !== undefined && node.type === 'TSTypeReference' && node.typeName.type === 'Identifier' && node.typeName.name === htmlAttributes) {
         const [element] = node.typeParameters?.params ?? []
 
         if (element?.type === 'TSLiteralType' && element.literal.type === 'StringLiteral') {
@@ -209,7 +209,7 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
       }
 
       // An interface extends a name only, so the attributes get one: `interface Props extends SvgAttributes`.
-      if (htmlAttributes && node.type === 'TSExpressionWithTypeArguments' && node.expression.type === 'Identifier' && node.expression.name === htmlAttributes) {
+      if (htmlAttributes !== undefined && node.type === 'TSExpressionWithTypeArguments' && node.expression.type === 'Identifier' && node.expression.name === htmlAttributes) {
         const [element] = node.typeParameters?.params ?? []
 
         if (element?.type === 'TSLiteralType' && element.literal.type === 'StringLiteral') {
@@ -311,7 +311,7 @@ function walk(node: t.Node, visit: (node: t.Node, parent: t.Node | undefined) =>
       continue
 
     for (const child of Array.isArray(value) ? value : [value]) {
-      if (child && typeof child === 'object' && typeof (child as t.Node).type === 'string')
+      if (child !== null && typeof child === 'object' && typeof (child as t.Node).type === 'string')
         walk(child as t.Node, visit, node)
     }
   }
@@ -332,7 +332,7 @@ function migrateTemplate(markup: string, options: MigrateOptions, imports: Impor
     root = parseExpression(wrapped, { plugins: ['jsx', 'typescript'] }) as t.JSXFragment
   }
   catch (error) {
-    note(1, `the markup does not parse as Astro markup kay reads (${error instanceof Error ? error.message : error}): kept as written, commented out`)
+    note(1, `the markup does not parse as Astro markup kay reads (${error instanceof Error ? error.message : String(error)}): kept as written, commented out`)
 
     return `// kay migrate: the markup below was not translated\n${markup.split('\n').map(line => `  ${line}`).join('\n')}\n`
   }
@@ -463,7 +463,7 @@ class Translator {
       return this.block(expression.children)
 
     if (expression.type === 'LogicalExpression' && expression.operator === '&&' && !containsJsx(expression.left))
-      return [`if ${this.expression(expression.left)}`, ...this.indent(this.rendering(expression.right as t.Expression))]
+      return [`if ${this.expression(expression.left)}`, ...this.indent(this.rendering(expression.right))]
 
     if (expression.type === 'ConditionalExpression' && !containsJsx(expression.test))
       return [`if ${this.expression(expression.test)}`, ...this.indent(this.rendering(expression.consequent)), ...isNothing(expression.alternate) ? [] : ['else', ...this.indent(this.rendering(expression.alternate))]]
@@ -504,9 +504,9 @@ class Translator {
 
     const key = body.type === 'JSXElement' ? body.openingElement.attributes.find((attribute): attribute is t.JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'key') : undefined
     const keyText = key?.value?.type === 'JSXExpressionContainer' && key.value.expression.type !== 'JSXEmptyExpression' ? ` key={${this.expression(key.value.expression)}}` : ''
-    const head = `for ${item.name}${index ? `, ${(index as t.Identifier).name}` : ''} of ${this.expression(expression.callee.object)}${keyText}`
+    const head = `for ${item.name}${index ? `, ${index.name}` : ''} of ${this.expression(expression.callee.object)}${keyText}`
 
-    return [head, ...this.indent(this.rendering(body as t.Expression))]
+    return [head, ...this.indent(this.rendering(body))]
   }
 
   private indent(lines: string[]): string[] {
@@ -712,7 +712,7 @@ class Translator {
       }
     }
 
-    if (hydrate)
+    if (hydrate !== undefined)
       attributes.push(`hydrate="${hydrate}"`)
 
     // Several static classes left out of the shorthand join in one attribute.

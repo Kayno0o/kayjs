@@ -8,7 +8,7 @@ const DIST = join(import.meta.dir, 'dist')
 
 // The same page shell as kay's: hydration script and module entry in the head, the app straight in the body.
 export async function createApp() {
-  plugin(solidPlugin('ssr'))
+  await plugin(solidPlugin('ssr'))
 
   const [{ App }, { createComponent, generateHydrationScript, renderToString }, { PRODUCTS }, build] = await Promise.all([
     import('./src/app'),

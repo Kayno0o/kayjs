@@ -331,26 +331,26 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
 
   for (const [name, card] of requested) {
     const target = join(clientDir, VARIANTS_DIR, name)
-    const cached = cacheDir && join(cacheDir, name)
+    const cached = cacheDir !== undefined && cacheDir !== '' ? join(cacheDir, name) : undefined
 
     if (await Bun.file(target).exists())
       continue
 
-    if (!cached || !await Bun.file(cached).exists()) {
+    if (cached === undefined || !await Bun.file(cached).exists()) {
       const source = card.image === undefined ? undefined : await findSource(card.image, { clientDir, cacheDir: '', remote })
 
       if (source && 'status' in source)
         throw new Error(`kay: a page's share card is drawn on ${card.image}, which the build could not download: ${source.message}`)
 
-      await writeCard(current!, cached || target, card.title, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS })
+      await writeCard(current!, cached ?? target, card.title, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS })
       drawn++
     }
 
-    if (cached)
+    if (cached !== undefined)
       await Bun.write(target, Bun.file(cached))
   }
 
-  if (cacheDir && existsSync(cacheDir))
+  if (cacheDir !== undefined && cacheDir !== '' && existsSync(cacheDir))
     await Promise.all((await readdir(cacheDir)).filter(name => !requested.has(name)).map(async name => rm(join(cacheDir, name), { force: true })))
 
   return drawn

@@ -59,6 +59,7 @@ function predict(filter: number | undefined, left: number, above: number, corner
 
       return toLeft <= toAbove && toLeft <= toCorner ? left : toAbove <= toCorner ? above : corner
     }
+    case undefined:
     default:
       throw new Error(`PNG filter type ${filter} is none of 0 to 4`)
   }

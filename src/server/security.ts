@@ -60,7 +60,7 @@ export function securityHeaders(options: SecurityOptions): Record<string, string
     headers['content-security-policy'] = policy([csp ?? {}], hashes, reportTo)
 
   if (reportOnly)
-    headers['content-security-policy-report-only'] = policy([csp || {}, reportOnly], hashes, reportTo)
+    headers['content-security-policy-report-only'] = policy([csp === false || csp === undefined ? {} : csp, reportOnly], hashes, reportTo)
 
   for (const [name, value] of Object.entries(options.security?.headers ?? {})) {
     if (value === false)

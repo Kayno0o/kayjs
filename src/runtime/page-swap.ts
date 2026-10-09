@@ -366,7 +366,7 @@ function moveFocus(swap: Swap): void {
     if (before?.isConnected)
       return
 
-    const again = before?.id ? document.getElementById(before.id) : before?.getAttribute('name') ? document.getElementsByName(before.getAttribute('name')!)[0] : null
+    const again = before?.id !== undefined && before.id !== '' ? document.getElementById(before.id) : (before?.getAttribute('name') ?? '') !== '' ? document.getElementsByName(before!.getAttribute('name')!)[0] : null
 
     if (again instanceof HTMLElement)
       again.focus({ preventScroll: true })
@@ -404,7 +404,7 @@ function showRefusal(form: HTMLFormElement | undefined, control: number): boolea
 
   const message = form.getAttribute('aria-describedby')?.split(ID_LIST).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean).join(' ')
 
-  if (message)
+  if (message !== undefined && message !== '')
     announce(message)
 
   const again = form.elements[control]
@@ -475,7 +475,7 @@ export async function submit(form: HTMLFormElement, submitter: HTMLElement | nul
   busyForms.delete(form)
 }
 
-function loadChecks(): Promise<typeof import('./validate')> {
+async function loadChecks(): Promise<typeof import('./validate')> {
   return checks ??= import('./validate')
 }
 

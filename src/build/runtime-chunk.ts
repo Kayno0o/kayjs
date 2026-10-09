@@ -91,8 +91,8 @@ async function runtimeImports(file: string): Promise<{ static: string[], lazy: s
     const found = transpiler.scanImports(await Bun.file(file).text()).filter(entry => RELATIVE.test(entry.path)).map(entry => ({ kind: entry.kind, file: runtimeFile(resolve(dirname(file), entry.path)) }))
 
     imports = {
-      static: found.filter(entry => entry.kind === 'import-statement' && entry.file).map(entry => entry.file!),
-      lazy: found.filter(entry => entry.kind === 'dynamic-import' && entry.file).map(entry => entry.file!),
+      static: found.filter(entry => entry.kind === 'import-statement' && entry.file !== undefined).map(entry => entry.file!),
+      lazy: found.filter(entry => entry.kind === 'dynamic-import' && entry.file !== undefined).map(entry => entry.file!),
     }
     scanned.set(file, imports)
   }
@@ -152,7 +152,7 @@ export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[
           build.onResolve({ filter: RELATIVE }, ({ path, importer }) => {
             const file = importer.startsWith(RUNTIME_DIR) ? runtimeFile(resolve(dirname(importer), path)) : undefined
 
-            return file ? { path: file, external: true } : undefined
+            return file !== undefined ? { path: file, external: true } : undefined
           })
         },
       }],
@@ -198,7 +198,7 @@ export function runtimeAnchor(chunk: RuntimeChunk, boot?: string): BunPlugin {
     name: 'kay-runtime-chunk',
     setup(build) {
       build.onResolve({ filter: new RegExp(`^${RegExp.escape(ANCHOR)}$`) }, () => ({ path: ANCHOR, namespace: ANCHOR_NAMESPACE }))
-      build.onLoad({ filter: /.*/, namespace: ANCHOR_NAMESPACE }, () => ({ contents: boot ? `${chunk.anchor}import ${JSON.stringify(boot)}\n` : chunk.anchor, loader: 'ts', resolveDir: chunk.dir }))
+      build.onLoad({ filter: /.*/, namespace: ANCHOR_NAMESPACE }, () => ({ contents: boot !== undefined && boot !== '' ? `${chunk.anchor}import ${JSON.stringify(boot)}\n` : chunk.anchor, loader: 'ts', resolveDir: chunk.dir }))
 
       for (const file of chunk.lazy)
         build.onLoad({ filter: new RegExp(`^${RegExp.escape(file)}$`) }, async () => ({ contents: `${await Bun.file(file).text()}\nimport ${JSON.stringify(ANCHOR)}\n`, loader: 'ts' }))

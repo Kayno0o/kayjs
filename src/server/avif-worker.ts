@@ -12,6 +12,10 @@ export interface AvifTask {
   quality: number
 }
 
+interface AvifEncoder {
+  encode: (data: Uint8Array, width: number, height: number, options: typeof defaultOptions & { quality: number }) => Uint8Array<ArrayBuffer> | null
+}
+
 export type AvifResult = { id: number, bytes: Uint8Array } | { id: number, error: string }
 
 declare const self: Worker
@@ -35,6 +39,6 @@ self.onmessage = async ({ data: { id, png, quality } }: MessageEvent<AvifTask>) 
   }
 }
 
-async function loadEncoder() {
-  return initEmscriptenModule(factory, await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer()))
+async function loadEncoder(): Promise<AvifEncoder> {
+  return initEmscriptenModule<AvifEncoder>(factory, await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer()))
 }

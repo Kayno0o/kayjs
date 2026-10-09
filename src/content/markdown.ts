@@ -230,10 +230,10 @@ function extractComponents(body: string, bodyLine: number): { text: string, comp
 
 // The block with its component tags, outside code spans, swapped for placeholders.
 function replaceTags(text: string, startLine: number, components: ExtractedComponent[], open: { name: string, line: number }[]): string {
-  return outsideCodeSpans(text, (part, offset) => part.replace(COMPONENT_TAG, (_tag: string, closing: string, name: string, inside = '', at: number) => {
+  return outsideCodeSpans(text, (part, offset) => part.replace(COMPONENT_TAG, (_tag: string, closing: string, name: string, inside: string, at: number) => {
     const line = startLine + lineOf(text, offset + at) - 1
 
-    if (closing) {
+    if (closing !== '') {
       const opened = open.pop()
 
       if (opened?.name !== name)
@@ -338,7 +338,7 @@ function readAttributes(text: string, component: string, line: number): Record<s
   while (rest !== '') {
     const name = ATTRIBUTE_NAME.exec(rest)?.[0]
 
-    if (!name)
+    if (name === undefined || name === '')
       throw new MarkdownError(`<${component}> has an attribute kay cannot read at ${JSON.stringify(rest.slice(0, 20))}`, line)
 
     rest = rest.slice(name.length).trimStart()

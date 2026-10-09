@@ -62,7 +62,7 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
 
         const contents = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir })
 
-        return { contents: options.anchor ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents, loader: 'ts' as const }
+        return { contents: options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents, loader: 'ts' as const }
       }
 
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))
@@ -70,7 +70,7 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
       const iconSets = installedIconSets(options.root ?? process.cwd())
 
       // Only a bundle has a config; the runtime loader takes the specifier as it is.
-      if (build.config) {
+      if (build.config !== undefined) {
         build.onResolve({ filter: TWIN_IMPORT }, ({ path, importer }) => ({ path: `${resolve(dirname(importer), withoutTwin(path))}${ISLAND_TWIN}`, namespace: TWIN_NAMESPACE }))
         build.onLoad({ filter: KAY_FILE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path))
         build.onResolve({ filter: ICON_SPECIFIER }, ({ path }) => ({ path, namespace: ICON_NAMESPACE }))

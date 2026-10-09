@@ -17,7 +17,7 @@ export async function registerLoader(root: string, settings?: Record<string, str
     ready = (async () => {
       const { kay } = await import('../build/plugin')
 
-      plugin(kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings: chosen }))
+      await plugin(kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings: chosen }))
     })()
   }
   else if (registered.root !== root) {

@@ -184,10 +184,10 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
   async function download(src: string, path: string, previous: Stored | undefined): Promise<Stored | { status: number, message: string }> {
     const headers: Record<string, string> = {}
 
-    if (previous?.etag)
+    if (previous?.etag !== undefined && previous.etag !== '')
       headers['if-none-match'] = previous.etag
 
-    if (previous?.lastModified)
+    if (previous?.lastModified !== undefined && previous.lastModified !== '')
       headers['if-modified-since'] = previous.lastModified
 
     let response: Response
@@ -257,7 +257,7 @@ async function saveCapped(response: Response, path: string): Promise<boolean> {
       if (size > MAX_REMOTE_BYTES)
         return false
 
-      writer.write(chunk)
+      void writer.write(chunk)
     }
 
     await writer.end()

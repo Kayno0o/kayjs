@@ -23,7 +23,7 @@ function hasTransition(node: Node): node is Element {
 function classes(phases: Phases, phase: Phase, step: '' | '-from' | '-to'): string[] {
   const own = phases[`${phase}${step}`]?.split(CLASS_LIST).filter(Boolean) ?? []
 
-  return phases.name ? [`${phases.name}-${phase}${step || '-active'}`, ...own] : own
+  return phases.name !== undefined && phases.name !== '' ? [`${phases.name}-${phase}${step || '-active'}`, ...own] : own
 }
 
 // No animation for a visitor asking for less motion, nor in a hidden tab, which draws no frames: a row leaving there would stay until the tab shows.

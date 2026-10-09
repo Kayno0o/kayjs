@@ -55,7 +55,7 @@ export async function timeBuild(variant: Variant, command: string[]): Promise<Bu
 
 // Lines of code by cloc when it is installed, `.kay` and `.astro` read as Vue's single-file components.
 function cloc(paths: string[]): number | undefined {
-  if (!Bun.which('cloc') || paths.length === 0)
+  if (Bun.which('cloc') === null || paths.length === 0)
     return undefined
 
   const csv = run(['cloc', '--quiet', '--csv', '--force-lang=Vuejs Component,kay', '--force-lang=Vuejs Component,astro', '--exclude-dir=baseline', ...paths], '/')

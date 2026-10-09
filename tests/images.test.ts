@@ -207,7 +207,7 @@ describe('image route', () => {
 
   it('answers an AVIF to a browser whose Accept names it and a WebP otherwise, both varying on Accept', async () => {
     const avif = await get(heroAt(640), { accept: 'image/avif,image/webp,*/*;q=0.8' })
-    const decoded = (await decodeAvif((await avif.bytes()).buffer as ArrayBuffer))!
+    const decoded = (await decodeAvif((await avif.bytes()).buffer))!
 
     expect(avif.headers.get('content-type')).toBe('image/avif')
     expect(avif.headers.get('vary')).toBe('accept')
@@ -376,7 +376,7 @@ describe('AVIF', () => {
 describe('crops and share cards', () => {
   const hero = registerImage('/_kay/assets/crop-abc.png', 1000, 600)
   const heroSrc = () => `/_kay/assets/${heroUrl}`
-  const route = (query: string) => get(`/_kay/image?src=${encodeURIComponent(heroSrc())}&${query}`)
+  const route = async (query: string) => get(`/_kay/image?src=${encodeURIComponent(heroSrc())}&${query}`)
 
   it('cuts an image to an aspect ratio, in lowest terms, each variant no wider than the cut', () => {
     const square = image(hero, { aspect: '2/2' })
@@ -536,7 +536,7 @@ describe('remote images', () => {
   let cache: string
   let remote: Elysia
 
-  const at = (path: string, width: number | string = 320) => remote.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(`${origin}${path}`)}&w=${width}`))
+  const at = async (path: string, width: number | string = 320) => remote.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(`${origin}${path}`)}&w=${width}`))
 
   beforeAll(async () => {
     cache = await mkdtemp(join(tmpdir(), 'kay-remote-'))
@@ -583,7 +583,7 @@ describe('remote images', () => {
         expect(image('https://elsewhere.example.com/a.jpg', { width: 1000, height: 600 })).toEqual({ src: 'https://elsewhere.example.com/a.jpg', width: 1000, height: 600 })
         expect(image('https://elsewhere.example.com/b.jpg', { width: 10, height: 10 }).srcset).toBeUndefined()
         expect(shareImage('https://elsewhere.example.com/a.jpg')).toBe('https://elsewhere.example.com/a.jpg')
-        expect(warned.mock.calls.map(call => call[0])).toEqual(['[kay] image() was given https://elsewhere.example.com/a.jpg, on a host images.remote in kay.config.ts does not list, so it is not resized'])
+        expect(warned.mock.calls.map(call => call[0] as string)).toEqual(['[kay] image() was given https://elsewhere.example.com/a.jpg, on a host images.remote in kay.config.ts does not list, so it is not resized'])
       }
       finally {
         warned.mockRestore()

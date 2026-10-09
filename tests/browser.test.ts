@@ -18,7 +18,7 @@ function elsewhere(): boolean {
 }
 
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
-describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test in a browser', () => {
   beforeAll(async () => {
     // The fixture's islands break on purpose, which the server would log.
     site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, onError: () => undefined })
@@ -81,7 +81,7 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
     await page.evaluate(() => void setTimeout(() => {
       throw new Error('Thrown later')
     }))
-    await page.waitUntil(() => new Promise(resolve => setTimeout(resolve, 50, true)))
+    await page.waitUntil(async () => new Promise(resolve => setTimeout(resolve, 50, true)))
 
     expect(page.errors.some(error => error.includes('Fragile broke'))).toBe(true)
     expect(page.errors.some(error => error.startsWith('Error: Thrown later'))).toBe(true)
@@ -164,7 +164,7 @@ describe.skipIf(!path && !process.env.CI)('kay/test in a browser', () => {
   })
 })
 
-describe.skipIf(!path && !process.env.CI)('kay dev in a browser', () => {
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in a browser', () => {
   it('shows each problem kay recovers from on the page, a page swap leaving them behind', async () => {
     const dev = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, dev: true, onError: () => undefined })
 
@@ -182,9 +182,9 @@ describe.skipIf(!path && !process.env.CI)('kay dev in a browser', () => {
         console.warn('[kay] the persisted signal note could not be kept')
         console.error('not kay')
       })
-      await shown.waitUntil(() => document.querySelector('kay-problems')!.shadowRoot!.textContent!.startsWith('2 kay problems'))
+      await shown.waitUntil(() => document.querySelector('kay-problems')!.shadowRoot!.textContent.startsWith('2 kay problems'))
 
-      expect(await shown.evaluate(() => [...document.querySelector('kay-problems')!.shadowRoot!.querySelectorAll('pre')].map(pre => pre.textContent!.slice(0, 20)))).toEqual(['island tests/fixture', 'the persisted signal'])
+      expect(await shown.evaluate(() => [...document.querySelector('kay-problems')!.shadowRoot!.querySelectorAll('pre')].map(pre => pre.textContent.slice(0, 20)))).toEqual(['island tests/fixture', 'the persisted signal'])
 
       await shown.evaluate(() => document.querySelector('kay-problems')!.shadowRoot!.querySelector('button')!.click())
 
@@ -206,7 +206,7 @@ describe.skipIf(!path && !process.env.CI)('kay dev in a browser', () => {
   }, 60_000)
 })
 
-describe.skipIf(!path && !process.env.CI)('publicEnv', () => {
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('publicEnv', () => {
   it('reads the variables the config declares public from the server\'s environment, on the server and in the browser', async () => {
     process.env.KAY_TEST_MAP_KEY = 'pk-123'
     process.env.KAY_TEST_SERVER_ONLY = 'hidden'

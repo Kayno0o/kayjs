@@ -274,46 +274,47 @@ function isPlainRead(rewrite: Rewrite): boolean {
 // The identifier a write to `name` assigns, so the diagnostic lands on the name instead of on the `++` or `[` the statement starts with.
 function assignedIdentifier(violation: t.Node, name: string): t.Identifier | undefined {
   const find = (pattern: t.Node | null | undefined): t.Identifier | undefined => {
-    switch (pattern?.type) {
-      case 'Identifier':
-        return pattern.name === name ? pattern : undefined
-      case 'ObjectPattern':
-        for (const property of pattern.properties) {
-          const found = find(property.type === 'RestElement' ? property.argument : property.value)
+    if (pattern?.type === 'Identifier')
+      return pattern.name === name ? pattern : undefined
 
-          if (found)
-            return found
-        }
+    if (pattern?.type === 'ObjectPattern') {
+      for (const property of pattern.properties) {
+        const found = find(property.type === 'RestElement' ? property.argument : property.value)
 
-        return undefined
-      case 'ArrayPattern':
-        for (const element of pattern.elements) {
-          const found = find(element)
+        if (found)
+          return found
+      }
 
-          if (found)
-            return found
-        }
-
-        return undefined
-      case 'AssignmentPattern':
-        return find(pattern.left)
-      case 'RestElement':
-        return find(pattern.argument)
-      default:
-        return undefined
-    }
-  }
-
-  switch (violation.type) {
-    case 'AssignmentExpression':
-    case 'ForInStatement':
-    case 'ForOfStatement':
-      return find(violation.left)
-    case 'UpdateExpression':
-      return find(violation.argument)
-    default:
       return undefined
+    }
+
+    if (pattern?.type === 'ArrayPattern') {
+      for (const element of pattern.elements) {
+        const found = find(element)
+
+        if (found)
+          return found
+      }
+
+      return undefined
+    }
+
+    if (pattern?.type === 'AssignmentPattern')
+      return find(pattern.left)
+
+    if (pattern?.type === 'RestElement')
+      return find(pattern.argument)
+
+    return undefined
   }
+
+  if (violation.type === 'AssignmentExpression' || violation.type === 'ForInStatement' || violation.type === 'ForOfStatement')
+    return find(violation.left)
+
+  if (violation.type === 'UpdateExpression')
+    return find(violation.argument)
+
+  return undefined
 }
 
 // A renamed or quoted key replaces the local name; an unrenamed one keeps it, so the read stays mapped to the source.
