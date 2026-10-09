@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path'
-import { clientDir } from '../build/assets'
+import { ASSET_PREFIX, clientDir } from '../build/assets'
+import { unrebaseCss } from './base'
 
 // Written beside the bundle as `manifest.json`, so a production server reads it instead of bundling at boot.
 export interface ClientManifest {
@@ -40,7 +41,14 @@ export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {
   // By absolute path.
   styles: Map<string, string>
   pages: Map<string, PrerenderedPage>
+  // With `inlineStyles`, the text each stylesheet URL is written into heads as.
+  inlineStyles?: Map<string, string> | undefined
 }
+
+// A URL with no scheme that is no path of the site nor a fragment: relative to the stylesheet it is written in.
+const RELATIVE_CSS_URL = /url\(\s*(["']?)(?![a-z][\w+.-]*:|\/|#)([^"')\s]+)\1\s*\)/gi
+const STYLE_END = /<\/style/gi
+const NOWHERE = 'http://nowhere.invalid'
 
 export const MANIFEST = 'manifest.json'
 
@@ -62,6 +70,25 @@ export async function readClient(root: string, base = join(root, '.kay', 'client
   const manifest = await readManifest(root, base)
 
   return manifest && fromManifest(root, manifest, join(base, 'dist'))
+}
+
+// Each stylesheet's text by URL, for heads to carry: what a URL is relative to stops being the file once inline, and the page goes under the mount point as it goes out, so the one the build added comes off.
+export async function readInlineStyles(client: ClientBuild, base: string): Promise<Map<string, string>> {
+  const inline = new Map<string, string>()
+
+  for (const url of new Set(client.styles.values())) {
+    const css = await Bun.file(join(client.dir, ...url.slice(ASSET_PREFIX.length).split('/').map(decodeURIComponent))).text()
+    const absolute = (base === '' ? css : unrebaseCss(css, base)).replace(RELATIVE_CSS_URL, (_, quote: string, path: string) => {
+      const target = new URL(path, `${NOWHERE}${url}`)
+
+      return `url(${quote}${target.pathname}${target.search}${target.hash}${quote})`
+    })
+
+    // A `</style` in a string would close the element: `\/` is the same slash to CSS.
+    inline.set(url, absolute.replace(STYLE_END, '<\\/style'))
+  }
+
+  return inline
 }
 
 export function fromManifest(root: string, manifest: ClientManifest, dir = clientDir(root)): ClientBuild {

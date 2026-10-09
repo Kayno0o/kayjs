@@ -17,11 +17,11 @@ import { localeState, runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
 import { overHttps, registerActionRoutes } from './actions'
 import { scanApi, serveApi } from './api'
-import { basePath, rebaseRedirects } from './base'
+import { basePath, rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { bundled } from './bundle'
 import { serveCards, setupCards } from './card'
-import { PRERENDERED_DIR } from './client'
+import { PRERENDERED_DIR, readInlineStyles } from './client'
 import { compressResponse, encodedCopies, encodedPath, filesUnder, preferredEncoding } from './compress'
 import { DEV_EVENTS, devEvents, hotSwap } from './dev'
 import { servePublicEnv } from './env'
@@ -169,11 +169,15 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   setTracer(options.tracer)
   setSite(options.site === undefined ? undefined : siteOrigin(options.site) + base, options.trailingSlash)
 
+  if (options.inlineStyles === true && !options.dev)
+    client.inlineStyles = await readInlineStyles(client, base)
+
   const { head, styles } = await configHead(root, options, client.dir, bundle !== undefined)
   const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head, base, maxDensity, offline: options.offline !== undefined && !options.dev }
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
-  const security = securityHeaders({ ...options, styles })
+  // Hashed as they go out, under the mount point.
+  const security = securityHeaders({ ...options, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) })
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])
 

@@ -4,6 +4,8 @@
 
 A component script or any `.ts` module imports its stylesheet: `import './card.css'`. Each page links one stylesheet per layout, outermost first, then its own, holding the CSS of every component it renders, islands included. Bun bundles them: `@import`, nesting and relative `url()` assets work, and `url(/logo.png)` is left for a public file.
 
+`inlineStyles: true` in kay.config.ts writes those stylesheets into each page's head as `style` elements instead of linking them, in production and prerendered pages, `kay dev` still linking them: the first paint waits for no stylesheet request, which on a phone over slow 4G painted a page with a 110 KB stylesheet 440 ms sooner, but every page then carries the stylesheet again, compressed, since no cache keeps it between pages, the swap's included. Their relative `url()`s point where the linked file's did, and kay's `content-security-policy` lets each through by its hash.
+
 Tailwind runs as a build plugin. `bun add -d tailwindcss bun-plugin-tailwind`, then:
 
 ```ts

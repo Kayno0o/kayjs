@@ -1,4 +1,4 @@
-import type { ClientManifest } from '../src/server/client'
+import type { ClientBuild, ClientManifest } from '../src/server/client'
 import type { Encoding } from '../src/server/compress'
 import type { Span, SpanOptions, Tracer } from '../src/server/trace'
 import { AsyncLocalStorage } from 'node:async_hooks'
@@ -13,8 +13,9 @@ import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
-import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { readClient, readInlineStyles, readManifest, writeManifest } from '../src/server/client'
 import { compressFiles, preferredEncoding } from '../src/server/compress'
+import { sourceHash } from '../src/server/csp'
 import { submittedValues } from '../src/server/flash'
 import { prerenderPages } from '../src/server/prerender'
 import { renderPage } from '../src/server/render'
@@ -152,6 +153,38 @@ describe('pages', () => {
     expect(page).toContain('.counter {')
     expect((await get('/about')).html).toContain(`<meta name="viewport" content="width=device-width"><link rel="stylesheet" href="${links[0]}"><meta name="description"`)
     expect((await Bun.file(join(process.cwd(), '.kay/classes.txt')).text()).split('\n')).toEqual(expect.arrayContaining(['card', 'counter']))
+  })
+
+  it('writes the stylesheets into the head with inlineStyles, each let through a strict style-src by its hash under the mount point', async () => {
+    for (const base of [undefined, '/docs']) {
+      const inline = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, inlineStyles: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
+      const response = await inline.handle(new Request('http://localhost/'))
+      const html = await response.text()
+      const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!)
+
+      expect(html).not.toContain('rel="stylesheet"')
+      expect(styles).toHaveLength(2)
+      expect(styles[0]).toContain(`background: url("${base ?? ''}/paper.png")`)
+      expect(styles[1]).toContain('.card {')
+      expect(html).toContain(`<meta name="viewport" content="width=device-width, initial-scale=1"><style>`)
+      for (const style of styles)
+        expect(response.headers.get('content-security-policy')).toContain(sourceHash(style))
+    }
+  })
+
+  it('reads a stylesheet to inline with its relative URLs made absolute, the mount point the build added taken off, and no way to close its element', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-inline-'))
+
+    try {
+      await Bun.write(join(dir, 'pages', 'home-1.css'), '.a{background:url("./a-1.png")}.b{background:url(../b.png?v=1#x)}.c{background:url(/docs/c.png)}.d{background:url(data:image/png;base64,AA)}.e{content:"</style>"}')
+
+      const inline = await readInlineStyles({ dir, styles: new Map([['/x.kay', '/_kay/pages/home-1.css']]) } as ClientBuild, '/docs')
+
+      expect(inline.get('/_kay/pages/home-1.css')).toBe('.a{background:url("/_kay/pages/a-1.png")}.b{background:url(/_kay/b.png?v=1#x)}.c{background:url(/c.png)}.d{background:url(data:image/png;base64,AA)}.e{content:"<\\/style>"}')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('ships the entry to a page whose islands all wait, without preloading their chunks', async () => {

@@ -484,7 +484,11 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   let html = cached.get(key)
 
   if (html === undefined) {
-    html = [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined).map(url => `<link rel="stylesheet" href="${url}">`).join('')
+    html = [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined).map((url) => {
+      const css = client.inlineStyles?.get(url)
+
+      return css === undefined ? `<link rel="stylesheet" href="${url}">` : `<style>${css}</style>`
+    }).join('')
     cached.set(key, html)
   }
 
