@@ -346,6 +346,45 @@ describe('loops', () => {
     }
   })
 
+  it('leave what reads only a row\'s key alone when its item is replaced by a copy under the same key', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal([{ id: 1, label: \'a\' }, { id: 2, label: \'b\' }])\nlet drawn = 0\nconst draw = (id: number) => `#${id}:${++drawn}`\n;(globalThis as { relabel?: () => void }).relabel = () => list.set(list().map(item => ({ ...item, label: `${item.label}!` })))\n---\nul\n  for item of list() key={item.id}\n    li\n      b {item.label}\n      i {draw(item.id)}\n',
+    })
+    const relabel = (globalThis as unknown as { relabel: () => void }).relabel
+
+    try {
+      relabel()
+      await settle()
+
+      expect([...root.querySelectorAll('li')].map(item => item.textContent)).toEqual(['a!#1:1', 'b!#2:2'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('warn when a part drawn again replaces the focused element with a new one of its kind', async () => {
+    const { root, dispose } = await mountKay({
+      'rows.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: { id: number, label: string }[], row: (label: string) => JSX.Element }>()\n---\nfor item of items key={item.id}\n  | {row(item.label)}\n',
+      'main.kay': '---\nimport { signal } from \'kay\'\nimport Rows from \'./rows.kay\'\n\nconst list = signal([{ id: 1, label: \'a\' }])\n;(globalThis as { relabel?: () => void }).relabel = () => list.set([{ id: 1, label: \'b\' }])\n---\nRows(items={list()})\n  @row(label)\n    input(name={label})\n',
+    })
+    const relabel = (globalThis as unknown as { relabel: () => void }).relabel
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      root.querySelector('input')!.focus()
+      relabel()
+      await settle()
+
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]).toEqual([expect.stringContaining('drew a new <input> in place of the focused one'), root.querySelector('input[name="b"]')])
+    }
+    finally {
+      warn.mockRestore()
+      await dispose()
+    }
+  })
+
   it('keep every node of multi-node rows through random reorders, inserts and removals', async () => {
     const { root, dispose } = await mountKay({
       'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal<number[]>([])\n;(globalThis as { setRows?: (next: number[]) => void }).setRows = next => list.set(next)\n---\np\n  b start\n  for n of list() key={n}\n    i {n}\n    | ;\n  b end\n',

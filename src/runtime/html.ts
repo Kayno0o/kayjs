@@ -11,6 +11,7 @@ import { safeUrl } from './url'
 export { componentClass } from './classes'
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
+export { untrack } from './reactive'
 
 export interface Html {
   t: string

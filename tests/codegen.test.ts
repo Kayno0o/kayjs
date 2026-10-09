@@ -152,6 +152,16 @@ describe('control flow', () => {
     expect(jsx('if user() as u\n  p {u.name}\nelse\n  p anon')).toBe('<>{<KayShow when={user()} fallback={<p>anon</p>}>{(u) => <p>{u.name}</p>}</KayShow>}</>')
   })
 
+  it('reads a keyed row\'s key untracked, since a row keeps its key for life, and leaves a write or a call through it as written', () => {
+    const dom = compileKay('ul\n  for todo of todos key={todo.id}\n    li(onClick={() => todo.id++}) {todo.id}: {todo.title} {todo.id.toFixed()}', 'test.kay', { output: 'dom' }).tsx
+
+    expect(dom).toContain('KayUntrack(() => todo().id)')
+    expect(dom).toContain('KayUntrack(() => todo().id).toFixed()')
+    expect(dom).toContain('todo().title')
+    expect(dom).toContain('todo().id++')
+    expect(compileKay('for row of rows key={row}\n  p {row}', 'test.kay', { output: 'dom' }).tsx).toContain('KayUntrack(() => row())')
+  })
+
   it('rejects writes to loop items', () => {
     expect(errors('for t of list key={t}\n  button(onClick={() => { t = 1 }}) x')).toEqual([expect.stringContaining('read-only')])
   })

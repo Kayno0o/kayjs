@@ -7,7 +7,7 @@ import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStatic
 import { childItems, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const TRANSITION_PART = 'transition:'
 

@@ -8,7 +8,7 @@ import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
 
 export { componentClass } from './classes'
-export { renderEffect as effect } from './reactive'
+export { renderEffect as effect, untrack } from './reactive'
 export { transition } from './transition'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.
@@ -418,6 +418,41 @@ function units(value: unknown, out: Unit[] = []): Unit[] {
   return out
 }
 
+// Where the focused element sits among the nodes of `list`: the index of its top node, then of each child down to it.
+function focusedIn(list: Unit[]): { element: Element, path: number[] } | undefined {
+  const element = typeof document === 'undefined' ? null : document.activeElement
+
+  if (!element || element === document.body)
+    return undefined
+
+  const top = list.flatMap(nodesOf)
+  const path: number[] = []
+
+  for (let node: Node = element; node.parentNode; node = node.parentNode) {
+    const index = top.indexOf(node)
+
+    if (index >= 0)
+      return { element, path: [index, ...path] }
+
+    path.unshift(Array.prototype.indexOf.call(node.parentNode.childNodes, node))
+  }
+
+  return undefined
+}
+
+// In development, a dynamic part drawn again with the same element in place of the focused one: the expression read something that changed, and whoever was typing in it lost focus.
+function warnRedrawn(focused: { element: Element, path: number[] }, list: Unit[], fn: () => unknown): void {
+  let node: Node | undefined = list.flatMap(nodesOf)[focused.path[0]!]
+
+  for (const index of focused.path.slice(1))
+    node = node?.childNodes[index]
+
+  if (!(node instanceof Element) || node === focused.element || node.tagName !== focused.element.tagName)
+    return
+
+  console.warn(`[kay] this expression ran again and drew a new <${node.localName}> in place of the focused one, which lost focus: it read something that changed, such as a loop row's item, or a list built again. Read only what it draws from, or call what draws in untrack().\n${String(fn)}`, node)
+}
+
 // Renders what `fn` returns into a dynamic part, again whenever what it read changes; `reactive` false renders it once, as a component call does.
 export function insert(element: Node | null, start: Node | null, end: Node | null, fn: () => unknown, reactive = true): void {
   const region = new Region(element, start, end)
@@ -449,6 +484,7 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
     if (next.length === current.length && next.every((unit, index) => unit === current[index]))
       return
 
+    const focused = process.env.NODE_ENV === 'production' ? undefined : focusedIn(current)
     const kept = new Set(next)
 
     for (const unit of current) {
@@ -460,6 +496,9 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
       region.insert(unit)
 
     current = next
+
+    if (focused)
+      warnRedrawn(focused, next, fn)
   }
 
   const first = () => {

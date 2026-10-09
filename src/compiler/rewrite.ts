@@ -34,6 +34,9 @@ export interface ConstantSignal {
   value?: Span | undefined
 }
 
+// A read a rewrite replaces past the name itself, by `length` source characters.
+type Read = Rewrite & { length?: number | undefined }
+
 // What writing to a name that cannot be written says.
 type ReadOnly = Pick<Diagnostic, 'message' | 'note' | 'help'>
 
@@ -79,7 +82,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
 
   // `typeOf` spells the type of the value the name stands for, when `typeof name` cannot read it through the rewritten name.
   // `rewrite` gives what a read becomes, or nothing to leave it as written.
-  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Rewrite | undefined, readOnly: ReadOnly, typeOf?: string) => {
+  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Read | undefined, readOnly: ReadOnly, typeOf?: string) => {
     const binding = scope.getBinding(name)
 
     if (!binding)
@@ -105,15 +108,16 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       if (source === undefined || tag === 'closing')
         continue
 
-      const found = rewrite(reference)
+      const read = rewrite(reference)
 
-      if (!found)
+      if (!read)
         continue
 
+      const { length = name.length, ...found } = read
       // Type checking copies a tag as a value too, which must not undo the opening tag's.
       const dynamic = (tag === 'opening' && !isPlainRead(found)) || rewrites.get(source)?.dynamic
 
-      rewrites.set(source, { ...found, end: source + name.length, dynamic })
+      rewrites.set(source, { ...found, end: source + length, dynamic })
     }
     for (const violation of binding.constantViolations) {
       const identifier = assignedIdentifier(violation.node, name)
@@ -144,9 +148,11 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       shadowsName = path.scope.getBinding(componentName)?.referencePaths.some(reference => reference.isIdentifier() && !inIslandExport(reference) && tagPosition(reference) === undefined) ?? false
     },
     ArrowFunctionExpression: (path) => {
-      for (const param of path.node.params) {
+      for (const [index, param] of path.node.params.entries()) {
         if (param.type !== 'Identifier' || !accessorSites.has(param.start!))
           continue
+
+        const key = index === 0 ? loopKey(path, param.name) : undefined
 
         const readOnly = { message: `\`${param.name}\` is read-only here`, note: 'it tracks the current value' }
 
@@ -154,7 +160,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
         if (values)
           visitBinding(path.scope, param.name, reference => tagPosition(reference) === 'opening' ? {} : undefined, readOnly)
         else
-          visitBinding(path.scope, param.name, reference => withShorthand(reference, param.name, { after: '()' }), readOnly, `ReturnType<typeof ${param.name}>`)
+          visitBinding(path.scope, param.name, reference => keyRead(reference, param.name, key, code) ?? withShorthand(reference, param.name, { after: '()' }), readOnly, `ReturnType<typeof ${param.name}>`)
       }
     },
     VariableDeclarator: (path) => {
@@ -353,6 +359,60 @@ function memberTypes(name: t.TSTypeQuery['exprName']): string {
 }
 
 // `{ todo }` cannot become `{ todo() }`, so a shorthand property spells its key out first.
+// The members a keyed loop's `keyed={(item) => item.a.b}` reads off its item, when `row` is that loop's row: none for a key that is the item itself.
+function loopKey(row: NodePath<t.ArrowFunctionExpression>, name: string): string[] | undefined {
+  const loop = row.parentPath.parentPath?.node
+
+  if (loop?.type !== 'JSXElement' || loop.openingElement.name.type !== 'JSXIdentifier' || loop.openingElement.name.name !== 'KayLoopFor')
+    return undefined
+
+  const keyed = loop.openingElement.attributes.find(attribute => attribute.type === 'JSXAttribute' && attribute.name.name === 'keyed')
+  const key = keyed?.type === 'JSXAttribute' && keyed.value?.type === 'JSXExpressionContainer' ? keyed.value.expression : undefined
+
+  if (key?.type !== 'ArrowFunctionExpression' || key.params[0]?.type !== 'Identifier' || key.params[0].name !== name)
+    return undefined
+
+  const members: string[] = []
+  let node = key.body
+
+  while (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier') {
+    members.unshift(node.property.name)
+    node = node.object
+  }
+
+  return node.type === 'Identifier' && node.name === name ? members : undefined
+}
+
+// A row keeps the key it was matched by, so a read of exactly its key tracks nothing: a copy of the item under the same key then leaves what reads only the key alone.
+// A write, a delete or a method call through it is left to the item itself.
+function keyRead(reference: NodePath, name: string, key: string[] | undefined, code: string): Read | undefined {
+  if (!key || tagPosition(reference) !== undefined)
+    return undefined
+
+  let read = reference
+
+  for (const member of key) {
+    const parent = read.parentPath
+
+    if (!parent?.isMemberExpression() || parent.node.object !== read.node || parent.node.computed || parent.node.property.type !== 'Identifier' || parent.node.property.name !== member)
+      return undefined
+
+    read = parent
+  }
+
+  const { parent, node } = read
+
+  if ((parent.type === 'AssignmentExpression' && parent.left === node) || parent.type === 'UpdateExpression' || (parent.type === 'UnaryExpression' && parent.operator === 'delete') || read.parentPath?.isPattern() === true)
+    return undefined
+
+  if (key.length > 0 && (parent.type === 'CallExpression' || parent.type === 'OptionalCallExpression') && parent.callee === node)
+    return undefined
+
+  const members = code.slice(reference.node.end!, node.end!)
+
+  return { ...withShorthand(reference, name, { replace: `KayUntrack(() => ${name}()${members})` }), length: node.end! - reference.node.start! }
+}
+
 function withShorthand(reference: NodePath, name: string, rewrite: Rewrite): Rewrite {
   const parent = reference.parent
 

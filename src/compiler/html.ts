@@ -6,7 +6,7 @@ import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'show', 'style']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'show', 'style', 'untrack']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])

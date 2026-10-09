@@ -11,7 +11,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `// note` | A comment. Lines indented under it are commented out too. |
 | `if cond` / `else if cond` / `else` | Conditional rendering. |
 | `if user() as u` | Binds the truthy value to `u` for the children. |
-| `for item of list` | A list, its rows matched across renders by `item.id`, else by the item itself; `key={item.slug}` names another key. `else` right after it renders when the list is empty. |
+| `for item of list` | A list, its rows matched across renders by `item.id`, else by the item itself; `key={item.slug}` names another key. A row keeps its key, so in an island a new copy of the item redraws what reads the rest of it, never what reads the key alone; in development, a part drawn again in place of the focused element warns in the console. `else` right after it renders when the list is empty. |
 | `for item, i of list key={i}` | Rows matched by position. |
 | `slot` | Where a layout or wrapper renders its children. |
 | `@name` | Directly under a component: passes the indented block as its `name` prop. |
