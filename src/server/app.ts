@@ -58,11 +58,11 @@ const SOURCE_MAP = '.js.map'
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
   // Project root: island ids and `.kay/` output are relative to it. Defaults to the working directory.
-  root?: string
+  root?: string | undefined
   // Shows thrown errors with their stack. Defaults to on when NODE_ENV is development.
-  dev?: boolean
+  dev?: boolean | undefined
   // Serves the bundle `kay build` wrote instead of bundling at boot. Defaults to on when NODE_ENV is production.
-  prebuilt?: boolean
+  prebuilt?: boolean | undefined
 }
 
 // The prerendered pages by route pattern, then by path, read once at boot with the compressed copies `kay build` wrote.

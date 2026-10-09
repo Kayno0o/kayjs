@@ -8,15 +8,15 @@ import { writeShadowTypes } from '../check'
 
 export interface DevOptions {
   // The server entry, relative to the root.
-  entry?: string
+  entry?: string | undefined
   // Page, public file and API directories relative to the root, for the regenerated `.kay/types`.
-  routes?: string
-  publicDir?: string
-  api?: string
+  routes?: string | undefined
+  publicDir?: string | undefined
+  api?: string | undefined
   // The app's modules for its libraries' settings, for the settings check in `.kay/types`.
-  settings?: Record<string, string>
+  settings?: Record<string, string> | undefined
   // Called with each server process once it is spawned.
-  onRestart?: (child: Subprocess) => void
+  onRestart?: ((child: Subprocess) => void) | undefined
 }
 
 // Long enough to gather the few events one save makes.

@@ -8,11 +8,11 @@ export interface Route {
   file: string
   params: string[]
   // The parameter a `[...name].kay` file binds to Elysia's `*`.
-  catchAll?: string
+  catchAll?: string | undefined
   // Params a `[[name]]` segment makes optional.
-  optional?: string[]
+  optional?: string[] | undefined
   // The matcher a `[name=matcher]` segment checks its param with, by param.
-  matchers?: Record<string, string>
+  matchers?: Record<string, string> | undefined
   // `_layout.kay` files wrapping the page, outermost first.
   layouts: string[]
   special: SpecialPages
@@ -34,8 +34,8 @@ export interface SpecialPage {
 
 // The nearest `_404.kay` and `_error.kay` up the directory tree.
 export interface SpecialPages {
-  notFound?: SpecialPage
-  error?: SpecialPage
+  notFound?: SpecialPage | undefined
+  error?: SpecialPage | undefined
 }
 
 const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]$/i

@@ -51,29 +51,29 @@ const CONTENT_PROBLEMS = fileURLToPath(new URL('../content/problems.ts', import.
 const MESSAGE_PROBLEMS = fileURLToPath(new URL('./messages.ts', import.meta.url))
 
 export interface CheckOptions {
-  tsconfig?: string
+  tsconfig?: string | undefined
   // The server entry relative to the root, `src/server.ts` by default: the `app` it exports types `ctx.locals` and the app routes links may point at.
-  entry?: string
+  entry?: string | undefined
   // Page directory relative to the root, so `ctx.params` is typed per route.
-  routes?: string
+  routes?: string | undefined
   // Public file directory relative to the root, whose files links may point at.
-  publicDir?: string
+  publicDir?: string | undefined
   // API directory relative to the root, whose modules' GET routes links may point at.
-  api?: string
+  api?: string | undefined
   // The app's own modules for its libraries' settings, checked against the defaults they replace.
-  settings?: Record<string, string>
+  settings?: Record<string, string> | undefined
   // The content config relative to the root, whose collections' entries are read against their schemas.
-  content?: string
+  content?: string | undefined
   // The config's redirects, whose targets on the site must be a page or a public file.
-  redirects?: Redirects
+  redirects?: Redirects | undefined
   // Where the site is mounted, the origin it is public at and how long a stopping server waits, which the server refuses at boot when it cannot read them.
-  base?: string
-  site?: string
-  shutdownTimeout?: Duration
+  base?: string | undefined
+  site?: string | undefined
+  shutdownTimeout?: Duration | undefined
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
-  i18n?: I18nConfig
+  i18n?: I18nConfig | undefined
   // The level of each lint, over its default.
-  lints?: LintLevels
+  lints?: LintLevels | undefined
 }
 
 export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity' | 'fixes'> {
@@ -81,11 +81,11 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
   line: number
   column: number
   // Where the span ends in the file's source, when it is longer than one character.
-  end?: number
+  end?: number | undefined
   message: string
-  code?: string
+  code?: string | undefined
   // Found by type checking only, so the file's type errors are still reported.
-  checkOnly?: boolean
+  checkOnly?: boolean | undefined
 }
 
 // What `noUnusedLocals` reports: `kay check` turns it on for .kay files, and leaves other files to the project's tsconfig.

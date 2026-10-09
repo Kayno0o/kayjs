@@ -6,11 +6,11 @@ import { defaultJobStore } from './queue'
 
 export interface ScheduleOptions {
   // IANA time zone the schedule reads in, such as `Europe/Paris`; the system's by default.
-  tz?: string
+  tz?: string | undefined
   // Runs each time once across every process sharing the job store, the first to reach it taking it: names the lock, unique per schedule.
-  lock?: string
+  lock?: string | undefined
   // Where the lock is taken: the queues' default store unless given.
-  store?: JobStore
+  store?: JobStore | undefined
 }
 
 // A lock slot is the minute a run is due, the finest a cron schedule goes: a run falls due at its first second, so the nearest minute names it for a process running it up to 30 s early or late, its clock skewed or its event loop busy.
@@ -19,8 +19,10 @@ const SLOT_MS = 60_000
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
 // A run that throws is logged and the next one comes as planned; a stopping server waits for the run in progress.
 export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, job: () => unknown, options: ScheduleOptions = {}) {
+  const zone = options.tz === undefined ? {} : { tz: options.tz }
+
   // A typo fails the boot rather than never running.
-  if (Bun.cron.parse(cron, Date.now(), { tz: options.tz }) === null)
+  if (Bun.cron.parse(cron, Date.now(), zone) === null)
     throw new Error(`kay: the schedule ${cron} never comes`)
 
   let handle: Bun.CronJob | undefined
@@ -46,7 +48,7 @@ export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cr
         running = run()
         await running
         running = undefined
-      }, { tz: options.tz })
+      }, zone)
     })
     .onStop(async () => {
       handle?.stop()

@@ -90,7 +90,7 @@ export interface RenderedMarkdown {
 // Markdown text rendered as a collection's entries are, headings anchored and code highlighted when `highlight` is given, for text the app has at runtime, such as a user's note.
 // The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`, and the headings may be ones a user typed as raw tags.
 // The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
-export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter } = {}): Promise<RenderedMarkdown> {
+export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined } = {}): Promise<RenderedMarkdown> {
   const html = Bun.markdown.html(markdown, { headings: { ids: true, autolink: true }, autolinks: true })
   const headings: Heading[] = []
 
@@ -101,7 +101,7 @@ export async function renderMarkdown(markdown: string, options: { highlight?: Hi
 }
 
 // A code block as Markdown renders one, through `highlight` when given, for a page's `innerHTML`.
-export async function highlightCode(code: string, language?: string, options: { highlight?: Highlighter } = {}): Promise<SafeHtml> {
+export async function highlightCode(code: string, language?: string, options: { highlight?: Highlighter | undefined } = {}): Promise<SafeHtml> {
   if (options.highlight)
     return await options.highlight(code, language) as SafeHtml
 

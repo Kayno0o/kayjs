@@ -20,15 +20,15 @@ export interface IconSet {
 }
 
 interface IconifyIcon {
-  body?: string
-  parent?: string
-  width?: number
-  height?: number
-  left?: number
-  top?: number
-  rotate?: number
-  hFlip?: boolean
-  vFlip?: boolean
+  body?: string | undefined
+  parent?: string | undefined
+  width?: number | undefined
+  height?: number | undefined
+  left?: number | undefined
+  top?: number | undefined
+  rotate?: number | undefined
+  hFlip?: boolean | undefined
+  vFlip?: boolean | undefined
 }
 
 // Iconify's default box, for a set that declares none.

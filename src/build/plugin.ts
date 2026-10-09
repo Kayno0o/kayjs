@@ -11,17 +11,17 @@ import { transformKayCached } from './transform'
 
 export interface KayPluginOptions {
   // Defaults to `dom` when bundling for the browser and `ssr` everywhere else, the Bun runtime included.
-  target?: Target
+  target?: Target | undefined
   // On by default: islands hydrate the server markup instead of re-rendering it.
-  hydratable?: boolean
+  hydratable?: boolean | undefined
   // Island ids are relative to this directory, and imported assets are written under its `.kay/client`; defaults to the working directory.
-  root?: string
+  root?: string | undefined
   // Keeps compiled files here between runs; off when unset.
-  cacheDir?: string
+  cacheDir?: string | undefined
   // The app's own module for a library's settings, by the library's name, relative to the root: `kay.config.ts`'s `settings`.
-  settings?: Record<string, string>
+  settings?: Record<string, string> | undefined
   // A module every component imports, which ties the runtime it uses to the chunk the page loads first: see runtime-chunk.ts.
-  anchor?: string
+  anchor?: string | undefined
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.

@@ -22,11 +22,11 @@ export interface FaviconOptions {
   source: string
   // Where `kay build` wrote the files, read instead of the source when there.
   builtDir: string
-  name?: string
-  description?: string
-  manifest?: ManifestConfig
+  name?: string | undefined
+  description?: string | undefined
+  manifest?: ManifestConfig | undefined
   // The site's mount point, which the manifest's paths go under.
-  base?: string
+  base?: string | undefined
 }
 
 // The favicon in the sizes browsers ask for: an ICO of PNGs, the Apple touch icon and the manifest's icons.

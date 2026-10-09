@@ -26,20 +26,20 @@ export interface CardSetup {
   clientDir: string
   // Whether kay.config.ts lists fonts: a `fonts.json` left from an earlier build is not read otherwise.
   fonts: boolean
-  config?: CardConfig
+  config?: CardConfig | undefined
   // `seo.name`, written under the title.
-  name?: string
-  quality?: number
+  name?: string | undefined
+  quality?: number | undefined
   // An executable, which only reads what its build wrote.
-  bundled?: boolean
+  bundled?: boolean | undefined
   // Keeps the cards pages ask for, for `kay build` to write: on while prerendering.
-  collect?: boolean
+  collect?: boolean | undefined
 }
 
 // What one setup draws and signs cards with. The face is read on the first card drawn and the key made on the first card linked, so an app drawing none reads and writes nothing for them.
 export interface Cards {
   font: { family: string, path: string } | Error
-  face?: Promise<Face>
+  face?: Promise<Face> | undefined
   key: Uint8Array | undefined
   dir: string
   bundled: boolean
@@ -47,7 +47,7 @@ export interface Cards {
   look: string
   background: Color
   color: Color
-  name?: string
+  name?: string | undefined
   quality: number
   collect: boolean
 }
@@ -66,7 +66,7 @@ const REMOTE = /^https?:\/\//i
 
 // The setup pages link cards with, and the cards prerendered pages asked for, by file name, for `kay build` to write.
 let current: Cards | undefined
-const requested = new Map<string, { title: string, image?: string }>()
+const requested = new Map<string, { title: string, image?: string | undefined }>()
 
 // Settles the face, look and key cards are drawn and signed with, for every card this process links, served or prerendered; a face `images.card.font` names that `fonts` lacks stops the boot.
 export async function setupCards(setup: CardSetup): Promise<Cards> {
@@ -357,7 +357,7 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
 }
 
 // Written under a temporary name and moved into place, so a reader never sees a card half written.
-async function writeCard(cards: Cards, target: string, title: string, image?: { path: string, maxPixels?: number }): Promise<void> {
+async function writeCard(cards: Cards, target: string, title: string, image?: { path: string, maxPixels?: number | undefined }): Promise<void> {
   const partial = `${target}.${crypto.randomUUID()}.tmp`
   const look: CardLook = { face: await cardFace(cards), background: cards.background, color: cards.color, name: cards.name, quality: cards.quality }
 

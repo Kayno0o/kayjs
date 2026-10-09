@@ -32,11 +32,11 @@ export const END_MARKER = '<!--]-->'
 
 export interface HtmlOptions {
   // An island or a twin: dynamic parts carry markers for hydration.
-  hydratable?: boolean
+  hydratable?: boolean | undefined
   // Loop rows read their item, and a keyed row its index, through functions, as the island build of the same template does.
-  accessorLoops?: boolean
+  accessorLoops?: boolean | undefined
   // What a refused form's fields are described by.
-  errors?: ErrorMessages
+  errors?: ErrorMessages | undefined
 }
 
 // Static text written as markup: `& b` and `&amp;` both stay as written, the way JSX text reaches the server markup.

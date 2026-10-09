@@ -9,7 +9,7 @@ export interface CardLook {
   face: Face
   background: Color
   color: Color
-  name?: string
+  name?: string | undefined
   quality: number
 }
 

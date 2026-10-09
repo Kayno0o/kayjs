@@ -24,10 +24,10 @@ interface PageExports {
 }
 
 export interface SitemapOptions {
-  dev?: boolean
-  onError?: KayConfig['onError']
-  trailingSlash?: TrailingSlash
-  locales?: LocaleSettings
+  dev?: boolean | undefined
+  onError?: KayConfig['onError'] | undefined
+  trailingSlash?: TrailingSlash | undefined
+  locales?: LocaleSettings | undefined
 }
 
 // `/sitemap.xml` and `/robots.txt` for a project with a `site`, unless a public file or a page already serves that path.

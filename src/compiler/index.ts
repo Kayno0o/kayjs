@@ -21,35 +21,35 @@ export { ISLAND_TWIN, withoutTwin } from './twin'
 
 export interface CompileOptions {
   // Island ids are paths relative to this directory, so server and client agree on them.
-  root?: string
+  root?: string | undefined
   // Browser builds pass false so `--- server` code never reaches the bundle.
-  includeServer?: boolean
+  includeServer?: boolean | undefined
   // Parameters of the route this file serves, typing `ctx.params`.
-  params?: string[]
+  params?: string[] | undefined
   // A param's type when it is not `string`, such as a matcher's value.
-  paramTypes?: Record<string, string>
+  paramTypes?: Record<string, string> | undefined
   // Output for type checking: adds the link, form field and island prop assertions.
-  check?: boolean
-  relocateImport?: (specifier: string) => string | undefined
+  check?: boolean | undefined
+  relocateImport?: ((specifier: string) => string | undefined) | undefined
   // Code to run: `html` builds server markup as strings, `dom` builds the browser's DOM; type-checking output when unset.
-  output?: 'html' | 'dom'
+  output?: 'html' | 'dom' | undefined
   // Server output of a build that hydrates: islands carry markers, and a static component renders through its hydratable `?island` twin inside one.
-  hydratable?: boolean
+  hydratable?: boolean | undefined
   // Server output of a static component's `?island` twin, which carries markers like an island.
-  twinBuild?: boolean
+  twinBuild?: boolean | undefined
   // Type checking only: the level of each lint, over its default.
-  lints?: LintLevels
+  lints?: LintLevels | undefined
   // Renders in the browser only, as `--- client` does: set when a package the component imports cannot load on the server.
-  clientOnly?: boolean
+  clientOnly?: boolean | undefined
   // Type-checking a static component only islands render: its children render inline with it, so the props it passes them are not serialized.
-  insideIsland?: boolean
+  insideIsland?: boolean | undefined
 }
 
 export interface CompileResult {
   tsx: string
   map: SourceMap
   // Set when the component is interactive and renders as an island.
-  island?: string
+  island?: string | undefined
   // The `.class` shorthand names, which CSS tools scanning for class names cannot read off `div.md:flex.w-1/2`.
   classes: string[]
   diagnostics: Diagnostic[]

@@ -78,7 +78,7 @@ const MAX_HOPS = 16
 // Serves .kay files by compiling each to its shadow TSX, forwarding requests to tsgo's language server and mapping positions both ways.
 export class KayLanguageServer {
   private root = ''
-  private routesSetting?: string
+  private routesSetting: string | undefined
   private nodeUris = false
   private watchesFiles = false
   private readonly projects = new Map<string, Project>()

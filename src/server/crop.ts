@@ -20,16 +20,17 @@ export interface Png {
 // `source` resized to cover `width` by `height`, its middle kept, as a PNG.
 // Shrunk, it is resized first, so the cut reads few pixels; enlarged, it is cut first, so a thin image is never blown up whole.
 export async function coverImage(source: Blob | Uint8Array, width: number, height: number, maxPixels?: number): Promise<Uint8Array> {
-  const own = await new Bun.Image(source, { maxPixels }).metadata()
+  const limit = maxPixels === undefined ? {} : { maxPixels }
+  const own = await new Bun.Image(source, limit).metadata()
   const scale = Math.max(width / own.width, height / own.height)
 
   if (scale <= 1) {
-    const resized = await new Bun.Image(source, { maxPixels }).resize(Math.max(width, Math.round(own.width * scale)), Math.max(height, Math.round(own.height * scale)), { fit: 'fill' }).png({ compressionLevel: 0 }).bytes()
+    const resized = await new Bun.Image(source, limit).resize(Math.max(width, Math.round(own.width * scale)), Math.max(height, Math.round(own.height * scale)), { fit: 'fill' }).png({ compressionLevel: 0 }).bytes()
 
     return encodePng(cropPng(decodePng(resized), width, height))
   }
 
-  const whole = await new Bun.Image(source, { maxPixels }).png({ compressionLevel: 0 }).bytes()
+  const whole = await new Bun.Image(source, limit).png({ compressionLevel: 0 }).bytes()
   const cut = encodePng(cropPng(decodePng(whole), Math.min(own.width, Math.max(1, Math.round(width / scale))), Math.min(own.height, Math.max(1, Math.round(height / scale)))))
 
   return new Bun.Image(cut).resize(width, height, { fit: 'fill' }).png({ compressionLevel: 0 }).bytes()

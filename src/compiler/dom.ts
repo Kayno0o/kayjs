@@ -22,10 +22,10 @@ function domAlias(helper: string): string {
 // A node of a template, so the code can reach the ones it binds: through `firstChild` and `nextSibling`, and past a dynamic part through its end marker.
 interface TemplateNode {
   kind: 'element' | 'text' | 'start' | 'end'
-  parent?: TemplateNode
-  previous?: TemplateNode
-  last?: TemplateNode
-  variable?: string
+  parent?: TemplateNode | undefined
+  previous?: TemplateNode | undefined
+  last?: TemplateNode | undefined
+  variable?: string | undefined
 }
 
 // What the code does with a template's nodes once it holds the root, in document order, an element's own bindings after its content's.

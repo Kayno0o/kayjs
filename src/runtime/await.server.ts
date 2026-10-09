@@ -10,7 +10,7 @@ export interface PendingBlock {
   id: string
   value: Promise<unknown>
   ready: (value: never) => unknown
-  failed?: (error: unknown) => unknown
+  failed?: ((error: unknown) => unknown) | undefined
 }
 
 // Renders are synchronous, so the blocks of the one in progress can live here, like the islands it renders.

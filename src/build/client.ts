@@ -24,26 +24,26 @@ import { styleImports, withoutStyles } from './styles'
 import { analyzeKayCached, KayCompileError } from './transform'
 
 export interface ClientOptions {
-  minify?: boolean
-  plugins?: BunPlugin[]
+  minify?: boolean | undefined
+  plugins?: BunPlugin[] | undefined
   // Page directory relative to the root: its pages and layouts are where stylesheets are gathered from.
-  routes?: string
+  routes?: string | undefined
   // API directory relative to the root: an island importing a module there gets where its routes are served, not its code.
-  api?: string
+  api?: string | undefined
   // Links each island chunk to a map of its `.kay` sources, for the browser's devtools; the server points a map at them as it first serves it.
-  sourcemap?: boolean
+  sourcemap?: boolean | undefined
   // The site's mount point, which the stylesheets' own paths go under, `url(/bg.png)` included.
-  base?: string
+  base?: string | undefined
   // The app's own modules for its libraries' settings, as `kay.config.ts` gives them.
-  settings?: Record<string, string>
+  settings?: Record<string, string> | undefined
   // Swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions.
-  navigation?: boolean
+  navigation?: boolean | undefined
   // Development: an edited island swaps into the open pages rather than reloading them.
-  hot?: boolean
+  hot?: boolean | undefined
   // The config declares `publicEnv`: the entry imports its values from the server before any island hydrates.
-  publicEnv?: boolean
+  publicEnv?: boolean | undefined
   // The level of each lint the problems panel shows in development.
-  lints?: LintLevels
+  lints?: LintLevels | undefined
 }
 
 interface MetafileOutput {

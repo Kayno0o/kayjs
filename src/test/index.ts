@@ -47,7 +47,7 @@ export interface Visit extends PageReading {
 }
 
 export interface VisitInit {
-  headers?: Record<string, string>
+  headers?: Record<string, string> | undefined
 }
 
 // A text field, or a file input's `File`.
@@ -59,7 +59,7 @@ export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
   // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser.
-  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot, FormValue | FormValue[]>>, init?: VisitInit & { from?: string }) => Promise<Visit>
+  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
   call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit) => Promise<Success<ResultOf<Target>>>
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
@@ -131,7 +131,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return app.handle(request)
   }
 
-  const send = async (path: string, init: RequestInit & VisitInit): Promise<Response> => {
+  const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
     const headers = cookieHeader(new Headers(init.headers))
 
     const response = await handle(new Request(new URL(path, ORIGIN), { ...init, headers, redirect: 'manual' }))

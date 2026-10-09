@@ -9,7 +9,7 @@ const NO_BODY = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 // What an action or an API module lets a request send, the app's limit when it sets none, and its answer to one sending more.
 export interface BodyLimit {
-  bytes?: number
+  bytes?: number | undefined
   refuse: (request: Request, bytes: number, server: Server | null) => Response | Promise<Response>
 }
 

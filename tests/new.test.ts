@@ -82,7 +82,7 @@ async function lint(dir: string, path: string): Promise<{ filePath: string, mess
 }
 
 async function kay(args: string[], cwd?: string): Promise<{ stdout: string, stderr: string, code: number }> {
-  const child = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), ...args], { cwd, stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), ...args], { cwd: cwd ?? process.cwd(), stdout: 'pipe', stderr: 'pipe' })
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { stdout, stderr, code }

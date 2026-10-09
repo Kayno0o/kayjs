@@ -78,7 +78,7 @@ export async function readCapped(request: Request, max: number): Promise<string 
   return new TextDecoder().decode(Buffer.concat(chunks))
 }
 
-function readReport(text: string): { name: string, message: string, url: string, stack?: string, island?: string } | undefined {
+function readReport(text: string): { name: string, message: string, url: string, stack?: string | undefined, island?: string | undefined } | undefined {
   try {
     const { name, message, url, stack, island } = JSON.parse(text) as Record<string, unknown>
 

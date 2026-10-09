@@ -13,7 +13,7 @@ export interface MigrateReport {
   // Files left alone because the target exists.
   skipped: string[]
   // What was not translated, at its line in the Astro file, with the file written from it.
-  notes: { file: string, line: number, target?: string, message: string }[]
+  notes: { file: string, line: number, target?: string | undefined, message: string }[]
 }
 
 const WORD_BOUNDARY = /([a-z0-9])([A-Z])/g

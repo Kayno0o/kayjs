@@ -12,34 +12,34 @@ import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 export interface GenerateOptions {
   name: string
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
-  island?: string
+  island?: string | undefined
   // The island renders in the browser only: `--- client`, or a package it imports cannot load on the server.
-  client?: boolean
+  client?: boolean | undefined
   // Path relative to the project root, naming the module's actions.
   moduleId: string
   // Type-checking output: adds assertions on links, form fields and island props through globals `kay check` declares.
-  check?: boolean
+  check?: boolean | undefined
   // Type-checking a static component only islands render: the props it passes its children are not serialized, so they are not asserted.
-  insideIsland?: boolean
+  insideIsland?: boolean | undefined
   // Browser builds leave the `--- server` fence out entirely; type checking and SSR keep it.
-  includeServer?: boolean
+  includeServer?: boolean | undefined
   // Route parameters, typing `ctx.params` in `load`.
-  params?: string[]
-  paramTypes?: Record<string, string>
+  params?: string[] | undefined
+  paramTypes?: Record<string, string> | undefined
   // `_error.kay`, whose `ctx` carries the error it renders.
-  errorPage?: boolean
+  errorPage?: boolean | undefined
   // A layout or special page, which reads the query its page declares rather than one of its own.
-  special?: boolean
+  special?: boolean | undefined
   // Server output without hydration markers for a static component: inside an island it renders through this hydratable build of itself instead.
-  twin?: string
+  twin?: string | undefined
   // Code to run rather than type-check, built from the template: `html` builds server markup as strings, `dom` builds the browser's DOM. The analysis pass still generates JSX, which scope analysis reads.
-  output?: 'html' | 'dom'
+  output?: 'html' | 'dom' | undefined
   // Server markup of an island or a twin, carrying the markers hydration needs.
-  hydratable?: boolean
+  hydratable?: boolean | undefined
   // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
-  relocateImport?: (specifier: string) => string | undefined
+  relocateImport?: ((specifier: string) => string | undefined) | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
-  rewrites?: ReadonlyMap<number, Rewrite & { end: number }>
+  rewrites?: ReadonlyMap<number, Rewrite & { end: number }> | undefined
 }
 
 export interface Generated {
@@ -495,7 +495,7 @@ class Generator {
   }
 
   // The template's top-level `head` block, which renders into the document head rather than in place.
-  private splitHead(nodes: Node[]): { head?: ElementNode, template: Node[] } {
+  private splitHead(nodes: Node[]): { head?: ElementNode | undefined, template: Node[] } {
     let head: ElementNode | undefined
     const template: Node[] = []
 

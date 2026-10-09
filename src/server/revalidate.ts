@@ -12,7 +12,7 @@ interface Revalidation {
   invalidatedAt: number
   // After a render that failed, no request waits for another before this.
   retryAt: number
-  running?: Promise<void>
+  running?: Promise<void> | undefined
 }
 
 const revalidations = new WeakMap<ServedPage, Revalidation>()

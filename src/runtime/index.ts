@@ -197,7 +197,7 @@ export interface PageError {
   // The thrown error's message in development; production shows a generic one and logs the real error.
   message: string
   // Development only.
-  stack?: string
+  stack?: string | undefined
 }
 
 // The context of `_error.kay`, rendered when a page's load or render throws.

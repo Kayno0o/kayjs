@@ -37,7 +37,7 @@ export interface HotSwap {
   // Chunks the page never loaded that may come along, holding nothing but edited islands.
   fresh: string[]
   // The new entry, which the page then counts as its own, so a page swapped in later is not taken for another build.
-  entry?: string
+  entry?: string | undefined
 }
 
 setErrorReporter((error, island) => {

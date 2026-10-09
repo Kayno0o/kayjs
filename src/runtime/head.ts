@@ -8,11 +8,11 @@ export interface HeadTag {
 
 export interface HeadOptions {
   // Tags every page starts from: a tag of the same identity a layout or the page sets replaces one.
-  defaults?: HeadTag[]
+  defaults?: HeadTag[] | undefined
   // Wraps a title a layout or the page sets, such as `%s | Site`; a title from the defaults, or one marked `raw`, stays as it is.
-  titleTemplate?: string
+  titleTemplate?: string | undefined
   // Fills the social tags a page leaves out from the ones it sets, `og:title` from its title for instance, with `/` URLs made absolute against `origin`.
-  social?: { origin?: string }
+  social?: { origin?: string | undefined } | undefined
 }
 
 export interface RenderedHead {

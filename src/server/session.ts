@@ -20,13 +20,13 @@ export interface SessionOptions {
   // At least 32 characters, from the environment. A list rotates them: the first seals new cookies, every one opens old ones.
   secret: string | string[]
   // Defaults to `session`.
-  cookie?: string
+  cookie?: string | undefined
   // How long a session lasts without being used, seconds or a string such as '30d', 30 days by default; one used past half of it is extended.
-  maxAge?: Duration
+  maxAge?: Duration | undefined
   // The parent domain sibling hosts share the session under, `example.com` for `app.example.com` and `auth.example.com`, the visited host or a parent of it; the cookie is the visited host's only without it.
-  domain?: string
+  domain?: string | undefined
   // Keeps the data server-side, the cookie carrying only an id; without one the data travels sealed in the cookie, about 3.5 KB at most.
-  store?: SessionStore
+  store?: SessionStore | undefined
 }
 
 export interface Session<Data extends object> {
@@ -101,19 +101,19 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 interface SessionConfig {
   name: string
   maxAge: number
-  domain?: string
-  store?: SessionStore
+  domain?: string | undefined
+  store?: SessionStore | undefined
   keys: Buffer[]
 }
 
 class RequestSession<Data extends object> implements Session<Data> {
-  private loading?: Promise<void>
+  private loading: Promise<void> | undefined
   private data: SessionData = {}
-  private id?: string
-  private issued?: number
+  private id: string | undefined
+  private issued: number | undefined
   private changed = false
   // An id `regenerate` or `destroy` left behind, deleted from the store on commit.
-  private retired?: string
+  private retired: string | undefined
   private oldKey = false
 
   constructor(private readonly request: Request, private readonly config: SessionConfig) {}
@@ -228,7 +228,7 @@ class RequestSession<Data extends object> implements Session<Data> {
   }
 
   private cookie(value: string, maxAge: number): string {
-    return new Bun.Cookie(this.config.name, value, { path: '/', domain: this.config.domain, httpOnly: true, sameSite: 'lax', secure: overHttps(this.request), maxAge }).serialize()
+    return new Bun.Cookie(this.config.name, value, { path: '/', ...this.config.domain === undefined ? {} : { domain: this.config.domain }, httpOnly: true, sameSite: 'lax', secure: overHttps(this.request), maxAge }).serialize()
   }
 }
 

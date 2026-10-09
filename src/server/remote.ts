@@ -17,8 +17,8 @@ export type RemoteOriginal = { path: string, key: string } | { status: number, m
 export type RemoteImages = (src: string, client?: string) => Promise<RemoteOriginal>
 
 interface Stored {
-  etag?: string
-  lastModified?: string
+  etag?: string | undefined
+  lastModified?: string | undefined
   // Until when the original is served without asking the host again, in milliseconds.
   freshUntil: number
 }

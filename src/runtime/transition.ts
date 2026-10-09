@@ -6,7 +6,7 @@ import { playTransitions } from './dom'
 export type Phase = 'enter' | 'leave'
 
 // What the attributes set: a name for the six classes it stands for, and classes of their own for any of them.
-type Phases = Partial<Record<'name' | Phase | `${Phase}-from` | `${Phase}-to`, string>>
+type Phases = Partial<Record<'name' | Phase | `${Phase}-from` | `${Phase}-to`, string | undefined>>
 
 const phasesOf = new WeakMap<Element, Phases>()
 // Ends the phase an element is playing, as the other one starts.

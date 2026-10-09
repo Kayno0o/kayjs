@@ -6,13 +6,13 @@ import { speculationRules } from './speculation'
 import { SWAP_CALL, SWAP_SCRIPT } from './stream'
 
 export interface ScriptHashOptions {
-  prefetch?: Prefetch
+  prefetch?: Prefetch | undefined
   // Adds the live-reload script `kay dev` pages carry.
-  dev?: boolean
+  dev?: boolean | undefined
   // The site's mount point, which the speculation rules and the service worker's registration name.
-  base?: string
+  base?: string | undefined
   // Adds the script registering the service worker `offline` turns on.
-  offline?: boolean
+  offline?: boolean | undefined
 }
 
 const SCRIPT_BODY = /<script[^>]*>([\s\S]*?)<\/script>/g

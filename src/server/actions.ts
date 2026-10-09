@@ -59,12 +59,12 @@ const BODY_PREFIX = /^body\./
 
 export interface ActionOptions {
   // Shows a failed action's message instead of a generic one.
-  dev?: boolean
-  onError?: KayConfig['onError']
+  dev?: boolean | undefined
+  onError?: KayConfig['onError'] | undefined
   // An action runs in the locale of the page it was sent from.
-  i18n?: I18n
+  i18n?: I18n | undefined
   // Where the site is mounted, which the page a refused form post came from is served under.
-  base?: string
+  base?: string | undefined
 }
 
 // Renders the page a refused plain form post came from, with how it failed, through the app the post reached.

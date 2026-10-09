@@ -151,7 +151,7 @@ export interface ServiceWorkerOptions {
   offline: true | OfflineConfig | undefined
   // The site's mount point: the worker is served under it, and controls only what is.
   base: string
-  lang?: string
+  lang?: string | undefined
   // The prerendered pages of routes no guard covers, which every visitor gets alike, by path.
   publicPages: string[]
 }

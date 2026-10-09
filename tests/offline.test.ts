@@ -31,7 +31,7 @@ function registerHash(base: string): string {
   return `'sha256-${new Bun.CryptoHasher('sha256').update(registerScript(base).slice('<script>'.length, -'</script>'.length)).digest('base64')}'`
 }
 
-async function worker(app: { handle: (request: Request) => Promise<Response> }): Promise<{ text: string, settings?: WorkerSettings, headers: Headers }> {
+async function worker(app: { handle: (request: Request) => Promise<Response> }): Promise<{ text: string, settings?: WorkerSettings | undefined, headers: Headers }> {
   const response = await app.handle(new Request('http://localhost/sw.js'))
   const text = await response.text()
   const settings = SETTINGS.exec(text)?.[1]

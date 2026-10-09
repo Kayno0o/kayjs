@@ -16,7 +16,7 @@ interface Line {
 // An attribute list rewritten in place when it fits on one line, else spread one attribute per line.
 interface AttributeEdit extends Span {
   text: string
-  lines?: string[]
+  lines?: string[] | undefined
 }
 
 const INDENT = '  '

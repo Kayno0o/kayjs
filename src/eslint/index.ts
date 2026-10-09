@@ -18,11 +18,11 @@ export interface LintMessage {
   message: string
   line: number
   column: number
-  endLine?: number
-  endColumn?: number
-  fatal?: boolean
-  fix?: LintFix
-  suggestions?: { desc: string, fix: LintFix }[]
+  endLine?: number | undefined
+  endColumn?: number | undefined
+  fatal?: boolean | undefined
+  fix?: LintFix | undefined
+  suggestions?: { desc: string, fix: LintFix }[] | undefined
 }
 
 export interface ParserOptions {

@@ -15,8 +15,8 @@ export interface RawEntry {
   data: unknown
   // The line each top-level field sits on, for the error that refuses it.
   lines: Record<string, number>
-  segments?: Segment[]
-  headings?: Heading[]
+  segments?: Segment[] | undefined
+  headings?: Heading[] | undefined
 }
 
 // Under `.kay/client`, beside the build's other output, and embedded with it in an executable.

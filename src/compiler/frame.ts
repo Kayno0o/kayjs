@@ -13,7 +13,7 @@ export interface Report extends Pick<Diagnostic, 'message' | 'label' | 'related'
   line: number
   column: number
   // The source the report points into, and its span there; without it only the location is printed.
-  frame?: { source: string, start: number, end: number }
+  frame?: { source: string, start: number, end: number } | undefined
 }
 
 interface Mark extends Labelled {

@@ -8,21 +8,21 @@ export interface Diagnostic extends Span {
   // What is wrong, short; what to do about it goes in `help`.
   message: string
   // Printed under the span, when the message alone does not say what this part of the line is.
-  label?: string
+  label?: string | undefined
   // The other places the problem involves, each labelled with its part in it.
-  related?: Labelled[]
+  related?: Labelled[] | undefined
   // Why it is a problem, when the message does not say.
-  note?: string
+  note?: string | undefined
   // What to write instead.
-  help?: string
+  help?: string | undefined
   // A lint's name, which `kay.config.ts` and a `// kay-allow` comment set the level of; a compile error has none.
-  code?: string
+  code?: string | undefined
   // A lint at the `warn` level is a warning, reported without failing; anything else is an error.
-  severity?: 'error' | 'warning'
+  severity?: 'error' | 'warning' | undefined
   // What the editor offers to fix it with.
-  fixes?: Fix[]
+  fixes?: Fix[] | undefined
   // Reported by type checking only: the code generated around it is whole, so the file's type errors still count.
-  checkOnly?: boolean
+  checkOnly?: boolean | undefined
 }
 
 export interface Labelled extends Span {
@@ -75,8 +75,8 @@ export interface TextNode extends Span {
 }
 
 export interface IfBranch extends Span {
-  test?: Span
-  alias?: Span
+  test?: Span | undefined
+  alias?: Span | undefined
   children: Node[]
 }
 
@@ -88,24 +88,24 @@ export interface IfNode extends Span {
 export interface ForNode extends Span {
   kind: 'for'
   item: Span
-  index?: Span
+  index?: Span | undefined
   each: Span
   // Without one, rows are matched by the item's `id`, else by the item itself.
-  key?: Span
+  key?: Span | undefined
   children: Node[]
-  fallback?: Node[]
+  fallback?: Node[] | undefined
 }
 
 export interface SlotNode extends Span {
   kind: 'slot'
   name: Span
   // Inside the brackets of `@row(todo)`: the block is then a function of these parameters.
-  params?: Span
+  params?: Span | undefined
   children: Node[]
 }
 
 export interface AwaitBranch extends Span {
-  alias?: Span
+  alias?: Span | undefined
   children: Node[]
 }
 
@@ -143,7 +143,7 @@ export function actionOf(element: ElementNode, source: string): Extract<Attribut
 // A field of a form posting to an action: what a refused post fills back in, and whether it can be marked invalid.
 export interface FormField {
   name: string
-  fill?: 'value' | 'checked' | 'content' | 'selected'
+  fill?: 'value' | 'checked' | 'content' | 'selected' | undefined
   invalid: boolean
 }
 
@@ -323,12 +323,12 @@ export function tryBlocks(node: TryNode): Node[][] {
 
 export interface KayFile {
   source: string
-  script?: Span
-  server?: Span
+  script?: Span | undefined
+  server?: Span | undefined
   // Inside the angle brackets of `--- <T extends Row>`: the component function's type parameters.
-  typeParameters?: Span
+  typeParameters?: Span | undefined
   // The `client` of `--- client`: the component renders in the browser only.
-  client?: Span
+  client?: Span | undefined
   // Where the template begins, past the fences.
   templateStart: number
   template: Node[]

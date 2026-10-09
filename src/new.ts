@@ -17,9 +17,9 @@ export const TEMPLATES: readonly Template[] = ['server', 'site', 'app']
 
 export interface NewOptions {
   // The \`kay\` dependency: by default the published kay running this command, or a packed copy of the checkout running it.
-  kay?: string
+  kay?: string | undefined
   // `server` by default, an Elysia app serving the pages, run in production as one executable; `site`, a static site built to files; `app`, the server with sessions, a sign-in, members in Postgres through pg-orm, a guarded section and a websocket.
-  template?: Template
+  template?: Template | undefined
 }
 
 // Scaffolds a project that \`kay dev\` runs and \`kay check\` passes as it is; refuses a directory that already holds files.

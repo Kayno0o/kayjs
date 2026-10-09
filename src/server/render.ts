@@ -60,23 +60,23 @@ export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | '
 }
 
 export interface RenderOptions {
-  lang?: string
-  prefetch?: Prefetch
+  lang?: string | undefined
+  prefetch?: Prefetch | undefined
   // Shows thrown errors with their stack instead of a generic message.
-  dev?: boolean
+  dev?: boolean | undefined
   // Renders once at build time: what only a request carries throws instead of reading as empty.
-  prerendering?: boolean
-  onError?: KayConfig['onError']
+  prerendering?: boolean | undefined
+  onError?: KayConfig['onError'] | undefined
   // The tags `site` and `seo` give every page.
-  head?: SeoHead
+  head?: SeoHead | undefined
   // The site's mount point, which every path a page renders goes under.
-  base?: string
+  base?: string | undefined
   // `images.maxDensity`, written for the islands when it is not the default.
-  maxDensity?: number
+  maxDensity?: number | undefined
   // Times each load and the render in a `Server-Timing` header, as development always does.
-  serverTiming?: boolean
+  serverTiming?: boolean | undefined
   // Registers the service worker `offline` turns on.
-  offline?: boolean
+  offline?: boolean | undefined
 }
 
 // What Elysia hands a route handler, derived and resolved values included; pages see it whole as `ctx.locals`.

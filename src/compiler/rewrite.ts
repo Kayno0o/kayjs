@@ -31,7 +31,7 @@ export type Rewrites = Map<number, Rewrite & { end: number }>
 
 export interface ConstantSignal {
   name: Span
-  value?: Span
+  value?: Span | undefined
 }
 
 // What writing to a name that cannot be written says.

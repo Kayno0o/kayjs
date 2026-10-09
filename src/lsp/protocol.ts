@@ -33,20 +33,20 @@ export interface DidChangeTextDocumentParams {
 export interface Diagnostic {
   range: Range
   message: string
-  severity?: 1 | 2 | 3 | 4
-  code?: number | string
-  source?: string
+  severity?: 1 | 2 | 3 | 4 | undefined
+  code?: number | string | undefined
+  source?: string | undefined
   [key: string]: unknown
 }
 
 export interface DocumentDiagnosticReport {
   kind: 'full' | 'unchanged'
-  items?: Diagnostic[]
+  items?: Diagnostic[] | undefined
 }
 
 export interface Hover {
   contents: unknown
-  range?: Range
+  range?: Range | undefined
 }
 
 export interface TextEdit {
@@ -62,16 +62,16 @@ export interface InsertReplaceEdit {
 
 export interface CompletionItem {
   label: string
-  insertText?: string
-  textEdit?: TextEdit | InsertReplaceEdit
-  additionalTextEdits?: TextEdit[]
+  insertText?: string | undefined
+  textEdit?: TextEdit | InsertReplaceEdit | undefined
+  additionalTextEdits?: TextEdit[] | undefined
   [key: string]: unknown
 }
 
 export interface CompletionList {
   isIncomplete: boolean
   items: CompletionItem[]
-  itemDefaults?: { editRange?: Range | { insert: Range, replace: Range }, [key: string]: unknown }
+  itemDefaults?: { editRange?: Range | { insert: Range, replace: Range } | undefined, [key: string]: unknown } | undefined
 }
 
 export interface Location {
@@ -80,7 +80,7 @@ export interface Location {
 }
 
 export interface LocationLink {
-  originSelectionRange?: Range
+  originSelectionRange?: Range | undefined
   targetUri: string
   targetRange: Range
   targetSelectionRange: Range
@@ -88,12 +88,12 @@ export interface LocationLink {
 
 export interface DocumentHighlight {
   range: Range
-  kind?: number
+  kind?: number | undefined
 }
 
 export interface WorkspaceEdit {
-  changes?: Record<string, TextEdit[]>
-  documentChanges?: ({ textDocument: TextDocumentIdentifier, edits: TextEdit[] } | { kind: string })[]
+  changes?: Record<string, TextEdit[]> | undefined
+  documentChanges?: ({ textDocument: TextDocumentIdentifier, edits: TextEdit[] } | { kind: string })[] | undefined
 }
 
 export interface CodeActionParams {
@@ -104,10 +104,10 @@ export interface CodeActionParams {
 
 export interface CodeAction {
   title: string
-  kind?: string
-  diagnostics?: Diagnostic[]
-  edit?: WorkspaceEdit
-  command?: unknown
+  kind?: string | undefined
+  diagnostics?: Diagnostic[] | undefined
+  edit?: WorkspaceEdit | undefined
+  command?: unknown | undefined
   [key: string]: unknown
 }
 
@@ -118,10 +118,10 @@ export interface FileEvent {
 }
 
 export interface InitializeParams {
-  rootUri?: string | null
-  rootPath?: string | null
-  workspaceFolders?: { uri: string, name: string }[] | null
+  rootUri?: string | null | undefined
+  rootPath?: string | null | undefined
+  workspaceFolders?: { uri: string, name: string }[] | null | undefined
   capabilities: Record<string, unknown> & { textDocument?: Record<string, unknown> }
-  initializationOptions?: { routes?: string }
+  initializationOptions?: { routes?: string } | undefined
   [key: string]: unknown
 }

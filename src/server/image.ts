@@ -19,14 +19,14 @@ export interface ImageRouteOptions {
   // Where variants made on request are kept.
   cacheDir: string
   // Directories of images added at runtime, by the URL path they are served at, the directories absolute.
-  dirs?: Record<string, string>
-  quality?: number
+  dirs?: Record<string, string> | undefined
+  quality?: number | undefined
   // AVIF quality, which a request whose `Accept` names `image/avif` gets instead of WebP; none serves WebP alone.
-  avif?: number
+  avif?: number | undefined
   // The aspect ratios variants are cut to, `images.aspects`.
-  aspects?: readonly string[]
+  aspects?: readonly string[] | undefined
   // Downloads an image from a host `images.remote` lists.
-  remote?: RemoteImages
+  remote?: RemoteImages | undefined
 }
 
 export const VARIANTS_DIR = 'images'
@@ -49,7 +49,7 @@ export function variantName(source: string, variant: number | ImageVariant, form
 }
 
 // `images.avif` as a quality, or undefined when it is off.
-export function avifQuality(images: { avif?: false | { quality?: number } } | undefined): number | undefined {
+export function avifQuality(images: { avif?: false | { quality?: number | undefined } | undefined } | undefined): number | undefined {
   return images?.avif === false ? undefined : images?.avif?.quality ?? DEFAULT_AVIF_QUALITY
 }
 
@@ -88,7 +88,7 @@ export async function writeVariant(source: string, variant: number | ImageVarian
 
 // Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files, with the crops and share cards pages asked for, each in AVIF too given its quality; returns how many were encoded.
 // With a cache directory, a variant an earlier build encoded is copied from it, and what this build no longer uses is pruned from it, unless `prune` is off for a pass that sees only some of the build's images.
-export async function writeImageVariants(clientDir: string, quality = DEFAULT_QUALITY, cacheDir?: string, { prune = true, avif }: { prune?: boolean, avif?: number } = {}): Promise<number> {
+export async function writeImageVariants(clientDir: string, quality = DEFAULT_QUALITY, cacheDir?: string, { prune = true, avif }: { prune?: boolean | undefined, avif?: number | undefined } = {}): Promise<number> {
   const assets = join(clientDir, 'assets')
   const used = new Set<string>()
   let encoded = 0
@@ -158,7 +158,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if (!own) {
       try {
         stats = await stat(source.path)
-        own = await new Bun.Image(Bun.file(source.path), { maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }).metadata()
+        own = await new Bun.Image(Bun.file(source.path), source.immutable ? {} : { maxPixels: MAX_UPLOAD_PIXELS }).metadata()
       }
       catch (error) {
         if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
@@ -295,7 +295,7 @@ export function sourceFile(src: string, options: ImageRouteOptions): { path: str
 }
 
 // `images.maxDensity`, `images.aspects` and `images.remote`, checked and set for every image this process renders, served or prerendered; returns the density.
-export function applyImageConfig(images: { maxDensity?: number, aspects?: string[], remote?: string[] } | undefined): number {
+export function applyImageConfig(images: { maxDensity?: number | undefined, aspects?: string[] | undefined, remote?: string[] | undefined } | undefined): number {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
   if (!(maxDensity >= 1))

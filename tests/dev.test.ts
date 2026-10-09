@@ -193,7 +193,7 @@ describe('kay dev', () => {
     try {
       // An entry file in place of the directory, as `kay dev` took before, runs in the current directory.
       for (const [args, expected, cwd] of [[[root], `server|${root}`, undefined], [[root, '--entry', join(root, 'src/other.ts')], `other|${root}`, undefined], [['src/other.ts'], `other|${root}`, root]] as const) {
-        const child = Bun.spawn(['bun', cli, 'dev', ...args], { cwd, stdout: 'ignore', stderr: 'pipe' })
+        const child = Bun.spawn(['bun', cli, 'dev', ...args], { cwd: cwd ?? process.cwd(), stdout: 'ignore', stderr: 'pipe' })
 
         await until(() => existsSync(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
         child.kill('SIGTERM')

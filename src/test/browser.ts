@@ -3,13 +3,13 @@ import process from 'node:process'
 
 export interface BrowserOptions {
   // The Chrome or Chromium executable, else `BUN_CHROME_PATH`, else the first one found on the PATH or where it usually installs.
-  path?: string
-  width?: number
-  height?: number
+  path?: string | undefined
+  width?: number | undefined
+  height?: number | undefined
   // How long a page waits for an element, a condition or a navigation, in milliseconds.
-  timeout?: number
+  timeout?: number | undefined
   // The page's next call fails once it logs a problem kay recovers from in production, such as an island that did not match its server markup; `false` leaves it in `errors`.
-  strict?: boolean
+  strict?: boolean | undefined
 }
 
 export interface WaitOptions {
@@ -107,8 +107,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   // Chrome refuses to run its sandbox as root, as in a CI container, whose small /dev/shm crashes its renderer.
   const argv = process.getuid?.() === 0 ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
   const view = new Bun.WebView({
-    width: options.width,
-    height: options.height,
+    ...options.width === undefined ? {} : { width: options.width },
+    ...options.height === undefined ? {} : { height: options.height },
     backend: { type: 'chrome', path: executable, argv, url: false },
     console: (type, ...args) => {
       if (type === 'error')

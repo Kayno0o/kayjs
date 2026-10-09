@@ -21,7 +21,7 @@ export type Invalidation = { keys: string[] } | { pages: string[] }
 
 export interface CacheOptions {
   // Keeps the value across restarts, and for every process sharing the store; the value must survive devalue, as session data does.
-  store?: CacheStore
+  store?: CacheStore | undefined
 }
 
 interface Entry {
@@ -30,7 +30,7 @@ interface Entry {
   // False while the first load runs, with no value to give yet.
   loaded: boolean
   // The load running for this key: the first miss's, which every concurrent caller awaits, or the background refresh of a stale value.
-  loading?: Promise<unknown>
+  loading?: Promise<unknown> | undefined
 }
 
 const entries = new Map<string, Entry>()

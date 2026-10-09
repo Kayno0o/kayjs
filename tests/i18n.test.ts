@@ -181,7 +181,10 @@ describe('locale detection', () => {
       expect(translate(translations, 'missing')).toBe('missing')
     }
     finally {
-      process.env.NODE_ENV = mode
+      if (mode === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = mode
     }
   })
 

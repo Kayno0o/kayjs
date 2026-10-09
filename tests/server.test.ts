@@ -1231,10 +1231,10 @@ describe('special pages', () => {
 interface RecordedSpan {
   name: string
   // The span active where it started, as OpenTelemetry's context manager tracks it.
-  parent?: string
-  kind?: number
+  parent?: string | undefined
+  kind?: number | undefined
   attributes: Record<string, unknown>
-  status?: number
+  status?: number | undefined
 }
 
 // A tracer keeping each span as it ends, the active one tracked across awaits.

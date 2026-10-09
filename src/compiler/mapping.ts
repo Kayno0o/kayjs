@@ -15,11 +15,11 @@ export interface RangeMapping {
 
 // Text replaced or wrapped while copying a source span: `todo` becomes `todo()`, `a` becomes `__props.a`.
 export interface Rewrite {
-  before?: string
-  replace?: string
-  after?: string
+  before?: string | undefined
+  replace?: string | undefined
+  after?: string | undefined
   // The name is a component tag the rewrite cannot spell as one: it opens as `KayDynamic component={...}`.
-  dynamic?: boolean
+  dynamic?: boolean | undefined
 }
 
 export const DYNAMIC_TAG = 'KayDynamic'

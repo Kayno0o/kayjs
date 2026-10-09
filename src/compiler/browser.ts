@@ -20,7 +20,7 @@ interface Read {
   chain: t.Node[]
   typeOf: boolean
   // The fence's top-level statement holding it, when it sits there outside any function.
-  statement?: t.Statement
+  statement?: t.Statement | undefined
 }
 
 const WORD = /[a-z_$][\w$]*/gi

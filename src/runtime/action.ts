@@ -292,7 +292,7 @@ export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Ex
 type HoneypotOf<Target> = Target extends { [HONEYPOT]?: (field: infer Field) => void } ? Field : never
 
 // An action as the fields of a form posting to it read it, whatever its input; a string target is a plain URL.
-type FormTarget = Action<Record<string, unknown>, unknown, string>
+type FormTarget = Action<Record<string, unknown>, unknown>
 
 // What a refused post sent for a field of a form posting to `target`, to show it again; undefined without one, and for the honeypot.
 export function formValue(target: unknown, name: string): string | undefined {

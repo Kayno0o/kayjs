@@ -5,11 +5,11 @@ import { inlineScriptHashes } from './csp'
 import { CSP_ENDPOINT, CSP_REPORTS } from './violations'
 
 export interface SecurityOptions {
-  security?: SecurityConfig | false
-  prefetch?: Prefetch
-  dev?: boolean
-  base?: string
-  offline?: KayConfig['offline']
+  security?: SecurityConfig | false | undefined
+  prefetch?: Prefetch | undefined
+  dev?: boolean | undefined
+  base?: string | undefined
+  offline?: KayConfig['offline'] | undefined
 }
 
 // Strict where it costs a site nothing: scripts only from itself plus kay's own inline ones, no plugins, no foreign forms or frames. Images may come from any https host, and inline styles stay allowed, since `style` attributes are everyday template code.

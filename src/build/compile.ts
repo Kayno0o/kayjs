@@ -16,7 +16,7 @@ import { withoutStyles } from './styles'
 
 export interface CompileOptions {
   // The server entry, `src/server.ts` under the root by default.
-  entry?: string
+  entry?: string | undefined
   outfile: string
 }
 

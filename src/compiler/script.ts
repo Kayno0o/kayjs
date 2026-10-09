@@ -20,18 +20,18 @@ export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.
   local: Span
   key: string
-  fallback?: Span
+  fallback?: Span | undefined
   // What leaves the destructuring without it, separator included, when another name stays.
-  removal?: Span
+  removal?: Span | undefined
 }
 
 export interface PropsDeclaration {
   statement: Span
-  type?: Span
+  type?: Span | undefined
   // `const props = props<T>()` keeps a name; `const { a, b } = props<T>()` destructures.
-  name?: Span
+  name?: Span | undefined
   bindings: PropsBinding[]
-  rest?: Span
+  rest?: Span | undefined
 }
 
 // One name an import brings in, with the specifier's own span so a duplicate of it can be left out.

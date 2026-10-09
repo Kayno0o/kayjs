@@ -18,13 +18,13 @@ export type Target = 'dom' | 'ssr'
 export interface TransformOptions {
   target: Target
   // Server output carries hydration markers and client output hydrates them, so islands can pick up server HTML.
-  hydratable?: boolean
+  hydratable?: boolean | undefined
   // Island ids are relative to this directory.
-  root?: string
+  root?: string | undefined
   // Where compiled files are kept between runs, so a restart compiles only what changed; none when unset.
-  cacheDir?: string
+  cacheDir?: string | undefined
   // Renders in the browser only: an island importing a package that cannot load on the server.
-  clientOnly?: boolean
+  clientOnly?: boolean | undefined
 }
 
 interface Compiled {
@@ -34,7 +34,7 @@ interface Compiled {
 
 // What `buildClient` reads off each component before bundling.
 export interface Analysis {
-  island?: string
+  island?: string | undefined
   classes: string[]
   diagnostics: Diagnostic[]
 }
