@@ -3,8 +3,8 @@ import type { ScatterPoint } from '@kaynooo/kayjs-ui'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
 
-// What the test reads back: the dot pressed.
-const { onSelect } = props<{ onSelect: (point: ScatterPoint) => void }>()
+// What the test reads back: the dot pressed, the span dragged.
+const { onSelect, onRange } = props<{ onSelect: (point: ScatterPoint) => void, onRange: (from: number, to: number) => void }>()
 ---
-LineChart#line(label="Visits" labels={['Mon', 'Tue', 'Wed']} series={[{ name: 'Visits', values: [null, 3, 5] }, { name: 'Sales', values: [1, 2, 1], color: 'red' }]} formatValue={value => `${value} v`})
+LineChart#line(label="Visits" labels={['Mon', 'Tue', 'Wed']} series={[{ name: 'Visits', values: [null, 3, 5] }, { name: 'Sales', values: [1, 2, 1], color: 'red' }]} formatValue={value => `${value} v`} onRange={onRange})
 ScatterChart#scatter(label="Games" points={[{ key: 1, label: 'Hades', x: 10, y: 90 }, { key: 2, label: 'Celeste', x: 30, y: 70 }]} onSelect={onSelect})

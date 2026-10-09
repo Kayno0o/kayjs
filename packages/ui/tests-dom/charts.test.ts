@@ -6,14 +6,16 @@ import { click } from './dom'
 
 let mounted: Mounted | undefined
 const selected: string[] = []
+const ranges: [number, number][] = []
 
 afterEach(() => {
   mounted?.unmount()
   selected.length = 0
+  ranges.length = 0
 })
 
 async function charts() {
-  mounted = await mount('src/components/charts.kay', { onSelect: (point: ScatterPoint) => selected.push(point.label) })
+  mounted = await mount('src/components/charts.kay', { onSelect: (point: ScatterPoint) => selected.push(point.label), onRange: (from: number, to: number) => ranges.push([from, to]) })
 
   return mounted.root
 }
@@ -43,6 +45,27 @@ describe('LineChart', () => {
     await settle()
 
     expect(root.querySelector('.kui-line-chart-tooltip')).toBeNull()
+  })
+
+  test('hands over the span a drag covers, first point first, and nothing for a press in place', async () => {
+    const root = await charts()
+    const overlay = root.querySelector('#line .kui-line-chart-overlay')!
+    const rect = root.querySelector('#line .kui-line-chart-plot')!.getBoundingClientRect()
+    const pointer = (type: string, x: number) => overlay.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: 0, button: 0, bubbles: true }))
+
+    pointer('pointerdown', rect.right + 100)
+    pointer('pointermove', 0)
+    await settle()
+
+    expect(root.querySelector('#line .kui-line-chart-band')).not.toBeNull()
+
+    pointer('pointerup', 0)
+    pointer('pointerdown', 0)
+    pointer('pointerup', 0)
+    await settle()
+
+    expect(ranges).toEqual([[0, 2]])
+    expect(root.querySelector('#line .kui-line-chart-band')).toBeNull()
   })
 })
 

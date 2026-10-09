@@ -11,7 +11,7 @@ const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), xLabels = false, legend, options, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), xLabels = false, legend, options, onRange, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels and the tooltip's values.
@@ -22,6 +22,8 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   legend?: boolean
   // Merged over the defaults, for what the props do not cover.
   options?: LineChartOptions
+  // Lets a drag across the plot pick a span, handed over as the indices of its first and last points, such as to zoom in on it.
+  onRange?: (from: number, to: number) => unknown
   // Describes the chart for screen readers, which cannot read the drawing.
   label: string
   class?: string
@@ -47,6 +49,8 @@ const settings = (): LineChartOptions => {
 // Where chartist last drew the plot, which the hover cursor and dots are placed against.
 const plot = signal<{ rect: ChartRect, axisY: Axis } | null>(null)
 const hovered = signal<{ index: number, clientX: number, clientY: number } | null>(null)
+// The points a drag under way started and stands at.
+const dragged = signal<{ from: number, to: number } | null>(null)
 let canvas: HTMLDivElement | undefined
 
 const cursor = () => {
@@ -94,16 +98,64 @@ onMount(() => {
   onCleanup(() => chart.detach())
 })
 
-function pointerMove(event: PointerEvent) {
+// The point under the pointer, or none before the plot is drawn.
+function pointAt(event: PointerEvent): number | null {
   const drawn = plot()
 
   if (!drawn || labels.length === 0)
-    return
+    return null
 
   const width = drawn.rect.width()
   const x = event.clientX - (event.currentTarget as HTMLElement).getBoundingClientRect().left - drawn.rect.x1
 
-  hovered.set({ index: indexAt(width > 0 ? x / width : 0, labels.length, times()), clientX: event.clientX, clientY: event.clientY })
+  return indexAt(width > 0 ? x / width : 0, labels.length, times())
+}
+
+// Where the dragged span is drawn across the plot, once it covers more than one point.
+const band = () => {
+  const drawn = plot()
+  const span = dragged()
+
+  if (!drawn || !span || span.from === span.to)
+    return null
+
+  const [left, right] = [span.from, span.to].map(index => drawn.rect.x1 + positionOf(index, labels.length, times()) * drawn.rect.width()).sort((a, b) => a - b)
+
+  return `left: ${left}px; width: ${right! - left!}px; top: ${drawn.rect.y2}px; height: ${drawn.rect.height()}px`
+}
+
+function pointerMove(event: PointerEvent) {
+  const index = pointAt(event)
+
+  if (index === null)
+    return
+
+  hovered.set({ index, clientX: event.clientX, clientY: event.clientY })
+
+  if (dragged())
+    dragged.set({ from: dragged()!.from, to: index })
+}
+
+function pointerDown(event: PointerEvent) {
+  const index = pointAt(event)
+
+  if (!onRange || event.button !== 0 || index === null)
+    return
+
+  const overlay = event.currentTarget as HTMLElement
+
+  // Captured, so a drag released past the plot still ends the span.
+  overlay.setPointerCapture?.(event.pointerId)
+  dragged.set({ from: index, to: index })
+}
+
+function pointerUp() {
+  const span = dragged()
+
+  dragged.set(null)
+
+  if (span && span.from !== span.to)
+    void onRange?.(Math.min(span.from, span.to), Math.max(span.from, span.to))
 }
 ---
 .kui-line-chart({...rest} role="img" aria-label={label} class={className})
@@ -114,7 +166,9 @@ function pointerMove(event: PointerEvent) {
       for item, index of series key={item.name}
         if dot(index)
           .kui-line-chart-dot(style={dot(index)})
-    .kui-line-chart-overlay(role="presentation" onPointerMove={pointerMove} onPointerLeave={() => hovered.set(null)})
+    if band() !== null
+      .kui-line-chart-band(style={band()})
+    .kui-line-chart-overlay(role="presentation" data-range={onRange ? '' : undefined} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => dragged.set(null)} onPointerLeave={() => hovered.set(null)})
   if hovered()
     .kui-line-chart-tooltip(style={`left: ${hovered()!.clientX}px; top: ${hovered()!.clientY}px`})
       .kui-line-chart-tooltip-label {labels[hovered()!.index]}

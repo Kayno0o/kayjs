@@ -314,6 +314,7 @@ CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { l
   - A series has a `name`, one value per label, `null` for a gap in the line, and an optional CSS `color`; without one it takes the next `--color-kui-chart-1` to `-6` token.
   - `xLabels` draws up to five x-axis labels, and spaces the points by time when every label is a date. `legend` names the series under the chart, by default once there is more than one. `formatValue` formats the y-axis and the tooltip, `toLocaleString` by default; `options` is merged over chartist's settings.
   - Hovering shows a cursor, a dot on each line and a tooltip reading every series at that point, `-` for a gap. `label` describes the chart for screen readers, which cannot read the drawing.
+  - `onRange(from, to)` lets a drag across the plot pick a span, from an island: a band follows the drag, and on release it hands over the indices of the span's first and last points, such as to zoom in on them; a press in place picks nothing.
   - The server renders its frame and legend; the drawing happens once the island mounts.
 - `ScatterChart(label="Games" points={games} x={{ label: 'Hours', scale: 'log', ticks }} y={{ label: 'Score', domain: [0, 100] }} quadrant={{ x: 20, y: 80 }} corners={{ topRight: 'Long and loved' }})`:
   - A point has a `key`, a `label`, `x` and `y`, a `weight` its dot's area follows, and a `tooltip`, the label by default.

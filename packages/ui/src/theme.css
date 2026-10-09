@@ -658,6 +658,14 @@
 
   .kui-line-chart-overlay {
     @apply absolute inset-0;
+
+    &[data-range] {
+      @apply cursor-crosshair touch-pan-y select-none;
+    }
+  }
+
+  .kui-line-chart-band {
+    @apply pointer-events-none absolute border-x border-kui-accent bg-kui-accent/10;
   }
 
   .kui-line-chart-cursor {
