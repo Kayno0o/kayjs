@@ -25,8 +25,8 @@ export interface KayConfig {
   site?: string | undefined
   seo?: SeoConfig | undefined
   images?: ImagesConfig | undefined
-  // A square image, 512 pixels wide or more, relative to the root: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page.
-  favicon?: string | undefined
+  // A square image, 512 pixels wide or more, relative to the root: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. Defaults to kay's own mark; `false` serves none.
+  favicon?: string | false | undefined
   // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
   manifest?: ManifestConfig | undefined
   // A service worker keeping the build's files and some pages for a visitor offline, `true` or what it keeps; off by default.

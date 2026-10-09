@@ -32,7 +32,7 @@ import { writeCards } from './server/card'
 import { PRERENDERED_DIR } from './server/client'
 import { compressFiles } from './server/compress'
 import { buildingWithoutEnv } from './server/env'
-import { FAVICON_DIR, writeFavicons } from './server/favicon'
+import { FAVICON_DIR, faviconSource, writeFavicons } from './server/favicon'
 import { avifQuality, writeImageVariants, writeRemoteVariants } from './server/image'
 import { ExportError, prerenderPages } from './server/prerender'
 import { remoteImages, remotePatterns } from './server/remote'
@@ -368,8 +368,10 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   await writeRemoteVariants(client.dir, remote, config.images?.quality)
   await writeCards(client.dir, join(root, '.kay', 'cache', 'cards'), remote)
 
-  if (config.favicon !== undefined)
-    await writeFavicons(resolve(root, config.favicon), join(client.dir, '..', FAVICON_DIR))
+  const favicon = faviconSource(root, config.favicon)
+
+  if (favicon !== undefined)
+    await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR))
 
   await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 

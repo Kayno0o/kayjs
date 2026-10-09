@@ -83,6 +83,19 @@ describe('favicon', () => {
     expect((await own.handle(new Request('http://localhost/icon-192.png'))).status).toBe(200)
   })
 
+  it('serves kay\'s mark when the project names no favicon, and none once it is turned off', async () => {
+    const plain = await pages({ routes: ROUTES, prebuilt: false })
+    const off = await pages({ routes: ROUTES, prebuilt: false, favicon: false })
+    const icon = await plain.handle(new Request('http://localhost/icon-512.png'))
+
+    expect(await icon.bytes()).toEqual((await faviconFiles('src/server/favicon.png')).get('/icon-512.png')!)
+    expect(await (await plain.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="icon" href="/favicon.ico"')
+    expect(await (await off.handle(new Request('http://localhost/about'))).text()).not.toContain('rel="icon"')
+
+    for (const path of ['/favicon.ico', '/manifest.webmanifest'])
+      expect((await off.handle(new Request(`http://localhost${path}`))).status).toBe(404)
+  })
+
   it('refuses a source that is not square or smaller than the largest icon, and writes the files for a build', async () => {
     const wide = join(scratch, 'wide.png')
     const small = join(scratch, 'small.png')

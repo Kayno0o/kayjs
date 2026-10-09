@@ -30,7 +30,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
     styles.push(fonts.css)
   }
 
-  if (config.favicon !== undefined)
+  if (config.favicon !== false)
     extra.push(...faviconTags(config.manifest))
 
   return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base)), styles }

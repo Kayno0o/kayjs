@@ -151,7 +151,7 @@ describe('pages', () => {
     expect(layout).toContain('background: url("/paper.png")')
     expect(page).toContain('.card {')
     expect(page).toContain('.counter {')
-    expect((await get('/about')).html).toContain(`<meta name="viewport" content="width=device-width"><link rel="stylesheet" href="${links[0]}"><meta name="description"`)
+    expect((await get('/about')).html).toContain(`<meta name="viewport" content="width=device-width"><link rel="stylesheet" href="${links[0]}"><link rel="icon"`)
     expect((await Bun.file(join(process.cwd(), '.kay/classes.txt')).text()).split('\n')).toEqual(expect.arrayContaining(['card', 'counter']))
   })
 

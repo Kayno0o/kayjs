@@ -79,7 +79,7 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
 
   // What kay serves itself comes from the app, as a server would answer it.
   const app = new Elysia().use(await servePages({ ...config, root, prebuilt: true, log: false, health: false, security: false, compress: false }))
-  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...config.favicon === undefined ? [] : FAVICON_PATHS, ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => collection.options.feed ? [collection.options.feed.path] : [])]
+  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...config.favicon === false ? [] : FAVICON_PATHS, ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => collection.options.feed ? [collection.options.feed.path] : [])]
 
   for (const path of fetched) {
     const response = await app.handle(new Request(`http://localhost${path}`))

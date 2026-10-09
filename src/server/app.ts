@@ -26,7 +26,7 @@ import { compressResponse, encodedCopies, encodedPath, filesUnder, fixedTexts, p
 import { DEV_EVENTS, DEV_PATCH, devEvents, devPatch, hotSwap } from './dev'
 import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
-import { FAVICON_DIR, serveFavicons } from './favicon'
+import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuards } from './guards'
 import { cookieLocale, hostLocale, loadI18n, localeCookie, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
@@ -326,8 +326,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (options.site !== undefined)
     serveSitemap(app, routes, siteOrigin(options.site) + base, publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
 
-  if (options.favicon !== undefined)
-    serveFavicons(app, new Set([...publicUrls, ...servedPaths(routes)]), { source: resolve(root, options.favicon), builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
+  const favicon = faviconSource(root, options.favicon)
+
+  if (favicon !== undefined)
+    serveFavicons(app, new Set([...publicUrls, ...servedPaths(routes)]), { source: favicon, builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))

@@ -2,10 +2,12 @@ import type { Elysia } from 'elysia'
 import type { ManifestConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
 import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { revalidated } from './public'
 
 export const FAVICON_DIR = 'favicon'
+// kay's own mark, served when a project names no favicon.
+const DEFAULT_FAVICON = join(import.meta.dir, 'favicon.png')
 const MANIFEST = '/manifest.webmanifest'
 // Browsers ask for the first two at these paths on their own; the manifest points at the others.
 const PNG_FILES: Record<string, number> = { '/apple-touch-icon.png': 180, '/icon-192.png': 192, '/icon-512.png': 512 }
@@ -16,6 +18,14 @@ const ICO = '/favicon.ico'
 
 // Every path the favicon serves.
 export const FAVICON_PATHS = [ICO, ...Object.keys(PNG_FILES), MANIFEST]
+
+// The favicon's source, absolute: the project's own, kay's mark when it names none, or none once turned off.
+export function faviconSource(root: string, favicon: string | false | undefined): string | undefined {
+  if (favicon === false)
+    return undefined
+
+  return favicon === undefined ? DEFAULT_FAVICON : resolve(root, favicon)
+}
 
 export interface FaviconOptions {
   // The square source image, absolute.
