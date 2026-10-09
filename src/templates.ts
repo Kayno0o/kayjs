@@ -187,6 +187,7 @@ function home({ has, tw }: Setup): string {
       'head',
       '  title Home',
       `h1${tw('.text-3xl.font-bold')} __NAME__`,
+      has('auth') && 'a(href="/account") Account',
       has('ws') && 'Online',
     )
   }
@@ -411,7 +412,7 @@ function serverContainerFiles({ has }: Setup): Record<string, string> {
   return {
     'Dockerfile': `FROM oven/bun:1 AS build
 WORKDIR /app
-COPY package.json bun.lock*${has('eslint') || has('auth') ? ' .npmrc' : ''} ./
+COPY package.json bun.lock* .npmrc ./
 RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run compile
@@ -439,9 +440,10 @@ CMD ["./server"]
   }
 }
 
-// The static site's container: the same files, served by nginx with the compressed copies the build wrote.
-const STATIC_CONTAINER_FILES: Record<string, string> = {
-  'Dockerfile': `FROM oven/bun:1 AS build
+// The static site's container: the same files, served by nginx with the compressed copies the build wrote, and the starter's 404 page for a path it lacks.
+function staticContainerFiles({ has }: Setup): Record<string, string> {
+  return {
+    'Dockerfile': `FROM oven/bun:1 AS build
 WORKDIR /app
 COPY . .
 RUN bun install --frozen-lockfile && bun run build
@@ -450,7 +452,7 @@ FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 `,
-  'nginx.conf': `server {
+    'nginx.conf': `server {
   listen 80;
   root /usr/share/nginx/html;
   gzip_static on;
@@ -462,12 +464,11 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
   location / {
     try_files $uri $uri.html $uri/index.html =404;
-  }
-
-  error_page 404 /404.html;
+  }${has('starter') ? '\n\n  error_page 404 /404.html;' : ''}
 }
 `,
-  '.dockerignore': 'node_modules\n.kay\ndist\n',
+    '.dockerignore': 'node_modules\n.kay\ndist\n',
+  }
 }
 
 // Sessions, a sign-in, members kept in Postgres through pg-orm and a guarded section.
@@ -747,11 +748,12 @@ export function templateFiles(features: ReadonlySet<Feature>): Record<string, st
   const server = has('server')
 
   return {
+    // kay itself is published there, as are @kaynooo/eslint and @kaynooo/pg-orm.
+    '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
     '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', has('auth') && '.env'),
     'kay.config.ts': config(setup),
     'src/routes/_layout.kay': layout(setup),
     'src/routes/index.kay': home(setup),
-    ...(has('eslint') || has('auth')) && { '.npmrc': `@kaynooo:registry=${REGISTRY}\n` },
     ...has('tailwind') && { 'src/app.css': tailwindCss(setup) },
     ...has('starter') && !has('tailwind') && { 'src/app.css': PLAIN_CSS },
     ...has('starter') && starterFiles(setup),
@@ -765,7 +767,7 @@ export function templateFiles(features: ReadonlySet<Feature>): Record<string, st
       'tests/home.test.ts': homeTest(setup),
     },
     ...has('ci') && (server ? { '.forgejo/workflows/test.yml': testWorkflow(setup) } : { '.forgejo/workflows/pages.yml': pagesWorkflow(setup) }),
-    ...has('docker') && (server ? serverContainerFiles(setup) : STATIC_CONTAINER_FILES),
+    ...has('docker') && (server ? serverContainerFiles(setup) : staticContainerFiles(setup)),
     ...has('auth') && authFiles(setup),
     ...has('auth') && has('tests') && AUTH_TEST_FILES,
     ...has('ws') && wsFiles(setup),

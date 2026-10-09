@@ -108,7 +108,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
     const missing = FEATURES[feature].needs.filter(need => !features.has(need))
 
     if (missing.length > 0)
-      throw new Error(`kay: ${feature} needs ${missing.join(' and ')}`)
+      throw new Error(`kay: ${feature} needs ${missing.join(' and ')}: add --with ${missing.join(',')}, or drop it with --without ${feature}`)
   }
 
   await refuseTarget(target)

@@ -426,6 +426,14 @@ async function scaffold(args: string[]): Promise<number> {
       return 1
     }
 
+    const both = listed(added).find(name => listed(removed).includes(name))
+
+    if (both !== undefined) {
+      console.error(`kay new: ${both} is in both --with and --without`)
+
+      return 1
+    }
+
     await refuseTarget(dir)
 
     // With no option saying what to scaffold, a terminal asks; anything else takes the preset, the server's by default, with what --with and --without change.

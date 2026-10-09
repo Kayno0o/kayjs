@@ -1,9 +1,9 @@
 import process from 'node:process'
 import { styleText } from 'node:util'
 
-// What the terminal sends for a key: an arrow's escape sequence, or one character, a lone Escape included.
+// What the terminal sends for a key: a whole escape sequence, such as an arrow's or Home's, which no prompt but the arrows reads, or one character, a lone Escape included.
 // eslint-disable-next-line no-control-regex -- escape sequences are what it splits
-const KEY_SEQUENCES = /\x1B[[O][A-D]|[\s\S]/g
+const KEY_SEQUENCES = /\x1B\[[0-9;]*[A-Z~]|\x1BO[A-Z]|[\s\S]/gi
 
 type Key = 'up' | 'down' | 'toggle' | 'enter' | 'cancel'
 
@@ -99,12 +99,12 @@ async function ask(render: (state: 'asking' | 'enter' | 'cancel') => string[], p
     drawn = frame.length
   }
 
-  stdin.setRawMode(true)
-  stdin.resume()
-  stderr.write('\x1B[?25l')
-  draw('asking')
-
   try {
+    stdin.setRawMode(true)
+    stdin.resume()
+    stderr.write('\x1B[?25l')
+    draw('asking')
+
     return await new Promise<boolean>((resolve) => {
       const onData = (data: Buffer) => {
         for (const key of readKeys(data.toString())) {

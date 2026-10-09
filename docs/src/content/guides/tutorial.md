@@ -17,13 +17,13 @@ kay is published as `@kaynooo/kayjs` on the registry at git.kaynooo.fr. Tell Bun
 Then scaffold a project and start it:
 
 ```sh
-bunx -p @kaynooo/kayjs kay new reading-list
+bunx -p @kaynooo/kayjs kay new reading-list -y
 cd reading-list
 bun install
 bun run dev
 ```
 
-`kay dev` serves it on http://localhost:3000 and reloads the page on every change. Pages live in `src/routes/`, one `.kay` file per page: `src/routes/index.kay` is `/`.
+`-y` takes the default `server` preset; without it, `kay new` asks in the terminal for a preset and then for each feature. `kay dev` serves it on http://localhost:3000 and reloads the page on every change. Pages live in `src/routes/`, one `.kay` file per page: `src/routes/index.kay` is `/`.
 
 ## Keep the books in a module
 

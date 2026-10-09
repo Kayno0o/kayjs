@@ -161,13 +161,14 @@ describe('kay command line', () => {
 
     try {
       expect((await kay(['new', 'styled', '--kay', '^1.0.0', '--template', 'blank', '--with', 'tailwind, tests'], dir)).code).toBe(0)
-      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
+      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.npmrc', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
       expect((await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)).code).toBe(0)
       expect(await readdir(join(dir, 'lean'))).not.toEqual(expect.arrayContaining(['Dockerfile']))
       expect(await Bun.file(join(dir, 'lean/src/server.ts')).exists()).toBe(true)
       expect(await kay(['new', 'unknown', '--with', 'bogus'], dir)).toEqual({ stdout: '', stderr: 'kay new: bogus is none of the features server, starter, tailwind, accents, eslint, tests, ci, docker, auth, ws\n', code: 1 })
-      expect(await kay(['new', 'static', '--kay', '^1.0.0', '--template', 'site', '--with', 'auth'], dir)).toEqual({ stdout: '', stderr: 'kay: auth needs server\n', code: 1 })
-      expect(await kay(['new', 'unstyled', '--kay', '^1.0.0', '--without', 'tailwind'], dir)).toEqual({ stdout: '', stderr: 'kay: accents needs tailwind\n', code: 1 })
+      expect(await kay(['new', 'both', '--with', 'docker', '--without', 'ci,docker'], dir)).toEqual({ stdout: '', stderr: 'kay new: docker is in both --with and --without\n', code: 1 })
+      expect(await kay(['new', 'static', '--kay', '^1.0.0', '--template', 'site', '--with', 'auth'], dir)).toEqual({ stdout: '', stderr: 'kay: auth needs server: add --with server, or drop it with --without auth\n', code: 1 })
+      expect(await kay(['new', 'unstyled', '--kay', '^1.0.0', '--without', 'tailwind'], dir)).toEqual({ stdout: '', stderr: 'kay: accents needs tailwind: add --with tailwind, or drop it with --without accents\n', code: 1 })
       expect((await readdir(dir)).sort()).toEqual(['lean', 'styled'])
     }
     finally {
@@ -187,7 +188,8 @@ describe('kay command line', () => {
       // From the server preset up to blank, then server checked, and the accent picker with the starter pages and Tailwind it needs.
       terminal.write('\x1B[A\r')
       await shown(() => screen, 'Features')
-      terminal.write(' \x1B[B\x1B[B\x1B[B \r')
+      // Home and Ctrl+Down, which the picker does not read, leave it open.
+      terminal.write('\x1B[H\x1B[1;5B \x1B[B\x1B[B\x1B[B \r')
 
       expect(await child.exited).toBe(0)
       expect(screen).toContain('Start from \x1B[36mblank')
@@ -402,7 +404,9 @@ describe('kay new', () => {
       const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.blank.features })
       const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
 
-      expect(files).toEqual(['.gitignore', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
+      expect(files).toEqual(['.gitignore', '.npmrc', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
+      // kay itself comes from the registry this names, whatever else is left out.
+      expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.scripts).toEqual({ dev: 'kay dev', build: 'kay build --static', check: 'kay check --deny-warnings', fmt: 'kay fmt' })
       expect(Object.keys(manifest.devDependencies)).toEqual(['@types/bun'])
       expect(Object.keys(manifest.dependencies)).toEqual(['elysia', 'kay'])
@@ -417,6 +421,8 @@ describe('kay new', () => {
       expect(report).toContain('exported 1 page')
       expect(code).toBe(0)
       expect(await Bun.file(join(dir, 'dist/index.html')).text()).toContain('<main><h1>my-app</h1></main>')
+      // With no _404.kay, no 404.html, which the nginx.conf of a site without the starter pages does not name.
+      expect(await Bun.file(join(dir, 'dist/404.html')).exists()).toBe(false)
     }
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
@@ -436,6 +442,9 @@ describe('kay new', () => {
         await installKay(dir)
         expect({ features, problems: await check(dir) }).toEqual({ features, problems: [] })
         expect({ features, changed: (await formatFiles([join(dir, 'src')], { write: false })).changed }).toEqual({ features, changed: [] })
+
+        if (variant.has('docker') && !variant.has('server'))
+          expect({ features, notFound: (await Bun.file(join(dir, 'nginx.conf')).text()).includes('error_page 404 /404.html') }).toEqual({ features, notFound: variant.has('starter') })
 
         if (variant.has('eslint'))
           expect({ features, messages: (await lint(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
@@ -464,7 +473,7 @@ describe('kay new', () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
-      await expect(createProject(dir, { kay: '^1.0.0', features: ['accents'] })).rejects.toThrow('kay: accents needs starter and tailwind')
+      await expect(createProject(dir, { kay: '^1.0.0', features: ['accents'] })).rejects.toThrow('kay: accents needs starter and tailwind: add --with starter,tailwind, or drop it with --without accents')
       expect(await readdir(join(dir, '..'))).toEqual([])
     }
     finally {
