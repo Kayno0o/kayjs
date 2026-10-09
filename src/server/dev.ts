@@ -1,23 +1,25 @@
 import type { KayCompileError } from '../build/transform'
 import type { HotSwap } from '../runtime/client'
 import type { ClientBuild } from './client'
-import { statSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { compileErrorPage } from './overlay'
 
 export const DEV_EVENTS = '/_kay/dev/events'
+export const DEV_PATCH = '/_kay/dev/patch.js'
+const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
 const BACKSLASH = /\\/g
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 
 // One per server process: `kay dev` restarts the process on every change, so a new id means new code.
 const BOOT_ID = crypto.randomUUID()
 
-// Reconnects once the restarted server is up: one running the code this page came from, restarted for a stylesheet, gets the page's stylesheets swapped in, one at a time; one running new code refreshes the page through the swap, which keeps the scroll and the islands whose props did not change, and loads the page fully when the swap cannot apply it, as after a new island. A page with no swap, or a server that failed to boot, reloads.
+// Reconnects once the restarted server is up: one running the code this page came from, restarted for a stylesheet, gets the page's stylesheets swapped in, one at a time; one running new code refreshes the page through the swap, which keeps the scroll and the islands whose props did not change, and loads the page fully when the swap cannot apply it, as after a new island. A page with no swap, as under `navigation: false`, keeps the server render it loaded with and applies what changed between it and the new one to the page, through `DEV_PATCH`; it reloads when that cannot be applied, and a server that failed to boot always reloads.
 // The old links go once the new ones loaded, so the page never shows unstyled, and a page that no longer answers as it did reloads instead.
 // A server restarted for edited islands only also names their new chunks: a page on the code it replaced swaps them in through `$kayHot`, keeping its state, then its stylesheets.
-export const LIVE_RELOAD = `<script>(()=>{let b=${JSON.stringify(BOOT_ID)},v,q=Promise.resolve();new EventSource(${JSON.stringify(DEV_EVENTS)}).addEventListener('boot',e=>q=q.then(async()=>{const d=e.data,s=d.indexOf(' '),t=d.indexOf(' ',s+1),i=d.slice(0,s),c=t<0?d.slice(s+1):d.slice(s+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i||!window.$kayRefresh)return location.reload();try{await window.$kayRefresh()}catch{return location.reload()}}v=c}b=i;try{const r=await fetch(location.href);if(!r.ok||r.redirected)return location.reload();const d=new DOMParser().parseFromString(await r.text(),'text/html'),o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()}catch{location.reload()}}))})()</script>`
+export const LIVE_RELOAD = `<script>(()=>{let b=${JSON.stringify(BOOT_ID)},v,s,q=Promise.resolve();const load=async()=>{try{const r=await fetch(location.href,{cache:'no-store',headers:{accept:'text/html'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return null}};new EventSource(${JSON.stringify(DEV_EVENTS)}).addEventListener('boot',e=>q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()}catch{location.reload()}}))})()</script>`
 
 // Shows each problem kay logs in the browser, as `[kay] ...`, in a panel on the page as well as in the console; its own shadow root keeps the page's styles off it, and styles set through `style` pass a policy without inline styles.
 // The problems `kay check` would report of the project's components, without type checking, come in a data block the page carries, and show once it loads. A page swap takes the panel away with the body, so the next one lists the new page's problems only. It updates in a microtask, so a failure of its own never breaks the call that logged.
@@ -65,6 +67,15 @@ function changedFiles(text: string | undefined): string[] | undefined {
   catch {
     return undefined
   }
+}
+
+// The module a page without the page swap applies its refresh with, its TypeScript source stripped to what a browser runs.
+let patchModule: string | undefined
+
+export function devPatch(): Response {
+  patchModule ??= new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(PATCH_SOURCE, 'utf8'))
+
+  return new Response(patchModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
 }
 
 // The stream stays open until the process exits; `retry` makes the browser poll quickly for the next one.

@@ -23,7 +23,7 @@ import { bundled } from './bundle'
 import { serveCards, setupCards } from './card'
 import { PRERENDERED_DIR, readInlineStyles } from './client'
 import { compressResponse, encodedCopies, encodedPath, filesUnder, preferredEncoding } from './compress'
-import { DEV_EVENTS, devEvents, hotSwap } from './dev'
+import { DEV_EVENTS, DEV_PATCH, devEvents, devPatch, hotSwap } from './dev'
 import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, serveFavicons } from './favicon'
@@ -226,6 +226,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     const hot = hotSwap(root, client)
 
     app.get(DEV_EVENTS, () => devEvents(false, hot))
+    app.get(DEV_PATCH, () => devPatch())
   }
 
   const clientFiles = await filesUnder(client.dir)

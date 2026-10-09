@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
+import { patch } from '../src/runtime/dev-patch'
 import { cappedSizes } from '../src/runtime/image'
 import { DEV_PROBLEMS, LIVE_RELOAD, problemsBlock } from '../src/server/dev'
 import { settle } from '../src/test'
@@ -702,11 +703,12 @@ describe('the live reload script', () => {
     try {
       // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
       (new Function(script) as () => void)()
+      // A page without the page swap keeps the server render it loaded with.
       await onBoot({ data: `${boot} 3` })
-      expect(fetched).toEqual([])
+      expect(fetched).toEqual(['http://localhost/page'])
 
       await onBoot({ data: 'next 3' })
-      expect(fetched).toEqual(['http://localhost/page'])
+      expect(fetched).toEqual(['http://localhost/page', 'http://localhost/page'])
       expect(stylesheets()).toEqual(['/_kay/app-2.css', '/theme.css?kay-dev=next'])
       expect(reload).not.toHaveBeenCalled()
 
@@ -756,6 +758,93 @@ describe('actions called from the browser', () => {
     finally {
       fetchStub.mockRestore()
       await dispose()
+    }
+  })
+})
+
+describe('the dev patch', () => {
+  const page = (body: string, head = '<title>Home</title>') => `<!doctype html><html lang="en"><head>${head}<script>new EventSource("/_kay/dev/events")</script></head><body>${body}</body></html>`
+  const parse = (html: string) => new DOMParser().parseFromString(html, 'text/html')
+
+  it('changes only what the server render changed, leaving what scripts did to the rest of the page', () => {
+    const before = page('<h1>Title</h1><div class="bar" id="a"></div><p class="note">Old</p><footer>End</footer>')
+    const live = parse(before)
+    const bar = live.querySelector('.bar')!
+    const note = live.querySelector('p')!
+    const panel = live.createElement('kay-problems')
+
+    bar.classList.add('in-view')
+    note.classList.add('seen')
+    live.body.append(panel)
+
+    const after = page('<h1>Title</h1><div class="bar" id="a"></div><p class="note wide">New</p><footer>End</footer>', '<title>Next</title>')
+
+    expect(patch(parse(before), parse(after), live)).toBe(true)
+    expect(live.querySelector('.bar')).toBe(bar)
+    expect(bar.className).toBe('bar in-view')
+    expect(live.querySelector('p')).toBe(note)
+    expect(note.className).toBe('note seen wide')
+    expect(note.textContent).toBe('New')
+    expect(live.title).toBe('Next')
+    expect(live.body.lastElementChild).toBe(panel)
+  })
+
+  it('removes an attribute and a class the server dropped, and inserts and removes nodes between the common ends', () => {
+    const before = page('<h1>Title</h1><p class="a b" hidden>One</p><p>Two</p><footer>End</footer>')
+    const live = parse(before)
+
+    live.querySelector('p')!.classList.add('script')
+
+    expect(patch(parse(before), parse(page('<h1>Title</h1><p class="a">One</p><footer>End</footer>')), live)).toBe(true)
+    expect(live.body.innerHTML).toBe('<h1>Title</h1><p class="a script">One</p><footer>End</footer>')
+
+    const grown = page('<h1>Title</h1><p class="a">One</p><aside>New</aside><footer>End</footer>')
+
+    expect(patch(parse(page('<h1>Title</h1><p class="a">One</p><footer>End</footer>')), parse(grown), live)).toBe(true)
+    expect(live.body.innerHTML).toBe('<h1>Title</h1><p class="a script">One</p><aside>New</aside><footer>End</footer>')
+  })
+
+  it('asks for a reload when the change cannot be applied in place', () => {
+    const base = '<p>Text</p><slot data-component="a" data-props="{}"><b>0</b></slot>'
+    const cases: [string, string, string?][] = [
+      [base, base.replace('"{}"', '"{&quot;n&quot;:1}"')],
+      [base, `${base}<slot data-component="b"></slot>`],
+      [base, '<p>Text</p>'],
+      [base, `${base}<script>run()</script>`],
+      [base, base.replace('Text', 'Other'), `${base}<div></div>`],
+      ['<p>Text</p><!--kay-await:1-->x<!--/kay-await:1-->', '<p>Other</p><!--kay-await:1-->x<!--/kay-await:1-->'],
+    ]
+
+    for (const [before, after, live] of cases) {
+      const old = parse(page(before))
+      const next = parse(page(after))
+
+      expect(patch(old, next, parse(page(live ?? before)))).toBe(false)
+    }
+
+    const lang = page('<p>Text</p>')
+
+    expect(patch(parse(lang), parse(lang.replace('lang="en"', 'lang="fr"')), parse(lang))).toBe(false)
+    expect(patch(parse(lang), parse(page('<p>Text</p>', '<title>Home</title><script type="module" src="/entry.js"></script>')), parse(lang))).toBe(false)
+    // A live page that lost a node its render had.
+    expect(patch(parse(page('<p>a</p><p>b</p>')), parse(page('<p>a</p><p>c</p>')), parse(page('<p>a</p>')))).toBe(false)
+  })
+
+  it('leaves the stylesheets to the live reload', () => {
+    const { happyDOM } = globalThis as unknown as { happyDOM: { settings: { disableCSSFileLoading: boolean } } }
+    const before = page('<p>Text</p>', '<link rel="stylesheet" href="/app-1.css">')
+
+    happyDOM.settings.disableCSSFileLoading = true
+
+    try {
+      const live = parse(before)
+
+      expect(patch(parse(before), parse(page('<p>Other</p>', '<link rel="stylesheet" href="/app-2.css">')), live)).toBe(true)
+      expect(live.querySelector('link')!.getAttribute('href')).toBe('/app-1.css')
+      expect(live.querySelector('p')!.textContent).toBe('Other')
+    }
+    finally {
+      happyDOM.settings.disableCSSFileLoading = false
     }
   })
 })
