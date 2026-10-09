@@ -455,12 +455,17 @@
     @apply grid grid-cols-1 gap-3 sm:grid-cols-2;
   }
 
+  /* One wrapping row, the label taking no box of its own: the head and the action share the first line, the action wrapping under the head rather than over the control, and the rest take a line each. */
   .kui-form-field {
-    @apply relative flex w-full flex-col gap-1;
+    @apply flex w-full flex-wrap items-center gap-1;
   }
 
   .kui-form-field-label {
-    @apply flex flex-col gap-1;
+    @apply contents;
+  }
+
+  :where(.kui-form-field, .kui-form-field-label) > * {
+    @apply basis-full;
   }
 
   .kui-form-field
@@ -477,13 +482,14 @@
     @apply m-0 min-w-0 border-0 p-0;
   }
 
+  /* A floated legend is no longer the fieldset's rendered legend, so it sits in the row like the label's head; the float itself does nothing in a flex row. */
   .kui-form-field-head {
-    @apply flex flex-wrap items-center gap-2;
+    @apply float-left order-first flex flex-1 basis-auto flex-wrap items-center gap-2;
   }
 
-  /* Held on the label's line, outside the label. */
+  /* Held on the label's line, outside the label, and moved under it when the line is too short for both. */
   .kui-form-field-action {
-    @apply absolute top-0 right-0 flex flex-wrap items-center gap-1.5;
+    @apply order-first ml-auto flex basis-auto flex-wrap items-center justify-end gap-1.5;
   }
 
   .kui-form-field-required {
@@ -1245,10 +1251,6 @@
   }
 
   /* Below lg the links fold behind the toggle, opening as a panel under it; from lg they sit in a row and the toggle hides. */
-  .kui-site-nav {
-    @apply relative;
-  }
-
   .kui-site-nav-toggle {
     @apply lg:hidden;
   }
@@ -1257,8 +1259,11 @@
     @apply hidden items-center gap-1 lg:flex;
   }
 
+  /* Anchored under the toggle wherever it sits in the header, and flipped by the browser when it would run off the screen. */
   :where(.kui-site-nav[data-open]) .kui-site-nav-list {
-    @apply absolute top-full right-0 z-30 mt-2 flex min-w-56 flex-col items-stretch border border-kui-surface2 bg-kui-mantle p-2 lg:static lg:mt-0 lg:min-w-0 lg:flex-row lg:items-center lg:border-0 lg:bg-transparent lg:p-0;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-inline;
+    @apply absolute z-30 mt-2 flex min-w-56 flex-col items-stretch border border-kui-surface2 bg-kui-mantle p-2 lg:static lg:mt-0 lg:min-w-0 lg:flex-row lg:items-center lg:border-0 lg:bg-transparent lg:p-0;
   }
 
   .kui-site-nav-link {

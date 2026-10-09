@@ -151,10 +151,11 @@ describe('FormField', () => {
 describe('layout', () => {
   const page = async (id: string) => (await element('/layout', id)).replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<svg[^>]*>.*?<\/svg>/g, '<svg/>')
 
-  test('SiteNav marks the page on screen and the section holding it, its links folded behind a closed toggle', async () => {
+  test('SiteNav marks the page on screen and the section holding it, its links folded behind a closed toggle they are anchored to', async () => {
     const nav = (await page('site-nav')).replaceAll(/<\/?slot[^>]*>/g, '')
 
-    expect(nav).toContain('<nav aria-label="Main" class="kui-site-nav"><button aria-expanded="false" aria-controls="main-links" type="button" aria-label="Ouvrir le menu"')
+    expect(nav).toContain('<nav aria-label="Main" class="kui-site-nav"><button aria-expanded="false" aria-controls="main-links" style="anchor-name: --kui-site-nav-main-links" type="button" aria-label="Ouvrir le menu"')
+    expect(nav).toContain('<ul class="kui-site-nav-list" id="main-links" style="position-anchor: --kui-site-nav-main-links">')
     expect([...nav.matchAll(/<a class="kui-site-nav-link" href="([^"]*)"(?: aria-current="(\w+)")?>/g)].map(([, href, current]) => `${href}${current ? ` ${current}` : ''}`)).toEqual(['/', '/chart', '/charts true', '/charts/moons page', '/data'])
   })
 

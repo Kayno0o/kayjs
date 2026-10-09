@@ -19,6 +19,7 @@ const { id, links, current, label, menuLabel = 'Menu', class: className, ...rest
 }>()
 
 const listId = id ?? uid()
+const anchor = `--kui-site-nav-${listId}`
 const open = signal(false)
 let toggle: HTMLElement | undefined
 
@@ -51,8 +52,8 @@ function escape(event: KeyboardEvent) {
 }
 ---
 nav.kui-site-nav({...rest} aria-label={label} data-open={open() || undefined} class={className} onKeyDown={escape})
-  IconButton(icon={open() ? 'close' : 'menu'} label={menuLabel} variant="ghost" class="kui-site-nav-toggle" aria-expanded={String(open())} aria-controls={listId} ref={element => toggle = element} onClick={() => open.set(!open())})
-  ul.kui-site-nav-list(id={listId})
+  IconButton(icon={open() ? 'close' : 'menu'} label={menuLabel} variant="ghost" class="kui-site-nav-toggle" aria-expanded={String(open())} aria-controls={listId} style={`anchor-name: ${anchor}`} ref={element => toggle = element} onClick={() => open.set(!open())})
+  ul.kui-site-nav-list(id={listId} style={`position-anchor: ${anchor}`})
     for link of links key={link.href}
       li
         a.kui-site-nav-link(href={link.href} aria-current={marked(link.href)} onClick={() => open.set(false)}) {link.label}
