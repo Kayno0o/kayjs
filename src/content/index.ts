@@ -21,6 +21,8 @@ export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { highlightCode, renderMarkdown } from './markdown'
 
 export const COLLECTION = Symbol.for('kay.collection')
+// Never set: it only carries a feed's path in the collection's type, for `kay check` to count it as served.
+declare const FEED_PATH: unique symbol
 // Loaded entries are kept until `invalidate()` or a restart unless the loader sets a `ttl`: about thirty years.
 const FOREVER = 1e9
 
@@ -73,8 +75,9 @@ export interface CollectionOptions<Schema extends TSchema> {
   feed?: FeedOptions<Static<Schema>> | undefined
 }
 
-export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>> {
+export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string> {
   readonly [COLLECTION]: true
+  readonly [FEED_PATH]?: FeedPath
   // The folder, relative to the project root, or the loader's name.
   readonly name: string
   // The folder, or undefined for a collection a loader fills.
@@ -97,7 +100,7 @@ interface Entries<Data> {
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
 // File entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production. Loaded entries are read when first asked for, and kept as `cached` keeps a value.
-export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>>(source: string | ContentLoader, options: CollectionOptions<Schema> & { components?: Components }): Collection<Static<Schema>, Components> {
+export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = never>(source: string | ContentLoader, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined }): Collection<Static<Schema>, Components, FeedPath> {
   type Data = Static<Schema>
   let loading: Promise<Entries<Data>> | undefined
   const components = options.components ?? {}
@@ -229,6 +232,9 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, highlight:
 
   return entries
 }
+
+// The paths the module's collections serve their feeds at, the ones written as literals.
+export type FeedPathsOf<Module> = { [Name in keyof Module]: Module[Name] extends Collection<unknown, Record<string, Component<never>>, infer Path> ? string extends Path ? never : Path : never }[keyof Module]
 
 export function isCollection(value: unknown): value is Collection<unknown> {
   return typeof value === 'object' && value !== null && COLLECTION in value

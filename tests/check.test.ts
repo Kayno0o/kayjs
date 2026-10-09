@@ -819,6 +819,23 @@ describe('kay check, what the server refuses at boot', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('lets a link to a collection\'s feed through, as one to the sitemap is', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'link(rel="alternate" href="/notes.xml")\na(href="/notes.xml") Notes\na(href="/sitemap.xml") Sitemap\na(href="/robots.txt") Robots\na(href="/other.xml") Other\n',
+      'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nconst path: string = \'/any.xml\'\n\nexport const notes = collection(\'content/notes\', {\n  schema: t.Object({ title: t.String() }),\n  feed: { path: \'/notes.xml\', title: \'Notes\', item: note => ({ title: note.data.title, path: `/notes/${note.slug}`, date: new Date(0) }) },\n})\nexport const pages = collection(\'content/pages\', { schema: t.Object({}) })\nexport const any = collection(\'content/any\', { schema: t.Object({}), feed: { path, title: \'Any\', item: () => ({ title: \'a\', path: \'/\', date: new Date(0) }) } })\n',
+      'src/content/notes/a.md': '---\ntitle: A\n---\nText\n',
+    })
+
+    try {
+      const unserved = (await check(root, { site: 'https://example.com' })).filter(d => d.code !== undefined).map(d => [d.line, d.message])
+
+      expect(unserved).toEqual([[5, expect.stringContaining('No page, public file or app route serves /other.xml')]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('kay check, string fields an action leaves unbounded', () => {

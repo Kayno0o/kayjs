@@ -169,8 +169,10 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const config = existsSync(join(root, CONFIG_FILE)) ? relative(dirname(environmentPath), join(root, CONFIG_FILE)).replace(TS_EXTENSION, '') : undefined
   const entry = resolve(root, options.entry ?? SERVER_ENTRY)
   const app = await exportsApp(entry) ? relative(dirname(environmentPath), entry).replace(TS_EXTENSION, '') : undefined
+  const contentConfig = resolve(root, options.content ?? CONTENT_CONFIG)
+  const content = existsSync(contentConfig) ? relative(dirname(environmentPath), contentConfig).replace(TS_EXTENSION, '') : undefined
 
-  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }, config, app))
+  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }, config, app, content))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS]
@@ -380,15 +382,18 @@ function i18nSettings(root: string, config: I18nConfig, diagnostics: CheckDiagno
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], messages: string }, config?: string, app?: string): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], messages: string }, config?: string, app?: string, content?: string): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
-  const paths = files.length > 0 ? files.flatMap(spellings).map(file => JSON.stringify(file)).join(' | ') : 'never'
+  // The collections' feeds are served as files are.
+  const feeds = content === undefined ? [] : [`FeedPathsOf<typeof import(${importSpecifier(content)})>`]
+  const paths = [...files.flatMap(spellings).map(file => JSON.stringify(file)), ...feeds].join(' | ') || 'never'
   const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: typeof import(${importSpecifier(i18n.messages)}).default` : ''
   const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
   const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
 
   return [
     'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ChildrenProp, FieldName, FunctionProp, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
+    ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     '',
     'declare module \'kay\' {',
     `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules}${publicEnv} }`,
