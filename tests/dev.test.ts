@@ -240,6 +240,29 @@ describe('kay dev', () => {
     }
   })
 
+  it('serves the pages itself while the project has no server entry, and runs one written meanwhile at the next restart', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const seen = join(root, 'seen.txt')
+    const children: Subprocess[] = []
+
+    await Bun.write(join(root, '.env'), 'PORT=0\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    const stop = await dev(root, { onRestart: child => children.push(child) })
+
+    try {
+      await Bun.sleep(500)
+      expect(children[0]!.exitCode).toBeNull()
+
+      await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(seen)}, 'server')\nsetInterval(() => undefined, 1000)\n`)
+      await until(() => existsSync(seen), 10_000)
+      expect(children).toHaveLength(2)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('tells each server how many changes other than to stylesheets came before it', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     // Hidden, so writing it restarts nothing.

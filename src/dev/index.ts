@@ -1,13 +1,13 @@
 import type { Subprocess } from 'bun'
 import type { FSWatcher } from 'node:fs'
-import { readdirSync, readFileSync, statSync, watch } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { IGNORED_DIRS } from '../build/files'
 import { writeShadowTypes } from '../check'
 
 export interface DevOptions {
-  // The server entry, relative to the root.
+  // The server entry, relative to the root, `src/server.ts` by default; with no file there, a server of kay's own serves the pages.
   entry?: string | undefined
   // Page, public file and API directories relative to the root, for the regenerated `.kay/types`.
   routes?: string | undefined
@@ -22,6 +22,7 @@ export interface DevOptions {
 // Long enough to gather the few events one save makes.
 const DEBOUNCE_MS = 30
 const SPARE = join(import.meta.dir, 'spare.ts')
+const PAGES_ENTRY = join(import.meta.dir, 'pages.ts')
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
 const STYLESHEET = /\.css$/
@@ -40,6 +41,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const entry = resolve(root, options.entry ?? 'src/server.ts')
   let child: Subprocess<'pipe'> | undefined
   let spare: Subprocess<'pipe'> | undefined
+  let spareEntry: string | undefined
   let timer: Timer | undefined
   let changed = false
   // Bun reads these as a process starts, so changing one needs a process started after it.
@@ -52,10 +54,16 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let changedFiles = new Set<string>()
 
   const env = await environmentWithoutDotenv()
-  const spawn = () => Bun.spawn([process.execPath, '--preload', SPARE, entry], { cwd: root, env: { ...env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
+  // Chosen again for each process, so a `src/server.ts` written or deleted while running takes over at the next restart.
+  const entryToRun = () => options.entry === undefined && !existsSync(entry) ? PAGES_ENTRY : entry
+  const spawn = () => {
+    spareEntry = entryToRun()
+
+    return Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
+  }
   // Each restart takes the process waiting with kay loaded, and readies the next one.
   const start = () => {
-    if (startupChanged || spare === undefined || spare.exitCode !== null) {
+    if (startupChanged || spare === undefined || spare.exitCode !== null || spareEntry !== entryToRun()) {
       spare?.kill()
       spare = spawn()
       startupChanged = false

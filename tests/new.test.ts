@@ -255,6 +255,20 @@ describe('kay new', () => {
       expect(await check(dir)).toEqual([])
       expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
+      // With no server entry, `kay dev` serves the pages with kay's own, live reload included.
+      const server = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev'], { cwd: dir, env: { ...process.env, PORT: '0' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+
+      try {
+        const home = await (await fetch(`http://localhost:${await listeningPort(server)}/`)).text()
+
+        expect(home).toContain('<title>Home | my-site</title>')
+        expect(home).toContain('new EventSource("/_kay/dev/events")')
+      }
+      finally {
+        server.kill()
+        await server.exited
+      }
+
       const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', '--static'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, SITE_URL: 'https://pages.example', SITE_BASE: '/me/my-site' } })
       const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
 
