@@ -32,7 +32,7 @@ export interface EmailOptions {
   requireVerified?: boolean | undefined
 }
 
-export type EmailCore = Required<Omit<EmailOptions, 'templates'>> & { templates: Templates }
+export type EmailCore = Required<Omit<EmailOptions, 'templates' | 'requireVerified'>> & { requireVerified: boolean, templates: Templates }
 
 // Sent whether or not an account has that address, so the answer tells nothing of which ones exist.
 export type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'unavailable' }

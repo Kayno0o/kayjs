@@ -466,7 +466,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     twoFactorPage: options.twoFactorPage ?? '/two-factor',
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: { ...DEFAULT_LIMITS, ...options.limits },
-    email: options.email && { requireVerified: false, ...options.email, templates: { ...defaultTemplates, ...options.email.templates } },
+    email: options.email && { ...options.email, requireVerified: options.email.requireVerified ?? false, templates: { ...defaultTemplates, ...options.email.templates } },
     oauth,
     refreshers: new Map(),
     allow: options.allow,

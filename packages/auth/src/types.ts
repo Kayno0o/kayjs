@@ -6,7 +6,7 @@ export type Principal<P> = P | null
 /** Request-derived facts a predicate may read - a subset of the Elysia context. */
 export interface PolicyContext {
   params?: Record<string, any> | undefined
-  body?: any | undefined
+  body?: any
   query?: Record<string, string> | undefined
 }
 
