@@ -1,10 +1,10 @@
 import type { Duration } from '../runtime/duration'
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { durationSeconds } from '../runtime/duration'
 import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
+import { nodeCrypto } from './builtins'
 
 export type SessionData = Record<string, unknown>
 
@@ -67,7 +67,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (secrets.length === 0 || secrets.some(secret => secret.length < MIN_SECRET_LENGTH))
     throw new Error(`kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
 
-  const keys = secrets.map(secret => createHash('sha256').update(secret).digest())
+  const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
   const domain = options.domain?.trim().toLowerCase().replace(LEADING_DOT, '')
 
   if (domain !== undefined && !COOKIE_DOMAIN.test(domain))
@@ -179,7 +179,7 @@ class RequestSession<Data extends object> implements Session<Data> {
     let sealed: Sealed = { data: this.data, issued: now }
 
     if (store) {
-      this.id ??= randomBytes(32).toString('base64url')
+      this.id ??= nodeCrypto().randomBytes(32).toString('base64url')
       await store.set(this.id, this.data, maxAge)
       sealed = { id: this.id, issued: now }
     }
@@ -234,8 +234,8 @@ class RequestSession<Data extends object> implements Session<Data> {
 
 // AES-256-GCM: the cookie can be neither read nor altered without the secret, nor passed off under another cookie's name.
 function seal(text: string, key: Buffer, name: string): string {
-  const iv = randomBytes(IV_BYTES)
-  const cipher = createCipheriv('aes-256-gcm', key, iv)
+  const iv = nodeCrypto().randomBytes(IV_BYTES)
+  const cipher = nodeCrypto().createCipheriv('aes-256-gcm', key, iv)
 
   cipher.setAAD(Buffer.from(name))
   const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
@@ -252,7 +252,7 @@ function opened(value: string, keys: Buffer[], name: string): { sealed: Sealed, 
 
   for (const [index, key] of keys.entries()) {
     try {
-      const decipher = createDecipheriv('aes-256-gcm', key, bytes.subarray(0, IV_BYTES))
+      const decipher = nodeCrypto().createDecipheriv('aes-256-gcm', key, bytes.subarray(0, IV_BYTES))
 
       decipher.setAAD(Buffer.from(name))
       decipher.setAuthTag(bytes.subarray(-TAG_BYTES))

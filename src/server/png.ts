@@ -1,4 +1,4 @@
-import { inflateSync } from 'node:zlib'
+import { nodeZlib } from './builtins'
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10]
 
@@ -18,7 +18,7 @@ export function decodePng(png: Uint8Array): { pixels: Uint8Array, width: number,
       data.push(png.subarray(at + 8, at + 8 + view.getUint32(at)))
   }
 
-  const filtered = inflateSync(Buffer.concat(data))
+  const filtered = nodeZlib().inflateSync(Buffer.concat(data))
   const stride = width * 4
   const pixels = new Uint8Array(stride * height)
 

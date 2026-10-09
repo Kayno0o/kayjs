@@ -1,4 +1,4 @@
-import { brotliDecompressSync, inflateSync } from 'node:zlib'
+import { nodeZlib } from './builtins'
 
 // Reads what drawing text takes from a font file, `.ttf`, `.woff` or `.woff2`: which glyph draws a character, how far it moves the pen, the kerning between two, and its outline. Only TrueType outlines are read, which every Google font and so every Fontsource one has.
 
@@ -231,7 +231,7 @@ function woffTables(bytes: Uint8Array): Map<string, Table> {
     const length = reader.u32()
 
     reader.skip(4)
-    tables.set(tag, { data: stored.length < length ? new Uint8Array(inflateSync(stored)) : stored, transformed: false })
+    tables.set(tag, { data: stored.length < length ? new Uint8Array(nodeZlib().inflateSync(stored)) : stored, transformed: false })
   }
 
   return tables
@@ -258,7 +258,7 @@ function woff2Tables(bytes: Uint8Array): Map<string, Table> {
     entries.push({ tag, length: transformed ? reader.base128() : length, transformed })
   }
 
-  const data = new Uint8Array(brotliDecompressSync(bytes.subarray(reader.offset, reader.offset + compressedLength)))
+  const data = new Uint8Array(nodeZlib().brotliDecompressSync(bytes.subarray(reader.offset, reader.offset + compressedLength)))
   const tables = new Map<string, Table>()
   let offset = 0
 

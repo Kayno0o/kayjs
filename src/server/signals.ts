@@ -1,4 +1,4 @@
-import { STATUS_CODES } from 'node:http'
+import { nodeHttp } from './builtins'
 
 // Thrown by `ctx.redirect()`, `ctx.notFound()` and `ctx.deny()` to end a guard, page or action early; the server turns them into responses.
 // A line break would split the `location` header, and Bun refuses any control character there with its own message.
@@ -29,6 +29,6 @@ export class Denied {
   readonly message: string
 
   constructor(readonly status: number, message?: string) {
-    this.message = message ?? STATUS_CODES[status] ?? 'Denied'
+    this.message = message ?? nodeHttp().STATUS_CODES[status] ?? 'Denied'
   }
 }

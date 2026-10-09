@@ -1,4 +1,4 @@
-import { deflateSync, inflateSync } from 'node:zlib'
+import { nodeZlib } from './builtins'
 
 // Bun.Image resizes but cannot cut: an image is written as a PNG this reads back row by row, and the middle of it written again.
 const SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
@@ -70,7 +70,7 @@ export function decodePng(bytes: Uint8Array): Png {
 
   const bpp = CHANNELS[header.colorType]! * header.depth / 8
   const stride = header.width * bpp
-  const raw = inflateSync(Buffer.concat(data))
+  const raw = nodeZlib().inflateSync(Buffer.concat(data))
   const rows: Uint8Array[] = []
   let previous: Uint8Array = new Uint8Array(stride)
 
@@ -141,7 +141,7 @@ export function encodePng(png: Png): Uint8Array<ArrayBuffer> {
   for (const [y, row] of png.rows.entries())
     raw.set(row, y * (row.length + 1) + 1)
 
-  const chunks = [chunk('IHDR', header), ...png.kept.map(({ type, data }) => chunk(type, data)), chunk('IDAT', deflateSync(raw)), chunk('IEND', new Uint8Array())]
+  const chunks = [chunk('IHDR', header), ...png.kept.map(({ type, data }) => chunk(type, data)), chunk('IDAT', nodeZlib().deflateSync(raw)), chunk('IEND', new Uint8Array())]
 
   return new Uint8Array(Buffer.concat([SIGNATURE, ...chunks]))
 }

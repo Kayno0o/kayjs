@@ -1,8 +1,7 @@
 import { existsSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { promisify } from 'node:util'
-import { brotliCompress, constants, createBrotliCompress, createGzip, gzip } from 'node:zlib'
+import { nodeZlib } from './builtins'
 
 export type Encoding = 'br' | 'gzip'
 
@@ -16,8 +15,6 @@ const ENCODED_COPY = /\.(?:br|gz)$/
 // Below this a response fits in a packet or two anyway.
 const MIN_SIZE = 256
 const ACCEPTED = /^\s*([\w*-]+)\s*(?:;\s*q\s*=\s*([\d.]+))?/i
-const compressBrotli = promisify(brotliCompress)
-const compressGzip = promisify(gzip)
 // Levels for what compresses while serving: brotli 4 costs a third less CPU than 5 on a 110 KB page for 6% more bytes, about what gzip 6 costs.
 const BROTLI_QUALITY = 4
 const GZIP_LEVEL = 6
@@ -27,6 +24,15 @@ const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manife
 const BODILESS = new Set([101, 204, 205, 206, 304])
 const NO_TRANSFORM = /\bno-transform\b/i
 const VARY_ENCODING = /\baccept-encoding\b/i
+
+// One body through brotli or gzip, off the main thread.
+async function compressBrotli(bytes: Uint8Array, params: Record<number, number>): Promise<Uint8Array<ArrayBuffer>> {
+  return new Promise((resolve, reject) => nodeZlib().brotliCompress(bytes, { params }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))
+}
+
+async function compressGzip(bytes: Uint8Array, level: number): Promise<Uint8Array<ArrayBuffer>> {
+  return new Promise((resolve, reject) => nodeZlib().gzip(bytes, { level }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))
+}
 
 // Writes a brotli and a gzip copy beside every compressible file under the directory, at the strongest levels since it happens once, at build time; a copy saving little is not written.
 export async function compressFiles(dir: string): Promise<void> {
@@ -41,8 +47,9 @@ export async function compressPaths(paths: string[]): Promise<void> {
     if (bytes.length < MIN_SIZE)
       return
 
+    const { constants } = nodeZlib()
     const copies: [Encoding, Uint8Array][] = [
-      ['br', await compressBrotli(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length } })],
+      ['br', await compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })],
       ['gzip', Bun.gzipSync(bytes, { level: 9 })],
     ]
 
@@ -99,11 +106,12 @@ async function compressBytes(bytes: Uint8Array, encoding: Encoding): Promise<Uin
 
   try {
     if (encoding === 'gzip')
-      return new Uint8Array(await compressGzip(bytes, { level: GZIP_LEVEL }))
+      return await compressGzip(bytes, GZIP_LEVEL)
 
+    const { constants } = nodeZlib()
     const window = Math.min(Math.max(Math.ceil(Math.log2(bytes.length)), constants.BROTLI_MIN_WINDOW_BITS), constants.BROTLI_MAX_WINDOW_BITS)
 
-    return new Uint8Array(await compressBrotli(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: window, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length } }))
+    return await compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: window, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })
   }
   finally {
     compressing.release()
@@ -231,11 +239,12 @@ async function readWithinTick(body: ReadableStream<Uint8Array>): Promise<ReadBod
 // The levels of the request path. Brotli's window is cut to 512 KB, more than a page needs, since its default 4 MB is memory held per open stream.
 // Each chunk is flushed and sent before the next is read, so at most one waits in zlib; a browser going away stops both the source and zlib.
 function compressedStream(body: ReadableStream<Uint8Array>, encoding: Encoding): ReadableStream<Uint8Array> {
-  const zlib = encoding === 'br' ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: 19 } }) : createGzip({ level: GZIP_LEVEL })
+  const { constants, createBrotliCompress, createGzip } = nodeZlib()
+  const encoder = encoding === 'br' ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: 19 } }) : createGzip({ level: GZIP_LEVEL })
   const reader = body.getReader()
   const output: Uint8Array[] = []
   let failure: Error | undefined
-  const stopped = new Promise<void>(resolve => zlib.once('error', (error: Error) => {
+  const stopped = new Promise<void>(resolve => encoder.once('error', (error: Error) => {
     failure = error
     resolve()
   }))
@@ -247,7 +256,7 @@ function compressedStream(body: ReadableStream<Uint8Array>, encoding: Encoding):
       throw failure
   }
 
-  zlib.on('data', (chunk: Uint8Array) => output.push(chunk))
+  encoder.on('data', (chunk: Uint8Array) => output.push(chunk))
 
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -255,14 +264,14 @@ function compressedStream(body: ReadableStream<Uint8Array>, encoding: Encoding):
 
       if (done) {
         // 'end' comes once the last bytes went out as data.
-        const ended = new Promise<void>(resolve => zlib.once('end', resolve))
+        const ended = new Promise<void>(resolve => encoder.once('end', resolve))
 
-        zlib.end()
+        encoder.end()
         await settle(ended)
       }
       else {
-        zlib.write(value)
-        await settle(new Promise<void>(resolve => zlib.flush(() => resolve())))
+        encoder.write(value)
+        await settle(new Promise<void>(resolve => encoder.flush(() => resolve())))
       }
 
       for (const chunk of output.splice(0))
@@ -272,7 +281,7 @@ function compressedStream(body: ReadableStream<Uint8Array>, encoding: Encoding):
         controller.close()
     },
     async cancel(reason) {
-      zlib.destroy()
+      encoder.destroy()
       await reader.cancel(reason)
     },
   })

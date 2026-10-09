@@ -6,12 +6,12 @@ import type { FontAssets } from './fonts'
 import type { ImageRouteOptions } from './image'
 import type { Color } from './raster'
 import type { RemoteImages } from './remote'
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { CARD, CARD_ROUTE, IMPORTED, setCardMaker, variantFilesLinked, VARIANTS } from '../runtime/image'
+import { nodeCrypto } from './builtins'
 import { drawCard } from './card-draw'
 import { coverImage } from './crop'
 import { readFace } from './face'
@@ -167,7 +167,7 @@ function signingKey(cards: Cards): Uint8Array {
   const partial = `${file}.${crypto.randomUUID()}.tmp`
 
   mkdirSync(cards.dir, { recursive: true })
-  writeFileSync(partial, randomBytes(32), { mode: 0o600 })
+  writeFileSync(partial, nodeCrypto().randomBytes(32), { mode: 0o600 })
 
   try {
     linkSync(partial, file)
@@ -236,14 +236,14 @@ function cardFile(cards: Cards, spec: string, version = ''): string {
 }
 
 function signature(key: Uint8Array, spec: string): string {
-  return createHmac('sha256', key).update(spec).digest('base64url').slice(0, 22)
+  return nodeCrypto().createHmac('sha256', key).update(spec).digest('base64url').slice(0, 22)
 }
 
 function signed(key: Uint8Array, spec: string, given: string): boolean {
   const expected = Buffer.from(signature(key, spec))
   const actual = Buffer.from(given)
 
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
+  return actual.length === expected.length && nodeCrypto().timingSafeEqual(actual, expected)
 }
 
 // `/_kay/card?title=...&src=...&sig=...` answers the JPEG card a page linked, drawn on its first request and kept in the cache directory; a title or image the server did not sign is not found.

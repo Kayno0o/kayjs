@@ -4,10 +4,10 @@ import type { PreviewConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import type { PreviewState } from '../runtime/preview'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { createHmac, timingSafeEqual } from 'node:crypto'
 import { durationSeconds } from '../runtime/duration'
 import { setPreviewScope } from '../runtime/preview'
 import { overHttps } from './actions'
+import { nodeCrypto } from './builtins'
 
 // Where a preview link enters preview mode, or `?exit` leaves it.
 export const PREVIEW_ROUTE = '/_kay/preview'
@@ -133,12 +133,12 @@ function settingsFor(caller: string): PreviewSettings {
 }
 
 function sign(current: PreviewSettings, text: string): string {
-  return createHmac('sha256', current.secret).update(text).digest('base64url')
+  return nodeCrypto().createHmac('sha256', current.secret).update(text).digest('base64url')
 }
 
 function sameText(given: string, expected: string): boolean {
   const a = Buffer.from(given)
   const b = Buffer.from(expected)
 
-  return a.length === b.length && timingSafeEqual(a, b)
+  return a.length === b.length && nodeCrypto().timingSafeEqual(a, b)
 }
