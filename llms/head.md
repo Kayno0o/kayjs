@@ -107,7 +107,7 @@ export default defineConfig({
 
 ## Fonts
 
-`fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by one `@font-face` stylesheet every page links, and preloaded only with `preload: true`.
+`fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by `@font-face` rules in a `<style>` of every page's head, which spares the first paint a request of their own, and preloaded only with `preload: true`.
 
 ```ts
 import { defineConfig } from 'kay/server'

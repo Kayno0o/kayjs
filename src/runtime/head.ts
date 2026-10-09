@@ -16,6 +16,8 @@ export interface HeadOptions {
 }
 
 export interface RenderedHead {
+  // The page's own charset, base and viewport, which go before anything else.
+  prelude: string
   html: string
   // Whether the page set its own charset or viewport, which then replace the defaults.
   charset: boolean
@@ -115,6 +117,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
     fillSocial(winners, ownTitle, options.social.origin)
 
   let prelude = ''
+  let viewportTag = ''
   let links = ''
   let metas = ''
   let others = ''
@@ -127,6 +130,8 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
         title = `<title>${escape(titleText!)}</title>`
       else if (identity === CHARSET || identity === 'base')
         prelude += tagMarkup(tag)
+      else if (identity === VIEWPORT)
+        viewportTag += tagMarkup(tag)
       else if (tag.tag === 'link' || tag.tag === 'style')
         links += tagMarkup(tag)
       else if (tag.tag === 'meta')
@@ -138,7 +143,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
     }
   }
 
-  return { html: prelude + resourcesHtml + links + metas + others + scripts + title, charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
+  return { prelude: prelude + viewportTag, html: resourcesHtml + links + metas + others + scripts + title, charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
 }
 
 // Open Graph and Twitter read their own tags only, so the title, description and canonical URL a page sets are repeated there unless it sets those too.

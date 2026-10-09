@@ -110,7 +110,7 @@ describe('pages', () => {
     const about = (await get('/about')).html
     const home = (await get('/')).html
 
-    expect(about).toStartWith('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="description"')
+    expect(about).toStartWith('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet"')
     expect(about.match(/name="viewport"/g)).toHaveLength(1)
     expect(about).toContain('<meta name="viewport" content="width=device-width">')
     expect(home).toContain('<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">')
@@ -141,7 +141,7 @@ describe('pages', () => {
     expect(Bun.file(manifestFile.name!).lastModified).toBe(built)
   })
 
-  it('links the stylesheets the layouts and the page import, through components, islands and modules', async () => {
+  it('links the stylesheets the layouts and the page import, through components, islands and modules, right after the viewport', async () => {
     const home = (await get('/')).html
     const links = [...home.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(match => match[1]!)
     const [layout, page] = await Promise.all(links.map(async link => (await app.handle(new Request(`http://localhost${link}`))).text()))
@@ -150,7 +150,7 @@ describe('pages', () => {
     expect(layout).toContain('background: url("/paper.png")')
     expect(page).toContain('.card {')
     expect(page).toContain('.counter {')
-    expect((await get('/about')).html).toContain(`<link rel="stylesheet" href="${links[0]}"><script type="speculationrules">`)
+    expect((await get('/about')).html).toContain(`<meta name="viewport" content="width=device-width"><link rel="stylesheet" href="${links[0]}"><meta name="description"`)
     expect((await Bun.file(join(process.cwd(), '.kay/classes.txt')).text()).split('\n')).toEqual(expect.arrayContaining(['card', 'counter']))
   })
 

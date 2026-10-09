@@ -2,11 +2,11 @@ import type { FontConfig, FontsourceConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname, isAbsolute, join, resolve } from 'node:path'
-import { writeAsset, writeAssetBytes } from '../build/assets'
+import { writeAsset } from '../build/assets'
 
-// What every page links for the fonts: one stylesheet of `@font-face` rules and the files to preload.
+// What every page carries for the fonts: their `@font-face` rules and the files to preload.
 export interface FontAssets {
-  stylesheet: string
+  css: string
   preload: { href: string, type: string }[]
   // Each face's file, which share cards are drawn in; a build from before cards has none.
   faces?: { family: string, weight: string, style: string, url: string }[]
@@ -18,7 +18,7 @@ const QUOTE = /["\\]/g
 const RELATIVE = /^\.{1,2}\//
 const VARIABLE_SCOPE = '@fontsource-variable/'
 
-// Writes each font and the stylesheet declaring them as content-named assets, and records their URLs beside the client build for a server that only reads it.
+// Writes each font as a content-named asset, and records the rules declaring them beside the client build for a server that only reads it.
 export async function prepareFonts(root: string, fonts: (FontConfig | FontsourceConfig)[], dir: string): Promise<FontAssets> {
   const rules: string[] = []
   const preload: FontAssets['preload'] = []
@@ -50,7 +50,7 @@ export async function prepareFonts(root: string, fonts: (FontConfig | Fontsource
       preload.push({ href: url, type: `font/${format === 'truetype' ? 'ttf' : format === 'opentype' ? 'otf' : format}` })
   }
 
-  const assets = { stylesheet: await writeAssetBytes('fonts', '.css', `${rules.join('\n')}\n`, root), preload, faces }
+  const assets = { css: rules.join(''), preload, faces }
 
   await Bun.write(join(dir, FONTS_FILE), JSON.stringify(assets))
 
@@ -64,11 +64,12 @@ export async function builtFonts(dir: string): Promise<FontAssets | undefined> {
   return await file.exists() ? await file.json() as FontAssets : undefined
 }
 
-// The faces with `preload: true` are fetched before the stylesheet asks for them, so their text renders in its font on the first paint more often; `crossorigin` is what lets the browser reuse a font preload.
+// The rules sit in the head, a few hundred bytes that a stylesheet of their own would have the first paint wait a request for (30 to 45 ms on a throttled phone).
+// The faces with `preload: true` are fetched before the rules ask for them, so their text renders in its font on the first paint more often; `crossorigin` is what lets the browser reuse a font preload.
 export function fontTags(assets: FontAssets): HeadTag[] {
   return [
     ...assets.preload.map(({ href, type }) => ({ tag: 'link', props: { rel: 'preload', href, as: 'font', type, crossorigin: '' } })),
-    { tag: 'link', props: { rel: 'stylesheet', href: assets.stylesheet } },
+    { tag: 'style', props: { children: assets.css } },
   ]
 }
 

@@ -451,7 +451,7 @@ describe('kay build --compile', () => {
 
         const photo = await get('/photo')
         const variant = (/srcset="([^ "]+) 320w/).exec(photo.text)![1]!.replaceAll('&amp;', '&')
-        const fonts = (/<link rel="stylesheet" href="(\/_kay\/assets\/fonts-[^"]+)">/).exec(home.text)![1]!
+        const font = (/<style>@font-face\{font-family:"Display";src:url\("([^"]+)"\)/).exec(home.text)![1]!
         const image = await fetch(`${origin}${variant}`)
 
         expect(image.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
@@ -466,7 +466,7 @@ describe('kay build --compile', () => {
         expect(new TextDecoder().decode((await upload.bytes()).subarray(4, 12))).toBe('ftypavif')
         expect((await fetch(`${origin}/favicon.ico`)).headers.get('content-type')).toBe('image/x-icon')
         expect((await get('/manifest.webmanifest')).status).toBe(200)
-        expect((await get(fonts)).text).toContain('@font-face{font-family:"Display"')
+        expect((await get(font)).status).toBe(200)
         expect((await get('/sitemap.xml')).text).toContain('<loc>https://example.com/about</loc>')
         // Content entries come from what the build compiled, with nothing of src/content beside the executable.
         expect((await get('/notes/first')).text).toContain('<h1>First note</h1><h2 id="read-me"><a href="#read-me">Read me</a></h2>')

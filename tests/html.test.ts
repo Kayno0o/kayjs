@@ -80,13 +80,13 @@ describe('head', () => {
       head([{ tag: 'title', props: { children: 'Page & co' } }, { tag: 'meta', props: { name: 'description', content: 'page' } }, { tag: 'link', props: { rel: 'stylesheet', href: '/a.css' } }])
     })
 
-    expect(rendered).toEqual({ html: '<link rel="stylesheet" href="/a.css"><meta name="description" content="page"><title>Page &amp; co</title>', charset: false, viewport: false })
+    expect(rendered).toEqual({ prelude: '', html: '<link rel="stylesheet" href="/a.css"><meta name="description" content="page"><title>Page &amp; co</title>', charset: false, viewport: false })
   })
 
   it('tells whether the page set its own charset and viewport, and puts the charset first', () => {
     const { head: rendered } = collectHead(() => head([{ tag: 'meta', props: { name: 'viewport', content: 'width=1' } }, { tag: 'meta', props: { charset: 'utf-8' } }]))
 
-    expect(rendered).toEqual({ html: '<meta charset="utf-8"><meta name="viewport" content="width=1">', charset: true, viewport: true })
+    expect(rendered).toEqual({ prelude: '<meta charset="utf-8"><meta name="viewport" content="width=1">', html: '', charset: true, viewport: true })
   })
 
   it('sets nothing outside a render', () => {

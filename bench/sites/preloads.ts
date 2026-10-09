@@ -1,4 +1,6 @@
 import type { Browser } from 'playwright-core'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { chromium } from 'playwright-core'
 import { median } from '../format'
 import { PROFILES } from './browser'
@@ -12,8 +14,25 @@ const RUNS = Number(process.env.RUNS ?? 7)
 const PAGES = ['/', '/a-propos', '/peinture']
 const FONT_PRELOAD = /<link rel="preload"[^>]*as="font"[^>]*>/g
 const MODULE_PRELOAD = /<link rel="modulepreload"[^>]*>/g
+const FONTS_STYLESHEET = /<link rel="stylesheet" href="\/_kay\/assets\/(fonts-[^"]+\.css)">/
+const PAGE_STYLESHEET = /<link rel="stylesheet" href="\/_kay\/(?!assets\/)[^"]+">/g
+const VIEWPORT = /<meta name="viewport"[^>]*>/
+
+const variant = VARIANTS.find(candidate => candidate.site.name === 'jb-peinture' && candidate.kind === 'kay')!
 
 const low = (tag: string): string => tag.replace('<link ', '<link fetchpriority="low" ')
+
+// The `@font-face` rules in a `<style>` of the head rather than a stylesheet of their own.
+function fontsInline(html: string): string {
+  return html.replace(FONTS_STYLESHEET, (_, name: string) => `<style>${readFileSync(join(variant.dir, '.kay/client/dist/assets', name), 'utf8')}</style>`)
+}
+
+// The page's stylesheets right after the viewport, ahead of the metas, structured data and title.
+function cssFirst(html: string): string {
+  const sheets = html.match(PAGE_STYLESHEET)?.join('') ?? ''
+
+  return html.replace(PAGE_STYLESHEET, '').replace(VIEWPORT, tag => tag + sheets)
+}
 
 const REWRITES: Record<string, (html: string) => string> = {
   'as built': html => html,
@@ -29,6 +48,9 @@ const REWRITES: Record<string, (html: string) => string> = {
   'no modulepreload': html => html.replace(MODULE_PRELOAD, ''),
   'neither': html => html.replace(FONT_PRELOAD, '').replace(MODULE_PRELOAD, ''),
   'no font preload, modules low': html => html.replace(FONT_PRELOAD, '').replace(MODULE_PRELOAD, low),
+  'fonts inline': fontsInline,
+  'css first': cssFirst,
+  'css first, fonts inline': html => cssFirst(fontsInline(html)),
 }
 
 // Waits until no request has started for a second, then reads the paints, the layout shift and when the last script arrived.
@@ -61,7 +83,6 @@ const rewrites = Object.entries(REWRITES).filter(([name]) => !only || only.inclu
 if (rewrites.length === 0)
   throw new Error(`ONLY names none of: ${Object.keys(REWRITES).join(' | ')}`)
 
-const variant = VARIANTS.find(candidate => candidate.site.name === 'jb-peinture' && candidate.kind === 'kay')!
 const profile = PROFILES.find(candidate => candidate.name === (process.env.PROFILE ?? 'mobile'))!
 
 async function load(browser: Browser, path: string, rewrite: (html: string) => string): Promise<Sample> {

@@ -18,29 +18,28 @@ afterAll(async () => {
 })
 
 describe('fonts', () => {
-  it('declares every font in one stylesheet and preloads the ones asked for', async () => {
+  it('declares every font in the head and preloads the ones asked for', async () => {
     const app = await pages({ routes: ROUTES, prebuilt: false, fonts: FONTS })
     const html = await (await app.handle(new Request('http://localhost/about'))).text()
     const preloads = [...html.matchAll(/<link rel="preload" href="([^"]+)" as="font" type="([^"]+)" crossorigin="">/g)].map(match => [match[1], match[2]])
-    const stylesheet = (/<link rel="stylesheet" href="([^"]+)">/).exec(html)![1]!
+    const css = (/<style>([^<]+)<\/style>/).exec(html)![1]!
 
     expect(preloads).toEqual([[expect.stringMatching(/^\/_kay\/assets\/display-\w+\.woff2$/), 'font/woff2']])
-    expect(html.indexOf(stylesheet)).toBeLessThan(html.indexOf('</head>'))
+    expect(html).not.toContain('/_kay/assets/fonts-')
     // Fonts alone set no social card.
     expect(html).not.toContain('og:')
 
-    const css = await (await app.handle(new Request(`http://localhost${stylesheet}`))).text()
-
-    expect(css).toBe(`@font-face{font-family:"Display \\"One\\"";src:url("${preloads[0]![0]}") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}\n@font-face{font-family:"Body";src:url("${(/url\("(\/_kay\/assets\/body-italic-\w+\.woff)"\)/).exec(css)![1]}") format("woff");font-weight:400;font-style:italic;font-display:optional;unicode-range:U+0000-00FF}\n`)
+    expect(html.indexOf(css)).toBeLessThan(html.indexOf('</head>'))
+    expect(css).toBe(`@font-face{font-family:"Display \\"One\\"";src:url("${preloads[0]![0]}") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}@font-face{font-family:"Body";src:url("${(/url\("(\/_kay\/assets\/body-italic-\w+\.woff)"\)/).exec(css)![1]}") format("woff");font-weight:400;font-style:italic;font-display:optional;unicode-range:U+0000-00FF}`)
     expect((await app.handle(new Request(`http://localhost${preloads[0]![0]}`))).status).toBe(200)
   })
 
-  it('preloads no font unless one asks for it, still linking their stylesheet', async () => {
+  it('preloads no font unless one asks for it, still declaring them', async () => {
     const app = await pages({ routes: ROUTES, prebuilt: false, fonts: [{ ...FONTS[0]!, preload: false }, FONTS[1]!] })
     const html = await (await app.handle(new Request('http://localhost/about'))).text()
 
     expect(html).not.toContain('rel="preload"')
-    expect(html).toMatch(/<link rel="stylesheet" href="\/_kay\/assets\/fonts-\w+\.css">/)
+    expect(html).toMatch(/<style>@font-face\{font-family:"Display \\"One\\""/)
   })
 
   it('records what it wrote for an executable, which reads it back', async () => {
@@ -66,9 +65,8 @@ describe('fonts', () => {
       Bun.write(join(root, 'node_modules/@fontsource-variable/figtree/files/figtree-latin-ext-wght-normal.woff2'), display),
     ])
 
-    const { stylesheet } = await prepareFonts(root, [{ fontsource: '@fontsource/open-sans', weights: [400, 700], styles: ['normal', 'italic'] }, { fontsource: '@fontsource-variable/figtree', subset: 'latin-ext', display: 'optional' }], join(root, 'out'))
-    const css = await Bun.file(join(root, '.kay/client/dist/assets', stylesheet.split('/').at(-1)!)).text()
-    const faces = css.trim().split('\n').map(rule => rule.replace(/url\("[^"]+"\)/, 'url()'))
+    const { css } = await prepareFonts(root, [{ fontsource: '@fontsource/open-sans', weights: [400, 700], styles: ['normal', 'italic'] }, { fontsource: '@fontsource-variable/figtree', subset: 'latin-ext', display: 'optional' }], join(root, 'out'))
+    const faces = css.split(/(?<=\})(?=@)/).map(rule => rule.replace(/url\("[^"]+"\)/, 'url()'))
 
     expect(faces).toEqual([
       '@font-face{font-family:"Open Sans";src:url() format("woff2");font-weight:400;font-style:normal;font-display:swap}',
