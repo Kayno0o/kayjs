@@ -873,13 +873,16 @@ describe('compression', () => {
     }
   })
 
-  it('sends a page zlib\'s threads compressed past 15 KB as a stream, which Bun writes corked, and one compressed within the request\'s tick with its length', async () => {
+  it('sends a body of 15 KB or more that waited on zlib\'s threads as a stream, which Bun writes corked, and a smaller one or one compressed within the request\'s tick with its length', async () => {
     const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
     // Hashed numbers compress to about half their size, well past what Bun corks once a reply waited on a zlib callback.
     const words = (count: number, from = 0) => Array.from({ length: count }, (_, i) => ((i + from) * 2654435761 % 1e9).toString(36)).join(' ')
     const style = `<style>${words(6000, 1)}</style>`
     const fixed = fixedTexts([style])
-    const pages: Record<string, string> = { '/pool': `<p>${words(12000)}</p>`, '/spliced': `${style}<p>${words(12000)}</p>`, '/here': `${style}<p>${words(100)}</p>` }
+    // Random bytes, which no compression shrinks enough to send compressed.
+    let seed = 1
+    const noise = Uint8Array.from({ length: 20_000 }, () => (seed = Math.imul(seed, 1664525) + 1013904223 | 0) >>> 24)
+    const pages: Record<string, string | Uint8Array<ArrayBuffer>> = { '/pool': `<p>${words(12000)}</p>`, '/spliced': `${style}<p>${words(12000)}</p>`, '/here': `${style}<p>${words(100)}</p>`, '/small': `<p>${words(1500)}</p>`, '/noise': noise }
     const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: async (request) => {
       const response = wholeResponse(pages[new URL(request.url).pathname]!, { headers: { 'content-type': 'text/html' } })
 
@@ -887,12 +890,16 @@ describe('compression', () => {
     } })
 
     try {
-      for (const [path, accept, encoding] of [['/pool', 'br', 'br'], ['/spliced', 'br, gzip', 'gzip'], ['/here', 'br, gzip', 'gzip']] as const) {
-        const response = await fetch(`http://127.0.0.1:${server.port}${path}`, { headers: { 'accept-encoding': accept } })
+      for (const [path, accept, encoding, stream] of [['/pool', 'br', 'br', true], ['/spliced', 'br, gzip', 'gzip', true], ['/noise', 'br', null, true], ['/here', 'br, gzip', 'gzip', false], ['/small', 'br', 'br', false]] as const) {
+        const url = `http://127.0.0.1:${server.port}${path}`
+        const sent = await (await fetch(url, { headers: { 'accept-encoding': accept }, decompress: false })).bytes()
+        const response = await fetch(url, { headers: { 'accept-encoding': accept } })
 
+        // Each lands on its side of the line by its size as sent, not by luck of the ratio.
+        expect(sent.length >= 15 * 1024).toBe(path !== '/small')
         expect(response.headers.get('content-encoding')).toBe(encoding)
-        expect(response.headers.get('transfer-encoding')).toBe(path === '/here' ? null : 'chunked')
-        expect(await response.text()).toBe(pages[path]!)
+        expect(response.headers.get('transfer-encoding')).toBe(stream ? 'chunked' : null)
+        expect(await response.bytes()).toEqual(Buffer.from(pages[path]!))
       }
     }
     finally {

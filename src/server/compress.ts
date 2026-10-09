@@ -139,7 +139,7 @@ const deflateRaw: Deflate = async (bytes, last) => new Promise((resolve, reject)
 
 const deflateRawHere: Deflate = (bytes, last) => nodeZlib().deflateRawSync(bytes, runOptions(last))
 
-// Up to this much left to deflate, the main thread deflates it sooner than it hands it to zlib's threads and takes it back: a short inlined page serves 15 to 20% more requests, one with 40 KB left 10% fewer (#141).
+// Up to this much left to deflate, the main thread deflates it: a page serves 15 to 20% more requests than through zlib's threads below it, 10 to 13% fewer past it (#141).
 const SPLICE_HERE_BYTES = 32 * 1024
 
 interface Found { text: FixedText, at: number }
@@ -163,7 +163,10 @@ async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): 
 
   const left = body.length - found.reduce((total, { text }) => total + text.bytes.length, 0)
 
-  return left <= SPLICE_HERE_BYTES ? { gzip: await gzipAround(body, found, deflateRawHere), late: false } : { gzip: await compressing(async () => gzipAround(body, found, deflateRaw)), late: true }
+  if (left <= SPLICE_HERE_BYTES)
+    return { gzip: await gzipAround(body, found, deflateRawHere), late: false }
+
+  return { gzip: await compressing(async () => gzipAround(body, found, deflateRaw)), late: true }
 }
 
 async function gzipAround(body: Buffer, found: Found[], deflate: Deflate): Promise<Uint8Array<ArrayBuffer>> {
@@ -206,7 +209,7 @@ export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: Res
 }
 
 // The response compressed on the fly for a browser that takes brotli or gzip, or undefined when it is not worth it: already encoded, not text, too small, or asked to be left alone.
-// A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length unless zlib's threads compressed it past 15 KB (`lateBody`); a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
+// A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length unless it waited on zlib's threads and goes out at 15 KB or more, compressed or not (`lateBody`); a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
 // A response left alone is answered synchronously: Elysia sends an empty body for a `mapResponse` promise resolving to undefined.
 // A whole page holding `fixed` texts goes as gzip to a browser taking it, whatever weight it gives brotli: only the rest of it is compressed, where brotli would compress it all, as its streams cannot be joined.
 export function compressResponse(request: Request, response: Response, fixed?: FixedText[]): Response | undefined | Promise<Response> {
@@ -268,12 +271,13 @@ async function compressBody({ headers, status, statusText }: Response, source: R
 
   const spliced = fixed && await splicedGzip(body.bytes, fixed)
   const copy = spliced?.gzip ?? await compressBytes(body.bytes, encoding)
-  const reply = (bytes: Uint8Array<ArrayBuffer>) => spliced?.late === false ? bytes : lateBody(bytes)
+  const late = spliced?.late ?? true
+  const reply = (bytes: Uint8Array<ArrayBuffer>) => late ? lateBody(bytes) : bytes
 
   return copy.length < body.bytes.length * 0.9 ? new Response(reply(copy), { status, statusText, headers: compressedHeaders(spliced ? 'gzip' : encoding) }) : new Response(reply(body.bytes), { status, statusText, headers })
 }
 
-// Bun writes a reply resolved after a macrotask, a zlib callback included, uncorked once its body reaches this size: each header name, value and separator goes as its own send(), some forty segments a reply (#141, oven-sh/bun#41341).
+// Bun writes a reply resolved after a macrotask, a zlib callback included, uncorked once its body reaches this size: each header name, value and separator goes as its own send(), some forty segments a reply (#141). `lateBody` can go once oven-sh/bun#41341 corks every write.
 const UNCORKED_BYTES = 15 * 1024
 
 // Bytes past that go as a stream already holding them, whose head Bun corks: it serves about as fast as bytes answered within the request's tick, with no content-length.
