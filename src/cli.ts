@@ -2,7 +2,7 @@
 import type { ParseArgsOptionsConfig } from 'node:util'
 import type { Paint } from './compiler/frame'
 import type { KayConfig } from './config'
-import type { Template } from './new'
+import type { Feature, Preset } from './new'
 import type { ClientBuild } from './server/client'
 import { existsSync, statSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
@@ -24,7 +24,7 @@ import { dev } from './dev'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
 import { migrateAstroProject } from './migrate/project'
-import { createProject, TEMPLATES } from './new'
+import { createProject, FEATURE_NAMES, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from './new'
 import { linkVariantFiles } from './runtime/image'
 import { setAvifThreads } from './server/avif'
 import { basePath } from './server/base'
@@ -40,7 +40,7 @@ import { remoteImages, remotePatterns } from './server/remote'
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const toStderr: Paint = (styles, text) => styleText(styles, text, { stream: process.stderr })
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template server|site|app]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -395,7 +395,7 @@ function count(amount: number, noun: string): string {
 }
 
 async function scaffold(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { kay: { type: 'string' }, template: { type: 'string' } }, 1)
+  const parsed = parseCommand(args, { kay: { type: 'string' }, template: { type: 'string' }, with: { type: 'string' }, without: { type: 'string' }, yes: { type: 'boolean', short: 'y' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
@@ -409,18 +409,47 @@ async function scaffold(args: string[]): Promise<number> {
   }
 
   try {
-    const { template } = parsed.values
+    const { template, with: added, without: removed, yes } = parsed.values
 
-    if (template !== undefined && !TEMPLATES.includes(template as Template)) {
-      console.error(`kay new: --template is ${String(template)}, which is none of ${TEMPLATES.join(', ')}`)
+    if (template !== undefined && !PRESET_NAMES.includes(template as Preset)) {
+      console.error(`kay new: --template is ${String(template)}, which is none of ${PRESET_NAMES.join(', ')}`)
 
       return 1
     }
 
-    const files = await createProject(dir, { kay: typeof parsed.values.kay === 'string' ? parsed.values.kay : undefined, template: template as Template | undefined })
+    const listed = (list: string | boolean | undefined) => typeof list === 'string' ? list.split(',').map(name => name.trim()).filter(name => name !== '') : []
+    const unknown = [...listed(added), ...listed(removed)].find(name => !FEATURE_NAMES.includes(name as Feature))
+
+    if (unknown !== undefined) {
+      console.error(`kay new: ${unknown} is none of the features ${FEATURE_NAMES.join(', ')}`)
+
+      return 1
+    }
+
+    await refuseTarget(dir)
+
+    // With no option saying what to scaffold, a terminal asks; anything else takes the preset, the server's by default, with what --with and --without change.
+    const ask = template === undefined && added === undefined && removed === undefined && yes !== true && process.stdin.isTTY && process.stderr.isTTY
+    const chosen = new Set(PRESETS[(template as Preset | undefined) ?? 'server'].features)
+
+    for (const name of listed(added))
+      chosen.add(name as Feature)
+
+    for (const name of listed(removed))
+      chosen.delete(name as Feature)
+
+    const features = ask ? await pickFeatures() : [...chosen]
+
+    if (features === undefined) {
+      console.error('kay new: cancelled, nothing written')
+
+      return 1
+    }
+
+    const files = await createProject(dir, { kay: typeof parsed.values.kay === 'string' ? parsed.values.kay : undefined, features })
 
     // An app's database runs in the container its compose.dev.yaml describes, migrated before the first start.
-    console.error(`${files.map(file => `created ${join(dir, file)}`).join('\n')}\n\ncd ${shellQuote(dir)} && bun install && ${template === 'app' ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)
+    console.error(`${files.map(file => `created ${join(dir, file)}`).join('\n')}\n\ncd ${shellQuote(dir)} && bun install && ${features.includes('auth') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)
 
     return 0
   }

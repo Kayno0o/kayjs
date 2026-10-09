@@ -8,7 +8,7 @@ import { parse, stringify } from 'devalue'
 import { buildClient } from '../src/build/client'
 import { check } from '../src/check'
 import { formatFiles } from '../src/format'
-import { createProject } from '../src/new'
+import { createProject, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
 
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/
@@ -156,6 +156,76 @@ describe('kay command line', () => {
     }
   })
 
+  it('scaffolds a preset as --with and --without change it, refusing a feature it does not know or one without what it needs', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+
+    try {
+      expect((await kay(['new', 'styled', '--kay', '^1.0.0', '--template', 'blank', '--with', 'tailwind, tests'], dir)).code).toBe(0)
+      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
+      expect((await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)).code).toBe(0)
+      expect(await readdir(join(dir, 'lean'))).not.toEqual(expect.arrayContaining(['Dockerfile']))
+      expect(await Bun.file(join(dir, 'lean/src/server.ts')).exists()).toBe(true)
+      expect(await kay(['new', 'unknown', '--with', 'bogus'], dir)).toEqual({ stdout: '', stderr: 'kay new: bogus is none of the features server, starter, tailwind, accents, eslint, tests, ci, docker, auth, ws\n', code: 1 })
+      expect(await kay(['new', 'static', '--kay', '^1.0.0', '--template', 'site', '--with', 'auth'], dir)).toEqual({ stdout: '', stderr: 'kay: auth needs server\n', code: 1 })
+      expect(await kay(['new', 'unstyled', '--kay', '^1.0.0', '--without', 'tailwind'], dir)).toEqual({ stdout: '', stderr: 'kay: accents needs tailwind\n', code: 1 })
+      expect((await readdir(dir)).sort()).toEqual(['lean', 'styled'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('asks in a terminal for a preset, then for its features one by one, and scaffolds what was checked', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+    let screen = ''
+    const terminal = new Bun.Terminal({ cols: 120, data: (_terminal, data) => void (screen += new TextDecoder().decode(data)) })
+
+    try {
+      const child = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'new', 'picked', '--kay', '^1.0.0'], { cwd: dir, terminal })
+
+      await shown(() => screen, 'Start from')
+      // From the server preset up to blank, then server checked, and the accent picker with the starter pages and Tailwind it needs.
+      terminal.write('\x1B[A\r')
+      await shown(() => screen, 'Features')
+      terminal.write(' \x1B[B\x1B[B\x1B[B \r')
+
+      expect(await child.exited).toBe(0)
+      expect(screen).toContain('Start from \x1B[36mblank')
+      expect(screen).toContain('Features \x1B[36mserver, starter, tailwind, accents\x1B')
+
+      const files = await readdir(join(dir, 'picked'), { recursive: true })
+
+      expect(files).toEqual(expect.arrayContaining(['src/server.ts', 'src/app.css', 'src/components/accent-picker.kay', 'src/components/header.kay']))
+      expect(files).not.toEqual(expect.arrayContaining(['eslint.config.ts']))
+      expect(files).not.toEqual(expect.arrayContaining(['bunfig.toml']))
+    }
+    finally {
+      terminal.close()
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 15_000)
+
+  it('writes nothing once the terminal prompt is cancelled', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+    let screen = ''
+    const terminal = new Bun.Terminal({ data: (_terminal, data) => void (screen += new TextDecoder().decode(data)) })
+
+    try {
+      const child = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'new', 'dropped', '--kay', '^1.0.0'], { cwd: dir, terminal })
+
+      await shown(() => screen, 'Start from')
+      terminal.write('\x03')
+
+      expect(await child.exited).toBe(1)
+      await shown(() => screen, 'kay new: cancelled, nothing written')
+      expect(await readdir(dir)).toEqual([])
+    }
+    finally {
+      terminal.close()
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 15_000)
+
   it('refuses to scaffold over a file with a message', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
 
@@ -239,7 +309,7 @@ describe('kay new', () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-site')
 
     try {
-      const files = await createProject(dir, { kay: '^1.0.0', template: 'site' })
+      const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.site.features })
       const manifest = await Bun.file(join(dir, 'package.json')).json() as { scripts: Record<string, string> }
 
       expect(files).toContain('.forgejo/workflows/pages.yml')
@@ -295,9 +365,9 @@ describe('kay new', () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
-      const files = await createProject(dir, { kay: '^1.0.0', template: 'app' })
+      const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.app.features })
 
-      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts', 'tests/members.test.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts', 'tests/members.test.ts', 'tests/online.test.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
       expect(await Bun.file(join(dir, '.gitignore')).text()).toContain('.env')
@@ -325,6 +395,83 @@ describe('kay new', () => {
     }
   }, 30_000)
 
+  it('scaffolds a blank project of one bare page, which checks and builds as a static site', async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
+
+    try {
+      const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.blank.features })
+      const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
+
+      expect(files).toEqual(['.gitignore', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
+      expect(manifest.scripts).toEqual({ dev: 'kay dev', build: 'kay build --static', check: 'kay check --deny-warnings', fmt: 'kay fmt' })
+      expect(Object.keys(manifest.devDependencies)).toEqual(['@types/bun'])
+      expect(Object.keys(manifest.dependencies)).toEqual(['elysia', 'kay'])
+
+      await installKay(dir)
+      expect(await check(dir)).toEqual([])
+      expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
+
+      const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--static'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+      const [report, code] = await Promise.all([new Response(build.stderr).text(), build.exited])
+
+      expect(report).toContain('exported 1 page')
+      expect(code).toBe(0)
+      expect(await Bun.file(join(dir, 'dist/index.html')).text()).toContain('<main><h1>my-app</h1></main>')
+    }
+    finally {
+      await rm(join(dir, '..'), { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('scaffolds each feature alone, and the app with each one left out, as projects that check, are formatted, lint and pass their tests', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-new-'))
+    const variants = FEATURE_NAMES.flatMap(feature => [toggle(new Set(), feature), toggle(new Set(PRESETS.app.features), feature)])
+
+    try {
+      for (const [index, variant] of variants.entries()) {
+        const features = [...variant]
+        const dir = join(root, `variant-${index}`)
+
+        await createProject(dir, { kay: '^1.0.0', features })
+        await installKay(dir)
+        expect({ features, problems: await check(dir) }).toEqual({ features, problems: [] })
+        expect({ features, changed: (await formatFiles([join(dir, 'src')], { write: false })).changed }).toEqual({ features, changed: [] })
+
+        if (variant.has('eslint'))
+          expect({ features, messages: (await lint(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
+
+        // An app's tests need a Postgres, which the app preset's own test runs them on.
+        if (variant.has('tests') && !variant.has('auth')) {
+          const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+          const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+
+          expect({ features, code, report }).toEqual({ features, code: 0, report: expect.stringContaining(' 0 fail') })
+        }
+      }
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 240_000)
+
+  it('checks what a feature needs along with it, and unchecks what needs it along with it', () => {
+    expect([...toggle(new Set(), 'accents')]).toEqual(['accents', 'starter', 'tailwind'])
+    expect([...toggle(new Set(PRESETS.app.features), 'server')]).toEqual([...PRESETS.site.features])
+    expect([...toggle(new Set(PRESETS.server.features), 'tailwind')]).toEqual(['server', 'starter', 'eslint', 'tests', 'ci', 'docker'])
+  })
+
+  it('refuses a feature without what it needs, before writing anything', async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
+
+    try {
+      await expect(createProject(dir, { kay: '^1.0.0', features: ['accents'] })).rejects.toThrow('kay: accents needs starter and tailwind')
+      expect(await readdir(join(dir, '..'))).toEqual([])
+    }
+    finally {
+      await rm(join(dir, '..'), { recursive: true, force: true })
+    }
+  })
+
   it('refuses a directory that already holds files', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-new-'))
 
@@ -337,6 +484,16 @@ describe('kay new', () => {
     }
   })
 })
+
+// Waits for a terminal program to print `text`.
+async function shown(screen: () => string, text: string): Promise<void> {
+  for (let waited = 0; !screen().includes(text); waited += 10) {
+    if (waited > 10_000)
+      throw new Error(`never shown: ${text}\n${screen()}`)
+
+    await Bun.sleep(10)
+  }
+}
 
 // The first line a server prints with the port it listens on.
 async function listeningPort(child: Subprocess<'ignore', 'pipe', 'pipe'>): Promise<string> {
