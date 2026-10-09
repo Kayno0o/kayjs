@@ -9,7 +9,8 @@ import { rename, rm } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { parseArgs, styleText } from 'node:util'
+import { parseArgs } from 'node:util'
+import { colors, createColors } from '@kaynooo/utils/tools/colors'
 import { buildClient } from './build/client'
 import { compileServer } from './build/compile'
 import { exportStatic, refuseStaticConfig } from './build/static'
@@ -39,8 +40,8 @@ import { remoteImages, remotePatterns } from './server/remote'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
-const toStderr: Paint = (styles, text) => styleText(styles, text, { stream: process.stderr })
-const toStdout = (styles: Parameters<typeof styleText>[0], text: string) => styleText(styles, text, { stream: process.stdout })
+const stderrColors = createColors({ stream: process.stderr })
+const toStderr: Paint = (styles, text) => styles.reduce((paint, style) => paint[style], stderrColors)(text)
 const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
 
 interface Parsed {
@@ -399,7 +400,7 @@ function projectRoot(command: string, path = '.'): string | undefined {
 
 // What a command did, on stdout so a terminal does not take it for an error: the verb in green, the timing dimmed.
 function done(verb: string, rest: string, started?: number): void {
-  console.log(`${toStdout(['bold', 'green'], verb)} ${rest}${started === undefined ? '' : toStdout('dim', ` in ${Math.round(performance.now() - started)} ms`)}`)
+  console.log(`${colors.bold.green(verb)} ${rest}${started === undefined ? '' : colors.dim(` in ${Math.round(performance.now() - started)} ms`)}`)
 }
 
 function count(amount: number, noun: string): string {
@@ -470,7 +471,7 @@ async function scaffold(args: string[]): Promise<number> {
 
     done('created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
     // An app's database runs in the container its compose.dev.yaml describes, migrated before the first start.
-    console.log(`\n  ${toStdout('cyan', `cd ${shellQuote(dir)} && bun install && ${features.includes('auth') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)}`)
+    console.log(`\n  ${colors.cyan(`cd ${shellQuote(dir)} && bun install && ${features.includes('auth') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)}`)
 
     return 0
   }
@@ -510,7 +511,7 @@ async function migrate(args: string[]): Promise<number> {
     done('wrote', shown(file))
 
   for (const file of skipped)
-    console.log(`${toStdout(['bold', 'yellow'], 'kept')} ${shown(file)}, which exists`)
+    console.log(`${colors.bold.yellow('kept')} ${shown(file)}, which exists`)
 
   if (notes.length > 0)
     console.log(`\nLeft to do by hand, the code it concerns marked \`kay migrate:\` where it was commented out:\n${notes.map(each => `${relative(process.cwd(), join(dir, each.file))}:${each.line}${each.target === undefined ? '' : ` (${shown(each.target)})`}: ${each.message}`).join('\n')}`)

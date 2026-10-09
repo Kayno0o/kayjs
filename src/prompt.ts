@@ -1,11 +1,13 @@
 import process from 'node:process'
-import { styleText } from 'node:util'
+import { createColors } from '@kaynooo/utils/tools/colors'
 
 // What the terminal sends for a key: a whole escape sequence, such as an arrow's or Home's, which no prompt but the arrows reads, or one character, a lone Escape included.
 // eslint-disable-next-line no-control-regex -- escape sequences are what it splits
 const KEY_SEQUENCES = /\x1B\[[0-9;]*[A-Z~]|\x1BO[A-Z]|[\s\S]/gi
 
 type Key = 'up' | 'down' | 'toggle' | 'enter' | 'cancel'
+
+const colors = createColors({ stream: process.stderr })
 
 const KEYS: Record<string, Key> = { '\x1B[A': 'up', '\x1BOA': 'up', 'k': 'up', '\x1B[B': 'down', '\x1BOB': 'down', 'j': 'down', ' ': 'toggle', '\r': 'enter', '\n': 'enter', '\x03': 'cancel', '\x1B': 'cancel' }
 
@@ -24,7 +26,7 @@ function readKeys(input: string): Key[] {
 export async function select<T>(question: string, choices: Choice<T>[], initial: number): Promise<T | undefined> {
   let cursor = initial
   const accepted = await ask(
-    state => state === 'asking' ? [`${mark()} ${question} ${dim('(arrows move, enter picks)')}`, ...rows(choices, cursor, () => '')] : [answer(question, state, choices[cursor]!.label)],
+    state => state === 'asking' ? [`${mark()} ${question} ${colors.dim('(arrows move, enter picks)')}`, ...rows(choices, cursor, () => '')] : [answer(question, state, choices[cursor]!.label)],
     (key) => {
       if (key === 'up' || key === 'down')
         cursor = move(cursor, key, choices.length)
@@ -41,7 +43,7 @@ export async function checklist<T>(question: string, choices: Choice<T>[], initi
   let cursor = 0
   let checked = initial
   const accepted = await ask(
-    state => state === 'asking' ? [`${mark()} ${question} ${dim('(arrows move, space toggles, enter accepts)')}`, ...rows(choices, cursor, choice => checked.has(choice.value) ? '[x] ' : '[ ] ')] : [answer(question, state, choices.filter(choice => checked.has(choice.value)).map(choice => choice.label).join(', ') || 'none')],
+    state => state === 'asking' ? [`${mark()} ${question} ${colors.dim('(arrows move, space toggles, enter accepts)')}`, ...rows(choices, cursor, choice => checked.has(choice.value) ? '[x] ' : '[ ] ')] : [answer(question, state, choices.filter(choice => checked.has(choice.value)).map(choice => choice.label).join(', ') || 'none')],
     (key) => {
       if (key === 'up' || key === 'down')
         cursor = move(cursor, key, choices.length)
@@ -61,16 +63,12 @@ function move(cursor: number, key: 'up' | 'down', length: number): number {
 }
 
 function mark(): string {
-  return styleText('cyan', '?', { stream: process.stderr })
+  return colors.cyan('?')
 }
 
 // The line a prompt leaves once answered: what was picked, or that it was cancelled.
 function answer(question: string, state: 'enter' | 'cancel', picked: string): string {
-  return `${mark()} ${question} ${state === 'enter' ? styleText('cyan', picked, { stream: process.stderr }) : dim('cancelled')}`
-}
-
-function dim(text: string): string {
-  return styleText('dim', text, { stream: process.stderr })
+  return `${mark()} ${question} ${state === 'enter' ? colors.cyan(picked) : colors.dim('cancelled')}`
 }
 
 // A line per choice, cut to the terminal's width so none wraps, which would throw off the redraw.
@@ -83,7 +81,7 @@ function rows<T>(choices: Choice<T>[], cursor: number, marker: (choice: Choice<T
     const room = columns - head.length - 1
     const hint = choice.hint.length > room ? `${choice.hint.slice(0, Math.max(room - 3, 0))}...` : choice.hint
 
-    return `${index === cursor ? styleText('cyan', head, { stream: process.stderr }) : head}${dim(hint)}`
+    return `${index === cursor ? colors.cyan(head) : head}${colors.dim(hint)}`
   })
 }
 
