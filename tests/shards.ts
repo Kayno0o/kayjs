@@ -45,15 +45,8 @@ async function copyCheckout(dir: string) {
     throw new Error(`bun install in ${dir} failed:\n${install.output}`)
 }
 
-if (process.argv[2] === '--update-timings') {
-  const { output, code } = await run([process.execPath, 'test', `--timings=${TIMINGS}`, '--update-timings'], ROOT)
-
-  // Awaited, as a write to a pipe left pending when the process ends loses its tail.
-  await Bun.write(Bun.stdout, output)
-  process.exit(code)
-}
-
-const count = Number(process.argv[2] ?? 3)
+const updating = process.argv[2] === '--update-timings'
+const count = updating ? 1 : Number(process.argv[2] ?? 3)
 
 if (!Number.isInteger(count) || count < 1)
   throw new Error(`tests/shards.ts takes a number of shards, not ${process.argv[2]}`)
@@ -62,14 +55,16 @@ const copies = await mkdtemp(join(tmpdir(), 'kay-shards-'))
 let failed = false
 
 try {
-  const dirs = [ROOT, ...Array.from({ length: count - 1 }, (_, index) => join(copies, `shard-${index + 2}`))]
+  // Measuring runs the whole suite once in a copy, whose run lock is its own: a wait for a run in this checkout would count against the first file.
+  const dirs = updating ? [join(copies, 'timings')] : [ROOT, ...Array.from({ length: count - 1 }, (_, index) => join(copies, `shard-${index + 2}`))]
 
-  await Promise.all(dirs.slice(1).map(copyCheckout))
+  await Promise.all(dirs.filter(dir => dir !== ROOT).map(copyCheckout))
   await Promise.all(dirs.map(async (dir, index) => {
     const started = performance.now()
-    const { output, code } = await run([process.execPath, 'test', `--shard=${index + 1}/${count}`, `--timings=${join(ROOT, TIMINGS)}`], dir)
+    const { output, code } = await run([process.execPath, 'test', `--timings=${join(ROOT, TIMINGS)}`, updating ? '--update-timings' : `--shard=${index + 1}/${count}`], dir)
 
     failed ||= code !== 0
+    // Awaited, as a write to a pipe left pending when the process ends loses its tail.
     await print(async () => Bun.write(Bun.stdout, `\n== shard ${index + 1}/${count}: exit ${code} in ${((performance.now() - started) / 1000).toFixed(1)}s\n${output}`))
   }))
 }
