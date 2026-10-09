@@ -10,6 +10,9 @@ export type Encoding = 'br' | 'gzip'
 const SUFFIXES: Record<Encoding, string> = { br: '.br', gzip: '.gz' }
 const ENCODINGS = Object.keys(SUFFIXES) as Encoding[]
 const ON_THE_FLY: ReadonlySet<Encoding> = new Set(ENCODINGS)
+const GZIP_ONLY: ReadonlySet<Encoding> = new Set(['gzip'])
+// A gzip member's header: deflate, no name or time, from an unknown system.
+const GZIP_HEADER = new Uint8Array([0x1F, 0x8B, 8, 0, 0, 0, 0, 0, 0, 0xFF])
 // Text the build writes; images, fonts and media come compressed already.
 const COMPRESSIBLE = /\.(?:js|mjs|css|html|svg|json|txt|xml|map|wasm)$/i
 const ENCODED_COPY = /\.(?:br|gz)$/
@@ -92,6 +95,60 @@ async function compressBytes(bytes: Uint8Array, encoding: Encoding): Promise<Uin
   })
 }
 
+// Text a response carries whole every time it carries it, as an inlined stylesheet, deflated once at the strongest level.
+// Each ends on a full flush, which empties the window, so it can sit between two other deflate runs of a gzip member without either reaching into it.
+export interface FixedText {
+  bytes: Buffer
+  deflated: Buffer
+}
+
+export function fixedTexts(texts: string[]): FixedText[] {
+  const { constants, deflateRawSync } = nodeZlib()
+
+  return [...new Set(texts)].map((text) => {
+    const bytes = Buffer.from(text)
+
+    return { bytes, deflated: deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }) }
+  })
+}
+
+async function deflateRaw(bytes: Uint8Array, last: boolean): Promise<Buffer> {
+  const { constants, deflateRaw: deflate } = nodeZlib()
+
+  return new Promise((resolve, reject) => deflate(bytes, { level: GZIP_LEVEL, finishFlush: last ? constants.Z_FINISH : constants.Z_FULL_FLUSH }, (error, result) => error ? reject(error) : resolve(result)))
+}
+
+// A gzip of the body that deflates only what lies around the fixed texts it holds, theirs deflated once already; undefined when it holds none.
+async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  const body = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length)
+  const found = fixed.map(text => ({ text, at: body.indexOf(text.bytes) })).filter(({ at }) => at >= 0).sort((a, b) => a.at - b.at)
+
+  if (found.length === 0)
+    return undefined
+
+  return compressing(async () => {
+    const parts: Uint8Array[] = [GZIP_HEADER]
+    let cursor = 0
+
+    for (const { text, at } of found) {
+      if (at < cursor)
+        continue
+
+      parts.push(await deflateRaw(body.subarray(cursor, at), false), text.deflated)
+      cursor = at + text.bytes.length
+    }
+
+    const trailer = new Uint8Array(8)
+    const view = new DataView(trailer.buffer)
+
+    parts.push(await deflateRaw(body.subarray(cursor), true), trailer)
+    view.setUint32(0, nodeZlib().crc32(body), true)
+    view.setUint32(4, body.length % 2 ** 32, true)
+
+    return new Uint8Array(Buffer.concat(parts))
+  })
+}
+
 // The size of each body kay made whole, so compression judges it and reads it without a stream: opening a reader on a body costs Bun about 6 µs, more than a small response costs in all.
 const wholeSizes = new WeakMap<Response, number>()
 
@@ -107,7 +164,8 @@ export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: Res
 // The response compressed on the fly for a browser that takes brotli or gzip, or undefined when it is not worth it: already encoded, not text, too small, or asked to be left alone.
 // A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length; a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
 // A response left alone is answered synchronously: Elysia sends an empty body for a `mapResponse` promise resolving to undefined.
-export function compressResponse(request: Request, response: Response): Response | undefined | Promise<Response> {
+// A whole body holding `fixed` texts goes as gzip to a browser taking it, brotli or not: only the rest of it is compressed, where brotli would compress it all, as its streams cannot be joined.
+export function compressResponse(request: Request, response: Response, fixed?: FixedText[]): Response | undefined | Promise<Response> {
   const { headers, status } = response
   const length = headers.get('content-length')
   const size = length === null ? wholeSizes.get(response) : Number(length)
@@ -128,7 +186,9 @@ export function compressResponse(request: Request, response: Response): Response
   if (!response.body)
     return undefined
 
-  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding)
+  const splice = fixed !== undefined && fixed.length > 0 && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
+
+  return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, splice)
 }
 
 function varyOnEncoding(headers: Headers): void {
@@ -136,7 +196,7 @@ function varyOnEncoding(headers: Headers): void {
     headers.append('vary', 'accept-encoding')
 }
 
-async function compressBody({ headers, status, statusText }: Response, source: Response | ReadableStream<Uint8Array>, encoding: Encoding): Promise<Response> {
+async function compressBody({ headers, status, statusText }: Response, source: Response | ReadableStream<Uint8Array>, encoding: Encoding, fixed?: FixedText[]): Promise<Response> {
   // From here on the body is read off the response, so every path answers a new one.
   const body: ReadBody = source instanceof Response ? { whole: true, bytes: await source.bytes() } : await readWithinTick(source)
 
@@ -147,22 +207,28 @@ async function compressBody({ headers, status, statusText }: Response, source: R
 
   const plain = () => new Response(body.whole ? body.bytes : body.stream, { status, statusText, headers })
 
-  const compressed = new Headers(headers)
-  const etag = compressed.get('etag')
+  const compressedHeaders = (used: Encoding) => {
+    const compressed = new Headers(headers)
+    const etag = compressed.get('etag')
 
-  compressed.set('content-encoding', encoding)
-  compressed.delete('content-length')
+    compressed.set('content-encoding', used)
+    compressed.delete('content-length')
 
-  // The bytes differ from the uncompressed copy's, so a strong tag no longer holds.
-  if (etag?.startsWith('"'))
-    compressed.set('etag', `W/${etag}`)
+    // The bytes differ from the uncompressed copy's, so a strong tag no longer holds.
+    if (etag?.startsWith('"'))
+      compressed.set('etag', `W/${etag}`)
+
+    return compressed
+  }
 
   if (!body.whole)
-    return new Response(compressedStream(body.stream, encoding), { status, statusText, headers: compressed })
+    return new Response(compressedStream(body.stream, encoding), { status, statusText, headers: compressedHeaders(encoding) })
 
-  const copy = await compressBytes(body.bytes, encoding)
+  const spliced = fixed && await splicedGzip(body.bytes, fixed)
+  const used = spliced ? 'gzip' : encoding
+  const copy = spliced ?? await compressBytes(body.bytes, encoding)
 
-  return copy.length < body.bytes.length * 0.9 ? new Response(copy, { status, statusText, headers: compressed }) : plain()
+  return copy.length < body.bytes.length * 0.9 ? new Response(copy, { status, statusText, headers: compressedHeaders(used) }) : plain()
 }
 
 type ReadBody = { whole: true, bytes: Uint8Array<ArrayBuffer> } | { whole: false, stream: ReadableStream<Uint8Array> }

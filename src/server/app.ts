@@ -22,7 +22,7 @@ import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { bundled } from './bundle'
 import { serveCards, setupCards } from './card'
 import { PRERENDERED_DIR, readInlineStyles } from './client'
-import { compressResponse, encodedCopies, encodedPath, filesUnder, preferredEncoding } from './compress'
+import { compressResponse, encodedCopies, encodedPath, filesUnder, fixedTexts, preferredEncoding } from './compress'
 import { DEV_EVENTS, DEV_PATCH, devEvents, devPatch, hotSwap } from './dev'
 import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
@@ -195,8 +195,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   // Scoped, so the app's own routes are compressed too; what is encoded already, as the build's copies are, goes as it is.
   if (options.compress) {
+    // Inlined stylesheets go out as `rebaseHtml` leaves them, under the mount point.
+    const fixed = client.inlineStyles && fixedTexts([...client.inlineStyles.values()].map(css => `<style>${rebaseCss(css, base)}</style>`))
+
     // eslint-disable-next-line ts/promise-function-async -- Elysia sends an empty body when a mapResponse promise resolves to undefined
-    app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue) : undefined)
+    app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed) : undefined)
   }
 
   const log = options.log ?? process.env.NODE_ENV === 'production'

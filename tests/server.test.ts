@@ -172,6 +172,22 @@ describe('pages', () => {
     }
   })
 
+  it('compresses only what lies around the inlined stylesheets, as gzip even to a browser taking brotli, the page decoding as it was', async () => {
+    for (const base of [undefined, '/docs']) {
+      const inline = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, inlineStyles: true, compress: true, base })
+      const page = async (accept?: string) => inline.handle(new Request('http://localhost/', { headers: accept === undefined ? {} : { 'accept-encoding': accept } }))
+      const plain = await (await page()).text()
+      const spliced = await page('br, gzip')
+      const brotli = await page('br')
+
+      expect(plain).toContain('<style>')
+      expect(spliced.headers.get('content-encoding')).toBe('gzip')
+      expect(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await spliced.arrayBuffer())))).toBe(plain)
+      expect(brotli.headers.get('content-encoding')).toBe('br')
+      expect(brotliDecompressSync(new Uint8Array(await brotli.arrayBuffer())).toString()).toBe(plain)
+    }
+  })
+
   it('reads a stylesheet to inline with its relative URLs made absolute, the mount point the build added taken off, its line breaks read as the browser hashes them, and no way to close its element', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-inline-'))
 
