@@ -31,9 +31,17 @@ export interface Swap {
   refused?: { form: number, control: number }
 }
 
+// A guard `guardLeave` registers, which a leave asks once it holds unsaved changes.
+export interface LeaveGuard {
+  dirty: () => boolean
+  confirm?: ((to: URL) => boolean | Promise<boolean>) | undefined
+}
+
 interface HistoryState {
   kay: true
   scroll: [number, number]
+  // The entry's place in the session's history, which tells how far back or forward a traversal went; missing from an entry an older kay wrote.
+  at?: number
 }
 
 type Eagerness = 'conservative' | 'moderate' | 'eager' | false
@@ -43,9 +51,12 @@ const SKIPPED_PATHS = /^\/(?:_kay|api)(?:\/|$)/
 const ACTION_PATH = /^\/_kay\/action\//
 const SPECULATION = 'script[type="speculationrules"]'
 const SCROLL_SAVE_MS = 150
+const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
 
-// What the swap shares with this part: the entry's hooks, and the page shown, by URL without its hash, since going back to an entry of the same page only scrolls.
-export const navigation: { hooks?: NavigationHooks, shown: string } = { shown: '' }
+// What the swap shares with this part: the entry's hooks, the page shown, by URL without its hash, since going back to an entry of the same page only scrolls, and the place of its entry.
+// `released` lets a full load kay starts itself through `beforeunload`, as one the guards were asked about or one that is no leave.
+export const navigation: { hooks?: NavigationHooks, shown: string, at: number, released: boolean } = { shown: '', at: 0, released: false }
+export const leaveGuards = new Set<LeaveGuard>()
 export const busyForms = new WeakSet<HTMLFormElement>()
 // A form handed back to the browser after the swap could not send it, which the next submit event lets through.
 export const nativeSubmits = new WeakSet<HTMLFormElement>()
@@ -53,6 +64,10 @@ export const nativeSubmits = new WeakSet<HTMLFormElement>()
 let eagerness: Eagerness = false
 let scrollTimer: ReturnType<typeof setTimeout> | undefined
 let swapModule: Promise<typeof import('./page-swap')> | undefined
+// A traversal undone while the guards are asked about it: where it went, and how far.
+let held: { url: URL, delta: number } | undefined
+// A traversal the guards let through, made again.
+let passing = false
 
 // Takes over the links and forms of the app; called once by the entry.
 export function startNavigation(given: NavigationHooks): void {
@@ -68,10 +83,13 @@ export function startNavigation(given: NavigationHooks): void {
   const saved = history.state as HistoryState | null
 
   // An entry this script made before: a reload, or back from another site, where the browser no longer restores the scroll.
-  if (saved?.kay)
+  if (saved?.kay) {
+    navigation.at = saved.at ?? 0
     scrollTo(...saved.scroll)
-  else
+  }
+  else {
     history.replaceState(state(), '')
+  }
 
   // The swap would never use what the browser prefetches for a full load, so it prefetches the same links itself.
   for (const script of document.querySelectorAll(SPECULATION))
@@ -104,7 +122,11 @@ export async function navigate<const Href extends string>(href: Href & CheckedHr
 
   const url = new URL(withBase(href), location.href)
 
+  if (!await mayLeave(url))
+    return
+
   if (!navigation.hooks || !swappable(url)) {
+    navigation.released = true
     location.assign(url)
 
     return
@@ -119,6 +141,7 @@ export async function refresh(): Promise<void> {
     return
 
   if (!navigation.hooks) {
+    navigation.released = true
     location.reload()
 
     return
@@ -156,8 +179,31 @@ async function follow(url: URL, swap: Swap): Promise<void> {
   await swapper.go(url, swap)
 }
 
+// Whether the page may be left for `to`: the first guard holding unsaved changes asks, once for them all.
+export async function mayLeave(to: URL): Promise<boolean> {
+  const guard = dirtyGuard()
+
+  return guard ? (guard.confirm ?? askLeave)(to) : true
+}
+
+function dirtyGuard(): LeaveGuard | undefined {
+  for (const guard of leaveGuards) {
+    if (guard.dirty())
+      return guard
+  }
+
+  return undefined
+}
+
+function askLeave(): boolean {
+  // eslint-disable-next-line no-alert -- the default question is the browser's own, which an app replaces through `confirm`
+  return confirm(LEAVE_MESSAGE)
+}
+
 // A full load instead, taking the place of the entry going back already made.
 export function leave(target: URL, swap: Swap): void {
+  navigation.released = true
+
   if (swap.history === 'none')
     location.replace(target)
   else
@@ -165,15 +211,18 @@ export function leave(target: URL, swap: Swap): void {
 }
 
 function state(): HistoryState {
-  return { kay: true, scroll: [scrollX, scrollY] }
+  return { kay: true, scroll: [scrollX, scrollY], at: navigation.at }
 }
 
 // The entry a swap adds or replaces, holding where the page it leaves was scrolled to.
 export function writeHistory(swap: Swap, target: URL): void {
-  if (swap.history === 'push')
+  if (swap.history === 'push') {
+    navigation.at++
     history.pushState(state(), '', target)
-  else if (swap.history === 'replace')
+  }
+  else if (swap.history === 'replace') {
     history.replaceState(state(), '', target)
+  }
 }
 
 // The scroll position goes in the entry as it changes, a while after it stops, for going back and forward to restore it.
@@ -246,7 +295,12 @@ function onClick(event: MouseEvent): void {
     return
 
   event.preventDefault()
-  void follow(url, { history: 'push', scroll: 'top' })
+  void followAsked(url)
+}
+
+async function followAsked(url: URL): Promise<void> {
+  if (await mayLeave(url))
+    await follow(url, { history: 'push', scroll: 'top' })
 }
 
 function onPopState(event: PopStateEvent): void {
@@ -257,10 +311,38 @@ function onPopState(event: PopStateEvent): void {
   const url = new URL(location.href)
   const swap: Swap = { history: 'none', scroll: saved?.kay ? saved.scroll : 'top' }
 
+  // Back on the page left, the traversal undone, whose guard asks now.
+  if (held) {
+    void traverseAsked(held.url, held.delta)
+    held = undefined
+
+    return
+  }
+
+  // Leaving with unsaved changes goes back to the page left first, so it keeps its URL while asked. An entry kay did not write tells no place, so it is let through.
+  if (!passing && saved?.at !== undefined && saved.at !== navigation.at && pageKey(url) !== navigation.shown && dirtyGuard()) {
+    held = { url, delta: saved.at - navigation.at }
+    history.go(-held.delta)
+
+    return
+  }
+
+  passing = false
+
+  if (saved?.at !== undefined)
+    navigation.at = saved.at
+
   if (pageKey(url) === navigation.shown)
     restoreScroll(swap, url.hash)
   else
     void follow(url, swap)
+}
+
+async function traverseAsked(url: URL, delta: number): Promise<void> {
+  if (await mayLeave(url)) {
+    passing = true
+    history.go(delta)
+  }
 }
 
 function onPointLink(event: PointerEvent): void {
@@ -391,6 +473,7 @@ async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url:
 
 // The browser posts the form, as it would have without the swap.
 export function submitNatively(form: HTMLFormElement, submitter: HTMLElement | null): void {
+  navigation.released = true
   nativeSubmits.add(form)
   form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : null)
 }

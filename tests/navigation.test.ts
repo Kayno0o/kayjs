@@ -1,4 +1,4 @@
-import type { Browser, ConsoleMessage, Page } from 'playwright-core'
+import type { Browser, ConsoleMessage, Dialog, Page } from 'playwright-core'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -35,6 +35,11 @@ async function listeningPort(child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): P
 // Set on the window before a navigation: still there after it means the page was swapped, not loaded.
 async function sameDocument(): Promise<boolean> {
   return page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)
+}
+
+async function until(holds: () => boolean | Promise<boolean>): Promise<void> {
+  while (!await holds())
+    await Bun.sleep(20)
 }
 
 // A full Chromium, as CI installs, asks for a favicon the fixture has none of.
@@ -292,6 +297,94 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
     expect(await sameDocument()).toBe(true)
     expect(await page.textContent('button.player')).toBe('Played 1')
+  })
+
+  it('asks before leaving a page with unsaved changes, once for every guard, and stays as it was when refused', async () => {
+    const asked: string[] = []
+    let answer = false
+    const onDialog = async (dialog: Dialog) => {
+      asked.push(`${dialog.type()} ${dialog.message()}`)
+      await (answer ? dialog.accept() : dialog.dismiss())
+    }
+    // A refused leave changes nothing, so it is waited for as the question, then a while after it.
+    const refused = async (count: number) => {
+      await until(() => asked.length === count)
+      await Bun.sleep(300)
+      expect(await page.textContent('h1')).toBe('Guarded')
+      expect(await sameDocument()).toBe(true)
+    }
+
+    page.on('dialog', onDialog)
+
+    try {
+      await page.goto(origin)
+      await page.evaluate(() => {
+        (window as { kayAlive?: boolean }).kayAlive = true
+        const link = document.createElement('a')
+
+        link.href = '/guarded'
+        link.className = 'guarded'
+        document.body.append(link)
+        link.click()
+      })
+      await page.locator('h1', { hasText: 'Guarded' }).waitFor()
+      await page.fill('.two input.draft', 'draft')
+
+      await page.click('a.second')
+      await refused(1)
+      expect(asked[0]).toBe('confirm This page has unsaved changes. Leave it anyway?')
+
+      await page.click('.two button.draft-home')
+      await refused(2)
+
+      await page.fill('.two input.draft', '')
+      await page.fill('.one input.draft', 'draft')
+      await page.click('a.second')
+      await refused(3)
+      expect(asked[2]).toBe('confirm Leave for /second?')
+
+      // Both hold changes from here on, and each leave asks once.
+      await page.fill('.two input.draft', 'draft')
+
+      await page.evaluate(() => {
+        scrollTo(0, 400)
+        history.back()
+      })
+      await refused(4)
+      await page.waitForFunction(() => location.pathname === '/guarded')
+      expect(await page.inputValue('.one input.draft')).toBe('draft')
+      expect(await page.evaluate(() => scrollY)).toBe(400)
+
+      // Neither an island's own URL state nor a post to an action of the page is a leave.
+      await page.click('.two button.tab')
+      expect(page.url()).toBe(`${origin}/guarded?tab=b`)
+      await page.click('a.second')
+      await refused(5)
+      expect(page.url()).toBe(`${origin}/guarded?tab=b`)
+
+      await page.click('button.save')
+      await until(async () => await page.inputValue('.one input.draft') === '')
+      expect(asked).toHaveLength(5)
+
+      await page.fill('.two input.draft', 'draft')
+      await page.evaluate(() => location.reload())
+      await refused(6)
+      expect(asked[5]).toStartWith('beforeunload')
+
+      answer = true
+      await page.evaluate(() => history.back())
+      await page.locator('h1', { hasText: 'Home' }).waitFor()
+      expect(asked).toHaveLength(7)
+      expect(await sameDocument()).toBe(true)
+
+      // The guards went with their page: nothing asks any more.
+      await page.reload()
+      await page.locator('h1', { hasText: 'Home' }).waitFor()
+      expect(asked).toHaveLength(7)
+    }
+    finally {
+      page.off('dialog', onDialog)
+    }
   })
 
   it('still works without JavaScript, as full page loads', async () => {

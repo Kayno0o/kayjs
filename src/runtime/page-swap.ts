@@ -108,6 +108,7 @@ export async function go(url: URL, swap: Swap): Promise<void> {
       page = await pageFor(url)
     }
     catch {
+      navigation.released = true
       location.assign(url)
 
       return
@@ -538,6 +539,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
       return
 
     if (!swappable(next)) {
+      navigation.released = true
       location.assign(next)
 
       return

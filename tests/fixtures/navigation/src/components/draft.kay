@@ -1,0 +1,18 @@
+---
+import { guardLeave, navigate, signal } from 'kay'
+
+const { asks } = props<{ asks?: boolean }>()
+const text = signal('')
+
+// An app's own dialog stands for the default one: it answers later, naming where the visitor is going.
+async function ask(to: URL): Promise<boolean> {
+  await new Promise(resolve => setTimeout(resolve, 50))
+
+  return confirm(`Leave for ${to.pathname}?`)
+}
+
+guardLeave(() => text() !== '', asks ? { confirm: ask } : {})
+---
+input.draft(bind:value={text})
+button.draft-home(onClick={() => navigate('/')}) Home
+button.tab(onClick={() => history.replaceState(history.state, '', '?tab=b')}) Tab

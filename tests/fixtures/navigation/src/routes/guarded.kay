@@ -1,0 +1,20 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const save = action(t.Object({ text: t.String() }), () => undefined)
+---
+---
+import Draft from '../components/draft.kay'
+---
+head
+  title Guarded
+h1 Guarded
+.one
+  Draft(asks={true})
+.two
+  Draft
+form(action={save})
+  input(name="text")
+  button.save Save
+div(style="height: 3000px")
