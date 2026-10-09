@@ -128,19 +128,18 @@ function offsetOf(body: Buffer, text: FixedText): number {
 
 type Deflate = (bytes: Uint8Array, last: boolean) => Buffer | Promise<Buffer>
 
-const deflateRaw: Deflate = async (bytes, last) => {
-  const { constants, deflateRaw: deflate } = nodeZlib()
+// A run ends on a full flush so the next can follow it, the last one finishing the member.
+function runOptions(last: boolean): { level: number, finishFlush: number } {
+  const { constants } = nodeZlib()
 
-  return new Promise((resolve, reject) => deflate(bytes, { level: GZIP_LEVEL, finishFlush: last ? constants.Z_FINISH : constants.Z_FULL_FLUSH }, (error, result) => error ? reject(error) : resolve(result)))
+  return { level: GZIP_LEVEL, finishFlush: last ? constants.Z_FINISH : constants.Z_FULL_FLUSH }
 }
 
-const deflateRawHere: Deflate = (bytes, last) => {
-  const { constants, deflateRawSync } = nodeZlib()
+const deflateRaw: Deflate = async (bytes, last) => new Promise((resolve, reject) => nodeZlib().deflateRaw(bytes, runOptions(last), (error, result) => error ? reject(error) : resolve(result)))
 
-  return deflateRawSync(bytes, { level: GZIP_LEVEL, finishFlush: last ? constants.Z_FINISH : constants.Z_FULL_FLUSH })
-}
+const deflateRawHere: Deflate = (bytes, last) => nodeZlib().deflateRawSync(bytes, runOptions(last))
 
-// Bun answers far fewer requests a second with a body over about 24 KB once the reply waited on a macrotask, a zlib callback included, its main thread left partly idle; so up to this much left to deflate, about 200 µs of it, deflates on the main thread, and a short inlined page serves four times the requests.
+// Bun answers far fewer requests a second with a body over about 24 KB once the reply waited on a macrotask, a zlib callback included, its main thread left partly idle (#141). So up to this much left to deflate, about 200 µs of work, deflates on the main thread, where a short inlined page serves four times the requests.
 const SPLICE_HERE_BYTES = 64 * 1024
 
 interface Found { text: FixedText, at: number }
@@ -148,24 +147,30 @@ interface Found { text: FixedText, at: number }
 // A gzip of the body that deflates only what lies around the fixed texts it holds, theirs deflated once already; undefined when it holds none.
 async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): Promise<Uint8Array<ArrayBuffer> | undefined> {
   const body = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length)
-  const found = fixed.map(text => ({ text, at: offsetOf(body, text) })).filter(({ at }) => at >= 0).sort((a, b) => a.at - b.at)
+  const found: Found[] = []
+  let end = 0
+
+  // In body order, a text overlapping the one before left to the deflate.
+  for (const one of fixed.map(text => ({ text, at: offsetOf(body, text) })).filter(({ at }) => at >= 0).sort((a, b) => a.at - b.at)) {
+    if (one.at >= end) {
+      found.push(one)
+      end = one.at + one.text.bytes.length
+    }
+  }
 
   if (found.length === 0)
     return undefined
 
   const left = body.length - found.reduce((total, { text }) => total + text.bytes.length, 0)
 
-  return left <= SPLICE_HERE_BYTES ? splice(body, found, deflateRawHere) : compressing(async () => splice(body, found, deflateRaw))
+  return left <= SPLICE_HERE_BYTES ? gzipAround(body, found, deflateRawHere) : compressing(async () => gzipAround(body, found, deflateRaw))
 }
 
-async function splice(body: Buffer, found: Found[], deflate: Deflate): Promise<Uint8Array<ArrayBuffer>> {
+async function gzipAround(body: Buffer, found: Found[], deflate: Deflate): Promise<Uint8Array<ArrayBuffer>> {
   const parts: Uint8Array[] = [GZIP_HEADER]
   let cursor = 0
 
   for (const { text, at } of found) {
-    if (at < cursor)
-      continue
-
     parts.push(await deflate(body.subarray(cursor, at), false), text.deflated)
     cursor = at + text.bytes.length
   }
