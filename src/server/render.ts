@@ -51,11 +51,11 @@ interface PageModule {
 
 type Loaded = PromiseSettledResult<Record<string, unknown>>
 
-// A prerendered page as the server holds it from boot.
+// A prerendered page as the server holds it from boot: the brotli copy in memory, which nearly every browser takes, the others as files.
 export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | 'headers'> {
-  html: string
-  // The compressed copies `kay build` wrote.
-  encoded: Partial<Record<Encoding, Uint8Array<ArrayBuffer>>>
+  html: string | Bun.BunFile
+  // The compressed copies `kay build` wrote, or a revalidation made.
+  encoded: Partial<Record<Encoding, Uint8Array<ArrayBuffer> | Bun.BunFile>>
   headers: [string, string][]
 }
 
@@ -332,13 +332,13 @@ export function hasFlash(request: Request): boolean {
 }
 
 // A page under a mount point has its paths put under it as it goes out; a prerendered one had them when it was rendered, and its compressed copies are left as they are.
-function respond(rendering: Rendering, body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>): Response {
+function respond(rendering: Rendering, body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array> | Bun.BunFile): Response {
   rendering.writeCookies()
 
   const init = { status: rendering.status, headers: rendering.headers }
-  const response = body instanceof ReadableStream ? new Response(body, init) : wholeResponse(body, init)
+  const response = body instanceof ReadableStream || body instanceof Blob ? new Response(body, init) : wholeResponse(body, init)
 
-  return rendering.base !== '' && !(body instanceof Uint8Array) ? rebaseHtml(response, rendering.base) : response
+  return rendering.base !== '' && (typeof body === 'string' || body instanceof ReadableStream) ? rebaseHtml(response, rendering.base) : response
 }
 
 // A redirect goes out as is; anything else renders the nearest special page, falling back to plain text.

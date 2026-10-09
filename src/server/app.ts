@@ -66,7 +66,8 @@ export interface PagesOptions extends KayConfig {
   prebuilt?: boolean | undefined
 }
 
-// The prerendered pages by route pattern, then by path, read once at boot with the compressed copies `kay build` wrote.
+// The prerendered pages by route pattern, then by path, with the compressed copies `kay build` wrote: only the brotli one is read into memory, at boot, the others served from their files.
+// A page with no copy is held as text, which compression then knows too small or not worth compressing again.
 async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<string, ServedPage>>> {
   const byRoute = new Map<string, Map<string, ServedPage>>()
   const dir = join(client.dir, '..', PRERENDERED_DIR)
@@ -74,12 +75,16 @@ async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<str
 
   const loaded = await Promise.all([...client.pages.values()].map(async (page) => {
     const file = join(dir, page.file)
+    const encodings = copies.get(file)
     const encoded: ServedPage['encoded'] = {}
 
-    for (const encoding of copies.get(file) ?? [])
-      encoded[encoding] = await Bun.file(encodedPath(file, encoding)).bytes()
+    if (!encodings)
+      return { html: await Bun.file(file).text(), encoded }
 
-    return { html: await Bun.file(file).text(), encoded }
+    for (const encoding of encodings)
+      encoded[encoding] = encoding === 'br' ? await Bun.file(encodedPath(file, encoding)).bytes() : Bun.file(encodedPath(file, encoding))
+
+    return { html: Bun.file(file), encoded }
   }))
 
   for (const [index, [path, page]] of [...client.pages].entries()) {

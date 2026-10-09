@@ -576,6 +576,20 @@ describe('await blocks', () => {
     }
   })
 
+  it('leaves a streamed rejection with no catch block to the log, a try around it having rendered already', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const html = await (await bare.handle(new Request('http://localhost/guarded'))).text()
+
+      expect(html).not.toContain('Unavailable')
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('Rows down'))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('loads the entry right after a shell holding islands, and streams nothing for an await inside a pending block', async () => {
     const [shell, block, end] = await chunksOf('/live')
 
@@ -724,6 +738,7 @@ describe('prerendering', () => {
       expect((await fetch('/docs/guide/intro', { 'accept-encoding': 'br', 'if-none-match': etag })).status).toBe(304)
       expect((await fetch('/docs/guide/intro', { 'if-none-match': etag })).status).toBe(200)
       expect(await (await fetch('/docs/guide/intro')).text()).toBe(file)
+      expect(new TextDecoder().decode(Bun.gunzipSync(await (await fetch('/docs/guide/intro', { 'accept-encoding': 'gzip' })).bytes()))).toBe(file)
 
       const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const report = await signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': 'ada', 'accept-encoding': 'br' } }))
