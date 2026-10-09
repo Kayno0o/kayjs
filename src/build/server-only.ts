@@ -17,6 +17,9 @@ const DEFINED = 'NODE_ENV'
 const BROWSER_T = 'builds a schema on the server, and kay'
 const KAY_IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"]kay['"]/g
 const T_SPECIFIER = /^t(?:\s+as\s+\w+)?$/
+// Bun's refusal of a builtin in a browser build, which names the module importing it and not the island that reached it.
+const BUILTIN_REFUSAL = /^Browser build cannot import (?:Node\.js|Bun) builtin/
+const PACKAGE_PATH = /node_modules\/((?:@[^/]+\/)?[^/]+)/
 
 export interface ServerOnlyRead {
   name: string
@@ -312,4 +315,76 @@ async function sourceOf(file: string): Promise<string | undefined> {
   catch {
     return undefined
   }
+}
+
+interface InputImport {
+  path: string
+  external?: boolean
+}
+
+export type BundleInputs = Record<string, { imports: InputImport[] }>
+
+// The builtins Bun refused a browser build for.
+export function refusedBuiltins(logs: readonly (BuildMessage | ResolveMessage)[]): string[] {
+  return [...new Set(logs.flatMap(log => log.name === 'ResolveMessage' && BUILTIN_REFUSAL.test(log.message) ? [log.specifier] : []))]
+}
+
+// For each island reaching one of the builtins, the shortest chain of imports from it, cut at the first package since the fix is never inside one.
+// `inputs` is the metafile of the same build with the builtins left external, its modules named relative to where the build ran.
+export function builtinChains(root: string, inputs: BundleInputs, islands: Iterable<string>, builtins: string[]): string[] {
+  const refused = new Set(builtins)
+  const keyOf = new Map(Object.keys(inputs).map(input => [resolve(process.cwd(), input), input]))
+  const chains: string[] = []
+
+  for (const island of islands) {
+    const start = keyOf.get(island)
+
+    if (start === undefined)
+      continue
+
+    const parents = new Map<string, string | undefined>([[start, undefined]])
+    const queue = [start]
+    let reached: { input: string, builtin: string } | undefined
+
+    while (queue.length > 0 && !reached) {
+      const input = queue.shift()!
+
+      for (const { path, external } of inputs[input]?.imports ?? []) {
+        if (external && refused.has(path)) {
+          reached = { input, builtin: path }
+
+          break
+        }
+
+        if (!external && !parents.has(path)) {
+          parents.set(path, input)
+          queue.push(path)
+        }
+      }
+    }
+
+    if (!reached)
+      continue
+
+    const path: string[] = [reached.builtin]
+
+    for (let input: string | undefined = reached.input; input !== undefined; input = parents.get(input))
+      path.unshift(input)
+
+    const shown: string[] = []
+
+    for (const input of path.slice(0, -1)) {
+      const file = relative(root, resolve(process.cwd(), input))
+      const name = PACKAGE_PATH.exec(file)?.[1]
+
+      shown.push(name ?? file)
+
+      if (name)
+        break
+    }
+
+    chains.push([...shown, reached.builtin].join(' -> '))
+  }
+
+  return chains
 }

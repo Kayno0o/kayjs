@@ -2,9 +2,11 @@ import type { BunPlugin } from 'bun'
 import type { LintLevels } from '../compiler/lints'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { KayLibrary } from './libraries'
+import type { BundleInputs } from './server-only'
 import type { FileDiagnostic } from './transform'
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
+import { builtinModules } from 'node:module'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { formatDiagnostic } from '../compiler'
@@ -17,7 +19,7 @@ import { findKayFiles, writeIfChanged } from './files'
 import { findKayLibraries, reachableLibraryFiles, sourceWords } from './libraries'
 import { kay } from './plugin'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
-import { refuseServerOnlyReads } from './server-only'
+import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
 import { forgetBundleMaps } from './sourcemap'
 import { styleImports, withoutStyles } from './styles'
 import { analyzeKayCached, KayCompileError } from './transform'
@@ -57,6 +59,8 @@ type Outputs = Record<string, MetafileOutput>
 const LEADING_DOT_SLASH = /^\.\//
 const JS_OUTPUT = /\.js$/
 const CSS_OUTPUT = /\.css$/
+// Every builtin, the ones Bun polyfills included: one whose polyfill lacks an export would fail the build that only looks for the way to the others.
+const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
 
 // Bundles what the browser needs: one entry hydrating the islands, each island in its own chunk, and a stylesheet per page and layout.
 // Every component is compiled first, so all of the project's syntax errors come out together instead of one per bundler run.
@@ -175,9 +179,8 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   if (chunk)
     await Bun.write(entryFile, `import ${JSON.stringify(ANCHOR)}\n${options.hot ? `import ${JSON.stringify(bootFile)}\n` : ''}`)
 
-  const build = await Bun.build({
+  const config = {
     entrypoints: [entryFile],
-    outdir: clientDir(root),
     target: 'browser',
     splitting: true,
     // The pages preload the chunks of their islands themselves, and every island shares the one the page loads first, so Bun's own preloading would only weigh on it.
@@ -189,10 +192,15 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
     external,
     plugins: chunk ? [runtimeAnchor(chunk, options.hot ? undefined : bootFile), ...await plugins(ANCHOR)] : await plugins(),
-  })
+    throw: false,
+  } satisfies Bun.BuildConfig
+  const build = await Bun.build({ ...config, outdir: clientDir(root) })
 
-  if (!build.success)
+  if (!build.success) {
+    await refuseBuiltinImports(root, build.logs, islands, config)
+
     throw new AggregateError(build.logs, 'kay: client build failed')
+  }
 
   await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs as Outputs)
 
@@ -203,6 +211,21 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     manifest.entryImports.push(PUBLIC_ENV_PATH)
 
   return { ...manifest, navigation }
+}
+
+// Bun names the module importing a builtin a browser lacks, not the island reaching it: the same build with every builtin left out, in memory, gives the imports leading there.
+// An island bundles all of a module it imports, whatever it opens as it loads included, so the fix is in that chain.
+async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'], islands: Map<string, string>, config: Bun.BuildConfig): Promise<void> {
+  const builtins = refusedBuiltins(logs)
+
+  if (builtins.length === 0)
+    return
+
+  const probe = await Bun.build({ ...config, external: [...config.external ?? [], ...BUILTINS], throw: false })
+  const chains = probe.success ? builtinChains(root, probe.metafile!.inputs as BundleInputs, islands.values(), builtins) : []
+
+  if (chains.length > 0)
+    throw new Error(`kay: a browser has no ${builtins.join(', ')}, and islands import modules reaching ${builtins.length === 1 ? 'it' : 'them'}: ${chains.join('; ')}. An island bundles every module it imports, the database or environment one opens as it loads included: move what the island needs to a module importing none of it, or pass it as a prop.`)
 }
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders.

@@ -45,6 +45,23 @@ describe('kay build', () => {
     }
   })
 
+  it('refuses a client build whose island reaches a builtin a browser lacks, naming the imports leading there', async () => {
+    const root = await scratchProject({
+      'src/db.ts': 'import { Database } from \'bun:sqlite\'\n\nexport const db = new Database(\':memory:\')\n',
+      // A helper the island needs, beside a query it does not: the module opens the database as it loads all the same.
+      'src/links.ts': 'import { db } from \'./db\'\n\nexport const link = (id: number) => `/items/${id}`\nexport const count = () => db.query(\'select 1\').get()\n',
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { link } from \'./links\'\n\nconst n = signal(0)\n---\na(href={link(n())} onClick={() => n.set(n() + 1)}) {n()}\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+    })
+
+    try {
+      await expect(buildClient(root)).rejects.toThrow('src/counter.kay -> src/links.ts -> src/db.ts -> bun:sqlite')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves the islands of a kay project nested inside to that project, whose API modules are its own', async () => {
     const island = (api: string) => `---\nimport { signal, socket } from 'kay'\nimport live from '${api}'\n\nconst n = signal(0)\nconst feed = socket(live, '/')\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {feed.status()} {n()}\n`
     const root = await scratchProject({
