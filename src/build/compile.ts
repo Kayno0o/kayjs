@@ -1,7 +1,8 @@
+import type { BunPlugin } from 'bun'
 import type { KayConfig } from '../config'
 import type { Route, SpecialPages } from '../server/routes'
 import { existsSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG } from '../content/server'
 import { scanApi } from '../server/api'
@@ -21,6 +22,22 @@ export interface CompileOptions {
 
 // Bun embeds an asset directory under its last path component, beside the executable's entry.
 const CLIENT_ASSETS = 'client'
+// What bundles the client and loads `.kay` files at boot, which bring the compiler: a server reading the build it embeds imports neither.
+const COMPILER_MODULES = new Set([join(import.meta.dir, 'client.ts'), join(import.meta.dir, 'plugin.ts')])
+const LEFT_OUT = 'kay-left-out'
+const RELATIVE = /^\.\.?\//
+const ANY = /.*/
+
+// Leaves the compiler out of the executable: 2 MB the server never runs.
+function withoutCompiler(): BunPlugin {
+  return {
+    name: 'kay-without-compiler',
+    setup(build) {
+      build.onResolve({ filter: RELATIVE }, ({ path, importer }) => COMPILER_MODULES.has(`${resolve(dirname(importer), path)}.ts`) ? { path, namespace: LEFT_OUT } : undefined)
+      build.onLoad({ filter: ANY, namespace: LEFT_OUT }, () => ({ contents: 'throw new Error(\'kay: an executable serves the build it embeds, and carries no compiler\')', loader: 'js' }))
+    },
+  }
+}
 
 // Bundles the server, its pages and the client build `kay build` wrote into one executable, which runs as `NODE_ENV=production bun <entry>` would.
 // The entry it generates registers every route module before the server entry calls `pages()`, which then reads nothing from disk but the embedded files.
@@ -100,7 +117,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [...configPlugins, withoutStyles(), kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings: config.settings }), ...config.plugins ?? []],
+    plugins: [...configPlugins, withoutStyles(), withoutCompiler(), kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings: config.settings }), ...config.plugins ?? []],
   })
 
   if (!build.success)

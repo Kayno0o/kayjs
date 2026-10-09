@@ -403,6 +403,8 @@ describe('kay build --compile', () => {
 
       expect(report).toContain('compiled server in ')
       expect(code).toBe(0)
+      // Serving the build it embeds, it carries neither kay's compiler nor Babel.
+      expect(Buffer.from(await Bun.file(join(dir, 'server')).bytes()).includes('compiler/codegen.ts')).toBe(false)
       await rm(join(dir, 'node_modules/build-stamp'), { recursive: true })
 
       // Run from elsewhere, with nothing of the project to read but an upload.
