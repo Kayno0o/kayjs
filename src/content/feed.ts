@@ -6,21 +6,21 @@ export interface FeedItem {
   // The entry's page, a path on the site such as `/blog/hello`.
   path: string
   date: Date
-  description?: string
-  author?: string
+  description?: string | undefined
+  author?: string | undefined
 }
 
 export interface FeedOptions<Data> {
   // Where the feed is served, such as `/blog/rss.xml`.
   path: string
   title: string
-  description?: string
+  description?: string | undefined
   // Who writes the feed, which Atom requires; its title otherwise.
-  author?: string
+  author?: string | undefined
   // RSS 2.0 by default.
-  format?: 'rss' | 'atom'
+  format?: 'rss' | 'atom' | undefined
   // The newest this many items, 20 by default.
-  limit?: number
+  limit?: number | undefined
   // What an entry shows as, or undefined to leave it out, such as a draft.
   item: (entry: Entry<Data>) => FeedItem | undefined
 }

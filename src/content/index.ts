@@ -41,9 +41,9 @@ export interface LoadedEntry {
   slug: string
   data: unknown
   // Markdown, compiled as a file entry's body is: headings listed, code highlighted, the collection's components usable.
-  body?: string
+  body?: string | undefined
   // HTML rendered as it is, such as a CMS's rendered content: trusted, as a file entry's is.
-  html?: string
+  html?: string | undefined
 }
 
 // Where a collection takes its entries from instead of a folder: an API, a headless CMS, a database.
@@ -53,24 +53,24 @@ export interface ContentLoader {
   // Every entry, drafts included; `preview` is true for a visitor in preview mode and in `kay dev`, for a CMS that serves drafts apart.
   load: (context: { preview: boolean }) => LoadedEntry[] | Promise<LoadedEntry[]>
   // How long the entries are served before the next read refreshes them in the background, as `cached` does; without it, until `invalidate()` or a restart.
-  ttl?: Duration
+  ttl?: Duration | undefined
   // Keeps the entries across restarts and processes, as `cached` does.
-  store?: CacheStore
+  store?: CacheStore | undefined
 }
 
 export interface CollectionOptions<Schema extends TSchema> {
   // What each entry's frontmatter, or a data file's content, holds; an entry it refuses fails `kay check` and the build.
   schema: Schema
   // The kay components a Markdown entry may use, by the name it writes them with: `<Callout type="warn">`.
-  components?: Record<string, Component<never>>
+  components?: Record<string, Component<never>> | undefined
   // Highlights code blocks when the entries compile, at build time, such as with Shiki.
-  highlight?: Highlighter
+  highlight?: Highlighter | undefined
   // Entries left out everywhere but `kay dev` and preview mode: from `all()`, `get()`, prerendering, the sitemap and the feed.
-  draft?: (entry: Entry<Static<Schema>>) => boolean
+  draft?: ((entry: Entry<Static<Schema>>) => boolean) | undefined
   // The order `all()` lists entries in; by slug otherwise.
-  sort?: (a: Entry<Static<Schema>>, b: Entry<Static<Schema>>) => number
+  sort?: ((a: Entry<Static<Schema>>, b: Entry<Static<Schema>>) => number) | undefined
   // An RSS or Atom feed of the collection, served at its path.
-  feed?: FeedOptions<Static<Schema>>
+  feed?: FeedOptions<Static<Schema>> | undefined
 }
 
 export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>> {

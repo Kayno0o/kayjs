@@ -42,22 +42,22 @@ export interface JobStore {
 
 export interface QueueOptions<Payload> {
   // `sqliteJobs('data/jobs.sqlite')` unless given, in memory under `bun test`.
-  store?: JobStore
+  store?: JobStore | undefined
   // Runs in all, the first included, before a job is kept as failed. 5 by default.
-  attempts?: number
+  attempts?: number | undefined
   // The wait before the first retry, doubling for each one after it. 10 seconds by default.
-  backoff?: Duration
+  backoff?: Duration | undefined
   // Jobs of this queue one process runs at once. 1 by default.
-  concurrency?: number
+  concurrency?: number | undefined
   // How long a run may take before another process takes the job as lost and runs it again. 10 minutes by default.
-  lostAfter?: Duration
+  lostAfter?: Duration | undefined
   // Gets a job that failed its last attempt, once it is kept as failed.
-  onFailed?: (payload: Payload, error: unknown) => unknown
+  onFailed?: ((payload: Payload, error: unknown) => unknown) | undefined
 }
 
 export interface EnqueueOptions {
   // Runs it this long from now rather than as soon as a worker can.
-  delay?: Duration
+  delay?: Duration | undefined
 }
 
 export interface FailedJob<Payload> {

@@ -215,7 +215,7 @@ type Empty = Record<never, never>
 
 export interface ApiOptions {
   // The most bytes a request to the module's routes may send, in place of the app's `bodyLimit`.
-  bodyLimit?: number
+  bodyLimit?: number | undefined
 }
 
 // An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is.

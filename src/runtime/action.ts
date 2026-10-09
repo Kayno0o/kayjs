@@ -54,38 +54,38 @@ export interface RateLimit {
   max: number
   window: Duration
   // In this process's memory unless given.
-  store?: RateStore
+  store?: RateStore | undefined
 }
 
 export interface ActionRateLimit extends RateLimit {
   // `'succeeded'` counts only the posts whose handler returned without `ctx.fail` or an error, so typos and a failing mail server lock no one out; every attempt counts unless given. Posts arriving together all read the count before any adds to it, so a burst may pass `max` by a few: pair it with a limit on every attempt.
-  count?: 'succeeded'
+  count?: 'succeeded' | undefined
 }
 
 export interface HoneypotOptions<Field extends string = string> {
   field: Field
   // Answers a bot filling the field in as if its post went through, the handler never running, rather than refusing it.
-  pretend?: boolean
+  pretend?: boolean | undefined
 }
 
 export interface ActionProtection<Field extends string = never> {
   // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
   // Several limits all apply, such as one on every attempt and a tighter one on the posts that went through.
-  rateLimit?: ActionRateLimit | ActionRateLimit[]
+  rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
   // A field a form posting to the action renders out of sight by itself, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.
-  honeypot?: Field | HoneypotOptions<Field>
+  honeypot?: Field | HoneypotOptions<Field> | undefined
   // The most bytes a post may send, files included, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.
-  bodyLimit?: number
+  bodyLimit?: number | undefined
   // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
-  messages?: ProtectionMessages
+  messages?: ProtectionMessages | undefined
 }
 
 export interface ProtectionMessages {
   // Given the seconds until the client may post again.
-  rateLimit?: string | ((wait: number) => string)
-  honeypot?: string
+  rateLimit?: (string | ((wait: number) => string)) | undefined
+  honeypot?: string | undefined
   // Given the most bytes a post may send.
-  bodyLimit?: string | ((bytes: number) => string)
+  bodyLimit?: (string | ((bytes: number) => string)) | undefined
 }
 
 export interface ActionContext {
@@ -150,9 +150,9 @@ export function setRequestOutcome(read: () => Outcome | null | undefined): void 
 
 export interface CallOptions {
   // Whether the page shows what the call changed once it succeeded, its loads run again as `refresh()` runs them; on unless `false`, and only where the page swap runs.
-  refresh?: boolean
+  refresh?: boolean | undefined
   // Shows the change at once, as the call goes: the signals it writes go back to what they held if the call fails, unless something wrote them since.
-  optimistic?: () => void
+  optimistic?: (() => void) | undefined
 }
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
@@ -291,7 +291,7 @@ export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Ex
 
 type HoneypotOf<Target> = Target extends { [HONEYPOT]?: (field: infer Field) => void } ? Field : never
 
-// An action as the fields of a form posting to it read it, whatever its input; a string target is a plain URL.
+// An action as the fields of a form posting to it read it, whatever its input.
 type FormTarget = Action<Record<string, unknown>, unknown>
 
 // What a refused post sent for a field of a form posting to `target`, to show it again; undefined without one, and for the honeypot.

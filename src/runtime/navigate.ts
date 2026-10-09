@@ -15,7 +15,7 @@ export interface NavigationHooks {
 
 export interface NavigateOptions {
   // Replaces the current history entry instead of adding one.
-  replace?: boolean
+  replace?: boolean | undefined
 }
 
 export interface Swap {

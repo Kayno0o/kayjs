@@ -25,20 +25,20 @@ const DENSITY_META = 'meta[name="kay-max-density"]'
 // What `img` takes to load the right size: spread it, `img({...image(hero)} alt="")`.
 export interface ImageProps {
   src: string
-  srcset?: string
-  sizes?: string
-  width?: number
-  height?: number
+  srcset?: string | undefined
+  sizes?: string | undefined
+  width?: number | undefined
+  height?: number | undefined
 }
 
 export interface ImageOptions {
   // How wide the image shows, as the `sizes` attribute reads it: `(min-width: 60rem) 50vw, 100vw`. Without it the browser assumes the viewport's width.
-  sizes?: string
+  sizes?: string | undefined
   // Its width and height for an image kay did not import, such as an upload: the variants stop at that width, and the page keeps its space while it loads.
-  width?: number
-  height?: number
+  width?: number | undefined
+  height?: number | undefined
   // The shape it is cut to, its middle kept: `'1/1'` for a square, `'16/9'`. Each variant is cut on the server, so a phone loads none of the pixels cut away; `images.aspects` lists the ones allowed.
-  aspect?: string
+  aspect?: string | undefined
 }
 
 // One file an image is turned into: a width of the ladder, cut to an aspect ratio or not, or the share card.
@@ -330,7 +330,7 @@ export function variantFilesLinked(): boolean {
 export interface ShareCardOptions {
   title: string
   // An imported image, or one from `images.dirs` or `images.remote`, covering the card behind the title.
-  image?: string
+  image?: string | undefined
 }
 
 // Set by the server, which holds the face and the key a card is drawn and signed with.

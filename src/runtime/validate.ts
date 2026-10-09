@@ -3,21 +3,21 @@ import { formInput } from './form'
 
 // What the server sends of an action's schema, for the forms of a page to be checked before they post: the top-level fields, the keywords the browser checks, and their `error` messages.
 export interface FieldRules {
-  type?: string
-  format?: string
-  pattern?: string
-  minLength?: number
-  maxLength?: number
-  minimum?: number
-  maximum?: number
-  exclusiveMinimum?: number
-  exclusiveMaximum?: number
-  minItems?: number
-  maxItems?: number
-  const?: unknown
-  items?: FieldRules
-  anyOf?: FieldRules[]
-  error?: string
+  type?: string | undefined
+  format?: string | undefined
+  pattern?: string | undefined
+  minLength?: number | undefined
+  maxLength?: number | undefined
+  minimum?: number | undefined
+  maximum?: number | undefined
+  exclusiveMinimum?: number | undefined
+  exclusiveMaximum?: number | undefined
+  minItems?: number | undefined
+  maxItems?: number | undefined
+  const?: unknown | undefined
+  items?: FieldRules | undefined
+  anyOf?: FieldRules[] | undefined
+  error?: string | undefined
 }
 
 export interface FormRules {

@@ -14,9 +14,9 @@ export interface IconProps {
 export interface IconSet {
   prefix: string
   icons: Record<string, IconifyIcon>
-  aliases?: Record<string, IconifyIcon>
-  width?: number
-  height?: number
+  aliases?: Record<string, IconifyIcon> | undefined
+  width?: number | undefined
+  height?: number | undefined
 }
 
 interface IconifyIcon {

@@ -5,7 +5,7 @@ type Equals<T> = false | ((previous: T, next: T) => boolean)
 
 export interface SignalOptions<T> {
   // `false` notifies on every write; the default skips a write of the same value.
-  equals?: Equals<T>
+  equals?: Equals<T> | undefined
 }
 
 // A node others can depend on: a signal, or a memo.

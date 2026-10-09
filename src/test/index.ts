@@ -30,11 +30,11 @@ export type { Found, PageReading } from './page'
 
 export interface TestOptions extends PagesOptions {
   // The plugins the server entry uses before the pages, in order, such as `session()`: their derives reach `ctx.locals` and their cookies the next request.
-  use?: AnyElysia[]
+  use?: AnyElysia[] | undefined
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
-  locals?: (request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>
+  locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
   // Builds the islands for the browser, as `kay dev` does into `.kay/client`, for `open()` to load pages in a headless Chrome.
-  browser?: boolean | BrowserOptions
+  browser?: boolean | BrowserOptions | undefined
 }
 
 // The page, with its head and its elements read from `html`.
@@ -231,7 +231,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       if (options.browser === undefined || options.browser === false)
         throw new Error('kay: open() loads pages in a browser, which needs their islands built: testSite({ browser: true })')
 
-      const page = await browse(new URL(path, `http://localhost:${listening().port}`).href, { ...browser, ...browserOptions })
+      const page = await browse(new URL(path, `http://localhost:${listening().port}`).href, { ...browser, ...Object.fromEntries(Object.entries(browserOptions ?? {}).filter(([, value]) => value !== undefined)) })
       const close = page.close
 
       opened.add(page)

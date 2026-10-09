@@ -2,10 +2,10 @@ import type { SafeHtml } from './checks'
 
 export interface SanitizeOptions {
   // Tags kept besides the formatted text kept by default, such as `['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td']`.
-  tags?: string[]
+  tags?: string[] | undefined
   // Attributes kept per tag, besides a link's `href`: `{ img: ['src', 'alt', 'width', 'height'] }`. A URL, such as an `href`, a `src` or each of a `srcset`'s, is kept when it is an http(s), `mailto:` or site URL.
   // Read once per options object, so they are best declared once, outside the function calling `sanitizeHtml`.
-  attributes?: Record<string, string[]>
+  attributes?: Record<string, string[]> | undefined
 }
 
 // What `sanitizeHtml` keeps, written back without attributes but a link's `href`: formatted text, such as a comment or rendered Markdown, and nothing that loads, runs, styles or covers the page.

@@ -3,9 +3,9 @@ import { configuredSite } from './site'
 
 // Schema.org structured data: `@type` names what it describes, every other property is the vocabulary's own.
 export interface JsonLd {
-  '@context'?: string
+  '@context'?: string | undefined
   '@type': string | string[]
-  '@id'?: string
+  '@id'?: string | undefined
   [property: string]: unknown
 }
 

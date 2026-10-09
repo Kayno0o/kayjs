@@ -30,12 +30,12 @@ export interface RoomStore {
 
 export interface RoomsOptions {
   // `sqliteRooms(path)` reaches every process of the machine; one process's memory by default.
-  store?: RoomStore
+  store?: RoomStore | undefined
 }
 
 export interface CoalesceOptions {
   // How long changes are gathered before the one snapshot goes, in milliseconds: 50 by default.
-  wait?: number
+  wait?: number | undefined
 }
 
 export interface Rooms<Message, Member = undefined> {

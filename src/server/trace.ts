@@ -8,8 +8,8 @@ export interface Tracer {
 
 export interface SpanOptions {
   // OpenTelemetry's SpanKind: 1 for the server span a request makes, 0 for the work inside it.
-  kind?: number
-  attributes?: Record<string, string | number | boolean>
+  kind?: number | undefined
+  attributes?: Record<string, string | number | boolean> | undefined
 }
 
 export interface Span {

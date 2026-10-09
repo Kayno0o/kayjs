@@ -21,7 +21,7 @@ type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
 export interface PersistedOptions<T> extends SignalOptions<T> {
   // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated.
-  storage?: PersistStorage
+  storage?: PersistStorage | undefined
 }
 
 // A signal read as `count()` and written as `count.set(1)` or `count.set(c => c + 1)`.

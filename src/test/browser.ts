@@ -13,14 +13,14 @@ export interface BrowserOptions {
 }
 
 export interface WaitOptions {
-  timeout?: number
+  timeout?: number | undefined
 }
 
 export interface WaitForOptions extends WaitOptions {
   // Only an element whose text contains this.
-  text?: string
+  text?: string | undefined
   // Waits for no element to match instead.
-  gone?: boolean
+  gone?: boolean | undefined
 }
 
 export interface TestPage {

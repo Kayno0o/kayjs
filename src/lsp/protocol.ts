@@ -107,7 +107,7 @@ export interface CodeAction {
   kind?: string | undefined
   diagnostics?: Diagnostic[] | undefined
   edit?: WorkspaceEdit | undefined
-  command?: unknown | undefined
+  command?: unknown
   [key: string]: unknown
 }
 

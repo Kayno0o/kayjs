@@ -21,7 +21,7 @@ export interface LocaleSettings {
   // The default locale under its own prefix too, `/fr/about` rather than `/about`.
   prefixDefault: boolean
   // The host serving each locale, when locales go by domain rather than prefix.
-  hosts?: Readonly<Record<string, string>>
+  hosts?: Readonly<Record<string, string>> | undefined
 }
 
 // What a translation reads: the messages of its locale by dotted key, then the default locale's for a key it lacks.

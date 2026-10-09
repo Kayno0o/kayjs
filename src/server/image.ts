@@ -368,14 +368,14 @@ export async function writeRemoteVariants(clientDir: string, remote: RemoteImage
 
 export interface ProcessImageOptions {
   // The box the image is resized to: it fits inside, never enlarged, unless `fit: 'cover'` fills it whole, its middle kept. One side alone keeps the image's shape.
-  width?: number
-  height?: number
-  fit?: 'inside' | 'cover'
-  format?: 'webp' | 'jpeg' | 'png'
+  width?: number | undefined
+  height?: number | undefined
+  fit?: 'inside' | 'cover' | undefined
+  format?: 'webp' | 'jpeg' | 'png' | undefined
   // 1 to 100, 80 by default.
-  quality?: number
+  quality?: number | undefined
   // Refused past that many pixels, read from the header before any is decoded: 50 million by default.
-  maxPixels?: number
+  maxPixels?: number | undefined
 }
 
 export interface ProcessedImage {
@@ -414,6 +414,6 @@ export async function processImage(input: Blob | Uint8Array | ArrayBuffer, optio
 }
 
 // An image's size and format, from its header, refused past `maxPixels`, 50 million by default.
-export async function imageSize(input: Blob | Uint8Array | ArrayBuffer, options: { maxPixels?: number } = {}): Promise<{ width: number, height: number, format: string }> {
+export async function imageSize(input: Blob | Uint8Array | ArrayBuffer, options: { maxPixels?: number | undefined } = {}): Promise<{ width: number, height: number, format: string }> {
   return new Bun.Image(input instanceof ArrayBuffer ? new Uint8Array(input) : input, { maxPixels: options.maxPixels ?? MAX_UPLOAD_PIXELS }).metadata()
 }
