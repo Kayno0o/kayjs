@@ -385,7 +385,7 @@ describe('kay build --compile', () => {
         'node_modules/build-stamp/index.d.ts': 'declare const stamp: () => import(\'bun\').BunPlugin\nexport default stamp\n',
         'node_modules/build-stamp/index.js': 'import { readFileSync } from \'node:fs\'\nimport { join } from \'node:path\'\n\nconst binding = readFileSync(join(import.meta.dir, \'binding.txt\'), \'utf8\')\n\nexport default () => ({ name: binding, setup() {} })\n',
         'node_modules/build-stamp/binding.txt': 'stamp',
-        'kay.config.ts': 'import stamp from \'build-stamp\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [stamp()], lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], settings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
+        'kay.config.ts': 'import stamp from \'build-stamp\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [stamp()], lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], settings: { \'kay-lib\': \'./src/ui-settings.ts\' }, images: { dirs: { \'/uploads/\': \'uploads\' } } })\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
       // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
       await Promise.all([
@@ -405,8 +405,12 @@ describe('kay build --compile', () => {
       expect(code).toBe(0)
       await rm(join(dir, 'node_modules/build-stamp'), { recursive: true })
 
-      // Run from elsewhere, with nothing of the project to read.
-      const server = Bun.spawn([join(dir, 'server')], { cwd: tmpdir(), env: { PATH: process.env.PATH, PORT: '0' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+      // Run from elsewhere, with nothing of the project to read but an upload.
+      const elsewhere = join(dir, '..', 'elsewhere')
+
+      await Bun.write(join(elsewhere, 'uploads/photo.png'), Bun.file(join(repo, 'tests/fixtures/images/src/hero.png')))
+
+      const server = Bun.spawn([join(dir, 'server')], { cwd: elsewhere, env: { PATH: process.env.PATH, PORT: '0' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
       try {
         const port = await listeningPort(server)
@@ -443,6 +447,14 @@ describe('kay build --compile', () => {
 
         expect(image.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
         expect((await new Bun.Image(await image.bytes()).metadata()).width).toBe(320)
+
+        const avif = await fetch(`${origin}${variant}`, { headers: { accept: 'image/avif,image/webp' } })
+        // Encoded on request, on the worker thread the executable carries.
+        const upload = await fetch(`${origin}/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { headers: { accept: 'image/avif' } })
+
+        expect([avif.headers.get('content-type'), avif.headers.get('vary')]).toEqual(['image/avif', 'accept'])
+        expect(upload.headers.get('content-type')).toBe('image/avif')
+        expect(new TextDecoder().decode((await upload.bytes()).subarray(4, 12))).toBe('ftypavif')
         expect((await fetch(`${origin}/favicon.ico`)).headers.get('content-type')).toBe('image/x-icon')
         expect((await get('/manifest.webmanifest')).status).toBe(200)
         expect((await get(fonts)).text).toContain('@font-face{font-family:"Display"')

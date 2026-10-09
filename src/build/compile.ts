@@ -5,6 +5,7 @@ import { basename, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG } from '../content/server'
 import { scanApi } from '../server/api'
+import { AVIF_WORKER_SOURCE } from '../server/avif'
 import { messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
 import { refuseClashes, scanRoutes, specialPagesOf } from '../server/routes'
@@ -88,7 +89,9 @@ export async function compileServer(root: string, config: KayConfig, options: Co
 
   const configPlugins = runtime === undefined ? [] : [runtimeConfig(configFile, runtime)]
   const build = await Bun.build({
-    entrypoints: [generated],
+    // The AVIF encoder's worker too, which the executable starts from `/$bunfs/root/avif-worker.js`.
+    entrypoints: [generated, AVIF_WORKER_SOURCE],
+    naming: { entry: '[name].[ext]' },
     target: 'bun',
     // Parsed at build time: the server starts in a third of the time, for a few more megabytes of executable.
     bytecode: true,

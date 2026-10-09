@@ -3,12 +3,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { deflateSync, inflateSync } from 'node:zlib'
+import decodeAvif from '@jsquash/avif/decode.js'
 import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
 import { coverImage } from '../src/server/crop'
-import { serveImages, variantName, writeImageVariants } from '../src/server/image'
+import { avifQuality, serveImages, variantName, writeImageVariants } from '../src/server/image'
+import { decodePng } from '../src/server/png'
 import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
@@ -38,6 +40,20 @@ function pngChunk(type: string, data: Uint8Array): Uint8Array {
 
 async function get(path: string, headers: Record<string, string> = {}): Promise<Response> {
   return app.handle(new Request(`http://localhost${path}`, { headers }))
+}
+
+// How far apart two images of one size are, as the mean difference per channel from 0 to 255.
+function meanDifference(a: ArrayLike<number>, b: ArrayLike<number>): number {
+  let total = 0
+
+  for (let index = 0; index < a.length; index++)
+    total += Math.abs(a[index]! - b[index]!)
+
+  return total / a.length
+}
+
+function isAvif(bytes: Uint8Array): boolean {
+  return new TextDecoder().decode(bytes.subarray(4, 12)) === 'ftypavif'
 }
 
 describe('image()', () => {
@@ -189,6 +205,59 @@ describe('image route', () => {
     expect((await get(`/_kay/image?src=${encodeURIComponent('/uploads/huge.png')}&w=320`)).status).toBe(413)
   })
 
+  it('answers an AVIF to a browser whose Accept names it and a WebP otherwise, both varying on Accept', async () => {
+    const avif = await get(heroAt(640), { accept: 'image/avif,image/webp,*/*;q=0.8' })
+    const decoded = (await decodeAvif((await avif.bytes()).buffer as ArrayBuffer))!
+
+    expect(avif.headers.get('content-type')).toBe('image/avif')
+    expect(avif.headers.get('vary')).toBe('accept')
+    expect(avif.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect([decoded.width, decoded.height]).toEqual([640, 384])
+    expect(meanDifference(decoded.data, decodePng(await new Bun.Image(HERO).resize(640).png().bytes()).pixels)).toBeLessThan(4)
+
+    for (const accept of ['image/webp,*/*', 'image/avif;q=0, image/webp', 'image/avifx']) {
+      const webp = await get(heroAt(640), { accept })
+
+      expect(webp.headers.get('content-type')).toBe('image/webp')
+      expect(webp.headers.get('vary')).toBe('accept')
+    }
+  })
+
+  it('encodes a runtime image\'s AVIF on request, under an ETag of its own', async () => {
+    await Bun.write(join(uploads, 'formats.png'), Bun.file(HERO))
+
+    const path = `/_kay/image?src=${encodeURIComponent('/uploads/formats.png')}&w=320`
+    const avif = await get(path, { accept: 'image/avif' })
+    const webp = await get(path)
+    const etag = avif.headers.get('etag')!
+
+    expect(avif.headers.get('content-type')).toBe('image/avif')
+    expect(isAvif(await avif.bytes())).toBe(true)
+    expect(webp.headers.get('content-type')).toBe('image/webp')
+    expect([avif.headers.get('vary'), webp.headers.get('vary')]).toEqual(['accept', 'accept'])
+    expect(webp.headers.get('etag')).not.toBe(etag)
+    expect((await get(path, { 'accept': 'image/avif', 'if-none-match': etag })).status).toBe(304)
+  })
+
+  it('serves WebP alone, varying on nothing, with images.avif off', async () => {
+    const cache = await mkdtemp(join(tmpdir(), 'kay-webp-only-'))
+
+    try {
+      const plain = new Elysia()
+
+      serveImages(plain, { clientDir: join(cache, 'client'), cacheDir: cache, dirs: { '/uploads/': uploads } })
+
+      const response = await plain.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/formats.png')}&w=320`, { headers: { accept: 'image/avif' } }))
+
+      expect(response.headers.get('content-type')).toBe('image/webp')
+      expect(response.headers.get('vary')).toBeNull()
+      expect([avifQuality(undefined), avifQuality({}), avifQuality({ avif: { quality: 70 } }), avifQuality({ avif: false })]).toEqual([50, 50, 70, undefined])
+    }
+    finally {
+      await rm(cache, { recursive: true, force: true })
+    }
+  })
+
   it('answers 415 for a file that is no image', async () => {
     await Bun.write(join(uploads, 'broken.png'), 'not a png')
 
@@ -239,6 +308,68 @@ describe('build variants', () => {
     finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('AVIF', () => {
+  it('writes an AVIF beside each WebP variant given its quality, cached under it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-avif-'))
+    const client = join(dir, 'client')
+    const cache = join(dir, 'cache')
+    const widths = [320, 640, 960, 1000]
+
+    try {
+      await Bun.write(join(client, 'assets', 'hero-abc.png'), Bun.file(HERO))
+
+      expect(await writeImageVariants(client, undefined, cache, { avif: 50 })).toBe(8)
+      expect((await readdir(join(client, 'images'))).sort()).toEqual(widths.flatMap(width => [variantName('hero-abc.png', width), variantName('hero-abc.png', width, 'avif')]).sort())
+      expect((await readdir(cache)).sort()).toEqual(widths.flatMap(width => [`80-${variantName('hero-abc.png', width)}`, `50-${variantName('hero-abc.png', width, 'avif')}`]).sort())
+      expect(isAvif(await Bun.file(join(client, 'images', 'hero-abc-640.avif')).bytes())).toBe(true)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads back the pixels of a PNG, each of the five row filters undone, and of one Bun.Image wrote', async () => {
+    const width = 64
+    const height = 48
+    const pixels = new Uint8Array(width * height * 4)
+
+    // Gradients, flat runs and noise, so the encoder picks a different filter from row to row.
+    for (let index = 0; index < pixels.length; index++)
+      pixels[index] = index % 4 === 3 ? 255 : (index >> 8) % 3 === 0 ? (index * 7) & 0xFF : (index >> 8) % 3 === 1 ? 128 : Math.floor(Math.random() * 256)
+
+    const header = new Uint8Array(13)
+    const rows = new Uint8Array((width * 4 + 1) * height)
+
+    new DataView(header.buffer).setUint32(0, width)
+    new DataView(header.buffer).setUint32(4, height)
+    header.set([8, 6, 0, 0, 0], 8)
+
+    // Row y takes filter y % 5: none, left, above, their average, Paeth.
+    for (let y = 0; y < height; y++) {
+      const at = y * (width * 4 + 1)
+
+      rows[at] = y % 5
+
+      for (let x = 0; x < width * 4; x++) {
+        const byte = (dx: number, dy: number) => x >= dx * 4 && y >= dy ? pixels[(y - dy) * width * 4 + x - dx * 4]! : 0
+        const [left, above, corner] = [byte(1, 0), byte(0, 1), byte(1, 1)]
+        const estimate = left + above - corner
+        const paeth = [left, above, corner].sort((a, b) => Math.abs(estimate - a) - Math.abs(estimate - b))[0]!
+        const predicted = [0, left, above, (left + above) >> 1, paeth][y % 5]!
+
+        rows[at + 1 + x] = (byte(0, 0) - predicted) & 0xFF
+      }
+    }
+
+    const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...pngChunk('IHDR', header), ...pngChunk('IDAT', deflateSync(rows)), ...pngChunk('IEND', new Uint8Array())])
+    const decoded = decodePng(png)
+
+    expect([decoded.width, decoded.height]).toEqual([width, height])
+    expect(decoded.pixels).toEqual(pixels)
+    expect(decodePng(await new Bun.Image(png).png({ compressionLevel: 9 }).bytes()).pixels).toEqual(pixels)
   })
 })
 

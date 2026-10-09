@@ -6,6 +6,7 @@ import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, variantHeight, variantSuffix } from '../runtime/image'
+import { DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
@@ -20,6 +21,8 @@ export interface ImageRouteOptions {
   // Directories of images added at runtime, by the URL path they are served at, the directories absolute.
   dirs?: Record<string, string>
   quality?: number
+  // AVIF quality, which a request whose `Accept` names `image/avif` gets instead of WebP; none serves WebP alone.
+  avif?: number
   // The aspect ratios variants are cut to, `images.aspects`.
   aspects?: readonly string[]
   // Downloads an image from a host `images.remote` lists.
@@ -32,37 +35,60 @@ const IMMUTABLE = 'public, max-age=31536000, immutable'
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 const LADDER = new Set<number>(IMAGE_WIDTHS)
 const REMOTE_URL = /^https?:\/\//i
+const WEBP_EXTENSION = /\.webp$/
 
 // About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
 export const MAX_UPLOAD_PIXELS = 50_000_000
 export const DEFAULT_QUALITY = 80
 
+export type VariantFormat = 'webp' | 'avif'
+
 // The file name of one variant of an image the build or the route wrote, a width of the ladder by default.
-export function variantName(source: string, variant: number | ImageVariant): string {
-  return `${basename(source, extname(source))}${variantSuffix(typeof variant === 'number' ? { width: variant } : variant)}`
+export function variantName(source: string, variant: number | ImageVariant, format: VariantFormat = 'webp'): string {
+  return inFormat(`${basename(source, extname(source))}${variantSuffix(typeof variant === 'number' ? { width: variant } : variant)}`, format)
+}
+
+// `images.avif` as a quality, or undefined when it is off.
+export function avifQuality(images: { avif?: false | { quality?: number } } | undefined): number | undefined {
+  return images?.avif === false ? undefined : images?.avif?.quality ?? DEFAULT_AVIF_QUALITY
+}
+
+function inFormat(name: string, format: VariantFormat): string {
+  return format === 'avif' ? name.replace(WEBP_EXTENSION, '.avif') : name
+}
+
+function acceptsAvif(accept: string | null): boolean {
+  return accept?.split(',').some((entry) => {
+    const [type = '', ...params] = entry.split(';')
+    const weight = params.map(param => param.trim()).find(param => param.startsWith('q='))
+
+    return type.trim().toLowerCase() === 'image/avif' && (weight === undefined || Number(weight.slice(2)) > 0)
+  }) ?? false
 }
 
 // Written under a temporary name and moved into place, so a reader never sees a variant half written, nor one a crash cut short.
-export async function writeVariant(source: string, variant: number | ImageVariant, target: string, quality = DEFAULT_QUALITY): Promise<void> {
+export async function writeVariant(source: string, variant: number | ImageVariant, target: string, quality = DEFAULT_QUALITY, format: VariantFormat = 'webp'): Promise<void> {
   const partial = `${target}.${crypto.randomUUID()}.tmp`
 
   // Read through Bun.file, which also reaches the files an executable embeds, where Bun.Image given a path does not.
   const file = Bun.file(source)
   const shape = typeof variant === 'number' ? { width: variant } : variant
 
-  if (shape === 'card')
+  if (shape === 'card') {
     await new Bun.Image(await coverImage(file, CARD.width, CARD.height)).jpeg({ quality }).write(partial)
-  else if (shape.aspect)
-    await new Bun.Image(await coverImage(file, shape.width, variantHeight(shape.width, shape.aspect))).webp({ quality }).write(partial)
-  else
-    await new Bun.Image(file).resize(shape.width, undefined, { withoutEnlargement: true }).webp({ quality }).write(partial)
+  }
+  else {
+    const image = shape.aspect ? new Bun.Image(await coverImage(file, shape.width, variantHeight(shape.width, shape.aspect))) : new Bun.Image(file).resize(shape.width, undefined, { withoutEnlargement: true })
+
+    await (format === 'avif' ? Bun.write(partial, await encodeAvif(image, quality)) : image.webp({ quality }).write(partial))
+  }
 
   await rename(partial, target)
 }
 
-// Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files, with the crops and share cards pages asked for; returns how many were encoded.
+// Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files, with the crops and share cards pages asked for, each in AVIF too given its quality; returns how many were encoded.
 // With a cache directory, a variant an earlier build encoded is copied from it, and what this build no longer uses is pruned from it, unless `prune` is off for a pass that sees only some of the build's images.
-export async function writeImageVariants(clientDir: string, quality = DEFAULT_QUALITY, cacheDir?: string, { prune = true } = {}): Promise<number> {
+export async function writeImageVariants(clientDir: string, quality = DEFAULT_QUALITY, cacheDir?: string, { prune = true, avif }: { prune?: boolean, avif?: number } = {}): Promise<number> {
   const assets = join(clientDir, 'assets')
   const used = new Set<string>()
   let encoded = 0
@@ -76,10 +102,14 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
     const source = join(assets, name)
     const { width } = await new Bun.Image(source).metadata()
 
-    for (const variant of [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name)]) {
-      const target = join(clientDir, VARIANTS_DIR, variantName(name, variant))
+    const variants = [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name)]
+    // The share card stays a JPEG, which social sites read best.
+    const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: quality }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: avif }]])
+
+    for (const { variant, format, level } of encodings) {
+      const target = join(clientDir, VARIANTS_DIR, variantName(name, variant, format))
       // Asset names carry a hash of their content, so a cached variant only goes stale when the quality changes.
-      const cachedName = `${quality}-${variantName(name, variant)}`
+      const cachedName = `${level}-${variantName(name, variant, format)}`
       const cached = cacheDir && join(cacheDir, cachedName)
 
       used.add(cachedName)
@@ -88,7 +118,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
         continue
 
       if (!cached || !await Bun.file(cached).exists()) {
-        await writeVariant(source, variant, cached || target, quality)
+        await writeVariant(source, variant, cached || target, level, format)
         encoded++
       }
 
@@ -103,7 +133,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
   return encoded
 }
 
-// `/_kay/image?src=...&w=640` answers a WebP of an imported image, or of one in a directory of runtime images or on a host `images.remote` lists, at a width of the ladder or its own; `&crop=16x9` cuts it to an aspect ratio `images.aspects` allows, and `?src=...&card` answers its 1200x630 JPEG share card.
+// `/_kay/image?src=...&w=640` answers a WebP, or an AVIF to a browser that reads it when `avif` is set, of an imported image, or of one in a directory of runtime images or on a host `images.remote` lists, at a width of the ladder or its own; `&crop=16x9` cuts it to an aspect ratio `images.aspects` allows, and `?src=...&card` answers its 1200x630 JPEG share card.
 export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const pending = new Map<string, Promise<void>>()
   const allowed = new Set((options.aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!)))
@@ -146,12 +176,16 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if (typeof variant === 'string' && variant !== 'card')
       return new Response(variant, { status: 400, headers: TEXT })
 
+    // Both formats answer the same URL, so a cache keeps one per `Accept`.
+    const negotiated = options.avif !== undefined && variant !== 'card'
+    const format = negotiated && acceptsAvif(request.headers.get('accept')) ? 'avif' : 'webp'
+    const headers: Record<string, string> = negotiated ? { 'cache-control': IMMUTABLE, 'vary': 'accept' } : { 'cache-control': IMMUTABLE }
     // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after its key for a remote one, whose variants go when its original does.
-    const name = source.immutable ? variantName(source.path, variant) : `${source.key === undefined ? '' : `remote-${source.key}-`}${Bun.hash(`${source.path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`
+    const name = source.immutable ? variantName(source.path, variant, format) : inFormat(`${source.key === undefined ? '' : `remote-${source.key}-`}${Bun.hash(`${source.path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`, format)
     const found = source.immutable ? importedVariants.get(name) : undefined
 
     if (found)
-      return new Response(found, { headers: { 'cache-control': IMMUTABLE } })
+      return new Response(found, { headers })
 
     const built = join(options.clientDir, VARIANTS_DIR, name)
     const cached = join(options.cacheDir, name)
@@ -164,7 +198,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       if (!writing) {
         writing = (async () => {
           try {
-            await writeVariant(source.path, variant, cached, options.quality)
+            await writeVariant(source.path, variant, cached, format === 'avif' ? options.avif : options.quality, format)
           }
           finally {
             pending.delete(cached)
@@ -188,10 +222,10 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
       importedVariants.set(name, variantFile)
 
-      return new Response(variantFile, { headers: { 'cache-control': IMMUTABLE } })
+      return new Response(variantFile, { headers })
     }
 
-    return revalidated(request, `W/"${name}"`, () => Bun.file(file))
+    return revalidated(request, `W/"${name}"`, () => Bun.file(file), negotiated ? { vary: 'accept' } : {})
   })
 }
 

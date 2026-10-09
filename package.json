@@ -153,6 +153,7 @@
     "@babel/parser": "^7.29.7",
     "@babel/traverse": "^7.29.7",
     "@babel/types": "^7.29.7",
+    "@jsquash/avif": "2.1.1",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "devalue": "^6.0.2",
     "elysia": "^1.4.30"

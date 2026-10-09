@@ -6,6 +6,7 @@ import type { Template } from './new'
 import type { ClientBuild } from './server/client'
 import { existsSync, statSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
+import { availableParallelism } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs, styleText } from 'node:util'
@@ -25,13 +26,14 @@ import { startServer } from './lsp/server'
 import { migrateAstroProject } from './migrate/project'
 import { createProject, TEMPLATES } from './new'
 import { linkVariantFiles } from './runtime/image'
+import { setAvifThreads } from './server/avif'
 import { basePath } from './server/base'
 import { writeCards } from './server/card'
 import { PRERENDERED_DIR } from './server/client'
 import { compressFiles } from './server/compress'
 import { buildingWithoutEnv } from './server/env'
 import { FAVICON_DIR, writeFavicons } from './server/favicon'
-import { writeImageVariants, writeRemoteVariants } from './server/image'
+import { avifQuality, writeImageVariants, writeRemoteVariants } from './server/image'
 import { ExportError, prerenderPages } from './server/prerender'
 import { remoteImages, remotePatterns } from './server/remote'
 
@@ -337,8 +339,13 @@ async function bundleClient(root: string, config: KayConfig, exported: boolean):
 
   const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
 
+  // A static host cannot pick a format by `Accept`, so an export links WebP alone.
+  const avif = exported ? undefined : avifQuality(config.images)
+
+  // Each AVIF holds a thread for up to a second, while WebP encodes on Bun's own.
+  setAvifThreads(Math.min(4, availableParallelism()))
   // The prerender may import more images, so the cache is pruned once it has.
-  await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'), { prune: false })
+  await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'), { prune: false, avif })
 
   return client
 }
@@ -357,7 +364,7 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   // Remote originals are kept between builds, revalidated as the image route does.
   const remote = remoteImages(join(root, '.kay', 'cache', 'remote'), remotePatterns(config.images?.remote))
 
-  await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'))
+  await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'), { avif: exported ? undefined : avifQuality(config.images) })
   await writeRemoteVariants(client.dir, remote, config.images?.quality)
   await writeCards(client.dir, join(root, '.kay', 'cache', 'cards'), remote)
 

@@ -29,7 +29,7 @@ import { FAVICON_DIR, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuards } from './guards'
 import { cookieLocale, hostLocale, loadI18n, localeCookie, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
-import { applyImageConfig, serveImages } from './image'
+import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
 import { logRequests } from './log'
@@ -283,6 +283,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     cacheDir: imageCache,
     dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(bundle ? process.cwd() : root, dir)])),
     quality: options.images?.quality,
+    // Development serves WebP, so a page's first load does not wait on AVIF encoding.
+    avif: options.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
     remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache),
   }
