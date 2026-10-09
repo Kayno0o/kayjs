@@ -19,8 +19,8 @@ env:
 
 jobs:
   test:
-    # A release's version commit, `v1.2.3`, is tested by the publish workflow its tag starts, on the same tree; no other commit title starts with a `v`.
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'v')
+    # A release's version commit, `v1.2.3`, pushed alone, is tested by the publish workflow its tag starts, on the same tree; no other commit title starts with a `v`. Code commits pushed along with it still get the steps only this workflow runs.
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'v') || github.event.commits[1] != null
     runs-on: alpine
     timeout-minutes: 15
 
