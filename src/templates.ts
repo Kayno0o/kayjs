@@ -585,7 +585,7 @@ export const signOut = action(t.Object({}), async (_input, ctx) => {
 })
 
 const name = await ctx.locals.session.get('name')
-const member = name === undefined ? null : await db.repo(Member).read.findOneBy({ name })
+const member = name === undefined ? null : await db.repo(Member).read.findOne({ name })
 ---
 ---
 import Online from '../../components/online.kay'

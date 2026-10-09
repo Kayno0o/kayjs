@@ -20,7 +20,7 @@ export async function findNotice(id: number): Promise<PinnedNotice | undefined> 
 
 async function withAuthors(notices: NoticeInterface[]): Promise<PinnedNotice[]> {
   const ids = [...new Set(notices.map(notice => notice.author_id))]
-  const authors = await db.repo(AuthUsers).read.findManyBy({ id: ids })
+  const authors = await db.repo(AuthUsers).read.findMany({ id: ids })
   const names = new Map(authors.map(author => [author.id, author.username ?? 'A member']))
 
   return notices.map(notice => ({ ...notice, author: names.get(notice.author_id) ?? 'A member' }))

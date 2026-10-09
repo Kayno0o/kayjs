@@ -15,7 +15,7 @@ export const post = action(t.Object({
   if (!user)
     return ctx.fail(401, { error: 'Sign in to pin a notice' })
 
-  const notice = await db.repo(Notice).write.insertOne({ author_id: user.id, title: title.trim(), body: body.trim() }, { full: true })
+  const notice = await db.repo(Notice).write.insertOne({ author_id: user.id, title: title.trim(), body: body.trim() })
 
   // The members' mails go out from the queue; every open board hears of it now.
   await announcements.enqueue({ noticeId: notice.id })
