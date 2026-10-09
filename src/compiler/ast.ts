@@ -140,6 +140,62 @@ export function actionOf(element: ElementNode, source: string): Extract<Attribut
   return attribute?.kind === 'expression' ? attribute : undefined
 }
 
+// `Card(server)` renders per request inside a prerendered page, `Card(server="defer")` once the browser fetches it on approach.
+export const SERVER_ISLAND_ATTRIBUTE = 'server'
+export const SERVER_ISLAND_MODES = new Set(['defer'])
+
+// The mark making a component call a server island, with how it renders: undefined for a value no mode answers to.
+export function serverIslandOf(element: ElementNode, source: string): { attribute: NamedAttribute, mode: 'inline' | 'defer' | undefined } | undefined {
+  if (!element.component)
+    return undefined
+
+  const attribute = element.attributes.find((candidate): candidate is NamedAttribute => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === SERVER_ISLAND_ATTRIBUTE)
+
+  if (!attribute)
+    return undefined
+
+  if (attribute.kind === 'boolean')
+    return { attribute, mode: 'inline' }
+
+  return { attribute, mode: attribute.kind === 'static' && SERVER_ISLAND_MODES.has(attribute.text) ? attribute.text as 'defer' : undefined }
+}
+
+// Every element of a template, nested ones included, in source order.
+export function* elementsIn(nodes: readonly Node[]): Generator<ElementNode> {
+  for (const node of nodes) {
+    switch (node.kind) {
+      case 'element':
+        yield node
+        yield* elementsIn(node.children)
+
+        break
+      case 'text':
+        yield* elementsIn(node.parts.filter(part => part.kind === 'element'))
+
+        break
+      case 'if':
+        for (const branch of node.branches)
+          yield* elementsIn(branch.children)
+
+        break
+      case 'for':
+        yield* elementsIn([...node.children, ...node.fallback ?? []])
+
+        break
+      case 'await':
+        yield* elementsIn([...node.pending, ...node.resolved?.children ?? [], ...node.rejected?.children ?? []])
+
+        break
+      case 'try':
+        yield* elementsIn([...node.children, ...node.rejected?.children ?? []])
+
+        break
+      case 'slot':
+        yield* elementsIn(node.children)
+    }
+  }
+}
+
 // A field of a form posting to an action: what a refused post fills back in, and whether it can be marked invalid.
 export interface FormField {
   name: string

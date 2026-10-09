@@ -1,7 +1,9 @@
 import type { KayConfig } from '../config'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
 import type { Outcome } from '../runtime/action'
+import type { PendingBlock } from '../runtime/await.server'
 import type { HeadOptions } from '../runtime/head'
+import type { ServerIslandMode } from '../runtime/html'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Encoding } from './compress'
 import type { Flash, SuccessFlash } from './flash'
@@ -9,13 +11,14 @@ import type { ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
 import type { SeoHead } from './seo'
 import type { Prefetch } from './speculation'
+import type { Rendered } from './stream'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { browserOnlyHint, mapStack } from '../build/sourcemap'
 import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
-import { component } from '../runtime/html'
+import { component, newServerIslands, withServerIslands } from '../runtime/html'
 import { DEFAULT_MAX_DENSITY } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -37,7 +40,7 @@ import { reportServerError } from './report'
 import { inServerScope, withOutcome } from './scope'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
-import { renderStatic, streamDocument } from './stream'
+import { renderStatic, settle, streamDocument } from './stream'
 import { traced } from './trace'
 
 interface PageModule {
@@ -236,6 +239,90 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, con
   return respond(rendering, page.encoded[encoding]!)
 }
 
+export interface RenderedServerIslands {
+  // Each island's markup, in page order, under the mount point.
+  html: string[]
+  // The components a server island sits in, which the next request renders alone.
+  path: Set<unknown>
+  headers: Headers
+  // Answers with what the page's loads set, cookies included, for this visitor alone.
+  reply: (body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>) => Response
+}
+
+// The server islands of a prerendered page, rendered for this request: its loads run again, then only the components on the way to an island render, as `path` lists them; without one, the whole page renders once to find them.
+// A refusal, a redirect or a failed load answers as the page would.
+export async function renderServerIslands(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions, path: Set<unknown> | undefined, skip?: ServerIslandMode): Promise<RenderedServerIslands | Response> {
+  const rendering = createRendering(context, params, options)
+  const { request } = rendering.ctx
+  const report = (error: unknown) => reportServerError(error, request, options.onError)
+
+  return withOutcome(rendering.outcome, async () => {
+    const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
+
+    if (refusal)
+      return renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
+
+    const files = [...route.layouts, route.file]
+    const loaded = new Map<string, Loaded>()
+
+    try {
+      const modules = await importAll(files)
+      const loads = await Promise.allSettled(modules.map(async (module, index) => runLoad(files[index]!, module, rendering.ctx, undefined, index)))
+
+      for (const [index, load] of loads.entries())
+        loaded.set(files[index]!, load)
+
+      const data = loads.map((load) => {
+        if (load.status === 'rejected')
+          throw load.reason
+
+        return load.value
+      })
+
+      const islands = newServerIslands(path === undefined, path, skip)
+      const inScope = <T>(run: () => T) => inServerScope(request, report, run, () => rendering.headers.append('vary', 'cookie'))
+      const { deferred } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(modules, data))))
+      // What a block inside an island renders is the island's own, every component of it included.
+      const within = (view: () => unknown) => inScope(() => withServerIslands({ ...islands, inside: 1 }, () => renderStatic(view)))
+      const settled = await Promise.all(islands.html.map(async html => settleBlocks(html, deferred, within, report)))
+      const base = options.base ?? ''
+      const html = base === '' ? settled : await Promise.all(settled.map(async markup => rebaseHtml(new Response(markup, { headers: { 'content-type': 'text/html' } }), base).text()))
+
+      // Blocks the islands left out still settle, so one failing reports nothing.
+      void Promise.allSettled(deferred.map(async block => block.value))
+
+      return { html, path: islands.path, headers: rendering.headers, reply: (body) => {
+        rendering.headers.set('cache-control', 'private, no-store')
+
+        return respond({ ...rendering, base: '' }, body)
+      } }
+    }
+    catch (error) {
+      return renderFailure(error, route.special, rendering, loaded, client, options)
+    }
+  })
+}
+
+// Every `await` block in the markup swapped for what it settled into, as the island goes out whole.
+async function settleBlocks(html: string, deferred: PendingBlock[], render: (view: () => unknown) => Rendered, report: (error: unknown) => void): Promise<string> {
+  let markup = html
+
+  for (const block of deferred) {
+    const start = `<!--kay-await:${block.id}-->`
+    const end = `<!--/kay-await:${block.id}-->`
+    const at = markup.indexOf(start)
+
+    if (at === -1)
+      continue
+
+    const rendered = await settle(block, () => false, report, render)
+
+    markup = markup.slice(0, at) + await settleBlocks(rendered.html, rendered.deferred, render, report) + markup.slice(markup.indexOf(end, at) + end.length)
+  }
+
+  return markup
+}
+
 // A URL no page serves, answered by the routes directory's own `_404.kay` or `_error.kay`.
 export async function renderUnmatched(special: SpecialPages, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const rendering = createRendering(context, {}, options)
@@ -319,7 +406,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
 function needsRequest(name: string): () => never {
   return () => {
-    throw new Error(`kay: a prerendered page renders once, at build time, so it has no ${name}; drop \`export const prerender\` to render it per request`)
+    throw new Error(`kay: a prerendered page renders once, at build time, so it has no ${name}; drop \`export const prerender\`, or the \`server\` mark of a server island it holds, to render it per request`)
   }
 }
 
@@ -420,9 +507,9 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
   return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.onError), () => documentOf(files, modules, data, client, rendering, options), () => rendering.headers.append('vary', 'cookie'))
 }
 
-function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
+// The page inside its layouts, each through `component`, so what a layout provides reaches its page.
+function viewOf(modules: PageModule[], data: Record<string, unknown>[]): () => unknown {
   const page = modules.length - 1
-  // Each through `component`, so what a layout provides reaches its page.
   let view = () => component(modules[page]!.default, data[page]!)
 
   for (let index = page - 1; index >= 0; index--) {
@@ -433,12 +520,21 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
     } })
   }
 
-  const { result: { result: { html: body, islands, deferred }, head }, forms } = collectForms(() => collectHead(() => renderStatic(view), pageHead(modules[page]!, options.head?.(rendering.ctx.url, rendering.status))))
+  return view
+}
+
+function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
+  const page = modules.length - 1
+  const view = viewOf(modules, data)
+  // A prerendered page holds each server island between marks the server splits it at.
+  const scan = options.prerendering ? newServerIslands(true) : undefined
+  const { result: { result: { html: body, islands, deferred }, head }, forms } = collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(view)) : renderStatic(view), pageHead(modules[page]!, options.head?.(rendering.ctx.url, rendering.status))))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither still ships no JavaScript, and links from it load pages, losing no state.
   const posts = client.entry !== undefined && client.navigation === true && forms.size > 0
-  const shipsEntry = hasIslands || posts
+  // The entry fetches a deferred server island as it nears the viewport.
+  const shipsEntry = hasIslands || posts || (client.entry !== undefined && scan?.modes.includes('defer') === true)
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') : ''
   const locale = localeState()
   const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}${stylesheets(client, files)}${head.html}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) : ''}${options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS : ''}</head><body>${body}`

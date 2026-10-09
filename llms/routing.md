@@ -109,6 +109,35 @@ invalidatePage(path => path.startsWith('/blog/'))
 - The path is the one the routes serve, without the base, a locale's page under its segment, `/fr/blog/hello`. Requests arriving while the render runs wait for the same one; a render that fails or answers 5xx is logged, leaves the page as it was, and no request waits on another before a minute has passed.
 - Processes sharing a `sqliteCache` (see [Caching](rendering.md#caching)) mark the same pages within about half a second: a path given as it is reaches them all, a function the paths it matched in this process, which serves the same build.
 
+### Server islands
+
+`server` on a component call renders that component per request inside an otherwise prerendered page: a form carrying a fresh token, a greeting, a stock count. The mark is the whole setup. A page without params whose template reaches one, directly or through the components it imports, prerenders without `export const prerender`, unless it exports `prerender = false`. Each request runs the page's loads again, its server fence included, and renders only the components on the way down to the island, so its props come from the fence as they would on a page rendered whole:
+
+```kay
+--- server
+import { issueToken } from '../contact'
+
+export const contact = action(schema, send)
+const token = issueToken()
+---
+Hero
+Contact(action={contact} token={token})
+```
+
+```kay
+// src/components/contact.kay
+Section(title="Contact")
+  p Write to us
+  ContactForm(server="defer" action={action} token={token})
+```
+
+- `server` renders it on every GET and splices it into the prerendered page: it arrives with the page and needs no JavaScript. Only the island is rendered and compressed, the rest of the page being deflated once; the page then goes out as gzip, never brotli, with `Cache-Control: private, no-store` and no ETag.
+- `server="defer"` serves the page as any prerendered page, brotli and ETag included, and the browser fetches the island a screen before it scrolls into view, or once the page is idle, then hydrates what it brought. Until then the page shows the component as the build rendered it, inert and with its forms' field names and actions taken out, so it keeps its place and size and a bot reading the page has nothing to post. Pick it for what sits low on the page. A page deferring an island ships kay's browser entry, and with no island and `navigation: false` the build fails.
+- The island's URL is the page's with `?kay_island=N`: fetched by kay, it answers the island alone; visited, as from a link, it answers the page with every island in place.
+- A form post rendering the page, refused or coming back with how it went, renders it whole, islands included.
+- What a component on the way to an island provides reaches it; what a layout's or a sibling's render does besides does not run. A mark inside an island is reported by `kay check`, as an island renders whole in the browser too.
+- `kay build --static` refuses a page holding one, and the offline worker leaves it out of the pages it keeps unless `offline.pages` lists it, warning that it would keep one visitor's render.
+
 ## Redirects
 
 `redirects` in kay.config.ts sends old paths elsewhere, with a 308, or a 307 when `permanent` is false:
@@ -148,7 +177,7 @@ export default defineConfig({
 
 `kay build --static` writes the site to `dist`, or `--outdir`, for any static host: Forgejo Pages, a CDN, plain nginx.
 
-- Every page is rendered: one without params as it is, one with params for the values its `prerender` lists. A page a guard covers, one exporting an action, one with params and no list, one exporting `prerender = false`, one that redirects or answers another status than 200, one linking an image only the image route makes, and one whose render fails cannot be served without a server, nor can a module under `src/api/`, and the build fails naming each of them.
+- Every page is rendered: one without params as it is, one with params for the values its `prerender` lists. A page a guard covers, one exporting an action, one holding a [server island](#server-islands), one with params and no list, one exporting `prerender = false`, one that redirects or answers another status than 200, one linking an image only the image route makes, and one whose render fails cannot be served without a server, nor can a module under `src/api/`, and the build fails naming each of them.
 - Each page is written as `about.html` and `about/index.html`, so a host finds it at `/about` and `/about/` alike, `/` as `index.html`; the browser build goes under `_kay/`, the public files at the root, with the sitemap, `robots.txt`, feeds, favicons, `sw.js` (see [Offline](head.md#offline)) and `404.html` from `_404.kay`. Every compressible file has its `.br` and `.gz` copy beside it, for a server sending them as they are (nginx's `gzip_static`), and asset names carry their hash, so `_kay/` can be cached forever.
 - Imported images link the variants the build writes, `/_kay/images/hero-640.webp`, `hero-640-16x9.webp` cut and `hero-card.jpg` for the share card, since no image route answers; an image from `images.dirs` is not exported, and one from `images.remote` is downloaded by the build, its variants written as `/_kay/images/remote-<hash of its URL>-640.webp`, the build failing if the host does not answer.
 - A redirect without params becomes a page sending the browser on with `<meta http-equiv="refresh">`; every redirect also goes to `_redirects`, read by hosts such as Netlify and Cloudflare Pages. With `i18n.prefixDefault`, each unprefixed path sends the browser to the default locale's copy. Locales by domain need a server.

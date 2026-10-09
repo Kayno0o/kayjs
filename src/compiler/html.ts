@@ -1,12 +1,12 @@
 import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, describedByOf, formFieldOf } from './ast'
+import { actionOf, describedByOf, formFieldOf, SERVER_ISLAND_ATTRIBUTE, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'show', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -661,13 +661,15 @@ export class HtmlTemplate {
   private component(element: ElementNode): void {
     const { b } = this
     const dynamic = b.isDynamicTag(element.tag)
+    // What renders in the browser too renders whole: an island hydrates as one.
+    const island = dynamic || this.options.hydratable === true ? undefined : serverIslandOf(element, this.src)
 
     b.add(`${htmlAlias('child')}(`)
 
     if (dynamic)
       b.add(`${htmlAlias('dynamic')}(`).addSource(element.tag).add(', ')
     else
-      b.add(`${htmlAlias('component')}(`).addSource(element.tag).add(', ')
+      b.add(`${htmlAlias(island ? 'serverIsland' : 'component')}(`).addSource(element.tag).add(', ')
 
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
 
@@ -703,6 +705,9 @@ export class HtmlTemplate {
 
     if (spreads)
       b.add(')')
+
+    if (island)
+      b.add(`, ${JSON.stringify(island.mode ?? 'inline')}`)
 
     b.add('))')
   }
@@ -761,7 +766,7 @@ export class HtmlTemplate {
 
       const name = this.source(attribute.name)
 
-      if (!element.component && BEHAVIOUR.test(name))
+      if (element.component ? name === SERVER_ISLAND_ATTRIBUTE : BEHAVIOUR.test(name))
         continue
 
       separate()

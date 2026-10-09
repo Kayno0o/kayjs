@@ -108,13 +108,14 @@ export interface FixedText {
 
 // Each text deflated once, at the strongest level.
 export function fixedTexts(texts: string[]): FixedText[] {
+  return [...new Set(texts)].map(fixedText)
+}
+
+export function fixedText(text: string): FixedText {
   const { constants, deflateRawSync } = nodeZlib()
+  const bytes = Buffer.from(text)
 
-  return [...new Set(texts)].map((text) => {
-    const bytes = Buffer.from(text)
-
-    return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated: deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }) }
-  })
+  return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated: deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }) }
 }
 
 function offsetOf(body: Buffer, text: FixedText): number {
@@ -158,15 +159,42 @@ async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): 
     }
   }
 
-  if (found.length === 0)
-    return undefined
+  return found.length === 0 ? undefined : gzipFound(body, found)
+}
 
+async function gzipFound(body: Buffer, found: Found[]): Promise<{ gzip: Uint8Array<ArrayBuffer>, late: boolean }> {
   const left = body.length - found.reduce((total, { text }) => total + text.bytes.length, 0)
 
   if (left <= SPLICE_HERE_BYTES)
     return { gzip: await gzipAround(body, found, deflateRawHere), late: false }
 
   return { gzip: await compressing(async () => gzipAround(body, found, deflateRaw)), late: true }
+}
+
+// A gzip of the fixed texts with markup rendered per request between them, which alone is deflated: a prerendered page around its server islands.
+export async function gzipBetween(fixed: FixedText[], between: string[]): Promise<Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>> {
+  const chunks: Uint8Array[] = []
+  const found: Found[] = []
+  let at = 0
+
+  for (const [index, text] of fixed.entries()) {
+    found.push({ text, at })
+    chunks.push(text.bytes)
+    at += text.bytes.length
+
+    const markup = between[index]
+
+    if (markup !== undefined && index < fixed.length - 1) {
+      const bytes = Buffer.from(markup)
+
+      chunks.push(bytes)
+      at += bytes.length
+    }
+  }
+
+  const { gzip, late } = await gzipFound(Buffer.concat(chunks), found)
+
+  return late ? lateBody(gzip) : gzip
 }
 
 async function gzipAround(body: Buffer, found: Found[], deflate: Deflate): Promise<Uint8Array<ArrayBuffer>> {
@@ -281,7 +309,7 @@ async function compressBody({ headers, status, statusText }: Response, source: R
 const UNCORKED_BYTES = 15 * 1024
 
 // Bytes past that go as a stream already holding them, whose head Bun corks: it serves about as fast as bytes answered within the request's tick, with no content-length.
-function lateBody(bytes: Uint8Array<ArrayBuffer>): BodyInit {
+function lateBody(bytes: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array> {
   return bytes.length < UNCORKED_BYTES
     ? bytes
     : new ReadableStream({ start(controller) {

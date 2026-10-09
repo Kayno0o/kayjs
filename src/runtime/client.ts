@@ -17,6 +17,9 @@ interface IslandElement extends HTMLElement {
 
 // Starts loading a `visible` island this far before it scrolls into view.
 const VISIBLE_MARGIN = '200px'
+// Fetches a deferred server island about a screen before it scrolls into view, so a visitor never meets the copy standing in for it.
+const NEAR_MARGIN = '100% 0px'
+const SERVER_ISLAND = 'slot[data-kay-server]'
 const IDLE_FALLBACK_MS = 200
 const started = new WeakSet<HTMLElement>()
 // What disposes each hydrated island, so a page swap can end the ones it takes away: their effects, timers and connections.
@@ -78,6 +81,19 @@ async function post(body: string): Promise<void> {
 export async function hydrateIslands(registry: IslandRegistry, root: ParentNode = document): Promise<void> {
   const eager: Promise<void>[] = []
 
+  for (const element of root.querySelectorAll<HTMLElement>(SERVER_ISLAND)) {
+    if (started.has(element))
+      continue
+
+    started.add(element)
+
+    let fetched: Promise<void> | undefined
+    const run = async () => fetched ??= fetchServerIsland(registry, element)
+
+    whenVisible(element, run, NEAR_MARGIN)
+    whenIdle(run)
+  }
+
   for (const element of root.querySelectorAll<HTMLElement>(ISLAND)) {
     if (started.has(element))
       continue
@@ -94,6 +110,14 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
   }
 
   await Promise.all(eager)
+}
+
+// Its own chunk, which only a page deferring a server island loads.
+async function fetchServerIsland(registry: IslandRegistry, element: HTMLElement): Promise<void> {
+  const { fetchServerIsland: fetchIt } = await import('./fetch-island')
+
+  await fetchIt(element)
+  await hydrateIslands(registry, element)
 }
 
 async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Promise<void> {
@@ -326,7 +350,7 @@ function takeEvents(element: HTMLElement): Event[] {
   return taken
 }
 
-function whenVisible(element: HTMLElement, run: () => Promise<void>) {
+function whenVisible(element: HTMLElement, run: () => Promise<void>, margin = VISIBLE_MARGIN) {
   if (typeof IntersectionObserver === 'undefined') {
     void run()
 
@@ -339,7 +363,7 @@ function whenVisible(element: HTMLElement, run: () => Promise<void>) {
 
     observer.disconnect()
     void run()
-  }, { rootMargin: VISIBLE_MARGIN })
+  }, { rootMargin: margin })
 
   // The wrapper lays out as `display: contents`, so it has no box of its own to intersect.
   const targets = element.children.length > 0 ? element.children : [element.parentElement ?? element]

@@ -1,3 +1,4 @@
+import type { ServerIslandMode } from '../runtime/html'
 import { join, resolve } from 'node:path'
 import { ASSET_PREFIX, clientDir } from '../build/assets'
 import { NOWHERE } from '../runtime/base'
@@ -33,6 +34,8 @@ export interface PrerenderedPage {
   renderedAt: number
   // Seconds after which the server renders it again in the background, from the page's `revalidate` export.
   revalidate?: number | undefined
+  // How each of its server islands renders per request, in page order.
+  islands?: ServerIslandMode[] | undefined
 }
 
 export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {

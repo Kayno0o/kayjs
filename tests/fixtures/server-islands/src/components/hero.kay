@@ -1,0 +1,6 @@
+---
+import { renders } from '../renders'
+
+renders.hero++
+---
+p.hero Hero

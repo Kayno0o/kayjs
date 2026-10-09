@@ -1,0 +1,10 @@
+--- server
+import { stamp } from '../renders'
+
+const current = stamp()
+---
+---
+import Contact from '../components/contact.kay'
+---
+h1 Deferred
+Contact(stamp={current})

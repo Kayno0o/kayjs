@@ -180,6 +180,11 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     .map(entry => `${base}${ASSET_PREFIX}${join(entry.parentPath, entry.name).slice(client.dir.length + 1).replace(BACKSLASH, '/')}`)
     .sort()
   const pages = (config.pages ?? options.publicPages).map(path => `${base}${path}`).sort()
+  const rendered = config.pages?.filter(path => client.pages.get(path)?.islands !== undefined) ?? []
+
+  // Pages with server islands are not kept offline by default: an island needs the server, and an offline copy would keep one visitor's render.
+  if (rendered.length > 0)
+    console.warn(`[kay] offline.pages lists ${rendered.join(', ')}, whose server islands render per request: offline, a visitor gets the copy cached when the worker installed`)
 
   // Each one is fetched on every deploy's install, by every visitor who has the worker.
   if (config.pages === undefined && pages.length > MANY_PAGES)

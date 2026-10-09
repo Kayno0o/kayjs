@@ -1,0 +1,7 @@
+---
+const { stamp } = props<{ stamp: string }>()
+---
+form(method="post" action="/contact")
+  input(type="hidden" name="stamp" value={stamp})
+  button(type="submit" formaction="/elsewhere") Send
+  p.stamp {stamp}

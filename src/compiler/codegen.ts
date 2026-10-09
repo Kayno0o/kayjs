@@ -3,7 +3,7 @@ import type { LintName } from './lints'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, awaitBlocks, errorMessages, isChildrenSlot, isHead, tryBlocks } from './ast'
+import { actionOf, awaitBlocks, errorMessages, isChildrenSlot, isHead, serverIslandOf, tryBlocks } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -979,7 +979,15 @@ class Generator {
     })
   }
 
+  private checkServerIsland({ attribute, mode }: NonNullable<ReturnType<typeof serverIslandOf>>): void {
+    if (this.options.island !== undefined || this.options.insideIsland)
+      this.error(attribute.name, '`server` has no effect inside an island', { note: 'an island renders in the browser too, as a whole' })
+    else if (mode === undefined)
+      this.error(attribute.name, '`server` takes no value, or "defer"', { help: '`server` renders it per request inside the prerendered page, `server="defer"` once the browser fetches it on approach' })
+  }
+
   private emitAttributes(element: ElementNode) {
+    const serverIsland = serverIslandOf(element, this.src)
     const { b } = this
 
     if (element.id) {
@@ -1007,6 +1015,12 @@ class Generator {
 
       if (element.component && (this.options.island !== undefined || this.options.insideIsland) && attribute.kind !== 'spread' && ISLAND_OPTIONS.has(this.text(attribute.name)))
         this.error(attribute.name, `\`${this.text(attribute.name)}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
+
+      if (attribute === serverIsland?.attribute) {
+        this.checkServerIsland(serverIsland)
+
+        continue
+      }
 
       b.add(' ')
 

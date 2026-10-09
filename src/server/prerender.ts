@@ -2,7 +2,8 @@ import type { KayConfig } from '../config'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
-import { join, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
+import { elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { isAction } from '../runtime/action'
@@ -22,8 +23,10 @@ import { listedParams, pageEtag, pathOf, storedHeaders } from './prerendered'
 import { renderPage } from './render'
 import { refuseClashes, scanRoutes } from './routes'
 import { configHead, siteOrigin } from './seo'
+import { serverIslandModes } from './server-islands'
 
 const KAY_PREFIX = /^kay: /
+const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
 
 // The image route in an attribute, `src`, `srcset` or a style's `url()`: a page whose text only names it, as documentation does, links nothing.
 export const IMAGE_LINK = new RegExp(`="[^"]*${RegExp.escape(IMAGE_ROUTE)}\\?`)
@@ -67,15 +70,15 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   const matchers = await loadMatchers(routesDir, routes)
   const i18n = config.i18n ? await loadI18n(root, config.i18n) : undefined
 
-  async function prerenderRoute(route: Route, file: string): Promise<void> {
+  async function prerenderRoute(route: Route, file: string, marked: boolean): Promise<void> {
     const module = await import(route.file) as Record<string, unknown>
     const revalidate = revalidatePeriod(file, module.revalidate)
 
     if (options.exportAll)
       refuseServerOnly(route, module)
 
-    // A static export takes a page without params as it is.
-    const listed = options.exportAll && module.prerender === undefined && route.params.length === 0 ? true : module.prerender
+    // A static export takes a page without params as it is, and so does a page holding a server island: what is not one is the same for everyone.
+    const listed = (options.exportAll === true || marked) && module.prerender === undefined && route.params.length === 0 ? true : module.prerender
 
     if (options.exportAll && (listed === undefined || listed === false))
       throw new Error(listed === false ? 'kay: it exports prerender = false' : `kay: it takes ${route.params.join(', ')}, so \`prerender\` lists the values to export: export const prerender = [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }]`)
@@ -106,6 +109,14 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         if (options.exportAll && IMAGE_LINK.test(html))
           throw new Error(`kay: ${copy.path} links an image only the image route resizes, such as one from images.dirs, and no file of it is exported`)
 
+        const islands = serverIslandModes(html)
+
+        if (options.exportAll && islands.length > 0)
+          throw new Error(`kay: it holds ${islands.length === 1 ? 'a server island' : `${islands.length} server islands`}, which only a server renders per request`)
+
+        if (islands.includes('defer') && client.entry === undefined)
+          throw new Error(`kay: it defers a server island, which kay's browser entry fetches, and with no island and \`navigation: false\` the build has none; mark it \`server\` to render it inline instead`)
+
         const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
         const taken = paths.get(name)
 
@@ -115,7 +126,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         paths.set(name, copy.key)
         await mkdir(join(dir, name, '..'), { recursive: true })
         await Bun.write(join(dir, name), html)
-        pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate }
+        pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {} }
       }
     }
   }
@@ -125,13 +136,15 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   for (const route of routes) {
     // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
-    if (!options.exportAll && !await exportsPrerender(route.file))
+    const marked = route.params.length === 0 && await reachesServerIsland(route.file)
+
+    if (!options.exportAll && !marked && !await exportsPrerender(route.file))
       continue
 
     const file = relative(root, route.file)
 
     try {
-      await prerenderRoute(route, file)
+      await prerenderRoute(route, file, marked)
     }
     catch (error) {
       if (!options.exportAll)
@@ -173,6 +186,35 @@ function count(problems: number, what: string): string {
 // A page's `revalidate` export in seconds, or undefined when it has none.
 function revalidatePeriod(file: string, value: unknown): number | undefined {
   return value === undefined ? undefined : durationSeconds(value, `${file}'s revalidate`)
+}
+
+// Whether the file's template, or that of a component it imports, however deep, marks a server island.
+async function reachesServerIsland(file: string, seen = new Set<string>()): Promise<boolean> {
+  if (seen.has(file))
+    return false
+
+  seen.add(file)
+
+  const source = await Bun.file(file).text()
+
+  if ([...elementsIn(parseKay(source).template)].some(element => serverIslandOf(element, source)))
+    return true
+
+  for (const [, specifier] of source.matchAll(KAY_IMPORT)) {
+    let imported: string
+
+    try {
+      imported = Bun.resolveSync(specifier!, dirname(file))
+    }
+    catch {
+      continue
+    }
+
+    if (await reachesServerIsland(imported, seen))
+      return true
+  }
+
+  return false
 }
 
 async function exportsPrerender(file: string): Promise<boolean> {

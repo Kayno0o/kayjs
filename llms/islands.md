@@ -8,6 +8,8 @@ Props a static component passes to an island are serialized for the browser: pla
 
 An island hydrates as soon as the page loads, its chunks preloaded. `hydrate="idle"` waits until the browser is idle and `hydrate="visible"` until it scrolls near the viewport, neither preloaded: `Comments(postId={post.id} hydrate="visible")`. Only an island takes `hydrate`, and only from a static parent.
 
+A component the server renders per request inside an otherwise prerendered page, such as a form carrying a fresh token, is a server island instead: see [Server islands](routing.md#server-islands).
+
 ### Shared and persisted state
 
 A signal a `.ts` module exports is one state for every island of the page that imports it: `export const cart = signal<Item[]>([])` in `src/cart.ts`, read by a header badge and written by a product's button.

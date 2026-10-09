@@ -236,9 +236,107 @@ export function dynamic(tag: unknown, props: object): unknown {
   return typeof tag === 'function' ? component(tag as (props: object) => unknown, props) : undefined
 }
 
+export type ServerIslandMode = 'inline' | 'defer'
+
+// A page render looking for its server islands. Scanning renders every component, noting those a server island sits in; otherwise only those render, the rest of the page coming from its prerendered copy.
+export interface ServerIslands {
+  scanning: boolean
+  path: Set<unknown>
+  // Each server island's markup, in page order.
+  html: string[]
+  modes: ServerIslandMode[]
+  stack: unknown[]
+  inside: number
+  // Islands this request has no use for, left unrendered: a scan renders them all.
+  skip?: ServerIslandMode | undefined
+}
+
+let islands: ServerIslands | undefined
+
 // Calls a component under an owner of its own, so what it provides reaches only what it renders.
 export function component<P>(fn: (props: P) => unknown, props: P): unknown {
-  return scope(() => fn(props))
+  return islands ? throughServerIslands(islands, fn, props) : scope(() => fn(props))
+}
+
+export function newServerIslands(scanning: boolean, path = new Set<unknown>(), skip?: ServerIslandMode): ServerIslands {
+  return { scanning, path, html: [], modes: [], stack: [], inside: 0, skip }
+}
+
+export function withServerIslands<T>(state: ServerIslands, render: () => T): T {
+  const outer = islands
+
+  islands = state
+
+  try {
+    return render()
+  }
+  finally {
+    islands = outer
+  }
+}
+
+function throughServerIslands<P>(state: ServerIslands, fn: (props: P) => unknown, props: P): unknown {
+  if (state.inside > 0)
+    return scope(() => fn(props))
+
+  if (!state.scanning)
+    return state.path.has(fn) ? scope(() => fn(props)) : undefined
+
+  state.stack.push(fn)
+
+  try {
+    return scope(() => fn(props))
+  }
+  finally {
+    state.stack.pop()
+  }
+}
+
+// Where each server island sits in a prerendered page, between two comments the server splits the page at.
+export const SERVER_ISLAND = /<!--kay-server:(\d+)-->[\s\S]*?<!--\/kay-server:\1-->/g
+// What could post a form: the fields' names and where it goes.
+const POSTING_TAG = /<(?:form|input|select|textarea|button)\s[^>]*>/g
+const POSTING_ATTRIBUTE = /\s(?:name|action|formaction)="[^"]*"/g
+
+// A component the server renders per request inside a prerendered page: spliced into it for `inline`, fetched by the browser on approach for `defer`.
+// Outside a page looking for them, as when the whole page renders per request, it renders as any component does.
+export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: ServerIslandMode): unknown {
+  const state = islands
+
+  if (!state || state.inside > 0)
+    return component(fn, props)
+
+  if (!state.scanning && mode === state.skip) {
+    state.html.push('')
+
+    return undefined
+  }
+
+  state.inside++
+
+  let html: string
+
+  try {
+    html = child(component(fn, props))
+  }
+  finally {
+    state.inside--
+  }
+
+  const index = state.html.push(html) - 1
+
+  if (!state.scanning)
+    return undefined
+
+  for (const owner of state.stack)
+    state.path.add(owner)
+
+  state.modes.push(mode)
+
+  // The copy a deferred island shows until the browser fetches its own has its size, inert and with nothing it could post, as what it holds is from the build.
+  const placeholder = mode === 'defer' ? `<slot data-kay-server="${index}" inert>${html.replace(POSTING_TAG, tag => tag.replace(POSTING_ATTRIBUTE, ''))}</slot>` : ''
+
+  return { t: `<!--kay-server:${index}-->${placeholder}<!--/kay-server:${index}-->` }
 }
 
 // Props from several objects, later ones winning, each keeping its getters, so a spread `children` still renders only when read.

@@ -1,0 +1,15 @@
+--- server
+import { stamp } from '../renders'
+
+const current = stamp()
+---
+---
+import Contact from '../components/contact.kay'
+import Hero from '../components/hero.kay'
+import Stamped from '../components/stamped.kay'
+---
+h1 Home
+Hero
+Stamped(server stamp={current})
+Contact(stamp={current})
+p.after After

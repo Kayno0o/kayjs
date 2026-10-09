@@ -1,0 +1,6 @@
+---
+const { title } = props<{ title: string }>()
+---
+section
+  h2 {title}
+  slot
