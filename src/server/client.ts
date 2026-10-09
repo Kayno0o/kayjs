@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path'
 import { ASSET_PREFIX, clientDir } from '../build/assets'
+import { NOWHERE } from '../runtime/base'
 import { unrebaseCss } from './base'
 
 // Written beside the bundle as `manifest.json`, so a production server reads it instead of bundling at boot.
@@ -45,10 +46,11 @@ export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {
   inlineStyles?: Map<string, string> | undefined
 }
 
-// A URL with no scheme that is no path of the site nor a fragment: relative to the stylesheet it is written in.
-const RELATIVE_CSS_URL = /url\(\s*(["']?)(?![a-z][\w+.-]*:|\/|#)([^"')\s]+)\1\s*\)/gi
+// Quoted, spaces included, or bare.
+const CSS_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^"')\s]+))\s*\)/gi
+// A scheme, a path of the site or a fragment: what a stylesheet's place does not change.
+const NOT_RELATIVE = /^(?:[a-z][\w+.-]*:|\/|#)/i
 const STYLE_END = /<\/style/gi
-const NOWHERE = 'http://nowhere.invalid'
 
 export const MANIFEST = 'manifest.json'
 
@@ -74,21 +76,26 @@ export async function readClient(root: string, base = join(root, '.kay', 'client
 
 // Each stylesheet's text by URL, for heads to carry: what a URL is relative to stops being the file once inline, and the page goes under the mount point as it goes out, so the one the build added comes off.
 export async function readInlineStyles(client: ClientBuild, base: string): Promise<Map<string, string>> {
-  const inline = new Map<string, string>()
+  const urls = [...new Set(client.styles.values())]
 
-  for (const url of new Set(client.styles.values())) {
-    const css = await Bun.file(join(client.dir, ...url.slice(ASSET_PREFIX.length).split('/').map(decodeURIComponent))).text()
-    const absolute = (base === '' ? css : unrebaseCss(css, base)).replace(RELATIVE_CSS_URL, (_, quote: string, path: string) => {
+  return new Map(await Promise.all(urls.map(async (url): Promise<[string, string]> => {
+    // The browser hashes the text with its line breaks read as `\n`.
+    const css = (await Bun.file(join(client.dir, ...url.slice(ASSET_PREFIX.length).split('/').map(decodeURIComponent))).text()).replaceAll('\r\n', '\n')
+    const absolute = (base === '' ? css : unrebaseCss(css, base)).replace(CSS_URL, (match, double: string | undefined, single: string | undefined, bare: string | undefined) => {
+      const path = double ?? single ?? bare!
+
+      if (NOT_RELATIVE.test(path))
+        return match
+
       const target = new URL(path, `${NOWHERE}${url}`)
+      const quote = double !== undefined ? '"' : single !== undefined ? '\'' : ''
 
       return `url(${quote}${target.pathname}${target.search}${target.hash}${quote})`
     })
 
     // A `</style` in a string would close the element: `\/` is the same slash to CSS.
-    inline.set(url, absolute.replace(STYLE_END, '<\\/style'))
-  }
-
-  return inline
+    return [url, absolute.replace(STYLE_END, '<\\/style')]
+  })))
 }
 
 export function fromManifest(root: string, manifest: ClientManifest, dir = clientDir(root)): ClientBuild {

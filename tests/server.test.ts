@@ -172,15 +172,15 @@ describe('pages', () => {
     }
   })
 
-  it('reads a stylesheet to inline with its relative URLs made absolute, the mount point the build added taken off, and no way to close its element', async () => {
+  it('reads a stylesheet to inline with its relative URLs made absolute, the mount point the build added taken off, its line breaks read as the browser hashes them, and no way to close its element', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-inline-'))
 
     try {
-      await Bun.write(join(dir, 'pages', 'home-1.css'), '.a{background:url("./a-1.png")}.b{background:url(../b.png?v=1#x)}.c{background:url(/docs/c.png)}.d{background:url(data:image/png;base64,AA)}.e{content:"</style>"}')
+      await Bun.write(join(dir, 'pages', 'home-1.css'), `.a{background:url("./a-1.png")}.b{background:url(../b.png?v=1#x)}.c{background:url(/docs/c.png)}.d{background:url(data:image/png;base64,AA)}.e{content:"</style>"}\r\n.f{background:url('./f g.png')}`)
 
       const inline = await readInlineStyles({ dir, styles: new Map([['/x.kay', '/_kay/pages/home-1.css']]) } as ClientBuild, '/docs')
 
-      expect(inline.get('/_kay/pages/home-1.css')).toBe('.a{background:url("/_kay/pages/a-1.png")}.b{background:url(/_kay/b.png?v=1#x)}.c{background:url(/c.png)}.d{background:url(data:image/png;base64,AA)}.e{content:"<\\/style>"}')
+      expect(inline.get('/_kay/pages/home-1.css')).toBe(`.a{background:url("/_kay/pages/a-1.png")}.b{background:url(/_kay/b.png?v=1#x)}.c{background:url(/c.png)}.d{background:url(data:image/png;base64,AA)}.e{content:"<\\/style>"}\n.f{background:url('/_kay/pages/f%20g.png')}`)
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -685,6 +685,24 @@ describe('prerendering', () => {
       expect(served.headers.get('set-cookie')).toStartWith('seen=admin;')
       expect((await visit('ada', { 'if-none-match': `"other", W/${etag}` })).status).toBe(304)
       expect((await visit('bob')).status).toBe(403)
+    }
+    finally {
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('writes the stylesheets into the pages it prerenders with inlineStyles', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+
+    try {
+      await prerenderPages(root, { routes, inlineStyles: true }, (await readClient(root))!)
+      const file = await Bun.file(join(root, '.kay/client/pages/admin/report.html')).text()
+
+      expect(file).toContain('<style>')
+      expect(file).toContain('background: url("/paper.png")')
+      expect(file).not.toContain('rel="stylesheet"')
     }
     finally {
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })

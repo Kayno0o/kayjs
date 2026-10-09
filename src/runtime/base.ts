@@ -4,7 +4,7 @@ import type { CheckedHref } from './checks'
 let base: string | undefined
 
 // An origin no site has, to tell a path of this one from what a browser would read as another host: `//host`, `/\host`, or either with a tab or line break inside, which browsers drop.
-const NOWHERE = 'http://nowhere.invalid'
+export const NOWHERE = 'http://nowhere.invalid'
 
 const BASE_META = 'meta[name="kay-base"]'
 

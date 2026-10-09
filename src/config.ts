@@ -65,7 +65,7 @@ export interface KayConfig {
   shutdownTimeout?: Duration | undefined
   // Swaps the next page in place when a link or a form of the site is followed from a page with islands or forms posting to actions, so islands marked `persist` live on; on by default. `false` loads every page as a plain site does.
   navigation?: boolean | undefined
-  // Writes each page's stylesheets into its head instead of linking them, in production: the first paint waits for no stylesheet request, 440 ms sooner on a throttled phone for a 110 KB stylesheet, while every page weighs the stylesheet again, compressed, since no cache keeps it. Off by default.
+  // Writes each page's stylesheets into its head instead of linking them, in production: the first paint waits for no stylesheet request, while every page carries them again, since no cache keeps them.
   inlineStyles?: boolean | undefined
   // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
   prefetch?: Prefetch | undefined

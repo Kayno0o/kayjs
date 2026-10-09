@@ -66,7 +66,7 @@ export function rebaseCss(css: string, base: string): string {
 
 // The other way round, for a stylesheet the build put under the mount point that a page carries inline, which goes under it as the page goes out.
 export function unrebaseCss(css: string, base: string): string {
-  return css.replace(CSS_URL, (match, quote: string, url: string) => url === base || url.startsWith(`${base}/`) ? `url(${quote}${url.slice(base.length) || '/'}${quote})` : match)
+  return css.replace(CSS_URL, (match, quote: string, url: string) => url.startsWith(`${base}/`) ? `url(${quote}${url.slice(base.length)}${quote})` : match)
 }
 
 // A redirect to a path of the site goes under the mount point, whoever made it: a page, a guard, an action or a route the app registered after `pages()`.
