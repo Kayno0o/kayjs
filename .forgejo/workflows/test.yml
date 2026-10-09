@@ -30,11 +30,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.BUN_INSTALL_CACHE_DIR }}
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'bench/apps/*/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
 
+      # The Solid and Svelte apps the benchmark compares against are packages of their own, which the type-aware lint reads too.
       - name: Install dependencies
-        run: bun install --silent --frozen-lockfile
+        run: |
+          bun install --silent --frozen-lockfile
+          bun install --silent --frozen-lockfile --cwd bench/apps/solid
+          bun install --silent --frozen-lockfile --cwd bench/apps/svelte
 
       - name: Lint
         run: bun run lint
@@ -60,12 +64,8 @@ jobs:
       - name: Tests
         run: bun test
 
-      # The Solid and Svelte apps the benchmark compares against are packages of their own.
       - name: Check the benchmark apps
-        run: |
-          bun install --silent --frozen-lockfile --cwd bench/apps/solid
-          bun install --silent --frozen-lockfile --cwd bench/apps/svelte
-          bun run bench:check
+        run: bun run bench:check
 
       - name: Check that kay's bench pages leave hydration markers to islands
         run: bun test ./bench -t 'leave hydration markers'

@@ -28,11 +28,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.BUN_INSTALL_CACHE_DIR }}
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'bench/apps/*/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
 
+      # The benchmark apps are packages of their own, which the type-aware lint reads too.
       - name: Install project deps
-        run: bun install --silent --frozen-lockfile
+        run: |
+          bun install --silent --frozen-lockfile
+          bun install --silent --frozen-lockfile --cwd bench/apps/solid
+          bun install --silent --frozen-lockfile --cwd bench/apps/svelte
 
       # A tag that fails its own checks never reaches the registry.
       - name: Lint
