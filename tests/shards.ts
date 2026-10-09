@@ -1,12 +1,15 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
+import { limiter } from '../src/server/limit'
 
 // Runs `bun test` as a few shards at once, every shard but the first in a copy of this checkout: the test files build into the same fixtures, which one checkout cannot run side by side (#146).
 // `bun tests/shards.ts [count]`, or `bun tests/shards.ts --update-timings` to measure each file again into tests/timings.json, which balances the shards by time.
 const ROOT = join(import.meta.dir, '..')
 const TIMINGS = 'tests/timings.json'
+// One shard's output at a time, whole, as two shards may end together.
+const print = limiter(1)
 
 async function run(command: string[], cwd: string): Promise<{ output: string, code: number }> {
   // One pipe for both streams, so a failure stays next to the test that printed it.
@@ -16,14 +19,25 @@ async function run(command: string[], cwd: string): Promise<{ output: string, co
   return { output, code }
 }
 
-// The working tree as it stands, uncommitted changes included, with its own install.
-async function copyCheckout(dir: string) {
-  const listed = await run(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], ROOT)
+async function gitFiles(...flags: string[]): Promise<string[]> {
+  const listed = await run(['git', 'ls-files', '-z', ...flags], ROOT)
 
   if (listed.code !== 0)
     throw new Error(`git ls-files in ${ROOT} failed:\n${listed.output}`)
 
-  await Promise.all(listed.output.split('\0').filter(Boolean).map(async file => Bun.write(join(dir, file), Bun.file(join(ROOT, file)))))
+  return listed.output.split('\0').filter(Boolean)
+}
+
+// The working tree as it stands, uncommitted changes included, with its own install.
+async function copyCheckout(dir: string) {
+  const [files, deleted] = await Promise.all([gitFiles('--cached', '--others', '--exclude-standard'), gitFiles('--deleted')])
+  const gone = new Set(deleted)
+
+  // copyFile keeps the mode, so an executable stays one.
+  await Promise.all(files.filter(file => !gone.has(file)).map(async (file) => {
+    await mkdir(dirname(join(dir, file)), { recursive: true })
+    await copyFile(join(ROOT, file), join(dir, file))
+  }))
 
   const install = await run([process.execPath, 'install', '--frozen-lockfile', '--silent'], dir)
 
@@ -34,11 +48,16 @@ async function copyCheckout(dir: string) {
 if (process.argv[2] === '--update-timings') {
   const { output, code } = await run([process.execPath, 'test', `--timings=${TIMINGS}`, '--update-timings'], ROOT)
 
-  process.stdout.write(output)
+  // Awaited, as a write to a pipe left pending when the process ends loses its tail.
+  await Bun.write(Bun.stdout, output)
   process.exit(code)
 }
 
 const count = Number(process.argv[2] ?? 3)
+
+if (!Number.isInteger(count) || count < 1)
+  throw new Error(`tests/shards.ts takes a number of shards, not ${process.argv[2]}`)
+
 const copies = await mkdtemp(join(tmpdir(), 'kay-shards-'))
 let failed = false
 
@@ -51,7 +70,7 @@ try {
     const { output, code } = await run([process.execPath, 'test', `--shard=${index + 1}/${count}`, `--timings=${join(ROOT, TIMINGS)}`], dir)
 
     failed ||= code !== 0
-    process.stdout.write(`\n== shard ${index + 1}/${count}: exit ${code} in ${((performance.now() - started) / 1000).toFixed(1)}s\n${output}`)
+    await print(async () => Bun.write(Bun.stdout, `\n== shard ${index + 1}/${count}: exit ${code} in ${((performance.now() - started) / 1000).toFixed(1)}s\n${output}`))
   }))
 }
 finally {

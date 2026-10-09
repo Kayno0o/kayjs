@@ -9,6 +9,7 @@ import { buildClient } from '../src/build/client'
 import { check } from '../src/check'
 import { formatFiles } from '../src/format'
 import { createProject, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
+import { limiter } from '../src/server/limit'
 
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/
@@ -72,29 +73,7 @@ async function installKay(dir: string) {
 }
 
 // The scaffolds the concurrent tests below run at once: each runs tsgo, ESLint and its own tests, and all twenty at once ran a machine out of memory.
-const SCAFFOLDS_AT_ONCE = 4
-const scaffoldsWaiting: (() => void)[] = []
-let scaffolding = 0
-
-async function withScaffoldSlot(work: () => Promise<void>) {
-  if (scaffolding < SCAFFOLDS_AT_ONCE)
-    scaffolding++
-  else
-    await new Promise<void>(resolve => scaffoldsWaiting.push(resolve))
-
-  try {
-    await work()
-  }
-  finally {
-    // A slot freed goes straight to the next waiting scaffold, so the count stays as it is.
-    const next = scaffoldsWaiting.shift()
-
-    if (next === undefined)
-      scaffolding--
-    else
-      next()
-  }
-}
+const scaffold = limiter(4)
 
 // Lints as `bun run lint` does, through keslint and the eslint it runs under Node, as JSON.
 async function lint(dir: string, path: string): Promise<{ filePath: string, messages: { ruleId: string | null, line: number }[] }[]> {
@@ -454,10 +433,10 @@ describe('kay new', () => {
     }
   }, 30_000)
 
-  // Each feature alone, and the app with each one left out, a few at a time: every project is a directory of its own.
+  // Each feature alone, and the app with each one left out, a few at a time: every project is a directory of its own. A test's timeout counts its wait for a slot, so it holds the whole run of them.
   for (const [label, variant] of FEATURE_NAMES.flatMap(feature => [[`${feature} alone`, toggle(new Set(), feature)], [`the app without ${feature}`, toggle(new Set(PRESETS.app.features), feature)]] as const)) {
     it.concurrent(`scaffolds ${label} as a project that checks, is formatted, lints and passes its tests`, async () => {
-      await withScaffoldSlot(async () => {
+      await scaffold(async () => {
         const features = [...variant]
         const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
@@ -485,7 +464,7 @@ describe('kay new', () => {
           await rm(join(dir, '..'), { recursive: true, force: true })
         }
       })
-    }, 120_000)
+    }, 240_000)
   }
 
   it('checks what a feature needs along with it, and unchecks what needs it along with it', () => {
