@@ -297,7 +297,8 @@ export async function weigh(variant: Variant, path: string): Promise<Weight> {
     queue.push(...[...decoder.decode(body).matchAll(STATIC_IMPORT)].map(([, imported]) => resolve(imported!, url)))
   }
 
-  const fonts = new Set<string>()
+  // kay writes its @font-face rules in the head rather than a stylesheet.
+  const fonts = new Set(latinFontUrls(decoder.decode(page), path))
 
   for (const url of new Set(stylesheets)) {
     const body = await get(url)
