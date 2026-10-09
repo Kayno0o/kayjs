@@ -1,9 +1,9 @@
 import type { SourceMap } from '../compiler'
 import { dirname, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { withoutTwin } from '../compiler'
-import { browserGlobalMissing } from '../compiler/browser'
+import { browserGlobalMissing } from '../compiler/globals'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { withoutTwin } from '../compiler/twin'
 
 // What a `.kay` file compiled to, run as it is: a position in it maps straight back through kay's own map.
 interface Compiled {

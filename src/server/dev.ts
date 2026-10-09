@@ -1,10 +1,10 @@
+import type { KayCompileError } from '../build/transform'
 import type { HotSwap } from '../runtime/client'
 import type { ClientBuild } from './client'
 import { statSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import { KayCompileError } from '../build/transform'
 import { compileErrorPage } from './overlay'
 
 export const DEV_EVENTS = '/_kay/dev/events'
@@ -81,7 +81,8 @@ export function devEvents(failed = false, hot?: HotSwap): Response {
 
 // What a dev server serves when the project failed to boot: the errors on every page, until a fix restarts it.
 export function bootFailure(error: unknown, seed: string): Elysia {
-  const html = compileErrorPage(error instanceof KayCompileError ? error.diagnostics : [], error) + LIVE_RELOAD
+  // Told by its name: the class's module loads the compiler, which a production server never needs.
+  const html = compileErrorPage(error instanceof Error && error.name === 'KayCompileError' ? (error as KayCompileError).diagnostics : [], error) + LIVE_RELOAD
 
   const app = new Elysia({ name: 'kay/pages', seed })
 

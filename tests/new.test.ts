@@ -5,10 +5,10 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
+import { buildClient } from '../src/build/client'
 import { check } from '../src/check'
 import { formatFiles } from '../src/format'
 import { createProject } from '../src/new'
-import { buildClient } from '../src/server/client'
 
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/

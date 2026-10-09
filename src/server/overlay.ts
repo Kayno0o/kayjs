@@ -3,7 +3,7 @@ import type { PageError } from '../runtime'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { mapStack } from '../build/sourcemap'
-import { formatDiagnostic } from '../compiler'
+import { formatDiagnostic } from '../compiler/frame'
 
 const STYLE = 'body{margin:0;padding:2rem;font:14px/1.5 ui-monospace,monospace;background:#fff;color:#1a1a1a}h1{font-size:1.1rem;color:#b00020;white-space:pre-wrap}h2{font-size:1rem}pre{padding:1rem;border:1px solid #ddd;overflow-x:auto}'
 

@@ -8,11 +8,11 @@ import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, writeAsset } from '../src/build/assets'
+import { buildClient } from '../src/build/client'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
-import { buildClient } from '../src/server/client'
 
 const root = join(import.meta.dir, 'fixtures/islands')
 

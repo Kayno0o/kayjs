@@ -8,7 +8,7 @@ import process from 'node:process'
 import { escape } from '../runtime/escape'
 import { importModule } from './bundle'
 import { hostLocale, localeCopies } from './i18n'
-import { listedParams, pathOf } from './prerender'
+import { listedParams, pathOf } from './prerendered'
 import { reportServerError } from './report'
 import { servedPaths, slashedPath } from './routes'
 

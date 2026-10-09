@@ -3,7 +3,7 @@ import type { Chunk, CpuProfile, FrameOrigin, OriginBytes, SourceMapFile } from 
 import { readdirSync } from 'node:fs'
 import { cpus } from 'node:os'
 import { basename, join } from 'node:path'
-import { buildClient } from '../src/server/client'
+import { buildClient } from '../src/build/client'
 import { APP, browserOrigin, bytesByOrigin, ENGINE, GC, gzipSize, INLINE, KAY, LAYOUT, readChunk, timeByOrigin } from './attribution'
 import { launch, openTable, OPERATIONS, serve, timeClick, WARMUPS } from './browser'
 import { kilobytes, milliseconds, table } from './format'

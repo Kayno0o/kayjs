@@ -2,11 +2,11 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
 import { formatDiagnostic } from '../src/compiler'
 import { codeFrame, formatReport } from '../src/compiler/frame'
 import { offsetAt } from '../src/compiler/mapping'
-import { buildClient } from '../src/server/client'
 
 describe('compile errors', () => {
   it('frames the line at fault under the two before it, carets clipped to the line', () => {

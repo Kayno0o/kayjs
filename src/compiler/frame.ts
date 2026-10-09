@@ -83,3 +83,7 @@ function frameRows(source: string, primary: Mark, related: Labelled[], paint: Pa
 
   return { width, rows }
 }
+
+export function formatDiagnostic(source: string, filename: string, diagnostic: Diagnostic, paint?: Paint): string {
+  return formatReport({ ...diagnostic, file: filename, ...positionAt(source, diagnostic.start), frame: { source, start: diagnostic.start, end: diagnostic.end } }, paint)
+}

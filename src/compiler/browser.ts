@@ -1,12 +1,9 @@
 import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Fix, KayFile, Node, Span } from './ast'
-import { readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import process from 'node:process'
 import { parse } from '@babel/parser'
 import { awaitBlocks, tryBlocks } from './ast'
+import { browserGlobals } from './globals'
 import { loadTraverse } from './rewrite'
 
 // One part of the program `browserReads` analyzes: generated text standing for the source from `source` on, character for character.
@@ -26,7 +23,6 @@ interface Read {
   statement?: t.Statement
 }
 
-const DECLARED_GLOBAL = /^declare (?:var|function) ([\w$]+)/gm
 const WORD = /[a-z_$][\w$]*/gi
 const EVENT_HANDLER = /^on[A-Z]/
 // A function passed to one of these runs before the call returns, so as the render runs.
@@ -35,7 +31,6 @@ const ARRAY_CALLBACKS = new Set(['map', 'flatMap', 'filter', 'find', 'findIndex'
 // TypeScript nodes wrapping a value rather than spelling a type.
 const TS_EXPRESSIONS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
 const FENCE_OPENING = '---'
-const NOT_DEFINED = /^(\S+) is not defined$/
 const TYPEOF_GLOBAL = /\btypeof\s+([a-z_$][\w$]*)/gi
 // What may render differently on the server and in the browser, worth a scope analysis in an island.
 const VARYING_HINT = /\b(?:Date|Math|toLocale\w*|Intl)\b/
@@ -56,41 +51,6 @@ interface Varying {
   start: number
   end: number
   chain: t.Node[]
-}
-
-let globals: Set<string> | undefined
-
-// What lib.dom declares as globals and Bun's own globalThis lacks: reading one on the server throws.
-// Bun's globals come from a process of its own, as a test registering a DOM, or a preload, would add some to this one.
-export function browserGlobals(): ReadonlySet<string> {
-  if (globals)
-    return globals
-
-  globals = new Set()
-
-  try {
-    const preview = dirname(Bun.resolveSync('@typescript/native-preview/package.json', import.meta.dir))
-    const platform = dirname(Bun.resolveSync(`@typescript/native-preview-${process.platform}-${process.arch}/package.json`, preview))
-    const lib = readFileSync(join(platform, 'lib', 'lib.dom.d.ts'), 'utf8')
-    const own = Bun.spawnSync([process.execPath, '-e', 'console.log(JSON.stringify(Object.getOwnPropertyNames(globalThis)))'], { cwd: tmpdir() })
-    const bun = new Set(JSON.parse(own.stdout.toString()) as string[])
-
-    for (const match of lib.matchAll(DECLARED_GLOBAL)) {
-      if (!bun.has(match[1]!))
-        globals.add(match[1]!)
-    }
-  }
-  catch {}
-
-  return globals
-}
-
-// The browser-only global an error says is not defined, as Bun words a read of it on the server.
-export function browserGlobalMissing(error: unknown): string | undefined {
-  const { name, message } = (error ?? {}) as { name?: unknown, message?: unknown }
-  const missing = name === 'ReferenceError' && typeof message === 'string' ? NOT_DEFINED.exec(message)?.[1] : undefined
-
-  return missing !== undefined && browserGlobals().has(missing) ? missing : undefined
 }
 
 // Browser-only globals the component reads while it renders, which throws on the server, and `typeof` checks of them, which render differently there and break hydration.

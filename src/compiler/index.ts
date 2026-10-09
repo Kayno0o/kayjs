@@ -1,5 +1,4 @@
 import type { Diagnostic, Node, Span } from './ast'
-import type { Paint } from './frame'
 import type { LintLevels } from './lints'
 import type { FoundRewrites } from './rewrite'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
@@ -8,15 +7,17 @@ import process from 'node:process'
 import { awaitBlocks, drawIcons, tryBlocks } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandMessages } from './codegen'
-import { formatReport } from './frame'
 import { applyLints, templateLints } from './lints'
-import { positionAt, SourceMap } from './mapping'
+import { SourceMap } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
 import { analyzeScript, analyzeServer, unboundedFields } from './script'
+import { ISLAND_TWIN } from './twin'
 
 export type { Diagnostic } from './ast'
+export { formatDiagnostic } from './frame'
 export { SourceMap } from './mapping'
+export { ISLAND_TWIN, withoutTwin } from './twin'
 
 export interface CompileOptions {
   // Island ids are paths relative to this directory, so server and client agree on them.
@@ -64,19 +65,12 @@ const BACKSLASH = /\\/g
 // An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
 const ICON_IMPORT = /^~icons\//
 
-export const ISLAND_TWIN = '?island'
-
 // Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
 export function rendersAsIsland(source: string): boolean {
   const file = parseKay(source)
   const server = analyzeServer(source, file.server)
 
   return file.client !== undefined || isInteractive(file, analyzeScript(source, file.script, server?.data.map(data => data.name)))
-}
-
-// The `.kay` file a module path names, its `?island` twin included.
-export function withoutTwin(path: string): string {
-  return path.endsWith(ISLAND_TWIN) ? path.slice(0, -ISLAND_TWIN.length) : path
 }
 
 // Compiles a .kay component: to TSX the type checker reads, or with `output` to the HTML strings and DOM code that run.
@@ -222,8 +216,4 @@ export function componentName(filename: string): string {
 // A page `table.kay` importing `components/table.kay` would otherwise declare a `Table` that shadows the import and renders itself.
 function freeName(name: string, code: string): string {
   return new RegExp(`(?<![\\w$])${name}(?![\\w$])`).test(code) ? freeName(`${name}Page`, code) : name
-}
-
-export function formatDiagnostic(source: string, filename: string, diagnostic: Diagnostic, paint?: Paint): string {
-  return formatReport({ ...diagnostic, file: filename, ...positionAt(source, diagnostic.start), frame: { source, start: diagnostic.start, end: diagnostic.end } }, paint)
 }

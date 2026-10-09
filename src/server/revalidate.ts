@@ -1,7 +1,7 @@
 import type { ServedPage } from './render'
 import { broadcast, onPagesInvalidated } from '../runtime/cache'
 import { compressText } from './compress'
-import { pageEtag, storedHeaders } from './prerender'
+import { pageEtag, storedHeaders } from './prerendered'
 
 interface Revalidation {
   // The invalidation count when the render of the page in place started: one named after that is not in it.

@@ -7,7 +7,7 @@ import { mergeConfig, withConfig } from '../config'
 import { servePages } from './app'
 import { basePath } from './base'
 import { bundled } from './bundle'
-import { buildClient, readClient } from './client'
+import { readClient } from './client'
 import { bootFailure } from './dev'
 
 export type { KayConfig } from '../config'
@@ -86,6 +86,9 @@ async function clientFor(root: string, options: PagesOptions): Promise<ClientBui
 
     console.warn('kay: no client build in .kay/client, bundling now; run `kay build` before starting in production')
   }
+
+  // Imported only to bundle, as it brings the compiler, which a server reading a build never needs.
+  const { buildClient } = await import('../build/client')
 
   return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes, api: options.api, navigation: options.navigation, sourcemap: options.dev, hot: options.dev, base: basePath(options.base), settings: options.settings, publicEnv: options.publicEnv !== undefined, lints: options.lints })
 }

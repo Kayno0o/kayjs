@@ -2,7 +2,7 @@ import type { ScriptAnalysis } from '../compiler/script'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, sep } from 'node:path'
 import process from 'node:process'
-import { browserGlobalMissing } from '../compiler/browser'
+import { browserGlobalMissing } from '../compiler/globals'
 import { readCacheEntry, writeCacheEntry } from './cache'
 
 // What a specifier starts with when it names no package: a relative path, a URL scheme such as `node:`, kay itself or an icon.
