@@ -31,28 +31,50 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'bench/apps/*/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
 
-      # The benchmark apps are packages of their own, which the type-aware lint reads too.
-      - name: Install project deps
+      # A tag on a version commit alone, over a parent the Tests workflow passed, skips the checks below, which that run already made on the same tree. Anything else, or a status that cannot be read, runs them all.
+      - name: Find whether this tree was already tested
+        id: tested
         run: |
-          bun install --silent --frozen-lockfile
+          tested=false
+          if git diff --quiet HEAD^ HEAD -- . ":!package.json" && [ "$(git show HEAD^:package.json | jq -S "del(.version)")" = "$(jq -S "del(.version)" package.json)" ]; then
+            state=$(curl -sf -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$(git rev-parse HEAD^)/status" | jq -r .state || true)
+            echo "The parent commit's status: ${state:-unreadable}"
+            [ "$state" = success ] && tested=true
+          fi
+          echo "tested=$tested" >> "$GITHUB_OUTPUT"
+        env:
+          API: ${{ github.server_url }}/api/v1
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install project deps
+        run: bun install --silent --frozen-lockfile
+
+      # The benchmark apps are packages of their own, which the type-aware lint reads too.
+      - name: Install the benchmark apps' deps
+        if: steps.tested.outputs.tested != 'true'
+        run: |
           bun install --silent --frozen-lockfile --cwd bench/apps/solid
           bun install --silent --frozen-lockfile --cwd bench/apps/svelte
 
       # A tag that fails its own checks never reaches the registry.
       - name: Lint
+        if: steps.tested.outputs.tested != 'true'
         run: bun run lint
 
       - name: Check
+        if: steps.tested.outputs.tested != 'true'
         run: bun run check
 
       # The browser suites fail rather than skip under CI without one, as in the Tests workflow.
       - name: Install Chromium
+        if: steps.tested.outputs.tested != 'true'
         run: |
           apk add --no-cache chromium ttf-freefont
           echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
 
       # The app template's own tests need a Postgres under CI, started as in the Tests workflow.
       - name: Start PostgreSQL
+        if: steps.tested.outputs.tested != 'true'
         run: |
           mkdir -p /run/postgresql
           chown postgres:postgres /run/postgresql
@@ -61,7 +83,8 @@ jobs:
           echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kay_app_test" >> "$GITHUB_ENV"
 
       - name: Tests
-        run: bun test
+        if: steps.tested.outputs.tested != 'true'
+        run: bun tests/shards.ts 3
 
       - name: Configure npm authentication
         run: |

@@ -71,6 +71,31 @@ async function installKay(dir: string) {
   expect(processor.success).toBe(true)
 }
 
+// The scaffolds the concurrent tests below run at once: each runs tsgo, ESLint and its own tests, and all twenty at once ran a machine out of memory.
+const SCAFFOLDS_AT_ONCE = 4
+const scaffoldsWaiting: (() => void)[] = []
+let scaffolding = 0
+
+async function withScaffoldSlot(work: () => Promise<void>) {
+  if (scaffolding < SCAFFOLDS_AT_ONCE)
+    scaffolding++
+  else
+    await new Promise<void>(resolve => scaffoldsWaiting.push(resolve))
+
+  try {
+    await work()
+  }
+  finally {
+    // A slot freed goes straight to the next waiting scaffold, so the count stays as it is.
+    const next = scaffoldsWaiting.shift()
+
+    if (next === undefined)
+      scaffolding--
+    else
+      next()
+  }
+}
+
 // Lints as `bun run lint` does, through keslint and the eslint it runs under Node, as JSON.
 async function lint(dir: string, path: string): Promise<{ filePath: string, messages: { ruleId: string | null, line: number }[] }[]> {
   const child = Bun.spawn([join(dir, 'node_modules/.bin/keslint'), '--format', 'json', path], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
@@ -429,39 +454,39 @@ describe('kay new', () => {
     }
   }, 30_000)
 
-  it('scaffolds each feature alone, and the app with each one left out, as projects that check, are formatted, lint and pass their tests', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'kay-new-'))
-    const variants = FEATURE_NAMES.flatMap(feature => [toggle(new Set(), feature), toggle(new Set(PRESETS.app.features), feature)])
-
-    try {
-      for (const [index, variant] of variants.entries()) {
+  // Each feature alone, and the app with each one left out, a few at a time: every project is a directory of its own.
+  for (const [label, variant] of FEATURE_NAMES.flatMap(feature => [[`${feature} alone`, toggle(new Set(), feature)], [`the app without ${feature}`, toggle(new Set(PRESETS.app.features), feature)]] as const)) {
+    it.concurrent(`scaffolds ${label} as a project that checks, is formatted, lints and passes its tests`, async () => {
+      await withScaffoldSlot(async () => {
         const features = [...variant]
-        const dir = join(root, `variant-${index}`)
+        const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
-        await createProject(dir, { kay: '^1.0.0', features })
-        await installKay(dir)
-        expect({ features, problems: await check(dir) }).toEqual({ features, problems: [] })
-        expect({ features, changed: (await formatFiles([join(dir, 'src')], { write: false })).changed }).toEqual({ features, changed: [] })
+        try {
+          await createProject(dir, { kay: '^1.0.0', features })
+          await installKay(dir)
+          expect({ features, problems: await check(dir) }).toEqual({ features, problems: [] })
+          expect({ features, changed: (await formatFiles([join(dir, 'src')], { write: false })).changed }).toEqual({ features, changed: [] })
 
-        if (variant.has('docker') && !variant.has('server'))
-          expect({ features, notFound: (await Bun.file(join(dir, 'nginx.conf')).text()).includes('error_page 404 /404.html') }).toEqual({ features, notFound: variant.has('starter') })
+          if (variant.has('docker') && !variant.has('server'))
+            expect({ features, notFound: (await Bun.file(join(dir, 'nginx.conf')).text()).includes('error_page 404 /404.html') }).toEqual({ features, notFound: variant.has('starter') })
 
-        if (variant.has('eslint'))
-          expect({ features, messages: (await lint(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
+          if (variant.has('eslint'))
+            expect({ features, messages: (await lint(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
 
-        // An app's tests need a Postgres, which the app preset's own test runs them on.
-        if (variant.has('tests') && !variant.has('auth')) {
-          const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-          const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+          // An app's tests need a Postgres, which the app preset's own test runs them on.
+          if (variant.has('tests') && !variant.has('auth')) {
+            const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+            const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
-          expect({ features, code, report }).toEqual({ features, code: 0, report: expect.stringContaining(' 0 fail') })
+            expect({ features, code, report }).toEqual({ features, code: 0, report: expect.stringContaining(' 0 fail') })
+          }
         }
-      }
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  }, 240_000)
+        finally {
+          await rm(join(dir, '..'), { recursive: true, force: true })
+        }
+      })
+    }, 120_000)
+  }
 
   it('checks what a feature needs along with it, and unchecks what needs it along with it', () => {
     expect([...toggle(new Set(), 'accents')]).toEqual(['accents', 'starter', 'tailwind'])
