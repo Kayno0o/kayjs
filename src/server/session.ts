@@ -234,8 +234,9 @@ class RequestSession<Data extends object> implements Session<Data> {
 
 // AES-256-GCM: the cookie can be neither read nor altered without the secret, nor passed off under another cookie's name.
 function seal(text: string, key: Buffer, name: string): string {
-  const iv = nodeCrypto().randomBytes(IV_BYTES)
-  const cipher = nodeCrypto().createCipheriv('aes-256-gcm', key, iv)
+  const { createCipheriv, randomBytes } = nodeCrypto()
+  const iv = randomBytes(IV_BYTES)
+  const cipher = createCipheriv('aes-256-gcm', key, iv)
 
   cipher.setAAD(Buffer.from(name))
   const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
