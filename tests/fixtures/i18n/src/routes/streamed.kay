@@ -12,6 +12,7 @@ async function wait(): Promise<string> {
 const later = defer(wait())
 const label = (value: string) => `${t('nav.home')} ${value}`
 ---
+// kay-allow uncaught-await
 await later
   p Loading
 then value

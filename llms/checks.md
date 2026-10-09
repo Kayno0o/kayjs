@@ -19,7 +19,7 @@
 
 ## Lints and warnings
 
-`kay check`, `kay build` and `kay dev`'s problems panel print a problem as rustc does, and the editor shows the same message, note and help: `error[missing-alt]: An \`img\` needs \`alt\``, then ` --> src/routes/index.kay:4:3`, the lines at fault with the span underlined and the other places involved labelled, then `= note:` saying why when the message does not, and `= help:` saying what to write instead. A name in brackets is a lint's, and the project sets its level: `deny` reports it as an error, `warn` as a warning, and `allow` not at all. `kay check` prints warnings beside the errors and counts them apart, failing on them only with `--deny-warnings`; `kay build` and `kay dev` never fail on one. Lints are found while type checking, so a page with one still runs.
+`kay check`, `kay build` and `kay dev`'s problems panel print a problem as rustc does, and the editor shows the same message, note and help: `error[missing-alt]: An \`img\` needs \`alt\``, then ` --> src/routes/index.kay:4:3`, the lines at fault with the span underlined and the other places involved labelled, then `= note:` saying why when the message does not, and `= help:` saying what to write instead. A name in brackets is a lint's, and the project sets its level: `deny` reports it as an error, `warn` as a warning, and `allow` not at all. `kay check` prints warnings beside the errors and counts them apart, failing on them only with `--deny-warnings`, which the `check` script `kay new` writes passes; `kay build` and `kay dev` never fail on one. Lints are found while type checking, so a page with one still runs.
 
 - `lints` in `kay.config.ts` sets levels over the defaults: `defineConfig({ lints: { 'positional-key': 'deny', 'unread-name': 'warn' } })`.
 - `// kay-allow constant-signal` allows a lint on the line it ends, or, alone on its line, on the line after it, in a fence or in the template; it takes several names separated by commas, and one that is no lint is reported.
@@ -38,6 +38,7 @@
 | `missing-label` | warn | An `input`, `select` or `textarea` with no `label`, `aria-label`, `aria-labelledby`, `title` or `placeholder`. |
 | `skipped-heading` | warn | A heading skipping a level after the one before it, an `h3` after an `h1`. |
 | `constant-signal` | warn | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |
+| `uncaught-await` | warn | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
 
 ## Linting
 

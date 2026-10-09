@@ -40,7 +40,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
   const site = template === 'site'
   const app = template === 'app'
   // An app's tests run each file in modules of its own, so each gets the database tests/database.ts copies for it.
-  const scripts = { 'check': 'kay check', 'lint': 'keslint --cache', 'lint:fix': 'keslint --fix --cache', 'fmt': 'kay fmt', 'test': app ? 'bun test --isolate' : 'bun test', ...app && { 'db:generate': 'pg-orm generate', 'db:migrate': 'pg-orm apply' } }
+  const scripts = { 'check': 'kay check --deny-warnings', 'lint': 'keslint --cache', 'lint:fix': 'keslint --fix --cache', 'fmt': 'kay fmt', 'test': app ? 'bun test --isolate' : 'bun test', ...app && { 'db:generate': 'pg-orm generate', 'db:migrate': 'pg-orm apply' } }
   const devDependencies = Object.fromEntries(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'].map(name => [name, kay.devDependencies[name]!]))
   const files: Record<string, string> = {
     ...TEMPLATE_FILES[template],

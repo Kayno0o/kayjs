@@ -11,5 +11,6 @@ if (ctx.url.searchParams.has('fail'))
 
 const later = defer(ctx.url.searchParams.has('later') ? Promise.reject(new Error('Kaboom later')) : Promise.resolve('Fine'))
 ---
+// kay-allow uncaught-await
 await later then value
   p {value}

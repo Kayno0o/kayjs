@@ -8,8 +8,10 @@ const inner = defer(Promise.resolve('inner'))
 import Counter from '../components/counter.kay'
 ---
 Counter(start={1})
+// kay-allow uncaught-await
 await score
   p.pending Scoring
+  // kay-allow uncaught-await
   await inner then text
     p.inner {text}
 then value

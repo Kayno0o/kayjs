@@ -1,0 +1,10 @@
+--- server
+import { defer } from 'kay'
+
+const rows = defer(Promise.reject(new Error('Rows down')))
+---
+try
+  await rows then list
+    p {String(list)}
+catch
+  p.failed Unavailable

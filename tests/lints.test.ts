@@ -138,3 +138,15 @@ describe('constant-signal', () => {
     expect(lints('---\nfunction signal(value: number) {\n  return () => value\n}\n\nconst width = signal(1)\n---\np {width()}\n')).toEqual([])
   })
 })
+
+describe('uncaught-await', () => {
+  it('reports an await block with no catch block, one-line or not, inside a try block too', () => {
+    expect(lints('await comments\n  p Loading\nthen list\n  p {list.length}\n')).toEqual([{ code: 'uncaught-await', severity: 'warning', at: 'await comments' }])
+    expect(lints('try\n  await comments then list\n    p {list.length}\ncatch\n  p Failed\n')).toEqual([{ code: 'uncaught-await', severity: 'warning', at: 'await comments' }])
+  })
+
+  it('leaves an await block with a catch block, and reports one nested in a then block on its own', () => {
+    expect(lints('await comments then list\n  p {list.length}\ncatch\n  p Failed\n')).toEqual([])
+    expect(lints('await comments then list\n  await list then count\n    p {count}\ncatch\n  p Failed\n')).toEqual([{ code: 'uncaught-await', severity: 'warning', at: 'await list' }])
+  })
+})

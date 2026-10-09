@@ -182,6 +182,8 @@ describe('kay new', () => {
       // The container runs the one executable `kay build --compile` makes.
       expect(files).toEqual(expect.arrayContaining(['Dockerfile', 'compose.prod.yaml', 'src/components/accent-picker.kay']))
       expect(manifest.scripts.compile).toBe('kay build --compile server')
+      // A warning fails CI as an error does, so none piles up unread.
+      expect(manifest.scripts.check).toBe('kay check --deny-warnings')
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
       expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])

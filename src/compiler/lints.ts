@@ -84,6 +84,12 @@ export const LINTS = {
     wrong: '---\nimport { signal } from \'kay\'\n\nconst title = signal(\'Todos\')\n---\nh1 {title()}',
     right: '---\nconst title = \'Todos\'\n---\nh1 {title}',
   },
+  'uncaught-await': {
+    level: 'warn',
+    summary: 'An `await` block with no `catch`: once its value rejects, the pending block goes and nothing takes its place, so the visitor never learns it failed, and only the log does. A `try` around it does not help, as a streamed block settles after the page has rendered.',
+    wrong: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments',
+    right: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments\ncatch\n  p Comments are unavailable',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS
@@ -167,6 +173,9 @@ export function templateLints(file: KayFile): Diagnostic[] {
           visit(branch.children)
       }
       else if (node.kind === 'await') {
+        if (!node.rejected)
+          found.push({ start: node.start, end: node.value.end, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects', note: 'the pending block goes, and the error only reaches the log', help: 'add a `catch` block after it, at the same indentation, saying what failed', checkOnly: true })
+
         visit(awaitBlocks(node).flat())
       }
       else if (node.kind === 'try') {
