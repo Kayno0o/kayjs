@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { nodeZlib } from './builtins'
+import { limiter } from './limit'
 
 export type Encoding = 'br' | 'gzip'
 
@@ -76,46 +77,19 @@ export async function compressText(text: string): Promise<Partial<Record<Encodin
 }
 
 // At most this many bodies compress at once: past it each costs more CPU, as the threads fight over caches, and its encoder's memory, for no more throughput.
-const COMPRESSING_AT_ONCE = 4
-const compressing = (() => {
-  let active = 0
-  const waiting: (() => void)[] = []
-
-  return {
-    async acquire() {
-      if (active >= COMPRESSING_AT_ONCE)
-        await new Promise<void>(resolve => waiting.push(resolve))
-      else
-        active++
-    },
-    // A waiting body takes over the slot, so `active` only drops once none waits.
-    release() {
-      const next = waiting.shift()
-
-      if (next)
-        next()
-      else
-        active--
-    },
-  }
-})()
+const compressing = limiter(4)
 
 // One body compressed whole, off the main thread, at the levels of the request path. Brotli's window is cut to the body, since a larger one only costs memory: 4 MB at its default.
 async function compressBytes(bytes: Uint8Array, encoding: Encoding): Promise<Uint8Array<ArrayBuffer>> {
-  await compressing.acquire()
-
-  try {
+  return compressing(async () => {
     if (encoding === 'gzip')
-      return await compressGzip(bytes, GZIP_LEVEL)
+      return compressGzip(bytes, GZIP_LEVEL)
 
     const { constants } = nodeZlib()
     const window = Math.min(Math.max(Math.ceil(Math.log2(bytes.length)), constants.BROTLI_MIN_WINDOW_BITS), constants.BROTLI_MAX_WINDOW_BITS)
 
-    return await compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: window, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })
-  }
-  finally {
-    compressing.release()
-  }
+    return compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: window, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })
+  })
 }
 
 // The size of each body kay made whole, so compression judges it and reads it without a stream: opening a reader on a body costs Bun about 6 µs, more than a small response costs in all.

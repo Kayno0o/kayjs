@@ -16,7 +16,7 @@ import { drawCard } from './card-draw'
 import { coverImage } from './crop'
 import { readFace } from './face'
 import { builtFonts } from './fonts'
-import { DEFAULT_QUALITY, findSource, MAX_UPLOAD_PIXELS, VARIANTS_DIR } from './image'
+import { DEFAULT_QUALITY, drawing, findSource, MAX_UPLOAD_PIXELS, VARIANTS_DIR } from './image'
 import { revalidated } from './public'
 
 export interface CardSetup {
@@ -292,7 +292,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
       if (!writing) {
         writing = (async () => {
           try {
-            await writeCard(cards, file, title, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS })
+            await drawing(async () => writeCard(cards, file, title, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }))
           }
           finally {
             pending.delete(file)

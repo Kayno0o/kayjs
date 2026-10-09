@@ -9,7 +9,7 @@ import { Elysia } from 'elysia'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
 import { coverImage } from '../src/server/crop'
-import { avifQuality, serveImages, variantName, writeImageVariants } from '../src/server/image'
+import { avifQuality, drawing, serveImages, variantName, writeImageVariants } from '../src/server/image'
 import { decodePng } from '../src/server/png'
 import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
 
@@ -180,6 +180,21 @@ describe('image route', () => {
 
     expect(changed.status).toBe(200)
     expect(changed.headers.get('etag')).not.toBe(etag)
+  })
+
+  it('draws at most four variants or cards at once, the others waiting their turn', async () => {
+    let running = 0
+    let most = 0
+    const draw = async (index: number) => drawing(async () => {
+      most = Math.max(most, ++running)
+      await Bun.sleep(5)
+      running--
+
+      return index
+    })
+
+    expect(await Promise.all(Array.from({ length: 10 }, async (_, index) => draw(index)))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    expect(most).toBe(4)
   })
 
   it('answers several requests for a variant not written yet, each with the whole file', async () => {

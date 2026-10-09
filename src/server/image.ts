@@ -9,6 +9,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, variantHeight, variantSuffix } from '../runtime/image'
 import { DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
+import { limiter } from './limit'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
 import { remoteAllowed, remotePatterns } from './remote'
@@ -46,6 +47,8 @@ const MOST_ANSWERED = 1024
 // About 50 megapixels: a runtime image larger than that, which could take gigabytes to decode, is refused before any pixel is read.
 export const MAX_UPLOAD_PIXELS = 50_000_000
 export const DEFAULT_QUALITY = 80
+// Variants and cards drawn on request, each holding its source's decoded pixels, at most this many at once, so a burst of new images cannot take the memory of all of them.
+export const drawing = limiter(4)
 
 export type VariantFormat = 'webp' | 'avif'
 
@@ -219,7 +222,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       if (!writing) {
         writing = (async () => {
           try {
-            await writeVariant(source.path, variant, cached, format === 'avif' ? options.avif : options.quality, format)
+            await drawing(async () => writeVariant(source.path, variant, cached, format === 'avif' ? options.avif : options.quality, format))
           }
           finally {
             pending.delete(cached)
