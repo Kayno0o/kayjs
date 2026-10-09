@@ -782,6 +782,7 @@ describe('compression', () => {
       .use(await pages({ routes, prebuilt: false, compress: true }))
       .get('/api/report', () => new Response(JSON.stringify({ rows: Array.from({ length: 100 }, (_, i) => i) }), { headers: { 'content-type': 'application/json', 'set-cookie': 'seen=1' } }))
       .get('/api/tiny', () => new Response('{}', { headers: { 'content-type': 'application/json', 'content-length': '2' } }))
+      .get('/api/ok', () => new Response('ok', { headers: { 'content-type': 'text/plain' } }))
       .get('/api/raw', () => new Response('x'.repeat(1000), { headers: { 'content-type': 'text/plain', 'cache-control': 'no-transform' } }))
     const fetch = async (path: string, encoding: string) => app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': encoding } }))
     const page = await fetch('/contact', 'gzip, deflate, br, zstd')
@@ -801,6 +802,13 @@ describe('compression', () => {
     expect(JSON.parse(new TextDecoder().decode(Bun.gunzipSync(await report.bytes())))).toMatchObject({ rows: expect.any(Array) })
     expect((await fetch('/api/tiny', 'br')).headers.get('content-encoding')).toBeNull()
     expect((await fetch('/api/raw', 'br')).headers.get('content-encoding')).toBeNull()
+
+    // Too small to gain, its length unknown until read: sent as it is.
+    const ok = await fetch('/api/ok', 'br')
+
+    expect(ok.headers.get('content-encoding')).toBeNull()
+    expect(ok.headers.get('vary')).toBeNull()
+    expect(await ok.text()).toBe('ok')
   })
 
   it('sends a streamed page\'s early chunks before the stream ends', async () => {
@@ -813,7 +821,7 @@ describe('compression', () => {
         close = () => controller.close()
       },
     })
-    const response = compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': 'br' } }), new Response(body, { headers: { 'content-type': 'text/html' } }))!
+    const response = (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': 'br' } }), new Response(body, { headers: { 'content-type': 'text/html' } })))!
     const reader = response.body!.getReader()
     const parts: Uint8Array[] = []
 

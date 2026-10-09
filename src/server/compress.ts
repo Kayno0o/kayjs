@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { brotliCompress, constants, createBrotliCompress, createGzip } from 'node:zlib'
+import { brotliCompress, constants, createBrotliCompress, createGzip, gzip } from 'node:zlib'
 
 export type Encoding = 'br' | 'gzip'
 
@@ -17,6 +17,10 @@ const ENCODED_COPY = /\.(?:br|gz)$/
 const MIN_SIZE = 256
 const ACCEPTED = /^\s*([\w*-]+)\s*(?:;\s*q\s*=\s*([\d.]+))?/i
 const compressBrotli = promisify(brotliCompress)
+const compressGzip = promisify(gzip)
+// Levels for what compresses while serving: brotli 4 costs a third less CPU than 5 on a 110 KB page for 6% more bytes, about what gzip 6 costs.
+const BROTLI_QUALITY = 4
+const GZIP_LEVEL = 6
 // Response types worth compressing: text, and the structured data and scripts sent as text.
 const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manifest\+json|ld\+json|rss\+xml|atom\+xml|wasm)|image\/svg\+xml)/i
 // Statuses with no body to compress, or a partial one.
@@ -53,10 +57,9 @@ export async function compressText(text: string): Promise<Partial<Record<Encodin
   if (bytes.length < MIN_SIZE)
     return copies
 
-  const brotli = new Uint8Array(await compressBrotli(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: 5, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length } }))
-  const gzip = new Uint8Array(Bun.gzipSync(bytes, { level: 6 }))
+  for (const encoding of ENCODINGS) {
+    const copy = await compressBytes(bytes, encoding)
 
-  for (const [encoding, copy] of [['br', brotli], ['gzip', gzip]] as const) {
     if (copy.length < bytes.length * 0.9)
       copies[encoding] = copy
   }
@@ -64,22 +67,71 @@ export async function compressText(text: string): Promise<Partial<Record<Encodin
   return copies
 }
 
+// At most this many bodies compress at once: past it each costs more CPU, as the threads fight over caches, and its encoder's memory, for no more throughput.
+const COMPRESSING_AT_ONCE = 4
+const compressing = (() => {
+  let active = 0
+  const waiting: (() => void)[] = []
+
+  return {
+    async acquire() {
+      if (active >= COMPRESSING_AT_ONCE)
+        await new Promise<void>(resolve => waiting.push(resolve))
+      else
+        active++
+    },
+    // A waiting body takes over the slot, so `active` only drops once none waits.
+    release() {
+      const next = waiting.shift()
+
+      if (next)
+        next()
+      else
+        active--
+    },
+  }
+})()
+
+// One body compressed whole, off the main thread, at the levels of the request path. Brotli's window is cut to the body, since a larger one only costs memory: 4 MB at its default.
+async function compressBytes(bytes: Uint8Array, encoding: Encoding): Promise<Uint8Array<ArrayBuffer>> {
+  await compressing.acquire()
+
+  try {
+    if (encoding === 'gzip')
+      return new Uint8Array(await compressGzip(bytes, { level: GZIP_LEVEL }))
+
+    const window = Math.min(Math.max(Math.ceil(Math.log2(bytes.length)), constants.BROTLI_MIN_WINDOW_BITS), constants.BROTLI_MAX_WINDOW_BITS)
+
+    return new Uint8Array(await compressBrotli(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: window, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length } }))
+  }
+  finally {
+    compressing.release()
+  }
+}
+
 // The response compressed on the fly for a browser that takes brotli or gzip, or undefined when it is not worth it: already encoded, not text, too small, or asked to be left alone.
-// A streamed body is flushed chunk by chunk, so what the server sends early still reaches the browser early.
-export function compressResponse(request: Request, response: Response): Response | undefined {
-  const { headers } = response
+// A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length; a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
+export async function compressResponse(request: Request, response: Response): Promise<Response | undefined> {
+  const { headers, status, statusText } = response
   const length = headers.get('content-length')
 
-  if (!response.body || request.method === 'HEAD' || BODILESS.has(response.status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (length !== null && Number(length) < MIN_SIZE))
+  if (!response.body || request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (length !== null && Number(length) < MIN_SIZE))
     return undefined
+
+  // From here on the body is read off the response, so every path answers a new one.
+  const body = await readWithinTick(response.body)
+
+  if (body.whole && body.bytes.length < MIN_SIZE)
+    return new Response(body.bytes, { status, statusText, headers })
 
   // Whatever the browser takes, a shared cache keeps one copy per encoding.
   headers.append('vary', 'accept-encoding')
 
   const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
+  const plain = () => new Response(body.whole ? body.bytes : body.stream, { status, statusText, headers })
 
   if (!encoding)
-    return undefined
+    return plain()
 
   const compressed = new Headers(headers)
   const etag = compressed.get('etag')
@@ -91,13 +143,67 @@ export function compressResponse(request: Request, response: Response): Response
   if (etag?.startsWith('"'))
     compressed.set('etag', `W/${etag}`)
 
-  return new Response(compressedStream(response.body, encoding), { status: response.status, statusText: response.statusText, headers: compressed })
+  if (!body.whole)
+    return new Response(compressedStream(body.stream, encoding), { status, statusText, headers: compressed })
+
+  const copy = await compressBytes(body.bytes, encoding)
+
+  return copy.length < body.bytes.length * 0.9 ? new Response(copy, { status, statusText, headers: compressed }) : plain()
 }
 
-// Levels quick enough for a request path: brotli 5 and gzip 6 compress a 150 KB page in a millisecond or so.
+type ReadBody = { whole: true, bytes: Uint8Array<ArrayBuffer> } | { whole: false, stream: ReadableStream<Uint8Array> }
+
+// The body whole when it ends within a tick, else a stream giving back what was read before the rest.
+async function readWithinTick(body: ReadableStream<Uint8Array>): Promise<ReadBody> {
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let pending: ReturnType<typeof reader.read> | undefined
+
+  for (;;) {
+    const read = reader.read()
+    const result = await Promise.race([read, new Promise<undefined>(resolve => setImmediate(resolve))])
+
+    if (!result) {
+      pending = read
+
+      break
+    }
+
+    if (result.done)
+      return { whole: true, bytes: Buffer.concat(chunks) as Uint8Array<ArrayBuffer> }
+
+    chunks.push(result.value)
+  }
+
+  return {
+    whole: false,
+    stream: new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        const chunk = chunks.shift()
+
+        if (chunk)
+          return controller.enqueue(chunk)
+
+        const { value, done } = await (pending ?? reader.read())
+
+        pending = undefined
+
+        if (done)
+          controller.close()
+        else
+          controller.enqueue(value)
+      },
+      async cancel(reason) {
+        await reader.cancel(reason)
+      },
+    }),
+  }
+}
+
+// The levels of the request path. Brotli's window is cut to 512 KB, more than a page needs, since its default 4 MB is memory held per open stream.
 // Each chunk is flushed and sent before the next is read, so at most one waits in zlib; a browser going away stops both the source and zlib.
 function compressedStream(body: ReadableStream<Uint8Array>, encoding: Encoding): ReadableStream<Uint8Array> {
-  const zlib = encoding === 'br' ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: 5 } }) : createGzip({ level: 6 })
+  const zlib = encoding === 'br' ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: 19 } }) : createGzip({ level: GZIP_LEVEL })
   const reader = body.getReader()
   const output: Uint8Array[] = []
   let failure: Error | undefined
