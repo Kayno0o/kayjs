@@ -12,24 +12,24 @@ const SEARCH_FROM = 8
 
 const { id, options, value = [], label, placeholder = 'Any', searchLabel = 'Search', name, search, disabled = false, placement = 'bottom-start', onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange'> & {
   // The panel's id, unique on the page; one is drawn when none is given.
-  id?: string
+  id?: string | undefined
   options: readonly MultiSelectOption[]
   // The values picked to start with; a control whose parent passes others follows them.
-  value?: string[]
+  value?: string[] | undefined
   // Names the control for screen readers.
   label: string
   // What the trigger reads while nothing is picked.
-  placeholder?: string
+  placeholder?: string | undefined
   // The search box's placeholder, and with `label` after it, its name for screen readers.
-  searchLabel?: string
+  searchLabel?: string | undefined
   // Submits each picked value under this name, for a control inside a form.
-  name?: string
+  name?: string | undefined
   // Opens on a search box; on by default past eight options.
-  search?: boolean
-  disabled?: boolean
-  placement?: PopoverPlacement
-  onChange?: (value: string[]) => void
-  class?: string
+  search?: boolean | undefined
+  disabled?: boolean | undefined
+  placement?: PopoverPlacement | undefined
+  onChange?: ((value: string[]) => void) | undefined
+  class?: string | undefined
 }>()
 
 const picked = signal<string[]>(value)

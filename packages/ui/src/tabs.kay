@@ -17,10 +17,10 @@ const { tabs, value, label, onChange, panel, class: className, ...rest } = props
   value: Value
   // Names the tab list for screen readers.
   label: string
-  onChange?: (value: Value) => void
+  onChange?: ((value: Value) => void) | undefined
   // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
   panel: (value: Value) => JSX.Element
-  class?: string
+  class?: string | undefined
 }>()
 
 const id = uid()

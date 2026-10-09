@@ -5,20 +5,20 @@ import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
 
 interface Look {
-  variant?: 'default' | 'accent' | 'danger'
+  variant?: 'default' | 'accent' | 'danger' | undefined
   // Drawn before the label.
-  icon?: IconSlot | IconProps
+  icon?: IconSlot | IconProps | undefined
   // Spins in place of the icon while what the press started is under way.
-  busy?: boolean
-  label?: string
-  class?: string
+  busy?: boolean | undefined
+  label?: string | undefined
+  class?: string | undefined
 }
 
 type AsButton = Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & Look & {
   href?: undefined
-  type?: 'button' | 'submit' | 'reset'
+  type?: 'button' | 'submit' | 'reset' | undefined
   // Whether the disclosure the button opens is showing, for a popover or a panel it toggles.
-  expanded?: boolean
+  expanded?: boolean | undefined
 }
 
 // With an `href`, the button is a link looking like one, for an action that goes to another page.

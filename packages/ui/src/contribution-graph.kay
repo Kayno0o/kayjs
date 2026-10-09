@@ -12,8 +12,8 @@ const { days, color, today, months = false, class: className, ...rest } = props<
   // The ISO date of today, whose cell is marked.
   today: string
   // Names each month above the week it starts in, placing every cell by hand.
-  months?: boolean
-  class?: string
+  months?: boolean | undefined
+  class?: string | undefined
 }>()
 
 const describe = (day: ContributionDay) => day.description ? `${day.description} · ${day.day}` : day.day

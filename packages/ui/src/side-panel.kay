@@ -8,12 +8,12 @@ const { open, title, actions, footer, onClose, closeLabel = 'Close', class: clas
   open: boolean
   title: string
   // Controls in the head line, before its close button, such as previous and next.
-  actions?: JSX.Element
-  footer?: JSX.Element
+  actions?: JSX.Element | undefined
+  footer?: JSX.Element | undefined
   // Called however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
   onClose: (event: Event) => void
-  closeLabel?: string
-  class?: string
+  closeLabel?: string | undefined
+  class?: string | undefined
 }>()
 
 let panel: HTMLDialogElement | undefined

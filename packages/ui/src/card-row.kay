@@ -3,12 +3,12 @@ import type { JSX } from 'kay'
 
 const { left, right, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class'> & {
   // The leading element: a toggle, an icon, a colour dot.
-  left?: JSX.Element
+  left?: JSX.Element | undefined
   // A trailing readout, always shown.
-  right?: JSX.Element
+  right?: JSX.Element | undefined
   // Controls at the end of the row, dimmed until the row is hovered or focused.
-  actions?: JSX.Element
-  class?: string
+  actions?: JSX.Element | undefined
+  class?: string | undefined
 }>()
 ---
 // One line of a list drawn as cards: the children are its body, between what leads and what trails.

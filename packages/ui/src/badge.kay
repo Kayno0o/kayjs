@@ -5,10 +5,10 @@ import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
 
 const { tone = 'neutral', icon, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
-  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
-  icon?: IconSlot | IconProps
-  label?: string | number
-  class?: string
+  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | undefined
+  icon?: IconSlot | IconProps | undefined
+  label?: string | number | undefined
+  class?: string | undefined
 }>()
 ---
 // A label that does nothing: a count, a status, a tag.

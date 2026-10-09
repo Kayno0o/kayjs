@@ -10,14 +10,14 @@ const SHORTCUT_MARKERS: Partial<Record<string, string>> = { b: '**', i: '*' }
 
 const { value = '', onInput, onImage, uploadFailure = 'Could not upload the image', placeholder = 'Write markdown…', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // The text to start with; an editor whose parent passes other text follows it.
-  value?: string
+  value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload.
-  onInput?: (value: string) => void
+  onInput?: ((value: string) => void) | undefined
   // Uploads a pasted or dropped image and returns the url to embed it by. Without it, images are left to the browser.
-  onImage?: (file: File) => Promise<string>
+  onImage?: ((file: File) => Promise<string>) | undefined
   // Toasted when an upload throws.
-  uploadFailure?: string
-  class?: string
+  uploadFailure?: string | undefined
+  class?: string | undefined
 }>()
 
 const uploading = signal(0)

@@ -5,10 +5,10 @@ import Icon from './icon.kay'
 const { value, max = 5, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
   // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star.
   value: number
-  max?: number
+  max?: number | undefined
   // What screen readers read; `4 out of 5` by default.
-  label?: string
-  class?: string
+  label?: string | undefined
+  class?: string | undefined
 }>()
 
 // One place per star; a value that is no number fills none.

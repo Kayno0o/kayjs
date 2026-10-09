@@ -5,10 +5,10 @@ const { value, label, fillClass, class: className, ...rest } = props<Omit<JSX.In
   // The percentage filled, held between 0 and 100.
   value: number
   // Names the meter for screen readers.
-  label?: string
+  label?: string | undefined
   // Classes for the fill alone, such as a colour picked by threshold; the track always looks like `kui-meter`.
-  fillClass?: string
-  class?: string
+  fillClass?: string | undefined
+  class?: string | undefined
 }>()
 
 const percent = () => Math.min(100, Math.max(0, value))

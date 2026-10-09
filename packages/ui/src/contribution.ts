@@ -7,7 +7,7 @@ export interface ContributionDay {
   // How full its cell is, from 0 to 1.
   intensity: number
   // Hover text for the day, which the date follows.
-  description?: string
+  description?: string | undefined
 }
 
 // Columns a month label needs before the next one, so a sliver of a month at the start does not crowd its neighbour.

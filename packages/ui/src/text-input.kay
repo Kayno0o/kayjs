@@ -6,9 +6,9 @@ const { value, onInput, onChange, type = 'text', class: className, ...rest } = p
   value: string
   onInput: (value: string) => void
   // Called once the value is committed, on blur or Enter, after `onInput`.
-  onChange?: (value: string) => void
-  type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number' | 'date' | 'datetime-local' | 'time' | 'month' | 'week'
-  class?: string
+  onChange?: ((value: string) => void) | undefined
+  type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number' | 'date' | 'datetime-local' | 'time' | 'month' | 'week' | undefined
+  class?: string | undefined
 }>()
 
 let box: HTMLInputElement | undefined

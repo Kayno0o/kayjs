@@ -12,16 +12,16 @@ const { message, onConfirm, failure, refused, trigger = 'icon', label = 'Delete'
   // Toasted when `onConfirm` throws, which leaves the dialog open, unless the call carries a message of its own: see `attempt`.
   failure: string
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: toasted in place of `failure`, which stays for an answer of undefined or another error.
-  refused?: (data: Data) => string | undefined
+  refused?: ((data: Data) => string | undefined) | undefined
   // An icon by default; `button` is a labelled danger button, for a dialog footer.
-  trigger?: 'icon' | 'button'
+  trigger?: 'icon' | 'button' | undefined
   // What the trigger says, for a delete the reader knows by another name: "Empty trash", "Revoke link".
-  label?: string
+  label?: string | undefined
   // The icon trigger's size and look; the button trigger is always a danger button.
-  size?: 'xs' | 'sm' | 'md' | 'lg'
-  variant?: 'solid' | 'ghost' | 'inline' | 'danger'
+  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
+  variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
   // Goes on the trigger.
-  class?: string
+  class?: string | undefined
 }>()
 
 const open = signal(false)

@@ -7,7 +7,7 @@ const { onVisible, margin = 600 } = props<{
   // Loads the next rows: called once the sentinel comes into view, and again whenever the list around it grows and leaves it there, so a list too short to scroll keeps filling. A call returning a promise is not repeated before it settles, and a rejection goes unhandled, so wrap the call in `attempt`.
   onVisible: () => unknown
   // How far outside the scroll box counts as in view already, in pixels, so the next rows land before the list runs out.
-  margin?: number
+  margin?: number | undefined
 }>()
 
 let sentinel: HTMLElement | undefined

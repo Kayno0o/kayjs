@@ -6,18 +6,18 @@ import { rangeFrom } from './range'
 
 const { value = [null, null], min, max, step, label, unit, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The bounds to start with; a pair whose parent passes another follows it.
-  value?: RangeValue
+  value?: RangeValue | undefined
   // The lowest and highest values allowed, shown as the empty boxes' placeholders.
-  min?: number
-  max?: number
-  step?: number
+  min?: number | undefined
+  max?: number | undefined
+  step?: number | undefined
   // Names the pair for screen readers, each box adding "from" or "to".
   label: string
   // Written after the boxes, such as `h` or `%`.
-  unit?: string
+  unit?: string | undefined
   // Runs once a box is committed, on blur or Enter, rather than on every keystroke, and only when the range changed.
-  onChange?: (value: RangeValue) => void
-  class?: string
+  onChange?: ((value: RangeValue) => void) | undefined
+  class?: string | undefined
 }>()
 
 let low: HTMLInputElement | undefined

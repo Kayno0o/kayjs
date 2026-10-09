@@ -13,12 +13,12 @@ const { search, value = '', name, onChange, class: className, ...rest } = props<
   // The icons matching `query`, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A rejection goes unhandled and leaves the last grid on screen.
   search: (query: string, limit: number) => Promise<IconChoice[]>
   // The chosen icon's name, or an empty string for none; a picker whose parent passes another follows it.
-  value?: string
+  value?: string | undefined
   // Submits the chosen icon's name under this name, for a picker inside a form.
-  name?: string
+  name?: string | undefined
   // Hands over a pick, or an empty string for a cleared one.
-  onChange?: (name: string) => void
-  class?: string
+  onChange?: ((name: string) => void) | undefined
+  class?: string | undefined
 }>()
 
 const picked = signal(value)

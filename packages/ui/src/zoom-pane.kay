@@ -14,13 +14,13 @@ const { label, most = MOST, tools = true, zoomInLabel = 'Zoom in', zoomOutLabel 
   // Names the view for screen readers, since what it holds is a picture rather than words.
   label: string
   // How far in it may be taken, as a multiple of fitted.
-  most?: number
+  most?: number | undefined
   // Whether the buttons are drawn. The gestures work either way.
-  tools?: boolean
-  zoomInLabel?: string
-  zoomOutLabel?: string
-  fitLabel?: string
-  class?: string
+  tools?: boolean | undefined
+  zoomInLabel?: string | undefined
+  zoomOutLabel?: string | undefined
+  fitLabel?: string | undefined
+  class?: string | undefined
 }>()
 
 const plate = signal<Plate>(fitted())

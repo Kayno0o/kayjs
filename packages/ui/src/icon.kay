@@ -8,8 +8,8 @@ import settings from './settings'
 const { icon, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['svg'], 'class' | 'children'> & {
   icon: IconSlot | IconProps
   // Names the icon for screen readers; without it the icon is decorative.
-  label?: string
-  class?: string
+  label?: string | undefined
+  class?: string | undefined
 }>()
 
 const drawn = () => typeof icon === 'string' ? settings.icons[icon] : icon

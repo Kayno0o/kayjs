@@ -8,24 +8,24 @@ const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
 const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = 'Resize list', backLabel = 'Back', class: className, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
   list: JSX.Element
   detail: JSX.Element
-  listHead?: JSX.Element
-  detailHead?: JSX.Element
+  listHead?: JSX.Element | undefined
+  detailHead?: JSX.Element | undefined
   // A navigation column left of the list, from `md` up; below it, an overlay `sidebarOpen` shows.
-  sidebar?: JSX.Element
-  sidebarTitle?: string
+  sidebar?: JSX.Element | undefined
+  sidebarTitle?: string | undefined
   // Below `md`, whether the detail pane takes the list's place.
-  detailOpen?: boolean
+  detailOpen?: boolean | undefined
   // Below `md`, whether the sidebar covers the layout; its back button calls `onSidebarClose` for the parent to set it back to false.
-  sidebarOpen?: boolean
-  onSidebarClose?: () => void
+  sidebarOpen?: boolean | undefined
+  onSidebarClose?: (() => void) | undefined
   // A handle on the list's right edge, from `md` up, dragged or moved with the arrow keys.
-  resizableList?: boolean
+  resizableList?: boolean | undefined
   // The `localStorage` key the list's width is kept under, from one visit to the next.
-  listWidthKey?: string
-  resizeLabel?: string
-  backLabel?: string
-  class?: string
-  style?: string
+  listWidthKey?: string | undefined
+  resizeLabel?: string | undefined
+  backLabel?: string | undefined
+  class?: string | undefined
+  style?: string | undefined
 }>()
 
 const listWidth = signal(WIDTH.default)

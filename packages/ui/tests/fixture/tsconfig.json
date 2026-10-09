@@ -10,6 +10,7 @@
     "types": ["bun"],
     "allowImportingTsExtensions": true,
     "strict": true,
+    "exactOptionalPropertyTypes": true,
     "noEmit": true,
     "skipLibCheck": true
   },

@@ -15,23 +15,23 @@ const DIRECTIONS: Partial<Record<string, [number, number]>> = { ArrowLeft: [-1, 
 const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = 'Crop area: arrows move it, Shift and the arrows resize it', cropText = '{w} by {h} pixels at {x}, {y}', onCrop, onLoad, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   src: string
   // Width over height the crop is locked to; a change centres the crop again.
-  ratio?: number
+  ratio?: number | undefined
   // The smallest side of the crop, in natural pixels.
-  minSize?: number
+  minSize?: number | undefined
   // A rule-of-thirds overlay inside the crop.
-  grid?: boolean
-  alt?: string
+  grid?: boolean | undefined
+  alt?: string | undefined
   // Names the crop area for screen readers, with the keys that move it.
-  cropLabel?: string
+  cropLabel?: string | undefined
   // Reads the crop out as it changes, `{w}`, `{h}`, `{x}` and `{y}` standing for its size and place in natural pixels.
-  cropText?: string
+  cropText?: string | undefined
   // The crop in the image's natural pixels, ready for a canvas draw, after every change.
-  onCrop?: (crop: CropRect) => void
+  onCrop?: ((crop: CropRect) => void) | undefined
   // The image's natural size, once it has decoded.
-  onLoad?: (size: ImageSize) => void
+  onLoad?: ((size: ImageSize) => void) | undefined
   // Shown under the image: `@footer(reset)`, where `reset()` centres the crop again.
-  footer?: (reset: () => void) => JSX.Element
-  class?: string
+  footer?: ((reset: () => void) => JSX.Element) | undefined
+  class?: string | undefined
 }>()
 
 const size = signal<ImageSize | undefined>(undefined)

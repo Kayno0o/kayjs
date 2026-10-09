@@ -10,13 +10,13 @@ const { items, key, minWidth = 256, gap = 12, tile, class: className, style, ...
   // Names an item across updates, so its tile keeps its place and its measured height.
   key: (item: Item) => Key
   // The narrowest a lane may get, in pixels: as many lanes as fit at that width share the row.
-  minWidth?: number
+  minWidth?: number | undefined
   // Between two lanes and between two tiles of a lane, in pixels.
-  gap?: number
+  gap?: number | undefined
   // Draws each tile: `@tile(item)`.
   tile: (item: Item) => JSX.Element
-  class?: string
-  style?: string
+  class?: string | undefined
+  style?: string | undefined
 }>()
 
 const width = signal(0)

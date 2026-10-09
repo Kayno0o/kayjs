@@ -6,9 +6,9 @@ import Icon from './icon.kay'
 
 const { value, label, icon, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   value: number | string
-  label?: string
-  icon?: IconSlot | IconProps
-  class?: string
+  label?: string | undefined
+  icon?: IconSlot | IconProps | undefined
+  class?: string | undefined
 }>()
 ---
 // A figure and what it counts, read together: "12 moons".

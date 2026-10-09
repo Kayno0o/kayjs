@@ -6,10 +6,10 @@ import { memo } from 'kay'
 const { rows, onSelect, empty = 'No data yet.', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
   // Makes every row a button handing back the row it was pressed on.
-  onSelect?: (row: Row) => void
+  onSelect?: ((row: Row) => void) | undefined
   // What the list reads with no rows.
-  empty?: string
-  class?: string
+  empty?: string | undefined
+  class?: string | undefined
 }>()
 
 const largest = memo(() => Math.max(0, ...rows.map(row => row.value)))

@@ -13,20 +13,20 @@ const SWIPE_PX = 48
 const { items, index = 0, onIndexChange, ratio = '16 / 9', empty = 'No media.', previousLabel = 'Previous', nextLabel = 'Next', closeLabel = 'Close', openLabel = 'Open full size', itemLabel = 'Media {n}', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   items: MediaItem[]
   // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
-  index?: number
-  onIndexChange?: (index: number) => void
+  index?: number | undefined
+  onIndexChange?: ((index: number) => void) | undefined
   // The stage's CSS `aspect-ratio`.
-  ratio?: string
+  ratio?: string | undefined
   // What the gallery reads with no items.
-  empty?: string
-  previousLabel?: string
-  nextLabel?: string
-  closeLabel?: string
+  empty?: string | undefined
+  previousLabel?: string | undefined
+  nextLabel?: string | undefined
+  closeLabel?: string | undefined
   // Names the button opening the lightbox, followed by the item's title when it has one.
-  openLabel?: string
+  openLabel?: string | undefined
   // Names an item with no title, `{n}` standing for its number.
-  itemLabel?: string
-  class?: string
+  itemLabel?: string | undefined
+  class?: string | undefined
 }>()
 
 const shown = signal(index)

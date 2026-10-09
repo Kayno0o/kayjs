@@ -9,10 +9,10 @@ const { value, label, size, options, class: className, ...rest } = props<Omit<JS
   // What a screen reader says in place of the code, such as where it leads.
   label: string
   // Its width and height in pixels; without it the image takes the width CSS gives it.
-  size?: number
+  size?: number | undefined
   // How the code is drawn, as `qrCodeSvg` from @kaynooo/utils takes it: `ecc`, `moduleShape`, `eyeColor`, `foreground`, `background`, `margin` and the rest.
-  options?: Omit<QrCodeSvgOptions, 'size' | 'title' | 'ariaLabel'>
-  class?: string
+  options?: Omit<QrCodeSvgOptions, 'size' | 'title' | 'ariaLabel'> | undefined
+  class?: string | undefined
 }>()
 ---
 // An SVG image drawn when the page renders, on the server for a static page: dark modules on a light ground with a quiet zone, which every scanner reads.

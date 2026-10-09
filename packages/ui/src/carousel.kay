@@ -7,20 +7,20 @@ import { stepIndex } from './cycle'
 const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = 'Carousel', previousLabel = 'Previous slide', nextLabel = 'Next slide', slideLabel = 'Slide {n} of {count}', dotLabel = 'Go to slide {n}', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   slides: readonly { src: string, alt: string }[]
   // The slide shown first; a carousel whose parent passes another follows it.
-  index?: number
-  onIndexChange?: (index: number) => void
+  index?: number | undefined
+  onIndexChange?: ((index: number) => void) | undefined
   // Moves to the next slide every this many milliseconds, held while the pointer or the focus is on the carousel, and never for a visitor asking for reduced motion.
-  autoplay?: number
+  autoplay?: number | undefined
   // The slides' aspect ratio, as CSS writes it.
-  ratio?: string
+  ratio?: string | undefined
   // Names the carousel for screen readers.
-  label?: string
-  previousLabel?: string
-  nextLabel?: string
+  label?: string | undefined
+  previousLabel?: string | undefined
+  nextLabel?: string | undefined
   // `{n}` stands for the slide's number and `{count}` for how many there are.
-  slideLabel?: string
-  dotLabel?: string
-  class?: string
+  slideLabel?: string | undefined
+  dotLabel?: string | undefined
+  class?: string | undefined
 }>()
 
 const shown = signal(index)

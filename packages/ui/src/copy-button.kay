@@ -10,12 +10,12 @@ const { text, label, html, copiedLabel = 'Copied!', failure = 'Could not copy to
   text: string
   label: string
   // A rendered version copied alongside `text`, which rich editors paste instead.
-  html?: string
+  html?: string | undefined
   // What the button says for two seconds once the copy went through.
-  copiedLabel?: string
+  copiedLabel?: string | undefined
   // Toasted when the browser refuses the copy.
-  failure?: string
-  class?: string
+  failure?: string | undefined
+  class?: string | undefined
 }>()
 
 const copied = signal(false)
@@ -25,7 +25,7 @@ async function press() {
     return
 
   const done = await attempt(async () => {
-    await copy(text, { html })
+    await copy(text, html === undefined ? {} : { html })
 
     return true
   }, failure)

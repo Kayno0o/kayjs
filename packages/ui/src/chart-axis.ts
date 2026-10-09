@@ -45,8 +45,7 @@ export function xAxisOptions(labels: string[], times: number[] | null, showLabel
   if (times) {
     return {
       type: FixedScaleAxis,
-      low: times[0],
-      high: times.at(-1),
+      ...times.length > 0 ? { low: times[0]!, high: times.at(-1)! } : {},
       ticks: ticks.map(index => times[index]!),
       showLabel: true,
       showGrid: false,

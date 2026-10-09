@@ -8,7 +8,7 @@ const { links, current, label, class: className, ...rest } = props<Omit<JSX.Intr
   current: string
   // Names the navigation for screen readers.
   label: string
-  class?: string
+  class?: string | undefined
 }>()
 
 let nav: HTMLElement | undefined

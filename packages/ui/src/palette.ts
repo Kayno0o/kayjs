@@ -5,15 +5,15 @@ interface PaletteBase {
   label: string
   // The heading it sits under, and a word a query can match.
   group: string
-  icon?: IconSlot | IconProps
+  icon?: IconSlot | IconProps | undefined
   // Extra words a query matches, never shown.
-  keywords?: string
+  keywords?: string | undefined
 }
 
 // A place to go: followed in the same tab, or a new one with Ctrl or Cmd held, or always when `external`.
 export interface PaletteLink extends PaletteBase {
   href: string
-  external?: boolean
+  external?: boolean | undefined
 }
 
 // Something to do, run once the palette has closed.

@@ -8,10 +8,10 @@ const { icon, label, size = 'md', variant = 'solid', type = 'button', class: cla
   icon: IconSlot | IconProps
   // Names the action for screen readers and, as its tooltip, for everyone else, since the button shows nothing but the icon.
   label: string
-  size?: 'xs' | 'sm' | 'md' | 'lg'
-  variant?: 'solid' | 'ghost' | 'inline' | 'danger'
-  type?: 'button' | 'submit' | 'reset'
-  class?: string
+  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
+  variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
+  type?: 'button' | 'submit' | 'reset' | undefined
+  class?: string | undefined
 }>()
 
 // Only the solid and danger variants are framed by the shell's hairline.

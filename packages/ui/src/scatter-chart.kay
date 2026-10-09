@@ -6,18 +6,18 @@ import { axisExtent, axisPercent, dotSize } from './plot'
 
 const { points, x = {}, y = {}, quadrant, corners, onSelect, empty = 'No data yet.', label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
-  x?: ScatterAxis
-  y?: ScatterAxis
+  x?: ScatterAxis | undefined
+  y?: ScatterAxis | undefined
   // Guides through this point, splitting the plot into four regions that `corners` name.
-  quadrant?: { x: number, y: number }
-  corners?: { topLeft?: string, topRight?: string, bottomLeft?: string, bottomRight?: string }
+  quadrant?: { x: number, y: number } | undefined
+  corners?: { topLeft?: string, topRight?: string, bottomLeft?: string, bottomRight?: string } | undefined
   // Makes every dot a button handing back its point.
-  onSelect?: (point: Point) => void
+  onSelect?: ((point: Point) => void) | undefined
   // What the chart reads with no points.
-  empty?: string
+  empty?: string | undefined
   // Describes the chart for screen readers.
   label: string
-  class?: string
+  class?: string | undefined
 }>()
 
 const xExtent = memo(() => axisExtent(points.map(point => point.x), x))

@@ -5,16 +5,16 @@ import { acceptsFile } from './accept'
 
 const { accept, multiple = false, paste = false, disabled = false, onFiles, content, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // The files the zone takes, as an `accept` attribute: the picker filters on it, and dropped or pasted files that miss it are ignored.
-  accept?: string
-  multiple?: boolean
+  accept?: string | undefined
+  multiple?: boolean | undefined
   // Also takes files pasted anywhere on the page, unless the paste lands in a text field.
-  paste?: boolean
-  disabled?: boolean
+  paste?: boolean | undefined
+  disabled?: boolean | undefined
   // The files picked, dropped or pasted: one unless `multiple`, and never an empty list.
   onFiles: (files: File[]) => void
   // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone.
   content: (zone: { open: () => void, dragging: () => boolean }) => JSX.Element
-  class?: string
+  class?: string | undefined
 }>()
 
 const dragging = signal(false)

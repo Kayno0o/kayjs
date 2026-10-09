@@ -10,14 +10,14 @@ const { page, pages, url, param = 'page', siblings = 1, label = 'Pagination', pr
   // The URL of the page on screen, `ctx.url`: each link keeps its path and query, `param` set to the page.
   url: URL | string
   // The query parameter holding the page, `page` by default.
-  param?: string
+  param?: string | undefined
   // How many pages show on each side of the current one, 1 by default.
-  siblings?: number
+  siblings?: number | undefined
   // Names the navigation for screen readers.
-  label?: string
-  previousLabel?: string
-  nextLabel?: string
-  class?: string
+  label?: string | undefined
+  previousLabel?: string | undefined
+  nextLabel?: string | undefined
+  class?: string | undefined
 }>()
 
 // The page as one that exists, whatever the query held.

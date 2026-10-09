@@ -5,10 +5,10 @@ import { effect, signal } from 'kay'
 import Icon from './icon.kay'
 
 const { src, name, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
-  src?: string | null
+  src?: string | null | undefined
   // Names the site: it colours the fallback icon, and goes unused once the image loads.
   name: string
-  class?: string
+  class?: string | undefined
 }>()
 
 const failed = signal(false)

@@ -7,20 +7,20 @@ import { isPaletteLink, paletteMatches, paletteSections, withRecent } from './pa
 
 const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', label = 'Search', placeholder = 'Search', emptyLabel = 'No results', class: className } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
+  open?: boolean | undefined
+  onOpenChange?: ((open: boolean) => void) | undefined
   entries: PaletteEntry[]
   // The order groups are listed in; the rest follow as they come.
-  groups?: string[]
+  groups?: string[] | undefined
   // Hrefs of the links followed from it, most recent first, listed on top while the query is empty; `onRecentChange` hands the new list over for the app to keep.
-  recent?: string[]
-  onRecentChange?: (recent: string[]) => void
+  recent?: string[] | undefined
+  onRecentChange?: ((recent: string[]) => void) | undefined
   // Ctrl or Cmd and this key opens and closes it from anywhere, unless something handled the key first; `null` leaves opening to the app.
-  hotkey?: string | null
-  label?: string
-  placeholder?: string
-  emptyLabel?: string
-  class?: string
+  hotkey?: string | null | undefined
+  label?: string | undefined
+  placeholder?: string | undefined
+  emptyLabel?: string | undefined
+  class?: string | undefined
 }>()
 
 // A row of the list, numbered the way the arrow keys walk it.

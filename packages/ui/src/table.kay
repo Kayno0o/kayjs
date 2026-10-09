@@ -10,16 +10,16 @@ const { columns, rows, rowKey, sort, serverSort = false, onSort, cell, empty, cl
   rows: Row[]
   rowKey: RowKey<Row>
   // The sort to start from; a table whose parent passes a new one follows it.
-  sort?: SortState
+  sort?: SortState | undefined
   // Rows already sorted by the data source: the table reflects the sort in its headers and never reorders them itself.
-  serverSort?: boolean
+  serverSort?: boolean | undefined
   // Called with each sort a header click asks for, to fetch the rows sorted that way when `serverSort` is set.
-  onSort?: (sort: SortState) => void
+  onSort?: ((sort: SortState) => void) | undefined
   // Draws the cells of the columns marked `cell: true`.
-  cell?: (row: Row, column: Column<Row>) => JSX.Element
+  cell?: ((row: Row, column: Column<Row>) => JSX.Element) | undefined
   // Shown in place of the rows when there are none.
-  empty?: JSX.Element
-  class?: string
+  empty?: JSX.Element | undefined
+  class?: string | undefined
 }>()
 
 const current = signal(sort)

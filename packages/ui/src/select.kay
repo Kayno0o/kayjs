@@ -4,13 +4,13 @@ import type { JSX } from 'kay'
 const { value, options, onChange, emptyOption, loading = false, loadingLabel = 'Loading…', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
   value: string
   options: readonly { value: string | number, label: string }[]
-  onChange?: (value: string) => void
+  onChange?: ((value: string) => void) | undefined
   // A first option worth the empty string: a string is its label, `true` leaves it blank.
-  emptyOption?: string | boolean
+  emptyOption?: string | boolean | undefined
   // Shows a disabled row saying the options are on their way.
-  loading?: boolean
-  loadingLabel?: string
-  class?: string
+  loading?: boolean | undefined
+  loadingLabel?: string | undefined
+  class?: string | undefined
 }>()
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.

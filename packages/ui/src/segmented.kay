@@ -10,11 +10,11 @@ const { options, value, label, name, onChange, class: className, ...rest } = pro
   // Names the group for screen readers.
   label: string
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
-  name?: string
+  name?: string | undefined
   // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
-  onChange?: (value: Value) => unknown
-  class?: string
+  onChange?: ((value: Value) => unknown) | undefined
+  class?: string | undefined
 }>()
 
 // Held as a string: a signal cannot take a type parameter that might be a function.

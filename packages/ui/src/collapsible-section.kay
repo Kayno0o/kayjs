@@ -5,12 +5,12 @@ import Icon from './icon.kay'
 const { title, open = true, boxed = false, meta, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['details'], 'class' | 'title' | 'open' | 'children'> & {
   title: string
   // Whether it starts unfolded; the reader folds and unfolds it from then on.
-  open?: boolean
+  open?: boolean | undefined
   // Draws the section as a card: the title becomes a band over a padded body, so a stack of them reads as separate blocks.
-  boxed?: boolean
+  boxed?: boolean | undefined
   // Sits in the band before the chevron, for a count or a state the folded section would otherwise hide.
-  meta?: JSX.Element
-  class?: string
+  meta?: JSX.Element | undefined
+  class?: string | undefined
 }>()
 ---
 // A native disclosure, so it folds without script and a static page can hold it.

@@ -15,18 +15,18 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels and the tooltip's values.
-  formatValue?: (value: number) => string
+  formatValue?: ((value: number) => string) | undefined
   // Draws the x-axis labels: up to five, spaced by time when every label is a date.
-  xLabels?: boolean
+  xLabels?: boolean | undefined
   // Names each series under the chart; shown by default once there is more than one.
-  legend?: boolean
+  legend?: boolean | undefined
   // Merged over the defaults, for what the props do not cover.
-  options?: LineChartOptions
+  options?: LineChartOptions | undefined
   // Lets a drag across the plot pick a span, handed over as the indices of its first and last points, such as to zoom in on it.
-  onRange?: (from: number, to: number) => unknown
+  onRange?: ((from: number, to: number) => unknown) | undefined
   // Describes the chart for screen readers, which cannot read the drawing.
   label: string
-  class?: string
+  class?: string | undefined
 }>()
 
 const times = () => labelTimes(labels)
