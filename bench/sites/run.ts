@@ -12,7 +12,7 @@ import { PROFILES, vitals } from './browser'
 import { buildCommands, footprint, timeBuild } from './build'
 import { coldStart, load } from './load'
 import { memory, startAll } from './serve'
-import { commitOf, kayVersion, label, prepare, SITES, VARIANTS } from './sites'
+import { commitOf, kayVersion, KIND, label, prepare, SITES, VARIANTS } from './sites'
 import { VIEWPORTS, weigh } from './weigh'
 
 interface Result {
@@ -105,9 +105,9 @@ try {
     `${cpus()[0]?.model ?? 'unknown CPU'}, ${cpus().length} threads`,
     `Bun ${Bun.version}, Chromium ${browser.version()} headless, ${nginxVersion()}`,
     ...await Promise.all(SITES.map(async (site) => {
-      const [astro, kay] = VARIANTS.filter(variant => variant.site === site)
+      const sides = await Promise.all(VARIANTS.filter(variant => variant.site === site).map(async variant => variant.kind === 'astro' ? `Astro at ${commitOf(variant)}` : `kay ${await kayVersion(variant)} at ${commitOf(variant)}`))
 
-      return `${site.name}: Astro at ${commitOf(astro!)}, kay ${await kayVersion(kay!)} at ${commitOf(kay!)}`
+      return `${site.name}: ${sides.join(', ')}`
     })),
     `run on ${new Date().toISOString().slice(0, 10)}`,
   ]
@@ -171,7 +171,7 @@ try {
     '',
   ].join('\n')
 
-  await Bun.write(join(import.meta.dir, 'results.md'), markdown)
+  await Bun.write(join(import.meta.dir, KIND === undefined ? 'results.md' : `results.${KIND}.md`), markdown)
   console.log(markdown)
 }
 finally {

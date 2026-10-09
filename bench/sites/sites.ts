@@ -54,11 +54,14 @@ export const SITES: Site[] = [
   },
 ]
 
+// `KIND=kay` measures the kay side only, keeping the Astro figures of an earlier run; the ports stay those of a full run.
+export const KIND = process.env.KIND as Variant['kind'] | undefined
+
 export const VARIANTS: Variant[] = SITES.flatMap((site, index) => (['astro', 'kay'] as const).map((kind, offset) => {
   const slot = index * 2 + offset + 1
 
   return { site, kind, dir: join(WORK, `${site.name}-${kind}`), ports: { backend: 47200 + slot, http: 47080 + slot, https: 47440 + slot } }
-}))
+})).filter(variant => KIND === undefined || variant.kind === KIND)
 
 export function run(cmd: string[], cwd: string, env: Record<string, string> = {}): string {
   const result = Bun.spawnSync(cmd, { cwd, env: { ...process.env, ...env }, stdout: 'pipe', stderr: 'pipe' })
@@ -100,7 +103,9 @@ function buildSolidjs() {
 // Exports each site at its Astro commit and at its kay ref and installs them; build.ts then builds them as they deploy.
 export async function prepare() {
   mkdirSync(WORK, { recursive: true })
-  buildSolidjs()
+
+  if (VARIANTS.some(variant => variant.kind === 'astro'))
+    buildSolidjs()
 
   for (const variant of VARIANTS) {
     const repo = join(REPOS, variant.site.name)
