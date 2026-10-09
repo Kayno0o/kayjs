@@ -13,6 +13,9 @@ const ON_THE_FLY: ReadonlySet<Encoding> = new Set(ENCODINGS)
 const GZIP_ONLY: ReadonlySet<Encoding> = new Set(['gzip'])
 // A gzip member's header: deflate, no name or time, from an unknown system.
 const GZIP_HEADER = new Uint8Array([0x1F, 0x8B, 8, 0, 0, 0, 0, 0, 0, 0xFF])
+// Enough of a fixed text to find it by, past the `<style>` every stylesheet starts with: looking for one whole costs about 100 µs on a 110 KB page.
+const HEAD_BYTES = 72
+const HTML_TYPE = /^text\/html/i
 // Text the build writes; images, fonts and media come compressed already.
 const COMPRESSIBLE = /\.(?:js|mjs|css|html|svg|json|txt|xml|map|wasm)$/i
 const ENCODED_COPY = /\.(?:br|gz)$/
@@ -95,21 +98,32 @@ async function compressBytes(bytes: Uint8Array, encoding: Encoding): Promise<Uin
   })
 }
 
-// Text a response carries whole every time it carries it, as an inlined stylesheet, deflated once at the strongest level.
-// Each ends on a full flush, which empties the window, so it can sit between two other deflate runs of a gzip member without either reaching into it.
+// Text a page carries whole every time it carries it, as an inlined stylesheet.
 export interface FixedText {
   bytes: Buffer
+  head: Buffer
+  // Ends on a full flush, which empties the window, so it sits between two other deflate runs of a gzip member without either reaching into it.
   deflated: Buffer
 }
 
+// Each text deflated once, at the strongest level.
 export function fixedTexts(texts: string[]): FixedText[] {
   const { constants, deflateRawSync } = nodeZlib()
 
   return [...new Set(texts)].map((text) => {
     const bytes = Buffer.from(text)
 
-    return { bytes, deflated: deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }) }
+    return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated: deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }) }
   })
+}
+
+function offsetOf(body: Buffer, text: FixedText): number {
+  for (let at = body.indexOf(text.head); at >= 0; at = body.indexOf(text.head, at + 1)) {
+    if (body.subarray(at, at + text.bytes.length).equals(text.bytes))
+      return at
+  }
+
+  return -1
 }
 
 async function deflateRaw(bytes: Uint8Array, last: boolean): Promise<Buffer> {
@@ -121,7 +135,7 @@ async function deflateRaw(bytes: Uint8Array, last: boolean): Promise<Buffer> {
 // A gzip of the body that deflates only what lies around the fixed texts it holds, theirs deflated once already; undefined when it holds none.
 async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): Promise<Uint8Array<ArrayBuffer> | undefined> {
   const body = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length)
-  const found = fixed.map(text => ({ text, at: body.indexOf(text.bytes) })).filter(({ at }) => at >= 0).sort((a, b) => a.at - b.at)
+  const found = fixed.map(text => ({ text, at: offsetOf(body, text) })).filter(({ at }) => at >= 0).sort((a, b) => a.at - b.at)
 
   if (found.length === 0)
     return undefined
@@ -145,7 +159,15 @@ async function splicedGzip(bytes: Uint8Array<ArrayBuffer>, fixed: FixedText[]): 
     view.setUint32(0, nodeZlib().crc32(body), true)
     view.setUint32(4, body.length % 2 ** 32, true)
 
-    return new Uint8Array(Buffer.concat(parts))
+    const gzip = new Uint8Array(parts.reduce((total, part) => total + part.length, 0))
+    let written = 0
+
+    for (const part of parts) {
+      gzip.set(part, written)
+      written += part.length
+    }
+
+    return gzip
   })
 }
 
@@ -164,7 +186,7 @@ export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: Res
 // The response compressed on the fly for a browser that takes brotli or gzip, or undefined when it is not worth it: already encoded, not text, too small, or asked to be left alone.
 // A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length; a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
 // A response left alone is answered synchronously: Elysia sends an empty body for a `mapResponse` promise resolving to undefined.
-// A whole body holding `fixed` texts goes as gzip to a browser taking it, brotli or not: only the rest of it is compressed, where brotli would compress it all, as its streams cannot be joined.
+// A whole page holding `fixed` texts goes as gzip to a browser taking it, whatever weight it gives brotli: only the rest of it is compressed, where brotli would compress it all, as its streams cannot be joined.
 export function compressResponse(request: Request, response: Response, fixed?: FixedText[]): Response | undefined | Promise<Response> {
   const { headers, status } = response
   const length = headers.get('content-length')
@@ -186,7 +208,7 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   if (!response.body)
     return undefined
 
-  const splice = fixed !== undefined && fixed.length > 0 && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
+  const splice = fixed !== undefined && fixed.length > 0 && HTML_TYPE.test(headers.get('content-type') ?? '') && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
 
   return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, splice)
 }

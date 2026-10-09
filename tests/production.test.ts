@@ -842,6 +842,37 @@ describe('compression', () => {
     expect(await ok.text()).toBe('ok')
   })
 
+  it('splices fixed texts into the gzip of a page, wherever they sit, and compresses anything else as before', async () => {
+    const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
+    const a = `<style>.a{color:red}${'.x{margin:0}'.repeat(40)}</style>`
+    const b = `<style>.b{color:blue}${'.y{padding:0}'.repeat(40)}</style>`
+    const fixed = fixedTexts([a, b, a])
+    const send = async (body: string, accept: string, type = 'text/html') => (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': accept } }), wholeResponse(body, { headers: { 'content-type': type } }), fixed))!
+    const decoded = async (response: Response) => {
+      const bytes = new Uint8Array(await response.arrayBuffer())
+
+      return response.headers.get('content-encoding') === 'gzip' ? new TextDecoder().decode(Bun.gunzipSync(bytes)) : brotliDecompressSync(bytes).toString()
+    }
+    const text = `<p>${'café '.repeat(80)}</p>`
+
+    expect(fixed).toHaveLength(2)
+
+    // Side by side, leading, trailing, alone, twice, and in another order than given.
+    for (const page of [`<head>${a}${b}</head>${text}`, `${a}${text}`, `${text}${b}`, a, `${a}${text}${a}`, `${b}${a}`]) {
+      const response = await send(page, 'br, gzip')
+
+      expect(response.headers.get('content-encoding')).toBe('gzip')
+      expect(await decoded(response)).toBe(page)
+    }
+
+    for (const [page, accept, type] of [[`${a}${text}`, 'br, gzip;q=0', 'text/html'], [text, 'br, gzip', 'text/html'], [`{"css":${JSON.stringify(a)}}`, 'br, gzip', 'application/json']] as const) {
+      const response = await send(page, accept, type)
+
+      expect(response.headers.get('content-encoding')).toBe('br')
+      expect(await decoded(response)).toBe(page)
+    }
+  })
+
   it('sends a streamed page\'s early chunks before the stream ends', async () => {
     const { compressResponse } = await import('../src/server/compress')
     let push!: (text: string) => void
