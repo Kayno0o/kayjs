@@ -109,7 +109,7 @@ export function serveRedirects(app: Elysia, redirects: Redirect[]): void {
     app.get(redirect.path, ({ params, request }) => {
       const values = params as Record<string, string>
       // Named params arrive decoded, so they are encoded again; the `*` arrives as the browser sent it.
-      const target = redirect.to.replaceAll(TARGET_PART, (part, name: string | undefined) => name === undefined ? values['*'] ?? '' : encodeURIComponent(values[redirect.names.get(name)!] ?? ''))
+      const target = redirect.to.replaceAll(TARGET_PART, (_part, name: string | undefined) => name === undefined ? values['*'] ?? '' : encodeURIComponent(values[redirect.names.get(name)!] ?? ''))
       const { search } = new URL(request.url)
       const path = target.startsWith('/') ? target.replace(LEADING_SLASHES, '/') : target
       const location = search !== '' && !path.includes('?') ? `${path}${search}` : path

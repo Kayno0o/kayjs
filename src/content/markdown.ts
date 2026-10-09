@@ -230,7 +230,7 @@ function extractComponents(body: string, bodyLine: number): { text: string, comp
 
 // The block with its component tags, outside code spans, swapped for placeholders.
 function replaceTags(text: string, startLine: number, components: ExtractedComponent[], open: { name: string, line: number }[]): string {
-  return outsideCodeSpans(text, (part, offset) => part.replace(COMPONENT_TAG, (tag: string, closing: string, name: string, inside = '', at: number) => {
+  return outsideCodeSpans(text, (part, offset) => part.replace(COMPONENT_TAG, (_tag: string, closing: string, name: string, inside = '', at: number) => {
     const line = startLine + lineOf(text, offset + at) - 1
 
     if (closing) {

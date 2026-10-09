@@ -230,6 +230,8 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
 
         return false
       }
+
+      return true
     })
 
     edits.push(...astroEdits(statement, code, 0, options.role, hasProps ? 'typed' : 'untyped', note))

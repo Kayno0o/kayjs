@@ -107,6 +107,8 @@ describe('client-only islands', () => {
     const error = (() => {
       try {
         child(Bad({ unit: 'px' }))
+
+        return undefined
       }
       catch (thrown) {
         return thrown as Error
