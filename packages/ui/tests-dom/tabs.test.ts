@@ -83,3 +83,18 @@ test('moves between tabs with the arrows, wrapping, and Home and End, focus goin
 
   expect(shown()).toEqual(['Earth'])
 })
+
+test('keeps a panel, and the focus inside it, when the tabs are relabelled', async () => {
+  mounted = await mount('src/components/counted-tabs.kay')
+
+  const { root } = mounted
+  const input = root.querySelector<HTMLInputElement>('input[name="venus"]')!
+
+  input.focus()
+  input.value = 'v'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+
+  expect(root.querySelectorAll('[role="tab"]')[1]?.textContent).toBe('venus (1)')
+  expect(document.activeElement).toBe(input)
+})

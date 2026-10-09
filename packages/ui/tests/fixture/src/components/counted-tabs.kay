@@ -1,0 +1,10 @@
+---
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+
+// Each tab's label counts what its field holds, so typing hands Tabs a new list.
+const typed = signal<Record<string, string>>({})
+const tabs = memo(() => ['mars', 'venus'].map(value => ({ value, label: `${value} (${typed()[value]?.length ?? 0})` })))
+---
+Tabs(tabs={tabs} value="venus" label="Planets")
+  @panel(planet)
+    input(name={planet} onInput={event => typed.set({ ...typed(), [planet]: event.currentTarget.value })})
