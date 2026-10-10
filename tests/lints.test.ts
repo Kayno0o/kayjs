@@ -76,7 +76,7 @@ describe('kay explain', () => {
 
   it('lists every lint with its default level and the first sentence of what it reports', () => {
     expect(lintList().split('\n').map(line => line.split(/\s{2,}/).slice(0, 2))).toEqual(Object.entries(LINTS).map(([name, lint]) => [name, lint.level]))
-    expect(lintList()).toContain('unread-name        deny  A prop or server value nothing reads.\n')
+    expect(lintList()).toMatch(/^unread-name +deny {2}A prop or server value nothing reads\.$/m)
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code', () => {
@@ -148,5 +148,64 @@ describe('uncaught-await', () => {
   it('leaves an await block with a catch block, and reports one nested in a then block on its own', () => {
     expect(lints('await comments then list\n  p {list.length}\ncatch\n  p Failed\n')).toEqual([])
     expect(lints('await comments then list\n  await list then count\n    p {count}\ncatch\n  p Failed\n')).toEqual([{ code: 'uncaught-await', severity: 'warning', at: 'await list' }])
+  })
+})
+
+describe('a11y lints', () => {
+  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete'])
+  const a11y = (source: string) => lints(source).filter(d => A11Y.has(d.code ?? '')).map(d => `${d.code} ${d.at}`)
+
+  it('reports an aria attribute ARIA does not define, fixing it to the closest one, whatever the value', () => {
+    expect(a11y('div(aria-labeledby="t" aria-live={mode} aria-label="Menu") Menu\np(aria-zzzz="1") x\n')).toEqual(['unknown-aria aria-labeledby', 'unknown-aria aria-zzzz'])
+    expect(fixed('div(aria-labeledby="t") Menu\n')).toEqual(['div(aria-labelledby="t") Menu\n'])
+  })
+
+  it('reports an unknown or abstract role, taking a list of fallback roles and leaving one written as an expression', () => {
+    expect(a11y('div(role="buton") a\ndiv(role="widget") b\ndiv(role="switch checkbox" aria-checked="false") c\ndiv(role={kind}) d\nsection(role="doc-chapter") e\n')).toEqual(['unknown-role buton', 'unknown-role widget'])
+  })
+
+  it('reports a role missing a state it needs, unless a native input announces its own', () => {
+    expect(a11y('div(role="checkbox") a\ndiv(role="checkbox" aria-checked={checked}) b\ninput(type="checkbox" role="switch" aria-label="Dark")\ndiv(role="scrollbar" aria-valuenow="3") c\n')).toEqual(['missing-state checkbox', 'missing-state scrollbar'])
+  })
+
+  it('reports what takes the keyboard under aria-hidden, but not once out of the tab order, disabled, or under `hidden` or `inert`', () => {
+    expect(a11y('button(aria-hidden="true") a\ndiv(aria-hidden="true")\n  a(href="/x") x\n  input(name="trap" tabindex="-1")\n  button(disabled) b\n  span(tabindex="0") s\ndiv(hidden)\n  div(aria-hidden="true")\n    button c\ndiv(aria-hidden="true" inert)\n  input(name="trap")\ndiv(inert)\n  button(aria-hidden="true") d\n')).toEqual(['hidden-focusable button', 'hidden-focusable a', 'hidden-focusable span'])
+  })
+
+  it('reports a tabindex above 0, and autofocus outside a dialog', () => {
+    expect(a11y('span(tabindex="0") a\nspan(tabindex="-1") b\nspan(tabindex="2") c\ninput(name="q" aria-label="Q" autofocus)\np(role="status" tabindex="-1" autofocus) Sent\ndialog\n  input(name="r" aria-label="R" autofocus)\n')).toEqual(['positive-tabindex tabindex', 'autofocus autofocus'])
+  })
+
+  it('reports a link acting as a button, leaving one going somewhere or given a role', () => {
+    expect(a11y('a(onClick={go}) a\na(href="#" onClick={go}) b\na(href="javascript:void(0)" onClick={go}) c\na(href="/x" onClick={go}) d\na(href={url} onClick={go}) e\na(role="button" tabindex="0" onClick={go}) f\n')).toEqual(['link-as-button a', 'link-as-button a', 'link-as-button a'])
+  })
+
+  it('reports a control inside a link or a button, at any depth, leaving a hidden input and a link with no href', () => {
+    expect(a11y('a(href="/post")\n  div\n    button(onClick={save}) Save\nbutton(type="submit")\n  input(type="hidden" name="id" value="1")\n  | Send\na(href="/x")\n  a(href="/y") y\nbutton(onClick={go})\n  a link\n')).toEqual(['nested-control button', 'nested-control a'])
+  })
+
+  it('reports an id used twice, unless in different branches of a block, and one written out inside a `for`', () => {
+    expect(a11y('if open\n  p#note a\nelse\n  p#note b\nawait data\n  p#state Loading\nthen value\n  p#state {value}\ncatch\n  p#state Failed\np#main x\np(id="main") y\nfor item of items\n  span#row {item}\n')).toEqual(['duplicate-id p', 'duplicate-id span'])
+  })
+
+  it('reports a label pointing at no id of the template, unless an id may come from an expression or a spread', () => {
+    expect(a11y('label(for="email") Email\ninput#mail(name="email")\nlabel(for="card") Card\nCardField(id="card")\n')).toEqual(['dangling-label for'])
+    expect(a11y('label(for="email") Email\ninput(id={field} name="email")\n')).toEqual([])
+    expect(a11y('label(for="email") Email\ninput({...rest})\n')).toEqual([])
+  })
+
+  it('reports a video with no captions, unless muted or its tracks come from a block', () => {
+    expect(a11y('video(src="/a.mp4")\nvideo(src="/b.mp4" muted autoplay)\nvideo(src="/c.mp4")\n  track(kind="captions" src="/c.vtt")\nvideo(src="/d.mp4")\n  for track of tracks\n    track(kind="captions" src={track})\nvideo(src="/e.mp4")\n  track(kind="chapters" src="/e.vtt")\n')).toEqual(['missing-captions video', 'missing-captions video'])
+  })
+
+  it('reports alt text naming the image as one, or a filename, as whole words only', () => {
+    expect(a11y('img(src="/a.jpg" alt="Photo of the team")\nimg(src="/b.jpg" alt="team.jpg")\nimg(src="/c.jpg" alt="Photography studio front")\nimg(src="/d.jpg" alt="")\n')).toEqual(['redundant-alt alt', 'redundant-alt alt'])
+  })
+
+  it('reports an autocomplete value HTML does not define, taking sections, address and contact kinds and webauthn', () => {
+    const valid = ['email', 'shipping street-address', 'section-gift billing postal-code', 'work email', 'username webauthn', 'off', 'one-time-code']
+
+    expect(a11y(valid.map(value => `input(name="f" aria-label="F" autocomplete="${value}")`).join('\n'))).toEqual([])
+    expect(a11y('input(name="a" aria-label="A" autocomplete="nope")\ninput(name="b" aria-label="B" autocomplete="home name")\nform(autocomplete="email")\n  p x\nform(autocomplete="off")\n  p y\n')).toEqual(['invalid-autocomplete autocomplete', 'invalid-autocomplete autocomplete', 'invalid-autocomplete autocomplete'])
   })
 })

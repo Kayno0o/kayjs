@@ -621,7 +621,7 @@ describe('accessibility checks', () => {
       'input(id="age")\nlabel(for="age") Age',
       'input(aria-label="Search")\ninput(placeholder="Search")\ninput(title="Search")\ninput(aria-labelledby="heading")',
       'input(type="hidden" name="id")\ninput(type="submit" value="Send")\ninput(type="button" value="Go")',
-      'input(name="website" aria-hidden="true")\n.trap(hidden)\n  input(name="phone")',
+      'input(name="website" aria-hidden="true" tabindex="-1")\n.trap(hidden)\n  input(name="phone")',
     ].join('\n'))).toEqual([])
   })
 

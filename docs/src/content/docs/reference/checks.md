@@ -35,11 +35,24 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `missing-title` | deny | An `iframe` with no `title` |
 | `unreachable-click` | deny | An `onClick` on an element no keyboard reaches |
 | `empty-control` | deny | A button or link with nothing to announce |
+| `unknown-aria` | deny | An `aria-*` attribute ARIA does not define |
+| `unknown-role` | deny | A `role` ARIA does not define |
+| `missing-state` | deny | A `role="switch"` with no `aria-checked` |
+| `hidden-focusable` | deny | A focusable element under `aria-hidden` |
+| `positive-tabindex` | deny | A `tabindex` above 0 |
+| `link-as-button` | deny | An `a` with `onClick` and no `href` |
+| `nested-control` | deny | A button inside a link |
+| `duplicate-id` | deny | An id two elements share |
+| `invalid-autocomplete` | deny | An `autocomplete` value HTML does not define |
 | `unbounded-string` | deny | A string field of an action with no `maxLength` |
 | `positional-key` | warn | A `for` keyed by position whose rows read `item.id` |
 | `identity-key` | warn | An island `for` over objects with no `id` or `key` |
 | `missing-label` | warn | A form field with no label |
 | `skipped-heading` | warn | An `h3` right after an `h1` |
+| `autofocus` | warn | `autofocus` outside a `dialog` |
+| `dangling-label` | warn | A `label(for)` pointing at no id |
+| `missing-captions` | warn | A `video` with no captions |
+| `redundant-alt` | warn | Alt text that says it is an image |
 | `constant-signal` | warn | A signal that is only ever read |
 | `uncaught-await` | warn | An `await` block with no `catch` |
 
