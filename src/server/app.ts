@@ -31,7 +31,7 @@ import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuards } from './guards'
-import { cookieLocale, hostLocale, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, routedSettings, stateFor } from './i18n'
+import { cookieLocale, hostLocale, implicitI18n, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, routedSettings, stateFor } from './i18n'
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader, underKayDev } from './loader'
@@ -201,6 +201,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     i18n.settings = routedSettings(i18n.settings, routes)
   }
 
+  // Without `i18n`, every request runs in the site's one language, its extensions' messages and the app's read.
+  const locales = i18n ?? await implicitI18n(root, options.lang, options.extensions)
+  const inImplicitLocale = async (request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, new URL(request.url).pathname, request), run)
+
   const base = basePath(options.base)
   const maxDensity = applyImageConfig(options.images)
 
@@ -334,7 +338,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   })
 
   const matchers = await loadMatchers(routesDir, routes)
-  const actionOptions = { dev: options.dev, onError: options.onError, i18n, base }
+  const actionOptions = { dev: options.dev, onError: options.onError, i18n: locales, base }
   const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, await serveApi(app, apiModules, actionOptions))
@@ -518,7 +522,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
         return redirect
 
       if (!i18n || !settings)
-        return answer(served!.candidates, context, url)
+        return inImplicitLocale(context.request, async () => answer(served!.candidates, context, url))
 
       // With every locale prefixed, a path without one goes to the visitor's.
       if (locale === undefined)
@@ -546,7 +550,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (fallback.notFound ?? fallback.error) {
     app.get('/*', async (context) => {
       if (!i18n)
-        return renderUnmatched(fallback, context, client, renderOptions)
+        return inImplicitLocale(context.request, async () => renderUnmatched(fallback, context, client, renderOptions))
 
       const url = new URL(context.request.url)
       const { settings } = i18n

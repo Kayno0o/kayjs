@@ -115,7 +115,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
 function pageLinks(origin: string, url: URL, trailingSlash: TrailingSlash | undefined): HeadTag[] {
   const state = localeState()
 
-  if (!state)
+  if (!state || state.implicit)
     return [{ tag: 'link', props: { rel: 'canonical', href: origin + slashedPath(url.pathname, trailingSlash) } }]
 
   const copies = localeCopies(state.settings, state.path)

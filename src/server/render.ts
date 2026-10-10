@@ -33,7 +33,7 @@ import { FLASH_COOKIE, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
 import { hydrationScript } from './hydration'
-import { messagesScript } from './i18n'
+import { DEFAULT_LANG, messagesScript } from './i18n'
 import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { matchesEtag } from './public'
@@ -100,7 +100,6 @@ interface Rendering {
 }
 
 const CHARSET = '<meta charset="utf-8">'
-const DEFAULT_LANG = 'en'
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
 // Per set of islands and per chain of layouts: few exist, and they never change for a build.
 const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()

@@ -15,7 +15,7 @@ import { scanApi } from './api'
 import { basePath } from './base'
 import { setupCards } from './card'
 import { PRERENDERED_DIR, readInlineStyles, readManifest, writeManifest } from './client'
-import { loadI18n, localeCopies, routedSettings, stateFor } from './i18n'
+import { implicitI18n, loadI18n, localeCopies, routedSettings, stateFor } from './i18n'
 import { applyImageConfig } from './image'
 import { registerLoader } from './loader'
 import { loadMatchers, matchedParams } from './params'
@@ -76,6 +76,8 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   if (i18n)
     i18n.settings = routedSettings(i18n.settings, routes)
 
+  const locales = i18n ?? await implicitI18n(root, config.lang, config.extensions)
+
   async function prerenderRoute(route: Route, file: string, marked: boolean): Promise<void> {
     const module = await import(route.file) as Record<string, unknown>
     const revalidate = revalidatePeriod(file, module.revalidate)
@@ -102,7 +104,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()
         const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head, base: basePath(config.base), maxDensity, offline: config.offline !== undefined })
-        const response = await (i18n && copy.locale !== undefined ? runInLocale(stateFor(i18n, copy.locale, path, request), render) : render())
+        const response = await runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
 
         if (response.status >= 500)
           throw new Error(`kay: prerendering ${copy.path} from ${file} failed with ${response.status}; the error is logged above`)

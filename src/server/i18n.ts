@@ -14,6 +14,9 @@ import { patternShapes } from './routes'
 // Where a visitor's choice of locale is kept, read before their browser's languages.
 export const LOCALE_COOKIE = 'kay-locale'
 const MESSAGES_DIR = 'src/messages'
+
+// The language a site without `lang` is written in.
+export const DEFAULT_LANG = 'en'
 // A year: a choice of language is no session's.
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 const LOCALE_TAG = /^[a-z]{2,3}(?:-[a-z\d]{2,8})*$/i
@@ -24,9 +27,12 @@ const PARAM_NAME = /^:[^/]+$/
 export interface I18n {
   settings: LocaleSettings
   translations: Map<string, Translations>
+  // Read without `i18n`, for the site's one language: its URLs carry no locale and its pages no alternates.
+  implicit?: true
 }
 
-export function messagesFile(root: string, config: I18nConfig, locale: string): string {
+// A locale's catalog in the app, under src/messages unless `i18n.messages` moves it.
+export function messagesFile(root: string, config: Pick<I18nConfig, 'messages'>, locale: string): string {
   return join(resolve(root, config.messages ?? MESSAGES_DIR), `${locale}.ts`)
 }
 
@@ -173,31 +179,18 @@ function firstSegment(path: string): string {
 // Every locale's messages, the app's laid over its extensions' key by key, the default locale's standing in for a key another lacks.
 export async function loadI18n(root: string, config: I18nConfig, extensions?: KayExtension[]): Promise<I18n> {
   const settings = localeSettings(config)
-  const bundle = bundled()
-  const exists = (file: string) => bundle ? file in bundle.modules : existsSync(file)
   const flat = new Map<string, Map<string, Message>>()
 
   for (const locale of settings.locales) {
     const file = messagesFile(root, config, locale)
 
-    if (!exists(file))
+    const catalogs = [...libraryCatalogs(root, extensions, locale), ...fileExists(file) ? [file] : []]
+
+    // An extension's catalog stands in for an app with no text of its own in that locale.
+    if (catalogs.length === 0)
       throw new Error(`kay: i18n lists ${locale}, so its messages go in ${relative(process.cwd(), file)}: export default defineMessages({ ... })`)
 
-    const messages = new Map<string, Message>()
-
-    const libraries = bundle ? bundle.extensionMessages?.[locale] ?? [] : extensionMessageFiles(root, extensions, locale).filter(exists)
-
-    for (const catalog of [...libraries, file]) {
-      const tree = (await importModule<{ default?: unknown }>(catalog)).default
-
-      if (typeof tree !== 'object' || tree === null)
-        throw new Error(`kay: ${relative(process.cwd(), catalog)} must export its messages by default: export default defineMessages({ ... })`)
-
-      for (const [key, message] of flattenMessages(tree as MessageTree))
-        messages.set(key, message)
-    }
-
-    flat.set(locale, messages)
+    flat.set(locale, await mergedCatalogs(catalogs))
   }
 
   const fallback = flat.get(settings.defaultLocale)!
@@ -205,9 +198,47 @@ export async function loadI18n(root: string, config: I18nConfig, extensions?: Ka
   return { settings, translations: new Map([...flat].map(([locale, messages]) => [locale, { locale, messages, ...locale !== settings.defaultLocale && { fallback } }])) }
 }
 
+// A site without `i18n` in its one language: its extensions' messages, the app's own src/messages/<lang>.ts over them when it has one.
+export async function implicitI18n(root: string, lang: string | undefined, extensions?: KayExtension[]): Promise<I18n> {
+  const locale = lang ?? DEFAULT_LANG
+  const own = messagesFile(root, {}, locale)
+  const catalogs = [...libraryCatalogs(root, extensions, locale), ...fileExists(own) ? [own] : []]
+
+  return { settings: { locales: [locale], defaultLocale: locale, prefixDefault: false }, translations: new Map([[locale, { locale, messages: await mergedCatalogs(catalogs) }]]), implicit: true }
+}
+
+function fileExists(file: string): boolean {
+  const bundle = bundled()
+
+  return bundle ? file in bundle.modules : existsSync(file)
+}
+
+function libraryCatalogs(root: string, extensions: KayExtension[] | undefined, locale: string): string[] {
+  const bundle = bundled()
+
+  return bundle ? bundle.extensionMessages?.[locale] ?? [] : extensionMessageFiles(root, extensions, locale).filter(fileExists)
+}
+
+// The catalogs' messages, each laid over the ones before it key by key.
+async function mergedCatalogs(catalogs: string[]): Promise<Map<string, Message>> {
+  const messages = new Map<string, Message>()
+
+  for (const catalog of catalogs) {
+    const tree = (await importModule<{ default?: unknown }>(catalog)).default
+
+    if (typeof tree !== 'object' || tree === null)
+      throw new Error(`kay: ${relative(process.cwd(), catalog)} must export its messages by default: export default defineMessages({ ... })`)
+
+    for (const [key, message] of flattenMessages(tree as MessageTree))
+      messages.set(key, message)
+  }
+
+  return messages
+}
+
 // The state a request runs in for that locale, the page's path given without its prefix.
 export function stateFor(i18n: I18n, locale: string, path: string, request: Request): LocaleState {
-  return { ...i18n.translations.get(locale)!, settings: i18n.settings, path, host: new URL(request.url).host }
+  return { ...i18n.translations.get(locale)!, settings: i18n.settings, path, host: new URL(request.url).host, ...i18n.implicit && { implicit: true } }
 }
 
 // The locale a request's host serves, when locales go by domain.
@@ -306,7 +337,8 @@ export function prerenderKey(settings: LocaleSettings | undefined, locale: strin
 export function messagesScript(keys: Set<string>, first: boolean): string {
   const state = localeState()
 
-  if (!state || (keys.size === 0 && !first))
+  // Without `i18n`, the browser builds links as they are written: a page sends its locale only for the messages its islands read.
+  if (!state || (keys.size === 0 && (!first || state.implicit)))
     return ''
 
   const messages = Object.fromEntries([...keys].flatMap((key) => {
@@ -314,7 +346,7 @@ export function messagesScript(keys: Set<string>, first: boolean): string {
 
     return message === undefined ? [] : [[key, message]]
   }))
-  const payload = first ? { locale: state.locale, settings: state.settings, messages } : { messages }
+  const payload = first ? { locale: state.locale, ...!state.implicit && { settings: state.settings }, messages } : { messages }
 
   return `<script type="application/json" data-kay-i18n>${JSON.stringify(payload).replaceAll('<', '\\u003c')}</script>`
 }

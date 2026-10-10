@@ -30,7 +30,7 @@ import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
 import { scanApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
-import { extensionMessageFiles, localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
+import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
@@ -74,6 +74,8 @@ export interface CheckOptions {
   shutdownTimeout?: Duration | undefined
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
   i18n?: I18nConfig | undefined
+  // The site's one language without `i18n`: `t()` reads its extensions' catalogs and the app's then.
+  lang?: string | undefined
   // The level of each lint, over its default.
   lints?: LintLevels | undefined
 }
@@ -180,7 +182,12 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const contentConfig = resolve(root, options.content ?? CONTENT_CONFIG)
   const content = existsSync(contentConfig) ? relative(dirname(environmentPath), contentConfig).replace(TS_EXTENSION, '') : undefined
 
-  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, prefixes, messages: [...extensionMessageFiles(root, options.extensions, options.i18n.defaultLocale).filter(file => existsSync(file)), messagesFile(root, options.i18n, options.i18n.defaultLocale)].map(file => relative(dirname(environmentPath), file).replace(TS_EXTENSION, '')) }, config, app, content))
+  // `t()` reads the default locale's catalogs, or without `i18n` the site's one language's, when it has any.
+  const textLocale = options.i18n?.defaultLocale ?? options.lang ?? DEFAULT_LANG
+  const catalogs = [...extensionMessageFiles(root, options.extensions, textLocale), messagesFile(root, options.i18n ?? {}, textLocale)].filter(file => existsSync(file)).map(file => relative(dirname(environmentPath), file).replace(TS_EXTENSION, ''))
+  const texts = options.i18n ? settings && { locales: options.i18n.locales, prefixes, messages: catalogs } : catalogs.length > 0 ? { locales: [textLocale], prefixes: [], messages: catalogs } : undefined
+
+  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, texts, config, app, content))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS]
@@ -398,7 +405,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const feeds = feed === undefined ? [] : [feed, ...prefixes === undefined || prefixes === '' ? [] : [`\`\${${prefixes}}\${${feed}}\``]]
   const paths = [...files.flatMap(spellings).map(file => JSON.stringify(file)), ...feeds].join(' | ') || 'never'
   // The app's catalog laid over its extensions', key by key.
-  const messages = i18n?.messages.map(file => `typeof import(${importSpecifier(file)}).default`).reduce((under, over) => `MergeMessages<${under}, ${over}>`)
+  const messages = i18n?.messages.length === 0 ? '{}' : i18n?.messages.map(file => `typeof import(${importSpecifier(file)}).default`).reduce((under, over) => `MergeMessages<${under}, ${over}>`)
   const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: ${messages}` : ''
   const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
   const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`

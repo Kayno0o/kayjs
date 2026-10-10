@@ -11,7 +11,7 @@ function current(name: string): LocaleState {
   const state = localeState()
 
   if (!state)
-    throw new Error(`kay: ${name} reads the request's locale, so it runs while a page, an action or a guard does, and needs \`i18n\` in kay.config.ts`)
+    throw new Error(`kay: ${name} reads the request's locale, so it runs while a page, an action or a guard does`)
 
   return state
 }

@@ -86,6 +86,60 @@ console.log(JSON.stringify({ en: await visit('/auth/login'), fr: await visit('/f
 process.exit(0)
 `
 
+// The same library in an app without `i18n`, written in French: its pages read the French catalogs, the app's own over the library's.
+const IMPLICIT: Record<string, string> = {
+  'package.json': LOCALIZED['package.json']!,
+  'tsconfig.json': TSCONFIG,
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { authPages } from \'kay-lib\'\n\nexport default defineConfig({ lang: \'fr\', site: \'https://example.com\', extensions: [authPages()] })\n',
+  'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ auth: { title: \'Se connecter\' } })\n',
+  // A component no page renders, so the static export leaves its unknown key to kay check.
+  'src/wrong.kay': '---\nimport { t } from \'kay/i18n\'\n---\np {t(\'auth.nope\')}\n',
+  'node_modules/kay-lib/package.json': LOCALIZED['node_modules/kay-lib/package.json']!,
+  'node_modules/kay-lib/index.ts': LOCALIZED['node_modules/kay-lib/index.ts']!,
+  'node_modules/kay-lib/messages/en.ts': LOCALIZED['node_modules/kay-lib/messages/en.ts']!,
+  'node_modules/kay-lib/messages/fr.ts': LOCALIZED['node_modules/kay-lib/messages/fr.ts']!,
+  'node_modules/kay-lib/routes/login.kay': '--- server\nimport { locale, localize, t } from \'kay/i18n\'\n\nexport const prerender = true\n\nconst title = t(\'auth.title\')\nconst hint = t(\'auth.hint\')\nconst register = localize(\'/auth/register\')\nconst lang = locale()\n---\n---\nimport Hint from \'../hint.kay\'\n---\nh1 {title}\np {hint}\na(href={register}) {lang}\nHint\n',
+  'node_modules/kay-lib/hint.kay': '---\nimport { signal } from \'kay\'\nimport { t } from \'kay/i18n\'\n\nconst open = signal(false)\n---\nbutton(type="button" onClick={() => open.set(!open())}) {t(\'auth.hint\')}\n',
+  'node_modules/kay-lib/routes/register.kay': 'p register\n',
+}
+
+// The library's catalogs standing in for an app in two locales that writes none of its own.
+const BORROWED: Record<string, string> = {
+  ...LOCALIZED,
+  'src/messages/en.ts': undefined!,
+  'src/messages/fr.ts': undefined!,
+  'src/routes/index.kay': 'p home\n',
+}
+
+// The login page as the app serves it.
+const SERVE_LOGIN = `import { pages } from 'kay/server'
+
+const app = await pages({ prebuilt: true })
+const visit = async (path: string) => (await app.handle(new Request(\`http://localhost\${path}\`))).text()
+
+console.log(JSON.stringify({ login: await visit('/auth/login'), fr: await visit('/fr/auth/login') }))
+process.exit(0)
+`
+
+// An app whose extension lives beside it rather than under it, as a linked or workspace library does.
+const OUTSIDE: Record<string, string> = {
+  'app/package.json': JSON.stringify({ name: 'app' }),
+  'app/tsconfig.json': TSCONFIG,
+  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/auth\' } }] })\n',
+  'app/serve.ts': `import { stringify } from 'devalue'
+import { pages } from 'kay/server'
+
+const app = await pages({ prebuilt: true })
+const login = await (await app.handle(new Request('http://localhost/auth/login'))).text()
+const action = (/<form[^>]*action="([^"]+)"/).exec(login)?.[1] ?? ''
+const posted = await app.handle(new Request(\`http://localhost\${action}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({ name: 'Ada' }) }))
+
+console.log(JSON.stringify({ action, posted: await posted.text() }))
+process.exit(0)
+`,
+  'lib/routes/login.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const signIn = action(t.Object({ name: t.String({ maxLength: 50 }) }), ({ name }) => ({ signedIn: name }))\n---\nform(action={signIn})\n  input(name="name")\n  button Sign in\n',
+}
+
 const projects = new Map<string, string>()
 
 beforeAll(async () => {
@@ -93,10 +147,10 @@ beforeAll(async () => {
 
   await mkdir(base, { recursive: true })
 
-  for (const [name, files] of [['routes', { ...FILES, 'serve.ts': SERVE }], ['messages', { ...LOCALIZED, 'serve.ts': SERVE_LOCALIZED }]] as const) {
+  for (const [name, files] of [['routes', { ...FILES, 'serve.ts': SERVE }], ['messages', { ...LOCALIZED, 'serve.ts': SERVE_LOCALIZED }], ['implicit', { ...IMPLICIT, 'serve.ts': SERVE_LOGIN }], ['borrowed', { ...BORROWED, 'serve.ts': SERVE_LOGIN }], ['outside', OUTSIDE]] as const) {
     const dir = await mkdtemp(join(base, `extension-${name}-`))
 
-    await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+    await Promise.all(Object.entries(files).filter(([, content]) => content !== undefined).map(async ([path, content]) => Bun.write(join(dir, path), content)))
     projects.set(name, dir)
   }
 })
@@ -188,6 +242,20 @@ describe('a library\'s routes', () => {
   })
 })
 
+describe('a library outside the app\'s directory', () => {
+  it('takes posts to its actions at a URL no browser resolves away', async () => {
+    const { code, stdout, stderr } = await run([process.execPath, 'serve.ts'], join(projects.get('outside')!, 'app'))
+
+    expect(stderr).not.toContain('error')
+    expect(code).toBe(0)
+    const { action, posted } = JSON.parse(stdout) as { action: string, posted: string }
+
+    expect(action).toBe('/_kay/action/~/lib/routes/login.kay/signIn')
+    expect(new URL(action, 'http://localhost').pathname).toBe(action)
+    expect(parse(posted)).toEqual({ signedIn: 'Ada' })
+  })
+})
+
 describe('a library\'s messages', () => {
   const root = () => projects.get('messages')!
 
@@ -231,6 +299,85 @@ describe('a library\'s messages', () => {
     expect(output).not.toContain('"auth.hint"')
     expect(output).toContain('lacks auth.extra, which node_modules/kay-lib/messages/en.ts has')
     expect([...output.matchAll(/^ *--> (\S+)$/gm)].map(match => match[1])).toEqual(['src/routes/index.kay:5:17', 'src/messages/fr.ts:1:1'])
+  })
+})
+
+describe('a library\'s messages in an app without i18n', () => {
+  const root = () => projects.get('implicit')!
+
+  it('translate its pages in the site\'s language, the app\'s catalog over its own, links kept as written and no alternates', async () => {
+    const { code, stdout, stderr } = await run([process.execPath, 'serve.ts'], root())
+
+    expect(stderr).not.toContain('error')
+    expect(code).toBe(0)
+    const { login } = JSON.parse(stdout) as { login: string }
+
+    expect(login).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p><a href="/auth/register">fr</a>')
+    expect(login).toContain('<html lang="fr">')
+    expect(login).toContain('<link rel="canonical" href="https://example.com/auth/login">')
+    expect(login).not.toContain('hreflang')
+    // Its island gets the message it reads, and nothing to build localized links with.
+    expect(login).toContain('<script type="application/json" data-kay-i18n>{"locale":"fr","messages":{"auth.hint":"Utilisez votre e-mail"}}</script>')
+  })
+
+  it('are carried by the executable and written by a static export', async () => {
+    const build = await run([process.execPath, CLI, 'build', '--no-check', '--compile', 'server', '--entry', 'serve.ts'], root())
+
+    expect(build.stderr).not.toContain('error')
+    expect(build.code).toBe(0)
+    const elsewhere = join(root(), '..', `${basename(root())}-elsewhere`)
+
+    await mkdir(elsewhere, { recursive: true })
+
+    try {
+      const served = await run([join(root(), 'server')], elsewhere)
+
+      expect(served.code).toBe(0)
+      expect((JSON.parse(served.stdout) as { login: string }).login).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
+    }
+    finally {
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+
+    const exported = await run([process.execPath, CLI, 'build', '--no-check', '--static', '--outdir', 'dist'], root())
+
+    expect(exported.stderr).not.toContain('error')
+    expect(exported.code).toBe(0)
+    expect(await Bun.file(join(root(), 'dist/auth/login.html')).text()).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
+  }, 60_000)
+
+  it('give t() their keys in kay check', async () => {
+    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root())
+    const output = `${stdout}${stderr}`
+
+    expect(code).toBe(1)
+    expect(output).toContain('"auth.nope"')
+    expect([...output.matchAll(/^ *--> (\S+)$/gm)].map(match => match[1])).toEqual(['src/wrong.kay:4:6'])
+  })
+})
+
+describe('a library\'s catalogs in an app writing none of its own', () => {
+  const root = () => projects.get('borrowed')!
+
+  it('stand in for the app\'s in each locale', async () => {
+    const { code, stdout, stderr } = await run([process.execPath, 'serve.ts'], root())
+
+    expect(stderr).not.toContain('error')
+    expect(code).toBe(0)
+    const { login, fr } = JSON.parse(stdout) as { login: string, fr: string }
+
+    expect(login).toContain('<h1>Sign in</h1><p>Use your email</p>')
+    expect(fr).toContain('<h1>Connexion</h1><p>Utilisez votre e-mail</p>')
+  })
+
+  it('need no catalog of the app\'s in kay check, which still reports a key the library leaves untranslated', async () => {
+    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root())
+    const output = `${stdout}${stderr}`
+
+    expect(code).toBe(1)
+    expect(output).not.toContain('is missing')
+    expect(output).toContain('lacks auth.extra, which node_modules/kay-lib/messages/en.ts has')
+    expect([...output.matchAll(/^ *--> (\S+)$/gm)].map(match => match[1])).toEqual(['src/messages/fr.ts:1:1'])
   })
 })
 

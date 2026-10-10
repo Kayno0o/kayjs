@@ -28,14 +28,17 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
   for (const locale of config.locales) {
     const path = messagesFile(root, config, locale)
     const file = relative(root, path)
+    const libraries = extensionMessageFiles(root, extensions, locale).filter(existsSync)
+    const own = existsSync(path)
 
-    if (!existsSync(path)) {
+    // An extension's catalog stands in for an app with no text of its own in that locale.
+    if (!own && libraries.length === 0) {
       problems.push({ file, line: 1, message: `is missing: i18n lists ${locale}, so its messages go here, export default defineMessages({ ... })` })
 
       continue
     }
 
-    const tree = (await import(path) as { default?: unknown }).default
+    const tree = own ? (await import(path) as { default?: unknown }).default : {}
 
     if (typeof tree !== 'object' || tree === null) {
       problems.push({ file, line: 1, message: 'must export its messages by default: export default defineMessages({ ... })' })
@@ -43,7 +46,7 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
       continue
     }
 
-    const source = await Bun.file(path).text()
+    const source = own ? await Bun.file(path).text() : ''
     const messages = flattenMessages(tree as MessageTree)
 
     for (const key of messages.keys()) {
@@ -53,7 +56,7 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
 
     const entries = new Map<string, Entry>()
 
-    for (const catalog of extensionMessageFiles(root, extensions, locale).filter(existsSync)) {
+    for (const catalog of libraries) {
       const libraryTree = (await import(catalog) as { default?: unknown }).default
       const librarySource = await Bun.file(catalog).text()
 

@@ -7,6 +7,8 @@ export interface LocaleState extends Translations {
   // The page's path without its locale prefix, untranslated, for `alternate`.
   path: string
   host?: string
+  // A site without `i18n`, its one language's messages read and its URLs carrying no locale.
+  implicit?: true
 }
 
 const store = new AsyncLocalStorage<LocaleState>()

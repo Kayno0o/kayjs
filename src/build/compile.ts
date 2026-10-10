@@ -7,7 +7,7 @@ import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG } from '../content/server'
 import { scanApi } from '../server/api'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
-import { extensionMessageFiles, messagesFile } from '../server/i18n'
+import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
 import { refuseClashes, routeMounts, routeTrees, scanRoutes, specialPagesOf } from '../server/routes'
 import { kay } from './plugin'
@@ -61,10 +61,11 @@ export async function compileServer(root: string, config: KayConfig, options: Co
 
   const fallback = specialPagesOf(routeTrees(routesDir, mounts), '')
   const contentConfig = resolve(root, config.content ?? CONTENT_CONFIG)
-  // The content config too, which the server reads the collections and their feeds from, the project's own param matchers and its messages, its extensions' included.
+  // The content config too, which the server reads the collections and their feeds from, the project's own param matchers and its messages, its extensions' included, those of the site's one language without `i18n`.
   const matcherFiles = [...new Set(routes.flatMap(route => Object.values(route.matchers ?? {})))].map(name => matcherFile(routesDir, name)).filter(file => existsSync(file))
-  const extensionMessages = Object.fromEntries((config.i18n?.locales ?? []).map(locale => [locale, extensionMessageFiles(root, config.extensions, locale).filter(file => existsSync(file))]))
-  const messageFiles = config.i18n ? [...Object.values(extensionMessages).flat(), ...config.i18n.locales.map(locale => messagesFile(root, config.i18n!, locale)).filter(file => existsSync(file))] : []
+  const locales = config.i18n?.locales ?? [config.lang ?? DEFAULT_LANG]
+  const extensionMessages = Object.fromEntries(locales.map(locale => [locale, extensionMessageFiles(root, config.extensions, locale).filter(file => existsSync(file))]))
+  const messageFiles = [...Object.values(extensionMessages).flat(), ...locales.map(locale => messagesFile(root, config.i18n ?? {}, locale)).filter(file => existsSync(file))]
   // The API modules too, with their guards, which `pages()` mounts from the list rather than the directory.
   const api = await scanApi(resolve(root, config.api ?? 'src/api'))
   const modules = [...new Set([...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...api.flatMap(module => [module.file, ...module.guards])])]

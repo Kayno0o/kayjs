@@ -114,5 +114,5 @@ export default defineConfig({ extensions: [authPages()] })
 - Param matchers a library route names come from the app's `src/params` or kay's built-ins.
 - Two extensions mounting a page at the same path: the first listed serves it.
 - `kay dev` watches the app's files, not `node_modules`: after editing a linked library's pages, restart it.
-- `messages` names a directory of catalogs, `<locale>.ts` each, laid under the app's `src/messages` key by key: see [Locales](locales.md).
+- `messages` names a directory of catalogs, `<locale>.ts` each, laid under the app's `src/messages` key by key, with or without `i18n`: see [Locales](locales.md).
 - `transformPage` rewrites each prerendered page before it is written: see [Page hooks](routing.md#page-hooks).

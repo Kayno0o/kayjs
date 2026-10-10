@@ -16,6 +16,8 @@ export interface DevOptions {
   publicDir?: string | undefined
   // The locales, which prefix the routes links are checked against and type `t()`'s keys.
   i18n?: I18nConfig | undefined
+  // The site's one language without `i18n`, whose catalogs type `t()`'s keys then.
+  lang?: string | undefined
   api?: string | undefined
   // The app's modules for its libraries' settings, for the settings check in `.kay/types`.
   settings?: Record<string, string> | undefined
@@ -205,9 +207,9 @@ function describe(files: string[]): string {
 }
 
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
-async function regenerateTypes(root: string, { entry, routes, extensions, publicDir, api, settings, i18n }: DevOptions) {
+async function regenerateTypes(root: string, { entry, routes, extensions, publicDir, api, settings, i18n, lang }: DevOptions) {
   try {
-    await writeShadowTypes(root, { entry, routes, extensions, publicDir, api, settings, i18n })
+    await writeShadowTypes(root, { entry, routes, extensions, publicDir, api, settings, i18n, lang })
   }
   catch (error) {
     console.error(error)
