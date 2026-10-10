@@ -1,0 +1,7 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+---
+.flex.flex-wrap.items-center.gap-2
+  Button(label="Cancel")
+  Button(label="Save" variant="accent")
+  Button(label="Delete" variant="danger")

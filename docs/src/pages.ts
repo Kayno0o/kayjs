@@ -1,4 +1,6 @@
-import { components, guides, libraries, reference } from './content.config'
+import { components, docs, reference } from './content.config'
+import { llmsHref } from './reference'
+import { sectionOf, SECTIONS } from './sections'
 
 export interface PageLink {
   href: string
@@ -8,8 +10,6 @@ export interface PageLink {
 export const FORGE_ROOT = 'https://git.kaynooo.fr/kaynooo'
 
 export const FORGE = `${FORGE_ROOT}/kayjs/src/branch/main`
-
-export const topicHref = (slug: string) => slug === 'overview' ? '/' : `/reference/${slug}`
 
 // The pages before and after `slug` in the order the sidebar lists them.
 export function neighbours(entries: { slug: string, data: { title: string } }[], slug: string, href: (slug: string) => string): { previous?: PageLink | undefined, next?: PageLink | undefined } {
@@ -23,19 +23,27 @@ export function neighbours(entries: { slug: string, data: { title: string } }[],
   return { previous: at > 0 ? link(at - 1) : undefined, next: link(at + 1) }
 }
 
-export interface Navigation {
-  guides: PageLink[]
-  reference: PageLink[]
-  libraries: PageLink[]
-  components: PageLink[]
+export interface NavGroup {
+  title: string
+  links: PageLink[]
 }
 
-// The sidebar's links, every page but the overview, which the brand links.
+export interface Navigation {
+  groups: NavGroup[]
+  components: PageLink[]
+  reference: PageLink[]
+}
+
+// The sidebar's links: the docs by section, the kayjs-ui components, then the full reference written for agents.
 export async function navigation(): Promise<Navigation> {
+  const pages = await docs.all()
+
   return {
-    guides: (await guides.all()).map(guide => ({ href: `/guides/${guide.slug}`, title: guide.data.title })),
-    reference: (await reference.all()).filter(topic => topic.slug !== 'overview').map(topic => ({ href: topicHref(topic.slug), title: topic.data.title })),
-    libraries: (await libraries.all()).map(library => ({ href: `/libraries/${library.slug}`, title: library.data.title })),
+    groups: SECTIONS.map(section => ({
+      title: section.title,
+      links: pages.filter(page => sectionOf(page.slug)?.slug === section.slug).map(page => ({ href: `/${page.slug}`, title: page.data.title })),
+    })),
     components: (await components.all()).map(component => ({ href: `/ui/${component.slug}`, title: component.data.title })),
+    reference: (await reference.all()).map(topic => ({ href: llmsHref(topic.slug), title: topic.data.title })),
   }
 }

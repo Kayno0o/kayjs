@@ -12,3 +12,4 @@ tests/.canary-*
 .claude/scheduled_tasks.lock
 tests/fixtures/live/src/**/*.kay
 docs/public/search.json
+docs/public/llms.txt

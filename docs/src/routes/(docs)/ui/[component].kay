@@ -1,77 +1,68 @@
 --- server
-import { highlightCode } from 'kay/content'
-import { components, libraries } from '../../../content.config'
-import { highlight } from '../../../highlight'
+import { components, reference } from '../../../content.config'
 import { FORGE_ROOT, neighbours } from '../../../pages'
 
 export const prerender = components
 
 const component = await components.get(ctx.params.component) ?? ctx.notFound()
 const { Content } = component
-const { title, section, anchor, example, props } = component.data
-const version = (await libraries.get('kayjs-ui'))?.data.version
-const source = example === undefined ? undefined : await highlightCode(example.trimEnd(), 'kay', { highlight })
+const { title, description, props } = component.data
+const version = (await reference.get('kayjs-ui'))?.data.version
 const sections = [
   ...component.headings.filter(heading => heading.depth === 2 || heading.depth === 3),
-  ...example === undefined ? [] : [{ id: 'example', text: 'Example', depth: 2 }],
-  { id: 'props', text: 'Props', depth: 2 },
+  { id: 'api', text: 'API', depth: 2 },
 ]
 const { previous, next } = neighbours(await components.all(), component.slug, slug => `/ui/${slug}`)
 ---
 ---
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
-import UiExample from '../../../components/ui-example.kay'
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'
 import '../../../ui.css'
 ---
 head
   title {title} · kayjs-ui
+  meta(name="description" content={description})
 .page
   header.page-head
     p.eyebrow kayjs-ui · {version}
     h1 {title}
+    p.lede {description}
     p.import: code import {title} from '@kaynooo/kayjs-ui/{component.slug}.kay'
   Toc(sections={sections})
   article.prose
-    if section as heading
-      p.covered From the #[a(href={`/libraries/kayjs-ui#${anchor}`}) {heading}] section of the kayjs-ui docs.
     Content
-    if source as html
-      h2#example: a(href="#example") Example
-      .example
-        .ui-stage
-          UiExample(slug={component.slug})
-        div(innerHTML={html})
-    h2#props: a(href="#props") Props
+    h2#api: a(href="#api") API
     if props.length > 0
-      table.props
-        thead
-          tr
-            th Prop
-            th Type
-            th Default
-        tbody
-          for prop of props key={prop.name}
+      details.props
+        summary Props ({props.length})
+        table
+          thead
             tr
-              td
-                code {prop.name}
-                if !prop.optional && prop.default === undefined
-                  span.required required
-              td
-                code {prop.type}
-                if prop.comment as comment
-                  p.prop-comment
-                    for part, i of comment.split('`') key={i}
-                      if i % 2 === 1
-                        code {part}
-                      else
-                        | {part}
-              td
-                if prop.default as value
-                  code {value}
-      p.spread Attributes it does not declare go onto its root element, #[code id], #[code aria-*] and #[code data-*] included.
+              th Prop
+              th Type
+              th Default
+          tbody
+            for prop of props key={prop.name}
+              tr
+                td
+                  code {prop.name}
+                  if !prop.optional && prop.default === undefined
+                    span.required required
+                td
+                  code {prop.type}
+                  if prop.comment as comment
+                    p.prop-comment
+                      for part, i of comment.split('`') key={i}
+                        if i % 2 === 1
+                          code {part}
+                        else
+                          | {part}
+                td
+                  if prop.default as value
+                    code {value}
+      p.spread Attributes it does not declare go onto its root element.
     else
       p It takes no props.
   Pager(previous={previous} next={next} source={`${FORGE_ROOT}/kayjs-ui/src/branch/main/src/${component.slug}.kay`})

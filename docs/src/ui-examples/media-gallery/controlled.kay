@@ -1,0 +1,12 @@
+---
+import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
+import type { MediaItem } from '@kaynooo/kayjs-ui'
+
+const picture = (hue: number, width: number) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${width}"><rect width="100%" height="100%" fill="hsl(${hue} 70% 60%)"/></svg>`)
+
+const items: MediaItem[] = [30, 150, 270].map((hue, index) => ({ key: index, kind: 'image', thumb: picture(hue, 120), preview: picture(hue, 640), title: `Picture ${index + 1}` }))
+const current = signal(1)
+---
+.flex.max-w-sm.flex-col.gap-2
+  MediaGallery(items={items} index={1} ratio="1 / 1" onIndexChange={current.set})
+  p.text-kui-subtext0 Showing picture {current + 1}.

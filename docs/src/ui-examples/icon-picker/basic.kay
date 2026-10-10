@@ -1,0 +1,23 @@
+---
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
+import type { IconChoice } from '@kaynooo/kayjs-ui'
+import Bell from '~icons/tabler/bell'
+import Home from '~icons/tabler/home'
+import Rocket from '~icons/tabler/rocket'
+import Star from '~icons/tabler/star'
+import Heart from '~icons/tabler/heart'
+
+const all: IconChoice[] = [
+  { name: 'tabler:bell', icon: Bell },
+  { name: 'tabler:home', icon: Home },
+  { name: 'tabler:rocket', icon: Rocket },
+  { name: 'tabler:star', icon: Star },
+  { name: 'tabler:heart', icon: Heart },
+]
+const picked = signal('tabler:rocket')
+
+const search = async (query: string, limit: number) => all.filter(choice => choice.name.includes(query)).slice(0, limit)
+---
+.flex.flex-col.items-start.gap-2
+  IconPicker(search={search} value={picked} onChange={picked.set})
+  p.text-kui-subtext0 Picked: {picked || 'none'}.

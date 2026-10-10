@@ -1,0 +1,8 @@
+---
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+---
+.flex.flex-wrap.items-center.gap-2
+  IconButton(icon="close" label="Close" size="xs")
+  IconButton(icon="close" label="Close" size="sm")
+  IconButton(icon="close" label="Close" size="md")
+  IconButton(icon="close" label="Close" size="lg")

@@ -10,6 +10,10 @@ const root = join(import.meta.dir, '..')
 const llms = await Bun.file(join(root, 'llms.txt')).text()
 const docs = (await readdir(join(root, 'llms'))).filter(name => name.endsWith('.md')).sort()
 const LISTED = /^- \[[^\]]+\]\(llms\/([\w-]+\.md)\): \S/gm
+// A link to a page of the site in Markdown or a ReadMore, anchor left out: `](/essentials/routing#layouts)`, `href="/llms/server"`.
+const SITE_LINK = /(?:\]\(|href=")(\/[\w/-]*?)\/?(?:#[\w-]*)?[)"]/g
+// Code blocks and spans, whose links are examples rather than links of the site.
+const CODE = /```[\s\S]*?```|`[^`\n]*`/g
 const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
 
 describe('llms.txt', () => {
@@ -40,16 +44,16 @@ describe('llms.txt', () => {
 })
 
 describe('the documentation site', () => {
-  it('gives llms.txt and each doc it lists a page, links between them made links between pages', async () => {
+  it('serves llms.txt and each doc it lists as the full reference under /llms, links between them made links between pages', async () => {
     const pages = await loadReference()
 
     expect(pages.map(page => page.slug)).toEqual(['overview', ...[...llms.matchAll(LISTED)].map(match => match[1]!.replace('.md', ''))])
     expect(pages.find(page => page.slug === 'server')!.data.title).toBe('Locals, sessions and guards')
     expect(pages.flatMap(page => [...page.body.matchAll(LINK)].filter(([, path]) => path !== undefined))).toEqual([])
-    expect(pages.find(page => page.slug === 'project')!.body).toContain('](/reference/server#locals)')
+    expect(pages.find(page => page.slug === 'project')!.body).toContain('](/llms/server#locals)')
   })
 
-  it('gives each library a page, and each kayjs-ui component one with its docs, its example and the props it declares', async () => {
+  it('gives each library its full reference, and each kayjs-ui component a page with its usage and the props it declares', async () => {
     const components = await loadComponents()
     const button = components.find(component => component.slug === 'button')!
     const props = new Map(button.data.props.map(prop => [prop.name, prop]))
@@ -58,15 +62,45 @@ describe('the documentation site', () => {
 
     expect(libraries.map(library => library.slug)).toEqual(['kayjs-auth', 'kayjs-mail', 'kayjs-ui'])
     expect(ui.data.version).toBe((await Bun.file(join(root, 'node_modules/@kaynooo/kayjs-ui/package.json')).json() as { version: string }).version)
-    expect(ui.body).toStartWith('kay components')
-    expect(components.filter(component => component.data.section === undefined).map(component => component.slug)).toEqual([])
-    expect(components.find(component => component.slug === 'form-dialog')!.data.section).toBe('Forms')
-    expect(button.data).toMatchObject({ title: 'Button', section: 'Icon, Button, IconButton', anchor: 'icon-button-iconbutton' })
-    expect(button.data.example).toContain('Button(label=')
+    // FormDialog posts to an action, which the static site cannot serve, so its page shows code alone.
+    expect(components.filter(component => component.data.description === '').map(component => component.slug)).toEqual([])
+    expect(components.filter(component => !component.body.includes('<Demo name=')).map(component => component.slug)).toEqual(['form-dialog'])
     expect(props.get('href')).toMatchObject({ type: 'string', optional: true })
     expect(props.get('variant')).toMatchObject({ type: '"accent" | "danger" | "default"', default: '\'default\'' })
     expect(props.has('disabled')).toBe(false)
     expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => void')
+  })
+
+  it('keeps the demo registry in step with src/ui-examples', async () => {
+    const registry = join(root, 'docs/src/demos.ts')
+    const before = await Bun.file(registry).text()
+
+    await Bun.$`bun ${join(root, 'docs/demos.ts')}`.quiet()
+
+    expect(await Bun.file(registry).text()).toBe(before)
+  })
+
+  it('links only to pages the site serves', async () => {
+    const docsRoot = join(root, 'docs/src/content')
+    const files = [...new Bun.Glob('{docs/*/*,ui/*}.md').scanSync(docsRoot)]
+    const pages = new Set([
+      '/',
+      '/llms',
+      ...files.filter(file => file.startsWith('docs/')).map(file => `/${file.slice('docs/'.length, -'.md'.length)}`),
+      ...(await loadComponents()).map(component => `/ui/${component.slug}`),
+      ...(await loadReference()).map(topic => `/llms/${topic.slug}`),
+      ...(await loadLibraries()).map(library => `/llms/${library.slug}`),
+    ])
+    const broken: string[] = []
+
+    for (const file of files) {
+      for (const [, path] of (await Bun.file(join(docsRoot, file)).text()).replace(CODE, '').matchAll(SITE_LINK)) {
+        if (!pages.has(path!))
+          broken.push(`${file}: ${path}`)
+      }
+    }
+
+    expect(broken).toEqual([])
   })
 
   it('passes kay check, and so does the tutorial\'s example app', async () => {

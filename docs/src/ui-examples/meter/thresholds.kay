@@ -1,0 +1,9 @@
+---
+import Meter from '@kaynooo/kayjs-ui/meter.kay'
+
+const usage = signal(40)
+const fill = () => usage() > 90 ? 'bg-kui-error' : usage() > 70 ? 'bg-kui-warning' : undefined
+---
+.flex.max-w-sm.flex-col.gap-3
+  Meter(value={usage} label="Disk" fillClass={fill()})
+  input(type="range" min="0" max="100" value={usage} onInput={event => usage.set(Number(event.currentTarget.value))} aria-label="Usage")

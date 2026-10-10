@@ -1,0 +1,36 @@
+--- server
+import { docs } from '../../../content.config'
+import { FORGE, neighbours } from '../../../pages'
+import { sectionOf } from '../../../sections'
+
+export async function prerender() {
+  return (await docs.all()).map((entry) => {
+    const [section, page] = entry.slug.split('/')
+
+    return { section: section!, page: page! }
+  })
+}
+
+const entry = await docs.get(`${ctx.params.section}/${ctx.params.page}`) ?? ctx.notFound()
+const { Content } = entry
+const { title, description } = entry.data
+const sections = entry.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
+const { previous, next } = neighbours(await docs.all(), entry.slug, slug => `/${slug}`)
+---
+---
+import Pager from '../../../components/pager.kay'
+import Toc from '../../../components/toc.kay'
+---
+head
+  title {title} · kay
+  meta(name="description" content={description})
+.page
+  header.page-head
+    p.eyebrow {sectionOf(entry.slug)?.title}
+    h1 {title}
+    p.lede {description}
+  if sections.length > 0
+    Toc(sections={sections})
+  article.prose
+    Content
+  Pager(previous={previous} next={next} source={`${FORGE}/docs/src/content/docs/${entry.slug}.md`})

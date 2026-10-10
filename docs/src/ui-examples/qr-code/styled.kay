@@ -1,0 +1,4 @@
+---
+import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
+---
+QrCode(value="https://kayjs.kaynooo.fr" label="Scan to open kay's docs" size={160} options={{ moduleShape: 'dot', foreground: '#1e66f5', ecc: 'Q' }})

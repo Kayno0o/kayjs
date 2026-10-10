@@ -1,29 +1,52 @@
 --- server
-import { guides, reference } from '../../content.config'
-import { FORGE } from '../../pages'
+import { highlightCode } from 'kay/content'
+import { highlight } from '../../highlight'
 
-const overview = await reference.get('overview') ?? ctx.notFound()
-const { Content } = overview
-const sections = overview.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
-const first = (await guides.all())[0]
-const topic = (await reference.all()).find(entry => entry.slug !== 'overview')
-const next = first && { href: `/guides/${first.slug}`, title: first.data.title }
+export const prerender = true
+
+const SAMPLE = `--- server
+import { t } from 'kay'
+import { addTodo, listTodos } from '../todos'
+
+export const add = action(t.Object({ title: t.String({ minLength: 1 }) }), ({ title }) => addTodo(title))
+
+const todos = await listTodos()
+---
+h1 Todos
+ul
+  for todo of todos
+    li {todo.title}
+form(action={add})
+  input(name="title")
+  button Add`
+
+const sample = await highlightCode(SAMPLE, 'kay', { highlight })
+const features = [
+  { title: 'One file per component', text: 'TypeScript fences, then an indented template. No JSX, no closing tags.', href: '/essentials/templates' },
+  { title: 'HTML first', text: 'Pages render to plain HTML on the server. Only interactive components ship JavaScript.', href: '/essentials/islands' },
+  { title: 'Typed forms', text: 'Actions take a schema, work without JavaScript and are called like functions from islands.', href: '/essentials/forms-and-actions' },
+  { title: 'Checked templates', text: 'kay check types every template and reports errors at the .kay line.', href: '/reference/checks' },
+]
 ---
 ---
 import Pager from '../../components/pager.kay'
-import Toc from '../../components/toc.kay'
+import { FORGE } from '../../pages'
 ---
 head
-  title kay
-.page
+  title(raw) kay, a Bun web framework
+.page.home
   header.page-head.hero
     h1 kay
-    p.lede A Bun web framework: one #[code .kay] file per component, pages rendered to plain HTML on the server, islands hydrated by kay's own signals, everything typed down to the template line.
+    p.lede A Bun web framework. One #[code .kay] file per component, pages rendered to plain HTML on the server, interactive islands in the browser, and types down to the template line.
     .hero-actions
-      a.button.primary(href={next?.href ?? "/"}) Start the tutorial
-      a.button(href={topic ? `/reference/${topic.slug}` : "/"}) Browse the reference
-  if sections.length > 0
-    Toc(sections={sections})
-  article.prose
-    Content
-  Pager(next={next} source={`${FORGE}/llms.txt`})
+      a.button.primary(href="/getting-started/introduction") Get started
+      a.button(href="/guides/tutorial") Follow the tutorial
+  .home-body
+    .hero-code(innerHTML={sample})
+    ul.features
+      for feature of features key={feature.href}
+        li
+          a(href={feature.href})
+            strong {feature.title}
+            span {feature.text}
+  Pager(next={{ href: '/getting-started/introduction', title: 'Introduction' }} source={`${FORGE}/docs/src/routes/(docs)/index.kay`})

@@ -1,6 +1,7 @@
 ---
 title: "Tutorial: a reading list"
 order: 1
+description: Build a small reading list with a page, a typed form action, an island and a page per book.
 ---
 
 This builds a small reading list: a page listing books from the server, a form adding one through a typed action, an island filtering the list in the browser, and a page per book. The finished app is `examples/reading-list` in kay's repository.

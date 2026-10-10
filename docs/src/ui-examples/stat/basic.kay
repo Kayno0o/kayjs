@@ -3,4 +3,4 @@ import Stat from '@kaynooo/kayjs-ui/stat.kay'
 ---
 .flex.flex-wrap.gap-6
   Stat(value={95} label="moons")
-  Stat(value="1.9e27 kg" label="mass" icon="info")
+  Stat(value="12 h" label="rotation")

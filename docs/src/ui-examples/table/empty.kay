@@ -1,0 +1,19 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import type { Column } from '@kaynooo/kayjs-ui'
+
+interface Moon {
+  id: number
+  name: string
+}
+
+const columns: Column<Moon>[] = [{ key: 'name', header: 'Name' }]
+const moons = signal<Moon[]>([])
+---
+.flex.flex-col.items-start.gap-2
+  Table(columns={columns} rows={moons()} rowKey="id")
+    @empty
+      EmptyState(title="No moons yet")
+  Button(label="Add a moon" onClick={() => moons.set([...moons(), { id: moons().length, name: `Moon ${moons().length + 1}` }])})

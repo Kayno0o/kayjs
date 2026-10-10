@@ -1,0 +1,6 @@
+---
+import Widget from '@kaynooo/kayjs-ui/widget.kay'
+---
+Widget(title="Errors" icon="alert" isEmpty)
+  @empty
+    p.text-kui-subtext0 Nothing went wrong today.

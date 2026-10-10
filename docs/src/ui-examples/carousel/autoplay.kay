@@ -1,0 +1,13 @@
+---
+import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
+
+const panel = (color: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="${color}"/></svg>`)}`
+
+const slides = [
+  { src: panel('#6d8f7a'), alt: 'A green panel' },
+  { src: panel('#7a86b8'), alt: 'A blue panel' },
+  { src: panel('#c08a6a'), alt: 'An orange panel' },
+]
+---
+.max-w-md
+  Carousel(slides={slides} autoplay={3000} ratio="4 / 3" label="Panels")

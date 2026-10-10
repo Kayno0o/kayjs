@@ -9,12 +9,14 @@ export interface ReferencePage {
 const ROOT = join(import.meta.dir, '../..')
 // A line of llms.txt's list of docs, `- [Actions](llms/actions.md): ...`.
 const DOC = /^- \[[^\]]+\]\((llms\/[\w-]+\.md)\)/gm
-// A link to a doc, `actions.md` from another doc or `llms/server.md#locals` from llms.txt.
+// A link to a doc, `actions.md` from another doc or `llms/server.md#locals` from llms.txt, made a link to its page under /llms.
 const DOC_LINK = /\]\((?:llms\/)?([\w-]+)\.md(#[\w-]+)?\)/g
 const TITLE = /^# (.+)\n+/
 const QUOTED = /^> /gm
 
-const linked = (markdown: string) => markdown.replace(DOC_LINK, (_link, slug: string, anchor = '') => `](/reference/${slug}${anchor})`)
+export const llmsHref = (slug: string) => slug === 'overview' ? '/llms' : `/llms/${slug}`
+
+const linked = (markdown: string) => markdown.replace(DOC_LINK, (_link, slug: string, anchor = '') => `](/llms/${slug}${anchor})`)
 
 // llms.txt as the overview, then one page per doc it lists, in its order, links between them made links between pages.
 export async function loadReference(): Promise<ReferencePage[]> {

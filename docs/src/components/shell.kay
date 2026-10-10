@@ -19,20 +19,20 @@ a.skip-link(href="#content") Skip to the content
         Menu
         | Menu
     nav#sidebar.sidebar(popover aria-label="Documentation")
-      p.group Guides
-      ul
-        for link of nav.guides key={link.href}
-          li
-            a(href={link.href}) {link.title}
-      p.group Reference
-      LinkFilter(links={nav.reference} current={current} label="Filter the reference")
-      p.group Libraries
-      ul
-        for link of nav.libraries key={link.href}
-          li
-            a(href={link.href}) {link.title}
-      p.group kayjs-ui components
+      for group of nav.groups key={group.title}
+        p.group {group.title}
+        ul
+          for link of group.links key={link.href}
+            li
+              a(href={link.href}) {link.title}
+      p.group UI components
       LinkFilter(links={nav.components} current={current} label="Filter the components")
+      details.full-reference(open={current.startsWith('/llms')})
+        summary.group Full reference
+        ul
+          for link of nav.reference key={link.href}
+            li
+              a(href={link.href}) {link.title}
   main#content
     slot
 CodeCopy(persist)

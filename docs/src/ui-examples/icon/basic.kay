@@ -1,9 +1,7 @@
 ---
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
-import Rocket from '~icons/tabler/rocket'
 ---
 .flex.flex-wrap.items-center.gap-3.text-xl
   Icon(icon="success")
   Icon(icon="alert")
-  Icon(icon="info" label="Information")
-  Icon(icon={Rocket} label="Launch")
+  Icon(icon="info")

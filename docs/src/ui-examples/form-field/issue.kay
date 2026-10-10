@@ -1,0 +1,6 @@
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+---
+.max-w-sm
+  FormField(label="Title" issue="Two letters at least" required)
+    input.kui-field-input(name="title" value="a")

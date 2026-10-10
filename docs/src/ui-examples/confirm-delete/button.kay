@@ -1,0 +1,10 @@
+---
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+
+async function empty() {
+  await new Promise(resolve => setTimeout(resolve, 600))
+  toast.success('Emptied')
+}
+---
+ConfirmDelete(message="Empty the trash?" failure="Could not empty it" onConfirm={empty} trigger="button" label="Empty trash")

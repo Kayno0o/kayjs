@@ -1,0 +1,17 @@
+---
+import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
+
+const moons = [{ name: 'Io', x: 120 }, { name: 'Europa', x: 140 }, { name: 'Ganymede', x: 165 }]
+const named = signal(true)
+---
+.flex.flex-col.gap-2
+  label.flex.items-center.gap-2
+    input(type="checkbox" bind:checked={named})
+    | Show names
+  ZoomPane(label="Map of Jupiter's moons" class="h-64 w-full rounded-lg border border-kui-surface2")
+    svg(viewBox="0 0 200 100" width="100%" height="100%")
+      circle(cx="100" cy="50" r="12" fill="currentColor")
+      for moon of moons key={moon.name}
+        circle(cx={moon.x} cy="50" r="3" fill="currentColor")
+        if named
+          text(x={moon.x} y="62" font-size="5" text-anchor="middle" fill="currentColor") {moon.name}

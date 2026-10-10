@@ -1,0 +1,9 @@
+---
+import ArrowRight from '~icons/tabler/arrow-right'
+
+const { href } = props<{ href: string }>()
+---
+a.read-more(href={href})
+  span.read-more-body
+    slot
+  ArrowRight

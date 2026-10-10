@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { renderMarkdown } from 'kay/content'
 import { loadComponents, loadLibraries } from './src/libraries'
-import { loadReference } from './src/reference'
+import { llmsHref, loadReference } from './src/reference'
 
 export interface SearchSection {
   page: string
@@ -10,7 +10,10 @@ export interface SearchSection {
   text: string
 }
 
-const GUIDES = join(import.meta.dir, 'src/content/guides')
+const ROOT = join(import.meta.dir, '..')
+const DOCS = join(import.meta.dir, 'src/content/docs')
+const RAW = 'https://git.kaynooo.fr/kaynooo/kayjs/raw/branch/main/'
+const DOC_LINK = /\]\((llms\/[\w-]+\.md)/g
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n/
 const HEADING = /<h([1-4]) id="([^"]+)">([\s\S]*?)<\/h\1>/g
 // Block tags part words, inline ones such as code sit inside a sentence.
@@ -42,21 +45,19 @@ async function sections(page: string, href: string, markdown: string): Promise<S
   return found.filter(section => section.heading !== undefined || section.text !== '')
 }
 
-const guides = await Promise.all([...new Bun.Glob('*.md').scanSync(GUIDES)].map(async (file) => {
-  const source = await Bun.file(join(GUIDES, file)).text()
-  const data = Bun.YAML.parse(FRONTMATTER.exec(source)?.[1] ?? '') as { title: string, order: number }
+const docs = await Promise.all([...new Bun.Glob('*/*.md').scanSync(DOCS)].map(async (file) => {
+  const source = await Bun.file(join(DOCS, file)).text()
+  const data = Bun.YAML.parse(FRONTMATTER.exec(source)?.[1] ?? '') as { title: string }
 
   return { slug: file.replace(/\.md$/, ''), data, body: source.replace(FRONTMATTER, '') }
 }))
 
-guides.sort((a, b) => a.data.order - b.data.order)
-
 const index = [
-  ...(await Promise.all(guides.map(async guide => sections(guide.data.title, `/guides/${guide.slug}`, guide.body)))).flat(),
-  ...(await Promise.all((await loadReference()).map(async topic => sections(topic.data.title, topic.slug === 'overview' ? '/' : `/reference/${topic.slug}`, topic.body)))).flat(),
-  ...(await Promise.all((await loadLibraries()).map(async library => sections(library.data.title, `/libraries/${library.slug}`, library.body)))).flat(),
-  // A component's prose is its library's, indexed there already, so its own entry holds what only its page shows: the props.
-  ...(await loadComponents()).map(component => ({ page: `${component.data.title} · kayjs-ui`, href: `/ui/${component.slug}`, text: ['kayjs-ui component.', ...component.data.props.map(prop => [prop.name, prop.comment].filter(Boolean).join(': '))].join(' ') })),
+  ...(await Promise.all(docs.map(async page => sections(page.data.title, `/${page.slug}`, page.body)))).flat(),
+  ...(await Promise.all([...await loadReference(), ...await loadLibraries()].map(async topic => sections(`${topic.data.title} · full reference`, llmsHref(topic.slug), topic.body)))).flat(),
+  ...(await Promise.all((await loadComponents()).map(async component => sections(`${component.data.title} · kayjs-ui`, `/ui/${component.slug}`, [component.data.description, component.body].join('\n\n'))))).flat(),
 ]
 
 await Bun.write(join(import.meta.dir, 'public/search.json'), JSON.stringify(index))
+// llms.txt for agents, its links made absolute on the forge since the site serves the docs it lists as pages.
+await Bun.write(join(import.meta.dir, 'public/llms.txt'), (await Bun.file(join(ROOT, 'llms.txt')).text()).replace(DOC_LINK, (_link, path: string) => `](${RAW}${path}`))

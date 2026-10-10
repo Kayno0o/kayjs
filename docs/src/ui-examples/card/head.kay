@@ -1,0 +1,8 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
+---
+Card(title="Traffic")
+  @head
+    Badge(label="This week" tone="accent")
+  p 1,284 visits, up 12% on last week.

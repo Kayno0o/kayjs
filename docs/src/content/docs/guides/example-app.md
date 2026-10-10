@@ -1,6 +1,7 @@
 ---
 title: "Example: kay with its libraries"
 order: 2
+description: A tour of the noticeboard example, which runs kay with kayjs-auth, kayjs-mail, kayjs-ui and Postgres together.
 ---
 
 The tutorial builds an app from kay alone. [examples/noticeboard](https://git.kaynooo.fr/kaynooo/kayjs/src/branch/main/examples/noticeboard) in kay's repository is the next step: a club noticeboard running kay with the libraries a real site takes, each wired as its own reference says.

@@ -1,0 +1,9 @@
+---
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+
+async function remove() {
+  await new Promise(resolve => setTimeout(resolve, 600))
+  throw new Error('The server said no')
+}
+---
+ConfirmDelete(message="Delete this post?" failure="Could not delete the post" onConfirm={remove})

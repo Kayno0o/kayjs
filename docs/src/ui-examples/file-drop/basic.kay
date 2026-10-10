@@ -1,0 +1,16 @@
+---
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+
+const names = signal<string[]>([])
+---
+FileDrop(accept="image/*" multiple onFiles={files => names.set(files.map(file => file.name))})
+  @content(zone)
+    .p-6.text-center
+      if zone.dragging()
+        p Drop to upload
+      else
+        p
+          button(type="button" onClick={zone.open}) Choose images
+          |  or drop them here
+      if names().length > 0
+        p {names().join(', ')}

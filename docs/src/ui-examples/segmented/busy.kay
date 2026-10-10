@@ -1,0 +1,9 @@
+---
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+const view = signal('list')
+---
+.flex.flex-col.items-start.gap-2
+  Segmented(options={[{ value: 'list', label: 'List' }, { value: 'grid', label: 'Grid' }]} value={view} label="View" onChange={async (next) => { await wait(800); view.set(next) }})
+  p Saved view: {view}.

@@ -1,11 +1,5 @@
 ---
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
 ---
-.flex.flex-col.gap-3
-  CollapsibleSection(title="Active")
-    p Io, Europa and Ganymede.
-  CollapsibleSection(title="Archived" open={false} boxed)
-    @meta
-      Badge(label={2})
-    p Callisto and Amalthea.
+CollapsibleSection(title="Active")
+  p Io, Europa and Ganymede.

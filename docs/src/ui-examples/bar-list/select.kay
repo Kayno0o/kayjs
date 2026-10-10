@@ -1,0 +1,12 @@
+---
+import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+
+const rows = [
+  { key: 'fr', label: 'France', value: 420 },
+  { key: 'de', label: 'Germany', value: 260 },
+  { key: 'jp', label: 'Japan', value: 120 },
+]
+---
+.max-w-md
+  BarList(rows={rows} onSelect={row => toast.info(row.label)})

@@ -1,26 +1,35 @@
 --- server
 import { reference } from '../../../content.config'
-import { FORGE, neighbours, topicHref } from '../../../pages'
+import { FORGE, FORGE_ROOT, neighbours } from '../../../pages'
+import { llmsHref } from '../../../reference'
 
-export const prerender = reference
+export async function prerender() {
+  return (await reference.all()).map(topic => topic.slug === 'overview' ? {} : { topic: topic.slug })
+}
 
-const topic = await reference.get(ctx.params.topic) ?? ctx.notFound()
+const topic = await reference.get(ctx.params.topic ?? 'overview') ?? ctx.notFound()
 const { Content } = topic
 const sections = topic.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
-const { previous, next } = neighbours(await reference.all(), topic.slug, topicHref)
+const { previous, next } = neighbours(await reference.all(), topic.slug, llmsHref)
+const { version } = topic.data
+const source = version !== undefined ? `${FORGE_ROOT}/${topic.slug}/src/branch/main/llms.txt` : topic.slug === 'overview' ? `${FORGE}/llms.txt` : `${FORGE}/llms/${topic.slug}.md`
 ---
 ---
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'
 ---
 head
-  title {topic.data.title} · kay
+  title {topic.data.title} · Full reference · kay
 .page
   header.page-head
-    p.eyebrow Reference
+    p.eyebrow
+      | Full reference
+      if version as published
+        |  · {published}
     h1 {topic.data.title}
+    p.lede Every option and edge case, written for coding agents as much as for people. For the common path, start from the #[a(href="/getting-started/introduction") guide].
   if sections.length > 0
     Toc(sections={sections})
   article.prose
     Content
-  Pager(previous={previous} next={next} source={`${FORGE}/llms/${topic.slug}.md`})
+  Pager(previous={previous} next={next} source={source})

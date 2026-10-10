@@ -1,0 +1,9 @@
+---
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+const saved = signal(false)
+---
+.flex.flex-col.items-start.gap-2
+  Toggle(label="Notifications" checked={saved} onChange={async (next) => { await wait(800); saved.set(next) }})
+  p Saved as {saved ? 'on' : 'off'}.

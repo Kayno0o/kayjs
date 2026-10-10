@@ -1,0 +1,11 @@
+---
+import type { DemoName } from '../demos'
+import { demos } from '../demos'
+
+const { name } = props<{ name: DemoName }>()
+const { component: Example, html } = demos[name]
+---
+.example
+  .ui-stage
+    Example
+  div(innerHTML={html})

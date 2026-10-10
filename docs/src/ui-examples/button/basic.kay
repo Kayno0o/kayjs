@@ -1,9 +1,4 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
 ---
-.flex.flex-wrap.items-center.gap-2
-  Button(label="Save" variant="accent" icon="success")
-  Button(label="Cancel")
-  Button(label="Delete" variant="danger" icon="delete")
-  Button(label="Saving" busy)
-  Button(label="Read the guide" href="/guides/tutorial")
+Button(label="Save")

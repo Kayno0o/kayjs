@@ -1,0 +1,12 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Popover from '@kaynooo/kayjs-ui/popover.kay'
+
+const open = signal(false)
+---
+.flex.items-center.gap-3
+  Button(label="Toggle from outside" onClick={() => open.set(!open())})
+  Popover(open={open} onToggle={open.set} placement="bottom-start")
+    @trigger(attributes)
+      Button({...attributes} label="Details")
+    p.p-3 Opened by either button, closed by a click outside or Escape.

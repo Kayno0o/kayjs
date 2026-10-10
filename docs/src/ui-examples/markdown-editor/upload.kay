@@ -1,0 +1,13 @@
+---
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+
+const body = signal('')
+
+const upload = async (file: File) => {
+  await new Promise(resolve => setTimeout(resolve, 800))
+
+  return `/uploads/${file.name}`
+}
+---
+.max-w-xl
+  MarkdownEditor(value={body} onInput={body.set} onImage={upload} name="body" placeholder="Paste or drop an image…" rows={6})

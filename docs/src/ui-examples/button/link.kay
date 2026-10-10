@@ -1,0 +1,4 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+---
+Button(label="Read the guide" href="/guides/tutorial")

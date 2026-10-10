@@ -7,6 +7,4 @@ async function remove() {
   toast.success('Deleted')
 }
 ---
-.flex.items-center.gap-3
-  ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})
-  ConfirmDelete(message="Empty the trash?" failure="Could not empty it" onConfirm={remove} trigger="button" label="Empty trash")
+ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})

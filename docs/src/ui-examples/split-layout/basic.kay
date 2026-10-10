@@ -1,0 +1,13 @@
+---
+import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
+
+const moons = ['Io', 'Europa', 'Ganymede', 'Callisto']
+const picked = signal<string>()
+---
+.h-64.overflow-hidden.rounded-lg.border.border-kui-surface2
+  SplitLayout(detailOpen={picked() !== undefined})
+    @list
+      for moon of moons key={moon}
+        button.block.w-full.px-3.py-2.text-left(type="button" onClick={() => picked.set(moon)}) {moon}
+    @detail
+      p.p-4 {picked() ?? 'Pick a moon.'}

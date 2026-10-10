@@ -3,11 +3,7 @@ import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
 import Widget from '@kaynooo/kayjs-ui/widget.kay'
 ---
-.grid.gap-3(class="sm:grid-cols-2")
-  Widget(title="Visitors" icon="info")
-    @actions
-      IconButton(icon="close" label="Hide" size="xs" variant="ghost")
-    Stat(value="1,284" label="this week")
-  Widget(title="Errors" icon="alert" isEmpty)
-    @empty
-      p.text-kui-subtext0 Nothing went wrong today.
+Widget(title="Visitors" icon="info")
+  @actions
+    IconButton(icon="close" label="Hide" size="xs" variant="ghost")
+  Stat(value="1,284" label="this week")

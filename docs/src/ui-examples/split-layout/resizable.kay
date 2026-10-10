@@ -1,0 +1,14 @@
+---
+import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
+---
+.h-64.overflow-hidden.rounded-lg.border.border-kui-surface2
+  SplitLayout(resizableList listWidthKey="docs-split-layout")
+    @listHead
+      strong.block.px-3.py-2 Moons
+    @list
+      p.px-3.py-2 Io
+      p.px-3.py-2 Europa
+    @detailHead
+      strong.block.px-3.py-2 Details
+    @detail
+      p.p-4 Drag the edge of the list, or focus it and use the arrow keys.

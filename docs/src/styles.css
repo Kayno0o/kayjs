@@ -494,7 +494,7 @@ main {
     grid-area: head;
   }
 
-  .page > .prose {
+  .page > :is(.prose, .home-body) {
     grid-area: body;
   }
 
@@ -676,12 +676,108 @@ pre code {
   font-size: inherit;
 }
 
+/* Markdown components: a callout set off from the prose, a link out to the full reference. */
+.callout {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--mantle);
+  border-left: 3px solid var(--callout, var(--muted));
+  border-radius: var(--radius);
+}
+
+.callout > svg {
+  flex: none;
+  margin-top: 0.3rem;
+  color: var(--callout, var(--muted));
+}
+
+.callout-tip {
+  --callout: light-dark(#2f7a4f, #7fcf9a);
+}
+
+.callout-warning {
+  --callout: var(--accent);
+}
+
+.callout-body > * {
+  margin: 0;
+}
+
+.callout-body > * + * {
+  margin-top: 0.75rem;
+}
+
+.read-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.read-more:hover {
+  background: var(--mantle);
+}
+
+.read-more > svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.read-more-body > * {
+  margin: 0;
+}
+
+/* The home page: the hero, a sample of a page, then what kay is about. */
+.hero-code {
+  margin-top: 0.5rem;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 0.75rem;
+  margin: 2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.features a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 1rem;
+  color: var(--subtext);
+  text-decoration: none;
+  background: var(--mantle);
+  border-radius: var(--radius);
+}
+
+.features a:hover {
+  background: var(--tint);
+}
+
+.features strong {
+  color: var(--text);
+}
+
+/* The full reference sits folded at the bottom of the sidebar. */
+.full-reference summary {
+  cursor: pointer;
+}
+
 /* A kayjs-ui component's page: its example rendered over its source, then its props. */
 .import {
   margin: 0.75rem 0 0;
 }
 
-.covered,
 .spread {
   color: var(--muted);
   font-size: 0.9rem;
@@ -699,6 +795,15 @@ pre code {
 
 .example .code {
   border-radius: 0;
+}
+
+.props summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.props table {
+  margin-top: 1rem;
 }
 
 .props td:first-child {

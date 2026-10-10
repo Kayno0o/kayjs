@@ -1,0 +1,16 @@
+---
+import AlertTriangle from '~icons/tabler/alert-triangle'
+import Bulb from '~icons/tabler/bulb'
+import InfoCircle from '~icons/tabler/info-circle'
+
+const { type = 'note' } = props<{ type?: 'note' | 'tip' | 'warning' }>()
+---
+aside(class={`callout callout-${type}`})
+  if type === 'tip'
+    Bulb
+  else if type === 'warning'
+    AlertTriangle
+  else
+    InfoCircle
+  .callout-body
+    slot

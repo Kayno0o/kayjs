@@ -1,0 +1,7 @@
+---
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+
+const colors = [{ value: 'red', label: 'Red' }, { value: 'green', label: 'Green' }, { value: 'blue', label: 'Blue' }]
+---
+form.flex.items-center.gap-2
+  MultiSelect(label="Colors" options={colors} name="color" placeholder="Any color" search)
