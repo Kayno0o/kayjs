@@ -1,6 +1,7 @@
-import type { Diagnostic, ForNode, KayFile, Node } from './ast'
+import type { Diagnostic, ForNode, KayFile, Node, TextChunk } from './ast'
 import { accessibilityLints } from './a11y'
 import { awaitBlocks, tryBlocks } from './ast'
+import { VOID_ELEMENTS } from './html'
 import { positionAt } from './mapping'
 
 // `allow` reports nothing, `warn` a warning that fails nothing unless `kay check --deny-warnings` runs, `deny` an error.
@@ -223,6 +224,13 @@ export const LINTS = {
     wrong: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments',
     right: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments\ncatch\n  p Comments are unavailable',
   },
+  'literal-tag': {
+    level: 'warn',
+    group: 'code',
+    summary: 'Template text holding what reads as an HTML tag: kay escapes text, so readers see the tag as written rather than the element.',
+    wrong: 'p Press <kbd>Ctrl</kbd> K to search',
+    right: 'p Press #[kbd Ctrl] K to search',
+  },
   'missing-site': {
     level: 'warn',
     group: 'seo',
@@ -317,6 +325,14 @@ export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 
 const ALLOW_COMMENT = /\/\/[ \t]*kay-allow[ \t]+([\w-]+(?:[ \t]*,[ \t]*[\w-]+)*)/g
 const LINT_NAME = /[\w-]+/g
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
+// An opening, closing or self-closing tag, with what it holds after its name.
+const TAG = /<(\/?)([a-z][a-z\d]*)(?=[\s/>])([^<>]*)>/gi
+const SELF_CLOSING = /\s*\/$/
+// What `#[...]` cannot hold as written: another tag, or a bracket ending it early.
+const INLINE_UNSAFE = /[[\]<]/
+// Elements whose text shows code or keyboard input, where a tag is meant as written.
+const LITERAL_TEXT = new Set(['code', 'pre', 'samp', 'kbd', 'textarea', 'script', 'style'])
+const HTML_ELEMENTS = new Set(['a', 'abbr', 'address', 'article', 'aside', 'audio', 'b', 'bdi', 'bdo', 'blockquote', 'br', 'button', 'canvas', 'caption', 'cite', 'code', 'col', 'data', 'dd', 'del', 'details', 'dfn', 'dialog', 'div', 'dl', 'dt', 'em', 'embed', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'i', 'iframe', 'img', 'input', 'ins', 'kbd', 'label', 'legend', 'li', 'main', 'mark', 'menu', 'meter', 'nav', 'ol', 'optgroup', 'option', 'output', 'p', 'picture', 'pre', 'progress', 'q', 's', 'samp', 'section', 'select', 'small', 'source', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'textarea', 'tfoot', 'th', 'thead', 'time', 'tr', 'u', 'ul', 'var', 'video', 'wbr'])
 
 export function isLint(code: string | undefined): code is LintName {
   return code !== undefined && Object.hasOwn(LINTS, code)
@@ -391,27 +407,39 @@ function unknownLints(source: string): Diagnostic[] {
 // The template's own lints: what it can say from the markup alone.
 export function templateLints(file: KayFile): Diagnostic[] {
   const found: Diagnostic[] = []
-  const visit = (nodes: Node[]) => {
+  // `literal` inside an element whose text shows code, where a tag is meant as written.
+  const visit = (nodes: Node[], literal = false) => {
     for (const node of nodes) {
-      if (node.kind === 'for') {
+      if (node.kind === 'text') {
+        for (const part of node.parts) {
+          if (part.kind === 'element')
+            visit([part], literal)
+          else if (part.kind === 'chunk' && !literal)
+            literalTags(file.source, part, found)
+        }
+      }
+      else if (node.kind === 'element') {
+        visit(node.children, literal || LITERAL_TEXT.has(node.name))
+      }
+      else if (node.kind === 'for') {
         positionalKey(file.source, node, found)
-        visit([...node.children, ...node.fallback ?? []])
+        visit([...node.children, ...node.fallback ?? []], literal)
       }
       else if (node.kind === 'if') {
         for (const branch of node.branches)
-          visit(branch.children)
+          visit(branch.children, literal)
       }
       else if (node.kind === 'await') {
         if (!node.rejected)
           found.push({ start: node.start, end: node.value.end, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects', note: 'the pending block goes, and the error only reaches the log', help: 'add a `catch` block after it, at the same indentation, saying what failed', checkOnly: true })
 
-        visit(awaitBlocks(node).flat())
+        visit(awaitBlocks(node).flat(), literal)
       }
       else if (node.kind === 'try') {
-        visit(tryBlocks(node).flat())
+        visit(tryBlocks(node).flat(), literal)
       }
-      else if (node.kind !== 'text' && node.kind !== 'const' && node.kind !== 'error') {
-        visit(node.children)
+      else if (node.kind !== 'const' && node.kind !== 'error') {
+        visit(node.children, literal)
       }
     }
   }
@@ -419,6 +447,43 @@ export function templateLints(file: KayFile): Diagnostic[] {
   visit(file.template)
 
   return [...found, ...accessibilityLints(file)]
+}
+
+// `<kbd>Ctrl</kbd>` in text; `&lt;kbd&gt;` is the tag meant as written, and `Array<string>` names no element.
+function literalTags(source: string, chunk: TextChunk, found: Diagnostic[]) {
+  const text = source.slice(chunk.start, chunk.end)
+  let closedUpTo = 0
+
+  for (const match of text.matchAll(TAG)) {
+    const [tag, closing, written, attributes = ''] = match
+    const name = written!.toLowerCase()
+
+    if (!HTML_ELEMENTS.has(name) || match.index < closedUpTo)
+      continue
+
+    const start = chunk.start + match.index
+    const after = match.index + tag.length
+    const close = closing === '' && !VOID_ELEMENTS.has(name) && !tag.endsWith('/>') ? text.indexOf(`</${written}>`, after) : -1
+    const inner = close === -1 ? '' : text.slice(after, close)
+    const own = attributes.trim().replace(SELF_CLOSING, '')
+    // Only a pair around plain text, or an element with no content, becomes `#[...]` as written.
+    const element = closing === '' && !INLINE_UNSAFE.test(inner + own) && (close !== -1 || VOID_ELEMENTS.has(name) || tag.endsWith('/>')) ? `#[${name}${own === '' ? '' : `(${own})`}${inner === '' ? '' : ` ${inner}`}]` : undefined
+    const end = close === -1 ? start + tag.length : chunk.start + close + written!.length + 3
+
+    if (close !== -1)
+      closedUpTo = close + written!.length + 3
+
+    found.push({
+      start,
+      end: start + tag.length,
+      code: 'literal-tag',
+      message: `\`${tag}\` shows as text, not as an element`,
+      note: 'kay escapes template text, so readers see the tag as written',
+      help: `write the element, ${element === undefined ? `\`#[${name} ...]\` inside text or \`${name}\` on a line of its own` : `\`${element}\``}, or \`innerHTML\` for markup that comes as a string; \`&lt;${name}&gt;\` shows the tag on purpose`,
+      ...element === undefined ? {} : { fixes: [{ title: `Write \`${element}\``, edits: [{ start, end, text: element }] }] },
+      checkOnly: true,
+    })
+  }
 }
 
 // `for todo, i of todos key={i}` whose rows read `todo.id`.

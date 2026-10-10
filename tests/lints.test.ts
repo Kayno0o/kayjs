@@ -215,6 +215,31 @@ describe('uncaught-await', () => {
   })
 })
 
+describe('literal-tag', () => {
+  it('reports an HTML tag written in template text, a pair once, a closing tag left alone too', () => {
+    expect(lints('p Press <kbd>Ctrl</kbd> K\n| Line<br>next\np(title="a") <em>a <b>b</b></em> </p>\n')).toEqual([
+      { code: 'literal-tag', severity: 'warning', at: '<kbd>' },
+      { code: 'literal-tag', severity: 'warning', at: '<br>' },
+      { code: 'literal-tag', severity: 'warning', at: '<em>' },
+      { code: 'literal-tag', severity: 'warning', at: '</p>' },
+    ])
+  })
+
+  it('leaves text meant literally: entities, a comparison, a type, and text inside code, pre and kbd', () => {
+    expect(lints('p &lt;kbd&gt; and a < b with Array<string>\ncode <div>\npre\n  | <b>x</b>\np See #[code <i>] and #[kbd <Enter>]\n')).toEqual([])
+  })
+
+  it('writes the element in place of a pair around plain text, an empty element or a void one, attributes kept', () => {
+    expect(fixed('p Press <kbd>Ctrl</kbd> K, <b class="x">bold</b>, a<br/>b <img src="/a.png" alt="A">\n')).toEqual([
+      'p Press #[kbd Ctrl] K, <b class="x">bold</b>, a<br/>b <img src="/a.png" alt="A">\n',
+      'p Press <kbd>Ctrl</kbd> K, #[b(class="x") bold], a<br/>b <img src="/a.png" alt="A">\n',
+      'p Press <kbd>Ctrl</kbd> K, <b class="x">bold</b>, a#[br]b <img src="/a.png" alt="A">\n',
+      'p Press <kbd>Ctrl</kbd> K, <b class="x">bold</b>, a<br/>b #[img(src="/a.png" alt="A")]\n',
+    ])
+    expect(fixed('p <em>a <b>b</b></em>\n')).toEqual([])
+  })
+})
+
 describe('a11y lints', () => {
   const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete'])
   const a11y = (source: string) => lints(source).filter(d => A11Y.has(d.code ?? '')).map(d => `${d.code} ${d.at}`)

@@ -57,6 +57,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `constant-signal` | warn | islands | A signal that is only ever read |
 | `deprecated-page-export` | warn | code | A page setting exported under its own name, now a key of `page` |
 | `deprecated-schema-name` | warn | code | The schema builder imported as `t`, now `s` |
+| `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `uncaught-await` | warn | code | An `await` block with no `catch` |
 | `missing-site` | warn | seo | `seo` with no `site` |
 | `missing-description` | warn | seo | No `seo.description` |
