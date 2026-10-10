@@ -340,7 +340,8 @@ describe('action protection', () => {
 
       setSystemTime(start + 1000)
 
-      const early = await site.submit(ask, { message: 'hello' }, { from: page })
+      // The page's own stamp, which testSite would otherwise date back far enough to go through.
+      const early = await site.submit(ask, { message: 'hello', kay_since: stamp }, { from: page })
 
       expect(early.html).toContain('<p class="error">422 Sent too fast; take a moment, then send it again</p>')
       // The refused page keeps the time the form first rendered at, so the visitor does not wait again from zero.
@@ -363,7 +364,8 @@ describe('action protection', () => {
     try {
       setSystemTime(start - 86_400_000 - 1000)
 
-      const stale = (await site.visit('/quote')).find(`form[action^="${ask.url}"] input[name="kay_since"]`)[0]!.attributes.value
+      const yesterday = await site.visit('/quote')
+      const stale = yesterday.find(`form[action^="${ask.url}"] input[name="kay_since"]`)[0]!.attributes.value
 
       setSystemTime(start - 5000)
 
@@ -384,10 +386,13 @@ describe('action protection', () => {
 
       expect((await refusalOf(worded, new Request('http://localhost/'), { kay_since: signStamp('/_kay/action/worded', start - 1000) }, true, null))?.message).toBe('early!')
       expect((await refusalOf(worded, new Request('http://localhost/'), {}, true, null))?.message).toBe('expired!')
-      expect((await site.submit(ask, { message: 'hello' }, { from: '/quote' })).html).toContain('<p class="error">422 This form has expired; send it again</p>')
+      // A test posting with no page, or right after it, goes through unless it says how long the form was open.
+      expect((await site.submit(ask, { message: 'hello' }, { from: '/quote' })).html).toContain('<p class="asked">Asked 5</p>')
+      expect((await site.submit(ask, { message: 'hello' }, { from: await site.visit('/quote') })).html).toContain('<p class="asked">Asked 5</p>')
+      // A page older than `maxAge` is still too old.
+      expect((await site.submit(ask, { message: 'hello' }, { from: yesterday })).html).toContain('<p class="error">422 This form has expired; send it again</p>')
       // A stamp given to it wins over the page's.
       expect((await site.submit(ask, { message: 'hello', kay_since: 'forged' }, { from: page })).html).toContain('<p class="error">422 This form has expired; send it again</p>')
-      // As does one dated by how long the form was open, the clock left alone.
       expect((await site.submit(ask, { message: 'hello' }, { from: '/quote', openedFor: '5s' })).html).toContain('<p class="asked">Asked 5</p>')
       expect((await site.submit(ask, { message: 'hello' }, { from: page, openedFor: 0 })).html).toContain('<p class="error">422 Sent too fast; take a moment, then send it again</p>')
       expect((await site.submit(ask, { message: 'hello' }, { from: page, openedFor: '2d' })).html).toContain('<p class="error">422 This form has expired; send it again</p>')
@@ -408,7 +413,7 @@ describe('action protection', () => {
     const page = await site.visit('/quote')
 
     // The handler would have answered the message's length.
-    expect((await site.submit(quick, { message: 'hello' }, { from: page })).html).toContain('<p class="sent">Sent </p>')
+    expect((await site.submit(quick, { message: 'hello' }, { from: page, openedFor: 0 })).html).toContain('<p class="sent">Sent </p>')
   })
 
   it('signs the stamps with the preview secret over a session\'s, which replaces only the key of the process', () => {

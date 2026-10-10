@@ -1,5 +1,5 @@
 import type { AnyElysia } from 'elysia'
-import type { Action, ResultOf, Success } from '../runtime/action'
+import type { Action, ActionProtection, ResultOf, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
@@ -11,7 +11,7 @@ import { beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
-import { encodeCall, readActionResponse, STAMP_FIELD } from '../runtime/action'
+import { encodeCall, minTimeOf, readActionResponse, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
@@ -21,7 +21,7 @@ import { shutdown } from '../server/lifecycle'
 import { drainQueues } from '../server/queue'
 import { sendFrom } from '../server/rewrite'
 import { SITEMAP } from '../server/sitemap'
-import { signStamp } from '../server/stamp'
+import { signStamp, stampTime } from '../server/stamp'
 import { servedThrough } from '../server/visit'
 import { browse } from './browser'
 import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket } from './natives'
@@ -65,7 +65,7 @@ export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
   // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser. A `Visit` as `from` posts where its form does, with the stamp `minTime` reads, from the URL the browser shows it at, the action's own for a page a refused post answered.
-  // `openedFor` sends a stamp as if the form had been open that long, `0` as if just opened, in place of the page's.
+  // A post to an action with `minTime` goes through as if its form had been open long enough; `openedFor` sends one as if open that long instead, `0` as if just opened.
   submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit, openedFor?: Duration | 0 }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
   call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit) => Promise<Success<ResultOf<Target>>>
@@ -114,6 +114,22 @@ function nextClient(): string {
   clients++
 
   return `10.${clients >> 16 & 255}.${clients >> 8 & 255}.${clients & 255}`
+}
+
+// The stamp `minTime` reads, as the browser sends the form it was rendered in: dated `openedFor` ago when given, else the page's own made no younger than the action asks, so a test about something else is not refused as too fast.
+function postedStamp(action: Action<never, unknown> & { protection?: ActionProtection<string> }, rendered: string | undefined, openedFor: Duration | 0 | undefined): string | undefined {
+  if (openedFor !== undefined)
+    return signStamp(action.url, Date.now() - (openedFor === 0 ? 0 : durationSeconds(openedFor, 'openedFor') * 1000))
+
+  const after = action.protection && minTimeOf(action.protection)?.after
+
+  if (after === undefined)
+    return rendered
+
+  const latest = Date.now() - after
+  const at = stampTime(action.url, rendered)
+
+  return at !== undefined && at <= latest ? rendered : signStamp(action.url, latest)
 }
 
 // The project's pages and actions without a server, and without a browser build unless `browser` is set: pages then render their islands' markup and no scripts.
@@ -292,9 +308,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       const posted = url === undefined ? action.url : url.pathname + url.search
       const form = new NativeFormData()
 
-      // The stamp `minTime` reads goes with the post, as the browser sends the form it was rendered in.
-      const opened = init.openedFor === undefined ? undefined : signStamp(action.url, Date.now() - (init.openedFor === 0 ? 0 : durationSeconds(init.openedFor, 'openedFor') * 1000))
-      const stamp = opened ?? (url === undefined ? undefined : page?.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value)
+      const rendered = url === undefined ? undefined : page?.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value
+      const stamp = postedStamp(action, rendered, init.openedFor)
 
       if (stamp !== undefined && !(STAMP_FIELD in fields))
         form.set(STAMP_FIELD, stamp)
