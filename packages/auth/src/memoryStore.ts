@@ -134,10 +134,10 @@ export function memoryStore(): AuthStore {
     },
     bearerTokens: {
       create(token) {
-        bearerTokens.set(token.id, { ...token })
+        bearerTokens.set(token.id, copyToken(token)!)
       },
-      findByDigest: digest => clone([...bearerTokens.values()].find(token => token.digest === digest)),
-      listByUser: userId => [...bearerTokens.values()].filter(token => token.userId === userId).map(token => ({ ...token })),
+      findByDigest: digest => copyToken([...bearerTokens.values()].find(token => token.digest === digest)),
+      listByUser: userId => [...bearerTokens.values()].filter(token => token.userId === userId).map(token => copyToken(token)!),
       touch(id, at) {
         const token = bearerTokens.get(id)
 
@@ -191,6 +191,10 @@ export function memoryStore(): AuthStore {
 // Callers get their own copy, as from a database, so changing one changes nothing stored.
 function copy(user: UserRecord | undefined): UserRecord | undefined {
   return user && { ...user, roles: [...user.roles] }
+}
+
+function copyToken(token: BearerTokenRecord | undefined): BearerTokenRecord | undefined {
+  return token && { ...token, scopes: token.scopes && [...token.scopes] }
 }
 
 function clone<T extends object>(value: T | undefined): T | undefined {

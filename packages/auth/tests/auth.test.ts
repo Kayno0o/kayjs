@@ -206,13 +206,13 @@ describe('guard', () => {
   }
 
   // The context a kay page would see, built by the same plugin.
-  async function contextOf(plugin: ReturnType<typeof testApp>['auth']['plugin'], cookie = ''): Promise<object> {
+  async function contextOf(plugin: ReturnType<typeof testApp>['auth']['plugin'], cookie = '', headers: Record<string, string> = {}): Promise<object> {
     return new Promise((resolve) => {
       void new Elysia().use(plugin).get('/', (ctx) => {
         resolve(ctx)
 
         return 'ok'
-      }).handle(new Request('http://localhost/', { headers: { cookie } }))
+      }).handle(new Request('http://localhost/', { headers: { cookie, ...headers } }))
     })
   }
 
@@ -235,6 +235,21 @@ describe('guard', () => {
     expect(await run(auth.guard(), guardContext({ locals }))).toBe('passed')
     expect(await run(auth.guard({ require: 'editor' }), guardContext({ locals }))).toBe('passed')
     expect(await run(auth.guard({ require: 'admin' }), guardContext({ locals }))).toBe('deny 403')
+  })
+
+  test('lets a scoped bearer token through only with one of the scopes asked', async () => {
+    const { auth, browser } = testApp({ scopes: ['posts:read', 'posts:write'] })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+    const { token } = await ada.call('createToken', { password: 'correct horse battery' }, 'Phone', { scopes: ['posts:read'] })
+    const locals = await contextOf(auth.plugin, '', { authorization: `Bearer ${token}` })
+    const session = await contextOf(auth.plugin, `session=${ada.cookies.get('session')}`)
+
+    expect(await run(auth.guard({ scope: ['posts:read', 'posts:write'] }), guardContext({ locals }))).toBe('passed')
+    expect(await run(auth.guard({ scope: 'posts:write' }), guardContext({ locals }))).toBe('deny 403')
+    expect(await run(auth.guard(), guardContext({ locals }))).toBe('deny 403')
+    expect(await run(auth.guard({ scope: 'posts:write' }), guardContext({ locals: session }))).toBe('passed')
   })
 })
 

@@ -2,10 +2,11 @@ import type { AnyElysia } from 'elysia'
 import type { Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
-import type { BearerToken } from './bearer'
+import type { BearerToken, CreateTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
+import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
 import type { SecurityEvent } from './mail'
 import type { OAuthFailure } from './oauth/flow'
@@ -24,7 +25,7 @@ import { pwnedPassword } from './breached'
 import { captchaRequired } from './captcha'
 import { publicUser } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithEmailCode, signInWithMagicLink, verifyEmail, verifyEmailCode } from './email'
-import { createGate } from './gate'
+import { createGate, scopeAllows } from './gate'
 import { deriveKeys } from './keys'
 import { DEFAULT_LIMITS } from './limits'
 import { defaultTemplates } from './mail'
@@ -48,7 +49,7 @@ export type AuthRequirement<Role extends string> = Requirement<User, Role>
 // The plugin kay's `session()` returns, whichever data the app keeps beside kayjs-auth's.
 export interface SessionPlugin<Data extends AuthSessionData> { '~Ephemeral': { derive: { readonly session: Session<Data> } } }
 
-export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth'> {
+export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never> {
   sessions: SessionPlugin<Data>
   // At least 32 characters, from the environment; each use gets its own key derived from it. A list rotates them: the first writes, every one reads.
   secret: string | string[]
@@ -77,6 +78,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   onDelete?: ((user: User) => void | Promise<void>) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, for an audit log of the app's own.
   onEvent?: ((event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>) | undefined
+  // What a bearer token may be limited to, such as `['posts:read', 'posts:write']`: a route asks for one with `scope:`.
+  scopes?: readonly Scope[] | undefined
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   // The roles every new user starts with, by password or by provider, such as a site's `user`. An unverified account holding only these counts as given none: see `requireVerified`.
@@ -94,10 +97,11 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
-export class Auth {
+export class Auth<Scope extends string = string> {
   readonly [STATE]: RequestState
   private resolving?: Promise<UserRecord | null>
   private source: 'session' | 'bearer' | null = null
+  private tokenScopes: string[] | null = null
 
   constructor(private readonly session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string) {
     this[STATE] = {
@@ -317,8 +321,20 @@ export class Auth {
   }
 
   // A bearer token for a device or an API client of the signed-in user, shown this once; minted from a session only, never from another token.
-  async createToken(proof: Proof, label: string): Promise<{ ok: true, token: string, id: string } | { ok: false, error: ProofFailure | 'label' }> {
-    return createToken(this[STATE], proof, label)
+  async createToken(proof: Proof, label: string, options: TokenOptions<Scope> = {}): Promise<CreateTokenResult> {
+    return createToken(this[STATE], proof, label, options)
+  }
+
+  // The scopes of the bearer token this request came with; null for a session, or a token with every scope.
+  async scopes(): Promise<string[] | null> {
+    await this.record()
+
+    return this.tokenScopes && [...this.tokenScopes]
+  }
+
+  // Whether this request may reach what `scope` guards: a session may, and a token given that scope or every one.
+  async hasScope(scope: Scope): Promise<boolean> {
+    return scopeAllows(await this.scopes(), scope)
   }
 
   // The signed-in user's bearer tokens, without the tokens themselves.
@@ -363,13 +379,14 @@ export class Auth {
     const owner = await bearerUser(this.core, this.request)
 
     this.source = owner ? 'bearer' : null
+    this.tokenScopes = owner?.scopes ?? null
 
-    return owner ?? null
+    return owner?.record ?? null
   }
 }
 
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
-export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth'>(options: AuthOptions<Data, Role, Prefix>) {
+export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never>(options: AuthOptions<Data, Role, Prefix, Scope>) {
   const core = createCore(options)
   const { hasRole, isGranted } = createRoleHierarchy<User, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 
@@ -385,7 +402,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       if (!session)
         throw new Error('kayjs-auth: no session reaches this route. Use the session plugin on the app itself, or leave it to auth.plugin, rather than in a plugin of the app\'s own before auth.plugin')
 
-      return { auth: new Auth(session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server, options.proxy))) }
+      return { auth: new Auth<Scope>(session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server, options.proxy))) }
     })
     // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
     .as('global')
@@ -436,24 +453,27 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
     // The user a bearer token belongs to, for a websocket handshake sending one in its first message.
     async userFromToken(token: string): Promise<User | null> {
-      const record = await tokenUser(core, token)
+      const owner = await tokenUser(core, token)
 
-      return record ? publicUser(record) : null
+      return owner ? publicUser(owner.record) : null
     },
 
     // Closes every route of the Elysia instance it is used on unless the user meets `require`, signed in by default. A route takes `auth: <requirement>` to ask for more and `auth: false` to stay open.
-    gate(gateOptions: { require?: AuthRequirement<Role> } = {}) {
-      const gate = createGate<User, Role>({
+    gate(gateOptions: { require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> } = {}) {
+      const gate = createGate<User, Role, Scope>({
         principal: ctx => authOf(ctx).user(),
         authorize,
         defaultRequirement: gateOptions.require ?? signedIn,
+        scopes: async ctx => authOf(ctx).scopes(),
+        defaultScope: gateOptions.scope,
       })
 
       return (app: AnyElysia) => gate(app.use(plugin))
     },
 
     // A `_guard.ts` default export. An anonymous visitor goes to `redirect` with where they were going as `?redirect=`, or gets a 401 without one, as does any post; a user who does not meet `require` gets a 403.
-    guard(guardOptions: { redirect?: string, require?: AuthRequirement<Role> } = {}): Guard {
+    // A scoped bearer token passes only with one of `scope`.
+    guard(guardOptions: { redirect?: string, require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> } = {}): Guard {
       return async (ctx) => {
         const user = await authOf(ctx.locals).user()
         const reading = READ_METHODS.has(ctx.request.method)
@@ -467,12 +487,15 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
         if (guardOptions.require !== undefined && !(await authorize(user, guardOptions.require, reading ? 'read' : 'write', {})))
           ctx.deny(403)
+
+        if (!scopeAllows(await authOf(ctx.locals).scopes(), guardOptions.scope))
+          ctx.deny(403)
       }
     },
   }
 }
 
-function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string>(options: AuthOptions<Data, Role, Prefix>): Core {
+function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string>(options: AuthOptions<Data, Role, Prefix, Scope>): Core {
   const prefix = options.prefix ?? '/auth'
   const oauth: Core['oauth'] = new Map()
   const oauthApps = Object.entries(options.oauth ?? {})
@@ -493,6 +516,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     twoFactorPage: options.twoFactorPage ?? '/two-factor',
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: { ...DEFAULT_LIMITS, ...options.limits },
+    scopes: new Set(options.scopes),
     captcha: options.captcha,
     breached: options.breachedPasswords === true ? pwnedPassword : options.breachedPasswords || undefined,
     email: options.email && {

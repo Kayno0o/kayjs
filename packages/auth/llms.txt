@@ -60,7 +60,7 @@ The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(
 - `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
 - `prefix`: where the OAuth routes live, `/auth` by default.
 - `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default.
-- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords.
+- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords.
 
 ## The signed-in user
 
@@ -233,8 +233,10 @@ Changing what protects the account takes a `proof`: `changePassword`, `changeEma
 
 ## Bearer tokens
 
-- `createToken(proof, label)` answers `{ ok: true, token, id }`: the token, shown this once, for a device or an API client to send as `Authorization: Bearer <token>`. It is minted from a session only, never with another token. `'label'` for an empty label or one over 64 characters.
-- `tokens()` lists `{ id, label, createdAt, lastUsedAt }`, since only the token's digest is stored; `revokeToken(id)` revokes one. A use is recorded at most every five minutes. A token ends with a password change, a reset and `signOutEverywhere`, each of which may answer a stolen device, so the devices sign in again after one.
+- `createToken(proof, label, { scopes?, expiresIn? })` answers `{ ok: true, token, id }`: the token, shown this once, for a device or an API client to send as `Authorization: Bearer <token>`. It is minted from a session only, never with another token. `'label'` for an empty label or one over 64 characters, `'scope'` for an empty list or a scope the app did not declare, `'expiry'` for an `expiresIn` (seconds) that is not above 0.
+- `scopes: ['posts:read', 'posts:write']` in `createAuth` declares what a token may be limited to, typed from then on. A token given `scopes` passes a gated route only when the route names one of them, `.get('/posts', handler, { scope: ['posts:read', 'posts:write'] })`, any one passing; a route naming none refuses it with a 403, so a route that forgets `scope:` stays closed to limited tokens, and `scope: false` lets every token through. `auth.gate({ scope })` sets the scope of its routes naming none, and `auth.guard({ scope })` does the same for pages. A token made without `scopes`, and a session, pass every scope. `auth.scopes()` answers the request's token's scopes, null for a session or a token with every scope, and `auth.hasScope(scope)` checks one, for an app's own checks.
+- An expired token reads as no token at all, in `user()`, gates and `userFromToken`.
+- `tokens()` lists `{ id, label, scopes, createdAt, lastUsedAt, expiresAt, expired }`, since only the token's digest is stored; `revokeToken(id)` revokes one. A use is recorded at most every five minutes. A token ends with a password change, a reset and `signOutEverywhere`, each of which may answer a stolen device, so the devices sign in again after one.
 - A token reads as its user in `user()`, guards and gates. A websocket checks the token its first message carries with `auth.userFromToken(token)`, which `createWsAuthStore(verify)` keeps per connection.
 
 ## Security mails

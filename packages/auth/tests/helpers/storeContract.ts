@@ -126,13 +126,13 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
     test('bearer tokens are found by digest, listed, touched and deleted by their owner only', async () => {
       await store.users.create(userRecord({ id: 'u1' }))
       await store.users.create(userRecord({ id: 'u2' }))
-      await store.bearerTokens.create({ id: 't1', userId: 'u1', label: 'Phone', digest: 'd1', createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null })
+      await store.bearerTokens.create({ id: 't1', userId: 'u1', label: 'Phone', digest: 'd1', scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: new Date('2030-01-01T00:00:00Z') })
 
       const at = new Date('2026-02-01T00:00:00Z')
 
       await store.bearerTokens.touch('t1', at)
 
-      expect(await store.bearerTokens.findByDigest('d1')).toMatchObject({ id: 't1', lastUsedAt: at })
+      expect(await store.bearerTokens.findByDigest('d1')).toMatchObject({ id: 't1', lastUsedAt: at, scopes: ['posts:read'], expiresAt: new Date('2030-01-01T00:00:00Z') })
       expect((await store.bearerTokens.listByUser('u1')).map(token => token.label)).toEqual(['Phone'])
       expect(await store.bearerTokens.delete('u2', 't1')).toBe(false)
       expect(await store.bearerTokens.delete('u1', 't1')).toBe(true)
@@ -144,7 +144,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       await store.identities.create(identity('discord', '1', 'u1'))
       await store.tokens.create({ digest: 'a', type: 'magic-link', userId: 'u1', email: 'x', redirect: null, expiresAt: new Date(Date.now() + 60_000) })
       await store.recoveryCodes.replace('u1', ['a'])
-      await store.bearerTokens.create({ id: 't1', userId: 'u1', label: 'Phone', digest: 'd1', createdAt: new Date(), lastUsedAt: null })
+      await store.bearerTokens.create({ id: 't1', userId: 'u1', label: 'Phone', digest: 'd1', scopes: null, createdAt: new Date(), lastUsedAt: null, expiresAt: null })
 
       await store.users.delete('u1')
 

@@ -1,6 +1,6 @@
 export type { ChangeUsernameResult } from './account'
 export * from './auth'
-export type { BearerToken } from './bearer'
+export type { BearerToken, CreateTokenResult, TokenOptions } from './bearer'
 export { pwnedPassword } from './breached'
 export { hcaptcha, turnstile } from './captcha'
 export type { CaptchaAction, CaptchaOptions } from './captcha'

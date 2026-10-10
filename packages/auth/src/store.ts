@@ -38,8 +38,12 @@ export interface BearerTokenRecord {
   userId: string
   label: string
   digest: string
+  // What the token may reach, from the scopes the app declares; null for everything its user may.
+  scopes: string[] | null
   createdAt: Date
   lastUsedAt: Date | null
+  // Null for a token that never expires.
+  expiresAt: Date | null
 }
 
 // What an emailed link proves once used.

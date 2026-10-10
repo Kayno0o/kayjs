@@ -55,8 +55,10 @@ export const AuthBearerTokens = defineTable('auth_bearer_token', t => ({
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   label: t.text().notNull(),
   digest: t.text().notNull().unique(),
+  scopes: t.array(t.text()).nullable(),
   created_at: t.timestamptz().notNull(),
   last_used_at: t.timestamptz().nullable(),
+  expires_at: t.timestamptz().nullable(),
 })).withIndexes([{ columns: ['user_id'] }])
 
 export const AuthAttempts = defineTable('auth_attempt', t => ({
@@ -126,7 +128,7 @@ export function pgStore(db: Database): AuthStore {
     },
     bearerTokens: {
       async create(token) {
-        await bearerTokens.write.insertOne({ id: token.id, user_id: token.userId, label: token.label, digest: token.digest, created_at: token.createdAt, last_used_at: token.lastUsedAt })
+        await bearerTokens.write.insertOne({ id: token.id, user_id: token.userId, label: token.label, digest: token.digest, scopes: token.scopes, created_at: token.createdAt, last_used_at: token.lastUsedAt, expires_at: token.expiresAt })
       },
       findByDigest: async digest => toBearerToken(await bearerTokens.read.findOne({ digest })),
       listByUser: async userId => (await bearerTokens.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toBearerToken(row)!),
@@ -224,7 +226,7 @@ function toToken(row: InferEntity<typeof AuthTokens>): TokenRecord {
 }
 
 function toBearerToken(row: InferEntity<typeof AuthBearerTokens> | null): BearerTokenRecord | undefined {
-  return row ? { id: row.id, userId: row.user_id, label: row.label, digest: row.digest, createdAt: row.created_at, lastUsedAt: row.last_used_at } : undefined
+  return row ? { id: row.id, userId: row.user_id, label: row.label, digest: row.digest, scopes: row.scopes, createdAt: row.created_at, lastUsedAt: row.last_used_at, expiresAt: row.expires_at } : undefined
 }
 
 // pg-orm refuses an `undefined` value, so a patch names only the fields it changes.

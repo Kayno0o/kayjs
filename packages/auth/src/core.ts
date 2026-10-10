@@ -64,6 +64,8 @@ export interface Core {
   // The site's name, as mails and authenticators show it.
   site: string
   limits: Limits
+  // The scopes a bearer token may be given.
+  scopes: Set<string>
   captcha?: CaptchaOptions | undefined
   // Whether a new password is known from a breach.
   breached?: ((password: string) => boolean | Promise<boolean>) | undefined

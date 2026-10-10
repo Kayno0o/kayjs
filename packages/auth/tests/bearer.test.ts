@@ -8,12 +8,12 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function withToken() {
-  const app = testApp()
+async function withToken(options: { scopes?: string[], expiresIn?: number } = {}) {
+  const app = testApp({ scopes: ['posts:read', 'posts:write', 'stats'] })
   const ada = app.browser()
 
   await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-  const minted = await ada.call('createToken', { password: PASSWORD }, 'Phone')
+  const minted = await ada.call('createToken', { password: PASSWORD }, 'Phone', options)
 
   return { ...app, ada, minted, bearer: { authorization: `Bearer ${minted.token}` } }
 }
@@ -32,7 +32,7 @@ describe('bearer tokens', () => {
     const { ada, browser, bearer, minted } = await withToken()
     const tokens = await ada.call('tokens')
 
-    expect(tokens).toEqual([{ id: minted.id, label: 'Phone', createdAt: expect.any(String), lastUsedAt: null }])
+    expect(tokens).toEqual([{ id: minted.id, label: 'Phone', scopes: null, createdAt: expect.any(String), lastUsedAt: null, expiresAt: null, expired: false }])
     expect(JSON.stringify(tokens)).not.toContain(minted.token)
 
     expect(await ada.call('revokeToken', minted.id)).toBe(true)
@@ -106,5 +106,80 @@ describe('bearer tokens', () => {
     await ada.call('deleteAccount', { password: PASSWORD })
 
     expect(await browser().json('/me', { headers: bearer })).toBe('anonymous')
+  })
+})
+
+describe('scoped and expiring tokens', () => {
+  function gated(app: Awaited<ReturnType<typeof withToken>>) {
+    const api = new Elysia()
+      .use(app.auth.gate())
+      .get('/posts', () => 'ok', { scope: ['posts:read', 'posts:write'] })
+      .post('/posts', () => 'ok', { scope: 'posts:write' })
+      .get('/me', () => 'ok')
+      .get('/health', () => 'ok', { scope: false })
+
+    return browserOf(new Elysia().use(app.app).group('/api', group => group.use(api)))
+  }
+
+  test('a scoped token passes only routes naming one of its scopes, a route naming none included', async () => {
+    const app = await withToken({ scopes: ['posts:read'] })
+    const device = gated(app)
+
+    expect((await device.fetch('/api/posts', { headers: app.bearer })).status).toBe(200)
+    expect((await device.fetch('/api/posts', { method: 'POST', headers: app.bearer })).status).toBe(403)
+    expect((await device.fetch('/api/me', { headers: app.bearer })).status).toBe(403)
+    expect((await device.fetch('/api/health', { headers: app.bearer })).status).toBe(200)
+  })
+
+  test('a token with every scope, and a session, pass every route', async () => {
+    const app = await withToken()
+    const device = gated(app)
+    const session = gated(app)
+
+    await session.call('signInWithPassword', { identifier: 'ada@example.com', password: PASSWORD })
+
+    for (const browser of [device, session]) {
+      const headers = browser === device ? app.bearer : {}
+
+      expect((await browser.fetch('/api/posts', { method: 'POST', headers })).status).toBe(200)
+      expect((await browser.fetch('/api/me', { headers })).status).toBe(200)
+    }
+  })
+
+  test('a gate\'s scope applies to its routes naming none', async () => {
+    const app = await withToken({ scopes: ['stats'] })
+    const api = new Elysia().use(app.auth.gate({ scope: 'stats' })).get('/stats', () => 'ok').get('/posts', () => 'ok', { scope: 'posts:read' })
+    const device = browserOf(new Elysia().use(app.app).use(api))
+
+    expect((await device.fetch('/stats', { headers: app.bearer })).status).toBe(200)
+    expect((await device.fetch('/posts', { headers: app.bearer })).status).toBe(403)
+  })
+
+  test('a request reads its token\'s scopes', async () => {
+    const app = await withToken({ scopes: ['posts:read', 'posts:read'] })
+    const device = browserOf(new Elysia().use(app.app).get('/scopes', async ({ auth }) => ({ scopes: await auth.scopes(), write: await auth.hasScope('posts:write') })))
+
+    expect(await device.json('/scopes', { headers: app.bearer })).toEqual({ scopes: ['posts:read'], write: false })
+    expect(await device.json('/scopes')).toEqual({ scopes: null, write: true })
+  })
+
+  test('only declared scopes are given, and an expiry must lie ahead', async () => {
+    const { ada } = await withToken()
+
+    expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { scopes: ['admin'] })).toEqual({ ok: false, error: 'scope' })
+    expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { scopes: [] })).toEqual({ ok: false, error: 'scope' })
+    expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { expiresIn: 0 })).toEqual({ ok: false, error: 'expiry' })
+  })
+
+  test('an expired token is refused, and listed as expired', async () => {
+    const { ada, browser, bearer, auth, minted } = await withToken({ expiresIn: 3600 })
+
+    expect(await browser().json('/me', { headers: bearer })).toMatchObject({ email: 'ada@example.com' })
+
+    setSystemTime(Date.now() + 3601 * 1000)
+
+    expect(await browser().json('/me', { headers: bearer })).toBe('anonymous')
+    expect(await auth.userFromToken(minted.token)).toBeNull()
+    expect(await ada.call('tokens')).toEqual([expect.objectContaining({ id: minted.id, expiresAt: expect.any(String), expired: true })])
   })
 })
