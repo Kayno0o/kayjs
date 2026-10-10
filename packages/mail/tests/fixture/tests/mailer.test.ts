@@ -51,6 +51,15 @@ describe('rendering', () => {
     await expect(mail.render({ to: 'ada@example.com', subject: 'Hallo', view: Hello, lang: 'de' })).rejects.toThrow('none of the site\'s locales')
   })
 
+  it('offers one-click unsubscribe through the headers RFC 8058 names, refusing a URL that is not https', async () => {
+    const single = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: 'https://fixture.test/unsubscribe?u=1&t=<x>' })
+    const both = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: { url: 'https://fixture.test/u', address: 'unsubscribe@fixture.test' } })
+
+    expect(single.headers).toEqual({ 'List-Unsubscribe': '<https://fixture.test/unsubscribe?u=1&t=%3Cx%3E>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' })
+    expect(both.headers['List-Unsubscribe']).toBe('<https://fixture.test/u>, <mailto:unsubscribe@fixture.test>')
+    await expect(mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: 'http://fixture.test/u' })).rejects.toThrow('it takes an https URL')
+  })
+
   it('takes no props for a mail without required ones, and the text it is given over the one written from the html', async () => {
     const rendered = await mail.render({ to: 'ada@example.com', subject: 'Plain', view: Plain, text: 'Given text' })
 

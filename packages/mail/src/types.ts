@@ -23,6 +23,8 @@ export interface Envelope {
   lang?: string | undefined
   headers?: Record<string, string> | undefined
   attachments?: Attachment[] | undefined
+  // Where the recipient unsubscribes in one click, written as `List-Unsubscribe` and `List-Unsubscribe-Post`: an https URL answering a POST, and an address to write to as well.
+  unsubscribe?: string | { url: string, address: string } | undefined
 }
 
 // A `.kay` component renders the html, given its props unless it takes none required; `text` replaces the one written from the html.

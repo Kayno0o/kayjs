@@ -76,6 +76,22 @@ function asDocument(html: string, subject: string, lang: string): string {
   return `<!doctype html><html lang="${escape(lang)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting" content="true"><title>${escape(subject)}</title>${OUTLOOK_SETTINGS}</head><body style="margin:0;padding:0">${html}</body></html>`
 }
 
+// RFC 8058's one-click unsubscribe, which Gmail and Yahoo require of bulk senders.
+function unsubscribeHeaders(unsubscribe: NonNullable<Message['unsubscribe']>, subject: string): Record<string, string> {
+  const { url, address } = typeof unsubscribe === 'string' ? { url: unsubscribe, address: undefined } : unsubscribe
+  const parsed = URL.parse(url)
+
+  if (parsed?.protocol !== 'https:')
+    throw new Error(`kayjs-mail: "${subject}" unsubscribes at ${url}, which one-click unsubscribe refuses: it takes an https URL`)
+
+  if (address !== undefined && LINE_BREAK.test(address))
+    throw new Error(`kayjs-mail: "${subject}" has an address holding a line break`)
+
+  const targets = [`<${parsed.href}>`, ...address === undefined ? [] : [`<mailto:${encodeURI(addressOf(address))}>`]]
+
+  return { 'List-Unsubscribe': targets.join(', '), 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
+}
+
 function named(address: string, name: string | undefined): Address {
   return name === undefined || address.includes('<') ? address : { name, address }
 }
@@ -164,6 +180,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
         throw new Error(`kayjs-mail: "${message.subject}" has an address holding a line break`)
     }
 
+    const unsubscribe = message.unsubscribe === undefined ? {} : unsubscribeHeaders(message.unsubscribe, message.subject)
     const markup = message.view ? await renderToString(message.view, ...[message.props, message.lang === undefined ? undefined : { locale: message.lang }] as never) : message.html
     const html = markup === undefined ? undefined : asDocument(markup, message.subject, message.lang ?? lang)
 
@@ -176,7 +193,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       subject: message.subject,
       html,
       text: message.text ?? htmlToText(html!),
-      headers: message.headers ?? {},
+      headers: { ...unsubscribe, ...message.headers },
       attachments: message.attachments ?? [],
     }
   }

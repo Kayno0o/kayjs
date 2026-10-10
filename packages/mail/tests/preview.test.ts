@@ -27,7 +27,7 @@ describe('the development outbox page', () => {
   it('lists the mails sent, newest first, and shows each one\'s headers, html and text', async () => {
     const mail = mailer({ from: 'dev@example.com' })
 
-    await mail.send({ to: 'ada@example.com', subject: 'First <one>', html: '<p>Hello <a href="https://example.com">there</a></p>' })
+    await mail.send({ to: 'ada@example.com', subject: 'First <one>', unsubscribe: 'https://example.com/unsubscribe', html: '<p>Hello <a href="https://example.com">there</a></p>' })
     await mail.send({ to: 'bob@example.com', replyTo: 'visitor@example.com', subject: 'Second', text: 'Only text' })
 
     const list = await (await get(mail, '/_kay/mail')).text()
@@ -40,6 +40,7 @@ describe('the development outbox page', () => {
 
     expect(detail.status).toBe(200)
     expect(page).toContain('<th>From</th><td>dev@example.com</td>')
+    expect(page).toContain('<th>List-Unsubscribe</th><td>&lt;https://example.com/unsubscribe&gt;</td>')
     expect(page).toContain(`src="/_kay/mail/${first.id}/html"`)
     expect(page).toContain('<pre>Hello there (https://example.com)</pre>')
     // Its own, so a site's narrower frame-src cannot blank the mail's frame.
