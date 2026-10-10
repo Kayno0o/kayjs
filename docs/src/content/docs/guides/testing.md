@@ -25,7 +25,7 @@ it('lists the books', async () => {
 })
 ```
 
-The page also has `meta(key)`, `canonical()`, `jsonLd()`, `links()` and `find(selector)`, which returns `{ tag, attributes, text }` for each match.
+The page also has `meta(key)`, `canonical()`, `jsonLd()`, `links()`, `find(selector)`, which returns `{ tag, attributes, text }` for each match, and `text(selector)`, the text a visitor reads in the first match, or in the whole body. Assert on text through these rather than on `page.html`: an island's markup holds hydration markers inside an interpolated text, so `Thanks, {name}!` is not one string there.
 
 ## Posting an action
 
@@ -37,7 +37,7 @@ import { add } from '../src/routes/index.kay'
 it('shows why a book was refused', async () => {
   const page = await site.submit(add, { title: '' }, { from: '/' })
 
-  expect(page.html).toContain('Write a title')
+  expect(page.text('.error')).toBe('Write a title')
 })
 ```
 

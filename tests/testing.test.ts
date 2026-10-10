@@ -16,7 +16,6 @@ const routes = 'tests/fixtures/site/src/routes'
 
 // The schema of the admin page's actions, which take a name.
 type Named = ReturnType<typeof t.Object<{ name: ReturnType<typeof t.String> }>>
-const MARKERS = /<!--[$/]-->/g
 // A 1x1 PNG, which Elysia's `t.File({ type: 'image/png' })` recognises from its bytes.
 const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
 const site = await testSite({ routes, publicDir: 'tests/fixtures/site/public', locals: request => ({ user: request.headers.get('x-user') ?? undefined }) })
@@ -98,6 +97,9 @@ describe('kay/test', () => {
 
       expect(await (await echo.fetch('/echo', { headers: { 'x-user': 'ada' } })).text()).toBe('ada')
       expect((await site.submit(add, { title: 'Sent under a DOM' })).html).toContain('Sent under a DOM</a></li>')
+      // A refused post renders its page, and one that succeeded shows what it returned there, through the app.
+      expect((await site.submit(add, { title: '' }, { from: '/' })).text('p.error')).toBe('Write a title')
+      expect((await site.submit(schedule, { title: 'Launch', at: '2026-10-04T10:00:00Z' }, { from: '/events' })).text('p.done')).toStartWith('Scheduled Launch')
       expect(await site.call(add, { title: 'Called under a DOM' })).toBeNumber()
     }
     finally {
@@ -210,14 +212,19 @@ describe('kay/test', () => {
 
     expect(result).toEqual({ title: 'Launch', at, tags: new Set(['new']), seats: 10n })
     await expect(site.call(schedule, { title: 'Old', at: new Date(0) })).rejects.toMatchObject({ status: 422, data: { earliest: new Date(Date.UTC(2000, 0, 1)) } })
-    expect((await site.submit(schedule, { title: 'Old', at: '1990-01-01T00:00:00Z' }, { from: '/events' })).html.replace(MARKERS, '')).toContain('<p class="error">Not before 2000</p>')
+    expect((await site.submit(schedule, { title: 'Old', at: '1990-01-01T00:00:00Z' }, { from: '/events' })).text('p.error')).toBe('Not before 2000')
   })
 
   it('shows the page what a plain form post that succeeded returned, once', async () => {
     const page = await site.submit(schedule, { title: 'Launch', at: '2026-10-04T10:00:00Z' }, { from: '/events' })
 
     expect(page.url).toBe('/events')
-    expect(page.html.replace(MARKERS, '')).toContain('<p class="done">Scheduled Launch on 2026-10-04T10:00:00.000Z, 1 tag, 10 seats</p>')
+    // Read as a visitor reads it, as one string, where an island's markup holds hydration markers between its parts.
+    expect(page.html).not.toContain('2000 1')
+    expect(page.text('button.since')).toBe('2000 1')
+    expect(page.text('p.done')).toBe('Scheduled Launch on 2026-10-04T10:00:00.000Z, 1 tag, 10 seats')
+    expect(page.text()).toContain('Scheduled Launch on 2026-10-04T10:00:00.000Z, 1 tag, 10 seats')
+    expect(page.text('p.missing')).toBeUndefined()
     expect((await site.visit('/events')).html).not.toContain('class="done"')
   })
 
@@ -241,7 +248,7 @@ describe('kay/test', () => {
     const page = await site.submit(schedule, { title: 'é'.repeat(4000), at: '1990-01-01T00:00:00Z' }, { from: '/events' })
 
     expect(page.url).toBe('/events')
-    expect(page.html.replace(MARKERS, '')).toContain('<p class="error">Not before 2000</p>')
+    expect(page.text('p.error')).toBe('Not before 2000')
     expect(site.cookies.has('kay_flash')).toBe(false)
   })
 
@@ -299,6 +306,10 @@ describe('reading a page', () => {
     const page = await site.submit(add, { title: 'Paint  <walls> &\n  doors' }, { from: '/' })
 
     expect(page.find('li a').at(-1)!.text).toBe('Paint <walls> & doors')
+    // The page's text leaves out its scripts, which a visitor never reads.
+    expect(page.html).toContain('<script')
+    expect(page.text()).toContain('Paint <walls> & doors')
+    expect(page.text()).not.toContain('{')
   })
 
   it('lists the sitemap\'s URLs, and fails on one that does not answer', async () => {

@@ -18,12 +18,16 @@ export interface PageReading {
   links: () => string[]
   // Every element a CSS selector matches, in page order.
   find: (selector: string) => Found[]
+  // The text a visitor reads in the body, or in the first element `selector` matches, as `find` gives it but without scripts, styles and templates: `Thanks, {name}!` reads as one string, where `html` holds hydration markers inside it.
+  text: (selector?: string) => string | undefined
 }
 
 const ENTITY = /&(?:#(\d+)|#x([\da-f]+)|(amp|lt|gt|quot|apos|nbsp));/gi
 const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ' }
 const WHITESPACE = /\s+/g
 const LOC = /<loc>([^<]*)<\/loc>/g
+// What holds text a visitor never reads.
+const UNREAD = 'script, style, template'
 
 // HTMLRewriter hands over the markup as written: kay escapes with the named entities, and a page or markdown may write numeric ones.
 function decode(text: string): string {
@@ -41,12 +45,25 @@ function squash(text: string): string {
 
 type Matched = Omit<Found, 'text'> & { raw: string }
 
-// Every element `selector` matches, a CSS selector as HTMLRewriter reads it, in the order they open, with the markup of the text inside.
-function matches(html: string, selector: string): Matched[] {
+// Every element `selector` matches, a CSS selector as HTMLRewriter reads it, in the order they open, with the markup of the text inside; `visible` leaves out what a visitor does not read.
+function matches(html: string, selector: string, visible = false): Matched[] {
   const found: Matched[] = []
   const open = new Set<Matched>()
+  const rewriter = new HTMLRewriter()
+  let hidden = 0
 
-  new HTMLRewriter()
+  if (visible) {
+    rewriter.on(UNREAD, {
+      element: (element) => {
+        hidden++
+        element.onEndTag(() => {
+          hidden--
+        })
+      },
+    })
+  }
+
+  rewriter
     .on(selector, {
       element: (element) => {
         const match = { tag: element.tagName, attributes: Object.fromEntries([...element.attributes].map(([name, value]) => [name, decode(value)])), raw: '' }
@@ -63,6 +80,9 @@ function matches(html: string, selector: string): Matched[] {
     })
     .onDocument({
       text: (chunk) => {
+        if (hidden > 0)
+          return
+
         for (const match of open)
           match.raw += chunk.text
       },
@@ -89,6 +109,11 @@ export function readPage(html: string): PageReading {
     }),
     links: () => find(html, 'a[href]').map(({ attributes }) => attributes.href!),
     find: selector => find(html, selector),
+    text: (selector = 'body') => {
+      const [first] = matches(html, selector, true)
+
+      return first && squash(first.raw)
+    },
   }
 }
 

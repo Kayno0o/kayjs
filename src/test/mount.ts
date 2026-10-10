@@ -2,6 +2,8 @@ import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { kay } from '../build/plugin'
 import { loadConfig } from '../config'
+import { sendValue } from '../runtime/send'
+import { decodeValue } from '../runtime/wire'
 import { testRoot } from './root'
 
 export interface Mounted {
@@ -21,6 +23,18 @@ const bundles = new Map<string, Promise<string>>()
 // Lets queued effects and timers due now land, as after a click, before the DOM is read.
 export async function settle(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 0))
+}
+
+// Keeps a value in localStorage as `persisted(key, initial, { storage: 'local' })` does, encoded as island props are rather than as JSON, for a component mounted after to read.
+export function writePersisted(key: string, value: unknown): void {
+  localStorage.setItem(key, sendValue(value))
+}
+
+// The value a `persisted(key, initial, { storage: 'local' })` signal kept in localStorage, decoded, or undefined when it kept none.
+export function readPersisted(key: string): unknown {
+  const text = localStorage.getItem(key)
+
+  return text === null ? undefined : decodeValue(text)
 }
 
 // Renders a component compiled for the browser, as an island renders, into the document a DOM such as happy-dom's registered: for testing what its handlers and effects do.

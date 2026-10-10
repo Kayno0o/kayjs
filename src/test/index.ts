@@ -26,14 +26,14 @@ import { SITEMAP } from '../server/sitemap'
 import { signStamp, stampTime } from '../server/stamp'
 import { servedThrough } from '../server/visit'
 import { browse } from './browser'
-import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket } from './natives'
+import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
 import { readPage, sitemapUrls } from './page'
 import { testRoot } from './root'
 
 export type { A11yViolation, BrowserOptions, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
 export type { Mounted } from './mount'
-export { mount, settle } from './mount'
+export { mount, readPersisted, settle, writePersisted } from './mount'
 export type { Found, PageReading } from './page'
 
 export interface TestOptions extends PagesOptions {
@@ -172,7 +172,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const handle = async (request: Request): Promise<Response> => {
     servedThrough(request, handle)
 
-    return app.handle(request)
+    return withNatives(async () => app.handle(request))
   }
 
   const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
@@ -214,7 +214,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       current = await send(path, { headers })
     }
 
-    const html = await current.text()
+    // A page streamed after its shell renders on as it is read.
+    const html = await withNatives(async () => current.text())
 
     return { url: path, status: current.status, headers: current.headers, html, ...readPage(html) }
   }

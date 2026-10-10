@@ -1,8 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { sendValue } from '../src/runtime/send'
-import { mount, settle } from '../src/test'
+import { mount, readPersisted, settle, writePersisted } from '../src/test'
 
 beforeAll(() => {
   GlobalRegistrator.register()
@@ -33,20 +32,26 @@ describe('mount', () => {
     expect(root.isConnected).toBe(false)
   })
 
-  it('runs every mount on modules of its own, as a page load does, a persisted signal reading storage as it is then', async () => {
+  it('runs every mount on modules of its own, as a page load does, a persisted signal reading storage as it is then, which a test writes and reads as it keeps it', async () => {
     try {
-      localStorage.setItem('favorites', sendValue(['first']))
+      writePersisted('favorites', ['first'])
 
       const first = await mount('tests/fixtures/mount/favorites.kay')
 
-      expect(first.root.textContent).toBe('first')
+      expect(first.root.querySelector('.favorites')!.textContent).toBe('first')
       first.unmount()
 
-      localStorage.setItem('favorites', sendValue(['second']))
+      writePersisted('favorites', ['second'])
 
       const second = await mount('tests/fixtures/mount/favorites.kay')
 
-      expect(second.root.textContent).toBe('second')
+      expect(second.root.querySelector('.favorites')!.textContent).toBe('second')
+      second.root.querySelector('button')!.click()
+      await settle()
+
+      expect(readPersisted('favorites')).toEqual(['second', 'added'])
+      expect(localStorage.getItem('favorites')).not.toBe(JSON.stringify(['second', 'added']))
+      expect(readPersisted('nothing')).toBeUndefined()
       second.unmount()
     }
     finally {
