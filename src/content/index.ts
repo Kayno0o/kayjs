@@ -11,6 +11,7 @@ import process from 'node:process'
 import { cached, invalidate } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { child } from '../runtime/html'
+import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
 import { loadEntries } from './load'
 import { compileMarkdown, MarkdownError } from './markdown'
@@ -36,6 +37,10 @@ export interface Entry<Data> {
   Content: Component
   // The file, relative to the project root; a loaded entry's collection name and slug, `posts/hello`.
   file: string
+  // In a localized collection, the locale whose folder holds the entry, the default one's when it stands in for a locale lacking it.
+  locale?: string | undefined
+  // In a localized collection, the locales with an entry of this slug, its own included.
+  translations?: readonly string[] | undefined
 }
 
 // One entry a loader gives: its data, read against the schema as a file's, and its body as Markdown or as HTML.
@@ -73,6 +78,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   sort?: ((a: Entry<Static<Schema>>, b: Entry<Static<Schema>>) => number) | undefined
   // An RSS or Atom feed of the collection, served at its path.
   feed?: FeedOptions<Static<Schema>> | undefined
+  // Each entry sits in a folder named after its locale, `fr/hello.md`, a translation sharing its slug: `all()` and `get()` read the request's locale, the default locale's entry standing in for one it lacks, and the feed is served once per locale.
+  localized?: boolean | undefined
 }
 
 export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string> {
@@ -85,10 +92,10 @@ export interface Collection<Data, Components extends Record<string, Component<ne
   readonly options: CollectionOptions<TSchema>
   // The components its Markdown entries may use, typed as given, which `kay check` reads their props from.
   readonly components: Components
-  // Every entry, in the collection's order.
-  all: () => Promise<Entry<Data>[]>
-  // The entry with that slug, or undefined.
-  get: (slug: string) => Promise<Entry<Data> | undefined>
+  // Every entry, in the collection's order; in a localized collection those of the request's locale or the one given, or every locale's outside a request.
+  all: (locale?: string) => Promise<Entry<Data>[]>
+  // The entry with that slug, or undefined; in a localized collection the request's locale's or the one given.
+  get: (slug: string, locale?: string) => Promise<Entry<Data> | undefined>
   // Loads the entries afresh on the next read: for a webhook a CMS calls once an entry changed. A loader's `store` passes it to every process sharing it.
   invalidate: () => void
 }
@@ -96,6 +103,8 @@ export interface Collection<Data, Components extends Record<string, Component<ne
 interface Entries<Data> {
   list: Entry<Data>[]
   bySlug: Map<string, Entry<Data>>
+  // A localized collection's entries by locale, then slug.
+  byLocale: Map<string, Map<string, Entry<Data>>>
 }
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
@@ -108,14 +117,29 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const name = typeof source === 'string' ? source : source.name
   const key = `kay:content:${name}`
   const decoded = new WeakMap<RawEntry[], Entries<Data>>()
-  const { draft } = options
+  const { draft, localized = false } = options
 
   const decode = (raw: RawEntry[]): Entries<Data> => {
-    const entries = decodeEntries(raw, options.schema, components).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components))
+    const entries = decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized))
+    const byLocale = new Map<string, Map<string, Entry<Data>>>()
 
-    entries.sort(options.sort ?? ((a, b) => a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0))
+    entries.sort(options.sort ?? ((a, b) => a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : a.locale! < b.locale! ? -1 : 1))
 
-    return { list: entries, bySlug: new Map(entries.map(entry => [entry.slug, entry])) }
+    for (const entry of entries) {
+      if (entry.locale === undefined)
+        continue
+
+      const slugs = byLocale.get(entry.locale) ?? new Map<string, Entry<Data>>()
+
+      byLocale.set(entry.locale, slugs.set(entry.slug, entry))
+    }
+
+    for (const entry of entries) {
+      if (localized)
+        entry.translations = [...byLocale].filter(([, slugs]) => slugs.has(entry.slug)).map(([locale]) => locale).sort()
+    }
+
+    return { list: entries, bySlug: new Map(entries.map(entry => [entry.slug, entry])), byLocale }
   }
 
   // Validated before `cached` keeps them, so entries the schema refuses are fetched again on the next read.
@@ -165,6 +189,8 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
   const loaded = loader ? fromLoader : fromFolder
   const hidden = (entry: Entry<Data>) => draft !== undefined && process.env.NODE_ENV !== 'development' && !previewing() && draft(entry)
+  // A draft translation is left out as a missing one is, the default locale's entry standing in.
+  const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined
 
   return {
     [COLLECTION]: true,
@@ -172,11 +198,27 @@ export function collection<Schema extends TSchema, Components extends Record<str
     dir: loader ? undefined : name,
     options,
     components: components as Components,
-    all: async () => (await loaded()).list.filter(entry => !hidden(entry)),
-    get: async (slug) => {
-      const entry = (await loaded()).bySlug.get(slug)
+    all: async (locale) => {
+      const { list, byLocale } = await loaded()
+      const wanted = localized ? locale ?? localeState()?.locale : undefined
 
-      return entry && !hidden(entry) ? entry : undefined
+      if (wanted === undefined)
+        return list.filter(entry => !hidden(entry))
+
+      const own = byLocale.get(wanted)
+      const fallback = localeState()?.settings.defaultLocale
+
+      return list.filter(entry => !hidden(entry) && (entry.locale === wanted || (entry.locale === fallback && shown(own?.get(entry.slug)) === undefined)))
+    },
+    get: async (slug, locale) => {
+      const { bySlug, byLocale } = await loaded()
+      const wanted = localized ? locale ?? localeState()?.locale : undefined
+      const fallback = localeState()?.settings.defaultLocale
+
+      if (wanted === undefined)
+        return shown(bySlug.get(slug))
+
+      return shown(byLocale.get(wanted)?.get(slug)) ?? (fallback === undefined ? undefined : shown(byLocale.get(fallback)?.get(slug)))
     },
     invalidate: () => {
       loading = undefined
@@ -240,11 +282,13 @@ export function isCollection(value: unknown): value is Collection<unknown> {
   return typeof value === 'object' && value !== null && COLLECTION in value
 }
 
-function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>): Entry<Data> {
+function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean): Entry<Data> {
   const segments = entry.segments ?? []
+  const split = entry.slug.indexOf('/')
 
   return {
-    slug: entry.slug,
+    ...localized && { locale: entry.slug.slice(0, split) },
+    slug: localized ? entry.slug.slice(split + 1) : entry.slug,
     data,
     headings: entry.headings ?? [],
     Content: () => render(segments, components, entry.file),

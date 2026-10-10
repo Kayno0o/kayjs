@@ -29,7 +29,7 @@ const FIELD = /^\/([^/]*)/
 const checks = new WeakMap<TSchema, TypeCheck<TSchema>>()
 
 // Each entry's data read against the schema, defaults filled in and values decoded, such as a date from its text; the components each uses must be ones the collection names.
-export function decodeEntries(entries: RawEntry[], schema: TSchema, components: Record<string, unknown>): { entry: RawEntry, data: unknown }[] {
+export function decodeEntries(entries: RawEntry[], schema: TSchema, components: Record<string, unknown>, localized = false): { entry: RawEntry, data: unknown }[] {
   let check = checks.get(schema)
 
   if (!check)
@@ -40,6 +40,9 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
 
   for (const entry of entries) {
     const data = withDefaults(entry.data, schema)
+
+    if (localized && !entry.slug.includes('/'))
+      problems.push({ file: entry.file, line: 1, message: 'sits outside a locale folder, where a localized collection keeps each entry: fr/hello.md' })
 
     for (const { component, line } of unknownComponents(entry.segments ?? [], components))
       problems.push({ file: entry.file, line, message: `uses <${component}>, which the collection's components do not name` })

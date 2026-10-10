@@ -30,7 +30,8 @@ export async function listedParams(route: Route, file: string, name: string, val
     if (nested)
       throw new Error(`kay: ${file} takes one segment as ${param}, but the entry ${nested.file} has the slug ${nested.slug}; name the page [...${param}].kay for nested entries`)
 
-    return entries.map(entry => ({ [param]: entry.slug }))
+    // A localized collection lists a slug once, each locale's copy of the page following from it.
+    return [...new Set(entries.map(entry => entry.slug))].map(slug => ({ [param]: slug }))
   }
 
   if (value === true) {

@@ -1,0 +1,8 @@
+--- server
+import { news } from '../../content.config'
+
+const list = await news.all()
+---
+ul.news
+  for entry of list key={entry.slug}
+    li {entry.data.title} ({entry.locale})

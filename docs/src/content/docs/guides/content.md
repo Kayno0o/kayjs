@@ -103,6 +103,10 @@ export const posts = collection('content/posts', {
 })
 ```
 
+## Entries per locale
+
+On a site with `i18n`, `localized: true` keeps each entry in a folder named after its locale: `posts/fr/hello.md` and `posts/en/hello.md` are one entry, slug `hello`, in two languages. `all()` and `get()` read the request's locale, falling back to the default locale's entry, `entry.locale` says which one was read, and the feed is served once per locale.
+
 ## Collections from a CMS
 
 When the entries live in a headless CMS, an API or a database, pass a loader instead of a folder. The collection is read, typed and used the same way, and is cached for the `ttl`:

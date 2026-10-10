@@ -6,7 +6,7 @@ import { cp, mkdir, readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import { projectCollections } from '../content/server'
+import { feedPaths, projectCollections } from '../content/server'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
@@ -79,7 +79,7 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
 
   // What kay serves itself comes from the app, as a server would answer it.
   const app = new Elysia().use(await servePages({ ...config, root, prebuilt: true, log: false, health: false, security: false, compress: false }))
-  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...config.favicon === false ? [] : FAVICON_PATHS, ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => collection.options.feed ? [collection.options.feed.path] : [])]
+  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...config.favicon === false ? [] : FAVICON_PATHS, ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => feedPaths(collection, config.i18n && localeSettings(config.i18n)).map(({ path }) => path))]
 
   for (const path of fetched) {
     const response = await app.handle(new Request(`http://localhost${path}`))

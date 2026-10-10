@@ -1,10 +1,15 @@
 import type { Elysia } from 'elysia'
+import type { LocaleSettings } from '../runtime/i18n'
+import type { I18n } from '../server/i18n'
 import type { Collection } from './index'
 import type { Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { existsSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
+import { localePath } from '../runtime/i18n'
+import { runInLocale } from '../runtime/locale-state'
 import { bundled, importModule } from '../server/bundle'
+import { hostLocale, stateFor } from '../server/i18n'
 import { registerLoader } from '../server/loader'
 import { feedXml } from './feed'
 import { isCollection } from './index'
@@ -13,6 +18,7 @@ import { ContentError, decodeEntries } from './validate'
 
 // The module declaring a project's collections, which `kay build`, `kay check` and the server read them from.
 export const CONTENT_CONFIG = 'src/content.config.ts'
+const TRAILING_SLASH = /\/$/
 
 // Starts the line `kay check` reads the content problems from.
 export const PROBLEMS_MARKER = 'kay-content-problems:'
@@ -70,7 +76,7 @@ export async function writeContentManifests(root: string, clientBase: string, co
 
     const entries = await loadEntries(collection.dir, collection.options.highlight, true)
 
-    decodeEntries(entries, collection.options.schema, collection.options.components ?? {})
+    decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized)
     await Bun.write(manifestFile(clientBase, collection.dir), JSON.stringify(entries))
     count += entries.length
   }
@@ -97,7 +103,7 @@ export async function contentProblems(root: string, config?: string, site = true
       for (const entry of entries)
         uses.push(...componentUses(name, collection.components, entry.file, entry.segments ?? []))
 
-      decodeEntries(entries, collection.options.schema, collection.options.components ?? {})
+      decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized)
     }
     catch (error) {
       if (!(error instanceof ContentError))
@@ -121,8 +127,22 @@ function feedNeedsSite(collection: Collection<unknown>): Error {
   return new Error(`kay: the collection ${collection.name} has a feed, whose links need the site's URL: set \`site\` in kay.config.ts`)
 }
 
+// Where a collection's feed is served: at its path, or a localized collection's under each locale's prefix, the locale then known; with domains, each host serves its own at the path.
+export function feedPaths(collection: Collection<unknown>, settings: LocaleSettings | undefined): { path: string, locale: string | undefined }[] {
+  const { feed, localized } = collection.options
+
+  if (!feed)
+    return []
+
+  if (localized !== true || !settings || settings.hosts)
+    return [{ path: feed.path, locale: undefined }]
+
+  return settings.locales.map(locale => ({ path: localePath(settings, feed.path, locale), locale }))
+}
+
 // Serves each collection's feed at its path; one stays cached for an hour in production.
-export function serveFeeds(app: Elysia, collections: Collection<unknown>[], origin: string | undefined, dev = false): void {
+// A localized collection's feed lists only the entries written in its locale, linking each at its path there.
+export function serveFeeds(app: Elysia, collections: Collection<unknown>[], origin: string | undefined, dev = false, i18n?: I18n): void {
   for (const collection of collections) {
     const { feed } = collection.options
 
@@ -132,8 +152,37 @@ export function serveFeeds(app: Elysia, collections: Collection<unknown>[], orig
     if (origin === undefined)
       throw feedNeedsSite(collection)
 
-    const type = feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'
+    const headers = { 'content-type': `${feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'}; charset=utf-8`, 'cache-control': dev ? 'no-cache' : 'public, max-age=3600' }
 
-    app.get(feed.path, async () => new Response(feedXml(await collection.all(), feed, origin), { headers: { 'content-type': `${type}; charset=utf-8`, 'cache-control': dev ? 'no-cache' : 'public, max-age=3600' } }))
+    for (const { path, locale } of feedPaths(collection, i18n?.settings)) {
+      app.get(path, async ({ request }) => {
+        if (!i18n || collection.options.localized !== true)
+          return new Response(feedXml(await collection.all(), feed, origin), { headers })
+
+        const { settings } = i18n
+        const written = locale ?? hostLocale(settings, request)
+        const host = settings.hosts?.[written]
+
+        return runInLocale(stateFor(i18n, written, feed.path, request), async () => {
+          const entries = (await collection.all(written)).filter(entry => entry.locale === written)
+          const localized = { ...feed, path, item: (entry: Parameters<typeof feed.item>[0]) => {
+            const item = feed.item(entry)
+
+            return item && { ...item, path: localePath(settings, item.path, written, host) }
+          } }
+
+          return new Response(feedXml(entries, localized, host === undefined ? origin : onHost(origin, host)), { headers })
+        })
+      })
+    }
   }
+}
+
+// The site's origin, its mount point kept, on another host.
+function onHost(origin: string, host: string): string {
+  const url = new URL(origin)
+
+  url.host = host
+
+  return url.href.replace(TRAILING_SLASH, '')
 }

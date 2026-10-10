@@ -334,7 +334,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   serveCards(app, cards, imageRoute)
 
-  serveFeeds(app, await projectCollections(root, options.content), site, options.dev)
+  serveFeeds(app, await projectCollections(root, options.content), site, options.dev, i18n)
 
   if (site !== undefined)
     serveSitemap(app, routes, site, publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })

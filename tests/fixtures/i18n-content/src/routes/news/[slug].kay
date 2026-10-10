@@ -1,0 +1,13 @@
+--- server
+import { news } from '../../content.config'
+
+export const sitemap = news
+
+const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
+const { Content } = entry
+const translations = (entry.translations ?? []).join(' ')
+---
+h1.entry {entry.data.title}
+p.written {entry.locale}
+p.translations {translations}
+Content
