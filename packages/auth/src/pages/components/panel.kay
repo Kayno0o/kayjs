@@ -1,0 +1,11 @@
+---
+import Card from '@kaynooo/kayjs-ui/card.kay'
+
+const { title } = props<{ title: string }>()
+---
+// A sign-in page's frame: one card, its title the page's heading.
+.kayjs-auth.mx-auto.flex.w-full.max-w-md.flex-col.gap-4.px-4.py-8
+  h1.kui-heading-section {title}
+  Card
+    .flex.flex-col.gap-4
+      slot

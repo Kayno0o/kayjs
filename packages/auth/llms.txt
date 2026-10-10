@@ -1,6 +1,6 @@
 # kayjs-auth
 
-> Auth for kay apps, built on kay's `session()`: OAuth sign-in with any provider, passwords, mailed links (email verification, password reset, magic links, email change), TOTP two-factor with recovery codes, bearer tokens for devices and API clients, security mails, a CAPTCHA hook, a breached-password check, and a fail-closed gate for routes. It works in kay pages, actions and guards, and in a plain Elysia app. Its data lives in a store: in memory for tests, in Postgres through pg-orm, or in any object keeping the store contract.
+> Auth for kay apps, built on kay's `session()`: OAuth sign-in with any provider, passwords, mailed links (email verification, password reset, magic links, email change), TOTP two-factor with recovery codes, bearer tokens for devices and API clients, security mails, a CAPTCHA hook, a breached-password check, a fail-closed gate for routes, and prebuilt sign-in and account pages. It works in kay pages, actions and guards, and in a plain Elysia app. Its data lives in a store: in memory for tests, in Postgres through pg-orm, or in any object keeping the store contract.
 
 ## Rules that are easy to get wrong
 
@@ -59,8 +59,36 @@ The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(
 - `store`: see Stores.
 - `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
 - `prefix`: where the OAuth routes live, `/auth` by default.
-- `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default.
+- `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default. `pages`: see Prebuilt pages, which these then default to.
 - `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `sessionMaxAge`, `rememberMaxAge`, `browserSessionMaxAge`, `sessionsPage`, `locate`: see Sessions. `passkeys`: see Passkeys. `audit`: see Events and the audit log. `admin`: see Admin. `organizations`: see Organizations.
+
+## Prebuilt pages
+
+kayjs-auth ships every sign-in and account page as a kay extension, styled with kayjs-ui, in English and French. An app turns them on in two places:
+
+```ts
+// kay.config.ts
+import { authPages } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({ extensions: [authPages()] })
+```
+
+```ts
+// src/auth.ts
+export const auth = createAuth({ /* ... */ pages: true })
+```
+
+- `authPages({ prefix, home })` and `createAuth({ pages: { prefix, home } })` take the same options: `prefix` where the pages live, `/auth` by default, and `home` where a sign-in goes when nothing asked for another page and where a sign-out goes, `/` by default. `pages: true` takes the defaults.
+- The pages: `sign-in` (providers, password, magic link or code, passkey, remember me), `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link`, `confirm-email`, and under `account`: the profile (address, username, verification), `security` (password, two-factor with its QR code and recovery codes, passkeys), `sessions`, `connections` (shown with providers), `tokens` and `data` (download, deletion). Each works without JavaScript but passkeys, and shows only what the config enables.
+- With `pages`, `signInPage`, `twoFactorPage`, `sessionsPage` and every `email.links` default to those pages, and `auth.guard()` without `redirect` sends an anonymous visitor to the sign-in page, `?redirect=` back. Without `pages`, `email.links` names a page for each kind, or `createAuth` throws.
+- An app file at a page's path replaces that page alone: `src/routes/auth/magic-link.kay` is the app's own magic-link page. Its texts live under `auth` in kay's messages: a key in the app's `src/messages/en.ts`, such as `auth: { signIn: { title: 'Welcome back' } }`, replaces that text and keeps the rest.
+- Until kay can serve an extension's messages alone, the pages need `i18n` in kay.config.ts and a messages file per locale, even an empty `defineMessages({})`.
+- `captcha.widget`, `turnstileWidget(siteKey)` or `hcaptchaWidget(siteKey)`, is the widget the pages show where `captchaRequired` asks for one.
+- A provider's button reads its `label`, set on each preset (`GitHub`, `Google`) and overridden by `oauth.<name>.label`.
+- kayjs-ui is a dependency of kayjs-auth; the app keeps `@iconify-json/tabler` and Tailwind, kayjs-ui's peers.
+
+`auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, requireVerified, passkeys, captcha, scopes, prefix, signInPage, pages }`.
 
 ## The signed-in user
 
@@ -198,7 +226,7 @@ email: {
 - `mailer.send(mail)` gets `{ to, kind, locale, subject, text, html, url?, code? }`, filled from the templates keyed by `kind`, and is awaited, its result ignored. An app with its own templating reads `kind`, `locale` and `url`.
 - Mails are written in the user's language: `locale` on the user, a BCP 47 tag kept from the browser's `Accept-Language` on signing up, from `register({ locale })`, or set with `setLocale(tag)`; the browser's when the user has none. `email.locales` lists the languages the site writes, `['en']` by default, the first for anyone else: a tag picks its own, else one of its language (`fr-CA` gets `fr`). kayjs-auth writes English (`defaultTemplates`) and French (`frenchTemplates`); `templates` goes over them in every language, and `translations: { de: {...} }` over both for its own.
 - A mailer of `@kaynooo/kayjs-mail` fits as it is, `mail` being its `mailer()`: `{ send: mail.enqueue }` renders each mail at once and leaves it to its queue, which retries a mail server that is away, `{ send: mail.send }` sends it before the call answers. In development and tests the mails go to its outbox, listed at `/_kay/mail`.
-- `links` names the app's page for each kind; the link is `url` + that path + `?token=`. The page shows a button posting the token to an action, so opening the link spends nothing:
+- `links` names the app's page for each kind, the prebuilt pages' by default with `pages`; the link is `url` + that path + `?token=`. The page shows a button posting the token to an action, so opening the link spends nothing:
 
 ```kay
 --- server
@@ -273,7 +301,7 @@ Changing what protects the account takes a `proof`: `changePassword`, `changeEma
 
 - `changePassword(proof, password)` sets the password, or a first one (`errors.password` as `register`'s), ends the user's other sessions and bearer tokens, and voids the links mailed before.
 - `changeUsername(username)` names the signed-in user, or renames them, normalised and checked as `register` does: `{ ok: true, user }`, `errors: { username }` with `'length'`, `'characters'`, `'mixed-scripts'`, `'taken'` or `'unchanged'`, or `'signed-out'`. Recasing one's own name is allowed. It takes no proof and sends no mail, a name being no credential, but needs a session: a bearer token answers `'signed-out'`. Renames are not limited, a name being public anyway. A page asks a user without one for it, as after an OAuth sign-up whose name was taken.
-- `exportData()` gives the signed-in user everything kayjs-auth keeps about them, for a download of their data: `{ ok: true, data: { exportedAt, user, identities, sessions, passkeys, tokens, recoveryCodesLeft, organizations, audit, app } }`, `user` with `createdAt`, `emailVerifiedAt` and `twoFactorEnabledAt`, no hash, secret or token among it. `onExport(user)` gives `app`, what the app keeps about them. It needs a session: a bearer token answers `'signed-out'`.
+- `exportData()` gives the signed-in user everything kayjs-auth keeps about them, for a download of their data: `{ ok: true, data: { exportedAt, user, identities, sessions, passkeys, tokens, recoveryCodesLeft, organizations, audit, app } }`, `user` with `createdAt`, `emailVerifiedAt` and `twoFactorEnabledAt`, no hash, secret or token among it. `onExport(user)` gives `app`, what the app keeps about them. It needs a session: a bearer token answers `'signed-out'`. `GET <prefix>/export` downloads it as `<site>-data.json`, 401 to anyone signed out.
 - `unlink(provider, proof)` unlinks a provider: `'not-linked'` when it is not, `'last-way-in'` when the user would have no password, no other provider and no verified address to get a magic link at.
 - `deleteAccount(proof)` deletes the user with everything kayjs-auth keeps for them, calls `onDelete(user)` for the app's own records, and signs out. Asking the user to type their name first is the page's job.
 
@@ -359,7 +387,7 @@ createAuth({
 
 - `captcha.verify(token, action)` checks the token the page's widget posted, for `action` one of `'register'`, `'sign-in'`, `'reset'` and `'magic-link'`. `turnstile(secret)` and `hcaptcha(secret)` are presets calling the provider's siteverify; their widgets post the token as `cf-turnstile-response` and `h-captcha-response`, which the action passes on.
 - The token goes in as `register({ ..., captcha })`, `signInWithPassword({ ..., captcha })`, `requestPasswordReset(email, { captcha })` and `requestMagicLink(email, redirect, { captcha })`. A missing or refused token answers `{ ok: false, error: 'captcha' }`, and so does a `verify` that throws. The request still counts against the client's limit.
-- `captcha.on` sets each request to `'always'` (every one, by default), `false`, or a number: asked only once this client made that many of it in the limit's window, so people rarely see it. `auth.captchaRequired(action)` says whether the next one needs it, for the page to show the widget.
+- `captcha.on` sets each request to `'always'` (every one, by default), `false`, or a number: asked only once this client made that many of it in the limit's window, so people rarely see it. `auth.captchaRequired(action)` says whether the next one needs it, for the page to show the widget. `captcha.widget` names that widget for the prebuilt pages and `features()`.
 - `breachedPasswords: true` refuses a new password Have I Been Pwned lists, on `register`, `resetPassword` and `changePassword`, as `errors.password: 'breached'`. Only the first five characters of the password's SHA-1 leave the server, the answer padded with decoys. A function `(password) => boolean` checks against a list of the app's own instead. A check that fails or takes over three seconds lets the password through, logged: an outage never stops anyone registering. `pwnedPassword(password)` is exported for a check of the app's own.
 
 ## Limits

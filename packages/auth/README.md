@@ -1,6 +1,6 @@
 # kayjs-auth
 
-Auth for kay apps, built on kay's sessions: OAuth and OpenID Connect sign-in (Discord, GitHub, Google, Apple, Microsoft, GitLab or any OpenID provider), passwords, mailed links (verification, reset, magic links, email change), TOTP two-factor with recovery codes, passkeys, a list of sessions to end one by one, bearer tokens, security mails, sign-in events with an optional audit log, admin tools (roles, bans, impersonation), organizations with their own roles and email invitations, a CAPTCHA hook and a breached-password check. It works in kay pages, actions and guards, and in a plain Elysia app, with its data in memory, in Postgres through pg-orm, or in a store of your own. It ships no UI: the app's pages call it, styled with kayjs-ui or anything else.
+Auth for kay apps, built on kay's sessions: OAuth and OpenID Connect sign-in (Discord, GitHub, Google, Apple, Microsoft, GitLab or any OpenID provider), passwords, mailed links (verification, reset, magic links, email change), TOTP two-factor with recovery codes, passkeys, a list of sessions to end one by one, bearer tokens, security mails, sign-in events with an optional audit log, admin tools (roles, bans, impersonation), organizations with their own roles and email invitations, a CAPTCHA hook and a breached-password check. It works in kay pages, actions and guards, and in a plain Elysia app, with its data in memory, in Postgres through pg-orm, or in a store of your own. It ships every sign-in and account page, styled with kayjs-ui, in English and French, which an app turns on with one line, then overrides page by page and text by text; or the app writes its own pages calling it.
 
 ## Install
 
@@ -75,6 +75,18 @@ import { auth } from '../../auth'
 
 export default auth.guard({ redirect: '/login' })
 ```
+
+## Prebuilt pages
+
+```ts
+// kay.config.ts
+import { authPages } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({ extensions: [authPages()] })
+```
+
+With `pages: true` in `createAuth`, kayjs-auth sends users to `/auth/sign-in`, `/auth/account` and the rest. A file of the app's at one of those paths replaces that page, and a key under `auth` in its messages replaces that text.
 
 ## Develop
 

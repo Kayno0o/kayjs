@@ -1,0 +1,8 @@
+---
+const { text, tone = 'error' } = props<{ text: string, tone?: 'error' | 'success' }>()
+---
+// An error is announced at once, a confirmation when the reader gets to it.
+if tone === 'error'
+  p.kayjs-auth-error.text-kui-error(role="alert") {text}
+else
+  p.kayjs-auth-success.text-kui-success(role="status") {text}

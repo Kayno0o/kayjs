@@ -1,0 +1,78 @@
+--- server
+import { action } from 'kay'
+import { localize, t } from 'kay/i18n'
+import Message from '../components/message.kay'
+import Panel from '../components/panel.kay'
+import { failure, schemas } from '../forms'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+// The link only shows this button, so a mail scanner opening it spends nothing.
+export const verify = action(schemas.verify, async ({ token, password }, ctx) => {
+  const result = await ctx.locals.auth.verifyEmail(token, password)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+export const code = action(schemas.emailCode, async ({ code }, ctx) => {
+  const result = await ctx.locals.auth.verifyEmailCode(code)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+export const resend = action(schemas.nothing, async (_input, ctx) => {
+  const result = await ctx.locals.auth.sendVerification()
+
+  return result.ok ? 'sent' : ctx.fail(400, { error: result.error })
+})
+
+const auth = ctx.locals.auth
+const token = ctx.url.searchParams.get('token') ?? ctx.failed(verify)?.values.token
+const user = await auth.user()
+const pending = await auth.emailCodePending()
+const refused = ctx.failed(verify)?.data?.error
+const codeError = ctx.failed(code)?.data?.error
+const resendError = ctx.failed(resend)?.data?.error
+const resent = ctx.succeeded(resend) !== undefined
+---
+head
+  title {t('auth.verify.title')}
+Panel(title={t('auth.verify.title')})
+  if token
+    form.flex.flex-col.gap-3(action={verify})
+      input(type="hidden" name="token" value={token})
+      if refused === 'confirm'
+        p {t('auth.verify.confirm')}
+        FormField(label={t('auth.password')} required)
+          input(name="password" type="password" autocomplete="current-password" required)
+      else
+        p {t('auth.verify.intro')}
+        if refused
+          Message(text={failure(refused)})
+      Button(type="submit" variant="accent" label={t('auth.verify.submit')})
+  else if pending?.type === 'verify'
+    form.flex.flex-col.gap-3(action={code})
+      p {t('auth.verify.codeIntro', { email: pending.email })}
+      FormField(label={t('auth.code')} required)
+        input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
+      if codeError
+        Message(text={failure(codeError)})
+      Button(type="submit" variant="accent" label={t('auth.verify.submit')})
+  else if user?.email && !user.emailVerified
+    form.flex.flex-col.gap-3(action={resend})
+      p {t('auth.verify.unverified', { email: user.email })}
+      if resent
+        Message(tone="success" text={t('auth.verify.resent')})
+      if resendError
+        Message(text={failure(resendError)})
+      Button(type="submit" label={t('auth.verify.resend')})
+  else if user?.emailVerified
+    Message(tone="success" text={t('auth.verify.done')})
+  else
+    Message(text={failure('link')})

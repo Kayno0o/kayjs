@@ -1,0 +1,61 @@
+--- server
+import { action } from 'kay'
+import { localize, t } from 'kay/i18n'
+import Message from '../../components/message.kay'
+import Proof from '../../components/proof.kay'
+import { failure, proofOf, schemas } from '../../forms'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+// Linking asks for a recent proof: this one renews it, then starts the provider's flow, which comes back here.
+export const connect = action(schemas.unlink, async (input, ctx) => {
+  const auth = ctx.locals.auth
+  const proved = await auth.reprove(proofOf(input))
+
+  if (!proved.ok)
+    return ctx.fail(400, { error: proved.error, provider: input.provider })
+
+  const features = auth.features()
+  const back = localize(`${features.pages?.prefix ?? features.prefix}/account/connections`)
+
+  return ctx.redirect(`${features.prefix}/${encodeURIComponent(input.provider)}?link=1&redirect=${encodeURIComponent(back)}`)
+})
+
+export const disconnect = action(schemas.unlink, async (input, ctx) => {
+  const result = await ctx.locals.auth.unlink(input.provider, proofOf(input))
+
+  return result.ok ? 'disconnected' : ctx.fail(400, { error: result.error, provider: input.provider })
+})
+
+const auth = ctx.locals.auth
+const user = (await auth.user())!
+const features = auth.features()
+const linked = new Set(await auth.identities())
+const refused = ctx.failed(connect)?.data ?? ctx.failed(disconnect)?.data
+---
+PageSection(title={t('auth.account.connections.title')})
+  .flex.flex-col.gap-2
+    p {t('auth.account.connections.intro')}
+    for provider of features.providers key={provider.name}
+      CardRow(data-provider={provider.name})
+        .flex.flex-col.gap-2
+          span.flex.items-center.gap-2
+            strong {provider.label}
+            if linked.has(provider.name)
+              Badge(label={t('auth.account.connections.connected')} tone="success")
+          if refused?.provider === provider.name
+            Message(text={failure(refused.error)})
+          if linked.has(provider.name)
+            form.flex.flex-wrap.items-end.gap-2(action={disconnect})
+              input(type="hidden" name="provider" value={provider.name})
+              Proof(user={user})
+              Button(type="submit" variant="danger" label={t('auth.account.connections.disconnect')})
+          else
+            form.flex.flex-wrap.items-end.gap-2(action={connect})
+              input(type="hidden" name="provider" value={provider.name})
+              Proof(user={user})
+              Button(type="submit" label={t('auth.account.connections.connect')})
+    else
+      p {t('auth.account.connections.none')}

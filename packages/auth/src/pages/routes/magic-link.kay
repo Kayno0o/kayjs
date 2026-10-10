@@ -1,0 +1,33 @@
+--- server
+import { action } from 'kay'
+import { localize, t } from 'kay/i18n'
+import Message from '../components/message.kay'
+import Panel from '../components/panel.kay'
+import { failure, schemas } from '../forms'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+
+// The link only shows this button, so a mail scanner opening it spends nothing.
+export const spend = action(schemas.token, async ({ token }, ctx) => {
+  const result = await ctx.locals.auth.signInWithMagicLink(token)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+const token = ctx.url.searchParams.get('token') ?? ctx.failed(spend)?.values.token
+const error = ctx.failed(spend)?.data?.error
+---
+head
+  title {t('auth.magic.title')}
+Panel(title={t('auth.magic.title')})
+  if token
+    form.flex.flex-col.gap-3(action={spend})
+      input(type="hidden" name="token" value={token})
+      p {t('auth.magic.intro')}
+      if error
+        Message(text={failure(error)})
+      Button(type="submit" variant="accent" label={t('auth.magic.submit')})
+  else
+    Message(text={failure('link')})

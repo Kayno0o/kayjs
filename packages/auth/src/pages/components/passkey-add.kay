@@ -1,0 +1,55 @@
+---
+import type { User } from '../../core'
+import { ActionError, onMount, signal } from 'kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import { addPasskey, passkeyOptions } from '../routes/account/security.kay'
+import Proof from './proof.kay'
+
+const { user, label, nameLabel, unsupported, failed, errors } = props<{ user: User, label: string, nameLabel: string, unsupported: string, failed: string, errors: Record<string, string> }>()
+
+const supported = signal<boolean>()
+const error = signal('')
+const name = signal('')
+
+onMount(() => supported.set(typeof PublicKeyCredential !== 'undefined' && 'parseCreationOptionsFromJSON' in PublicKeyCredential))
+
+async function add(event: SubmitEvent) {
+  event.preventDefault()
+  error.set('')
+
+  try {
+    const proof = new FormData(event.currentTarget as HTMLFormElement)
+
+    proof.delete('name')
+
+    const options = await passkeyOptions(proof, { refresh: false })
+    const credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(options) })
+
+    if (credential instanceof PublicKeyCredential)
+      await addPasskey({ response: credential.toJSON(), name: name() || undefined })
+  }
+  catch (caught) {
+    if (caught instanceof ActionError) {
+      const code = (caught.data as { error?: string } | undefined)?.error
+
+      error.set(code === undefined ? failed : errors[code] ?? failed)
+    }
+    // Dismissing the browser's prompt is no failure.
+    else if (!(caught instanceof DOMException && caught.name === 'NotAllowedError')) {
+      error.set(failed)
+    }
+  }
+}
+---
+// A passkey needs script, so the form shows once the browser proves it can make one.
+if supported() === false
+  p.text-kui-muted {unsupported}
+else if supported()
+  form.flex.flex-col.gap-3(onSubmit={add} novalidate)
+    FormField(label={nameLabel})
+      input(name="name" bind:value={name})
+    Proof(user={user})
+    if error()
+      p.kayjs-auth-error.text-kui-error(role="alert") {error()}
+    Button(type="submit" label={label} busy={passkeyOptions.pending() || addPasskey.pending()})

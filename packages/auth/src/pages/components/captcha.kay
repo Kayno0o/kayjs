@@ -1,0 +1,8 @@
+---
+import type { CaptchaWidget } from '../../captcha'
+
+const { widget } = props<{ widget: CaptchaWidget }>()
+---
+// The provider's script fills the element and adds the field its token posts as.
+div(class={widget.class} data-sitekey={widget.siteKey})
+script(src={widget.script} async defer)

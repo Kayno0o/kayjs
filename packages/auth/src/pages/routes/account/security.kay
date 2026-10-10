@@ -1,0 +1,164 @@
+--- server
+import { action } from 'kay'
+import { formatDate, t } from 'kay/i18n'
+import { PASSWORD_MIN_LENGTH } from '../../../rules'
+import Message from '../../components/message.kay'
+import PasskeyAdd from '../../components/passkey-add.kay'
+import Proof from '../../components/proof.kay'
+import RecoveryCodes from '../../components/recovery-codes.kay'
+import { failure, issue, proofOf, schemas } from '../../forms'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
+
+export const changePassword = action(schemas.changePassword, async (input, ctx) => {
+  const result = await ctx.locals.auth.changePassword(proofOf(input), input.newPassword)
+
+  if (!result.ok)
+    return ctx.fail(400, 'errors' in result ? { password: result.errors.password } : { error: result.error })
+
+  return 'saved'
+})
+
+// Only the URI comes back: the page draws its QR code and reads the key off it.
+export const setUp = action(schemas.proof, async (input, ctx) => {
+  const result = await ctx.locals.auth.setUpTwoFactor(proofOf(input))
+
+  return result.ok ? result.setup.uri : ctx.fail(400, { error: result.error })
+})
+
+// Posts the URI back with the code, so a wrong code shows the same QR code again.
+export const enable = action(schemas.enableTwoFactor, async ({ code }, ctx) => {
+  const result = await ctx.locals.auth.enableTwoFactor(code)
+
+  return result.ok ? result.recoveryCodes : ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
+})
+
+export const regenerate = action(schemas.proof, async (input, ctx) => {
+  const result = await ctx.locals.auth.regenerateRecoveryCodes(proofOf(input))
+
+  return result.ok ? result.recoveryCodes : ctx.fail(400, { error: result.error })
+})
+
+export const disable = action(schemas.proof, async (input, ctx) => {
+  const result = await ctx.locals.auth.disableTwoFactor(proofOf(input))
+
+  return result.ok ? 'disabled' : ctx.fail(400, { error: result.error })
+})
+
+// A proof given with the request renews the recent one a new passkey needs.
+export const passkeyOptions = action(schemas.proof, async (input, ctx) => {
+  const auth = ctx.locals.auth
+
+  if (input.password !== undefined || input.code !== undefined) {
+    const proved = await auth.reprove(proofOf(input))
+
+    if (!proved.ok)
+      return ctx.fail(400, { error: proved.error })
+  }
+
+  const result = await auth.passkeyRegistrationOptions()
+
+  return result.ok ? result.options : ctx.fail(400, { error: result.error })
+})
+
+export const addPasskey = action(schemas.registerPasskey, async (input, ctx) => {
+  const result = await ctx.locals.auth.registerPasskey(input.response as never, input.name)
+
+  return result.ok ? result.passkey.id : ctx.fail(400, { error: result.error })
+})
+
+export const renamePasskey = action(schemas.renamePasskey, async ({ id, name }, ctx) => {
+  return await ctx.locals.auth.renamePasskey(id, name) ? name : ctx.fail(404, { error: 'not-found' })
+})
+
+export const removePasskey = action(schemas.removePasskey, async (input, ctx) => {
+  const result = await ctx.locals.auth.removePasskey(input.id, proofOf(input))
+
+  return result.ok ? 'removed' : ctx.fail(400, { error: result.error, id: input.id })
+})
+
+const auth = ctx.locals.auth
+const user = (await auth.user())!
+const features = auth.features()
+const passwordSaved = ctx.succeeded(changePassword) !== undefined
+const passwordRefused = ctx.failed(changePassword)?.data
+const setupUri = ctx.succeeded(setUp)?.data ?? ctx.failed(enable)?.values.uri
+const setupKey = setupUri && new URL(setupUri).searchParams.get('secret')
+const twoFactorError = ctx.failed(setUp)?.data?.error ?? ctx.failed(enable)?.data?.error ?? ctx.failed(regenerate)?.data?.error ?? ctx.failed(disable)?.data?.error
+const recoveryCodes = ctx.succeeded(enable)?.data ?? ctx.succeeded(regenerate)?.data
+const codesLeft = user.twoFactor ? await auth.recoveryCodesLeft() : 0
+const passkeys = features.passkeys ? await auth.passkeys() : []
+const removeRefused = ctx.failed(removePasskey)?.data
+const passkeyErrors = Object.fromEntries(['proof', 'stale', 'limited', 'impersonating', 'expired', 'invalid', 'signed-out'].map(code => [code, failure(code)]))
+---
+PageSection(title={t('auth.account.password.title')})
+  form.flex.flex-col.gap-3(action={changePassword})
+    if !user.hasPassword
+      p {t('auth.account.password.none')}
+    Proof(user={user})
+    FormField(label={t('auth.newPassword')} hint={t('auth.passwordHint', { min: PASSWORD_MIN_LENGTH })} issue={passwordRefused && 'password' in passwordRefused ? issue('password', passwordRefused.password) : undefined} required)
+      input(name="newPassword" type="password" autocomplete="new-password" minlength={PASSWORD_MIN_LENGTH} required)
+    if passwordSaved
+      Message(tone="success" text={t('auth.account.password.changed')})
+    if passwordRefused && 'error' in passwordRefused
+      Message(text={failure(passwordRefused.error)})
+    Button(type="submit" label={user.hasPassword ? t('auth.account.password.change') : t('auth.account.password.set')})
+PageSection(title={t('auth.account.twoFactor.title')})
+  @actions
+    Badge(label={user.twoFactor ? t('auth.account.twoFactor.on') : t('auth.account.twoFactor.off')} tone={user.twoFactor ? 'success' : 'neutral'})
+  .flex.flex-col.gap-3
+    if recoveryCodes
+      RecoveryCodes(codes={recoveryCodes})
+    if twoFactorError
+      Message(text={failure(twoFactorError)})
+    if user.twoFactor
+      p#kayjs-auth-codes-left {t('auth.account.twoFactor.codesLeft', { count: codesLeft })}
+      form.flex.flex-col.gap-3(action={regenerate})
+        Proof(user={user} secondFactor)
+        Button(type="submit" label={t('auth.account.twoFactor.regenerate')})
+      form.flex.flex-col.gap-3(action={disable})
+        Proof(user={user} secondFactor)
+        Button(type="submit" variant="danger" label={t('auth.account.twoFactor.disable')})
+    else if setupUri
+      p {t('auth.account.twoFactor.scan')}
+      QrCode(value={setupUri} label={t('auth.account.twoFactor.qr')} size={192})
+      if setupKey
+        p
+          | {t('auth.account.twoFactor.key')}: #[code#kayjs-auth-key {setupKey}]
+      form.flex.flex-col.gap-3(action={enable})
+        input(type="hidden" name="uri" value={setupUri})
+        FormField(label={t('auth.code')} required)
+          input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
+        Button(type="submit" variant="accent" label={t('auth.account.twoFactor.enable')})
+    else
+      form.flex.flex-col.gap-3(action={setUp})
+        p {t('auth.account.twoFactor.intro')}
+        Proof(user={user})
+        Button(type="submit" variant="accent" label={t('auth.account.twoFactor.setUp')})
+if features.passkeys
+  PageSection(title={t('auth.account.passkeys.title')})
+    .flex.flex-col.gap-3
+      p {t('auth.account.passkeys.intro')}
+      for passkey of passkeys key={passkey.id}
+        CardRow
+          form.flex.flex-wrap.items-end.gap-2(action={renamePasskey})
+            input(type="hidden" name="id" value={passkey.id})
+            FormField(label={t('auth.account.passkeys.name')})
+              input(name="name" value={passkey.name} required)
+            Button(type="submit" label={t('auth.account.passkeys.rename')})
+          p.text-kui-muted
+            | {t('auth.account.passkeys.created', { date: formatDate(passkey.createdAt, { dateStyle: 'medium' }) })}
+          form.flex.flex-wrap.items-end.gap-2(action={removePasskey})
+            input(type="hidden" name="id" value={passkey.id})
+            Proof(user={user})
+            if removeRefused?.id === passkey.id
+              Message(text={failure(removeRefused.error)})
+            Button(type="submit" variant="danger" label={t('auth.account.passkeys.remove')})
+      else
+        EmptyState(title={t('auth.account.passkeys.none')})
+      PasskeyAdd(user={user} label={t('auth.account.passkeys.add')} nameLabel={t('auth.account.passkeys.name')} unsupported={t('auth.account.passkeys.unsupported')} failed={t('auth.account.passkeys.failed')} errors={passkeyErrors})

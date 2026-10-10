@@ -1,0 +1,67 @@
+--- server
+import { action } from 'kay'
+import { localize, t } from 'kay/i18n'
+import { safeRedirect } from '../../oauth/redirect'
+import { PASSWORD_MIN_LENGTH } from '../../rules'
+import Captcha from '../components/captcha.kay'
+import Message from '../components/message.kay'
+import Panel from '../components/panel.kay'
+import Separator from '../components/separator.kay'
+import { captchaOf, failure, issue, schemas } from '../forms'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+export const register = action(schemas.register, async (input, ctx) => {
+  const result = await ctx.locals.auth.register({ email: input.email, password: input.password, username: input.username, remember: input.remember === true, captcha: captchaOf(input), locale: ctx.locale })
+
+  if (!result.ok)
+    return ctx.fail(400, 'errors' in result ? { fields: result.errors } : { error: result.error })
+
+  if (!result.signedIn)
+    return 'verify'
+
+  return ctx.redirect(safeRedirect(input.redirect, localize(ctx.locals.auth.features().pages?.home ?? '/')))
+})
+
+const auth = ctx.locals.auth
+const features = auth.features()
+const prefix = features.pages?.prefix ?? features.prefix
+const redirect = safeRedirect(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
+const user = await auth.user()
+
+if (user && !user.guest)
+  ctx.redirect(redirect)
+
+const captcha = await auth.captchaRequired('register')
+const refused = ctx.failed(register)?.data
+const fields = refused && 'fields' in refused ? refused.fields : {}
+const error = refused && 'error' in refused ? refused.error : undefined
+const verify = ctx.succeeded(register) !== undefined
+---
+head
+  title {t('auth.register.title')}
+Panel(title={t('auth.register.title')})
+  if verify
+    Message(tone="success" text={t('auth.register.checkMail')})
+  else
+    if features.providers.length > 0
+      .flex.flex-col.gap-2
+        for provider of features.providers key={provider.name}
+          Button(href={`${features.prefix}/${provider.name}?redirect=${encodeURIComponent(redirect)}`} label={t('auth.signIn.provider', { provider: provider.label })} data-no-prefetch)
+      Separator
+    form.flex.flex-col.gap-3(action={register})
+      input(type="hidden" name="redirect" value={redirect})
+      FormField(label={t('auth.email')} issue={fields.email && issue('email', fields.email)} required)
+        input(name="email" type="email" autocomplete="email" required)
+      FormField(label={t('auth.password')} hint={t('auth.passwordHint', { min: PASSWORD_MIN_LENGTH })} issue={fields.password && issue('password', fields.password)} required)
+        input(name="password" type="password" autocomplete="new-password" minlength={PASSWORD_MIN_LENGTH} required)
+      label.flex.items-center.gap-2
+        input(name="remember" type="checkbox")
+        span {t('auth.remember')}
+      if features.captcha && captcha
+        Captcha(widget={features.captcha})
+      if error
+        Message(text={failure(error)})
+      Button(type="submit" variant="accent" label={t('auth.register.submit')})
+  p.text-center
+    | {t('auth.register.haveAccount')} #[a(href={localize(`${prefix}/sign-in?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.register.signIn')}]

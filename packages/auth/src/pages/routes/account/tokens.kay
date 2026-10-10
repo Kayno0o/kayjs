@@ -1,0 +1,80 @@
+--- server
+import { action } from 'kay'
+import { formatDate, t } from 'kay/i18n'
+import Message from '../../components/message.kay'
+import Proof from '../../components/proof.kay'
+import { failure, proofOf, schemas } from '../../forms'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+const DAY = 24 * 60 * 60
+const EXPIRIES = [30, 90, 365]
+
+// The plain token comes back once, for the page to show it this one time.
+export const create = action(schemas.createToken, async (input, ctx) => {
+  const result = await ctx.locals.auth.createToken(proofOf(input), input.label, { scopes: input.scopes?.length ? input.scopes : undefined, expiresIn: input.days ? input.days * DAY : undefined })
+
+  return result.ok ? result.token : ctx.fail(400, { error: result.error })
+})
+
+export const revoke = action(schemas.id, async ({ id }, ctx) => {
+  return await ctx.locals.auth.revokeToken(id) ? 'revoked' : ctx.fail(404, { error: 'not-found' })
+})
+
+const auth = ctx.locals.auth
+const user = (await auth.user())!
+const features = auth.features()
+const tokens = await auth.tokens()
+const created = ctx.succeeded(create)?.data
+const refused = ctx.failed(create)?.data?.error
+const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
+---
+PageSection(title={t('auth.account.tokens.title')})
+  .flex.flex-col.gap-2
+    p {t('auth.account.tokens.intro')}
+    if created
+      Message(tone="success" text={t('auth.account.tokens.created')})
+      code#kayjs-auth-token.break-all {created}
+      CopyButton(text={created} label={t('auth.account.tokens.copy')})
+    for token of tokens key={token.id}
+      CardRow(data-token={token.id})
+        @right
+          form(action={revoke})
+            input(type="hidden" name="id" value={token.id})
+            Button(type="submit" variant="danger" label={t('auth.account.tokens.revoke')})
+        .flex.flex-col
+          span.flex.flex-wrap.items-center.gap-2
+            strong {token.label}
+            if token.expired
+              Badge(label={t('auth.account.tokens.expired')} tone="warning")
+          span.text-kui-muted {(token.scopes ?? [t('auth.account.tokens.allScopes')]).join(', ')}
+          span.text-kui-muted
+            | {token.lastUsedAt ? t('auth.account.tokens.lastUsed', { date: date(token.lastUsedAt) }) : t('auth.account.tokens.neverUsed')}
+            if token.expiresAt && !token.expired
+              | · {t('auth.account.tokens.expires', { date: date(token.expiresAt) })}
+    else
+      EmptyState(title={t('auth.account.tokens.none')})
+PageSection(title={t('auth.account.tokens.create')})
+  form.flex.flex-col.gap-3(action={create})
+    FormField(label={t('auth.account.tokens.label')} required)
+      input(name="label" maxlength="100" required)
+    if features.scopes.length > 0
+      FormField(label={t('auth.account.tokens.scopes')} group)
+        for scope of features.scopes key={scope}
+          label.flex.items-center.gap-2
+            input(type="checkbox" name="scopes" value={scope})
+            code {scope}
+    FormField(label={t('auth.account.tokens.expiresIn')})
+      select(name="days")
+        option(value="0") {t('auth.account.tokens.never')}
+        for days of EXPIRIES key={days}
+          option(value={String(days)} selected={days === 90}) {t('auth.account.tokens.days', { count: days })}
+    Proof(user={user})
+    if refused
+      Message(text={failure(refused)})
+    Button(type="submit" variant="accent" label={t('auth.account.tokens.create')})

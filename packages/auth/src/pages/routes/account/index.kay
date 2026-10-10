@@ -1,0 +1,82 @@
+--- server
+import { action } from 'kay'
+import { t } from 'kay/i18n'
+import Message from '../../components/message.kay'
+import Proof from '../../components/proof.kay'
+import { failure, issue, proofOf, schemas } from '../../forms'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+export const resend = action(schemas.nothing, async (_input, ctx) => {
+  const result = await ctx.locals.auth.sendVerification()
+
+  return result.ok ? 'sent' : ctx.fail(400, { error: result.error })
+})
+
+export const changeEmail = action(schemas.changeEmail, async (input, ctx) => {
+  const result = await ctx.locals.auth.changeEmail(proofOf(input), input.email)
+
+  if (!result.ok)
+    return ctx.fail(400, 'errors' in result ? { email: result.errors.email } : { error: result.error })
+
+  return input.email
+})
+
+export const changeUsername = action(schemas.changeUsername, async ({ username }, ctx) => {
+  const result = await ctx.locals.auth.changeUsername(username)
+
+  if (!result.ok)
+    return ctx.fail(400, 'errors' in result ? { username: result.errors.username } : { error: result.error })
+
+  return 'saved'
+})
+
+const auth = ctx.locals.auth
+const user = (await auth.user())!
+const features = auth.features()
+const resent = ctx.succeeded(resend) !== undefined
+const resendError = ctx.failed(resend)?.data?.error
+const emailSent = ctx.succeeded(changeEmail)?.data
+const emailRefused = ctx.failed(changeEmail)?.data
+const usernameSaved = ctx.succeeded(changeUsername) !== undefined
+const usernameRefused = ctx.failed(changeUsername)?.data
+---
+PageSection(title={t('auth.account.profile.title')})
+  .flex.flex-col.gap-3
+    .flex.flex-wrap.items-center.gap-2
+      if user.email
+        span#kayjs-auth-email {user.email}
+        if user.emailVerified
+          Badge(label={t('auth.account.profile.verified')} tone="success")
+        else
+          Badge(label={t('auth.account.profile.unverified')} tone="warning")
+      else
+        span {t('auth.account.profile.noEmail')}
+    if user.email && !user.emailVerified && features.email
+      form(action={resend})
+        if resent
+          Message(tone="success" text={t('auth.account.profile.resent')})
+        if resendError
+          Message(text={failure(resendError)})
+        Button(type="submit" label={t('auth.account.profile.resend')})
+    form.flex.flex-col.gap-3(action={changeUsername})
+      FormField(label={t('auth.account.profile.username')} issue={usernameRefused && 'username' in usernameRefused ? issue('username', usernameRefused.username) : undefined})
+        input(name="username" value={user.username ?? ''} autocomplete="username" required)
+      if usernameSaved
+        Message(tone="success" text={t('auth.account.profile.usernameSaved')})
+      if usernameRefused && 'error' in usernameRefused
+        Message(text={failure(usernameRefused.error)})
+      Button(type="submit" label={t('auth.account.profile.saveUsername')})
+if features.email
+  PageSection(title={t('auth.account.profile.changeEmail')})
+    form.flex.flex-col.gap-3(action={changeEmail})
+      FormField(label={t('auth.account.profile.newEmail')} issue={emailRefused && 'email' in emailRefused ? issue('email', emailRefused.email) : undefined} required)
+        input(name="email" type="email" autocomplete="email" required)
+      Proof(user={user})
+      if emailSent
+        Message(tone="success" text={t('auth.account.profile.changeSent', { email: emailSent })})
+      if emailRefused && 'error' in emailRefused
+        Message(text={failure(emailRefused.error)})
+      Button(type="submit" label={t('auth.account.profile.sendChange')})
