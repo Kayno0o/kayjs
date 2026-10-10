@@ -1,6 +1,8 @@
 import type { SentMail } from './outbox'
-import type { Address, Attachment } from './types'
+import type { Address, Attachment, Mail, Message } from './types'
 import { createHash } from 'node:crypto'
+import { join } from 'node:path'
+import process from 'node:process'
 import { Elysia } from 'elysia'
 import MailComposer from 'nodemailer/lib/mail-composer'
 import { escapeHtml as escape } from './escape'
@@ -12,11 +14,22 @@ export const PREVIEW_PATH = '/_kay/mail'
 // The mail's own markup runs nothing and loads only images and fonts, so a link or a script in it never acts as the development site.
 const MAIL_POLICY = 'sandbox allow-popups allow-popups-to-escape-sandbox; default-src \'none\'; img-src * data: cid:; style-src \'unsafe-inline\' *; font-src * data:'
 
+export const SAMPLES_PATH = `${PREVIEW_PATH}/samples`
+// Where an app keeps its mails, from its root, which `kay dev` runs the server in.
+const MAILS_DIR = 'src/mails'
+const KAY_FILE = new Bun.Glob('**/*.kay')
+const KAY_EXTENSION = /\.kay$/
+const SAMPLE_ADDRESS = 'sample@localhost'
+
 // Reloads the list as each mail arrives.
 const LIVE = `new EventSource('${PREVIEW_PATH}/events').onmessage=()=>location.reload()`
+// Reloads a sample once `kay dev` restarts the server for a changed file: its stream names the server it comes from first.
+const RESTARTED = `let b;new EventSource('/_kay/dev/events').addEventListener('boot',e=>{const i=e.data.split(' ')[0];if(b&&i!==b)location.reload();b=i})`
+
+const hashOf = (script: string): string => `'sha256-${createHash('sha256').update(script).digest('base64')}'`
 
 // The pages' own policy, which a site's narrower one, such as a `frame-src` naming only a map provider, would otherwise replace and leave the mail's frame blank.
-const PAGE_POLICY = `default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${createHash('sha256').update(LIVE).digest('base64')}'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'self'`
+const PAGE_POLICY = `default-src 'none'; style-src 'unsafe-inline'; script-src ${hashOf(LIVE)} ${hashOf(RESTARTED)}; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'self'`
 
 // Gmail cuts a mail whose html passes this, behind a "View entire message" link.
 const GMAIL_CLIP_BYTES = 102 * 1024
@@ -62,21 +75,33 @@ function listPage(clearing: boolean): Response {
   const live = `<script>${LIVE}</script>`
 
   if (mails.length === 0)
-    return page('Outbox', `<h1>Outbox</h1><p class="empty">No mail sent since the server started. Mails show here as they are sent.</p>`, 200, live)
+    return page('Outbox', `<h1>Outbox</h1><div class="bar"><a href="${SAMPLES_PATH}">Mail samples</a></div><p class="empty">No mail sent since the server started. Mails show here as they are sent.</p>`, 200, live)
 
   const count = `${mails.length} mail${mails.length === 1 ? '' : 's'}`
   const bar = clearing
     ? `<form class="confirm" method="post" action="${PREVIEW_PATH}/clear"><p>Clear the ${count} in the outbox? Their pages go with them.</p><div class="bar"><button type="submit">Clear ${count}</button><a href="${PREVIEW_PATH}">Cancel</a></div></form>`
-    : `<div class="bar"><span>${count}, newest first</span><a href="${PREVIEW_PATH}?clear">Clear the outbox</a></div>`
+    : `<div class="bar"><span>${count}, newest first</span><a href="${PREVIEW_PATH}?clear">Clear the outbox</a><a href="${SAMPLES_PATH}">Mail samples</a></div>`
   const rows = mails.map(mail => `<tr><td>${escape(mail.sentAt.toLocaleTimeString('en-GB'))}</td><td>${shown(mail.to)}</td><td><a href="${PREVIEW_PATH}/${mail.id}">${escape(mail.subject)}</a></td></tr>`)
 
   return page('Outbox', `<h1>Outbox</h1>${bar}<table><thead><tr><th>Sent</th><th>To</th><th>Subject</th></tr></thead><tbody>${rows.join('')}</tbody></table>`, 200, live)
 }
 
-function mailPage(mail: SentMail, phone: boolean): Response {
+function sizeOf(mail: Mail): string {
   const htmlBytes = mail.html === undefined ? 0 : Buffer.byteLength(mail.html)
   const clipped = htmlBytes > GMAIL_CLIP_BYTES ? ` <span class="warning">Gmail clips it: its html passes ${kilobytes(GMAIL_CLIP_BYTES)}</span>` : ''
-  const size = `${kilobytes(htmlBytes + Buffer.byteLength(mail.text))}, html ${kilobytes(htmlBytes)}${clipped}`
+
+  return `${kilobytes(htmlBytes + Buffer.byteLength(mail.text))}, html ${kilobytes(htmlBytes)}${clipped}`
+}
+
+// The mail's html in a frame at desktop or phone width, as `view` links to each, then its text.
+function rendered(mail: Mail, view: (phone: boolean) => string, frame: string, phone: boolean): string {
+  const views = `<a href="${view(false)}"${phone ? '' : ' aria-current="page"'}>Desktop</a><a href="${view(true)}"${phone ? ' aria-current="page"' : ''}>Phone</a>`
+  const html = mail.html === undefined ? '' : `<h2>Html</h2><div class="bar">${views}</div><iframe${phone ? ' class="phone"' : ''} title="The mail's html" src="${frame}"></iframe>`
+
+  return `${html}<h2>Text</h2><pre>${escape(mail.text)}</pre>`
+}
+
+function mailPage(mail: SentMail, phone: boolean): Response {
   const headers: [string, string][] = [
     ['From', shown(mail.from)],
     ['To', shown(mail.to)],
@@ -85,15 +110,58 @@ function mailPage(mail: SentMail, phone: boolean): Response {
     ...mail.replyTo === undefined ? [] : [['Reply-To', shown(mail.replyTo)] as [string, string]],
     ['Subject', escape(mail.subject)],
     ['Sent', escape(mail.sentAt.toISOString())],
-    ['Size', size],
+    ['Size', sizeOf(mail)],
     ...Object.entries(mail.headers).map(([name, value]) => [escape(name), escape(value)] as [string, string]),
     ...mail.attachments.map(attachment => ['Attachment', escape(`${attachment.filename} (${attachment.contentType ?? 'unknown type'}, ${typeof attachment.content === 'string' ? attachment.content.length : attachment.content.byteLength} bytes)`)] as [string, string]),
   ]
   const self = `${PREVIEW_PATH}/${mail.id}`
-  const views = `<a href="${self}"${phone ? '' : ' aria-current="page"'}>Desktop</a><a href="${self}?view=phone"${phone ? ' aria-current="page"' : ''}>Phone</a>`
-  const html = mail.html === undefined ? '' : `<h2>Html</h2><div class="bar">${views}</div><iframe${phone ? ' class="phone"' : ''} title="The mail's html" src="${self}/html"></iframe>`
 
-  return page(mail.subject, `<div class="bar"><a href="${PREVIEW_PATH}">Outbox</a><a href="${self}/eml">Download .eml</a></div><h1>${escape(mail.subject)}</h1><table><tbody>${headers.map(([name, value]) => `<tr><th>${name}</th><td>${value}</td></tr>`).join('')}</tbody></table>${html}<h2>Text</h2><pre>${escape(mail.text)}</pre>`)
+  return page(mail.subject, `<div class="bar"><a href="${PREVIEW_PATH}">Outbox</a><a href="${self}/eml">Download .eml</a></div><h1>${escape(mail.subject)}</h1><table><tbody>${headers.map(([name, value]) => `<tr><th>${name}</th><td>${value}</td></tr>`).join('')}</tbody></table>${rendered(mail, phone => phone ? `${self}?view=phone` : self, `${self}/html`, phone)}`)
+}
+
+// The app's mails, as paths from its mails folder.
+async function mailFiles(): Promise<string[]> {
+  return (await Array.fromAsync(KAY_FILE.scan({ cwd: join(process.cwd(), MAILS_DIR), onlyFiles: true }))).toSorted()
+}
+
+const previewOf = (file: string): string => file.replace(KAY_EXTENSION, '.preview.ts')
+
+// A mail rendered as the mailer renders it, with the props its `<name>.preview.ts` default-exports, or none, and whether it had them.
+async function sample(file: string, render: (message: Message) => Promise<Mail>): Promise<{ mail: Mail, sampled: boolean }> {
+  const props = join(process.cwd(), MAILS_DIR, previewOf(file))
+  const view = (await import(join(process.cwd(), MAILS_DIR, file))).default
+  const sampled = await Bun.file(props).exists()
+  const mail = await render({ to: SAMPLE_ADDRESS, subject: file, view, props: sampled ? (await import(props)).default : undefined })
+
+  return { mail, sampled }
+}
+
+function samplesPage(files: string[]): Response {
+  const live = `<script>${RESTARTED}</script>`
+  const back = `<div class="bar"><a href="${PREVIEW_PATH}">Outbox</a></div>`
+
+  if (files.length === 0)
+    return page('Mail samples', `${back}<h1>Mail samples</h1><p class="empty">No .kay mail under ${MAILS_DIR}.</p>`, 200, live)
+
+  const rows = files.map(file => `<li><a href="${SAMPLES_PATH}?mail=${encodeURIComponent(file)}">${escape(file)}</a></li>`)
+
+  return page('Mail samples', `${back}<h1>Mail samples</h1><p>Each mail under ${MAILS_DIR}, rendered with the props its <code>&lt;name&gt;.preview.ts</code> default-exports.</p><ul>${rows.join('')}</ul>`, 200, live)
+}
+
+async function samplePage(file: string, phone: boolean, render: (message: Message) => Promise<Mail>): Promise<Response> {
+  const live = `<script>${RESTARTED}</script>`
+  const self = `${SAMPLES_PATH}?mail=${encodeURIComponent(file)}`
+  const back = `<div class="bar"><a href="${SAMPLES_PATH}">Mail samples</a></div>`
+
+  try {
+    const { mail, sampled } = await sample(file, render)
+    const props = sampled ? escape(previewOf(file)) : `none, as there is no ${escape(previewOf(file))}`
+
+    return page(file, `${back}<h1>${escape(file)}</h1><table><tbody><tr><th>Props</th><td>${props}</td></tr><tr><th>Size</th><td>${sizeOf(mail)}</td></tr></tbody></table>${rendered(mail, phone => phone ? `${self}&amp;view=phone` : self, `${SAMPLES_PATH}/html?mail=${encodeURIComponent(file)}`, phone)}`, 200, live)
+  }
+  catch (error) {
+    return page(file, `${back}<h1>${escape(file)}</h1><p class="warning">It did not render: ${escape(error instanceof Error ? error.message : String(error))}</p><p>A mail taking props renders with those ${escape(previewOf(file))} default-exports beside it.</p>`, 500, live)
+  }
 }
 
 // An attachment's bytes as base64, which JSON can carry.
@@ -136,37 +204,62 @@ async function eml(mail: SentMail): Promise<Response> {
 
 const missing = (): Response => page('Not in the outbox', `<p><a href="${PREVIEW_PATH}">Outbox</a></p><p class="empty">This mail is no longer in the outbox: it keeps the last 500, and empties when the server restarts.</p>`, 404)
 
-// The development server's view of the outbox: every mail sent since it started, newest first, each with its headers, html and text.
-export const preview = new Elysia({ name: 'kayjs-mail-preview' })
-  .get(PREVIEW_PATH, ({ query }) => listPage('clear' in query))
-  .get(`${PREVIEW_PATH}/events`, events)
+const notSample = (): Response => page('No such mail', `<p><a href="${SAMPLES_PATH}">Mail samples</a></p><p class="empty">No .kay mail by this name under ${MAILS_DIR}.</p>`, 404)
+
+// What the mail frame shows: markup that runs nothing and acts as no page of the site.
+function mailHtml(html: string): Response {
+  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': MAIL_POLICY } })
+}
+
+// The development server's view of the outbox, every mail sent since it started, newest first, each with its headers, html and text, and of the app's mails rendered with sample props, through `render`.
+export function preview(render: (message: Message) => Promise<Mail>) {
+  return new Elysia({ name: 'kayjs-mail-preview' })
+    .get(PREVIEW_PATH, ({ query }) => listPage('clear' in query))
+    .get(SAMPLES_PATH, async ({ query }) => {
+      const files = await mailFiles()
+
+      if (query.mail === undefined)
+        return samplesPage(files)
+
+      return files.includes(query.mail) ? samplePage(query.mail, query.view === 'phone', render) : notSample()
+    })
+    .get(`${SAMPLES_PATH}/html`, async ({ query }) => {
+      if (query.mail === undefined || !(await mailFiles()).includes(query.mail))
+        return notSample()
+
+      const { html } = (await sample(query.mail, render)).mail
+
+      return html === undefined ? notSample() : mailHtml(html)
+    })
+    .get(`${PREVIEW_PATH}/events`, events)
   // Only from the outbox page itself, so another site the developer visits cannot empty it.
-  .post(`${PREVIEW_PATH}/clear`, ({ request }) => {
-    const site = request.headers.get('sec-fetch-site')
+    .post(`${PREVIEW_PATH}/clear`, ({ request }) => {
+      const site = request.headers.get('sec-fetch-site')
 
-    if (site !== null && site !== 'same-origin')
-      return new Response('Refused: the outbox is cleared from its own page', { status: 403 })
+      if (site !== null && site !== 'same-origin')
+        return new Response('Refused: the outbox is cleared from its own page', { status: 403 })
 
-    outbox.clear()
+      outbox.clear()
 
-    return Response.redirect(PREVIEW_PATH, 303)
-  })
-  .get(`${PREVIEW_PATH}.json`, ({ query }) => jsonList(query.to))
-  .get(`${PREVIEW_PATH}/:id`, ({ params, query }) => {
-    const mail = outbox.find(params.id)
+      return Response.redirect(PREVIEW_PATH, 303)
+    })
+    .get(`${PREVIEW_PATH}.json`, ({ query }) => jsonList(query.to))
+    .get(`${PREVIEW_PATH}/:id`, ({ params, query }) => {
+      const mail = outbox.find(params.id)
 
-    return mail ? mailPage(mail, query.view === 'phone') : missing()
-  })
-  .get(`${PREVIEW_PATH}/:id/eml`, async ({ params }) => {
-    const mail = outbox.find(params.id)
+      return mail ? mailPage(mail, query.view === 'phone') : missing()
+    })
+    .get(`${PREVIEW_PATH}/:id/eml`, async ({ params }) => {
+      const mail = outbox.find(params.id)
 
-    return mail ? eml(mail) : missing()
-  })
-  .get(`${PREVIEW_PATH}/:id/html`, ({ params }) => {
-    const html = outbox.find(params.id)?.html
+      return mail ? eml(mail) : missing()
+    })
+    .get(`${PREVIEW_PATH}/:id/html`, ({ params }) => {
+      const html = outbox.find(params.id)?.html
 
-    if (html === undefined)
-      return missing()
+      if (html === undefined)
+        return missing()
 
-    return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': MAIL_POLICY } })
-  })
+      return mailHtml(html)
+    })
+}

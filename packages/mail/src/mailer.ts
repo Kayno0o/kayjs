@@ -247,7 +247,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const plugin = new Elysia().use(jobs)
 
   if (transport === outbox && process.env.NODE_ENV === 'development')
-    plugin.use(preview)
+    plugin.use(preview(render as (message: Message) => Promise<Mail>))
 
   const sending = Object.assign(plugin, {
     send: async <P extends object>(message: Message<P>) => {

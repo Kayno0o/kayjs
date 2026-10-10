@@ -139,6 +139,15 @@ it('welcomes a new account', async () => {
 
 Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged with its subject and kept in the outbox, and `/_kay/mail` lists them, newest first, each with its headers, its size, its html in a sandboxed frame and its text. The list reloads as mails arrive and can be cleared, a mail's html shows at desktop or phone width (`?view=phone`), its size warns past the 102 KB of html Gmail clips at, and it downloads as the `.eml` SMTP would send. The outbox lives in the server's process: a restart empties it.
 
+`/_kay/mail/samples` shows the app's mails without sending any: every `.kay` file under `src/mails`, each rendered as the mailer renders it, html at desktop or phone width and text, with the props its `<name>.preview.ts` beside it default-exports, or none without one; a mail that throws shows why. The page reloads when `kay dev` restarts the server for a changed file.
+
+```ts
+// src/mails/welcome.preview.ts
+import type Welcome from './welcome.kay'
+
+export default { name: 'Ada', url: 'https://example.com/confirm' } satisfies Parameters<typeof Welcome>[0]
+```
+
 ## Other transports
 
 `transport` takes any `{ send(mail) }` resolving with a `Delivery`, such as a provider's HTTP API. `smtp({ host, port, user, pass, name, timeout, maxConnections, rateLimit, dkim: { domain, selector, privateKey } })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.

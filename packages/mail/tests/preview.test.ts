@@ -167,3 +167,47 @@ describe('the development outbox page', () => {
     }
   })
 })
+
+describe('the mail samples page', () => {
+  const root = process.cwd()
+
+  beforeAll(() => process.chdir(`${root}/tests/fixture`))
+  afterAll(() => process.chdir(root))
+
+  it('lists the app\'s mails, linked from the outbox, reloading once kay dev restarts the server', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+    const list = await get(mail, '/_kay/mail/samples')
+    const html = await list.text()
+    const script = (/<script>([^<]*)<\/script>/).exec(html)![1]!
+
+    expect(await (await get(mail, '/_kay/mail')).text()).toContain('<a href="/_kay/mail/samples">Mail samples</a>')
+    expect(html).toContain('<a href="/_kay/mail/samples?mail=welcome.kay">welcome.kay</a>')
+    expect(html).toContain('<a href="/_kay/mail/samples?mail=plain.kay">plain.kay</a>')
+    expect(script).toContain('/_kay/dev/events')
+    expect(list.headers.get('content-security-policy')).toContain(`'sha256-${createHash('sha256').update(script).digest('base64')}'`)
+  })
+
+  it('renders a mail as the mailer does, with the props its .preview.ts default-exports, at desktop or phone width', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+    const page = await (await get(mail, '/_kay/mail/samples?mail=welcome.kay&view=phone')).text()
+    const frame = await get(mail, '/_kay/mail/samples/html?mail=welcome.kay')
+
+    expect(page).toContain('<iframe class="phone" title="The mail\'s html" src="/_kay/mail/samples/html?mail=welcome.kay">')
+    expect(page).toContain('Welcome, Ada')
+    expect(page).toContain('<th>Props</th><td>welcome.preview.ts</td>')
+    expect(await (await get(mail, '/_kay/mail/samples?mail=plain.kay')).text()).toContain('<th>Props</th><td>none, as there is no plain.preview.ts</td>')
+    expect(frame.headers.get('content-security-policy')).toStartWith('sandbox')
+    expect(await frame.text()).toContain('<!doctype html><html lang="en"')
+    expect(outbox.mails).toEqual([])
+  })
+
+  it('says why a mail taking props without a .preview.ts did not render, and knows no file outside the mails', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+    const failed = await get(mail, '/_kay/mail/samples?mail=receipt.kay')
+
+    expect(failed.status).toBe(500)
+    expect(await failed.text()).toContain('receipt.preview.ts default-exports beside it')
+    expect((await get(mail, '/_kay/mail/samples?mail=../server.ts')).status).toBe(404)
+    expect((await get(mail, '/_kay/mail/samples/html?mail=../server.ts')).status).toBe(404)
+  })
+})
