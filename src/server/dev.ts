@@ -95,6 +95,18 @@ export function devInspector(): Response {
   return new Response(inspectorModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
 }
 
+// False when the command could not start, as when it names no program.
+function spawned(command: string[], cwd: string): boolean {
+  try {
+    Bun.spawn(command, { cwd, stdio: ['ignore', 'ignore', 'ignore'] }).unref()
+
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
 // Loads the inspector on the pages of a server `kay dev` started, the one whose elements carry their source position.
 export function inspectorScript(): string {
   return underKayDev() ? `<script type="module" src="${DEV_INSPECTOR}"></script>` : ''
@@ -123,14 +135,8 @@ export async function openInEditor(root: string, request: Request): Promise<Resp
 
   const command = editorCommand(path, Number(line), Number(column))
 
-  try {
-    if (command !== undefined) {
-      Bun.spawn(command, { cwd: root, stdio: ['ignore', 'ignore', 'ignore'] }).unref()
-
-      return Response.json({ opened: true })
-    }
-  }
-  catch {}
+  if (command !== undefined && spawned(command, root))
+    return Response.json({ opened: true })
 
   console.log(`kay dev: ${file}:${line}:${column}, set KAY_EDITOR to open it from the page`)
 

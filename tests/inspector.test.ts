@@ -1,7 +1,9 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { compileKay } from '../src/compiler'
 import { startInspector } from '../src/runtime/dev-inspector'
+import { pages } from '../src/server'
 
 const SOURCE = `---
 const count = signal(0)
@@ -34,18 +36,23 @@ describe('the source positions', () => {
 
 describe('the inspector', () => {
   const opened: string[] = []
-  let answer = true
+  // Whether the editor opened, or 404 for a file the server refuses.
+  let answer: boolean | 404 = true
+  const realFetch = globalThis.fetch
 
   beforeAll(() => {
     GlobalRegistrator.register()
     globalThis.fetch = (async (_url: string, init: RequestInit) => {
       opened.push((JSON.parse(init.body as string) as { source: string }).source)
 
-      return Response.json({ opened: answer })
+      return answer === 404 ? new Response(null, { status: 404 }) : Response.json({ opened: answer })
     }) as typeof fetch
   })
 
-  afterAll(async () => GlobalRegistrator.unregister())
+  afterAll(async () => {
+    await GlobalRegistrator.unregister()
+    globalThis.fetch = realFetch
+  })
 
   const host = () => document.querySelector('[data-kay-inspector]')!.shadowRoot!
 
@@ -74,6 +81,11 @@ describe('the inspector', () => {
       span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }))
       await Bun.sleep(0)
       expect(host().textContent).toContain('src/routes/index.kay:4:3: no editor found, set KAY_EDITOR')
+
+      answer = 404
+      span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }))
+      await Bun.sleep(0)
+      expect(host().textContent).toContain('src/routes/index.kay:4:3: not a .kay file of this project')
     }
     finally {
       answer = true
@@ -107,6 +119,12 @@ describe('the inspector', () => {
 
       expect(panel.textContent).toBe('src/islands/counter.kay#1 1#2 {"open":true}src/islands/late.kaynot hydrated')
 
+      // Unchanged, the rows stay, and a click or a selection in them with them.
+      const row = panel.firstChild
+
+      await Bun.sleep(600)
+      expect(panel.firstChild).toBe(row)
+
       values.set(document.querySelector('slot')!, [2, { open: false }])
       await Bun.sleep(600)
       expect(panel.textContent).toContain('#1 2#2 {"open":false}')
@@ -118,5 +136,18 @@ describe('the inspector', () => {
     finally {
       inspector.stop()
     }
+  })
+})
+
+describe('a dev server kay dev did not start', () => {
+  it('marks no element, loads no inspector and opens nothing', async () => {
+    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true, dev: true }))
+    const page = await (await app.handle(new Request('http://localhost/'))).text()
+
+    expect(page).toContain('/_kay/dev/events')
+    expect(page).not.toContain('data-kay-src')
+    expect(page).not.toContain('/_kay/dev/inspector.js')
+    expect((await app.handle(new Request('http://localhost/_kay/dev/inspector.js'))).status).toBe(404)
+    expect((await app.handle(new Request('http://localhost/_kay/dev/open', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-dev': '1' }, body: JSON.stringify({ source: 'tests/fixtures/bare/src/routes/index.kay:1:1' }) }))).status).toBe(404)
   })
 })

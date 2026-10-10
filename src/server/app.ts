@@ -32,7 +32,7 @@ import { loadGuards } from './guards'
 import { cookieLocale, hostLocale, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, routedSettings, stateFor } from './i18n'
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
-import { registerLoader } from './loader'
+import { registerLoader, underKayDev } from './loader'
 import { logRequests, pathOf } from './log'
 import { serveServiceWorker } from './offline'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
@@ -245,8 +245,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
     app.get(DEV_EVENTS, () => devEvents(false, hot))
     app.get(DEV_PATCH, () => devPatch())
-    app.get(DEV_INSPECTOR, () => devInspector())
-    app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
+
+    if (underKayDev()) {
+      app.get(DEV_INSPECTOR, () => devInspector())
+      app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
+    }
   }
 
   const clientFiles = await filesUnder(client.dir)

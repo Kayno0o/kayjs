@@ -15,9 +15,18 @@ interface InspectedWindow {
   $kaySignals?: (island: HTMLElement) => unknown[] | undefined
 }
 
+// What the dev server did with a position the inspector asked it to open.
+type Opened = 'opened' | 'no editor' | 'unknown file' | 'unreachable'
+
+const FAILURES: Record<Exclude<Opened, 'opened'>, string> = {
+  'no editor': 'no editor found, set KAY_EDITOR',
+  'unknown file': 'not a .kay file of this project',
+  'unreachable': 'kay dev did not answer',
+}
+
 export interface Inspector {
-  // Asks the dev server to open `source` (`file:line:column`) in the editor; resolves to whether it could.
-  open: (source: string) => Promise<boolean>
+  // Asks the dev server to open `source` (`file:line:column`) in the editor.
+  open: (source: string) => Promise<Opened>
   stop: () => void
 }
 
@@ -37,6 +46,8 @@ export function startInspector(doc: Document = document): Inspector {
   const toggle = make('button', `position:fixed;left:.75rem;bottom:.75rem;z-index:2147483647;padding:.25rem .6rem;border:1px solid #7c3aed;border-radius:999px;background:#fff;color:#4c1d95;cursor:pointer;${FONT}`)
   const panel = make('div', `position:fixed;left:.75rem;bottom:2.75rem;z-index:2147483647;width:min(28rem,calc(100vw - 1.5rem));max-height:50vh;overflow:auto;padding:.5rem;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;box-shadow:0 4px 16px rgba(0,0,0,.15);${FONT}`)
   let expanded = false
+  // What the panel shows: rebuilt only when it changed, so a click, a selection or the focus inside it survives the refresh.
+  let shown: { islands: HTMLElement[], text: string } | undefined
   let message: ReturnType<typeof setTimeout> | undefined
 
   host.setAttribute('data-kay-inspector', '')
@@ -76,21 +87,24 @@ export function startInspector(doc: Document = document): Inspector {
       hide()
     }, MESSAGE_MS)
   }
-  const open = async (source: string) => {
+  const open = async (source: string): Promise<Opened> => {
     try {
       const response = await fetch(OPEN_URL, { method: 'POST', headers: { 'content-type': 'application/json', [OPEN_HEADER]: '1' }, body: JSON.stringify({ source }) })
 
-      return response.ok && (await response.json() as { opened?: boolean }).opened === true
+      if (response.status === 404)
+        return 'unknown file'
+
+      return response.ok && (await response.json() as { opened?: boolean }).opened === true ? 'opened' : 'no editor'
     }
     catch {
-      return false
+      return 'unreachable'
     }
   }
-  const openFrom = async (target: Element) => {
-    const source = target.getAttribute(SOURCE)!
+  const openFrom = async (target: Element, source: string) => {
+    const opened = await open(source)
 
-    if (!await open(source))
-      say(target, `${source}: no editor found, set KAY_EDITOR`)
+    if (opened !== 'opened')
+      say(target, `${source}: ${FAILURES[opened]}`)
   }
   const sourceOf = (event: Event): Element | undefined => {
     if (event.composedPath().includes(host))
@@ -118,10 +132,10 @@ export function startInspector(doc: Document = document): Inspector {
     event.preventDefault()
     event.stopImmediatePropagation()
 
-    void openFrom(target)
+    void openFrom(target, target.getAttribute(SOURCE)!)
   }
   const onKey = (event: KeyboardEvent) => {
-    if (event.key === 'Alt' && event.type === 'keyup')
+    if (event.key === 'Alt')
       hide()
   }
   const islands = () => [...doc.querySelectorAll<HTMLElement>(ISLAND)]
@@ -141,19 +155,24 @@ export function startInspector(doc: Document = document): Inspector {
     if (!expanded)
       return
 
-    panel.replaceChildren(...found.map((island) => {
+    const rows = found.map(island => ({ island, component: island.dataset.component ?? '?', values: win.$kaySignals?.(island)?.map(formatted) }))
+    const text = JSON.stringify(rows.map(({ component, values }) => [component, values]))
+
+    if (shown?.text === text && shown.islands.length === found.length && shown.islands.every((island, index) => island === found[index]))
+      return
+
+    shown = { islands: found, text }
+    hide()
+    panel.replaceChildren(...rows.map(({ island, component, values }) => {
       const row = make('div', 'padding:.25rem .25rem .5rem;border-bottom:1px solid #eee')
       const name = make('button', `padding:0;border:0;background:none;color:#4c1d95;cursor:pointer;text-decoration:underline;${FONT}`)
-      const component = island.dataset.component ?? '?'
 
       name.type = 'button'
       name.textContent = component
-      name.onclick = () => void open(`${component}:1:1`)
+      name.onclick = () => void openFrom(island, `${component}:1:1`)
       row.append(name)
       row.onpointerenter = () => show(island, component)
       row.onpointerleave = hide
-
-      const values = win.$kaySignals?.(island)
 
       if (values === undefined)
         row.append(note('not hydrated'))
@@ -161,7 +180,7 @@ export function startInspector(doc: Document = document): Inspector {
       for (const [index, value] of (values ?? []).entries()) {
         const line = make('div', 'white-space:pre-wrap;word-break:break-all')
 
-        line.textContent = `#${index + 1} ${formatted(value)}`
+        line.textContent = `#${index + 1} ${value}`
         row.append(line)
       }
 
@@ -174,6 +193,7 @@ export function startInspector(doc: Document = document): Inspector {
 
   toggle.onclick = () => {
     expanded = !expanded
+    shown = undefined
     panel.hidden = !expanded
     toggle.setAttribute('aria-expanded', String(expanded))
     render()

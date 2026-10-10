@@ -42,6 +42,7 @@ const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/
 const MAX_CHANGED_FILES = 200
 // The address of a server listening on the root path, as kay's do, reads better without its slash.
 const ROOT_PATH = /(?<=\/\/[^/]+)\/$/
+const STOP_SIGNALS = new Set(['SIGINT', 'SIGTERM', 'SIGHUP'])
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
 // Resolves once watching, with a function stopping the watchers and the server.
@@ -62,8 +63,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // The count the last server started with, and the files changed since: a page on that count may swap in what changed.
   let startedAt = 0
   let changedFiles = new Set<string>()
-  // Every file changed since the last restart began, stylesheets included, then what the last one came from and when it began: what its report names.
+  // Every file changed since the last restart began, stylesheets included.
   let touched = new Set<string>()
+  // What the last restart came from and when it began, for its report.
   let restartedFor: string[] = []
   let restartedAt = performance.now()
   let address: string | undefined
@@ -90,11 +92,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     address = url
   }
 
-  // A server killed for a restart or by `kay dev` stopping exits as expected; one exiting on its own leaves nothing serving until the next change.
+  // A server killed for a restart or by `kay dev` stopping exits as expected, as does one the terminal interrupted along with `kay dev`; one exiting on its own leaves nothing serving until the next change.
   const reportExit = async (server: Subprocess) => {
     const code = await server.exited
 
-    if (server === child && !stopping)
+    if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode ?? ''))
       log(`${stamp()} the server exited with code ${code}, waiting for a change`)
   }
 
@@ -163,8 +165,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }, DEBOUNCE_MS)
   })
 
-  await regenerateTypes(root, options)
   start()
+  await regenerateTypes(root, options)
 
   return async () => {
     stopping = true
@@ -179,6 +181,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
 // The files a change left in place, which leaves out the directories holding them and an editor's temporary files; a deletion names what is gone.
 function changedFilesNamed(root: string, files: string[]): string[] {
+  if (files.length > MAX_CHANGED_FILES)
+    return files
+
   const kept = files.filter(file => statSync(join(root, file), { throwIfNoEntry: false })?.isFile() === true)
 
   return kept.length > 0 ? kept : files.filter(file => !files.some(other => other.startsWith(`${file}/`)))
