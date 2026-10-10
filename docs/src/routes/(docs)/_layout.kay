@@ -6,7 +6,7 @@ const current = ctx.url.pathname.replace(/\/$/, '') || '/'
 ---
 ---
 import Shell from '../../components/shell.kay'
-import '../../styles.css'
+import '../../site.css'
 ---
 Shell(nav={nav} current={current})
   slot

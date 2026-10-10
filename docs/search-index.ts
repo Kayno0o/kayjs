@@ -56,7 +56,7 @@ const index = [
   ...(await Promise.all((await loadReference()).map(async topic => sections(topic.data.title, topic.slug === 'overview' ? '/' : `/reference/${topic.slug}`, topic.body)))).flat(),
   ...(await Promise.all((await loadLibraries()).map(async library => sections(library.data.title, `/libraries/${library.slug}`, library.body)))).flat(),
   // A component's prose is its library's, indexed there already, so its own entry holds what only its page shows: the props.
-  ...(await loadComponents()).map(component => ({ page: component.data.title, href: `/ui/${component.slug}`, text: ['kayjs-ui component.', ...component.data.props.map(prop => [prop.name, prop.comment].filter(Boolean).join(': '))].join(' ') })),
+  ...(await loadComponents()).map(component => ({ page: `${component.data.title} · kayjs-ui`, href: `/ui/${component.slug}`, text: ['kayjs-ui component.', ...component.data.props.map(prop => [prop.name, prop.comment].filter(Boolean).join(': '))].join(' ') })),
 ]
 
 await Bun.write(join(import.meta.dir, 'public/search.json'), JSON.stringify(index))

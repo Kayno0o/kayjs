@@ -4,9 +4,8 @@ import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 
 const open = signal(false)
 ---
-.min-h-80
-  Button(label="Show details" onClick={() => open.set(true)})
-  SidePanel(open={open} title="Europa" onClose={() => open.set(false)})
-    @footer
-      Button(label="Done" variant="accent" onClick={() => open.set(false)})
-    p Jupiter's fourth largest moon, 1,561 km in radius, with an ocean under its ice.
+Button(label="Show details" onClick={() => open.set(true)})
+SidePanel(open={open} title="Europa" onClose={() => open.set(false)})
+  @footer
+    Button(label="Done" variant="accent" onClick={() => open.set(false)})
+  p Jupiter's fourth largest moon, 1,561 km in radius, with an ocean under its ice.

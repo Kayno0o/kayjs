@@ -1,5 +1,4 @@
 import type { Prop } from './ui-props'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { renderMarkdown } from 'kay/content'
 import { propsOf } from './ui-props'
@@ -18,14 +17,17 @@ export interface ComponentPage {
 
 const ROOT = join(import.meta.dir, '../..')
 const PACKAGES = join(ROOT, 'node_modules/@kaynooo')
-// Each example is a page of its own, which the component's page shows in a frame, so its Tailwind and kayjs-ui's theme stay out of the docs' styles.
-const EXAMPLES = join(import.meta.dir, 'routes/(demo)/ui-demo')
+const EXAMPLES = join(import.meta.dir, 'ui-examples')
 const LIBRARIES = ['kayjs-auth', 'kayjs-mail', 'kayjs-ui']
 const TITLE = /^# (.+)\n+/
-const QUOTED = /^> /gm
+// The summary under the title, a quote in llms.txt, is the page's first paragraph.
+const INTRO = /^> /
 const HEADING = /^(#{2,3}) (.+)$/gm
 const NAMES = /\s*(?:,|\band\b)\s*/
 const KEBAB = /-(\w)/g
+const FIRST = /^\w/
+const KAY_FILE = /\.kay$/
+const TOPIC = /^[^:]*:/
 
 // Each library's llms.txt, from the package installed at the root: the version the docs describe is the one published.
 export async function loadLibraries(): Promise<LibraryPage[]> {
@@ -33,7 +35,7 @@ export async function loadLibraries(): Promise<LibraryPage[]> {
     const text = await Bun.file(join(PACKAGES, name, 'llms.txt')).text()
     const { version } = await Bun.file(join(PACKAGES, name, 'package.json')).json() as { version: string }
 
-    return { slug: name, data: { title: name, order, version }, body: text.replace(TITLE, '').replace(QUOTED, '') }
+    return { slug: name, data: { title: name, order, version }, body: text.replace(TITLE, '').replace(INTRO, '') }
   }))
 }
 
@@ -52,11 +54,11 @@ function sectionsOf(text: string): Section[] {
     const heading = match[2]!
     const end = found[index + 1]?.index ?? text.length
 
-    return { heading, depth: match[1]!.length, names: heading.replace(/^[^:]*:/, '').split(NAMES), text: text.slice(match.index + match[0].length, end).trim() }
+    return { heading, depth: match[1]!.length, names: heading.replace(TOPIC, '').split(NAMES), text: text.slice(match.index + match[0].length, end).trim() }
   })
 }
 
-// One page per component kayjs-ui ships: the part of its docs covering it, its props read from its source, and its example page when there is one.
+// One page per component kayjs-ui ships: the part of its docs covering it, its props read from its source, and its example when there is one.
 export async function loadComponents(): Promise<ComponentPage[]> {
   const source = join(PACKAGES, 'kayjs-ui/src')
   const files = [...new Bun.Glob('*.kay').scanSync(source)].sort()
@@ -64,9 +66,10 @@ export async function loadComponents(): Promise<ComponentPage[]> {
   const sections = sectionsOf(await Bun.file(join(PACKAGES, 'kayjs-ui/llms.txt')).text())
 
   return Promise.all(files.map(async (file, order) => {
-    const slug = file.replace(/\.kay$/, '')
-    const title = slug.replace(/^\w/, letter => letter.toUpperCase()).replace(KEBAB, (_dash, letter: string) => letter.toUpperCase())
-    const section = sections.find(candidate => candidate.depth === 3 && candidate.names.includes(title)) ?? sections.find(candidate => candidate.text.includes(`\`${title}(`) || candidate.text.includes(`${title} `))
+    const slug = file.replace(KAY_FILE, '')
+    const title = slug.replace(FIRST, letter => letter.toUpperCase()).replace(KEBAB, (_dash, letter: string) => letter.toUpperCase())
+    // A component a heading does not name, such as FormDialog under Forms, belongs to the section importing it.
+    const section = sections.find(candidate => candidate.depth === 3 && candidate.names.includes(title)) ?? sections.find(candidate => candidate.text.includes(`/${file}'`))
     const example = join(EXAMPLES, file)
     const data: ComponentPage['data'] = { title, order, props: props.get(join(source, file)) ?? [] }
 
@@ -75,7 +78,7 @@ export async function loadComponents(): Promise<ComponentPage[]> {
       data.anchor = (await renderMarkdown(`## ${section.heading}`)).headings[0]!.id
     }
 
-    if (existsSync(example))
+    if (await Bun.file(example).exists())
       data.example = await Bun.file(example).text()
 
     return { slug, data, body: section?.text ?? '' }

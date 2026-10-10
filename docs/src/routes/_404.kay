@@ -5,7 +5,7 @@ const nav = await navigation()
 ---
 ---
 import Shell from '../components/shell.kay'
-import '../styles.css'
+import '../site.css'
 ---
 head
   title Not found · kay

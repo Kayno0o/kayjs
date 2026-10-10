@@ -8,10 +8,9 @@ const open = signal(false)
 const entries: PaletteEntry[] = [
   { label: 'New moon', group: 'Actions', icon: 'plus', onSelect: () => toast.info('New moon') },
   { label: 'Export', group: 'Actions', keywords: 'download csv', onSelect: () => toast.info('Exported') },
-  { label: 'Button', group: 'Pages', href: '/ui-demo/button' },
-  { label: 'Dialog', group: 'Pages', href: '/ui-demo/dialog' },
+  { label: 'Button', group: 'Pages', href: '/ui/button' },
+  { label: 'Dialog', group: 'Pages', href: '/ui/dialog' },
 ]
 ---
-.min-h-80
-  Button(label="Open the palette" onClick={() => open.set(true)})
-  CommandPalette(open={open} onOpenChange={open.set} entries={entries} groups={['Actions', 'Pages']})
+Button(label="Open the palette" onClick={() => open.set(true)})
+CommandPalette(open={open} onOpenChange={open.set} entries={entries} groups={['Actions', 'Pages']})

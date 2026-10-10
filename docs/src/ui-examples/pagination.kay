@@ -1,7 +1,4 @@
---- server
-const url = ctx.url
----
 ---
 import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 ---
-Pagination(page={4} pages={12} url={url})
+Pagination(page={4} pages={12} url="/ui/pagination")

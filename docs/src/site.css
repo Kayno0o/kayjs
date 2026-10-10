@@ -1,0 +1,3 @@
+/* The docs' own styles sit in the lowest layer, so kayjs-ui's components shown on a component page keep their look inside them. */
+@layer docs, theme, base, components, utilities;
+@import './styles.css' layer(docs);

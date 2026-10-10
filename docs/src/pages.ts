@@ -5,7 +5,9 @@ export interface PageLink {
   title: string
 }
 
-export const FORGE = 'https://git.kaynooo.fr/kaynooo/kayjs/src/branch/main'
+export const FORGE_ROOT = 'https://git.kaynooo.fr/kaynooo'
+
+export const FORGE = `${FORGE_ROOT}/kayjs/src/branch/main`
 
 export const topicHref = (slug: string) => slug === 'overview' ? '/' : `/reference/${slug}`
 

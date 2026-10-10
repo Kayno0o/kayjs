@@ -1,0 +1,121 @@
+---
+import BadgeExample from '../ui-examples/badge.kay'
+import BarListExample from '../ui-examples/bar-list.kay'
+import ButtonExample from '../ui-examples/button.kay'
+import CardRowExample from '../ui-examples/card-row.kay'
+import CardExample from '../ui-examples/card.kay'
+import CollapsibleSectionExample from '../ui-examples/collapsible-section.kay'
+import CommandPaletteExample from '../ui-examples/command-palette.kay'
+import ConfirmDeleteExample from '../ui-examples/confirm-delete.kay'
+import ContributionGraphExample from '../ui-examples/contribution-graph.kay'
+import CopyButtonExample from '../ui-examples/copy-button.kay'
+import DialogExample from '../ui-examples/dialog.kay'
+import EmptyStateExample from '../ui-examples/empty-state.kay'
+import IconButtonExample from '../ui-examples/icon-button.kay'
+import IconExample from '../ui-examples/icon.kay'
+import LineChartExample from '../ui-examples/line-chart.kay'
+import MenuExample from '../ui-examples/menu.kay'
+import MeterExample from '../ui-examples/meter.kay'
+import MultiSelectExample from '../ui-examples/multi-select.kay'
+import PageSectionExample from '../ui-examples/page-section.kay'
+import PaginationExample from '../ui-examples/pagination.kay'
+import PopoverExample from '../ui-examples/popover.kay'
+import QrCodeExample from '../ui-examples/qr-code.kay'
+import RangeInputExample from '../ui-examples/range-input.kay'
+import RatingExample from '../ui-examples/rating.kay'
+import ScatterChartExample from '../ui-examples/scatter-chart.kay'
+import SegmentedExample from '../ui-examples/segmented.kay'
+import SelectExample from '../ui-examples/select.kay'
+import SidePanelExample from '../ui-examples/side-panel.kay'
+import SiteFaviconExample from '../ui-examples/site-favicon.kay'
+import SiteNavExample from '../ui-examples/site-nav.kay'
+import StatExample from '../ui-examples/stat.kay'
+import TabNavExample from '../ui-examples/tab-nav.kay'
+import TableExample from '../ui-examples/table.kay'
+import TabsExample from '../ui-examples/tabs.kay'
+import TextInputExample from '../ui-examples/text-input.kay'
+import ToasterExample from '../ui-examples/toaster.kay'
+import ToggleExample from '../ui-examples/toggle.kay'
+import TooltipHostExample from '../ui-examples/tooltip-host.kay'
+import WidgetExample from '../ui-examples/widget.kay'
+
+const { slug } = props<{ slug: string }>()
+---
+if slug === 'badge'
+  BadgeExample
+else if slug === 'bar-list'
+  BarListExample
+else if slug === 'button'
+  ButtonExample
+else if slug === 'card-row'
+  CardRowExample
+else if slug === 'card'
+  CardExample
+else if slug === 'collapsible-section'
+  CollapsibleSectionExample
+else if slug === 'command-palette'
+  CommandPaletteExample
+else if slug === 'confirm-delete'
+  ConfirmDeleteExample
+else if slug === 'contribution-graph'
+  ContributionGraphExample
+else if slug === 'copy-button'
+  CopyButtonExample
+else if slug === 'dialog'
+  DialogExample
+else if slug === 'empty-state'
+  EmptyStateExample
+else if slug === 'icon-button'
+  IconButtonExample
+else if slug === 'icon'
+  IconExample
+else if slug === 'line-chart'
+  LineChartExample
+else if slug === 'menu'
+  MenuExample
+else if slug === 'meter'
+  MeterExample
+else if slug === 'multi-select'
+  MultiSelectExample
+else if slug === 'page-section'
+  PageSectionExample
+else if slug === 'pagination'
+  PaginationExample
+else if slug === 'popover'
+  PopoverExample
+else if slug === 'qr-code'
+  QrCodeExample
+else if slug === 'range-input'
+  RangeInputExample
+else if slug === 'rating'
+  RatingExample
+else if slug === 'scatter-chart'
+  ScatterChartExample
+else if slug === 'segmented'
+  SegmentedExample
+else if slug === 'select'
+  SelectExample
+else if slug === 'side-panel'
+  SidePanelExample
+else if slug === 'site-favicon'
+  SiteFaviconExample
+else if slug === 'site-nav'
+  SiteNavExample
+else if slug === 'stat'
+  StatExample
+else if slug === 'tab-nav'
+  TabNavExample
+else if slug === 'table'
+  TableExample
+else if slug === 'tabs'
+  TabsExample
+else if slug === 'text-input'
+  TextInputExample
+else if slug === 'toaster'
+  ToasterExample
+else if slug === 'toggle'
+  ToggleExample
+else if slug === 'tooltip-host'
+  TooltipHostExample
+else if slug === 'widget'
+  WidgetExample

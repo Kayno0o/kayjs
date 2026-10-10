@@ -1,6 +1,6 @@
 --- server
 import { libraries } from '../../../content.config'
-import { neighbours } from '../../../pages'
+import { FORGE_ROOT, neighbours } from '../../../pages'
 
 export const prerender = libraries
 
@@ -23,4 +23,4 @@ head
     Toc(sections={sections})
   article.prose
     Content
-  Pager(previous={previous} next={next} source={`https://git.kaynooo.fr/kaynooo/${library.slug}/src/branch/main/llms.txt`})
+  Pager(previous={previous} next={next} source={`${FORGE_ROOT}/${library.slug}/src/branch/main/llms.txt`})

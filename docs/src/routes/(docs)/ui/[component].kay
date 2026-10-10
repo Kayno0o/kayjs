@@ -2,7 +2,7 @@
 import { highlightCode } from 'kay/content'
 import { components, libraries } from '../../../content.config'
 import { highlight } from '../../../highlight'
-import { neighbours } from '../../../pages'
+import { FORGE_ROOT, neighbours } from '../../../pages'
 
 export const prerender = components
 
@@ -19,9 +19,12 @@ const sections = [
 const { previous, next } = neighbours(await components.all(), component.slug, slug => `/ui/${slug}`)
 ---
 ---
-import Demo from '../../../components/demo.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import UiExample from '../../../components/ui-example.kay'
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'
+import '../../../ui.css'
 ---
 head
   title {title} · kayjs-ui
@@ -33,12 +36,13 @@ head
   Toc(sections={sections})
   article.prose
     if section as heading
-      p.covered Documented with #[a(href={`/libraries/kayjs-ui#${anchor}`}) {heading}].
+      p.covered From the #[a(href={`/libraries/kayjs-ui#${anchor}`}) {heading}] section of the kayjs-ui docs.
     Content
     if source as html
       h2#example: a(href="#example") Example
       .example
-        Demo(src={`/ui-demo/${component.slug}`} title={`${title} example`})
+        .ui-stage
+          UiExample(slug={component.slug})
         div(innerHTML={html})
     h2#props: a(href="#props") Props
     if props.length > 0
@@ -58,11 +62,19 @@ head
               td
                 code {prop.type}
                 if prop.comment as comment
-                  p.prop-comment {comment}
+                  p.prop-comment
+                    for part, i of comment.split('`') key={i}
+                      if i % 2 === 1
+                        code {part}
+                      else
+                        | {part}
               td
                 if prop.default as value
                   code {value}
       p.spread Attributes it does not declare go onto its root element, #[code id], #[code aria-*] and #[code data-*] included.
     else
       p It takes no props.
-  Pager(previous={previous} next={next} source={`https://git.kaynooo.fr/kaynooo/kayjs-ui/src/branch/main/src/${component.slug}.kay`})
+  Pager(previous={previous} next={next} source={`${FORGE_ROOT}/kayjs-ui/src/branch/main/src/${component.slug}.kay`})
+.ui-stage
+  Toaster
+  TooltipHost

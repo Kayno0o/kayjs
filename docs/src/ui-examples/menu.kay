@@ -11,6 +11,6 @@ const items: MenuEntry[] = [
   { label: 'Delete', icon: 'delete', danger: true, onSelect: () => picked.set('Delete') },
 ]
 ---
-.flex.h-48.items-start.gap-3
+.flex.items-center.gap-3
   Menu(label="Actions" icon="plus" items={items})
   p.text-kui-subtext0 Picked: {picked}.

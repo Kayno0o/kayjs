@@ -1,8 +1,8 @@
 ---
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 
-const links = [{ href: '/ui-demo/site-nav', label: 'Home' }, { href: '/ui-demo/rooms', label: 'Rooms' }, { href: '/ui-demo/about', label: 'About' }]
+const links = [{ href: '/', label: 'Overview' }, { href: '/guides/tutorial', label: 'Tutorial' }, { href: '/ui/site-nav', label: 'SiteNav' }]
 ---
 header.flex.items-center.gap-4
-  strong Club
-  SiteNav(links={links} current="/ui-demo/site-nav" label="Main")
+  strong kay
+  SiteNav(links={links} current="/ui/site-nav" label="Main")

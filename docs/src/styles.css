@@ -676,7 +676,7 @@ pre code {
   font-size: inherit;
 }
 
-/* A kayjs-ui component's page: its example running in a frame over its source, then its props. */
+/* A kayjs-ui component's page: its example rendered over its source, then its props. */
 .import {
   margin: 0.75rem 0 0;
 }
@@ -692,11 +692,8 @@ pre code {
   border-radius: var(--radius);
 }
 
-.demo {
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  border: none;
+.example > .ui-stage {
+  padding: 1.5rem 1.25rem;
   background: var(--mantle);
 }
 

@@ -53,9 +53,14 @@ describe('the documentation site', () => {
     const components = await loadComponents()
     const button = components.find(component => component.slug === 'button')!
     const props = new Map(button.data.props.map(prop => [prop.name, prop]))
+    const libraries = await loadLibraries()
+    const ui = libraries.find(library => library.slug === 'kayjs-ui')!
 
-    expect((await loadLibraries()).map(library => library.slug)).toEqual(['kayjs-auth', 'kayjs-mail', 'kayjs-ui'])
+    expect(libraries.map(library => library.slug)).toEqual(['kayjs-auth', 'kayjs-mail', 'kayjs-ui'])
+    expect(ui.data.version).toBe((await Bun.file(join(root, 'node_modules/@kaynooo/kayjs-ui/package.json')).json() as { version: string }).version)
+    expect(ui.body).toStartWith('kay components')
     expect(components.filter(component => component.data.section === undefined).map(component => component.slug)).toEqual([])
+    expect(components.find(component => component.slug === 'form-dialog')!.data.section).toBe('Forms')
     expect(button.data).toMatchObject({ title: 'Button', section: 'Icon, Button, IconButton', anchor: 'icon-button-iconbutton' })
     expect(button.data.example).toContain('Button(label=')
     expect(props.get('href')).toMatchObject({ type: 'string', optional: true })

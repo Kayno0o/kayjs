@@ -35,29 +35,23 @@ export function propsOf(files: string[]): Map<string, Prop[]> {
   return new Map(files.map(file => [file, declaredProps(checker, program.getSourceFile(`${file}.ts`)!)]))
 }
 
-// The component script as TypeScript: its `---` fence, `props` declared, and the type parameters a generic component's fence line takes declared as their constraints.
+// The component script as TypeScript: its client fence, `props` declared, and the type parameters a generic component's fence line takes declared as their constraints.
 function scriptOf(source: string): string {
   const lines = source.split('\n')
-  let generics: string | undefined
-  let start = -1
+  let open: { line: number, server: boolean, generics: string | undefined } | undefined
 
   for (const [index, line] of lines.entries()) {
     const fence = FENCE.exec(line)
 
-    if (start === -1 && fence !== null && fence.groups?.server === undefined) {
-      generics = fence.groups?.generics
-      start = index + 1
-    }
-    else if (start !== -1 && line.trim() === '---') {
-      return `declare function props<T>(): T\n${typeParameters(generics)}\n${lines.slice(start, index).join('\n')}`
-    }
-    else if (fence?.groups?.server !== undefined) {
-      // A server fence's lines are skipped up to its closing line.
-      start = -2
-    }
-    else if (start === -2 && line.trim() === '---') {
-      start = -1
-    }
+    if (fence === null)
+      continue
+
+    if (open === undefined)
+      open = { line: index, server: fence.groups?.server !== undefined, generics: fence.groups?.generics }
+    else if (open.server)
+      open = undefined
+    else
+      return `declare function props<T>(): T\n${typeParameters(open.generics)}\n${lines.slice(open.line + 1, index).join('\n')}`
   }
 
   return ''

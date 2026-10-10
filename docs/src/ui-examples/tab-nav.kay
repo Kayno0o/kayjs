@@ -1,6 +1,6 @@
 ---
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 
-const links = [{ href: '/ui-demo/tab-nav', label: 'Profile' }, { href: '/ui-demo/tab-nav/keys', label: 'Keys' }, { href: '/ui-demo/tab-nav/sessions', label: 'Sessions' }]
+const links = [{ href: '/ui/tab-nav', label: 'TabNav' }, { href: '/ui/tabs', label: 'Tabs' }, { href: '/ui/segmented', label: 'Segmented' }]
 ---
-TabNav(links={links} current="/ui-demo/tab-nav" label="Settings")
+TabNav(links={links} current="/ui/tab-nav" label="Navigation components")
