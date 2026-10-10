@@ -5,6 +5,7 @@ import process from 'node:process'
 import { logError } from '../build/sourcemap'
 import { durationSeconds } from '../runtime/duration'
 import { wholeResponse } from './compress'
+import { pathOf } from './log'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
@@ -32,7 +33,7 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, config: HealthCon
         return wholeResponse('unhealthy', { status: 503, headers })
     }
     catch (error) {
-      console.error(`kay: the health check failed for ${request.url}`)
+      console.error(`kay: the health check failed for ${pathOf(request.url)}`)
       logError(error)
 
       return wholeResponse('unhealthy', { status: 503, headers })
@@ -65,7 +66,7 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
         return
 
       lifecycle.draining = true
-      console.error(`kay: ${signal} received; finishing open requests`)
+      console.log(`kay: ${signal} received; finishing open requests`)
 
       const forced = setTimeout(() => {
         console.error(`kay: requests still open after ${timeout} s; closing them`)

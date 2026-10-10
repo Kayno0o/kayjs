@@ -1,3 +1,4 @@
+import { logError } from '../build/sourcemap'
 import { openSqlite } from '../runtime/sqlite.server'
 
 // What a room sends a connection through: Elysia's `ws`, read through its raw socket, the one object that stays the same from `open` to `close`.
@@ -133,7 +134,7 @@ export function rooms<Message, Member = undefined>(options: RoomsOptions = {}): 
           return
 
         waiting.add(room)
-        setTimeout(guarded(() => {
+        setTimeout(guarded('sending a room its snapshot', () => {
           waiting.delete(room)
           store.publish(room, messageText(read(room)), {})
         }), wait)
@@ -148,13 +149,14 @@ function messageText(message: unknown): string {
 }
 
 // What a timer runs, its error logged rather than taking the process down.
-function guarded(run: () => void): () => void {
+function guarded(what: string, run: () => void): () => void {
   return () => {
     try {
       run()
     }
     catch (error) {
-      console.error(error)
+      console.error(`kay: ${what} failed`)
+      logError(error)
     }
   }
 }
@@ -247,7 +249,7 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
 
   beat()
 
-  const beating = setInterval(guarded(beat), HEARTBEAT)
+  const beating = setInterval(guarded('marking this process alive in the rooms store', beat), HEARTBEAT)
 
   beating.unref()
 
@@ -273,7 +275,7 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
       // Read from now on: what others published before anyone here listened is for the members they had then.
       if (!reading) {
         last = latest.get()?.id ?? 0
-        reading = setInterval(guarded(read), poll)
+        reading = setInterval(guarded('reading what other processes published to rooms', read), poll)
         reading.unref()
       }
 

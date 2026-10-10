@@ -1262,6 +1262,21 @@ describe('lifecycle', () => {
     expect((await (await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, health: false })).handle(new Request('http://localhost/_kay/health'))).status).toBe(404)
   })
 
+  it('logs a health check that throws with its path, never its query', async () => {
+    const failing = await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, health: { check: () => {
+      throw new Error('Database down')
+    } } })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect((await failing.handle(new Request('http://localhost/_kay/health?token=secret'))).status).toBe(503)
+      expect(logged.mock.calls.map(call => String(call[0]))).toEqual(['kay: the health check failed for /_kay/health', expect.stringMatching(/^Error: Database down/)])
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('probes the health route of a server beside it, as an executable run with --health does', async () => {
     const app = new Elysia().use(await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, health: { path: '/up' } })).listen(0)
     const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
