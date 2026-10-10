@@ -46,6 +46,8 @@ const STATE = Symbol('kayjs-auth.state')
 const TRAILING_SLASH = /\/$/
 // kay's own session lifetime, 30 days.
 const DEFAULT_SESSION_MAX_AGE = 30 * 24 * 60 * 60
+// What a provider posting back to the callback may say, carried over to the GET.
+const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
 export type AuthRequirement<Role extends string> = Requirement<User, Role>
@@ -482,9 +484,27 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return redirect(typeof started === 'string' ? started : failed(started.error), 303)
     })
     .get(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ auth, params, query, redirect }) => {
-      const outcome = await finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error) })
+      const outcome = await finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error), user: text(query.user) })
 
       return redirect('error' in outcome ? failed(outcome.error) : outcome.redirect, 303)
+    })
+    // Apple, or any provider asked for `response_mode=form_post`, comes back with a cross-site POST, which a SameSite=Lax session cookie does not ride on: the GET it is turned into does.
+    .post(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ params, body, redirect, status }) => {
+      if (!core.oauth.has(params.provider))
+        return status(404, 'Not Found')
+
+      const form = (body ?? {}) as Record<string, unknown>
+      const query = new URLSearchParams()
+
+      // Not the ID token Apple posts too: the one the token endpoint answers is the one checked.
+      for (const name of FORM_POST_FIELDS) {
+        const value = form[name]
+
+        if (typeof value === 'string')
+          query.set(name, value)
+      }
+
+      return redirect(`${core.prefix}/${params.provider}/callback?${query}`, 303)
     })
 
   const evaluate = async (user: User, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => {

@@ -124,7 +124,7 @@ const api = new Elysia({ prefix: '/api' })
 
 ## OAuth
 
-Each entry of `oauth` names a provider app; its routes are `/auth/<name>` and `/auth/<name>/callback`, and the callback URL to register at the provider is `url` + `/auth/<name>/callback`.
+Each entry of `oauth` names a provider app: `{ provider, clientId, clientSecret }`. Its routes are `/auth/<name>` and `/auth/<name>/callback`, and the callback URL to register at the provider is `url` + `/auth/<name>/callback`.
 
 ```kay
 a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
@@ -132,6 +132,12 @@ a(href="/auth/github?link=1&redirect=/account" data-no-prefetch) Link GitHub
 ```
 
 - `discordProvider({ scopes })` (`identify` and `email` by default) and `githubProvider({ scopes })` are presets; any `OAuthProvider` works. A provider's `normalizeUser` reports an `email` only when the provider verified it, as the presets do.
+- OpenID Connect providers take `{ scopes, params }`, `params` added to the authorize URL, such as Google's `{ access_type: 'offline', prompt: 'consent' }` for a refresh token. Their ID token is checked before anything is read off it: signed by a key of the provider's JWKS, by its issuer, for this `clientId`, unexpired, and carrying the nonce the flow sent.
+  - `oidcProvider({ issuer, name })`: any provider by its issuer URL (Keycloak, Authentik, Auth0, Okta, Zitadel...), its endpoints read once off `<issuer>/.well-known/openid-configuration` on first use; a discovery that fails is `unavailable` and tried again on the next sign-in. Its `preferred_username` is the username.
+  - `googleProvider()`.
+  - `microsoftProvider({ tenant })`: `common` (personal and work accounts, the default), `consumers`, `organizations` or one tenant's id. A work account's email is kept only with the `xms_edov` optional claim on the app registration, saying the domain's owner vouches for it.
+  - `gitlabProvider({ url })`: gitlab.com, or a self-hosted instance at `url`.
+  - `appleProvider({ teamId, keyId, privateKey })`: `privateKey` is the `.p8` key's PEM text, the app's `clientId` its Services ID, and it takes no `clientSecret`: the preset signs one. Apple comes back with a POST to the callback, which kayjs-auth turns into a GET so the session cookie rides along. Apple names the user only on their first sign-in, so `profile.displayName` reaches `onSignUp` then and never again.
 - The flow keeps its state and PKCE verifier in the session, so a callback works once, in the browser that started it, within ten minutes. `redirect` is kept to a path on the site. `safeRedirect(path, fallback?)`, exported, does that for the app's own redirects: it answers the path normalised, dot segments resolved, and `fallback` for anything that would leave the site once resolved or decoded, such as `/.//evil.com`.
 - A provider account signs into the user it is linked to. A new one signs up a new user, taking its email and its name only when no other user has them: no account is ever merged into another by email. `onSignUp(user, profile)` runs for every new user, to create the app's own records; `profile` is `undefined` for a password sign-up.
 - `onProviderProfile(user, profile)` runs whenever a provider answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar or a display name. A failure in it is logged and the sign-in goes on.

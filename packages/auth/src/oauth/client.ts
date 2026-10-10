@@ -1,9 +1,16 @@
-import type { OAuthClientConfig, OAuthProvider, OAuthTokens } from './types'
+import type { JWTVerifyGetKey } from 'jose'
+import type { OAuthClientConfig, OAuthEndpoints, OAuthProvider, OAuthTokens, OpenIdCheck } from './types'
+import { createRemoteJWKSet, errors, jwtVerify } from 'jose'
+
+// How far apart the provider's clock and this one may be when an ID token's times are read.
+const CLOCK_TOLERANCE_S = 60
 
 interface AuthorizeUrlOptions {
   state?: string
   /** PKCE code challenge (S256); pair with `codeVerifier` on `exchangeCode`. */
   codeChallenge?: string
+  /** Sent to an OpenID Connect provider only, to find in the ID token on `readUser`. */
+  nonce?: string
   extraParams?: Record<string, string>
 }
 
@@ -22,14 +29,111 @@ export class OAuthExchangeError extends Error {
 
 /** A configured OAuth client bound to one provider and one app's credentials. */
 export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProvider<Raw, User>, config: OAuthClientConfig) {
+  let discovered: Promise<OAuthEndpoints> | undefined
+  const keySets = new Map<string, JWTVerifyGetKey>()
+
+  // Discovered once; a failure is tried again on the next use rather than kept.
+  const endpoints = async (): Promise<OAuthEndpoints> => {
+    if (!provider.discover)
+      return provider
+
+    discovered ??= provider.discover()
+
+    try {
+      return { ...provider, ...await discovered }
+    }
+    catch (error) {
+      discovered = undefined
+
+      throw new OAuthExchangeError(502, `OAuth discovery failed (${provider.name}): ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  const endpoint = async (name: 'authorizeUrl' | 'tokenUrl'): Promise<string> => {
+    const url = (await endpoints())[name]
+
+    if (url === undefined)
+      throw new Error(`kayjs-auth: the ${provider.name} provider has no ${name}`)
+
+    return url
+  }
+
+  const withCredentials = async (body: URLSearchParams): Promise<URLSearchParams> => {
+    const secret = provider.clientSecret ? await provider.clientSecret(config.clientId) : config.clientSecret
+
+    body.set('client_id', config.clientId)
+
+    if (secret !== undefined)
+      body.set('client_secret', secret)
+
+    return body
+  }
+
+  const userInfo = async (accessToken: string, userUrl: string | undefined): Promise<Record<string, unknown>> => {
+    if (userUrl === undefined)
+      throw new Error(`kayjs-auth: the ${provider.name} provider has neither a userUrl nor an ID token to read the user from`)
+
+    const res = await fetch(userUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...provider.authHeaders?.(accessToken),
+      },
+    })
+
+    if (!res.ok)
+      throw new OAuthExchangeError(res.status, `OAuth user fetch failed (${provider.name}): ${res.status} ${redactBody(await res.text())}`)
+
+    return await res.json() as Record<string, unknown>
+  }
+
+  const checkIdToken = async (idToken: string | undefined, check: OpenIdCheck, nonce: string | undefined): Promise<Record<string, unknown>> => {
+    if (idToken === undefined)
+      throw new OAuthExchangeError(400, `OAuth token response missing id_token (${provider.name})`)
+
+    let keys = keySets.get(check.jwksUrl)
+
+    if (!keys) {
+      keys = createRemoteJWKSet(new URL(check.jwksUrl))
+      keySets.set(check.jwksUrl, keys)
+    }
+
+    let claims: Record<string, unknown>
+
+    try {
+      ({ payload: claims } = await jwtVerify(idToken, keys, { ...typeof check.issuer === 'function' ? {} : { issuer: check.issuer }, audience: config.clientId, clockTolerance: CLOCK_TOLERANCE_S, requiredClaims: ['sub', 'iat', 'exp'] }))
+    }
+    catch (error) {
+      // A key set out of reach is the provider down; any other failure, a token not to trust.
+      const refused = error instanceof errors.JOSEError && error.code !== 'ERR_JOSE_GENERIC' && !(error instanceof errors.JWKSTimeout)
+
+      throw new OAuthExchangeError(refused ? 400 : 502, `OAuth ID token refused (${provider.name}): ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud]
+
+    if (typeof check.issuer === 'function' && !check.issuer(claims))
+      throw new OAuthExchangeError(400, `OAuth ID token refused (${provider.name}): unexpected issuer`)
+
+    // A token for several clients names the one it was given to.
+    if (audiences.length > 1 && claims.azp !== config.clientId)
+      throw new OAuthExchangeError(400, `OAuth ID token refused (${provider.name}): issued to another client`)
+
+    if (nonce !== undefined && claims.nonce !== nonce)
+      throw new OAuthExchangeError(400, `OAuth ID token refused (${provider.name}): nonce mismatch`)
+
+    return claims
+  }
+
   return {
     /** The provider authorize URL to redirect the user to. */
-    authorizeUrl({ state, codeChallenge, extraParams }: AuthorizeUrlOptions = {}): string {
+    async authorizeUrl({ state, codeChallenge, nonce, extraParams }: AuthorizeUrlOptions = {}): Promise<string> {
+      const { openId } = await endpoints()
       const params = new URLSearchParams({
         client_id: config.clientId,
         redirect_uri: config.redirectUri,
         response_type: 'code',
         scope: provider.scopes.join(provider.scopeSeparator ?? ' '),
+        ...provider.authorizeParams,
         ...extraParams,
       })
 
@@ -41,14 +145,15 @@ export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProv
         params.set('code_challenge_method', 'S256')
       }
 
-      return `${provider.authorizeUrl}?${params}`
+      if (nonce !== undefined && openId)
+        params.set('nonce', nonce)
+
+      return `${await endpoint('authorizeUrl')}?${params}`
     },
 
     /** Exchanges an authorization code for tokens (replay the PKCE `codeVerifier` if used). */
     async exchangeCode(code: string, opts: { codeVerifier?: string } = {}): Promise<OAuthTokens> {
       const body = new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
         grant_type: 'authorization_code',
         code,
         redirect_uri: config.redirectUri,
@@ -57,38 +162,48 @@ export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProv
       if (opts.codeVerifier !== undefined)
         body.set('code_verifier', opts.codeVerifier)
 
-      return provider.parseTokens(await postToken(provider, body))
+      return provider.parseTokens(await postToken(provider.name, provider.tokenAccept, await endpoint('tokenUrl'), await withCredentials(body)))
     },
 
     /** Refreshes tokens with a refresh token. */
     async refreshTokens(refreshToken: string): Promise<OAuthTokens> {
-      return provider.parseTokens(await postToken(provider, new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
+      return provider.parseTokens(await postToken(provider.name, provider.tokenAccept, await endpoint('tokenUrl'), await withCredentials(new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
-      })))
+      }))))
     },
 
     /** Fetches and normalizes the provider user. */
     async fetchUser(accessToken: string): Promise<User> {
-      const res = await fetch(provider.userUrl, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          ...provider.authHeaders?.(accessToken),
-        },
-      })
+      return provider.normalizeUser(await userInfo(accessToken, (await endpoints()).userUrl) as Raw, {})
+    },
 
-      if (!res.ok)
-        throw new OAuthExchangeError(res.status, `OAuth user fetch failed (${provider.name}): ${res.status} ${redactBody(await res.text())}`)
+    /** The user a sign-in came back with: for OpenID Connect, off the ID token once checked, the user endpoint's answer over it when there is one; `callback` holds the parameters the provider came back with. */
+    async readUser(tokens: OAuthTokens, opts: { nonce?: string | undefined, callback?: Record<string, string> } = {}): Promise<User> {
+      const { userUrl, openId } = await endpoints()
+      const callback = opts.callback ?? {}
 
-      return provider.normalizeUser(await res.json() as Raw)
+      if (!openId)
+        return provider.normalizeUser(await userInfo(tokens.accessToken, userUrl) as Raw, callback)
+
+      const claims = await checkIdToken(tokens.idToken, openId, opts.nonce)
+
+      if (userUrl === undefined)
+        return provider.normalizeUser(claims as Raw, callback)
+
+      const info = await userInfo(tokens.accessToken, userUrl)
+
+      // An answer about another account than the token's would put one user's details on another.
+      if (info.sub !== claims.sub)
+        throw new OAuthExchangeError(502, `OAuth user fetch failed (${provider.name}): the user endpoint answered for another subject`)
+
+      return provider.normalizeUser({ ...claims, ...info } as Raw, callback)
     },
   }
 }
 
-async function postToken(provider: OAuthProvider<any, any>, body: URLSearchParams): Promise<any> {
-  const res = await fetch(provider.tokenUrl, {
+async function postToken(name: string, accept: OAuthProvider['tokenAccept'], tokenUrl: string, body: URLSearchParams): Promise<any> {
+  const res = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -100,16 +215,16 @@ async function postToken(provider: OAuthProvider<any, any>, body: URLSearchParam
   const text = await res.text()
 
   if (!res.ok)
-    throw new OAuthExchangeError(res.status, `OAuth token request failed (${provider.name}): ${res.status} ${redactBody(text)}`)
+    throw new OAuthExchangeError(res.status, `OAuth token request failed (${name}): ${res.status} ${redactBody(text)}`)
 
-  const isJson = provider.tokenAccept === 'json'
-    || (provider.tokenAccept !== 'form' && (res.headers.get('content-type') ?? '').includes('json'))
+  const isJson = accept === 'json'
+    || (accept !== 'form' && (res.headers.get('content-type') ?? '').includes('json'))
 
   const parsed = isJson ? JSON.parse(text) : Object.fromEntries(new URLSearchParams(text))
 
   // GitHub answers a refused grant with a 200 carrying `error`, where the spec answers a 400.
   if (typeof parsed?.error === 'string')
-    throw new OAuthExchangeError(400, `OAuth token request refused (${provider.name}): ${parsed.error}`)
+    throw new OAuthExchangeError(400, `OAuth token request refused (${name}): ${parsed.error}`)
 
   return parsed
 }

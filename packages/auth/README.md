@@ -1,6 +1,6 @@
 # kayjs-auth
 
-Auth for kay apps, built on kay's sessions: OAuth sign-in, passwords, mailed links (verification, reset, magic links, email change), TOTP two-factor with recovery codes, a list of sessions to end one by one, bearer tokens, security mails, a CAPTCHA hook and a breached-password check. It works in kay pages, actions and guards, and in a plain Elysia app, with its data in memory, in Postgres through pg-orm, or in a store of your own. It ships no UI: the app's pages call it, styled with kayjs-ui or anything else.
+Auth for kay apps, built on kay's sessions: OAuth and OpenID Connect sign-in (Discord, GitHub, Google, Apple, Microsoft, GitLab or any OpenID provider), passwords, mailed links (verification, reset, magic links, email change), TOTP two-factor with recovery codes, a list of sessions to end one by one, bearer tokens, security mails, a CAPTCHA hook and a breached-password check. It works in kay pages, actions and guards, and in a plain Elysia app, with its data in memory, in Postgres through pg-orm, or in a store of your own. It ships no UI: the app's pages call it, styled with kayjs-ui or anything else.
 
 ## Install
 

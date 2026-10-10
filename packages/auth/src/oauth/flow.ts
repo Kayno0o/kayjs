@@ -21,6 +21,8 @@ export interface OAuthFlow {
   provider: string
   state: string
   verifier: string
+  // Found again in an OpenID Connect provider's ID token, so one minted for another sign-in is refused.
+  nonce: string
   redirect: string
   // The user adding a provider to their account, null for a sign-in.
   link: string | null
@@ -47,14 +49,27 @@ export async function startOAuth(state: RequestState, provider: string, options:
 
   const pkce = await createPkcePair()
   const flowState = randomToken()
+  const nonce = randomToken()
+  let url: string
 
-  await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, redirect: safeRedirect(options.redirect), link: current?.id ?? null, expires: Date.now() + FLOW_MAX_AGE_MS })
+  try {
+    url = await entry.client.authorizeUrl({ state: flowState, codeChallenge: pkce.challenge, nonce })
+  }
+  // An OpenID Connect provider whose discovery document is out of reach.
+  catch (error) {
+    if (error instanceof OAuthExchangeError)
+      return { error: 'unavailable' }
 
-  return entry.client.authorizeUrl({ state: flowState, codeChallenge: pkce.challenge })
+    throw error
+  }
+
+  await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, nonce, redirect: safeRedirect(options.redirect), link: current?.id ?? null, expires: Date.now() + FLOW_MAX_AGE_MS })
+
+  return url
 }
 
-// Where to send the browser once the provider sent it back: the flow is spent whatever happens, so a callback URL replayed later finds none.
-export async function finishOAuth(state: RequestState, provider: string, query: { code?: string | undefined, state?: string | undefined, error?: string | undefined }): Promise<{ redirect: string } | { error: OAuthFailure }> {
+// Where to send the browser once the provider sent it back with `query`: the flow is spent whatever happens, so a callback URL replayed later finds none.
+export async function finishOAuth(state: RequestState, provider: string, query: Record<string, string | undefined>): Promise<{ redirect: string } | { error: OAuthFailure }> {
   const { core } = state
   const flow = await state.session.get('authOAuth')
 
@@ -74,7 +89,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
 
   try {
     tokens = await entry.client.exchangeCode(query.code, { codeVerifier: flow.verifier })
-    profile = { ...await entry.client.fetchUser(tokens.accessToken), provider }
+    profile = { ...await entry.client.readUser(tokens, { nonce: flow.nonce, callback: callbackParams(query) }), provider }
   }
   catch (error) {
     if (error instanceof OAuthExchangeError)
@@ -129,6 +144,18 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
   await heardProfile(core, record, profile)
 
   return { redirect: await state.complete(record, flow.redirect) }
+}
+
+// What else the provider came back with, such as Apple's `user` naming the user on their first sign-in.
+function callbackParams(query: Record<string, string | undefined>): Record<string, string> {
+  const params: Record<string, string> = {}
+
+  for (const [name, value] of Object.entries(query)) {
+    if (value !== undefined && name !== 'code' && name !== 'state')
+      params[name] = value
+  }
+
+  return params
 }
 
 // A failure is logged, not thrown: refreshing what the app keeps from a profile must not fail a sign-in the provider vouched for.

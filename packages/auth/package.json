@@ -60,7 +60,8 @@
     }
   },
   "dependencies": {
-    "@kaynooo/utils": "^2.27.0"
+    "@kaynooo/utils": "^2.27.0",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@kaynooo/eslint": "^6.0.1",

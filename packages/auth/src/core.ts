@@ -36,7 +36,8 @@ export interface SignedIn {
 export interface OAuthApp {
   provider: OAuthProvider<any, OAuthUser>
   clientId: string
-  clientSecret: string
+  // Left out for Apple, whose preset signs its own, or a public client.
+  clientSecret?: string | undefined
 }
 
 // A provider account as kayjs-auth reads it; `email` is set only when the provider says it is verified.

@@ -27,9 +27,9 @@ afterEach(() => {
 })
 
 describe('createOAuthClient.authorizeUrl', () => {
-  test('builds the authorize URL with scope, state and PKCE challenge', () => {
+  test('builds the authorize URL with scope, state and PKCE challenge', async () => {
     const client = createOAuthClient(discordProvider(), CONFIG)
-    const url = new URL(client.authorizeUrl({ state: 'st', codeChallenge: 'chal' }))
+    const url = new URL(await client.authorizeUrl({ state: 'st', codeChallenge: 'chal' }))
 
     expect(url.origin + url.pathname).toBe('https://discord.com/oauth2/authorize')
     expect(url.searchParams.get('client_id')).toBe('cid')
@@ -41,9 +41,9 @@ describe('createOAuthClient.authorizeUrl', () => {
     expect(url.searchParams.get('code_challenge_method')).toBe('S256')
   })
 
-  test('omits state and PKCE params when not supplied', () => {
+  test('omits state and PKCE params when not supplied', async () => {
     const client = createOAuthClient(discordProvider(), CONFIG)
-    const url = new URL(client.authorizeUrl())
+    const url = new URL(await client.authorizeUrl())
 
     expect(url.searchParams.has('state')).toBe(false)
     expect(url.searchParams.has('code_challenge')).toBe(false)
