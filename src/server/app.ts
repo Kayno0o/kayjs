@@ -342,8 +342,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   // Their canonical links, social URLs and anything built with `siteUrl()` name the site the build ran for.
   const moved = client.pages.size > 0 && client.site !== site
 
-  if (moved)
-    console.warn(`[kay] kay build rendered its pages for ${client.site ?? 'no site'} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
+  // A build with no site, for a server given one at boot, is the way to serve several hosts; a site that changed, or none at all, is worth a word.
+  if (moved && client.site !== undefined)
+    console.warn(`[kay] kay build rendered its pages for ${client.site} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
 
   for (const pages of prerendered.values())
     trackPrerendered(pages, page => moved || page.readsSite === true)

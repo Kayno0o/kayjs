@@ -801,11 +801,12 @@ describe('revalidation', () => {
       await prerenderPages(root, { routes }, (await readClient(root))!)
 
       expect((await readManifest(root))!.pages!['/origin']!.readsSite).toBe(true)
-      expect(warned).toHaveBeenCalledWith('[kay] /origin read the site, which neither `site` in kay.config.ts nor SITE_URL sets at build: the server renders it again on its first request')
 
       const app = await pages({ routes, prebuilt: true, security: false, site: 'https://example.com' })
 
       expect(await (await app.handle(new Request('http://localhost/origin'))).text()).toContain('<p class="origin">https://example.com</p>')
+      // Built for no site and served for one, as one build for several hosts is, it goes quietly.
+      expect(warned).not.toHaveBeenCalled()
       await expect(prerenderPages(root, { routes }, (await readClient(root))!, { exportAll: true })).rejects.toThrow('origin.kay: it reads the site, through siteUrl() or siteOrigin()')
     }
     finally {

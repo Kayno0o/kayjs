@@ -166,11 +166,6 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   if (problems.length > 0 || apiProblems.length > 0)
     throw new ExportError(`kay: ${[count(problems.length, 'page'), count(apiProblems.length, 'API module')].filter(part => part !== '').join(' and ')} cannot be exported to static files, which no server answers for:\n${[...problems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)
 
-  const siteless = Object.keys(pages).filter(path => pages[path]!.readsSite)
-
-  if (siteless.length > 0)
-    console.warn(`[kay] ${siteless.join(', ')} read the site, which neither \`site\` in kay.config.ts nor SITE_URL sets at build: the server renders ${siteless.length === 1 ? 'it' : 'each'} again on its first request`)
-
   await writeManifest(root, { ...manifest, pages, site })
   client.pages = new Map(Object.entries(pages))
 
