@@ -84,7 +84,7 @@ const open = signal(false)
 ---
 button(
   aria-controls={id}
-  aria-expanded={open ? 'true' : 'false'}
+  aria-expanded={open}
   onClick={() => open.set(!open)}
 )
   | Menu

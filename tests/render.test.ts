@@ -259,7 +259,7 @@ describe('static server output', () => {
     const source = '---\nconst { off, on, none, cls, css } = props<{ off: boolean, on: boolean, none?: string, cls: unknown, css: Record<string, string | null> }>()\n---\np(title="a &amp; b & c" data-e="" hidden aria-a={off} aria-b={on} aria-c={none} class={cls} style={css})'
     const html = await renderKay(source, { off: false, on: true, cls: ['x', { y: true, z: false }, 0], css: { color: 'red', margin: null } })
 
-    expect(html).toBe('<p title="a &amp; b &amp; c" data-e hidden aria-b class="0 x y" style="color:red"></p>')
+    expect(html).toBe('<p title="a &amp; b &amp; c" data-e hidden aria-a="false" aria-b="true" class="0 x y" style="color:red"></p>')
     expect(await renderKay('details(open) more')).toBe('<details open>more</details>')
   })
 

@@ -32,6 +32,7 @@ export class HydrationMismatch extends Error {
 }
 
 const TAG_END = /[\s>]/
+const ARIA = /^aria-/i
 // What `img(src={hero})` sets, its size left alone when the template gives one.
 const IMAGE_SOURCE = ['src', 'srcset', 'sizes']
 const SIZED_IMAGE = ['src', 'srcset', 'sizes', 'width', 'height']
@@ -1115,11 +1116,11 @@ export function omit(props: object, ...keys: string[]): Record<string, unknown> 
 
 // ---- attributes and events
 
-// A link's href goes to the page's locale's copy, as the server writes it, unless `written`: the link carries `hreflang`.
+// A link's href goes to the page's locale's copy, as the server writes it, unless `written`: the link carries `hreflang`. An ARIA state takes a boolean as `"true"` or `"false"`.
 export function attribute(element: Element, name: string, value: unknown, written = false): void {
-  if (value == null || value === false)
+  if (value == null || (value === false && !ARIA.test(name)))
     element.removeAttribute(name)
-  else if (value === true)
+  else if (value === true && !ARIA.test(name))
     element.setAttribute(name, '')
   else
     element.setAttribute(name, safeUrl(name, rebasedAttribute(name, name === 'href' && !written && element.localName === 'a' ? localizedHref(String(value)) : String(value))))

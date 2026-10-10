@@ -25,6 +25,12 @@ describe('element', () => {
     expect(element('button', [{ onClick: Number, ref: String, disabled: true, hidden: false, title: null, value: '' }]).t).toBe('<button disabled value></button>')
     expect(element('details', [{ open: true, ontoggle: 'x()' }]).t).toBe('<details open></details>')
   })
+
+  it('writes a boolean ARIA state as "true" or "false", leaving it out only for null and undefined', () => {
+    expect(element('button', [{ 'aria-expanded': true, 'aria-pressed': false, 'aria-busy': null, 'aria-hidden': undefined, 'aria-label': 'x' }]).t).toBe('<button aria-expanded="true" aria-pressed="false" aria-label="x"></button>')
+    expect(attribute('aria-selected', false)).toBe(' aria-selected="false"')
+    expect(attribute('hidden', true) + attribute('disabled', false)).toBe(' hidden')
+  })
 })
 
 describe('bound URLs', () => {

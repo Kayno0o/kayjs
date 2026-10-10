@@ -127,6 +127,30 @@ describe('component class', () => {
   })
 })
 
+describe('ARIA states', () => {
+  it('render a boolean as "true" or "false" as it changes, set or spread, null leaving the attribute out', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst open = signal<boolean | null>(false)\n---\nbutton(aria-expanded={open()} hidden={open() === true} onClick={() => open.set(open() === false ? true : null)}) x\ndiv({...{ \'aria-busy\': open() }})\n',
+    })
+
+    try {
+      const button = root.querySelector('button')!
+      const div = root.querySelector('div')!
+
+      expect([button.getAttribute('aria-expanded'), div.getAttribute('aria-busy'), button.hasAttribute('hidden')]).toEqual(['false', 'false', false])
+      button.click()
+      await settle()
+      expect([button.getAttribute('aria-expanded'), div.getAttribute('aria-busy'), button.getAttribute('hidden')]).toEqual(['true', 'true', ''])
+      button.click()
+      await settle()
+      expect([button.hasAttribute('aria-expanded'), div.hasAttribute('aria-busy'), button.hasAttribute('hidden')]).toEqual([false, false, false])
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('bound URLs', () => {
   it('neutralise one that would run script, set or spread, as it changes', async () => {
     const { root, dispose } = await mountKay({

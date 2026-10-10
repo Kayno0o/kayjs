@@ -37,6 +37,7 @@ const TAGS = /<[^>]*>/g
 const SPACES = /\s+/g
 const HTML_ENTITY = /&(?:amp|lt|gt|quot|#39);/g
 const TRAILING_SLASH = /(?<=.)\/$/
+const ARIA = /^aria-/i
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'' }
 const LINK_TAG = /<a\s[^>]*>/gi
 const LINK_HREF = /(\shref=")([^"]*)"/i
@@ -113,12 +114,12 @@ function rendered(value: object): string {
   return typeof t === 'string' ? t : ''
 }
 
-// ` name="value"`, ` name` for `true`, nothing for `null`, `undefined` and `false`.
+// ` name="value"`, ` name` for `true`, nothing for `null`, `undefined` and `false`; an ARIA state takes a boolean as `"true"` or `"false"`.
 export function attribute(name: string, value: unknown): string {
-  if (value == null || value === false)
+  if (value == null || (value === false && !ARIA.test(name)))
     return ''
 
-  return value === true ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, String(value)))}"`
+  return value === true && !ARIA.test(name) ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, String(value)))}"`
 }
 
 // A link of the site in the locale of the page rendering it; see `localizedLink`.

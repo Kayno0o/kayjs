@@ -174,7 +174,7 @@ dialog.palette(aria-label="Search the documentation" closedby="any" ref={el => d
     else
       ul#search-results.palette-results(role="listbox")
         for match, i of matches key={i}
-          li(id={`search-${i}`} role="option" aria-selected={i === active ? 'true' : 'false'} onMouseMove={() => active.set(i)} onClick={() => go(match)})
+          li(id={`search-${i}`} role="option" aria-selected={i === active} onMouseMove={() => active.set(i)} onClick={() => go(match)})
             span.palette-where
               span {match.section.page}
               if match.section.heading as heading
