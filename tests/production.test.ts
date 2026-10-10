@@ -387,6 +387,10 @@ describe('action protection', () => {
       expect((await site.submit(ask, { message: 'hello' }, { from: '/quote' })).html).toContain('<p class="error">422 This form has expired; send it again</p>')
       // A stamp given to it wins over the page's.
       expect((await site.submit(ask, { message: 'hello', kay_since: 'forged' }, { from: page })).html).toContain('<p class="error">422 This form has expired; send it again</p>')
+      // As does one dated by how long the form was open, the clock left alone.
+      expect((await site.submit(ask, { message: 'hello' }, { from: '/quote', openedFor: '5s' })).html).toContain('<p class="asked">Asked 5</p>')
+      expect((await site.submit(ask, { message: 'hello' }, { from: page, openedFor: 0 })).html).toContain('<p class="error">422 Sent too fast; take a moment, then send it again</p>')
+      expect((await site.submit(ask, { message: 'hello' }, { from: page, openedFor: '2d' })).html).toContain('<p class="error">422 This form has expired; send it again</p>')
 
       // An island's form renders no stamp; one it sends is still checked.
       expect(await refusal({ message: 'hi' }, false)).toBeUndefined()

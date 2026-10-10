@@ -1,5 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { Action, ResultOf, Success } from '../runtime/action'
+import type { Duration } from '../runtime/duration'
 import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
@@ -11,6 +12,7 @@ import { Elysia } from 'elysia'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
 import { encodeCall, readActionResponse, STAMP_FIELD } from '../runtime/action'
+import { durationSeconds } from '../runtime/duration'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { servePages } from '../server/app'
@@ -19,6 +21,7 @@ import { shutdown } from '../server/lifecycle'
 import { drainQueues } from '../server/queue'
 import { sendFrom } from '../server/rewrite'
 import { SITEMAP } from '../server/sitemap'
+import { signStamp } from '../server/stamp'
 import { servedThrough } from '../server/visit'
 import { browse } from './browser'
 import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket } from './natives'
@@ -62,7 +65,8 @@ export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
   // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser. A `Visit` as `from` posts where its form does, with the stamp `minTime` reads, from the URL the browser shows it at, the action's own for a page a refused post answered.
-  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit }) => Promise<Visit>
+  // `openedFor` sends a stamp as if the form had been open that long, `0` as if just opened, in place of the page's.
+  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit, openedFor?: Duration | 0 }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
   call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit) => Promise<Success<ResultOf<Target>>>
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
@@ -289,7 +293,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       const form = new NativeFormData()
 
       // The stamp `minTime` reads goes with the post, as the browser sends the form it was rendered in.
-      const stamp = url === undefined ? undefined : page?.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value
+      const opened = init.openedFor === undefined ? undefined : signStamp(action.url, Date.now() - (init.openedFor === 0 ? 0 : durationSeconds(init.openedFor, 'openedFor') * 1000))
+      const stamp = opened ?? (url === undefined ? undefined : page?.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value)
 
       if (stamp !== undefined && !(STAMP_FIELD in fields))
         form.set(STAMP_FIELD, stamp)
