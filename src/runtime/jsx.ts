@@ -1,5 +1,6 @@
 import type { Range } from './dom'
 import type { Html } from './html'
+import type { TransitionClasses } from './transition'
 
 // The types `kay check` and the editor read templates against: what a template renders, the elements it uses and the attributes each takes.
 // Templates compile to HTML strings and DOM code, never to JSX, so nothing here runs.
@@ -123,8 +124,8 @@ interface CommonAttributes<Target> {
   'itemscope'?: AttributeValue
   'itemtype'?: AttributeValue
   'writingsuggestions'?: AttributeValue
-  // Animates the element in an island as an `if`, a `for` row or an `await` shows it and before it goes: `fade` adds `fade-enter-from`, `fade-enter-active`, `fade-enter-to`, and `fade-leave-` likewise.
-  'transition'?: string | undefined
+  // Animates the element in an island as an `if`, a `for` row or an `await` shows it and before it goes: `fade` adds `fade-enter-from`, `fade-enter-active`, `fade-enter-to`, and `fade-leave-` likewise. A preset object, `{ enter, enterFrom, enterTo, leave, leaveFrom, leaveTo }`, gives each phase its classes instead.
+  'transition'?: string | TransitionClasses | undefined
   // Classes of each phase besides or instead of the named ones, Tailwind's included: `enter` and `leave` throughout, `-from` for the first frame, `-to` after it.
   'transition:enter'?: string | undefined
   'transition:enter-from'?: string | undefined

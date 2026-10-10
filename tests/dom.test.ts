@@ -536,6 +536,30 @@ describe('transitions', () => {
     }
   })
 
+  it('take the classes of each phase from a preset a module shares, the attributes adding to them', async () => {
+    const { root, dispose } = await mountKay({
+      'presets.ts': 'import type { TransitionClasses } from \'kay\'\n\nexport const fade: TransitionClasses = { enter: \'transition-opacity\', enterFrom: \'opacity-0\', leaveTo: \'opacity-0\' }\n',
+      'main.kay': toggled(false, `p.panel(transition:leave-to="scale-95" transition={fade} ${STYLE}) Hi`).replace('---\n', '---\nimport { fade } from \'./presets\'\n'),
+    })
+
+    try {
+      root.querySelector('button')!.click()
+      await updated()
+      const panel = root.querySelector('.panel')!
+
+      expect(panel.className).toBe('panel opacity-0 transition-opacity')
+      await twoFrames()
+      expect(panel.className).toBe('panel transition-opacity')
+      root.querySelector('button')!.click()
+      await updated()
+      await twoFrames()
+      expect(panel.className).toBe('panel opacity-0 scale-95')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   it('play a for row out as its item goes and the new rows in, the rows left in their order', async () => {
     const { root, dispose } = await mountKay({
       'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(['a', 'c'])}) Drop\nbutton.add(onClick={() => items.set(['a', 'c', 'd'])}) Add\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,

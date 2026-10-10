@@ -1,5 +1,6 @@
 ---
 import type { Todo } from './todo'
+import { fadeIn } from './todo'
 import { selection, signal } from 'kay'
 import TodoItem from './todo-item.kay'
 
@@ -15,6 +16,6 @@ section.todo-list
     for todo, i of shown() key={todo.id}
       TodoItem(todo={todo} index={i} selected={selected.is(todo.id)} onToggle={id => selected.set(id)})
     else
-      li.empty Nothing matches
+      li.empty(transition={fadeIn}) Nothing matches
   if todos.find(todo => todo.id === selected()) as todo
     p Selected #[strong {todo.title}]

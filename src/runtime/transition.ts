@@ -5,13 +5,24 @@ import { playTransitions } from './dom'
 
 export type Phase = 'enter' | 'leave'
 
-// What the attributes set: a name for the six classes it stands for, and classes of their own for any of them.
-type Phases = Partial<Record<'name' | Phase | `${Phase}-from` | `${Phase}-to`, string | undefined>>
+// The classes of each phase `transition={preset}` takes, as a module shares them between elements: `{ enter: 'transition duration-200', enterFrom: 'opacity-0' }`.
+export interface TransitionClasses {
+  enter?: string | undefined
+  enterFrom?: string | undefined
+  enterTo?: string | undefined
+  leave?: string | undefined
+  leaveFrom?: string | undefined
+  leaveTo?: string | undefined
+}
+
+// What the attributes set: a name for the six classes it stands for or a preset of them, and classes of their own for any of them.
+type Phases = Partial<Record<'name' | Phase | `${Phase}-from` | `${Phase}-to`, string | undefined>> & { preset?: TransitionClasses | undefined }
 
 const phasesOf = new WeakMap<Element, Phases>()
 // Ends the phase an element is playing, as the other one starts.
 const playing = new WeakMap<Element, () => void>()
 const CLASS_LIST = /\s+/
+const PRESET_STEP = { '': '', '-from': 'From', '-to': 'To' } as const
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
 const SECONDS = /s$/
 const MILLISECONDS = /ms$/
@@ -20,8 +31,12 @@ function hasTransition(node: Node): node is Element {
   return phasesOf.has(node as Element)
 }
 
+function classList(value: string | undefined): string[] {
+  return value?.split(CLASS_LIST).filter(Boolean) ?? []
+}
+
 function classes(phases: Phases, phase: Phase, step: '' | '-from' | '-to'): string[] {
-  const own = phases[`${phase}${step}`]?.split(CLASS_LIST).filter(Boolean) ?? []
+  const own = [...classList(phases.preset?.[`${phase}${PRESET_STEP[step]}`]), ...classList(phases[`${phase}${step}`])]
 
   return phases.name !== undefined && phases.name !== '' ? [`${phases.name}-${phase}${step || '-active'}`, ...own] : own
 }
@@ -108,7 +123,7 @@ function leave(element: Element): void {
 
 const HOOKS = { has: hasTransition, enter, leave }
 
-// Called by the generated code for `transition` (part `name`) and each `transition:` part.
+// Called by the generated code for `transition` (part `name`), a name or a preset, and each `transition:` part.
 export function transition(element: Element, part: string, value: unknown): void {
   playTransitions(HOOKS)
   let phases = phasesOf.get(element)
@@ -116,5 +131,14 @@ export function transition(element: Element, part: string, value: unknown): void
   if (!phases)
     phasesOf.set(element, phases = {})
 
-  phases[part as keyof Phases] = value == null || value === false ? undefined : String(value)
+  if (part === 'name' && typeof value === 'object' && value !== null) {
+    phases.name = undefined
+    phases.preset = value
+  }
+  else {
+    if (part === 'name')
+      phases.preset = undefined
+
+    phases[part as Exclude<keyof Phases, 'preset'>] = value == null || value === false ? undefined : String(value)
+  }
 }
