@@ -1,0 +1,5 @@
+---
+const { children } = props<{ children?: string }>()
+const shown = signal(true)
+---
+span.label(onClick={() => shown.set(!shown())}) {children}

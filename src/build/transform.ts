@@ -35,6 +35,7 @@ interface Compiled {
 // What `buildClient` reads off each component before bundling.
 export interface Analysis {
   island?: string | undefined
+  promote?: string | undefined
   classes: string[]
   diagnostics: Diagnostic[]
 }
@@ -102,8 +103,8 @@ export async function analyzeKayCached(source: string, filename: string, root: s
   if (cached !== undefined)
     return cached
 
-  const { island, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints })
-  const analysis = { island, classes, diagnostics }
+  const { island, promote, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints })
+  const analysis = { island, promote, classes, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly))
     await writeCacheEntry(entry, analysis)

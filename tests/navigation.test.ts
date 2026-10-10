@@ -249,6 +249,25 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await sameDocument()).toBe(true)
   })
 
+  it('keeps on a refresh an island whose children the page renders the same, and renders afresh one whose children changed', async () => {
+    await page.evaluate(() => {
+      for (const box of document.querySelectorAll('slot[data-component$="box.kay"]'))
+        (box as HTMLElement & { kayMark?: string }).kayMark = 'kept'
+    })
+    await page.click('section.box:has(p.same) button.box-count')
+    await page.locator('section.box:has(p.same) button.box-count', { hasText: 'Box 1' }).waitFor()
+
+    const before = await page.textContent('p.boxed-bumps')
+
+    await page.click('button.bump')
+    await page.locator('p.boxed-bumps', { hasNotText: before! }).waitFor()
+
+    expect(await page.evaluate(() => [...document.querySelectorAll('slot[data-component$="box.kay"]')].map(box => (box as HTMLElement & { kayMark?: string }).kayMark ?? 'fresh'))).toEqual(['kept', 'fresh'])
+    expect(await page.textContent('section.box:has(p.same) button.box-count')).toBe('Box 1')
+    await page.click('section.box:has(p.boxed-bumps) button.box-count')
+    await page.locator('section.box:has(p.boxed-bumps) button.box-count', { hasText: 'Box 1' }).waitFor()
+  })
+
   it('restores where the page was scrolled to when going back', async () => {
     await page.goto(origin)
     await page.evaluate(() => {

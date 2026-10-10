@@ -1,0 +1,7 @@
+---
+import Counter from './counter.kay'
+
+const start = () => 3
+---
+div.counted
+  Counter(start={start()})

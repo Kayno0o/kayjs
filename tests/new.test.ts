@@ -394,7 +394,7 @@ describe('kay new', () => {
         expect(code).toBe(0)
       }
 
-      expect(Object.keys((await buildClient(dir)).islands)).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay', 'src/components/online.kay'])
+      expect(Object.keys((await buildClient(dir)).islands).toSorted()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay', 'src/components/online.kay'])
     }
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })

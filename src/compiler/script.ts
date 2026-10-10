@@ -4,6 +4,7 @@ import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import { parse } from '@babel/parser'
 import { isSecret } from '../server/flash'
+import { SENDABLE_CLASSES } from './expression'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 const REACTIVE_MODULES = new Set(['kay'])
@@ -57,13 +58,15 @@ export interface ScriptAnalysis {
   implicit: string[]
   body: Span[]
   props?: PropsDeclaration
+  // The names the component body declares that may hold a function, a class or an instance of one, which no page can send an island.
+  functions: string[]
   diagnostics: Diagnostic[]
 }
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 // `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of.
 export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = []): ScriptAnalysis {
-  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], reactive: false, implicit: [], diagnostics: [] }
+  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], reactive: false, implicit: [], functions: [], diagnostics: [] }
 
   if (!script)
     return analysis
@@ -105,6 +108,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
         if (statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration' || statement.type === 'ExportAllDeclaration')
           analysis.diagnostics.push({ ...span, message: 'A component script exports only types', help: 'move the value to a `.ts` module and import it' })
 
+        analysis.functions.push(...functionNames(statement))
         analysis.body.push(span)
       }
     }
@@ -118,6 +122,32 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
   reportMisplacedProps(ast, analysis, shift)
 
   return analysis
+}
+
+// What a body declaration may hold a function or an instance of a class by: writing one, or a call returning one.
+const FUNCTION_VALUES = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'NewExpression', 'CallExpression', 'AwaitExpression'])
+
+function functionNames(statement: t.Statement): string[] {
+  if ((statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') && statement.id)
+    return [statement.id.name]
+
+  if (statement.type !== 'VariableDeclaration')
+    return []
+
+  return statement.declarations.flatMap(declaration => declaration.id.type === 'Identifier' && declaration.init && holdsFunction(declaration.init) ? [declaration.id.name] : [])
+}
+
+function holdsFunction(value: t.Node): boolean {
+  if (value.type === 'ObjectExpression')
+    return value.properties.some(property => property.type === 'ObjectMethod' || holdsFunction(property.type === 'SpreadElement' ? property.argument : property.value))
+
+  if (value.type === 'ArrayExpression')
+    return value.elements.some(element => element !== null && holdsFunction(element.type === 'SpreadElement' ? element.argument : element))
+
+  if (value.type === 'NewExpression')
+    return value.callee.type !== 'Identifier' || !SENDABLE_CLASSES.has(value.callee.name)
+
+  return FUNCTION_VALUES.has(value.type)
 }
 
 export interface ServerData {

@@ -1,0 +1,5 @@
+---
+import Picker from '../picker.kay'
+---
+Picker(format={(value: string) => value})
+slot

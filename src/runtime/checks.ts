@@ -162,13 +162,10 @@ type IsSerializable<T, Seen = never> = T extends Sendable
               : false
 
 // Props a static parent passes to an island are serialized for the browser, so they must survive it.
-export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? unknown : { kayError: 'An island receives its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances' } : unknown
+export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? unknown : { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : unknown
 
 // A function written in the attribute is checked apart from its value, which a wrapping call would stop a generic component from typing: `0` stands for the attribute.
-export type FunctionProp<Component> = Component extends IslandBrand ? { kayError: 'An island receives its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances' } : 0
-
-// Lines under an island's tag in a static parent, which cannot cross to the browser: `0` stands for them.
-export type ChildrenProp<Component> = Component extends IslandBrand ? { kayError: 'An island takes no children: pass data as props, or make the parent interactive too' } : 0
+export type FunctionProp<Component> = Component extends IslandBrand ? { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : 0
 
 declare const DEFERRED: unique symbol
 

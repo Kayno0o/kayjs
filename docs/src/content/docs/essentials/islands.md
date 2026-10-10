@@ -33,7 +33,35 @@ p {matches.length} results
 
 ## Props to an island
 
-Props a static parent passes are serialized for the browser: objects, arrays, strings, numbers, booleans, dates, maps and sets. Functions and class instances are not, and `kay check` reports them.
+Props a static parent passes are serialized for the browser: objects, arrays, strings, numbers, booleans, dates, maps and sets.
+
+Children and `@name` blocks render on the server with the page, and the island shows them where its template has `slot` or the prop. An island among them hydrates on its own, and keeps its state when the outer one hides them and shows them again.
+
+`src/components/collapsible.kay`:
+
+```kay
+---
+const { title } = props<{ title: string }>()
+const open = signal(false)
+---
+button(onClick={() => open.set(!open())}) {title}
+if open()
+  slot
+```
+
+`src/routes/index.kay`:
+
+```kay
+---
+import Collapsible from '../components/collapsible.kay'
+import Counter from '../components/counter.kay'
+---
+Collapsible(title="Details")
+  p Rendered on the server, shown by the island.
+  Counter
+```
+
+A function, a block with parameters or a class instance cannot be serialized: a component passing one to an island renders as an island itself. A layout or a page with a `--- server` fence cannot, so `kay check` reports it there: move that part to a component.
 
 ## When to hydrate
 

@@ -269,7 +269,7 @@ function render(segments: Segment[], components: Record<string, Component<never>
       throw new Error(`kay: ${file} uses <${segment.component}>, which its collection's components do not name`)
 
     const { children } = segment
-    // An island takes no children, so a self-closing tag passes none.
+    // A self-closing tag passes no children.
     const props = children.length === 0
       ? segment.props
       : { ...segment.props, get children() {

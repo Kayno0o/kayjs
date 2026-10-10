@@ -13,6 +13,7 @@ export const note = action(t.Object({ text: t.String({ maxLength: 5 }) }), () =>
 const bumps = store.bumps
 ---
 ---
+import Box from '../components/box.kay'
 import Bump from '../components/bump.kay'
 ---
 head
@@ -20,6 +21,10 @@ head
 h1 Home
 p.bumps Bumped {bumps}
 Bump
+Box
+  p.same Same each time
+Box
+  p.boxed-bumps Boxed {bumps}
 form(action={note})
   input(name="text")
   button.note Note

@@ -6,7 +6,7 @@ import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { awaitBlocks, drawIcons, tryBlocks } from './ast'
 import { browserReads } from './browser'
-import { generate, isInteractive, islandMessages } from './codegen'
+import { generate, isInteractive, islandMessages, mayPromote } from './codegen'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseKay } from './parser'
@@ -50,6 +50,8 @@ export interface CompileResult {
   map: SourceMap
   // Set when the component is interactive and renders as an island.
   island?: string | undefined
+  // Set when the static component renders as an island should it pass one what only an island sends.
+  promote?: string | undefined
   // The `.class` shorthand names, which CSS tools scanning for class names cannot read off `div.md:flex.w-1/2`.
   classes: string[]
   diagnostics: Diagnostic[]
@@ -90,7 +92,8 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const island = client || isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const generateOptions = { island, client, twin, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, insideIsland: options.insideIsland, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
+  const promote = island === undefined && !routeFile && mayPromote(file, script) ? islandId(filename, options.root) : undefined
+  const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, insideIsland: options.insideIsland, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.
@@ -134,6 +137,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     tsx: final.builder.code,
     map: final.builder.map(),
     island,
+    promote,
     classes: shorthandClasses(file.template, source),
     diagnostics: reported,
   }

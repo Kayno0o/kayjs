@@ -1,0 +1,9 @@
+---
+import type { JSX } from 'kay'
+
+const { items, row } = props<{ items: string[], row: (item: string) => JSX.Element }>()
+const reversed = signal(false)
+---
+ul.list(onClick={() => reversed.set(!reversed())})
+  for item of reversed() ? items.toReversed() : items
+    li {row(item)}

@@ -1,0 +1,8 @@
+---
+import Picker from './picker.kay'
+
+const { label } = props<{ label: string }>()
+const shout = (value: string) => `${label}: ${value.toUpperCase()}`
+---
+div.toolbar
+  Picker(format={shout})

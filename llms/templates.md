@@ -81,7 +81,7 @@ Card(title="Todos")
   p Body text
 ```
 
-A block taking parameters is passed as a function the component calls, once per row for instance, and its parameters take their types from the prop. A static parent cannot pass one to an island, since no function reaches the browser. A static component that only islands render is part of them, so it can.
+A block taking parameters is passed as a function the component calls, once per row for instance, and its parameters take their types from the prop. No function reaches the browser, so a static component passing one to an island renders as an island itself, and a layout or a page with a `--- server` fence cannot pass one. A static component that only islands render is part of them, so it can.
 
 ```kay
 --- <T extends { id: number }>

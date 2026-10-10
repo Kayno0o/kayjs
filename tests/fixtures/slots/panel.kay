@@ -1,0 +1,13 @@
+---
+import type { JSX } from 'kay'
+
+const { open: initial = true, actions } = props<{ open?: boolean, actions?: JSX.Element, children?: JSX.Element }>()
+const open = signal(initial)
+---
+section.panel
+  header
+    button.toggle(onClick={() => open.set(!open())}) Toggle
+    | {actions}
+  if open()
+    div.body
+      slot

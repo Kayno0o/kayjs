@@ -208,9 +208,11 @@ describe('elements', () => {
     expect(jsx('List(items={todos})\n  @row(todo, i)\n    li {i}. {todo.title}\n  @empty\n    p none')).toBe('<List items={todos} row={(todo, i) => <li>{i}. {todo.title}</li>} empty={<p>none</p>} />')
     expect(jsx('List\n  @row()\n    li x')).toBe('<List row={() => <li>x</li>} />')
 
-    const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[1]})\n  @row(n)\n    li {n}', 'test.kay', { check: true }).tsx
+    const source = '---\nimport List from \'./list.kay\'\n---\nList(items={[1]})\n  @row(n)\n    li {n}'
 
-    expect(code).toContain('<List items={KayProp(List)(([1]))} {...KayFunctionProp(List)(0)} row={(n) => <li>{n}</li>} />')
+    expect(compileKay(source, '_layout.kay', { check: true }).tsx).toContain('<List items={KayProp(List)(([1]))} {...KayFunctionProp(List)(0)} row={(n) => <li>{n}</li>} />')
+    // A component renders as an island in its place should List be one, so what it passes is not sent as it is.
+    expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain('<List items={[1]} row={(n) => <li>{n}</li>} />')
   })
 
   it('reports a prop a slot passes a second time', () => {
@@ -479,7 +481,7 @@ describe('generic components', () => {
   })
 
   it('leaves a function given to a component unwrapped in check output, so a generic one types its parameters', () => {
-    const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[1]} show={n => String(n)})', 'test.kay', { check: true }).tsx
+    const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[1]} show={n => String(n)})', '_layout.kay', { check: true }).tsx
 
     expect(code).toContain('<List items={KayProp(List)(([1]))} {...KayFunctionProp(List)(0)} show={n => String(n)} />')
   })

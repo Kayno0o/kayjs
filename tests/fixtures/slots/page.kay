@@ -1,0 +1,27 @@
+---
+import Counted from './counted.kay'
+import Counter from './counter.kay'
+import Label from './label.kay'
+import Panel from './panel.kay'
+import Plot from './plot.kay'
+import Rows from './rows.kay'
+import Toolbar from './toolbar.kay'
+
+const name = 'Ada'
+---
+main
+  Panel
+    @actions
+      a.more(href="/more") More
+    p.text Hello {name}
+    Counter(start={1})
+  Panel(open={false})
+    p.hidden Hidden at first
+    Counter(start={10})
+  Panel(hydrate="client")
+    p.client Client only
+  Label Plain text
+  Toolbar(label="Tool")
+  Rows
+  Counted
+  Plot

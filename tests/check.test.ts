@@ -49,13 +49,13 @@ describe('kay check', () => {
       { file: 'broken/src/routes/head.kay', line: 2, column: 8, code: 'TS2322', message: expect.stringContaining('nmae') },
       { file: 'broken/src/routes/lazy.kay', line: 4, column: 57, code: 'TS2322', message: expect.stringContaining('hydrate: string') },
       { file: 'broken/src/routes/links.kay', line: 6, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /form/extra') },
-      { file: 'broken/src/routes/links.kay', line: 9, column: 39, code: 'TS2345', message: expect.stringContaining('An island receives its props serialized') },
-      { file: 'broken/src/routes/links.kay', line: 9, column: 64, code: 'TS2345', message: expect.stringContaining('An island receives its props serialized') },
+      { file: 'broken/src/routes/links.kay', line: 9, column: 39, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
+      { file: 'broken/src/routes/links.kay', line: 9, column: 64, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
       { file: 'broken/src/routes/links.kay', line: 14, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /api/feed.json') },
       { file: 'broken/src/routes/links.kay', line: 15, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /api/import') },
       { file: 'broken/src/routes/links.kay', line: 16, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /docs/guide.txt') },
-      { file: 'broken/src/routes/links.kay', line: 18, column: 4, code: 'TS2345', message: expect.stringContaining('An island receives its props serialized') },
-      { file: 'broken/src/routes/links.kay', line: 20, column: 13, code: 'TS2345', message: expect.stringContaining('An island receives its props serialized') },
+      { file: 'broken/src/routes/links.kay', line: 18, column: 4, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
+      { file: 'broken/src/routes/links.kay', line: 20, column: 13, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
       { file: 'broken/src/routes/redirects.kay', line: 5, column: 78, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /form/extra') },
       { file: 'broken/src/routes/redirects.kay', line: 8, column: 16, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /moved/away') },
       { file: 'broken/src/todo-item.kay', line: 7, column: 14, code: 'TS2551', message: 'Property \'titel\' does not exist on type \'Todo\'. Did you mean \'title\'?' },
@@ -439,18 +439,16 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('refuses children under an island in a static parent, which an island cannot take, and lets a static component or an island\'s own children have them', async () => {
+  it('lets a page, a static component and an island pass an island children', async () => {
     const root = await scratchProject({
       'src/components/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {count()}\nslot\n',
       'src/components/frame.kay': 'div\n  slot\n',
       'src/components/panel.kay': '---\nimport { signal } from \'kay\'\nimport Counter from \'./counter.kay\'\n\nconst open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) Toggle\nCounter\n  p Inside an island\n',
-      'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\nimport Frame from \'../components/frame.kay\'\n---\nFrame\n  p Framed\nCounter\n  p Lost\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\nimport Frame from \'../components/frame.kay\'\n---\nFrame\n  p Framed\nCounter\n  p Shown by the island\n',
     })
 
     try {
-      expect((await check(root)).map(d => [d.file.slice(root.length + 1), d.line, d.column, d.message.match(/kayError: "([^"]+)"/)?.[1]])).toEqual([
-        ['src/routes/index.kay', 8, 3, 'An island takes no children: pass data as props, or make the parent interactive too'],
-      ])
+      expect(await check(root)).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -1,0 +1,7 @@
+---
+import type { Point } from './point'
+
+const { at } = props<{ at: Point }>()
+const shown = signal(0)
+---
+button.dot(onClick={() => shown.set(at.sum())}) Dot {shown}

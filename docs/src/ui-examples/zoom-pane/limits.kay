@@ -1,16 +1,10 @@
 ---
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
-
-const tools = signal(false)
 ---
-.flex.flex-col.gap-2
-  label.flex.items-center.gap-2
-    input(type="checkbox" bind:checked={tools})
-    | Show the zoom buttons
-  ZoomPane(label="Grid, up to 3 times" most={3} tools={tools()} class="h-56 w-full rounded-lg border border-kui-overlay1 bg-kui-surface0")
-    svg(viewBox="0 0 100 60" width="100%" height="100%")
-      for column of [10, 20, 30, 40, 50, 60, 70, 80, 90]
-        line(x1={column} y1="0" x2={column} y2="60" stroke="currentColor" stroke-width="0.3")
-      for row of [10, 20, 30, 40, 50]
-        line(x1="0" y1={row} x2="100" y2={row} stroke="currentColor" stroke-width="0.3")
-      circle(cx="50" cy="30" r="6" fill="currentColor")
+ZoomPane(label="Grid, up to 3 times" most={3} tools={false} class="h-56 w-full rounded-lg border border-kui-overlay1 bg-kui-surface0")
+  svg(viewBox="0 0 100 60" width="100%" height="100%")
+    for column of [10, 20, 30, 40, 50, 60, 70, 80, 90]
+      line(x1={column} y1="0" x2={column} y2="60" stroke="currentColor" stroke-width="0.3")
+    for row of [10, 20, 30, 40, 50]
+      line(x1="0" y1={row} x2="100" y2={row} stroke="currentColor" stroke-width="0.3")
+    circle(cx="50" cy="30" r="6" fill="currentColor")

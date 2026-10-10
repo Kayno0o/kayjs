@@ -130,13 +130,20 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     return
   }
 
-  const { default: component } = await load()
+  const [{ default: component }, slots] = await Promise.all([load(), staticSlots(registry, element)])
 
-  // A page swap took it away while its chunk loaded: hydrated now, its effects would outlive it.
-  if (!element.isConnected)
+  // A page swap took it away while its chunk loaded: hydrated now, its effects would outlive it. One in a static slot its island hid hydrates as it shows it again.
+  if (!element.isConnected) {
+    started.delete(element)
+
     return
+  }
 
   const [props, update] = liveProps(element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as Record<string, unknown>)
+
+  for (const [key, slot] of Object.entries(slots))
+    Object.defineProperty(props, key, { value: slot, enumerable: true, configurable: true })
+
   const early = takeEvents(element)
   // Counted again from where the server's were, so the ids it rendered are claimed as they are.
   const ids = element.dataset.uid ?? freshPrefix()
@@ -198,6 +205,11 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
       console.error(error)
     }
   }
+}
+
+// The static slots a static parent gave the island, whose code only a page holding such an island loads.
+async function staticSlots(registry: IslandRegistry, element: HTMLElement): Promise<Record<string, () => Node[]>> {
+  return element.dataset.slots === undefined ? {} : (await import('./static-slots')).islandSlots(element, root => void hydrateIslands(registry, root))
 }
 
 function noted<T>(element: HTMLElement, run: () => T): T {
@@ -262,7 +274,7 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
       }
 
       const values = signalsOf.get(element)?.()
-      const props = element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object
+      const props = { ...element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object, ...await staticSlots(registry, element) }
 
       dispose()
       element.textContent = ''
@@ -342,7 +354,8 @@ export function disposeIslands(root: ParentNode): void {
 // The clicks, inputs and changes the inline hydration script queued on the island while it waited for its chunk.
 function takeEvents(element: HTMLElement): Event[] {
   const queue = (globalThis as { _$K?: Event[] })._$K ?? []
-  const taken = queue.filter(event => element.contains(event.target as Node))
+  // Not those of an island in one of its static slots, which takes its own.
+  const taken = queue.filter(event => (event.target as Element).closest?.(ISLAND) === element)
 
   for (const event of taken)
     queue.splice(queue.indexOf(event), 1)

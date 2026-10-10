@@ -1,0 +1,7 @@
+---
+import Dot from './dot.kay'
+import { Point } from './point'
+
+const at = new Point(1, 2)
+---
+Dot(at={at})

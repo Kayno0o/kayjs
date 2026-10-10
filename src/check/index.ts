@@ -392,7 +392,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
 
   return [
-    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ChildrenProp, FieldName, FunctionProp, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, FieldName, FunctionProp, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     '',
     'declare module \'kay\' {',
@@ -406,7 +406,6 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     '  function KayField<Target extends string | Action<never, unknown>>(target: Target, name: FieldName<Target>): string',
     '  function KayProp<Component>(component: Component): <Value>(value: Value & IslandProp<Component, Value>) => Value',
     '  function KayFunctionProp<Component>(component: Component): (attribute: FunctionProp<Component>) => Record<never, never>',
-    '  function KayChildren<Component>(component: Component): (children: ChildrenProp<Component>) => Record<never, never>',
     '  function KayIdentityKey<Each>(each: Each & IdentityKeyed<Each>): Each',
     '}',
     '',

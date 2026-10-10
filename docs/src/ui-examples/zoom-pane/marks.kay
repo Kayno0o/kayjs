@@ -2,11 +2,8 @@
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
 
 const pins = [{ name: 'Home', x: 20, y: 30 }, { name: 'Office', x: 60, y: 55 }, { name: 'Park', x: 80, y: 20 }]
-const picked = signal('')
 ---
-.flex.flex-col.gap-2
-  p Picked: {picked || 'none'}
-  ZoomPane(label="Map with pins" class="h-64 w-full rounded-lg border border-kui-overlay1 bg-kui-surface0")
-    .relative.size-full
-      for pin of pins key={pin.name}
-        button.absolute.rounded-full.bg-kui-surface2.px-2.py-0.5.text-xs(type="button" style={`left: ${pin.x}%; top: ${pin.y}%; transform: scale(calc(1 / var(--kui-zoom-scale))); transform-origin: 0 0`} onClick={() => picked.set(pin.name)}) {pin.name}
+ZoomPane(label="Map with pins" class="h-64 w-full rounded-lg border border-kui-overlay1 bg-kui-surface0")
+  .relative.size-full
+    for pin of pins
+      span.absolute.rounded-full.bg-kui-surface2.px-2.py-0.5.text-xs(style={`left: ${pin.x}%; top: ${pin.y}%; transform: scale(calc(1 / var(--kui-zoom-scale))); transform-origin: 0 0`}) {pin.name}

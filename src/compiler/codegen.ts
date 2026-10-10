@@ -5,7 +5,7 @@ import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
 import { actionOf, awaitBlocks, errorMessages, isChildrenSlot, isHead, serverIslandOf, tryBlocks } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
-import { isFunctionExpression } from './expression'
+import { isFunctionExpression, mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 
@@ -32,6 +32,8 @@ export interface GenerateOptions {
   special?: boolean | undefined
   // Server output without hydration markers for a static component: inside an island it renders through this hydratable build of itself instead.
   twin?: string | undefined
+  // Set for a static component that may pass an island what only an island sends: the id it renders as an island by when it does.
+  promote?: string | undefined
   // Code to run rather than type-check, built from the template: `html` builds server markup as strings, `dom` builds the browser's DOM. The analysis pass still generates JSX, which scope analysis reads.
   output?: 'html' | 'dom' | undefined
   // Server markup of an island or a twin, carrying the markers hydration needs.
@@ -198,7 +200,7 @@ class Generator {
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
 
     if (this.options.twin !== undefined)
-      b.add(`import { insideIsland as KayInsideIsland } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
+      b.add(`import { ${this.options.promote === undefined ? 'insideIsland as KayInsideIsland' : 'promote as KayPromote'} } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
 
     if (this.options.island !== undefined && this.genericComponent)
       b.add(`import type { IslandBrand as KayIslandBrand, IslandOptions as KayIslandOptions } from 'kay'\n`)
@@ -283,7 +285,9 @@ class Generator {
     if (domTemplate)
       b.add(domTemplate.declarations())
 
-    if (this.options.twin !== undefined)
+    if (this.options.twin !== undefined && this.options.promote !== undefined)
+      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${this.options.name} as never, KayHydrated as never${islandMessages(this.src)}) as typeof ${this.options.name}\n`)
+    else if (this.options.twin !== undefined)
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${this.options.name}(props)) as typeof ${this.options.name}\n`)
 
     if (this.options.island !== undefined)
@@ -308,6 +312,11 @@ class Generator {
   // The final pass builds what runs; the analysis pass always generates JSX.
   private final(output: 'html' | 'dom'): boolean {
     return this.options.output === output && this.options.rewrites !== undefined
+  }
+
+  // Whether the props the template passes an island are sent to the browser as they are: a page, a layout, or a static component that would not render as an island in its place.
+  private get sendsIslandProps(): boolean {
+    return this.options.island === undefined && !this.options.insideIsland && this.options.promote === undefined
   }
 
   private get genericComponent(): boolean {
@@ -907,13 +916,6 @@ class Generator {
       const slots = element.children.filter((child): child is SlotNode => child.kind === 'slot')
       const children = element.children.filter(child => child.kind !== 'slot')
 
-      // A static parent cannot hand an island markup: it renders on the server alone. `0` stands for the lines under the tag.
-      if (children.length > 0 && element.component && this.options.check && this.options.island === undefined && !this.options.insideIsland) {
-        b.add(' {...KayChildren(').addSource(element.tag).add(')(')
-        b.wrap(children[0]!, () => b.add('0'))
-        b.add(')}')
-      }
-
       // Each prop is passed once: by an attribute, by an `@name` block, or for `children` by the lines under the tag.
       const passed = new Map<string, Labelled>(element.attributes.flatMap(attribute => attribute.kind === 'spread' ? [] : [[this.text(attribute.name), { ...attribute.name, label: 'passed by this attribute' }]]))
 
@@ -936,7 +938,7 @@ class Generator {
         passed.set(name, { ...slot.name, label: `passed by this \`@${name}\`` })
 
         // `@row(todo)` passes a function the component calls per item, its parameters typed from the prop.
-        if (slot.params && this.options.check && this.options.island === undefined && !this.options.insideIsland) {
+        if (slot.params && this.options.check && this.sendsIslandProps) {
           b.add(' ')
           this.emitFunctionPropCheck(element, slot.name)
         }
@@ -1253,7 +1255,7 @@ class Generator {
 
     // Spread props reach an island serialized as the others do, so the object is checked as one prop would be.
     if (attribute.kind === 'spread') {
-      if (!element.component || this.options.island !== undefined || this.options.insideIsland)
+      if (!element.component || !this.sendsIslandProps)
         return false
 
       b.add('{...KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
@@ -1282,7 +1284,7 @@ class Generator {
       return true
     }
 
-    if (!element.component || this.options.island !== undefined || this.options.insideIsland || attribute.kind !== 'expression' || name.startsWith('bind:'))
+    if (!element.component || !this.sendsIslandProps || attribute.kind !== 'expression' || name.startsWith('bind:'))
       return false
 
     // A function never reaches an island, and left unwrapped it takes its parameter types from a generic component's other props.
@@ -1435,6 +1437,34 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
     switch (node.kind) {
       case 'element':
         return node.attributes.some(attribute => attribute.kind !== 'spread' && INTERACTIVE_ATTRIBUTE.test(file.source.slice(attribute.name.start, attribute.name.end))) || visit(node.children)
+      case 'text':
+        return visit(node.parts.filter(part => part.kind === 'element'))
+      case 'if':
+        return node.branches.some(branch => visit(branch.children))
+      case 'for':
+        return visit(node.children) || visit(node.fallback ?? [])
+      case 'await':
+        return awaitBlocks(node).some(visit)
+      case 'try':
+        return tryBlocks(node).some(visit)
+      case 'slot':
+        return visit(node.children)
+    }
+
+    return false
+  })
+
+  return visit(file.template)
+}
+
+// Whether a static component passes a component what may be a function, a class or an instance of one, or a block taking parameters: should that component be an island, it renders as one itself.
+export function mayPromote(file: KayFile, script: ScriptAnalysis): boolean {
+  const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly).map(binding => binding.local)])
+
+  const visit = (nodes: Node[]): boolean => nodes.some((node) => {
+    switch (node.kind) {
+      case 'element':
+        return (node.component && (node.attributes.some(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names)) || node.children.some(child => child.kind === 'slot' && child.params !== undefined))) || visit(node.children)
       case 'text':
         return visit(node.parts.filter(part => part.kind === 'element'))
       case 'if':

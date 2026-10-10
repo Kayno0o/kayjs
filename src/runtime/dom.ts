@@ -404,6 +404,10 @@ function units(value: unknown, out: Unit[] = []): Unit[] {
   }
 
   if (value instanceof Node) {
+    // Already in place, as a static slot's nodes are: claimed as they are.
+    if (claim?.next === value)
+      claim.next = value.nextSibling
+
     if (value.nodeType === 11) {
       const { firstChild, lastChild } = value
 

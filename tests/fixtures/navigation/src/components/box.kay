@@ -1,0 +1,6 @@
+---
+const count = signal(0)
+---
+section.box
+  button.box-count(onClick={() => count.set(count() + 1)}) Box {count}
+  slot

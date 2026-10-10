@@ -1,0 +1,6 @@
+---
+import List from './list.kay'
+---
+List(items={['x', 'y']})
+  @row(item)
+    b {item}

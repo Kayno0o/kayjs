@@ -1,0 +1,5 @@
+---
+const { format } = props<{ format: (value: string) => string }>()
+const picked = signal('')
+---
+button.pick(onClick={() => picked.set(format('a'))}) Picked {picked}

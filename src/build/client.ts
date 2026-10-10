@@ -89,8 +89,11 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
         problems.push(formatDiagnostic(source, relative(root, file), diagnostic))
     }
 
-    if (compiled.island !== undefined)
-      islands.set(compiled.island, file)
+    // A static component that may render as an island gets a chunk too, which a page loads only when it does.
+    const island = compiled.island ?? compiled.promote
+
+    if (island !== undefined)
+      islands.set(island, file)
 
     for (const name of compiled.classes)
       classes.add(name)

@@ -37,6 +37,8 @@ let checks: Promise<typeof import('./validate')> | undefined
 interface KeptIsland extends HTMLElement {
   // Set by the entry once the island hydrated: gives it new props.
   _$p?: (props: object) => void
+  // Set by an island with static slots as it hydrates: its server markup, which a refresh compares.
+  _$h?: string
 }
 
 // Fetches a link's page ahead of the click, kept a few seconds for it.
@@ -330,16 +332,21 @@ function swapBody(next: Document, swap: Swap): void {
   }
 
   if (swap.refresh) {
-    const unchanged = [...old.querySelectorAll<HTMLElement>(ISLAND)]
+    const unchanged = [...old.querySelectorAll<KeptIsland>(ISLAND)]
 
     for (const placeholder of body.querySelectorAll<HTMLElement>(ISLAND)) {
-      if (kept.has(placeholder))
+      // One in the static slot of an island kept went along with it, or away with the copy it replaced.
+      if (!body.contains(placeholder) || [...kept].some(island => island.contains(placeholder)))
         continue
 
-      const index = unchanged.findIndex(live => live.dataset.component === placeholder.dataset.component && live.dataset.props === placeholder.dataset.props)
+      const index = unchanged.findIndex(live => old.contains(live) && live.dataset.component === placeholder.dataset.component && live.dataset.props === placeholder.dataset.props && live.dataset.slots === placeholder.dataset.slots && (live.dataset.slots === undefined || (live._$h ?? live.innerHTML) === placeholder.innerHTML))
 
-      if (index !== -1)
-        placeholder.replaceWith(...unchanged.splice(index, 1))
+      if (index !== -1) {
+        const [live] = unchanged.splice(index, 1)
+
+        placeholder.replaceWith(live!)
+        kept.add(live!)
+      }
     }
   }
 

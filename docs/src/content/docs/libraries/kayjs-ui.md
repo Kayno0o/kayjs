@@ -58,7 +58,7 @@ Button(label="Save" variant="accent" onClick={save})
 
 <Callout type="warning">
 
-A static page cannot pass functions or children to an island. Dialog, SidePanel, Popover, FormDialog and a Table with a `@cell` block belong in a component of yours that is an island itself, with an `on*` handler or a `signal`.
+A page can pass a Dialog or a Popover its content, but a layout or a page with a `--- server` fence cannot pass a function or a block with parameters, such as a Table's `@cell`: put those in a component of yours, which then renders as an island.
 
 </Callout>
 

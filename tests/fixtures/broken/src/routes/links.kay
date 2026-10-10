@@ -1,4 +1,4 @@
----
+--- server
 import Clicker from '../clicker.kay'
 import Tally from '../tally.kay'
 ---
