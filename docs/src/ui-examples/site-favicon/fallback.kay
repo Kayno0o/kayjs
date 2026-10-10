@@ -1,0 +1,7 @@
+---
+import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
+---
+.flex.items-center.gap-3
+  SiteFavicon(src="/icon-192.png" name="kay")
+  SiteFavicon(src="/missing-icon.png" name="kay")
+  SiteFavicon(name="kay")

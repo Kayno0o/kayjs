@@ -1,0 +1,20 @@
+---
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import type { MenuEntry } from '@kaynooo/kayjs-ui'
+
+const files = signal(['report.pdf', 'notes.md', 'photo.png'])
+
+function entries(file: string): MenuEntry[] {
+  return [
+    { label: 'Download', onSelect: () => {} },
+    { label: 'Archive', disabled: true, onSelect: () => {} },
+    'separator',
+    { label: 'Delete', icon: 'delete', danger: true, onSelect: () => files.set(list => list.filter(name => name !== file)) },
+  ]
+}
+---
+ul.w-72.divide-y.divide-kui-overlay1.rounded-lg.border.border-kui-overlay1
+  for file of files
+    li.flex.items-center.justify-between.px-3.py-1
+      | {file}
+      Menu(label={`Actions for ${file}`} icon="menu" size="sm" items={entries(file)})

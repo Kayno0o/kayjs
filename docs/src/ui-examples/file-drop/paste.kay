@@ -1,0 +1,13 @@
+---
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+
+const received = signal<string[]>([])
+---
+FileDrop(paste accept="image/*" onFiles={files => received.set(files.map(file => `${file.name} (${Math.ceil(file.size / 1024)} KB)`))})
+  @content(zone)
+    .rounded-lg.border.border-dashed.border-kui-overlay1.bg-kui-surface0.p-6.text-center
+      p Paste a screenshot anywhere on this page, or
+        |  
+        button(type="button" onClick={zone.open}) choose a file
+      if received().length > 0
+        p.mt-2.text-kui-subtext0 {received().join(', ')}

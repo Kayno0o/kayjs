@@ -1,0 +1,15 @@
+---
+import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
+
+const points = [
+  { key: 'a', label: 'Outer Wilds', x: 22, y: 95, weight: 3 },
+  { key: 'b', label: 'Celeste', x: 9, y: 90, weight: 2 },
+  { key: 'c', label: 'Hades', x: 60, y: 92, weight: 4 },
+  { key: 'e', label: 'A short one', x: 3, y: 55, weight: 1 },
+]
+
+const picked = signal('Pick a dot')
+---
+.flex.flex-col.gap-2.max-w-xl
+  ScatterChart(label="Games by length and score" points={points} x={{ label: 'Hours' }} y={{ label: 'Score' }} onSelect={point => picked.set(`${point.label}: ${point.x} h, score ${point.y}`)})
+  p.rounded.border.border-kui-overlay1.bg-kui-surface0.px-3.py-2 {picked}

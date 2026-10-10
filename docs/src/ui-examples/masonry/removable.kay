@@ -1,0 +1,21 @@
+---
+import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
+
+const notes = signal([
+  { id: 1, title: 'Groceries', body: 'Milk, eggs, bread, coffee, apples.' },
+  { id: 2, title: 'Idea', body: 'A docs site built with the framework it documents.' },
+  { id: 3, title: 'Call', body: 'Ask about the invoice.' },
+  { id: 4, title: 'Reading list', body: 'Three books, one paper and a long article that will not fit on one line of a narrow tile.' },
+  { id: 5, title: 'Reminder', body: 'Water the plants.' },
+])
+
+function remove(id: number) {
+  notes.set(list => list.filter(note => note.id !== id))
+}
+---
+Masonry(items={notes} key={note => note.id} minWidth={180} gap={12})
+  @tile(note)
+    .rounded-lg.border.border-kui-overlay1.bg-kui-surface0.p-3
+      h3.font-semibold {note.title}
+      p.text-kui-subtext0 {note.body}
+      button.mt-2.text-kui-subtext0.underline(type="button" onClick={() => remove(note.id)}) Remove

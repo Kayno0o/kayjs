@@ -11,3 +11,9 @@ Render one `Toaster` in the root layout, then call `toast.success`, `toast.error
 This page already renders the `Toaster`. `toast` only shows in the browser: the server's list is shared by every request, so call it from event handlers.
 
 </Callout>
+
+## After an action
+
+Call `toast` once what the user started has finished, with the outcome as its type. Here the button fails every other time.
+
+<Demo name="toaster/action" />

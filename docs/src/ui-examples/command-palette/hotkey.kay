@@ -1,0 +1,13 @@
+---
+import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
+import type { PaletteEntry } from '@kaynooo/kayjs-ui'
+import { toast } from '@kaynooo/kayjs-ui'
+
+const open = signal(false)
+const entries: PaletteEntry[] = [
+  { label: 'Say hello', group: 'Actions', onSelect: () => toast.info('Hello') },
+  { label: 'Dialog', group: 'Pages', href: '/ui/dialog' },
+]
+---
+p Press <kbd>Ctrl</kbd> + <kbd>J</kbd> (<kbd>Cmd</kbd> + <kbd>J</kbd> on a Mac). The palette is {open() ? 'open' : 'closed'}.
+CommandPalette(hotkey="j" onOpenChange={open.set} entries={entries})

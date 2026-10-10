@@ -1,0 +1,15 @@
+---
+import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
+
+const heights = [64, 112, 40, 88, 136, 56, 100, 72, 120]
+const tiles = heights.map((height, id) => ({ id, height }))
+const width = signal(100)
+---
+.flex.flex-col.gap-3
+  label.flex.items-center.gap-2.text-kui-subtext0
+    | Width
+    input(type="range" min="30" max="100" bind:value={width})
+  div(style={`width: ${width}%`})
+    Masonry(items={tiles} key={tile => tile.id} minWidth={100} gap={8})
+      @tile(tile)
+        .flex.items-center.justify-center.rounded-lg.bg-kui-surface0.text-kui-subtext0(style={`height: ${tile.height}px`}) {tile.id + 1}

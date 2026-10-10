@@ -1,0 +1,20 @@
+---
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+
+const moons = signal(['Io', 'Europa'])
+const names = ['Ganymede', 'Callisto', 'Amalthea']
+
+function add() {
+  const next = names[moons.length - 2]
+
+  if (next)
+    moons.set(list => [...list, next])
+}
+---
+PageSection(title="Moons")
+  @actions
+    IconButton(icon="plus" label="Add a moon" size="sm" onClick={add})
+  ul.list-disc.pl-5
+    for moon of moons
+      li {moon}

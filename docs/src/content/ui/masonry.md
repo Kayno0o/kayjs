@@ -6,7 +6,15 @@ description: Tiles of any height placed in the shortest of several lanes.
 
 ## Lanes
 
-`minWidth` is the narrowest a lane may get, and as many lanes as fit at that width share the row. `gap` sits between lanes and between tiles. `key` names an item across updates so its tile keeps its place, and the `@tile(item)` block draws each tile.
+`minWidth` is the narrowest a lane may get, and as many lanes as fit at that width share the row. `gap` sits between lanes and between tiles. The `@tile(item)` block draws each tile, and its height is whatever its content makes it.
+
+<Demo name="masonry/narrow" />
+
+## Keyed tiles
+
+`key` names an item across updates, so a tile keeps its place and its measured height while the others come and go.
+
+<Demo name="masonry/removable" />
 
 <Callout type="tip">
 

@@ -1,0 +1,6 @@
+---
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+---
+.flex.gap-2.pt-10
+  IconButton(icon="delete" label="Delete the file")
+  IconButton(icon="success" label="Mark as done")

@@ -1,0 +1,18 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
+import type { PaletteEntry } from '@kaynooo/kayjs-ui'
+import { toast } from '@kaynooo/kayjs-ui'
+
+const open = signal(false)
+const entries: PaletteEntry[] = [
+  { label: 'Export report', group: 'Actions', icon: 'star', keywords: 'download csv spreadsheet', onSelect: () => toast.info('Exported') },
+  { label: 'Archive project', group: 'Actions', keywords: 'hide close', onSelect: () => toast.info('Archived') },
+  { label: 'Settings', group: 'Pages', href: '/ui/button' },
+  { label: 'Billing', group: 'Pages', keywords: 'invoice payment', href: '/ui/dialog' },
+]
+---
+.flex.flex-wrap.items-center.gap-3
+  Button(label="Open the palette" onClick={() => open.set(true)})
+  p.text-kui-subtext0 Try "csv" or "invoice".
+CommandPalette(open={open} onOpenChange={open.set} entries={entries} groups={['Actions', 'Pages']})

@@ -1,0 +1,7 @@
+---
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+
+const links = ['Overview', 'Install', 'Usage', 'Options', 'Examples', 'Recipes', 'Changelog'].map(name => ({ href: `/ui/tab-nav#${name.toLowerCase()}`, label: name }))
+---
+.max-w-xs.rounded.border.border-kui-overlay1.bg-kui-surface0
+  TabNav(links={links} current="/ui/tab-nav#recipes" label="Sections")

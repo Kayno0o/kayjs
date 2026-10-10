@@ -1,0 +1,35 @@
+---
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
+import type { IconChoice } from '@kaynooo/kayjs-ui'
+import Bell from '~icons/tabler/bell'
+import Home from '~icons/tabler/home'
+import Rocket from '~icons/tabler/rocket'
+import Star from '~icons/tabler/star'
+import Heart from '~icons/tabler/heart'
+import Flame from '~icons/tabler/flame'
+import Leaf from '~icons/tabler/leaf'
+import Moon from '~icons/tabler/moon'
+
+const all: IconChoice[] = [
+  { name: 'tabler:bell', icon: Bell },
+  { name: 'tabler:home', icon: Home },
+  { name: 'tabler:rocket', icon: Rocket },
+  { name: 'tabler:star', icon: Star },
+  { name: 'tabler:heart', icon: Heart },
+  { name: 'tabler:flame', icon: Flame },
+  { name: 'tabler:leaf', icon: Leaf },
+  { name: 'tabler:moon', icon: Moon },
+]
+const calls = signal<string[]>([])
+
+// Stands in for an action reading an icon set on the server.
+async function search(query: string, limit: number) {
+  calls.set(list => [...list, `"${query}" up to ${limit}`].slice(-3))
+  await new Promise(resolve => setTimeout(resolve, 400))
+
+  return all.filter(choice => choice.name.includes(query)).slice(0, limit)
+}
+---
+.flex.flex-col.items-start.gap-2
+  IconPicker(search={search})
+  p.text-kui-subtext0 Searches made: {calls.join(', ') || 'none yet'}.

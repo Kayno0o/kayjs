@@ -1,0 +1,12 @@
+---
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+
+const tabs = [{ value: 'write', label: 'Write' }, { value: 'notes', label: 'Notes' }]
+const shown = signal('write')
+---
+Tabs(tabs={tabs} value={shown} label="Editor" onChange={shown.set})
+  @panel(tab)
+    if tab === 'write'
+      textarea.w-full.rounded-lg.border.border-kui-overlay1.bg-kui-surface0.p-2(rows="3" aria-label="Draft" placeholder="Type here, switch tab, come back")
+    else
+      p Nothing is lost when you switch: the draft is still in the other tab.

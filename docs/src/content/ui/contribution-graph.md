@@ -4,10 +4,18 @@ description: A calendar grid of days shaded by how full each one is, like a comm
 
 <Demo name="contribution-graph/basic" />
 
-`days` lists ascending days starting on a Monday, each with a `day` (an ISO date) and an `intensity` from 0 to 1. The filled cells shade towards `color`, and `today` marks its cell. `months` names each month above the week it starts in.
+## Days
 
-<Callout type="tip">
+`days` lists ascending days starting on a Monday, each with a `day` (an ISO date) and an `intensity` from 0 to 1. `today` marks its cell, and `months` names each month above the week it starts in.
 
-A day can carry a `description`, shown with its date as the cell's tooltip.
+## Tooltips
 
-</Callout>
+A day can carry a `description`, shown with its date as the cell's tooltip. Hover a cell below.
+
+<Demo name="contribution-graph/description" />
+
+## Colour
+
+The filled cells shade towards `color`, any CSS colour: a theme token keeps it in step with the theme, and an empty day stays unfilled.
+
+<Demo name="contribution-graph/colors" />

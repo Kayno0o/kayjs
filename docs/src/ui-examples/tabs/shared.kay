@@ -1,0 +1,11 @@
+---
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+
+const tabs = [{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }]
+const range = signal('week')
+---
+.flex.flex-col.gap-3
+  p.font-semibold Sales over the last {range}
+  Tabs(tabs={tabs} value={range} label="Range" onChange={range.set})
+    @panel(tab)
+      p Figures for the {tab}.

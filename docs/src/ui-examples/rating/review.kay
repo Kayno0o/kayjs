@@ -1,0 +1,16 @@
+---
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+
+const reviews = [
+  { name: 'Outer Wilds', score: 4.8, count: 1204 },
+  { name: 'Celeste', score: 4.5, count: 861 },
+  { name: 'Hades', score: 4.2, count: 2310 },
+]
+---
+ul.flex.flex-col.gap-2.w-full.max-w-sm
+  for review of reviews key={review.name}
+    li.flex.items-center.justify-between.gap-3.rounded.border.border-kui-overlay1.bg-kui-surface0.px-3.py-2
+      span {review.name}
+      span.flex.items-center.gap-2
+        Rating(value={review.score} label={`${review.name}: ${review.score} out of 5`})
+        small {review.count}

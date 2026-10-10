@@ -1,0 +1,5 @@
+.grid.grid-cols-2.gap-3.px-16.py-12.sm:grid-cols-4
+  button.kui-btn(type="button" data-tooltip="On top (default)") Top
+  button.kui-btn(type="button" data-tooltip="Below" data-tooltip-placement="bottom") Bottom
+  button.kui-btn(type="button" data-tooltip="To the left" data-tooltip-placement="left") Left
+  button.kui-btn(type="button" data-tooltip="To the right" data-tooltip-placement="right") Right

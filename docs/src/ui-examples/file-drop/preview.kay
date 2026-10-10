@@ -1,0 +1,18 @@
+---
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+
+const previews = signal<{ name: string, url: string }[]>([])
+---
+FileDrop(accept="image/*" multiple onFiles={files => previews.set(files.map(file => ({ name: file.name, url: URL.createObjectURL(file) })))})
+  @content(zone)
+    .rounded-lg.border.border-dashed.border-kui-overlay1.bg-kui-surface0.p-6.text-center
+      if zone.dragging()
+        p Drop to preview
+      else
+        p
+          button(type="button" onClick={zone.open}) Choose images
+          |  or drop them here
+      if previews().length > 0
+        .mt-4.flex.flex-wrap.justify-center.gap-2
+          for preview of previews() key={preview.url}
+            img.size-20.rounded.object-cover(src={preview.url} alt={preview.name})

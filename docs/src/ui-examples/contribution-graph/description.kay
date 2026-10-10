@@ -1,0 +1,16 @@
+---
+import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
+import type { ContributionDay } from '@kaynooo/kayjs-ui'
+
+const start = Date.UTC(2026, 4, 4)
+const days: ContributionDay[] = Array.from({ length: 140 }, (_, index) => {
+  const commits = index * 37 % 11
+
+  return {
+    day: new Date(start + index * 86_400_000).toISOString().slice(0, 10),
+    intensity: commits / 10,
+    description: `${commits} commits`,
+  }
+})
+---
+ContributionGraph(days={days} color="var(--color-kui-accent)" today="2026-09-20" months)

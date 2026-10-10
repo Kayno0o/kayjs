@@ -1,0 +1,10 @@
+---
+import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
+
+const sites = ['example.com', 'another.site', 'blog.example.org', 'docs.example.net']
+---
+ul.flex.flex-col.gap-2.w-full.max-w-xs
+  for site of sites key={site}
+    li.flex.items-center.gap-2.rounded.border.border-kui-overlay1.bg-kui-surface0.px-3.py-2
+      SiteFavicon(name={site})
+      span {site}

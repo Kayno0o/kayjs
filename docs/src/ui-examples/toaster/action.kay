@@ -1,0 +1,20 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+
+const saving = signal(false)
+let attempts = 0
+
+async function save() {
+  saving.set(true)
+  await new Promise(resolve => setTimeout(resolve, 800))
+  saving.set(false)
+  attempts += 1
+
+  if (attempts % 2 === 0)
+    toast.error('Could not save, try again')
+  else
+    toast.success('Profile saved')
+}
+---
+Button(label="Save profile" variant="accent" busy={saving()} onClick={save})

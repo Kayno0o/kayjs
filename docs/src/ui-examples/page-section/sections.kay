@@ -1,0 +1,8 @@
+---
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+---
+.flex.flex-col.gap-6
+  PageSection(title="Moons")
+    p Jupiter has 95 known moons.
+  PageSection(title="Rings")
+    p Saturn's rings are mostly water ice.
