@@ -32,6 +32,8 @@ export default defineConfig({
 
 A directory inside the project holding a `kay.config.ts` of its own, such as an example app or a documentation site, is another project: its components are never the outer one's islands, and it checks and builds from its own root.
 
+`extensions` lists what libraries add to the app, one value each, such as `extensions: [authPages()]`: pages laid over `src/routes` under a prefix and message catalogs under `src/messages`, an app file at the same path or an app key winning (see [Extensions](components.md#extensions)), and a hook rewriting each prerendered page (see [Page hooks](routing.md#page-hooks)).
+
 `minify` is on for `kay build` unless set to `false`, and off for `kay dev` and a server bundling at boot unless set to `true`. `lang`, the `<html lang>` of every page when `i18n` is not set, defaults to `en`.
 
 Every page carries speculation rules, which the swap replaces on pages shipping its script (see [Navigation](islands.md#navigation)): Chromium prefetches the page a link points at once it is hovered (`prefetch: 'moderate'`), on press with `'conservative'`, as soon as it can with `'eager'`, never with `false`. A link that changes something on GET, such as a logout, takes `data-no-prefetch`. A stylesheet holding `@view-transition { navigation: auto; }` animates from page to page where the browser supports it, swaps included; `kay new` writes one inside `@media (prefers-reduced-motion: no-preference)`.
