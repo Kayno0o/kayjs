@@ -25,8 +25,6 @@ interface Result {
   vitals: Record<string, Vitals[]>
 }
 
-// The pages each site is put under load on: its home, a prerendered page, and its stylesheet.
-const LOADED: Record<string, string[]> = { 'cromignon24': ['/', '/hotel-felin'], 'jb-peinture': ['/', '/peinture'] }
 const STYLESHEET = /<link rel="stylesheet" href="([^"]+)"/g
 const MB = 1024 * 1024
 
@@ -83,7 +81,7 @@ try {
     console.error(`weight and load: ${label(variant)}`)
     for (const path of variant.site.pages)
       result.weights.push(await weigh(variant, path))
-    for (const path of [...LOADED[variant.site.name]!, await stylesheet(variant)])
+    for (const path of [...variant.site.loaded ?? variant.site.pages.slice(0, 2), await stylesheet(variant)])
       result.loads.push(await load(variant, path, server, lab.nginx))
     result.memory = memory(server.pid)
   }
@@ -116,7 +114,7 @@ try {
     '',
     ...environment.map(line => `- ${line}`),
     '',
-    'cromignon24 and jb-peinture as they last ran on Astro, then on kay, each built and served as it deploys: Astro\'s standalone server under Bun, kay\'s one executable, both behind an nginx set up as production\'s (HTTP/2 over TLS, brotli and gzip at level 6). kay is the version each site pins, not this checkout. Reproduce with `bun run bench:sites`, the site repositories beside this one, given nginx with the brotli module (`NGINX_MODULES` if not under /usr/lib/nginx/modules), openssl, playwright-core\'s Chromium, and cloc for the line counts.',
+    'Each site as it last ran on Astro, then on kay, built and served as it deploys: Astro\'s standalone server under Bun, kay\'s one executable, both behind an nginx set up for production (HTTP/2 over TLS, brotli and gzip at level 6). kay is the version each site pins, not this checkout. Reproduce with `bun run bench:sites`, the sites listed in a config as `bench/sites/sites.config.example.ts` shows, given nginx with the brotli module (`NGINX_MODULES` if not under /usr/lib/nginx/modules), openssl, playwright-core\'s Chromium, and cloc for the line counts.',
     '',
     '## What a page downloads',
     '',

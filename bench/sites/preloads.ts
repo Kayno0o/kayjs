@@ -7,18 +7,23 @@ import { PROFILES } from './browser'
 import { startNginx, startServer, waitReady } from './serve'
 import { VARIANTS } from './sites'
 
-// The experiment behind #88: jb-peinture's kay build as `bench:sites` last built it, its head's preloads rewritten in flight, timed under Lighthouse's throttling.
+// The experiment behind #88: a site's kay build as `bench:sites` last built it, its head's preloads rewritten in flight, timed under Lighthouse's throttling.
 // The rewritten document is served by Playwright, so it skips the throttled network every other request takes: compare variants with each other, never with `bench:sites`.
-// Variants run interleaved, page after page and run after run, medians pooled over the pages; `RUNS`, `PROFILE=desktop` and `ONLY=as built|neither` narrow it.
+// Variants run interleaved, page after page and run after run, medians pooled over the pages; `SITE` picks the site of the config, the first unless set, and `RUNS`, `PROFILE=desktop` and `ONLY=as built|neither` narrow it.
 const RUNS = Number(process.env.RUNS ?? 7)
-const PAGES = ['/', '/a-propos', '/peinture']
 const FONT_PRELOAD = /<link rel="preload"[^>]*as="font"[^>]*>/g
 const MODULE_PRELOAD = /<link rel="modulepreload"[^>]*>/g
 const FONTS_STYLESHEET = /<link rel="stylesheet" href="\/_kay\/assets\/(fonts-[^"]+\.css)">/
 const PAGE_STYLESHEET = /<link rel="stylesheet" href="\/_kay\/(?!assets\/)[^"]+">/g
 const VIEWPORT = /<meta name="viewport"[^>]*>/
 
-const variant = VARIANTS.find(candidate => candidate.site.name === 'jb-peinture' && candidate.kind === 'kay')!
+const found = VARIANTS.find(candidate => candidate.kind === 'kay' && (process.env.SITE === undefined || candidate.site.name === process.env.SITE))
+
+if (found === undefined)
+  throw new Error(`no kay site named ${process.env.SITE ?? ''} in the config`)
+
+const variant = found
+const PAGES = variant.site.pages.slice(0, 3)
 
 const low = (tag: string): string => tag.replace('<link ', '<link fetchpriority="low" ')
 

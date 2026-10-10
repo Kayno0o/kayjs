@@ -62,7 +62,7 @@ const COLLECT = `(async () => {
   }
 })()`
 
-// `RUNS` cold loads of a page through nginx over HTTP/2, each in a fresh context, medians kept. Google's map frame stays out of both sites.
+// `RUNS` cold loads of a page through nginx over HTTP/2, each in a fresh context, medians kept. Requests to any other host, as a map frame or analytics, are aborted.
 export async function vitals(browser: Browser, variant: Variant, path: string, profile: Profile): Promise<Vitals> {
   const runs: Vitals[] = []
 

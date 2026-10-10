@@ -10,6 +10,7 @@ const VM_RSS = /VmRSS:\s+(\d+)/
 const VM_HWM = /VmHWM:\s+(\d+)/
 // Where nginx keeps its dynamic modules: Arch's and Debian's path unless `NGINX_MODULES` says otherwise.
 const MODULES = process.env.NGINX_MODULES ?? '/usr/lib/nginx/modules'
+const NOT_WORD = /\W/g
 
 // A variant's server as production runs it: Astro's standalone entry under Bun (its image aliases node to bun), kay's compiled executable.
 export function startServer(variant: Variant): Subprocess {
@@ -50,10 +51,10 @@ export function memory(pid: number): { rss: number, peak: number } {
 }
 
 function upstream(variant: Variant): string {
-  return `${variant.site.name.replace('-', '_')}_${variant.kind}`
+  return `${variant.site.name.replace(NOT_WORD, '_')}_${variant.kind}`
 }
 
-// nginx as production sets it up in front of the sites (nginx-sites): HTTP/2 over TLS, brotli and gzip at level 6, a keepalive upstream.
+// nginx as a production server sets it up in front of the sites: HTTP/2 over TLS, brotli and gzip at level 6, a keepalive upstream.
 export async function startNginx(): Promise<Subprocess> {
   mkdirSync(join(NGINX, 'tmp'), { recursive: true })
 

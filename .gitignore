@@ -13,3 +13,6 @@ tests/.canary-*
 tests/fixtures/live/src/**/*.kay
 docs/public/search.json
 docs/public/llms.txt
+
+bench/sites/sites.config.ts
+bench/sites/results*.md

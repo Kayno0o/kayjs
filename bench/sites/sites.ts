@@ -1,16 +1,25 @@
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { parseArgs } from 'node:util'
 
 export interface Site {
-  name: 'cromignon24' | 'jb-peinture'
-  // The commit that last ran on Astro; kay is measured at HEAD unless `KAY_REF` names another.
+  // How the site is labelled in the results.
+  name: string
+  // Its git repository, absolute or relative to the config file.
+  repo: string
+  // The commit that last ran on Astro, and the ref measured on kay, HEAD unless set or `KAY_REF` names another.
   astro: string
+  kay?: string
   pages: string[]
+  // The pages put under load, besides the largest stylesheet the home page links; the first two pages unless set.
+  loaded?: string[]
   // What the site reads from the environment when it builds and serves.
-  env: Record<string, string>
-  // Swaps the Astro site's dependencies whose pinned versions the registry lost.
-  patch: (manifest: Manifest) => void
+  env?: Record<string, string>
+  // Rewrites the Astro side's package.json before its install, as for dependencies whose pinned versions the registry lost.
+  patch?: (manifest: Manifest) => void
+  // Runs before the site's Astro side is exported, given the work directory, as for building a dependency it needs from source.
+  prepare?: (work: string) => void | Promise<void>
 }
 
 export interface Variant {
@@ -21,38 +30,20 @@ export interface Variant {
   ports: { backend: number, http: number, https: number }
 }
 
-interface Manifest {
+export interface Manifest {
   dependencies: Record<string, string>
 }
 
-// The site repositories sit beside this one, as in ~/Workspace.
-export const REPOS = resolve(process.env.SITES_DIR ?? join(import.meta.dir, '../../..'))
+const EXAMPLE = join(import.meta.dir, 'sites.config.example.ts')
+const CONFIG = resolve(parseArgs({ args: Bun.argv.slice(2), options: { config: { type: 'string' } }, strict: false }).values.config as string | undefined ?? process.env.SITES_CONFIG ?? join(import.meta.dir, 'sites.config.ts'))
+
 // Outside any project: inside this repository, the sites' Tailwind and Vite would scan kay's own files, and kay's tests would scan the sites'.
 export const WORK = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'kay-bench-sites')
-// The last @kaynooo/solidjs the jb-peinture Astro site ran on, gone from the registry: built from its tag instead.
-const SOLIDJS_TAG = 'v1.19.3'
 
-export const SITES: Site[] = [
-  {
-    name: 'cromignon24',
-    astro: 'fd11fb0',
-    pages: ['/', '/presentation', '/hotel-canin', '/hotel-felin', '/visite-domicile', '/promenade', '/tarifs', '/contact', '/legals'],
-    env: {},
-    patch: (manifest) => {
-      delete manifest.dependencies['@kaynooo/utils']
-    },
-  },
-  {
-    name: 'jb-peinture',
-    astro: '6b8c6e5',
-    pages: ['/', '/a-propos', '/peinture', '/ravalement', '/revetements', '/mentions-legales', '/politique-de-confidentialite'],
-    env: { CLIENT_URL: 'jb.kaynooo.fr' },
-    patch: (manifest) => {
-      manifest.dependencies['@kaynooo/utils'] = '^2.27.0'
-      manifest.dependencies['@kaynooo/solidjs'] = `file:${join(WORK, 'solidjs')}`
-    },
-  },
-]
+if (!existsSync(CONFIG))
+  throw new Error(`no sites to measure: write ${CONFIG} after ${EXAMPLE}, or pass --config <file>`)
+
+export const SITES: Site[] = ((await import(CONFIG)) as { default: Site[] }).default.map(site => ({ ...site, repo: resolve(dirname(CONFIG), site.repo) }))
 
 // `KIND=kay` measures the kay side only, keeping the Astro figures of an earlier run; the ports stay those of a full run.
 export const KIND = process.env.KIND as Variant['kind'] | undefined
@@ -73,7 +64,8 @@ export function run(cmd: string[], cwd: string, env: Record<string, string> = {}
   return output
 }
 
-function exportCommit(repo: string, ref: string, dir: string) {
+// Writes the repository at `ref` into `dir`, replacing what was there; a config's `prepare` may use it too.
+export function exportCommit(repo: string, ref: string, dir: string) {
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
   const archive = Bun.spawnSync(['git', '-C', repo, 'archive', ref], { stdout: 'pipe', stderr: 'pipe' })
@@ -87,32 +79,21 @@ function exportCommit(repo: string, ref: string, dir: string) {
     throw new Error(`extracting ${repo} at ${ref} failed:\n${extract.stderr.toString()}`)
 }
 
-function buildSolidjs() {
-  const dir = join(WORK, 'solidjs')
-
-  if (existsSync(join(dir, 'dist')))
-    return
-
-  exportCommit(join(REPOS, 'solidjs'), SOLIDJS_TAG, dir)
-  // Its lockfile pins @kaynooo/utils versions the registry lost; its ranges accept the current ones.
-  rmSync(join(dir, 'bun.lock'), { force: true })
-  run(['bun', 'install'], dir)
-  run(['bun', 'run', 'build'], dir)
+function refOf(variant: Variant): string {
+  return variant.kind === 'astro' ? variant.site.astro : process.env.KAY_REF ?? variant.site.kay ?? 'HEAD'
 }
 
 // Exports each site at its Astro commit and at its kay ref and installs them; build.ts then builds them as they deploy.
 export async function prepare() {
   mkdirSync(WORK, { recursive: true })
 
-  if (VARIANTS.some(variant => variant.kind === 'astro'))
-    buildSolidjs()
-
   for (const variant of VARIANTS) {
-    const repo = join(REPOS, variant.site.name)
+    if (variant.kind === 'astro')
+      await variant.site.prepare?.(WORK)
 
-    exportCommit(repo, variant.kind === 'astro' ? variant.site.astro : process.env.KAY_REF ?? 'HEAD', variant.dir)
+    exportCommit(variant.site.repo, refOf(variant), variant.dir)
 
-    if (variant.kind === 'astro') {
+    if (variant.kind === 'astro' && variant.site.patch !== undefined) {
       const file = Bun.file(join(variant.dir, 'package.json'))
       const manifest = await file.json() as Manifest
 
@@ -125,9 +106,7 @@ export async function prepare() {
 }
 
 export function commitOf(variant: Variant): string {
-  const ref = variant.kind === 'astro' ? variant.site.astro : process.env.KAY_REF ?? 'HEAD'
-
-  return run(['git', '-C', join(REPOS, variant.site.name), 'rev-parse', '--short', ref], WORK).trim()
+  return run(['git', '-C', variant.site.repo, 'rev-parse', '--short', refOf(variant)], WORK).trim()
 }
 
 export async function kayVersion(variant: Variant): Promise<string> {
