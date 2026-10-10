@@ -1,7 +1,7 @@
 import type { Mail, Transport } from '@kaynooo/kayjs-mail'
 import process from 'node:process'
 import { mailer, MailNotConfigured, outbox } from '@kaynooo/kayjs-mail'
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { mail } from '../src/mail'
 import Hello from '../src/mails/hello.kay'
 import Kit from '../src/mails/kit.kay'
@@ -166,6 +166,23 @@ describe('the queue', () => {
     expect(await queued.drain()).toBe(1)
     expect(sent.map(each => each.subject)).toEqual(['Queued'])
     expect(sent[0]!.html).toContain('Welcome, Ada')
+  })
+})
+
+describe('a partly refused mail', () => {
+  it('is logged naming the refused addresses, and sent all the same', async () => {
+    const partial: Transport = { send: async () => ({ accepted: ['ada@example.com'], rejected: ['bob@example.com'] }) }
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const delivery = await mailer({ from: 'site@example.com', transport: partial, queue: { name: 'partial-mail' } }).send({ to: ['ada@example.com', 'bob@example.com'], subject: 'Partly', text: 'T' })
+
+      expect(delivery.rejected).toEqual(['bob@example.com'])
+      expect(warn).toHaveBeenCalledWith('kayjs-mail: "Partly" was refused for bob@example.com, and sent to the others')
+    }
+    finally {
+      warn.mockRestore()
+    }
   })
 })
 

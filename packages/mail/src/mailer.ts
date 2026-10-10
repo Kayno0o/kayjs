@@ -201,6 +201,10 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const deliver = async (mail: Mail): Promise<Delivery> => {
     const delivery = await transport.send(mail)
 
+    // Logged rather than thrown: a retry would send the mail again to those who already have it.
+    if (delivery.rejected.length > 0)
+      console.warn(`kayjs-mail: "${mail.subject}" was refused for ${delivery.rejected.join(', ')}, and sent to the others`)
+
     if (transport === outbox && process.env.NODE_ENV === 'development')
       console.info(`kayjs-mail: "${mail.subject}" to ${mail.to.map(addressOf).join(', ')} kept in the outbox, shown at /_kay/mail`)
 
