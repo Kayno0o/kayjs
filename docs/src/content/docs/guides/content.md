@@ -49,7 +49,7 @@ An entry has `slug`, `data`, `headings` (for a table of contents) and `Content`,
 --- server
 import { posts } from '../../content.config'
 
-export const prerender = posts
+export const page = { prerender: posts }
 
 const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = post
@@ -73,7 +73,7 @@ import { posts } from '../../content.config'
 
 const blog = paginate(posts, 10)
 
-export const prerender = blog
+export const page = { prerender: blog }
 
 const list = await blog.page(ctx.params.page) ?? ctx.notFound()
 ---
@@ -82,7 +82,7 @@ for post of list.items key={post.slug}
 Pagination(of={list})
 ```
 
-`list` holds `items`, `page`, `pages`, the `prev` and `next` links, undefined at the ends, and `href(n)` for any page. The first page is `/blog`, the others `/blog/2`, `/blog/3`; `/blog/1`, a page past the last and anything but a number give `undefined`, a 404. Exported as `prerender` or `sitemap`, it lists every page, `kay build --static` included. Links follow the request's locale, the site's `base` and `trailingSlash`. A localized collection counts each locale's entries, so a locale with more of them has more pages, each listed in that locale alone. [Pagination](/ui/pagination) from kayjs-ui draws the links.
+`list` holds `items`, `page`, `pages`, the `prev` and `next` links, undefined at the ends, and `href(n)` for any page. The first page is `/blog`, the others `/blog/2`, `/blog/3`; `/blog/1`, a page past the last and anything but a number give `undefined`, a 404. As the `prerender` or `sitemap` key of `page`, it lists every page, `kay build --static` included. Links follow the request's locale, the site's `base` and `trailingSlash`. A localized collection counts each locale's entries, so a locale with more of them has more pages, each listed in that locale alone. [Pagination](/ui/pagination) from kayjs-ui draws the links.
 
 ## Components in Markdown
 

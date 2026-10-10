@@ -60,6 +60,18 @@ main
 
 Layouts nest: `blog/_layout.kay` renders inside the root one. To group pages under a layout without changing their URL, put them in a folder in parentheses: `(marketing)/pricing.kay` is `/pricing`.
 
+## Page settings
+
+A page's settings are the keys of one object its server fence exports:
+
+```kay
+--- server
+export const page = { prerender: true, revalidate: '1h' }
+---
+```
+
+The keys are `prerender` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), and `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)). `kay check` types the object, so the editor completes the keys and an unknown one is an error. The separate exports, `export const prerender = true` and the like, still work but are deprecated: `kay check` warns of each and `kay check --fix` moves them into `page`.
+
 ## Loading data
 
 A page reads its data in a `--- server` fence, with the request in `ctx`. See [Data loading](/essentials/data-loading).
@@ -82,7 +94,7 @@ A page that is the same for everyone can be rendered once at build time:
 
 ```kay
 --- server
-export const prerender = true
+export const page = { prerender: true }
 ---
 ```
 
@@ -92,13 +104,13 @@ A page with params lists the ones to build. Passing a content collection builds 
 --- server
 import { posts } from '../../content.config'
 
-export const prerender = posts
+export const page = { prerender: posts }
 ---
 ```
 
 <Callout type="note">
 
-Add `export const revalidate = '1h'` to rebuild a prerendered page in the background once it is older than that.
+Add `revalidate: '1h'` to `page` to rebuild a prerendered page in the background once it is older than that.
 
 </Callout>
 

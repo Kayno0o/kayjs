@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const prerender = true
+export const page = { prerender: true }
 
 export const join = action(t.Object({ email: t.String({ maxLength: 200, format: 'email', error: 'Not an email' }) }), ({ email }) => email.split('@')[0])
 

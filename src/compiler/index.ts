@@ -12,7 +12,7 @@ import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
-import { analyzeScript, analyzeServer, deprecatedSchemaNames, unboundedFields } from './script'
+import { analyzeScript, analyzeServer, deprecatedSchemaNames, separatePageSettings, unboundedFields } from './script'
 import { ISLAND_TWIN } from './twin'
 
 export type { Diagnostic } from './ast'
@@ -134,7 +134,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (options.check)
-    diagnostics.push(...unboundedFields(source, file.server), ...[file.script, file.server].flatMap(fence => fence ? fenceSchemaNames(source, fence) : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
+    diagnostics.push(...unboundedFields(source, file.server), ...server ? separatePageSettings(source, server) : [], ...[file.script, file.server].flatMap(fence => fence ? fenceSchemaNames(source, fence) : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })

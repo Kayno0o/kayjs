@@ -43,7 +43,7 @@ The cache lives in the process, and the value is shared by every caller, so neve
 
 ## Page cache
 
-A page that is the same for everyone is rendered once with `export const prerender = true`, and rebuilt in the background with `export const revalidate = '1h'`. See [Routing](/essentials/routing#prerendering). After a change, `invalidatePage(path => path.startsWith('/news'))` from `kay/server` refreshes the prerendered pages.
+A page that is the same for everyone is rendered once with `prerender: true` in its `page` object, and rebuilt in the background with `revalidate: '1h'`. See [Routing](/essentials/routing#prerendering). After a change, `invalidatePage(path => path.startsWith('/news'))` from `kay/server` refreshes the prerendered pages.
 
 ## Streaming
 

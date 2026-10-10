@@ -358,9 +358,27 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('reports a key page does not take, and still types a setting exported under its own name, warning that it moved', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true, prerendr: 1 }\n---\np x\n',
+      'src/routes/old.kay': '--- server\nimport { s } from \'kay\'\n\nexport const query = s.Object({ n: s.Integer() })\n\nconst label: string = ctx.query.n\n---\np {label}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([
+        ['old.kay', 4, 'deprecated-page-export'],
+        ['index.kay', 2, 'TS2561'],
+        ['old.kay', 6, 'TS2322'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types ctx.query from the page\'s query schema, and reports one a layout declares', async () => {
-    const page = '--- server\nimport { t } from \'elysia\'\n\nexport const query = t.Object({ page: t.Integer() })\n\nconst label: string = ctx.query.page\nconst other = ctx.query.pag\n---\np {label} {String(other)}\n'
-    const layout = '--- server\nimport { t } from \'elysia\'\n\nexport const query = t.Object({ q: t.String() })\n---\nslot\n'
+    const page = '--- server\nimport { t } from \'elysia\'\n\nexport const page = { query: t.Object({ page: t.Integer() }) }\n\nconst label: string = ctx.query.page\nconst other = ctx.query.pag\n---\np {label} {String(other)}\n'
+    const layout = '--- server\nimport { t } from \'elysia\'\n\nexport const page = { query: t.Object({ q: t.String() }) }\n---\nslot\n'
     const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/_layout.kay': layout })
 
     try {
@@ -595,16 +613,16 @@ describe('kay check, edge cases', () => {
 
   it('refuses what only a request carries in a prerendered page, and leaves it to a page rendered per request', async () => {
     const root = await scratchProject({
-      'src/routes/index.kay': '--- server\nexport const prerender = true\n\nconst theme = ctx.cookies.get(\'theme\')\n---\np {theme}\n',
-      'src/routes/posts/[slug].kay': '--- server\nexport const prerender = () => [{ slug: \'a\' }]\n\nconst page = ctx.query.page\nconst slug = ctx.params.slug\n---\np {slug} {String(page)}\n',
-      'src/routes/live.kay': '--- server\nexport const prerender = false\n\nconst theme = ctx.cookies.get(\'theme\')\n---\np {theme}\n',
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n\nconst theme = ctx.cookies.get(\'theme\')\n---\np {theme}\n',
+      'src/routes/posts/[slug].kay': '--- server\nexport const page = { prerender: () => [{ slug: \'a\' }] }\n\nconst number = ctx.query.page\nconst slug = ctx.params.slug\n---\np {slug} {String(number)}\n',
+      'src/routes/live.kay': '--- server\nexport const page = { prerender: false }\n\nconst theme = ctx.cookies.get(\'theme\')\n---\np {theme}\n',
       'src/routes/account.kay': '--- server\nconst who = ctx.locals\n---\np {String(who)}\n',
     })
 
     try {
       expect((await check(root)).map(d => [d.file.slice(root.length + 1), d.line, d.message.match(/kayError: "([^"]+)"/)?.[1]])).toEqual([
-        ['src/routes/index.kay', 4, 'A prerendered page renders once, at build time, with no ctx.cookies; drop export const prerender to render it per request'],
-        ['src/routes/posts/[slug].kay', 4, 'A prerendered page renders once, at build time, with no ctx.query; drop export const prerender to render it per request'],
+        ['src/routes/index.kay', 4, 'A prerendered page renders once, at build time, with no ctx.cookies; drop prerender from export const page to render it per request'],
+        ['src/routes/posts/[slug].kay', 4, 'A prerendered page renders once, at build time, with no ctx.query; drop prerender from export const page to render it per request'],
       ])
     }
     finally {
@@ -1006,7 +1024,7 @@ describe('kay check, string fields an action leaves unbounded', () => {
   })
 
   it('leaves bounded fields, secrets that never come back, options it cannot read and schemas outside actions alone', () => {
-    expect(fields('const options = { maxLength: 9 }\nexport const query = t.Object({ q: t.String() })\nexport const signIn = action(t.Object({ name: t.String({ maxLength: 40 }), password: t.String(), apiKey: t.String(), note: t.String(options), other: t.String({ ...options }) }), () => 1)')).toEqual([])
+    expect(fields('const options = { maxLength: 9 }\nexport const page = { query: t.Object({ q: t.String() }) }\nexport const signIn = action(t.Object({ name: t.String({ maxLength: 40 }), password: t.String(), apiKey: t.String(), note: t.String(options), other: t.String({ ...options }) }), () => 1)')).toEqual([])
   })
 })
 

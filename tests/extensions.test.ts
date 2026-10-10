@@ -42,7 +42,7 @@ const FILES: Record<string, string> = {
   'node_modules/kay-lib/routes/lib.css': '.lib { color: teal }\n',
   'node_modules/kay-lib/routes/register.kay': 'p.register theirs\n',
   'node_modules/kay-lib/routes/login.kay': LOGIN,
-  'node_modules/kay-lib/routes/terms.kay': '--- server\nexport const prerender = true\n---\np.terms terms\n',
+  'node_modules/kay-lib/routes/terms.kay': '--- server\nexport const page = { prerender: true }\n---\np.terms terms\n',
   // The library's own check reports this one, not the app's.
   'node_modules/kay-lib/routes/broken.kay': '---\nconst wrong: number = \'x\'\n---\np {wrong}\n',
   'node_modules/kay-lib/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton.count(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
@@ -101,7 +101,7 @@ const IMPLICIT: Record<string, string> = {
   'node_modules/kay-lib/index.ts': LOCALIZED['node_modules/kay-lib/index.ts']!,
   'node_modules/kay-lib/messages/en.ts': LOCALIZED['node_modules/kay-lib/messages/en.ts']!,
   'node_modules/kay-lib/messages/fr.ts': LOCALIZED['node_modules/kay-lib/messages/fr.ts']!,
-  'node_modules/kay-lib/routes/login.kay': '--- server\nimport { locale, localize, t } from \'kay/i18n\'\n\nexport const prerender = true\n\nconst title = t(\'auth.title\')\nconst hint = t(\'auth.hint\')\nconst register = localize(\'/auth/register\')\nconst lang = locale()\n---\n---\nimport Hint from \'../hint.kay\'\n---\nh1 {title}\np {hint}\na(href={register}) {lang}\nHint\n',
+  'node_modules/kay-lib/routes/login.kay': '--- server\nimport { locale, localize, t } from \'kay/i18n\'\n\nexport const page = { prerender: true }\n\nconst title = t(\'auth.title\')\nconst hint = t(\'auth.hint\')\nconst register = localize(\'/auth/register\')\nconst lang = locale()\n---\n---\nimport Hint from \'../hint.kay\'\n---\nh1 {title}\np {hint}\na(href={register}) {lang}\nHint\n',
   'node_modules/kay-lib/hint.kay': '---\nimport { signal } from \'kay\'\nimport { t } from \'kay/i18n\'\n\nconst open = signal(false)\n---\nbutton(type="button" onClick={() => open.set(!open())}) {t(\'auth.hint\')}\n',
   'node_modules/kay-lib/routes/register.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\nimport { t as text } from \'kay/i18n\'\n\nexport const register = action(t.Object({}), (_, ctx) => ({ locale: ctx.locale, hint: text(\'auth.hint\') }))\n---\nform(action={register})\n  button Register\n',
   'src/routes/_404.kay': '---\nimport { t } from \'kay/i18n\'\n---\np.missing {t(\'auth.title\')}\n',

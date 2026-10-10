@@ -921,7 +921,7 @@ describe('revalidation', () => {
     const page = join(routes, 'broken.kay')
 
     try {
-      await Bun.write(page, '--- server\nexport const prerender = true\nexport const revalidate = \'hourly\'\n---\np Broken\n')
+      await Bun.write(page, '--- server\nexport const page = { prerender: true, revalidate: \'hourly\' }\n---\np Broken\n')
 
       await expect(prerenderPages(root, { routes }, (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration')
     }

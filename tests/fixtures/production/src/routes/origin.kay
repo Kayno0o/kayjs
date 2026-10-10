@@ -1,7 +1,7 @@
 --- server
 import { siteOrigin } from 'kay/seo'
 
-export const prerender = true
+export const page = { prerender: true }
 
 const origin = siteOrigin()
 ---

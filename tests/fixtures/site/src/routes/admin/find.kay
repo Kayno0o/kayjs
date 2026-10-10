@@ -1,7 +1,7 @@
 --- server
 import { t } from 'elysia'
 
-export const query = t.Object({ n: t.Integer() })
+export const page = { query: t.Object({ n: t.Integer() }) }
 
 const { n } = ctx.query
 ---

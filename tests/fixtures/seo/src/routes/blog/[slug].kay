@@ -1,4 +1,4 @@
 --- server
-export const sitemap = [{ slug: 'first' }, { slug: 'a & b' }]
+export const page = { sitemap: [{ slug: 'first' }, { slug: 'a & b' }] }
 ---
 h1 {ctx.params.slug}

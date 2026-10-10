@@ -177,7 +177,7 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
       }
     }
     else if (statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'FunctionDeclaration' && statement.declaration.id?.name === 'getStaticPaths') {
-      note(lineOf(statement), 'getStaticPaths: list the params in `export const prerender = [...]` instead (see Prerendering); commented out')
+      note(lineOf(statement), 'getStaticPaths: list the params in `export const page = { prerender: [...] }` instead (see Prerendering); commented out')
       edits.push({ start: statement.start!, end: statement.end!, text: code.slice(statement.start!, statement.end!).split('\n').map(line => `// ${line}`).join('\n') })
     }
   }

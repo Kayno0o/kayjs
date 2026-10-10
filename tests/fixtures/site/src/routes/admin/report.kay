@@ -1,5 +1,5 @@
 --- server
-export const prerender = true
+export const page = { prerender: true }
 
 // A guarded page asking shared caches to keep it, which they must not.
 ctx.headers.set('cache-control', 'public, max-age=3600')

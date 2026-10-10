@@ -55,16 +55,16 @@ export default defineConfig({
 - JSON-LD goes in a `head` block as a `script(type="application/ld+json")` holding its text, which `jsonLd()` from `kay/seo` writes from typed data in a server fence: `const place = jsonLd({ '@type': 'LocalBusiness', 'name': shop.name })`, then `script(type="application/ld+json") {place}`. It adds the schema.org `@context` unless the data names its own, and takes a list as one `@graph`; the type checks `@type` only, the rest being schema.org's vocabulary. Any `<` in a JSON script is written `\u003c`, so a value holding `</script>` cannot end it. `seo.jsonLd` takes the same data.
 - `breadcrumbList(trail)` from `kay/seo` gives a page's breadcrumb trail as the `BreadcrumbList` search engines read, home first: `jsonLd(breadcrumbList([{ name: 'Home', path: '/' }, { name: 'Services', path: '/services' }]))`, each path made absolute by `siteUrl`.
 - `siteUrl('/contact')` from `kay/seo` gives an absolute URL of the site, `https://example.com/contact`, from `site` and `base` in kay.config.ts, for a mail, a share link or structured data; a path ending with a slash under `trailingSlash: 'always'`, as canonical links do; it throws on the server when `site` is not set, prerendered pages included, and in the browser reads the page's own origin. `siteUrl()` is the home page's, and `siteOrigin()` the origin alone, `https://example.com`, without `base`. The site is the one the last `pages()` or build of the process read, one site per process.
-- `export const noindex = true` in a page's server fence asks search engines to leave it out, `<meta name="robots" content="noindex">` in its head, a `robots` tag of its own still winning, and leaves it out of the sitemap, as legal pages often are.
+- `noindex: true` in the `page` object a page's server fence exports asks search engines to leave it out, `<meta name="robots" content="noindex">` in its head, a `robots` tag of its own still winning, and leaves it out of the sitemap, as legal pages often are.
 - Without `site` and `seo`, a page's head holds only the tags it and its layouts set.
 
 ## Sitemap and robots.txt
 
 A project with a `site` serves `/sitemap.xml` and `/robots.txt`, which allows every crawler and points at the sitemap; a file of the same name in `public/` replaces either. The sitemap lists:
 
-- every page without params, unless its server fence has `export const sitemap = false` or `export const noindex = true`;
-- for a page with params, the ones its `sitemap` export lists, else the ones its `prerender` export lists, else none. `sitemap` takes what `prerender` takes: `true`, `false`, a content collection, a list of params or a function returning one;
-- a page behind a guard only when its `sitemap` export lists it.
+- every page without params, unless its `page` sets `sitemap: false` or `noindex: true`;
+- for a page with params, the ones its `sitemap` key lists, else the ones its `prerender` key lists, else none. `sitemap` takes what `prerender` takes: `true`, `false`, a content collection, a list of params or a function returning one;
+- a page behind a guard only when its `sitemap` key lists it.
 
 ```kay
 --- server

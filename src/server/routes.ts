@@ -50,8 +50,12 @@ const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]$/i
 const OPTIONAL_SEGMENT = /^\[\[([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]\]$/i
 // `(marketing)`: groups pages for their layouts and guards, adding nothing to the URL.
 const GROUP_SEGMENT = /^\(.+\)$/
-// A file exporting this is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones.
+// A file setting this is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones.
 const NO_LAYOUTS = /^export\s+const\s+layouts\s*=\s*false\b/m
+const PAGE_EXPORT = /^export\s+const\s+page\s*=\s*\{/m
+const NO_LAYOUTS_KEY = /(?:layouts|'layouts'|"layouts")\s*:\s*false\b/y
+const QUOTES = new Set(['"', '\'', '`'])
+const SPACE = /\s/
 const KAY_EXTENSION = /\.kay$/
 const LAYOUT = '_layout.kay'
 const NOT_FOUND = '_404.kay'
@@ -226,9 +230,68 @@ function exportsNoLayouts(file: string, read: LayoutsRead): boolean {
   let found = read.get(file)
 
   if (found === undefined)
-    read.set(file, found = NO_LAYOUTS.test(readFileSync(file, 'utf8')))
+    read.set(file, found = setsNoLayouts(readFileSync(file, 'utf8')))
 
   return found
+}
+
+// `layouts: false` among the keys of `export const page = { ... }`, read without parsing the module: the server never loads a compiler.
+function setsNoLayouts(source: string): boolean {
+  const found = PAGE_EXPORT.exec(source)
+
+  if (!found)
+    return NO_LAYOUTS.test(source)
+
+  let depth = 1
+  // Where a key of the object itself may start: past its brace or a comma.
+  let atKey = true
+
+  for (let i = found.index + found[0].length; i < source.length && depth > 0; i++) {
+    const char = source[i]!
+
+    if (QUOTES.has(char)) {
+      if (depth === 1 && atKey) {
+        NO_LAYOUTS_KEY.lastIndex = i
+
+        if (NO_LAYOUTS_KEY.test(source))
+          return true
+      }
+
+      for (i++; i < source.length && source[i] !== char; i++) {
+        if (source[i] === '\\')
+          i++
+      }
+
+      atKey = false
+    }
+    else if (char === '/' && (source[i + 1] === '/' || source[i + 1] === '*')) {
+      const end = source[i + 1] === '/' ? source.indexOf('\n', i) : source.indexOf('*/', i) + 1
+
+      i = end <= 0 ? source.length : end
+    }
+    else if (char === '{' || char === '(' || char === '[') {
+      depth++
+      atKey = false
+    }
+    else if (char === '}' || char === ')' || char === ']') {
+      depth--
+    }
+    else if (depth === 1 && char === ',') {
+      atKey = true
+    }
+    else if (!SPACE.test(char)) {
+      if (depth === 1 && atKey) {
+        NO_LAYOUTS_KEY.lastIndex = i
+
+        if (NO_LAYOUTS_KEY.test(source))
+          return true
+      }
+
+      atKey = false
+    }
+  }
+
+  return NO_LAYOUTS.test(source)
 }
 
 function guardsOf(trees: RouteMount[], at: string, read: LayoutsRead): GuardFile[] {

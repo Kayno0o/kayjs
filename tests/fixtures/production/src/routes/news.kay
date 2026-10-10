@@ -3,8 +3,10 @@ import { s } from 'kay'
 import { invalidatePage } from 'kay/server'
 import { news } from '../news'
 
-export const prerender = true
-export const revalidate = 60
+export const page = {
+  prerender: true,
+  revalidate: 60,
+}
 
 export const publish = action(s.Object({ edition: s.Integer({ minimum: 1, maximum: 1000 }) }), ({ edition }) => {
   news.edition = edition

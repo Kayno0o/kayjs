@@ -1,5 +1,5 @@
 --- server
-export const prerender = [{ slug: 'first' }]
+export const page = { prerender: [{ slug: 'first' }] }
 
 const { slug } = ctx.params
 ---

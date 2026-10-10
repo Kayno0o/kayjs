@@ -1,11 +1,13 @@
 import type { ParseResult } from '@babel/parser'
 import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
-import type { Diagnostic, Span } from './ast'
+import type { Diagnostic, Fix, Span } from './ast'
 import type { SignalKind } from './module-signals'
+import type { PageSettingName } from './page-settings'
 import { parse } from '@babel/parser'
 import { isSecret } from '../runtime/form'
 import { SENDABLE_CLASSES } from './expression'
+import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 const REACTIVE_MODULES = new Set(['kay'])
@@ -159,6 +161,29 @@ export interface ServerData {
   local: Span
 }
 
+export interface PageSetting {
+  key: Span
+  value: Span
+}
+
+// `export const page = { ... }`, read as written: kay reads some of its settings before the module runs.
+export interface PageSettings {
+  // The declaration's whole value, `as const` or `satisfies` included.
+  init: Span
+  object: Span
+  settings: Map<string, PageSetting>
+}
+
+// A setting exported under its own name, as before `page` held them.
+export interface SeparateSetting {
+  name: PageSettingName
+  local: Span
+  statement: Span
+  value: Span
+  // Nothing else reads it and it has no type of its own, so it moves into `page` as it is.
+  movable: boolean
+}
+
 export interface ServerAnalysis {
   // Imports and types, plus exported values such as actions: module level, outside `load`.
   hoisted: Span[]
@@ -171,6 +196,8 @@ export interface ServerAnalysis {
   exportSpans: Map<string, Span>
   // The exports declared as `action(...)` calls, the ones `kay check` compares URLs of.
   actionNames: string[]
+  page?: PageSettings | undefined
+  separateSettings: SeparateSetting[]
   // Statements that run per request, inside `load(ctx)`.
   body: Span[]
   // What the fence reads of SERVER_GLOBALS without declaring or importing it.
@@ -185,7 +212,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], exportSpans: new Map(), actionNames: [], body: [], implicit: [], data: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], exportSpans: new Map(), actionNames: [], separateSettings: [], body: [], implicit: [], data: [], diagnostics: [] }
   const parsed = parseFence(source, server, analysis.diagnostics)
 
   if (!parsed)
@@ -220,6 +247,8 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
           if (declarator.id.type === 'Identifier' && declarator.init?.type === 'CallExpression' && declarator.init.callee.type === 'Identifier' && declarator.init.callee.name === 'action')
             analysis.actionNames.push(declarator.id.name)
         }
+
+        pageSettings(ast, statement, statement.declaration, span, shift, analysis)
       }
     }
     else if (isExport(statement)) {
@@ -246,7 +275,142 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
     cursor = span.end
   }
 
+  for (const setting of analysis.separateSettings) {
+    if (analysis.page?.settings.has(setting.name))
+      analysis.diagnostics.push({ ...setting.local, message: `\`${setting.name}\` is set twice, in \`page\` and on its own`, help: 'keep the one in `page`' })
+  }
+
   return analysis
+}
+
+// Reads `export const page` as written, and the settings still exported under their own names.
+function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declaration: t.VariableDeclaration, span: Span, shift: (node: t.Node) => Span, analysis: ServerAnalysis): void {
+  for (const declarator of declaration.declarations) {
+    if (declarator.id.type !== 'Identifier' || !declarator.init)
+      continue
+
+    const name = declarator.id.name
+
+    if (name === PAGE) {
+      let object = declarator.init
+
+      while (object.type === 'TSAsExpression' || object.type === 'TSSatisfiesExpression')
+        object = object.expression
+
+      if (object.type !== 'ObjectExpression') {
+        analysis.diagnostics.push({ ...shift(declarator.init), message: 'kay reads `page` as written, an object literal', help: '`export const page = { prerender: true }`' })
+
+        continue
+      }
+
+      const settings = new Map<string, PageSetting>()
+
+      for (const property of object.properties) {
+        const key = property.type === 'ObjectProperty' && !property.computed ? keyName(property.key) : undefined
+
+        if (property.type !== 'ObjectProperty' || key === undefined) {
+          analysis.diagnostics.push({ ...shift(property), message: 'kay reads each setting of `page` as written', help: 'write it `key: value`, with no spread, method or computed key' })
+
+          continue
+        }
+
+        settings.set(key, { key: shift(property.key), value: shift(property.value) })
+      }
+
+      analysis.page = { init: shift(declarator.init), object: shift(object), settings }
+    }
+    else if ((PAGE_SETTINGS as readonly string[]).includes(name)) {
+      const references = declaration.declarations.length === 1 && !declarator.id.typeAnnotation ? referenceCount(ast, statement, name) : 1
+
+      analysis.separateSettings.push({ name: name as PageSettingName, local: shift(declarator.id), statement: span, value: shift(declarator.init), movable: references === 0 })
+    }
+  }
+}
+
+function keyName(key: t.Node): string | undefined {
+  return key.type === 'Identifier' ? key.name : key.type === 'StringLiteral' ? key.value : undefined
+}
+
+// How often the rest of the fence reads what `statement` declares as `name`: Babel counts the export itself as a read.
+function referenceCount(ast: ParseResult<t.File>, statement: t.Statement, name: string): number {
+  let count = 1
+
+  // Babel refuses a fence declaring a name twice, which the fence reports itself.
+  try {
+    loadTraverse()(ast, {
+      Program(path: NodePath<t.Program>) {
+        const binding = path.scope.getBinding(name)
+        const within = (reference: NodePath) => reference.find(path => path.node === statement) !== null
+
+        if (binding && within(binding.path))
+          count = binding.referencePaths.filter(reference => !within(reference)).length
+
+        path.stop()
+      },
+    })
+  }
+  catch {}
+
+  return count
+}
+
+// Settings exported under their own names, with a fix moving every one it can into `page` at once: each diagnostic carries the same fix, applied once.
+export function separatePageSettings(source: string, server: ServerAnalysis): Diagnostic[] {
+  // A fence naming a value `page` itself, as a paginated list often does, renames it before `page` can hold the settings.
+  const taken = !server.page && (server.data.some(data => data.name === PAGE) || server.imports.some(binding => binding.local === PAGE))
+  const movable = taken ? [] : server.separateSettings.filter(setting => setting.movable && !server.page?.settings.has(setting.name))
+  const fix = movable.length > 0 ? moveIntoPage(source, server.page, movable) : undefined
+
+  return server.separateSettings.map(setting => ({
+    ...setting.local,
+    code: 'deprecated-page-export',
+    message: `\`export const ${setting.name}\` is a setting of \`page\` now`,
+    note: 'one `export const page = { ... }` holds every setting of a page, typed and completed in the editor',
+    help: taken ? `rename the fence's own \`page\`, then move it into \`export const page = { ${setting.name}: ... }\`` : `move it into \`export const page = { ${setting.name}: ... }\``,
+    fixes: fix && movable.includes(setting) ? [fix] : [],
+    checkOnly: true,
+  }))
+}
+
+function moveIntoPage(source: string, page: PageSettings | undefined, settings: SeparateSetting[]): Fix {
+  const entries = settings.map(setting => `${setting.name}: ${indentValue(source.slice(setting.value.start, setting.value.end))}`)
+  const removals = settings.map(setting => ({ start: setting.statement.start, end: lineEnd(source, setting.statement.end), text: '' }))
+  const title = `Move ${settings.length === 1 ? 'it' : 'them'} into \`page\``
+
+  if (!page) {
+    const [first, ...rest] = removals
+    const single = entries.length === 1 && !entries[0]!.includes('\n')
+    const text = single ? `export const page = { ${entries[0]} }\n` : `export const page = {\n${entries.map(entry => `  ${entry},\n`).join('')}}\n`
+
+    return { title, edits: [{ ...first!, text }, ...rest], safe: true }
+  }
+
+  const inside = source.slice(page.object.start + 1, page.object.end - 1)
+  const multiLine = inside.includes('\n')
+  const trimmed = inside.trimEnd()
+  const end = page.object.start + 1 + trimmed.length
+  let text: string
+
+  if (trimmed.trim() === '')
+    text = multiLine ? `\n${entries.map(entry => `  ${entry},`).join('\n')}` : ` ${entries.join(', ')} `
+  else if (multiLine)
+    text = `${trimmed.endsWith(',') ? '' : ','}\n${entries.map(entry => `  ${entry},`).join('\n')}`
+  else
+    text = `${trimmed.endsWith(',') ? '' : ','} ${entries.join(', ')}`
+
+  return { title, edits: [{ start: end, end, text }, ...removals], safe: true }
+}
+
+// A value moving into `page` one level deeper, unless a template literal's own lines would change with it.
+function indentValue(value: string): string {
+  return value.includes('`') ? value : value.replaceAll('\n', '\n  ')
+}
+
+// Past the line break ending a statement, so its line goes with it.
+function lineEnd(source: string, end: number): number {
+  const at = source.slice(end).search(/\S|\n/)
+
+  return at !== -1 && source[end + at] === '\n' ? end + at + 1 : end
 }
 
 function isExport(statement: t.Statement): boolean {

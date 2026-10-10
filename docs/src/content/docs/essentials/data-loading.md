@@ -41,20 +41,22 @@ p(class={theme}) Hello {user?.name}
 
 ## Query strings
 
-A page exports a `query` schema to read the search params typed. A value the schema refuses renders `_error.kay` with status 400.
+A page sets a `query` schema in its `page` object to read the search params typed. A value the schema refuses renders `_error.kay` with status 400.
 
 ```kay
 --- server
 import { s } from 'kay'
 
-export const query = s.Object({
-  q: s.String({ default: '' }),
-  page: s.Optional(s.Integer()),
-})
+export const page = {
+  query: s.Object({
+    q: s.String({ default: '' }),
+    page: s.Optional(s.Integer()),
+  }),
+}
 
-const { q, page = 1 } = ctx.query
+const { q, page: number = 1 } = ctx.query
 ---
-h1 Results for {q}, page {page}
+h1 Results for {q}, page {number}
 ```
 
 ## Redirect, not found and deny

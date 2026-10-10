@@ -1,4 +1,4 @@
 --- server
-export const noindex = true
+export const page = { noindex: true }
 ---
 h1 Legal

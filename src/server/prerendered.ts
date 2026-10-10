@@ -67,7 +67,7 @@ export async function listedParams(route: Route, file: string, name: string, val
 
   if (value === true) {
     if (route.params.length > 0)
-      throw new Error(`kay: ${file} takes params, so \`${name}\` lists them: export const ${name} = [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }]`)
+      throw new Error(`kay: ${file} takes params, so \`${name}\` lists them: export const page = { ${name}: [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }] }`)
 
     return [{}]
   }

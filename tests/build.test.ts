@@ -399,7 +399,7 @@ describe('kay build without the server environment', () => {
     const root = await scratchProject({
       'src/env.ts': 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ MAIL_TO: t.String() }))\n',
       'src/routes/_layout.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\nimport { env } from \'../env\'\n\nexport const send = action(t.Object({}), () => env.MAIL_TO)\n---\nslot\n',
-      'src/routes/index.kay': '--- server\nexport const prerender = true\n---\np Home\n',
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\np Home\n',
     })
     const build = async () => {
       const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', '--no-check'], { cwd: root, env: { PATH: process.env.PATH }, stdout: 'pipe', stderr: 'pipe' })
@@ -414,7 +414,7 @@ describe('kay build without the server environment', () => {
       expect(built.report).toContain('1 prerendered page')
       expect(built.code).toBe(0)
 
-      await Bun.write(join(root, 'src/routes/mail.kay'), '--- server\nimport { env } from \'../env\'\n\nexport const prerender = true\n\nconst to = env.MAIL_TO\n---\np {to}\n')
+      await Bun.write(join(root, 'src/routes/mail.kay'), '--- server\nimport { env } from \'../env\'\n\nexport const page = { prerender: true }\n\nconst to = env.MAIL_TO\n---\np {to}\n')
       const refused = await build()
 
       expect(refused.report).toContain('kay: MAIL_TO does not match the environment\'s schema')
@@ -443,8 +443,8 @@ describe('kay build checks the project first', () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
       'kay.config.ts': config('{ \'missing-description\': \'allow\', \'unsized-share-image\': \'allow\' }'),
-      'src/routes/index.kay': '--- server\nexport const prerender = true\n---\nhead\n  title Home\n  meta(name="robots" content="noindex")\np Home\n',
-      'src/routes/about.kay': '--- server\nexport const prerender = true\n---\nhead\n  title Home\n  meta(name="description" content="Who we are")\np About\n',
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="robots" content="noindex")\np Home\n',
+      'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Who we are")\np About\n',
     })
 
     try {
@@ -495,7 +495,7 @@ describe('kay build checks the project first', () => {
     const root = await scratchProject({ 'tsconfig.json': tsconfig })
     const ran = join(root, 'ran')
     // A prerendered page that records it ran, which the build does once the check passed.
-    const page = async (text: string, code = '') => Bun.write(join(root, 'src/routes/index.kay'), `--- server\nexport const prerender = true\nawait Bun.write(${JSON.stringify(ran)}, '${text}')\n${code}---\np ${text}\n`)
+    const page = async (text: string, code = '') => Bun.write(join(root, 'src/routes/index.kay'), `--- server\nexport const page = { prerender: true }\nawait Bun.write(${JSON.stringify(ran)}, '${text}')\n${code}---\np ${text}\n`)
     const prerendered = join(root, '.kay/client/pages/index.html')
     const output = join(root, '.kay/client')
     const previous = join(root, '.kay/client-previous')

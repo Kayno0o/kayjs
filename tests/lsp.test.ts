@@ -178,6 +178,23 @@ describe('kay lsp', () => {
     expect(names.filter(name => name === '__props' || name.startsWith('Kay'))).toEqual([])
   })
 
+  it('completes the keys of a page\'s settings', async () => {
+    const path = 'src/routes/search.kay'
+    const text = await Bun.file(join(fixtures, 'site', path)).text()
+
+    await site.open(path)
+    await site.change(path, '--- server\nexport const page = { noindex: true,  }\n---\np x\n', 2)
+
+    try {
+      const list = await site.request<CompletionList>('textDocument/completion', path, 1, 37)
+
+      expect(list.items.map(item => item.label)).toEqual(expect.arrayContaining(['prerender?', 'revalidate?', 'layouts?', 'query?', 'sitemap?']))
+    }
+    finally {
+      await site.change(path, text, 3)
+    }
+  })
+
   it('goes to definitions across .kay files', async () => {
     const [action] = await site.request<LocationLink[]>('textDocument/definition', 'src/components/quick-add.kay', 9, 19)
 

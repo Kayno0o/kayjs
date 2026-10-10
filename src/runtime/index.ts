@@ -2,6 +2,7 @@ import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect, RouteParams } from './checks'
+import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
@@ -166,7 +167,7 @@ export interface PageContext<Params extends Record<string, unknown> = Record<str
   // The locale the page is served in, as `i18n` in kay.config.ts gives it; the site's `lang` without.
   locale: Locale
   params: Params
-  // The search params, read against the page's `export const query = s.Object(...)`; a query it refuses answers 400. Their raw text is `url.searchParams`.
+  // The search params, read against the page's `export const page = { query: s.Object(...) }`; a query it refuses answers 400. Their raw text is `url.searchParams`.
   query: Query
   // Read on demand; what a page sets or deletes goes out as Set-Cookie headers, redirects included.
   cookies: CookieMap
@@ -192,9 +193,9 @@ export type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | u
   : boolean extends Flag
     ? Context
     : Omit<Context, 'cookies' | 'query' | 'locals'> & {
-      cookies: { kayError: 'A prerendered page renders once, at build time, with no ctx.cookies; drop export const prerender to render it per request' }
-      query: { kayError: 'A prerendered page renders once, at build time, with no ctx.query; drop export const prerender to render it per request' }
-      locals: { kayError: 'A prerendered page renders once, at build time, with no ctx.locals; drop export const prerender to render it per request' }
+      cookies: { kayError: 'A prerendered page renders once, at build time, with no ctx.cookies; drop prerender from export const page to render it per request' }
+      query: { kayError: 'A prerendered page renders once, at build time, with no ctx.query; drop prerender from export const page to render it per request' }
+      locals: { kayError: 'A prerendered page renders once, at build time, with no ctx.locals; drop prerender from export const page to render it per request' }
     }
 
 export interface PageError {
@@ -228,6 +229,22 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   void Promise.allSettled([promise])
 
   return promise as Deferred<T>
+}
+
+// `export const page = { ... }` in a page's server fence; a layout takes `layouts` alone.
+export interface PageSettings {
+  // `kay build` renders the page once: `true` for a route without params, else the params of each page to render, as a list, a function returning one, a content collection or a `paginate()` list.
+  prerender?: boolean | object
+  // How long a prerendered page is served before it renders again.
+  revalidate?: Duration
+  // `false` renders the page, or the layouts below this one, without the layouts above.
+  layouts?: false
+  // The schema `ctx.query` is read against; a query it refuses answers 400.
+  query?: TSchema
+  // The pages of the route the sitemap lists, as `prerender` takes them; `false` leaves it out.
+  sitemap?: boolean | object
+  // Keeps the page out of search engines and the sitemap.
+  noindex?: boolean
 }
 
 // What a page's query schema gives `ctx.query`.

@@ -1,7 +1,7 @@
 --- server
 import { news } from '../../content.config'
 
-export const prerender = news
+export const page = { prerender: news }
 
 const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = entry

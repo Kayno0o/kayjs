@@ -146,11 +146,12 @@ describe('control flow', () => {
   })
 
   it('types a page\'s load with its query schema and keeps the schema out of a browser build\'s action stubs', () => {
-    const page = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const query = t.Object({ q: t.String() })\nexport const add = action(t.Object({}), () => 1)\n\nconst q = ctx.query.q\n---\np {q}'
+    const page = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const page = { query: t.Object({ q: t.String() }) }\nexport const add = action(t.Object({}), () => 1)\n\nconst q = ctx.query.q\n---\np {q}'
 
-    expect(compileKay(page, 'src/routes/index.kay', { includeServer: true }).tsx).toContain('export async function load(ctx: KayPageContext<Record<string, string>, KayQueryOf<typeof query>>)')
+    expect(compileKay(page, 'src/routes/index.kay', { includeServer: true }).tsx).toContain('export async function load(ctx: KayPageContext<Record<string, string>, KayQueryOf<typeof page.query>>)')
+    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('export const page = { query: t.Object({ q: t.String() }) } satisfies KayPageSettings\n')
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).toContain('export const add = KayActionStub(')
-    expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).not.toContain('export const query')
+    expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).not.toContain('export const page')
   })
 
   it('renders a for fallback', () => {

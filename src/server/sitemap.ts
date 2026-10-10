@@ -8,6 +8,7 @@ import process from 'node:process'
 import { escape } from '../runtime/escape'
 import { importModule } from './bundle'
 import { hostLocale, localeCopies } from './i18n'
+import { pageSetting } from './page-settings'
 import { listedIn, listedParams, pathOf } from './prerendered'
 import { reportServerError } from './report'
 import { servedPaths, slashedPath } from './routes'
@@ -16,12 +17,6 @@ export const SITEMAP = '/sitemap.xml'
 export const ROBOTS = '/robots.txt'
 // Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
 const CACHE_MS = 60 * 60 * 1000
-
-interface PageExports {
-  sitemap?: unknown
-  prerender?: unknown
-  noindex?: boolean
-}
 
 export interface SitemapOptions {
   dev?: boolean | undefined
@@ -68,13 +63,15 @@ export function serveSitemap(app: Elysia, routes: ServedRoute[], origin: string,
 export async function sitemapXml(routes: ServedRoute[], origin: string, trailingSlash?: TrailingSlash, settings?: LocaleSettings, only?: string): Promise<string> {
   const lists = await Promise.all(routes.map(async (route) => {
     const file = relative(process.cwd(), route.file)
-    const module = await importModule<PageExports>(route.file)
+    const module = await importModule<object>(route.file)
+    const sitemap = pageSetting(module, 'sitemap')
+    const prerender = pageSetting(module, 'prerender')
 
-    if (module.noindex === true)
+    if (pageSetting(module, 'noindex') === true)
       return []
 
-    if (module.sitemap !== undefined)
-      return listedParams(route, file, 'sitemap', module.sitemap, settings)
+    if (sitemap !== undefined)
+      return listedParams(route, file, 'sitemap', sitemap, settings)
 
     if (route.guards.length > 0)
       return []
@@ -82,7 +79,7 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
     if (route.params.length === 0)
       return [{}]
 
-    return module.prerender === undefined ? [] : listedParams(route, file, 'prerender', module.prerender, settings)
+    return prerender === undefined ? [] : listedParams(route, file, 'prerender', prerender, settings)
   }))
 
   const absolute = (copy: LocaleCopy) => escape(`${copy.host === undefined ? origin : `https://${copy.host}`}${slashedPath(copy.path, trailingSlash)}`)

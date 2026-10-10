@@ -1,4 +1,4 @@
 --- server
-export const layouts = false
+export const page = { layouts: false }
 ---
 p.bare Bare

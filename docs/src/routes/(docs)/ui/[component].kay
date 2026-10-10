@@ -3,7 +3,7 @@ import { shareCard } from 'kay/image'
 import { components, reference } from '../../../content.config'
 import { FORGE_ROOT, neighbours } from '../../../pages'
 
-export const prerender = components
+export const page = { prerender: components }
 
 const component = await components.get(ctx.params.component) ?? ctx.notFound()
 const { Content } = component

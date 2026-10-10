@@ -1,7 +1,7 @@
 --- server
 import { s } from 'kay'
 
-export const query = s.Object({ token: s.Optional(s.String()) })
+export const page = { query: s.Object({ token: s.Optional(s.String()) }) }
 
 export const confirm = action(s.Object({ token: s.String() }), async ({ token }, ctx) => {
   const result = await ctx.locals.auth.confirmEmailChange(token)

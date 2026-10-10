@@ -82,7 +82,7 @@ export async function sitemap() {
 ---
 ```
 
-`export const noindex = true` keeps a page out of search engines and the sitemap. A file with the same name in `public/` replaces either generated one.
+`noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap. A file with the same name in `public/` replaces either generated one.
 
 ## Favicon
 

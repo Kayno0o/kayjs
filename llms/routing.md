@@ -30,12 +30,23 @@ export default (value: string) =>
 
 A URL a matcher refuses falls through to the page without one serving the same path, `items/[slug].kay` beside `items/[id=integer].kay`, and is a 404 when none does; several pages with matchers on one path are tried in the order of their file paths. Two pages serving one path, neither with a matcher, stop the server, whatever they name their params: `todos/[id].kay` and `todos/[slug].kay`, `blog/index.kay` and `blog/[[page]].kay`, `about.kay` and `(site)/about.kay`. A `prerender` list leaves an optional param out to prerender the path without it, and an entry a matcher refuses fails the build.
 
-A page or a layout whose server fence has a line starting with `export const layouts = false` is wrapped by none of the layouts above it: `export const layouts = false` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
+A page's settings are the keys of one object its server fence exports, `export const page = { prerender: true, revalidate: '1h' }`. `kay` exports the type `PageSettings`, which `kay check` types the object by (`satisfies PageSettings`): the editor completes the keys and an unknown one is a type error. Kay reads the object as written, a literal with no spread, computed key or method. A layout takes `layouts` alone, and `query` on a layout or a special page is reported. The separate exports (`export const prerender = true` and the like) still work but are deprecated: the lint `deprecated-page-export` reports each, `kay check --fix` moves them into `page` unless the fence names a value `page` itself or reads the setting, and a later minor removes them.
+
+| Key | Value | Detailed in |
+| --- | --- | --- |
+| `prerender` | `true`, `false`, a list of params, a function returning one, a content collection or `paginate()` | [Prerendering](#prerendering) |
+| `revalidate` | a `Duration`, how old a prerendered page gets before it is rendered again | [Prerendering](#prerendering) |
+| `layouts` | `false` only, to drop the layouts above | this section |
+| `query` | a schema `ctx.query` is read against | `ctx.query`, below |
+| `sitemap` | what `prerender` takes, or `false` | [Head and SEO](head.md) |
+| `noindex` | `true` to keep the page from search engines and the sitemap | [Head and SEO](head.md) |
+
+A page or a layout whose `page` has `layouts: false` among its keys is wrapped by none of the layouts above it: `export const page = { layouts: false }` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header. The old `export const layouts = false` still reads, deprecated.
 
 Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence runs per request and may use top-level `await` and the `ctx` object, except what an export such as an action reads: that runs once, when the module loads, so it may neither await nor read `ctx`, which `kay check` reports. The fence's `ctx`:
 
 - `ctx.params`, typed from the file name, `ctx.url`, `ctx.request`
-- `ctx.query`, the search params, read against the schema the page exports as `query`: `export const query = s.Object({ q: s.String(), page: s.Optional(s.Integer()) })` types `ctx.query.page` as a `number | undefined`. Each is read as a form field is (a number from decimal text, a list from a repeated name, `true` from `on`), one left out takes its `default`, and a query the schema refuses renders `_error.kay` with status 400, once the guards let the request through. Layouts read the page's, and declare none of their own; `query` is no action name for that reason. Without a schema each name reads as its text, a repeated one as a list, typed `unknown`; the raw text is `ctx.url.searchParams`.
+- `ctx.query`, the search params, read against the schema the page sets as the `query` key of `page`: `export const page = { query: s.Object({ q: s.String(), page: s.Optional(s.Integer()) }) }` types `ctx.query.page` as a `number | undefined`. Each is read as a form field is (a number from decimal text, a list from a repeated name, `true` from `on`), one left out takes its `default`, and a query the schema refuses renders `_error.kay` with status 400, once the guards let the request through. Layouts read the page's, and declare none of their own: `query` on a layout or a special page is reported, "Only a page declares its query". Without a schema each name reads as its text, a repeated one as a list, typed `unknown`; the raw text is `ctx.url.searchParams`.
 - `ctx.cookies`, a `Bun.CookieMap`: `ctx.cookies.get('theme')`; what `set` and `delete` change is sent back, redirects included
 - `ctx.locals`, what the app's Elysia `derive`, `resolve` and `decorate` add, such as the signed-in user
 - `ctx.status(404)` and `ctx.headers` set the response
@@ -77,7 +88,7 @@ export default defineConfig({
 
 ## Prerendering
 
-A page whose server fence has `export const prerender = true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.query` or `ctx.locals` in its server fence is reported by `kay check`, and in a layout fails the build, and `ctx.failed` and `ctx.succeeded` return `undefined`; `ctx.url` is `http://localhost` plus its path. A refused form post, and a request carrying the cookie a plain form post that went through leaves, as the browser coming back from one does, get it rendered for that request instead, with how the post went, as `Cache-Control: private, no-store` and no ETag; the next request gets the file again. Development renders it per request like any other.
+A page whose `page` has `prerender: true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.query` or `ctx.locals` in its server fence is reported by `kay check`, and in a layout fails the build, and `ctx.failed` and `ctx.succeeded` return `undefined`; `ctx.url` is `http://localhost` plus its path. A refused form post, and a request carrying the cookie a plain form post that went through leaves, as the browser coming back from one does, get it rendered for that request instead, with how the post went, as `Cache-Control: private, no-store` and no ETag; the next request gets the file again. Development renders it per request like any other.
 
 A route taking params lists the ones to render instead, as an array or a function returning one; any other path renders per request:
 
@@ -85,8 +96,8 @@ A route taking params lists the ones to render instead, as an array or a functio
 --- server
 import { findPost, listPosts } from '../../data'
 
-export async function prerender() {
-  return (await listPosts()).map(post => ({ slug: post.slug }))
+export const page = {
+  prerender: async () => (await listPosts()).map(post => ({ slug: post.slug })),
 }
 
 const post = await findPost(ctx.params.slug) ?? ctx.notFound()
@@ -94,9 +105,9 @@ const post = await findPost(ctx.params.slug) ?? ctx.notFound()
 h1 {post.title}
 ```
 
-Each value is a string with no empty, `.` or `..` segment, a catch-all's included with its slashes. `export const prerender = false` prerenders nothing. A list `paginate()` from `kay/content` split lists each of its pages, for a page whose one param is optional, `blog/[[page=integer]].kay` (see content).
+Each value is a string with no empty, `.` or `..` segment, a catch-all's included with its slashes. `prerender: false` prerenders nothing. A list `paginate()` from `kay/content` split lists each of its pages, for a page whose one param is optional, `blog/[[page=integer]].kay` (see content).
 
-`export const revalidate = '1h'` beside `prerender` keeps a prerendered page fresh: once it is older than that, seconds or a string such as `'1h'`, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does; every request after that render lands gets the new page, with a new ETag and compressed copies. One render runs at a time per path. A render that fails or answers 5xx is logged and leaves the page as it was, the next attempt coming a minute later at most. The new page lives in memory, so a restart serves the built file again until it goes stale; an executable built a while ago revalidates on its first request.
+`revalidate: '1h'` beside `prerender` in `page` keeps a prerendered page fresh: once it is older than that, seconds or a string such as `'1h'`, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does; every request after that render lands gets the new page, with a new ETag and compressed copies. One render runs at a time per path. A render that fails or answers 5xx is logged and leaves the page as it was, the next attempt coming a minute later at most. The new page lives in memory, so a restart serves the built file again until it goes stale; an executable built a while ago revalidates on its first request.
 
 An action or an API route that changed what a prerendered page shows calls `invalidatePage` from `kay/server`, and the next request for it waits for a fresh render rather than getting it as it was, whether or not the page has a `revalidate` period:
 
@@ -138,7 +149,7 @@ export const pageWeight: KayExtension = {
 
 ### Server islands
 
-`server` on a component call renders that component per request inside an otherwise prerendered page: a form carrying a fresh token, a greeting, a stock count. The mark is the whole setup. A page without params whose template reaches one, directly or through the components it imports, prerenders without `export const prerender`, unless it exports `prerender = false`. Each request runs the page's loads again, its server fence included, and renders only the components on the way down to the island, so its props come from the fence as they would on a page rendered whole:
+`server` on a component call renders that component per request inside an otherwise prerendered page: a form carrying a fresh token, a greeting, a stock count. The mark is the whole setup. A page without params whose template reaches one, directly or through the components it imports, prerenders without a `prerender` key, unless its `page` sets `prerender: false`. Each request runs the page's loads again, its server fence included, and renders only the components on the way down to the island, so its props come from the fence as they would on a page rendered whole:
 
 ```kay
 --- server

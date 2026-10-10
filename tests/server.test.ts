@@ -585,7 +585,7 @@ describe('route params in guards and actions', () => {
     await Bun.write(join(dir, 'routes/orgs/[org]/[team=integer].kay'), 'p Team\n')
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
     await Bun.write(join(dir, 'routes/shelves/[shelf].kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const stock = action(t.Object({}), () => \'stocked\')\nexport const count = action(t.Object({}), (_, ctx) => ctx.params)\n---\np Shelf\n')
-    await Bun.write(join(dir, 'routes/orgs/[org]/report.kay'), '--- server\nexport const prerender = [{ org: \'acme\' }, { org: \'other\' }]\n---\nh1 Report\n')
+    await Bun.write(join(dir, 'routes/orgs/[org]/report.kay'), '--- server\nexport const page = { prerender: [{ org: \'acme\' }, { org: \'other\' }] }\n---\nh1 Report\n')
     await Bun.write(join(dir, 'api/orgs/_guard.ts'), GUARD)
     await Bun.write(join(dir, 'api/orgs/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/:org\', ({ params }) => params.org)\n')
     served = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: true })
@@ -985,17 +985,17 @@ describe('prerendering', () => {
     const dir = await mkdtemp(join(root, '.kay/routes-'))
 
     try {
-      await Bun.write(join(dir, 'posts/[slug].kay'), '--- server\nexport const prerender = true\n---\np {ctx.params.slug}\n')
-      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('so `prerender` lists them: export const prerender = [{ slug: \'...\' }]')
+      await Bun.write(join(dir, 'posts/[slug].kay'), '--- server\nexport const page = { prerender: true }\n---\np {ctx.params.slug}\n')
+      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('so `prerender` lists them: export const page = { prerender: [{ slug: \'...\' }] }')
       await rm(join(dir, 'posts'), { recursive: true })
       // Another file, since the first one stays in the module cache.
-      await Bun.write(join(dir, 'tags/[slug].kay'), '--- server\nexport const prerender = [{ slug: 1 }]\n---\np {ctx.params.slug}\n')
+      await Bun.write(join(dir, 'tags/[slug].kay'), '--- server\nexport const page = { prerender: [{ slug: 1 }] }\n---\np {ctx.params.slug}\n')
       await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('lists {"slug":1} in prerender, which needs a string for each of slug')
       await rm(join(dir, 'tags'), { recursive: true })
-      await Bun.write(join(dir, 'files/[...path].kay'), '--- server\nexport const prerender = [{ path: \'a/../../x\' }]\n---\np {ctx.params.path}\n')
+      await Bun.write(join(dir, 'files/[...path].kay'), '--- server\nexport const page = { prerender: [{ path: \'a/../../x\' }] }\n---\np {ctx.params.path}\n')
       await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('with no empty, . or .. segment')
       await rm(join(dir, 'files'), { recursive: true })
-      await Bun.write(join(dir, 'notes/[slug].kay'), '--- server\nexport const prerender = \'yes\'\n---\np {ctx.params.slug}\n')
+      await Bun.write(join(dir, 'notes/[slug].kay'), '--- server\nexport const page = { prerender: \'yes\' }\n---\np {ctx.params.slug}\n')
       await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('exports a prerender that is neither true, false')
     }
     finally {
@@ -1010,8 +1010,8 @@ describe('prerendering', () => {
     const dir = await mkdtemp(join(root, '.kay/routes-'))
 
     try {
-      await Bun.write(join(dir, 'index.kay'), '--- server\nexport const prerender = true\n---\np Home\n')
-      await Bun.write(join(dir, '[slug].kay'), '--- server\nexport const prerender = [{ slug: \'index\' }]\nconst slug = ctx.params.slug\n---\np {slug}\n')
+      await Bun.write(join(dir, 'index.kay'), '--- server\nexport const page = { prerender: true }\n---\np Home\n')
+      await Bun.write(join(dir, '[slug].kay'), '--- server\nexport const page = { prerender: [{ slug: \'index\' }] }\nconst slug = ctx.params.slug\n---\np {slug}\n')
       await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('kay: /index and / would both be prerendered to index.html')
     }
     finally {
@@ -1143,6 +1143,29 @@ describe('route scan', () => {
       await Bun.write(join(dir, 'about/index.kay'), '')
       expect(await scanRoutes(dir)).toHaveLength(2)
       await expect(pages({ routes: dir, prebuilt: true })).rejects.toThrow('both serve /about')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads layouts: false among the keys of page, or exported on its own, and no other text saying it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-routes-'))
+    const pages = {
+      keyed: 'export const page = { noindex: true, layouts: false }',
+      quoted: 'export const page = {\n  \'layouts\': false,\n}',
+      own: 'export const layouts = false',
+      nested: 'export const page = {\n  query: s.Object({ layouts: s.Boolean() }),\n  // layouts: false\n  noindex: /layouts: false/.test(\'\'),\n}',
+      text: 'export const page = { sitemap: \'layouts: false\' }',
+    }
+
+    try {
+      await Bun.write(join(dir, '_layout.kay'), 'slot\n')
+      await Promise.all(Object.entries(pages).map(async ([name, code]) => Bun.write(join(dir, `${name}.kay`), `--- server\n${code}\n---\np\n`)))
+
+      const routes = await scanRoutes(dir)
+
+      expect(Object.fromEntries(Object.keys(pages).map(name => [name, routes.find(route => route.pattern === `/${name}`)!.layouts.length]))).toEqual({ keyed: 0, quoted: 0, own: 0, nested: 1, text: 1 })
     }
     finally {
       await rm(dir, { recursive: true, force: true })

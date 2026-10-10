@@ -187,6 +187,13 @@ export const LINTS = {
     wrong: '--- server\nimport { t } from \'kay\'\n\nexport const query = t.Object({ page: t.Integer({ minimum: 1 }) })\n---\np Page',
     right: '--- server\nimport { s } from \'kay\'\n\nexport const query = s.Object({ page: s.Integer({ minimum: 1 }) })\n---\np Page',
   },
+  'deprecated-page-export': {
+    level: 'warn',
+    group: 'code',
+    summary: 'A page setting exported under its own name, as before `export const page` held them all. `kay check --fix` moves it into `page`.',
+    wrong: '--- server\nexport const prerender = true\n---\np About',
+    right: '--- server\nexport const page = { prerender: true }\n---\np About',
+  },
   'positional-key': {
     level: 'warn',
     group: 'islands',

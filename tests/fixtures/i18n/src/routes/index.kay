@@ -2,7 +2,7 @@
 import { direction, formatList, formatNumber, formatRelativeTime, T, t } from 'kay/i18n'
 import Counter from '../components/counter.kay'
 
-export const prerender = true
+export const page = { prerender: true }
 
 const greeting = t('greeting', { name: 'Ada' })
 const none = t('items', { count: 0 })

@@ -2,7 +2,7 @@
 import { s } from 'kay'
 import { FAILURE_WORDS, PASSWORD_WORDS } from '../words'
 
-export const query = s.Object({ token: s.Optional(s.String()) })
+export const page = { query: s.Object({ token: s.Optional(s.String()) }) }
 
 export const request = action(s.Object({ email: s.String({ maxLength: 254 }) }), async ({ email }, ctx) => {
   const result = await ctx.locals.auth.requestPasswordReset(email)

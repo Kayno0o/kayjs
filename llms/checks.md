@@ -56,6 +56,7 @@ What the markup alone cannot tell, such as text too faint on its background, con
 | `missing-captions` | warn | a11y | A `video` that is not `muted` with no captions `track`. |
 | `redundant-alt` | warn | a11y | Alt text that is a filename or says it is an image. |
 | `constant-signal` | warn | islands | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |
+| `deprecated-page-export` | warn | code | A page setting exported under its own name, `export const prerender = true`, now a key of `export const page = { ... }`; `--fix` moves it there, unless the fence names a value `page` itself or reads the setting, which the author renames or moves. |
 | `deprecated-schema-name` | warn | code | `t` imported from `kay` for the schema builder, now `s`; `--fix` renames it, in `.kay` fences and the project's own modules alike. |
 | `uncaught-await` | warn | code | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
 | `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts or `SITE_URL`: no canonical links, `og:url`, sitemap or robots.txt. |
@@ -67,7 +68,7 @@ What the markup alone cannot tell, such as text too faint on its background, con
 | `duplicate-title` | warn | seo | A prerendered page with the title of another of the same locale. |
 | `long-description` | warn | seo | A prerendered page whose description runs over 160 characters, which search results cut. |
 | `unsized-share-image` | warn | seo | A prerendered page whose `og:image` has no `og:image:width`, kay reading no size off it. |
-| `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `export const noindex = true` does both. |
+| `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `noindex: true` in `page` does both. |
 
 ## SEO lints
 

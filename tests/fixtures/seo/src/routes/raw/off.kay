@@ -1,5 +1,5 @@
 --- server
-export const sitemap = false
+export const page = { sitemap: false }
 ---
 head
   title(raw={false}) Not raw

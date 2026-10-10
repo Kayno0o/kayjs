@@ -4,7 +4,7 @@ import { shareCard } from 'kay/image'
 import { components } from '../../content.config'
 import { highlight } from '../../highlight'
 
-export const prerender = true
+export const page = { prerender: true }
 
 const SAMPLE = `--- server
 import { s } from 'kay'

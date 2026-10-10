@@ -1,5 +1,5 @@
 --- server
-export const layouts = false
+export const page = { layouts: false }
 ---
 div.docs
   slot

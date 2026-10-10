@@ -1,7 +1,7 @@
 --- server
 import { s } from 'kay'
 
-export const query = s.Object({ token: s.Optional(s.String()) })
+export const page = { query: s.Object({ token: s.Optional(s.String()) }) }
 
 // Confirms the address without signing in: in another browser than the one that joined, the password proves who confirms.
 export const confirm = action(s.Object({ token: s.String(), password: s.Optional(s.String({ maxLength: 128 })) }), async ({ token, password }, ctx) => {

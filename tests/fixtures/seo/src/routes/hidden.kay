@@ -1,4 +1,4 @@
 --- server
-export const sitemap = false
+export const page = { sitemap: false }
 ---
 h1 Hidden

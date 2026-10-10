@@ -94,7 +94,7 @@ export function pageSeoLints(config: SiteSeo, pages: RenderedPage[], exported = 
       report('unsized-share-image', { ...at, message: `The share image of \`${page.path}\` has no size`, note: `kay reads no size off ${head.image}, so a network fetches it before laying the card out`, help: 'link a public file, an imported image, `shareImage()` or `shareCard()`, or set `og:image:width` and `og:image:height`' })
 
     if (head.noindex && !page.noindex && !page.sitemap && config.site !== undefined)
-      report('noindex-in-sitemap', { ...at, message: `\`${page.path}\` is in the sitemap, though its head says \`noindex\``, help: '`export const noindex = true` from its server fence sets the tag and leaves it out of the sitemap' })
+      report('noindex-in-sitemap', { ...at, message: `\`${page.path}\` is in the sitemap, though its head says \`noindex\``, help: '`export const page = { noindex: true }` in its server fence sets the tag and leaves it out of the sitemap' })
   }
 
   return found

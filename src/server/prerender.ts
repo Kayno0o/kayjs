@@ -20,6 +20,7 @@ import { PRERENDERED_DIR, readInlineStyles, readManifest, writeManifest } from '
 import { implicitI18n, loadI18n, localeCopies, routedSettings, stateFor } from './i18n'
 import { applyImageConfig } from './image'
 import { registerLoader } from './loader'
+import { pageSetting } from './page-settings'
 import { loadMatchers, matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pathOf, storedHeaders } from './prerendered'
 import { renderPage } from './render'
@@ -84,16 +85,17 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   async function prerenderRoute(route: Route, file: string, marked: boolean): Promise<void> {
     const module = await import(route.file) as Record<string, unknown>
-    const revalidate = revalidatePeriod(file, module.revalidate)
+    const revalidate = revalidatePeriod(file, pageSetting(module, 'revalidate'))
+    const prerender = pageSetting(module, 'prerender')
 
     if (options.exportAll)
       refuseServerOnly(route, module)
 
     // A static export takes a page without params as it is, and so does a page holding a server island: what is not one is the same for everyone.
-    const listed = (options.exportAll === true || marked) && module.prerender === undefined && route.params.length === 0 ? true : module.prerender
+    const listed = (options.exportAll === true || marked) && prerender === undefined && route.params.length === 0 ? true : prerender
 
     if (options.exportAll && (listed === undefined || listed === false))
-      throw new Error(listed === false ? 'kay: it exports prerender = false' : `kay: it takes ${route.params.join(', ')}, so \`prerender\` lists the values to export: export const prerender = [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }]`)
+      throw new Error(listed === false ? 'kay: its prerender is false' : `kay: it takes ${route.params.join(', ')}, so \`prerender\` lists the values to export: export const page = { prerender: [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }] }`)
 
     for (const params of await listedParams(route, file, 'prerender', listed, i18n?.settings)) {
       const path = pathOf(route, params)
@@ -149,7 +151,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         await Bun.write(join(dir, name), html)
 
         if (response.status === 200)
-          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex: module.noindex === true, sitemap: module.sitemap !== undefined })
+          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex: pageSetting(module, 'noindex') === true, sitemap: pageSetting(module, 'sitemap') !== undefined })
 
         pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {} }
       }
@@ -245,5 +247,7 @@ async function reachesServerIsland(file: string, seen = new Set<string>()): Prom
 async function exportsPrerender(file: string): Promise<boolean> {
   const source = await Bun.file(file).text()
 
-  return analyzeServer(source, parseKay(source).server)?.exportNames.includes('prerender') ?? false
+  const server = analyzeServer(source, parseKay(source).server)
+
+  return server?.page?.settings.has('prerender') === true || server?.exportNames.includes('prerender') === true
 }

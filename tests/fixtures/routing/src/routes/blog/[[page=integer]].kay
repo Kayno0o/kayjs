@@ -1,7 +1,7 @@
 --- server
-export const prerender = [{}, { page: '2' }]
+export const page = { prerender: [{}, { page: '2' }] }
 
-const page: number = ctx.params.page ?? 1
+const number: number = ctx.params.page ?? 1
 const type = typeof ctx.params.page
 ---
-p.page Page {page}, a {type}
+p.page Page {number}, a {type}

@@ -36,6 +36,7 @@ import { hydrationScript } from './hydration'
 import { DEFAULT_LANG, messagesScript } from './i18n'
 import { registerScript } from './offline'
 import { errorPage } from './overlay'
+import { pageSetting } from './page-settings'
 import { matchesEtag } from './public'
 import { readQuery } from './query'
 import { reportServerError } from './report'
@@ -48,10 +49,6 @@ import { traced } from './trace'
 interface PageModule {
   default: (props: Record<string, unknown>) => unknown
   load?: (ctx: PageContext<Record<string, unknown>>) => Promise<Record<string, unknown>>
-  // The page's schema for its search params.
-  query?: unknown
-  // Kept out of search engines and the sitemap.
-  noindex?: boolean
 }
 
 type Loaded = PromiseSettledResult<Record<string, unknown>>
@@ -129,7 +126,7 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
     const modules = await importAll(files)
 
     // Read once the guards let the request through, so a refused query never renders what they protect; the layouts see the page's.
-    const query = modules.at(-1)!.query
+    const query = pageSetting(modules.at(-1)!, 'query')
 
     if (query !== undefined && !options.prerendering)
       rendering.ctx.query = readQuery(query, rendering.ctx.url)
@@ -423,7 +420,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
 function needsRequest(name: string): () => never {
   return () => {
-    throw new Error(`kay: a prerendered page renders once, at build time, so it has no ${name}; drop \`export const prerender\`, or the \`server\` mark of a server island it holds, to render it per request`)
+    throw new Error(`kay: a prerendered page renders once, at build time, so it has no ${name}; drop \`prerender\` from \`export const page\`, or the \`server\` mark of a server island it holds, to render it per request`)
   }
 }
 
@@ -508,7 +505,7 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
 
 // The head a page starts from, a page saying `noindex` asking search engines to leave it out; a layout or the page may still set its own `robots`.
 function pageHead(page: PageModule, head: HeadOptions | undefined): HeadOptions | undefined {
-  if (page.noindex !== true)
+  if (pageSetting(page, 'noindex') !== true)
     return head
 
   return { ...head, defaults: [...head?.defaults ?? [], { tag: 'meta', props: { name: 'robots', content: 'noindex' } }] }

@@ -116,13 +116,46 @@ describe('kay explain', () => {
 describe('deprecated-schema-name', () => {
   it('renames the schema builder imported as t in its fence, or imports s as t where the rename cannot reach', () => {
     const renamed = '--- server\nimport { action, t } from \'kay\'\n\ntype Query = typeof t\nexport const add = action(t.Object({ title: t.String({ maxLength: 9 }) }), async () => undefined)\n---\np x'
-    const taken = '--- server\nimport { t } from \'kay\'\n\nconst s = 1\nexport const query = t.Object({})\n---\np x'
-    const aliased = '--- server\nimport { t as schema } from \'kay\'\n\nexport const query = schema.Object({})\n---\np x'
+    const taken = '--- server\nimport { t } from \'kay\'\n\nconst s = 1\nexport const page = { query: t.Object({}) }\n---\np x'
+    const aliased = '--- server\nimport { t as schema } from \'kay\'\n\nexport const page = { query: schema.Object({}) }\n---\np x'
 
     expect(lints(renamed)).toEqual([{ code: 'deprecated-schema-name', severity: 'warning', at: 't' }])
     expect(fixed(renamed)).toEqual([renamed.replaceAll('t }', 's }').replaceAll('typeof t', 'typeof s').replaceAll('t.', 's.')])
     expect(fixed(taken)).toEqual([taken.replace('{ t }', '{ s as t }')])
     expect(fixed(aliased)).toEqual([aliased.replace('t as schema', 's as schema')])
+  })
+})
+
+describe('deprecated-page-export', () => {
+  it('moves the settings exported under their own names into page, all at once, a value over several lines one level deeper', () => {
+    const one = '--- server\nexport const prerender = true\n---\np x'
+    const several = '--- server\nimport { s } from \'kay\'\n\n// The search\nexport const query = s.Object({\n  page: s.Integer(),\n})\nexport const revalidate = \'1h\'\n---\np x'
+    const moved = '--- server\nimport { s } from \'kay\'\n\nexport const page = {\n  query: s.Object({\n    page: s.Integer(),\n  }),\n  revalidate: \'1h\',\n}\n---\np x'
+
+    expect(lints(one)).toEqual([{ code: 'deprecated-page-export', severity: 'warning', at: 'prerender' }])
+    expect(fixed(one)).toEqual(['--- server\nexport const page = { prerender: true }\n---\np x'])
+    expect(fixed(several)).toEqual([moved, moved])
+  })
+
+  it('adds to the page export there is, on its line or one key a line', () => {
+    expect(fixed('--- server\nexport const page = { noindex: true }\nexport const layouts = false\n---\np x')).toEqual(['--- server\nexport const page = { noindex: true, layouts: false }\n---\np x'])
+    expect(fixed('--- server\nexport const layouts = false\nexport const page = {\n  noindex: true,\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  noindex: true,\n  layouts: false,\n}\n---\np x'])
+    expect(fixed('--- server\nexport const page = {}\nexport const layouts = false\n---\np x')).toEqual(['--- server\nexport const page = { layouts: false }\n---\np x'])
+  })
+
+  it('leaves a setting the fence reads, one with a type of its own, or one page already sets, for the author to move', () => {
+    expect(fixed('--- server\nexport const prerender = true\nconst again = prerender\n---\np {again}')).toEqual([])
+    expect(fixed('--- server\nexport const revalidate: number = 60\n---\np x')).toEqual([])
+
+    const twice = '--- server\nexport const page = { prerender: true }\nexport const prerender = false\n---\np x'
+
+    expect(lints(twice)).toEqual([{ code: undefined, severity: undefined, at: 'prerender' }, { code: 'deprecated-page-export', severity: 'warning', at: 'prerender' }])
+    expect(fixed(twice)).toEqual([])
+  })
+
+  it('reports a page export kay cannot read as written', () => {
+    expect(compileKay('--- server\nconst base = {}\nexport const page = { ...base, [\'x\']: 1 }\nexport const other = settings()\n---\np x', 'list.kay', { check: true }).diagnostics.map(d => d.message)).toEqual(['kay reads each setting of `page` as written', 'kay reads each setting of `page` as written'])
+    expect(compileKay('--- server\nexport const page = settings()\n---\np x', 'list.kay', { check: true }).diagnostics.map(d => d.message)).toEqual(['kay reads `page` as written, an object literal'])
   })
 })
 

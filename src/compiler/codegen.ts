@@ -1,6 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { LintName } from './lints'
 import type { Rewrite } from './mapping'
+import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
 import { actionOf, awaitBlocks, errorMessages, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isChildrenSlot, isHead, isSlot, serverIslandOf, tryBlocks } from './ast'
@@ -10,6 +11,7 @@ import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
 import { constDeclaration, slotValue } from './items'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
+import { PAGE, PAGE_SETTINGS } from './page-settings'
 
 export interface GenerateOptions {
   name: string
@@ -81,14 +83,14 @@ const IMPORT_COMMA_BEFORE = /,\s*$/
 const DEFAULT_PREFIX = '__default_'
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
 // `kay build` renders the page once when it is `true`.
-const PRERENDER = 'prerender'
+const PRERENDER: PageSettingName = 'prerender'
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 // The page's query schema, which types and validates `ctx.query`.
-const QUERY = 'query'
+const QUERY: PageSettingName = 'query'
 // `t('nav.home')` or `T(key="intro")`: a message key an island's source names as it is written.
 const MESSAGE_KEY = /(?:\bt\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
-// The server exports that are no actions; `sitemap` lists the page in the sitemap, `noindex` keeps it out of search engines, `revalidate` renders a prerendered page again once stale.
-const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap', 'noindex', 'revalidate', 'layouts'])
+// The server exports that are no actions: the page's settings, and each under its own name as they were exported before.
+const NOT_ACTIONS = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // What only a static parent passes an island.
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
@@ -152,7 +154,7 @@ class Generator {
     const query = this.declaresQuery()
 
     if (server)
-      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${query ? ', QueryOf as KayQueryOf' : ''}${server.exportNames.includes(PRERENDER) ? ', PrerenderedContext as KayPrerenderedContext' : ''} } from 'kay'\n`)
+      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${query !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${this.options.check && server.page ? ', PageSettings as KayPageSettings' : ''} } from 'kay'\n`)
 
     const kayHelpers = formHelpers(this.file)
     const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
@@ -315,17 +317,25 @@ class Generator {
     return { builder: b, accessorSites: this.accessorSites, constSites: this.constSites, diagnostics: this.diagnostics }
   }
 
-  // Whether the page declares its query; a layout's or special page's declaration is reported.
-  private declaresQuery(): boolean {
-    const span = this.server?.exportSpans.get(QUERY)
+  // The type of the page's query schema, when it declares one; a layout's or special page's declaration is reported.
+  private declaresQuery(): string | undefined {
+    const span = this.server?.page?.settings.get(QUERY)?.key ?? this.server?.exportSpans.get(QUERY)
 
     if (span && this.options.special) {
       this.error(span, 'Only a page declares its query', { help: 'read the page\'s query through `ctx.query`' })
 
-      return false
+      return undefined
     }
 
-    return span !== undefined
+    return this.settingType(QUERY)
+  }
+
+  // What `load` types a setting from: its key of `page`, else its export of its own.
+  private settingType(name: PageSettingName): string | undefined {
+    if (this.server?.page?.settings.has(name))
+      return `typeof ${PAGE}.${name}`
+
+    return this.server?.exportNames.includes(name) ? `typeof ${name}` : undefined
   }
 
   // The final pass builds what runs; the analysis pass always generates JSX.
@@ -419,11 +429,17 @@ class Generator {
   }
 
   // Server exports stay at module level; the rest of the fence becomes `load(ctx)`, returning every name it declares.
-  private emitLoad(server: ServerAnalysis, query: boolean) {
+  private emitLoad(server: ServerAnalysis, query: string | undefined) {
     const { b } = this
+    // Typed where it is written, so the editor completes its keys and `kay check` reports one kay does not know.
+    const page = this.options.check ? server.page?.init : undefined
 
     for (const span of server.exports) {
-      b.addSource(span).add('\n')
+      if (page && page.start >= span.start && page.end <= span.end)
+        b.addSource({ start: span.start, end: page.end }).add(' satisfies KayPageSettings').addSource({ start: page.end, end: span.end }).add('\n')
+      else
+        b.addSource(span).add('\n')
+
       this.deferDeclared(server, span)
     }
 
@@ -435,9 +451,10 @@ class Generator {
     // An unused parameter would trip `noUnusedParameters` in the user's tsconfig, so it is named `_ctx` when the fence never reads it.
     const ctx = server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'
 
-    const context = `KayPageContext<${params}${query ? `, KayQueryOf<typeof ${QUERY}>` : ''}>`
+    const context = `KayPageContext<${params}${query !== undefined ? `, KayQueryOf<${query}>` : ''}>`
+    const prerender = this.settingType(PRERENDER)
 
-    b.add(`\nexport async function load(${ctx}: ${server.exportNames.includes(PRERENDER) ? `KayPrerenderedContext<typeof ${PRERENDER}, ${context}>` : context}) {\n`)
+    b.add(`\nexport async function load(${ctx}: ${prerender !== undefined ? `KayPrerenderedContext<${prerender}, ${context}>` : context}) {\n`)
     for (const span of server.body) {
       b.addSource(span)
 

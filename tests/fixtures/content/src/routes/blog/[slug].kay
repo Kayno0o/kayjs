@@ -1,7 +1,7 @@
 --- server
 import { posts } from '../../content.config'
 
-export const prerender = posts
+export const page = { prerender: posts }
 
 const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = post
