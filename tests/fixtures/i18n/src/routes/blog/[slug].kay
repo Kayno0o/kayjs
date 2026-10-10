@@ -5,4 +5,4 @@ const slug = ctx.params.slug
 const french = alternate('fr')
 ---
 h1.post {slug}
-a.fr(href={french}) FR
+a.fr(href={french} hreflang="fr") FR

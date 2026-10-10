@@ -10,7 +10,7 @@ import type { ContentProblem } from './validate'
 import process from 'node:process'
 import { cached, invalidate } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
-import { child } from '../runtime/html'
+import { child, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
 import { loadEntries } from './load'
@@ -304,7 +304,7 @@ function render(segments: Segment[], components: Record<string, Component<never>
 
   for (const segment of segments) {
     if (typeof segment === 'string') {
-      markup += segment
+      markup += localLinks(segment)
 
       continue
     }

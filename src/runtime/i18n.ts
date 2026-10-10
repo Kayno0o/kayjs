@@ -25,6 +25,9 @@ export interface LocaleSettings {
   hosts?: Readonly<Record<string, string>> | undefined
   // A page's path in the locales translating it, by the pattern kay serves the page under: `{ '/about': { fr: '/a-propos' } }`.
   paths?: Readonly<Record<string, Readonly<Record<string, string>>>> | undefined
+  // The patterns the site's pages are served under and the paths of its localized feeds, which a link written as the default locale names them goes to in the page's locale.
+  pages?: readonly string[] | undefined
+  feeds?: readonly string[] | undefined
 }
 
 // What a translation reads: the messages of its locale by dotted key, then the default locale's for a key it lacks.
@@ -261,6 +264,34 @@ function cached<Value>(cache: Map<string, Value>, key: string, make: () => Value
   return value
 }
 
+// A link of the site written as the default locale names it, in the page's locale: `/about` on an English page is `/en/about`.
+// A link to no page, one under a locale's prefix already and a file a param would take, `/blog/cover.png`, stay as written.
+export function localizedLink(settings: LocaleSettings, href: string, locale: string, currentHost?: string): string {
+  const unchanged = settings.paths === undefined && (settings.hosts !== undefined || (locale === settings.defaultLocale && !settings.prefixDefault))
+
+  if (unchanged || !href.startsWith('/') || href.startsWith('//'))
+    return href
+
+  const end = href.search(PATH_END)
+  const path = end === -1 ? href : href.slice(0, end)
+  const segments = segmentsOf(path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path)
+
+  if (!settings.hosts && segments[0] !== undefined && prefixed(settings, segments[0]))
+    return href
+
+  if (settings.feeds?.includes(path) === true)
+    return localePath({ ...settings, paths: undefined }, href, locale, currentHost)
+
+  const file = segments.at(-1)?.includes('.') === true
+  const page = settings.pages?.some((pattern) => {
+    const named = matchSegments(segmentsOf(pattern), segments, {})
+
+    return named !== undefined && (!file || named === segments.length)
+  })
+
+  return page === true ? localePath(settings, href, locale, currentHost) : href
+}
+
 // The path in that locale, translated where the locale names the page its own way: under its prefix, bare for an unprefixed default, or on its own host when locales go by domain.
 export function localePath(settings: LocaleSettings, path: string, locale: string, currentHost?: string): string {
   const translated = translatedPath(settings, path, locale)
@@ -386,10 +417,14 @@ export function pathSegment(segment: string): string {
 // The locale a path's first segment names, and the path without it; a path with no locale prefix is the default locale's when it goes unprefixed.
 export function splitLocale(settings: LocaleSettings, path: string): { locale: string | undefined, path: string } {
   const [, first = '', ...rest] = path.split('/')
-  const prefixed = settings.locales.includes(first) && (first !== settings.defaultLocale || settings.prefixDefault)
 
-  if (settings.hosts || !prefixed)
+  if (settings.hosts || !prefixed(settings, first))
     return { locale: settings.hosts || settings.prefixDefault ? undefined : settings.defaultLocale, path }
 
   return { locale: first, path: `/${rest.join('/')}` }
+}
+
+// A segment naming a locale whose pages go under its prefix.
+function prefixed(settings: LocaleSettings, segment: string): boolean {
+  return settings.locales.includes(segment) && (segment !== settings.defaultLocale || settings.prefixDefault)
 }

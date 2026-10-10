@@ -3,6 +3,7 @@
 
 import { rebasedAttribute } from './base'
 import { flattenClasses } from './classes'
+import { localizedHref } from './i18n.client'
 import { imageSource } from './image'
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { freshPrefix, withIds } from './uid'
@@ -1114,11 +1115,14 @@ export function omit(props: object, ...keys: string[]): Record<string, unknown> 
 
 // ---- attributes and events
 
-export function attribute(element: Element, name: string, value: unknown): void {
+// A link's href goes to the page's locale's copy, as the server writes it, unless `written`: the link carries `hreflang`.
+export function attribute(element: Element, name: string, value: unknown, written = false): void {
   if (value == null || value === false)
     element.removeAttribute(name)
+  else if (value === true)
+    element.setAttribute(name, '')
   else
-    element.setAttribute(name, value === true ? '' : safeUrl(name, rebasedAttribute(name, String(value))))
+    element.setAttribute(name, safeUrl(name, rebasedAttribute(name, name === 'href' && !written && element.localName === 'a' ? localizedHref(String(value)) : String(value))))
 }
 
 // An `img` source, with the variants, `sizes` and size of an imported image; a later source clears what an earlier one set.
@@ -1130,7 +1134,7 @@ export function image(element: Element, src: unknown, sized: boolean, sizes?: un
 }
 
 // A property where the element has one, such as an input's `value`; an attribute otherwise.
-export function property(element: Element, name: string, value: unknown): void {
+export function property(element: Element, name: string, value: unknown, written = false): void {
   // The server wrote this value, and what the person typed or ticked since stays for the replayed event to read.
   if (claim && (name === 'value' || name === 'checked'))
     return
@@ -1140,7 +1144,7 @@ export function property(element: Element, name: string, value: unknown): void {
   else if (CONTENT_PROPERTIES.has(name))
     (element as ElementRecord)[name] = value ?? ''
   else
-    attribute(element, name, value)
+    attribute(element, name, value, written)
 }
 
 export function className(value: unknown): string {
@@ -1300,7 +1304,7 @@ export function spread(element: Element, sources: () => readonly object[], conte
       else if (name === 'style')
         setStyle(element, value)
       else
-        property(element, name, value)
+        property(element, name, value, Object.hasOwn(props, 'hreflang'))
     }
 
     for (const [name, previous] of set) {

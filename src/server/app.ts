@@ -197,9 +197,14 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const routes = await Promise.all(scanned.map(loadGuards))
   const i18n = options.i18n ? await loadI18n(root, options.i18n, options.extensions) : undefined
 
+  const collections = await projectCollections(root, options.content)
+
   if (i18n) {
     refuseLocaleClashes(i18n.settings, routes)
-    i18n.settings = routedSettings(i18n.settings, routes)
+    // A localized collection's feed is served once per locale, as a page is; any other's once for all of them.
+    const feeds = i18n.settings.hosts ? [] : collections.flatMap(({ options }) => options.feed && options.localized === true ? [options.feed.path] : [])
+
+    i18n.settings = { ...routedSettings(i18n.settings, routes), pages: routes.map(route => route.pattern), ...feeds.length > 0 && { feeds } }
   }
 
   // Without `i18n`, every request runs in the site's one language, its extensions' messages and the app's read.
@@ -392,7 +397,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   serveCards(app, cards, imageRoute)
 
-  serveFeeds(app, await projectCollections(root, options.content), site, options.dev, i18n)
+  serveFeeds(app, collections, site, options.dev, i18n)
 
   if (site !== undefined)
     serveSitemap(app, routes, site, publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })

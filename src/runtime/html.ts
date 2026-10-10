@@ -3,7 +3,9 @@
 
 import { flattenClasses } from './classes'
 import { escape, escapeAttribute } from './escape'
+import { localizedLink } from './i18n'
 import { imageSource } from './image'
+import { localeState } from './locale-state'
 import { currentServerScope, scope } from './reactive'
 import { ISLAND_PARAM } from './server-islands'
 import { failedIds, idMark } from './uid'
@@ -36,6 +38,9 @@ const SPACES = /\s+/g
 const HTML_ENTITY = /&(?:amp|lt|gt|quot|#39);/g
 const TRAILING_SLASH = /(?<=.)\/$/
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'' }
+const LINK_TAG = /<a\s[^>]*>/gi
+const LINK_HREF = /(\shref=")([^"]*)"/i
+const HREFLANG = /\shreflang=/i
 
 // A child value's markup: text escaped, numbers as they are, `null`, `undefined` and booleans as nothing, arrays item by item, functions as what they return.
 export function child(value: unknown): string {
@@ -114,6 +119,21 @@ export function attribute(name: string, value: unknown): string {
     return ''
 
   return value === true ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, String(value)))}"`
+}
+
+// A link of the site in the locale of the page rendering it; see `localizedLink`.
+export function localHref(href: unknown): unknown {
+  const state = localeState()
+
+  return state === undefined || state.implicit || typeof href !== 'string' ? href : localizedLink(state.settings, href, state.locale, state.host)
+}
+
+// The links of markup the page did not compile, such as a Markdown entry's, in its locale, but those carrying `hreflang`.
+export function localLinks(markup: string): string {
+  if (localeState() === undefined)
+    return markup
+
+  return markup.replace(LINK_TAG, tag => HREFLANG.test(tag) ? tag : tag.replace(LINK_HREF, (_, start: string, href: string) => `${start}${escapeAttribute(localHref(decode(href)) as string)}"`))
 }
 
 // ` aria-current="page"` on a link to the page being rendered: the same path, a trailing slash or not; a link with a query or a fragment leads elsewhere on it.
@@ -215,6 +235,8 @@ export function element(tag: string, sources: readonly object[], content?: () =>
         markup += ` style="${style(value)}"`
       else if (value === '')
         markup += ` ${escape(name)}`
+      else if (tag === 'a' && name === 'href' && !sources.some(later => later != null && Object.hasOwn(later, 'hreflang')))
+        markup += attribute(name, localHref(value))
       else
         markup += attribute(escape(name), value)
     }

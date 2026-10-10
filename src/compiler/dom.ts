@@ -367,7 +367,7 @@ export class DomTemplate {
           else if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && attributeName === 'value'))
             content = escapeText(decodeEntities(attribute.text))
           else if (BASED.has(attributeName) && ROOT_PATH.test(attribute.text))
-            own.push(variable => b.add(`KayAttribute(${variable(node)}, ${JSON.stringify(attributeName)}, ${JSON.stringify(decodeEntities(attribute.text))});`))
+            own.push(variable => b.add(`KayAttribute(${variable(node)}, ${JSON.stringify(attributeName)}, ${JSON.stringify(decodeEntities(attribute.text))}${this.writtenLink(element, attributeName) ? ', true' : ''});`))
           else
             html += attribute.text === '' ? ` ${attributeName}` : ` ${attributeName}="${escapeStaticAttribute(decodeEntities(attribute.text))}"`
 
@@ -416,7 +416,7 @@ export class DomTemplate {
           else
             b.add('(').addSource(expression).add(')')
 
-          b.add('));')
+          b.add(`${this.writtenLink(element, attributeName) ? ', true' : ''}));`)
         })
       }
 
@@ -825,6 +825,11 @@ export class DomTemplate {
 
   private named(element: ElementNode, name: string): boolean {
     return element.attributes.some(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === name)
+  }
+
+  // A link's href kept as written, the link carrying `hreflang`, where any other goes to the page's locale's copy.
+  private writtenLink(element: ElementNode, attribute: string): boolean {
+    return element.name === 'a' && attribute === 'href' && this.named(element, 'hreflang')
   }
 
   private staticAttribute(element: ElementNode, name: string): string | undefined {

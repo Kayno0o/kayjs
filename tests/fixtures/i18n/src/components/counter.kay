@@ -12,3 +12,6 @@ div
         strong {text}
       @docs(text)
         em {text}
+  a.island(href="/about") About
+  if count() > 0
+    a.later(href="/blog/new") New

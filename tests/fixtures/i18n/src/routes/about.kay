@@ -2,5 +2,15 @@
 import { t } from 'kay/i18n'
 
 const title = t('nav.about')
+const slug = 'hello'
+const newPost = { href: '/blog/new' }
 ---
 h1 {title}
+nav.links
+  a.post(href="/blog/hello?x=1#top") Post
+  a.self(href="/about") About
+  a.file(href="/blog/cover.png") Cover
+  a.out(href="https://example.com/about") Elsewhere
+  a.kept(href="/about" hreflang="fr") À propos
+  a.dynamic(href={`/blog/${slug}`}) Post
+  a.spread({...newPost}) New

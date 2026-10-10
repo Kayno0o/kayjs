@@ -11,7 +11,7 @@ import { check } from '../src/check'
 import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
-import { flattenMessages, localePath, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
+import { flattenMessages, localePath, localizedLink, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { acceptedLocale, localeSettings, requestLocale } from '../src/server/i18n'
@@ -52,8 +52,17 @@ describe('locale prefixes', () => {
 
     expect(html).toContain('<a class="home" href="/en">Home</a>')
     expect(html).toContain('<a class="about" href="/en/about" aria-current="page">About</a>')
-    expect(html).toContain('<a class="fr" href="/about">FR</a>')
-    expect(html).toContain('<a class="en" href="/en/about" aria-current="page">EN</a>')
+    expect(html).toContain('<a class="fr" href="/about" hreflang="fr">FR</a>')
+    expect(html).toContain('<a class="en" href="/en/about" hreflang="en" aria-current="page">EN</a>')
+  })
+
+  it('send a link written as the default locale names a page to the page\'s locale\'s copy, but one carrying hreflang, a file and another site\'s', async () => {
+    const english = (await get('/en/about')).html
+    const french = (await get('/about')).html
+
+    expect(english).toContain('<nav class="links"><a class="post" href="/en/blog/hello?x=1#top">Post</a><a class="self" href="/en/about" aria-current="page">About</a><a class="file" href="/blog/cover.png">Cover</a><a class="out" href="https://example.com/about">Elsewhere</a><a class="kept" href="/about" hreflang="fr">À propos</a><a class="dynamic" href="/en/blog/hello">Post</a><a href="/en/blog/new" class="spread">New</a></nav>')
+    expect(french).toContain('<nav class="links"><a class="post" href="/blog/hello?x=1#top">Post</a><a class="self" href="/about" aria-current="page">About</a>')
+    expect((await get('/en')).html).toContain('<a class="island" href="/en/about">About</a>')
   })
 
   it('format plurals, numbers and dates through Intl', async () => {
@@ -95,7 +104,7 @@ describe('locale prefixes', () => {
   it('send an island only the messages it uses', async () => {
     const { html } = await get('/en')
 
-    expect(html).toContain('<script type="application/json" data-kay-i18n>{"locale":"en","settings":{"locales":["fr","en"],"defaultLocale":"fr","prefixDefault":false},"messages":{"counter.label":"Counter","intro":"Read \\u003cabout>our story\\u003c/about>, {name}, or \\u003cdocs>the docs of {name}\\u003c/docs>."}}</script>')
+    expect(html).toContain('<script type="application/json" data-kay-i18n>{"locale":"en","settings":{"locales":["fr","en"],"defaultLocale":"fr","prefixDefault":false,"pages":["/about","/blog/:slug","/blog/new","/","/streamed"]},"messages":{"counter.label":"Counter","intro":"Read \\u003cabout>our story\\u003c/about>, {name}, or \\u003cdocs>the docs of {name}\\u003c/docs>."}}</script>')
     expect(html).toContain('<button><!--[-->Counter<!--]--> <!--[-->0<!--]--></button>')
   })
 
@@ -103,7 +112,7 @@ describe('locale prefixes', () => {
     const { html } = await get('/en/streamed')
 
     expect(html).toContain('<p class="later">Home later</p>')
-    expect(html).toContain('<script type="application/json" data-kay-i18n>{"locale":"en","settings":{"locales":["fr","en"],"defaultLocale":"fr","prefixDefault":false},"messages":{"counter.label":"Counter","intro":"Read \\u003cabout>our story\\u003c/about>, {name}, or \\u003cdocs>the docs of {name}\\u003c/docs>."}}</script>')
+    expect(html).toContain('<script type="application/json" data-kay-i18n>{"locale":"en","settings":{"locales":["fr","en"],"defaultLocale":"fr","prefixDefault":false,"pages":["/about","/blog/:slug","/blog/new","/","/streamed"]},"messages":{"counter.label":"Counter","intro":"Read \\u003cabout>our story\\u003c/about>, {name}, or \\u003cdocs>the docs of {name}\\u003c/docs>."}}</script>')
   })
 
   it('list every locale\'s copy of a page in the head and the sitemap', async () => {
@@ -170,8 +179,8 @@ describe('locales by domain', () => {
     const english = await get('http://x.com/about', domains)
 
     expect(english.html).toContain('<h1>About</h1>')
-    expect(english.html).toContain('<a class="fr" href="//x.fr/about">FR</a>')
-    expect(english.html).toContain('<a class="en" href="/about" aria-current="page">EN</a>')
+    expect(english.html).toContain('<a class="fr" href="//x.fr/about" hreflang="fr">FR</a>')
+    expect(english.html).toContain('<a class="en" href="/about" hreflang="en" aria-current="page">EN</a>')
     expect((await get('http://x.fr/about', domains)).html).toContain('<h1>À propos</h1>')
     expect((await get('http://elsewhere.example/about', domains)).html).toContain('<h1>À propos</h1>')
   })
@@ -183,6 +192,7 @@ describe('locales by domain', () => {
     expect(english).toContain('<url><loc>https://x.com/about</loc><xhtml:link rel="alternate" hreflang="fr" href="https://x.fr/about"/><xhtml:link rel="alternate" hreflang="en" href="https://x.com/about"/><xhtml:link rel="alternate" hreflang="x-default" href="https://x.fr/about"/></url>')
     expect(english).not.toContain('<loc>https://x.fr/')
     expect((await get('http://x.fr/sitemap.xml', domains)).html).toContain('<loc>https://x.fr/about</loc>')
+    expect((await get('http://x.com/about', domains)).html).toContain('<a class="post" href="/blog/hello?x=1#top">Post</a>')
   })
 })
 
@@ -196,11 +206,21 @@ describe('translated paths', () => {
 
     expect(english.html).toContain('<h1>About</h1>')
     expect(english.html).toContain('<a class="about" href="/en/about-us" aria-current="page">About</a>')
-    expect(english.html).toContain('<a class="fr" href="/a-propos">FR</a>')
+    expect(english.html).toContain('<a class="post" href="/en/articles/hello?x=1#top">Post</a><a class="self" href="/en/about-us" aria-current="page">About</a>')
+    expect((await get('/a-propos', served)).html).toContain('<a class="self" href="/a-propos" aria-current="page">About</a>')
+    expect(english.html).toContain('<a class="fr" href="/a-propos" hreflang="fr">FR</a>')
     expect((await get('/a-propos', served)).html).toContain('<h1>À propos</h1>')
     expect((await get('/en/articles/hello', served)).html).toContain('<h1 class="post">hello</h1>')
-    expect((await get('/en/articles/hello', served)).html).toContain('<a class="fr" href="/blog/hello">FR</a>')
+    expect((await get('/en/articles/hello', served)).html).toContain('<a class="fr" href="/blog/hello" hreflang="fr">FR</a>')
     expect((await get('/blog/hello', served)).html).toContain('<h1 class="post">hello</h1>')
+  })
+
+  it('localize a link by the page patterns and feeds the settings name, whichever way locales reach the URL', () => {
+    const settings = { ...localeSettings(translated), pages: ['/', '/about', '/blog/:slug', '/docs/*'], feeds: ['/blog/rss.xml'] }
+
+    expect(['/', '/about/', '/blog/a?b#c', '/blog/rss.xml', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/nowhere', 'about', '//x.com/about'].map(href => localizedLink(settings, href, 'en'))).toEqual(['/en', '/en/about-us/', '/en/articles/a?b#c', '/en/blog/rss.xml', '/en/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/nowhere', 'about', '//x.com/about'])
+    expect(['/', '/about', '/blog/rss.xml'].map(href => localizedLink({ ...settings, prefixDefault: true }, href, 'fr'))).toEqual(['/fr', '/fr/a-propos', '/fr/blog/rss.xml'])
+    expect(['/about', '/en/about'].map(href => localizedLink({ ...settings, hosts: { fr: 'x.fr', en: 'x.com' }, feeds: undefined }, href, 'en', 'x.com'))).toEqual(['/about-us', '/en/about'])
   })
 
   it('send a locale\'s untranslated path to its translation', async () => {
@@ -217,7 +237,7 @@ describe('translated paths', () => {
     const english = await get('http://x.com/about-us', domains)
 
     expect(english.html).toContain('<h1>About</h1>')
-    expect(english.html).toContain('<a class="fr" href="//x.fr/a-propos">FR</a>')
+    expect(english.html).toContain('<a class="fr" href="//x.fr/a-propos" hreflang="fr">FR</a>')
     expect(await get('http://x.com/about', domains)).toMatchObject({ status: 308, location: '/about-us' })
     expect((await get('http://x.fr/about-us', domains)).status).toBe(404)
     expect((await get('http://x.fr/a-propos', domains)).html).toContain('<h1>À propos</h1>')
@@ -271,6 +291,7 @@ describe('localized content', () => {
     expect(english).toContain('<p class="written">en</p>')
     expect(english).toContain('<p class="translations">en fr</p>')
     expect(english).toContain('<p>First post.</p>')
+    expect(english).toContain('<p>See <a href="/en/news/launch">the launch</a>, <a href="/en/news/rss.xml">the feed</a>, <a href="/news/cover.png">a picture</a> and <a href="/news/hello" hreflang="fr">the French one</a>.</p>')
     expect(fallback).toContain('<h1 class="entry">Lancement</h1>')
     expect(fallback).toContain('<p class="written">fr</p>')
     expect((await get('/news/hello', served)).html).toContain('<h1 class="entry">Bonjour</h1>')
@@ -567,7 +588,7 @@ describe('in the browser', () => {
 
 // CI installs Chromium for this: there, a missing browser fails rather than skipping.
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an island in a browser', () => {
-  it('hydrates T\'s blocks and fills them again when a placeholder changes', async () => {
+  it('hydrates T\'s blocks and fills them again when a placeholder changes, its links in the page\'s locale', async () => {
     const site = await testSite({ routes, i18n, browser: { path: chrome } })
 
     try {
@@ -577,6 +598,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an islan
       await page.click('button')
       expect(await page.text('p.rich')).toBe('Read our story, 1, or the docs of 1.')
       expect(await page.text('p.rich em')).toBe('the docs of 1')
+      expect(await page.evaluate(() => [document.querySelector('a.island')!.getAttribute('href'), document.querySelector('a.later')!.getAttribute('href')])).toEqual(['/en/about', '/en/blog/new'])
       expect(page.errors).toEqual([])
     }
     finally {

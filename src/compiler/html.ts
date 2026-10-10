@@ -6,7 +6,7 @@ import { decodeEntities } from './expression'
 import { childItems, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'localHref', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -423,6 +423,12 @@ export class HtmlTemplate {
           continue
         }
 
+        if (attributeName === 'href' && this.localLink(element) && decodeEntities(attribute.text).startsWith('/')) {
+          markup.dynamic(() => b.add(`${htmlAlias('attribute')}("href", ${htmlAlias('localHref')}(${JSON.stringify(decodeEntities(attribute.text))}))`))
+
+          continue
+        }
+
         markup.text(attribute.text === '' ? ` ${attributeName}` : ` ${attributeName}="${escapeStaticAttribute(decodeEntities(attribute.text))}"`)
 
         continue
@@ -466,6 +472,8 @@ export class HtmlTemplate {
 
         if (attribute === actionOf(element, this.src))
           b.add('KayFormAction((').addSource(expression).add('))')
+        else if (attributeName === 'href' && this.localLink(element))
+          b.add(`${htmlAlias('localHref')}((`).addSource(expression).add('))')
         else
           b.add('(').addSource(expression).add(')')
 
@@ -611,10 +619,17 @@ export class HtmlTemplate {
 
     const href = element.attributes.find(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'href')
 
+    const local = this.localLink(element)
+
     if (href?.kind === 'static' && decodeEntities(href.text).startsWith('/'))
-      markup.dynamic(() => this.b.add(`${htmlAlias('currentPage')}(${JSON.stringify(decodeEntities(href.text))})`))
+      markup.dynamic(() => this.b.add(`${htmlAlias('currentPage')}(${local ? `${htmlAlias('localHref')}(` : ''}${JSON.stringify(decodeEntities(href.text))}${local ? ')' : ''})`))
     else if (href?.kind === 'expression')
-      markup.dynamic(() => this.b.add(`${htmlAlias('currentPage')}((`).addSource(href.expression).add('))'))
+      markup.dynamic(() => this.b.add(`${htmlAlias('currentPage')}(${local ? `${htmlAlias('localHref')}(` : ''}(`).addSource(href.expression).add(local ? ')))' : '))'))
+  }
+
+  // A link going to the page's locale's copy of what it names, as one carrying `hreflang` does not.
+  private localLink(element: ElementNode): boolean {
+    return element.name === 'a' && !this.named(element, 'hreflang')
   }
 
   // A form posting to an action renders the action's honeypot field first; an island leaves it to the template, its markup claimed node by node as it hydrates.

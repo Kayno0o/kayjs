@@ -37,19 +37,30 @@ Without `i18n`, a site is in its one language, its `lang` (`en` without one): `t
 `kay/i18n` works anywhere a request is served from: loads, templates, components, islands, actions and guards, and in `renderToString` outside one, in the site's default locale or the one its `locale` option names (see rendering).
 
 - `t('greeting', { name })` gives a message in the request's locale, its key and placeholders typed from the default locale's file. A number fills a placeholder formatted for the locale, `1 234` in French, and a date with `dateStyle: 'medium'`. An object of plural forms is picked by `count` through `Intl.PluralRules`, `zero` taking 0 whenever it is given. A key no locale has renders as itself.
-- `T` from `kay/i18n` renders a message holding markup, a link mid-sentence say, its tags filled by the blocks of their names: `intro: 'Read <about>our story</about>, {name}.'` renders through
-
-  ```kay
-  T(key="intro" name={user.name})
-    @about(text)
-      a(href="/about") {text}
-  ```
-
-  Each block gets its tag's text, placeholders filled, and the text inside a tag and out is escaped, a value holding `<b>` included. `kay check` types the key, the placeholders as props and a block per tag of the default locale's message, a tag without its block or a block for no tag being an error, and holds every locale to the default one's tags. Tags do not nest, a plural's `count` goes as a prop like any placeholder, and in an island `T` renders again when a placeholder changes. `t()` gives such a message with its tags as written.
+- `T` renders a message holding markup, such as a link mid-sentence: see [Messages holding markup](#messages-holding-markup).
 - `formatNumber(value, options)` and `formatDate(value, options)` format through `Intl` for the request's locale, and so do `formatRelativeTime(date)`, a date relative to now in the largest unit it reaches, `3 days ago`, `yesterday` or `in 2 hours`, `formatRelativeTime(2, 'week')` in the unit given, and `formatList(['Ada', 'Grace'])`, `Ada and Grace`. In an island, give `formatRelativeTime` the moment it is relative to, `{ now }`, from the server, so the browser renders what the server did; `direction()` is `rtl` or `ltr`, for the request's locale or the one given; `locale()` names it, as do `ctx.locale` in pages and guards and an action's `ctx.locale`.
-- `localize('/about')` is that path in the request's locale, or in the one given as second argument, checked like any link; `alternate('en')` is the page being rendered in another locale, for a language switcher. With domains, a locale on another host gives its absolute URL.
+- A link written as the default locale names a page, `a(href="/about")`, goes to the page's locale's copy as it renders: `/en/about` on an English page, translated by `paths`, on the locale's host with `domains`. So do links to a localized collection's feed, the links of Markdown entries, and those an island renders in the browser, so converting a site needs no change to its links. A link carrying `hreflang` stays as written, as a language switcher's must: `a(href={alternate('fr')} hreflang="fr")`. So does one already under a locale's prefix, one to a file a param would take (`/blog/cover.png`), and one to no page, such as an API route or a public file.
+- `localize('/about')` is that path in the request's locale, or in the one given as second argument, checked like any link, for a path that is no `a`'s href: a redirect, a `fetch`, a URL to share. `alternate('en')` is the page being rendered in another locale, for a language switcher. With domains, a locale on another host gives its absolute URL.
 - An island gets only the messages it uses: those it looks up while rendering on the server and the keys its own source passes `t()`, or `T` as `key`, as they are written. A key built at runtime, or looked up only in a module the island imports, reaches the browser only if the server render used it.
 - A content collection with `localized: true` keeps one folder per locale, `src/content/posts/en/hello.md`, and reads the request's locale's entries, the default locale's standing in; see content.
 - An action runs in the locale of the page it was sent from, the one its `ctx.params` are read off (see actions), then the cookie and the browser's languages.
 
 The page's `<html lang>` is its locale, with `dir="rtl"` for one written right to left, such as Arabic, Hebrew, Persian or Urdu, so the page lays itself out that way and CSS logical properties, `margin-inline-start`, follow. With `site`, every page links its copy in each locale, `<link rel="alternate" hreflang>`, `x-default` being the default locale's, its canonical URL is its own locale's, and the sitemap lists every copy with the others as `xhtml:link` alternates. `kay build` prerenders a page once per locale.
+
+## Messages holding markup
+
+`T` from `kay/i18n` renders a message whose tags are filled by the blocks of their names, `intro: 'Read <about>our story</about>, {name}.'` through:
+
+```kay
+--- server
+import { T } from 'kay/i18n'
+---
+T(key="intro" name="Ada")
+  @about(text)
+    a(href="/about") {text}
+```
+
+- Each block gets its tag's text, placeholders filled; the text inside a tag and out is escaped, a value holding `<b>` included.
+- `kay check` types the key, the placeholders as props and one block per tag of the default locale's message, a tag without its block or a block for no tag being an error, and holds every locale to the default one's tags.
+- Tags do not nest, and a plural's `count` goes as a prop like any placeholder. In an island, `T` renders again when a placeholder changes.
+- `t()` gives such a message with its tags as written.

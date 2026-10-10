@@ -9,7 +9,7 @@ const french = alternate('fr')
 nav
   a.home(href={home}) {t('nav.home')}
   a.about(href={about}) {t('nav.about')}
-  a.en(href={english}) EN
-  a.fr(href={french}) FR
+  a.en(href={english} hreflang="en") EN
+  a.fr(href={french} hreflang="fr") FR
 main
   slot

@@ -1,7 +1,7 @@
 import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
 import { fragment, insert, markers } from './dom'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 
 export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions, RichText } from './i18n'
 export { defineMessages } from './i18n'
@@ -61,6 +61,14 @@ export const T = ((props: { key: string }) => fragment((parent) => {
     return richMessage(translations(), props.key, props)
   })
 })) as RichText
+
+// A link an island sets, in the page's locale as the server writes it; see `localizedLink`.
+export function localizedHref(href: string): string {
+  if (!settings)
+    load()
+
+  return settings ? localizedLink(settings, href, pageLocale, location.host) : href
+}
 
 export function locale(): Locale {
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them
