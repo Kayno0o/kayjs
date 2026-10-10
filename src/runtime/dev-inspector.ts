@@ -16,10 +16,11 @@ interface InspectedWindow {
 }
 
 // What the dev server did with a position the inspector asked it to open.
-type Opened = 'opened' | 'no editor' | 'unknown file' | 'unreachable'
+type Opened = 'opened' | 'no editor' | 'failed' | 'unknown file' | 'unreachable'
 
 const FAILURES: Record<Exclude<Opened, 'opened'>, string> = {
   'no editor': 'no editor found, set KAY_EDITOR',
+  'failed': 'the editor failed to open it, see the kay dev terminal',
   'unknown file': 'not a .kay file of this project',
   'unreachable': 'kay dev did not answer',
 }
@@ -49,6 +50,8 @@ export function startInspector(doc: Document = document): Inspector {
   // What the panel shows: rebuilt only when it changed, so a click, a selection or the focus inside it survives the refresh.
   let shown: { islands: HTMLElement[], text: string } | undefined
   let message: ReturnType<typeof setTimeout> | undefined
+  // Where the pointer last was, so pressing Alt outlines what it rests on without waiting for it to move.
+  let pointer: { x: number, y: number } | undefined
 
   host.setAttribute('data-kay-inspector', '')
   outline.hidden = true
@@ -94,7 +97,12 @@ export function startInspector(doc: Document = document): Inspector {
       if (response.status === 404)
         return 'unknown file'
 
-      return response.ok && (await response.json() as { opened?: boolean }).opened === true ? 'opened' : 'no editor'
+      if (!response.ok)
+        return 'no editor'
+
+      const answer = await response.json() as { opened?: boolean, failed?: boolean }
+
+      return answer.opened === true ? 'opened' : answer.failed === true ? 'failed' : 'no editor'
     }
     catch {
       return 'unreachable'
@@ -114,13 +122,23 @@ export function startInspector(doc: Document = document): Inspector {
 
     return target?.closest(`[${SOURCE}]`) ?? undefined
   }
-  const onMove = (event: PointerEvent) => {
-    const target = event.altKey ? sourceOf(event) : undefined
-
+  const outlined = (target: Element | undefined) => {
     if (target)
       show(target, `${target.localName}  ${target.getAttribute(SOURCE)}`)
     else if (message === undefined)
       hide()
+  }
+  const onMove = (event: PointerEvent) => {
+    pointer = { x: event.clientX, y: event.clientY }
+    outlined(event.altKey ? sourceOf(event) : undefined)
+  }
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'Alt' || event.repeat || !pointer)
+      return
+
+    const under = doc.elementFromPoint(pointer.x, pointer.y)
+
+    outlined(under === host ? undefined : under?.closest(`[${SOURCE}]`) ?? undefined)
   }
   const onClick = (event: MouseEvent) => {
     const target = event.altKey ? sourceOf(event) : undefined
@@ -134,7 +152,7 @@ export function startInspector(doc: Document = document): Inspector {
 
     void openFrom(target, target.getAttribute(SOURCE)!)
   }
-  const onKey = (event: KeyboardEvent) => {
+  const onKeyUp = (event: KeyboardEvent) => {
     if (event.key === 'Alt')
       hide()
   }
@@ -203,7 +221,8 @@ export function startInspector(doc: Document = document): Inspector {
 
   win.addEventListener('pointermove', onMove, true)
   win.addEventListener('click', onClick, true)
-  win.addEventListener('keyup', onKey, true)
+  win.addEventListener('keydown', onKeyDown, true)
+  win.addEventListener('keyup', onKeyUp, true)
   win.addEventListener('blur', hide)
 
   return {
@@ -213,7 +232,8 @@ export function startInspector(doc: Document = document): Inspector {
       clearTimeout(message)
       win.removeEventListener('pointermove', onMove, true)
       win.removeEventListener('click', onClick, true)
-      win.removeEventListener('keyup', onKey, true)
+      win.removeEventListener('keydown', onKeyDown, true)
+      win.removeEventListener('keyup', onKeyUp, true)
       win.removeEventListener('blur', hide)
       host.remove()
     },

@@ -36,8 +36,8 @@ describe('the source positions', () => {
 
 describe('the inspector', () => {
   const opened: string[] = []
-  // Whether the editor opened, or 404 for a file the server refuses.
-  let answer: boolean | 404 = true
+  // Whether the editor opened, 'failed' for an editor command that exited with an error, or 404 for a file the server refuses.
+  let answer: boolean | 'failed' | 404 = true
   const realFetch = globalThis.fetch
 
   beforeAll(() => {
@@ -45,7 +45,10 @@ describe('the inspector', () => {
     globalThis.fetch = (async (_url: string, init: RequestInit) => {
       opened.push((JSON.parse(init.body as string) as { source: string }).source)
 
-      return answer === 404 ? new Response(null, { status: 404 }) : Response.json({ opened: answer })
+      if (answer === 404)
+        return new Response(null, { status: 404 })
+
+      return Response.json(answer === 'failed' ? { opened: false, failed: true } : { opened: answer })
     }) as typeof fetch
   })
 
@@ -82,6 +85,11 @@ describe('the inspector', () => {
       await Bun.sleep(0)
       expect(host().textContent).toContain('src/routes/index.kay:4:3: no editor found, set KAY_EDITOR')
 
+      answer = 'failed'
+      span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }))
+      await Bun.sleep(0)
+      expect(host().textContent).toContain('src/routes/index.kay:4:3: the editor failed to open it, see the kay dev terminal')
+
       answer = 404
       span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }))
       await Bun.sleep(0)
@@ -92,6 +100,42 @@ describe('the inspector', () => {
       inspector.stop()
     }
     expect(document.querySelector('[data-kay-inspector]')).toBeNull()
+  })
+
+  it('outlines the element under a resting pointer as soon as Alt is pressed, and stops on its release', () => {
+    document.body.innerHTML = '<main data-kay-src="src/routes/index.kay:1:1"><p data-kay-src="src/routes/index.kay:2:3"><em>Hi</em></p></main>'
+    const inspector = startInspector()
+    const em = document.querySelector('em')!
+    const points: number[][] = []
+    const realFromPoint = document.elementFromPoint.bind(document)
+
+    document.elementFromPoint = (x: number, y: number) => {
+      points.push([x, y])
+
+      return em
+    }
+
+    try {
+      const label = () => [...host().querySelectorAll('div')].find(element => element.textContent.includes('.kay'))
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', bubbles: true }))
+      expect(label()).toBeUndefined()
+
+      em.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 40, clientY: 12 }))
+      expect(label()).toBeUndefined()
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', bubbles: true }))
+      expect(points).toEqual([[40, 12]])
+      expect(label()?.hidden).toBe(false)
+      expect(label()?.textContent).toBe('p  src/routes/index.kay:2:3')
+
+      document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt', bubbles: true }))
+      expect(label()?.hidden).toBe(true)
+    }
+    finally {
+      document.elementFromPoint = realFromPoint
+      inspector.stop()
+    }
   })
 
   it('lists the islands with the values their signals hold now, behind a button showing only when there are some', async () => {

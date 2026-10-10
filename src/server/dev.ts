@@ -95,16 +95,30 @@ export function devInspector(): Response {
   return new Response(inspectorModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
 }
 
-// False when the command could not start, as when it names no program.
-function spawned(command: string[], cwd: string): boolean {
-  try {
-    Bun.spawn(command, { cwd, stdio: ['ignore', 'ignore', 'ignore'] }).unref()
+// How long the editor command gets to fail before it counts as opened: a launcher such as `code -g` or `tmux new-window` exits at once, an editor keeping its process runs on.
+const EDITOR_FAILS_WITHIN_MS = 2000
 
-    return true
+// Whether the editor command started and did not exit with an error, its errors going to the `kay dev` terminal.
+async function launched(command: string[], cwd: string): Promise<boolean> {
+  let editor: Bun.Subprocess
+
+  try {
+    editor = Bun.spawn(command, { cwd, stdio: ['ignore', 'ignore', 'inherit'] })
   }
   catch {
     return false
   }
+
+  editor.unref()
+  const code = await Promise.race([editor.exited, waited(EDITOR_FAILS_WITHIN_MS)])
+
+  return code === undefined || code === 0
+}
+
+async function waited(ms: number): Promise<undefined> {
+  await Bun.sleep(ms)
+
+  return undefined
 }
 
 // Loads the inspector on the pages of a server `kay dev` started, the one whose elements carry their source position.
@@ -135,12 +149,18 @@ export async function openInEditor(root: string, request: Request): Promise<Resp
 
   const command = editorCommand(path, Number(line), Number(column))
 
-  if (command !== undefined && spawned(command, root))
+  if (command === undefined) {
+    console.log(`kay dev: ${file}:${line}:${column}, set KAY_EDITOR to open it from the page`)
+
+    return Response.json({ opened: false })
+  }
+
+  if (await launched(command, root))
     return Response.json({ opened: true })
 
-  console.log(`kay dev: ${file}:${line}:${column}, set KAY_EDITOR to open it from the page`)
+  console.log(`kay dev: ${command.join(' ')} failed to open ${file}:${line}:${column}`)
 
-  return Response.json({ opened: false })
+  return Response.json({ opened: false, failed: true })
 }
 
 // The stream stays open until the process exits; `retry` makes the browser poll quickly for the next one.

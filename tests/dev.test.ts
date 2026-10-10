@@ -1,5 +1,5 @@
 import type { Subprocess } from 'bun'
-import { existsSync, readFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -370,7 +370,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('marks its pages for the inspector, serves it, and opens the file it names in KAY_EDITOR', async () => {
+  it('marks its pages for the inspector, serves it, and opens the file it names in KAY_EDITOR, telling when that fails', async () => {
     // Inside the repository, where the browser build resolves `kay`.
     const scratch = join(import.meta.dir, '../node_modules/.cache')
 
@@ -379,7 +379,8 @@ describe('kay dev', () => {
     const seen = join(root, '.seen')
     const lines: string[] = []
 
-    await Bun.write(join(root, 'record.ts'), `await Bun.write(${JSON.stringify(seen)}, JSON.stringify(process.argv.slice(2)))\n`)
+    // Records the first call, and fails the next as an editor with nothing to open in would.
+    await Bun.write(join(root, 'record.ts'), `import { existsSync } from 'node:fs'\nif (existsSync(${JSON.stringify(seen)})) process.exit(1)\nawait Bun.write(${JSON.stringify(seen)}, JSON.stringify(process.argv.slice(2)))\n`)
     await Bun.write(join(root, '.env'), 'PORT=0\n')
     await Bun.write(join(root, 'src/routes/index.kay'), 'main\n  h1 Home\n')
     // Over any the shell set, which would win over a `.env` value.
@@ -411,6 +412,7 @@ describe('kay dev', () => {
       expect(await (await open('src/routes/index.kay:2:3')).json()).toEqual({ opened: true })
       await until(() => existsSync(seen))
       expect(JSON.parse(readFileSync(seen, 'utf8'))).toEqual([join(root, 'src/routes/index.kay')])
+      expect(await (await open('src/routes/index.kay:2:3')).json()).toEqual({ opened: false, failed: true })
     }
     finally {
       await stop()
@@ -505,13 +507,36 @@ describe('hot swap', () => {
 describe('the editor the inspector opens', () => {
   it('passes the position the way each editor takes it, and runs a terminal editor only when KAY_EDITOR names it', () => {
     const at = ['/p/src/routes/index.kay', 12, 3] as const
-    const none = { PATH: '' }
+    const none = { PATH: '', DISPLAY: ':0' }
 
     expect(editorCommand(...at, { ...none, EDITOR: 'code --wait' })).toEqual(['code', '--wait', '-g', '/p/src/routes/index.kay:12:3'])
     expect(editorCommand(...at, { ...none, VISUAL: '/usr/bin/zed' })).toEqual(['/usr/bin/zed', '/p/src/routes/index.kay:12:3'])
     expect(editorCommand(...at, { ...none, EDITOR: 'webstorm.sh' })).toEqual(['webstorm.sh', '--line', '12', '--column', '3', '/p/src/routes/index.kay'])
     expect(editorCommand(...at, { ...none, EDITOR: 'nvim' })).toBeUndefined()
-    expect(editorCommand(...at, { ...none, EDITOR: 'nvim', KAY_EDITOR: 'kitty nvim' })).toEqual(['kitty', 'nvim', '/p/src/routes/index.kay'])
+    expect(editorCommand(...at, { ...none, EDITOR: 'nvim', KAY_EDITOR: 'kitty nvim' })).toEqual(['kitty', 'nvim', '+12', '/p/src/routes/index.kay'])
+    expect(editorCommand(...at, { ...none, KAY_EDITOR: 'tmux new-window hx' })).toEqual(['tmux', 'new-window', 'hx', '/p/src/routes/index.kay:12:3'])
+    expect(editorCommand(...at, { ...none, KAY_EDITOR: 'my-editor --flag' })).toEqual(['my-editor', '--flag', '/p/src/routes/index.kay'])
     expect(editorCommand(...at, { ...none, EDITOR: 'nvim', KAY_EDITOR: 'cursor' })).toEqual(['cursor', '-g', '/p/src/routes/index.kay:12:3'])
+    expect(editorCommand(...at, { ...none, VISUAL: 'code-server' })).toEqual(['code-server', '--reuse-window', '/p/src/routes/index.kay:12:3'])
+  })
+
+  it('opens only code-server on a Linux machine with no display, as one reached over SSH', () => {
+    const at = ['/p/src/routes/index.kay', 12, 3] as const
+    const bin = mkdtempSync(join(tmpdir(), 'kay-editors-'))
+
+    try {
+      for (const name of ['code', 'code-server']) {
+        writeFileSync(join(bin, name), '#!/bin/sh\n')
+        chmodSync(join(bin, name), 0o755)
+      }
+
+      expect(editorCommand(...at, { PATH: bin, VISUAL: 'code --wait' }, 'linux')).toEqual([join(bin, 'code-server'), '--reuse-window', '/p/src/routes/index.kay:12:3'])
+      expect(editorCommand(...at, { PATH: bin, WAYLAND_DISPLAY: 'wayland-0' }, 'linux')).toEqual([join(bin, 'code'), '-g', '/p/src/routes/index.kay:12:3'])
+      expect(editorCommand(...at, { PATH: bin }, 'darwin')).toEqual([join(bin, 'code'), '-g', '/p/src/routes/index.kay:12:3'])
+      expect(editorCommand(...at, { PATH: '', VISUAL: 'code' }, 'linux')).toBeUndefined()
+    }
+    finally {
+      rmSync(bin, { recursive: true, force: true })
+    }
   })
 })
