@@ -1,4 +1,4 @@
-import type Elysia from 'elysia'
+import type { DefinitionBase, Elysia, EphemeralType, MetadataBase, RouteBase, SingletonBase } from 'elysia'
 import type { Level, PolicyContext, Requirement } from './types'
 
 const READ_METHODS = new Set(['GET', 'HEAD'])
@@ -41,8 +41,9 @@ export function scopeAllows(scopes: readonly string[] | null, wanted: ScopeRequi
 // The macro only stamps the route's requirement; one local beforeHandle enforces it, so routes added through `group`, `guard`, `use`, `route`, `all` or `ws` fall back to `defaultRequirement` too.
 // Routes of the instance it is used on take `auth: <Requirement>` to override the default and `auth: false` to opt out, and `scope:` for what a scoped bearer token needs. Answers 401 to an anonymous caller and 403 to a signed-in one who is denied.
 export function createGate<P, G extends string, S extends string = string>(deps: GateDeps<P, G, S>) {
-  return (app: Elysia) =>
-    app
+  // Generic over the app's own types, so what it holds already, such as `auth`, reaches the routes after it.
+  return <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => {
+    const gated = app
       .macro({
         auth: (requirement: Requirement<P, G> | false | undefined) => ({
           transform(ctx: object) {
@@ -56,31 +57,38 @@ export function createGate<P, G extends string, S extends string = string>(deps:
           },
         }),
       })
-      .onBeforeHandle({ as: 'local' }, async (context) => {
-        const ctx = context as unknown as GateContext<P, G>
-        const requirement = ctx[REQUIREMENT] ?? deps.defaultRequirement
 
-        if (requirement === false)
-          return
+    // Hooked as a plain instance: the hook changes no type, and the app's own make its context too deep to check.
+    const plain = gated as unknown as Elysia
 
-        // A route nested in two gated instances runs this once per gate: each holds it to its own requirement, and a requirement already met is not asked again.
-        if (!ctx[DECIDED]?.has(requirement)) {
-          const user = await deps.principal(ctx)
-          const level: Level = READ_METHODS.has(ctx.request.method) ? 'read' : 'write'
+    plain.onBeforeHandle({ as: 'local' }, async (context) => {
+      const ctx = context as unknown as GateContext<P, G>
+      const requirement = ctx[REQUIREMENT] ?? deps.defaultRequirement
 
-          if (!(await deps.authorize(user, requirement, level, { params: ctx.params, body: ctx.body, query: ctx.query }))) {
-            ctx.set.status = user === null ? 401 : 403
+      if (requirement === false)
+        return
 
-            return user === null ? 'Unauthorized' : 'Forbidden'
-          }
+      // A route nested in two gated instances runs this once per gate: each holds it to its own requirement, and a requirement already met is not asked again.
+      if (!ctx[DECIDED]?.has(requirement)) {
+        const user = await deps.principal(ctx)
+        const level: Level = READ_METHODS.has(ctx.request.method) ? 'read' : 'write'
 
-          (ctx[DECIDED] ??= new Set()).add(requirement)
+        if (!(await deps.authorize(user, requirement, level, { params: ctx.params, body: ctx.body, query: ctx.query }))) {
+          ctx.set.status = user === null ? 401 : 403
+
+          return user === null ? 'Unauthorized' : 'Forbidden'
         }
 
-        if (deps.scopes && !scopeAllows(await deps.scopes(ctx), ctx[SCOPE] ?? deps.defaultScope)) {
-          ctx.set.status = 403
+        (ctx[DECIDED] ??= new Set()).add(requirement)
+      }
 
-          return 'Forbidden'
-        }
-      })
+      if (deps.scopes && !scopeAllows(await deps.scopes(ctx), ctx[SCOPE] ?? deps.defaultScope)) {
+        ctx.set.status = 403
+
+        return 'Forbidden'
+      }
+    })
+
+    return gated
+  }
 }
