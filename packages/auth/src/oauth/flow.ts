@@ -6,6 +6,7 @@ import { newUserRecord, publicUser, sameText } from '../core'
 import { randomToken } from '../keys'
 import { notify } from '../notify'
 import { normalizeEmail, normalizeUsername, usernameProblem } from '../rules'
+import { chooseRemember } from '../sessions'
 import { provedLately } from '../twoFactor'
 import { OAuthExchangeError } from './client'
 import { createPkcePair } from './pkce'
@@ -30,7 +31,7 @@ export interface OAuthFlow {
 }
 
 // The provider's authorize URL, the flow parked in the session; undefined for a provider the app has not configured.
-export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string | undefined, link?: boolean | undefined }): Promise<string | { error: OAuthFailure } | undefined> {
+export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string | undefined, link?: boolean | undefined, remember?: boolean | undefined }): Promise<string | { error: OAuthFailure } | undefined> {
   const entry = state.core.oauth.get(provider)
 
   if (!entry)
@@ -62,6 +63,9 @@ export async function startOAuth(state: RequestState, provider: string, options:
 
     throw error
   }
+
+  if (!options.link)
+    await chooseRemember(state, options.remember)
 
   await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, nonce, redirect: safeRedirect(options.redirect), link: current?.id ?? null, expires: Date.now() + FLOW_MAX_AGE_MS })
 

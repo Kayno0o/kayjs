@@ -45,7 +45,7 @@ import { createOAuthTokenRefresher } from './oauth/refresher'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
 import { register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
-import { listSessions, liveSession, openSession } from './sessions'
+import { applyLifetime, chooseRemember, listSessions, liveSession, openSession } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
@@ -55,6 +55,9 @@ const STATE = Symbol('kayjs-auth.state')
 const TRAILING_SLASH = /\/$/
 // kay's own session lifetime, 30 days.
 const DEFAULT_SESSION_MAX_AGE = 30 * 24 * 60 * 60
+const DEFAULT_REMEMBER_MAX_AGE = 90 * 24 * 60 * 60
+// kay's own lifetime of a session whose cookie dies with the browser, a day.
+const DEFAULT_BROWSER_SESSION_MAX_AGE = 24 * 60 * 60
 const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
 // What a provider posting back to the callback may say, carried over to the GET.
 const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
@@ -108,6 +111,10 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   defaultRoles?: NoInfer<Role>[] | undefined
   // Seconds a session lives unseen: kay's session `maxAge`, 30 days by default as kay's is. A session past it leaves the list of where the user is signed in.
   sessionMaxAge?: number | undefined
+  // Seconds a session lives unseen when its sign-in asked to be remembered, `remember: true`: 90 days by default.
+  rememberMaxAge?: number | undefined
+  // Seconds a session lives unseen when its sign-in asked not to be, `remember: false`, its cookie dying with the browser: kay's session `browserMaxAge`, a day by default as kay's is.
+  browserSessionMaxAge?: number | undefined
   // The app's page listing where the user is signed in, linked from new sign-in mails: `/account/sessions`.
   sessionsPage?: string | undefined
   // Where an address is, shown beside each session, from a geolocation database of the app's: `ip => cityOf(ip)`.
@@ -175,8 +182,8 @@ export class Auth<Scope extends string = string, Role extends string = string> {
     return this.source
   }
 
-  // Signs `user` in on this session, without asking for their second factor: for a way of signing in the app proves itself.
-  async signIn(user: Pick<User, 'id'>): Promise<void> {
+  // Signs `user` in on this session, without asking for their second factor: for a way of signing in the app proves itself. `remember` as for `signInWithPassword`.
+  async signIn(user: Pick<User, 'id'>, options: { remember?: boolean | undefined } = {}): Promise<void> {
     const record = await this.core.store.users.get(user.id)
 
     if (!record)
@@ -185,6 +192,7 @@ export class Auth<Scope extends string = string, Role extends string = string> {
     if (banned(record))
       throw new Error(`kayjs-auth: user ${user.id} is banned`)
 
+    await chooseRemember(this[STATE], options.remember)
     await this.establish(record, 'app')
   }
 
@@ -266,11 +274,15 @@ export class Auth<Scope extends string = string, Role extends string = string> {
 
   // A new user with an email and a password, signed in on this session; field errors come back as codes.
   async register(input: RegisterInput): Promise<RegisterResult> {
+    await chooseRemember(this[STATE], input.remember)
+
     return register(this[STATE], input)
   }
 
   // Signs in with an email or a username and a password; a wrong password and an unknown account answer alike.
   async signInWithPassword(input: PasswordSignInInput): Promise<PasswordSignInResult> {
+    await chooseRemember(this[STATE], input.remember)
+
     return signInWithPassword(this[STATE], input)
   }
 
@@ -294,8 +306,10 @@ export class Auth<Scope extends string = string, Role extends string = string> {
     return resetPassword(this[STATE], token, password)
   }
 
-  // Mails a sign-in link to that address when an account has it; answers alike when none does.
-  async requestMagicLink(email: string, redirect?: string, options: { captcha?: string | undefined } = {}): Promise<MailRequestResult> {
+  // Mails a sign-in link to that address when an account has it; answers alike when none does. `remember` holds for the link opened in this browser, or the code typed in it.
+  async requestMagicLink(email: string, redirect?: string, options: { captcha?: string | undefined, remember?: boolean | undefined } = {}): Promise<MailRequestResult> {
+    await chooseRemember(this[STATE], options.remember)
+
     return requestMagicLink(this[STATE], email, redirect, options.captcha)
   }
 
@@ -488,7 +502,9 @@ export class Auth<Scope extends string = string, Role extends string = string> {
   }
 
   // Signs in with the passkey that answered `passkeySignInOptions`, with no second factor after it.
-  async signInWithPasskey(response: AuthenticationResponseJSON, redirect?: string): Promise<PasskeySignInResult> {
+  async signInWithPasskey(response: AuthenticationResponseJSON, redirect?: string, options: { remember?: boolean | undefined } = {}): Promise<PasskeySignInResult> {
+    await chooseRemember(this[STATE], options.remember)
+
     return signInWithPasskey(this[STATE], response, redirect, (record, method) => this.establish(record, method))
   }
 
@@ -633,15 +649,17 @@ export class Auth<Scope extends string = string, Role extends string = string> {
   // Under a new session id, so one planted before is worth nothing; `method` says how, for the `signed-in` event.
   private async establish(record: UserRecord, method: string): Promise<void> {
     const previous = await this.session.get('auth')
+    const remember = await this.session.get('authRemember')
 
     // Signing in again, as another user or the same, replaces the sign-in this browser held.
     if (previous?.session !== undefined)
       await this.core.store.sessions.delete(previous.user, previous.session)
 
     await this.session.unset('authChallenge')
+    await this.session.unset('authRemember')
     await this.session.regenerate()
 
-    const session = await openSession(this.core, record, this[STATE].address, this[STATE].userAgent)
+    const session = await openSession(this.core, record, this[STATE].address, this[STATE].userAgent, await applyLifetime(this[STATE], remember))
 
     await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now(), session })
     this.source = 'session'
@@ -729,7 +747,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
     // Typed as their literal paths, so `kay check` checks links to them once the app registers its Elysia app.
     .get(`${core.prefix}/:provider` as `${Prefix}/:provider`, async ({ auth, params, query, redirect, status }) => {
-      const started = await startOAuth(auth[STATE], params.provider, { redirect: text(query.redirect), link: query.link === '1' })
+      const started = await startOAuth(auth[STATE], params.provider, { redirect: text(query.redirect), link: query.link === '1', remember: query.remember === undefined ? undefined : query.remember === '1' })
 
       if (started === undefined)
         return status(404, 'Not Found')
@@ -860,6 +878,8 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: { ...DEFAULT_LIMITS, ...options.limits },
     sessionMaxAge: options.sessionMaxAge ?? DEFAULT_SESSION_MAX_AGE,
+    rememberMaxAge: options.rememberMaxAge ?? DEFAULT_REMEMBER_MAX_AGE,
+    browserSessionMaxAge: options.browserSessionMaxAge ?? DEFAULT_BROWSER_SESSION_MAX_AGE,
     sessionsPage: options.sessionsPage,
     locate: options.locate,
     scopes: new Set(options.scopes),

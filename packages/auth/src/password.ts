@@ -22,6 +22,8 @@ export interface RegisterInput {
   captcha?: string | undefined
   // The language the user reads, for their mails; the browser's by default.
   locale?: string | undefined
+  // As for `signInWithPassword`, when registering signs the user in.
+  remember?: boolean | undefined
 }
 
 // Why a field was refused, by field, as codes a form turns into messages in its own words and language.
@@ -42,6 +44,8 @@ export interface PasswordSignInInput {
   // Where to go once signed in, a path on the site; `/` by default.
   redirect?: string
   captcha?: string | undefined
+  // Whether the session lasts `rememberMaxAge` (true) or until the browser closes (false), when the sign-in form asks; kay's own lifetime without it.
+  remember?: boolean | undefined
 }
 
 // `invalid` whether no account matches or the password is wrong, so the answer tells nothing of which accounts exist.

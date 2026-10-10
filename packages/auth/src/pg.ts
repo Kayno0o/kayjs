@@ -74,6 +74,7 @@ export const AuthSessions = defineTable('auth_session', t => ({
   ip: t.text().notNull(),
   created_at: t.timestamptz().notNull(),
   last_seen_at: t.timestamptz().notNull(),
+  max_age: t.int4().nullable(),
 })).withIndexes([{ columns: ['user_id'] }])
 
 export const AuthPasskeys = defineTable('auth_passkey', t => ({
@@ -180,7 +181,7 @@ export function pgStore(db: Database): AuthStore {
     },
     sessions: {
       async create(session) {
-        await sessions.write.insertOne({ id: session.id, user_id: session.userId, version: session.version, user_agent: session.userAgent, ip: session.ip, created_at: session.createdAt, last_seen_at: session.lastSeenAt })
+        await sessions.write.insertOne({ id: session.id, user_id: session.userId, version: session.version, user_agent: session.userAgent, ip: session.ip, created_at: session.createdAt, last_seen_at: session.lastSeenAt, max_age: session.maxAge })
       },
       get: async id => toSession(await sessions.read.findById(id)),
       listByUser: async userId => (await sessions.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toSession(row)!),
@@ -323,7 +324,7 @@ function toBearerToken(row: InferEntity<typeof AuthBearerTokens> | null): Bearer
 }
 
 function toSession(row: InferEntity<typeof AuthSessions> | null): SessionRecord | undefined {
-  return row ? { id: row.id, userId: row.user_id, version: row.version, userAgent: row.user_agent, ip: row.ip, createdAt: row.created_at, lastSeenAt: row.last_seen_at } : undefined
+  return row ? { id: row.id, userId: row.user_id, version: row.version, userAgent: row.user_agent, ip: row.ip, createdAt: row.created_at, lastSeenAt: row.last_seen_at, maxAge: row.max_age } : undefined
 }
 
 function toAudit(row: InferEntity<typeof AuthAudit>): AuditRecord {

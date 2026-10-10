@@ -66,6 +66,8 @@ export interface SessionRecord {
   ip: string
   createdAt: Date
   lastSeenAt: Date
+  // Seconds it lives unseen, as chosen at sign-in; null for `sessionMaxAge`.
+  maxAge: number | null
 }
 
 // A line of the audit log, kept past its user's deletion so the log still tells what happened.

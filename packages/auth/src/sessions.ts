@@ -22,12 +22,12 @@ export interface UserSession {
   lastSeenAt: Date
 }
 
-// Records a new sign-in of `record` from this browser and answers its id.
-export async function openSession(core: Core, record: UserRecord, ip: string, userAgent: string): Promise<string> {
+// Records a new sign-in of `record` from this browser, living `maxAge` seconds unseen or `sessionMaxAge`, and answers its id.
+export async function openSession(core: Core, record: UserRecord, ip: string, userAgent: string, maxAge: number | null = null): Promise<string> {
   const now = new Date()
   const id = crypto.randomUUID()
 
-  await core.store.sessions.create({ id, userId: record.id, version: record.sessionVersion, userAgent: userAgent.slice(0, USER_AGENT_MAX_LENGTH), ip, createdAt: now, lastSeenAt: now })
+  await core.store.sessions.create({ id, userId: record.id, version: record.sessionVersion, userAgent: userAgent.slice(0, USER_AGENT_MAX_LENGTH), ip, createdAt: now, lastSeenAt: now, maxAge })
 
   return id
 }
@@ -80,7 +80,7 @@ export async function listSessions(state: RequestState): Promise<UserSession[]> 
 }
 
 function live(core: Core, session: SessionRecord, record: UserRecord, now: number): boolean {
-  return session.version === record.sessionVersion && now - session.lastSeenAt.getTime() < core.sessionMaxAge * 1000
+  return session.version === record.sessionVersion && now - session.lastSeenAt.getTime() < (session.maxAge ?? core.sessionMaxAge) * 1000
 }
 
 // A failure is logged, not thrown: a lookup service down must not hide the list.
@@ -93,4 +93,35 @@ async function locate(core: Core, ip: string): Promise<string | null> {
 
     return null
   }
+}
+
+// Keeps what the sign-in starting now chose about being remembered, for the session it opens; none leaves kay's own lifetime.
+export async function chooseRemember(state: RequestState, remember: boolean | undefined): Promise<void> {
+  if (remember !== undefined)
+    await state.session.set('authRemember', remember)
+  else if (await state.session.get('authRemember') !== undefined)
+    await state.session.unset('authRemember')
+}
+
+// Gives the session signing in the lifetime `remember` chose, back to `sessionMaxAge` without a choice since one may linger from a sign-in before, and answers it in seconds, null for `sessionMaxAge`.
+export async function applyLifetime(state: RequestState, remember: boolean | undefined): Promise<number | null> {
+  const { core, session } = state
+
+  // kay before 1.22 has no lifetime of a session's own.
+  if (!('lifetime' in session)) {
+    if (remember !== undefined)
+      throw new Error('kayjs-auth: remember needs kay 1.22 or later, whose sessions take a lifetime of their own')
+
+    return null
+  }
+
+  if (remember === undefined) {
+    await session.lifetime(core.sessionMaxAge)
+
+    return null
+  }
+
+  await session.lifetime(remember ? core.rememberMaxAge : 'browser')
+
+  return remember ? core.rememberMaxAge : core.browserSessionMaxAge
 }

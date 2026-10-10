@@ -155,10 +155,10 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
     })
 
     test('sessions are got, listed by user oldest first, updated, and deleted by their owner only', async () => {
-      const session = (id: string, createdAt: string) => ({ id, userId: 'u1', version: 0, userAgent: 'Firefox', ip: '10.0.0.1', createdAt: new Date(createdAt), lastSeenAt: new Date(createdAt) })
+      const session = (id: string, createdAt: string, maxAge: number | null = null) => ({ id, userId: 'u1', version: 0, userAgent: 'Firefox', ip: '10.0.0.1', createdAt: new Date(createdAt), lastSeenAt: new Date(createdAt), maxAge })
 
       await store.users.create(userRecord({ id: 'u1' }))
-      await store.sessions.create(session('s2', '2026-01-02T00:00:00Z'))
+      await store.sessions.create(session('s2', '2026-01-02T00:00:00Z', 86_400))
       await store.sessions.create(session('s1', '2026-01-01T00:00:00Z'))
 
       const at = new Date('2026-02-01T00:00:00Z')
@@ -166,7 +166,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       await store.sessions.update('s1', { version: 3, ip: '10.0.0.2', lastSeenAt: at })
 
       expect(await store.sessions.get('s1')).toEqual({ ...session('s1', '2026-01-01T00:00:00Z'), version: 3, ip: '10.0.0.2', lastSeenAt: at })
-      expect((await store.sessions.listByUser('u1')).map(found => found.id)).toEqual(['s1', 's2'])
+      expect(await store.sessions.listByUser('u1')).toEqual([expect.objectContaining({ id: 's1', maxAge: null }), session('s2', '2026-01-02T00:00:00Z', 86_400)])
       expect(await store.sessions.delete('u2', 's1')).toBe(false)
       expect(await store.sessions.delete('u1', 's1')).toBe(true)
       expect(await store.sessions.get('s1')).toBeUndefined()
@@ -216,7 +216,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       await store.tokens.create({ digest: 'a', type: 'magic-link', userId: 'u1', email: 'x', redirect: null, expiresAt: new Date(Date.now() + 60_000) })
       await store.recoveryCodes.replace('u1', ['a'])
       await store.bearerTokens.create({ id: 't1', userId: 'u1', label: 'Phone', digest: 'd1', scopes: null, createdAt: new Date(), lastUsedAt: null, expiresAt: null })
-      await store.sessions.create({ id: 's1', userId: 'u1', version: 0, userAgent: '', ip: '', createdAt: new Date(), lastSeenAt: new Date() })
+      await store.sessions.create({ id: 's1', userId: 'u1', version: 0, userAgent: '', ip: '', createdAt: new Date(), lastSeenAt: new Date(), maxAge: null })
       await store.passkeys.create({ id: 'p1', userId: 'u1', name: 'Phone', publicKey: 'pk', counter: 0, transports: [], multiDevice: false, backedUp: false, createdAt: new Date(), lastUsedAt: null })
 
       await store.users.delete('u1')

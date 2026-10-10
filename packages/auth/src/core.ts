@@ -20,6 +20,8 @@ export interface AuthSessionData {
   authChallenge?: Challenge
   authEmailCode?: PendingCode
   authPasskey?: PasskeyChallenge
+  // Whether the sign-in under way asked to be remembered, from the call that started it.
+  authRemember?: boolean
   // The account this browser registered, or proved the password of while its address was unverified: it may have the link resent and verify it without signing in.
   authRegistered?: string
 }
@@ -75,6 +77,10 @@ export interface Core {
   limits: Limits
   // Seconds a session lives unseen, kay's session `maxAge`.
   sessionMaxAge: number
+  // Seconds a session signed in with `remember: true` lives unseen.
+  rememberMaxAge: number
+  // Seconds a session signed in with `remember: false` lives unseen, kay's session `browserMaxAge`.
+  browserSessionMaxAge: number
   // The app's page listing the user's sessions, linked from new sign-in mails.
   sessionsPage?: string | undefined
   // Where an address is, such as a city, shown beside each session.
