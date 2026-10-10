@@ -21,8 +21,7 @@ export const leak = action(t.Object({}), () => ({ format: new Intl.NumberFormat(
 
 const scheduled = ctx.succeeded(schedule)
 const failure = ctx.failed(schedule)
----
----
+--- script
 import List from '../components/list.kay'
 import Picker from '../components/picker.kay'
 import Rows from '../components/rows.kay'

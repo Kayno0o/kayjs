@@ -7,8 +7,7 @@ Up to two fences come first, in either order, then the template. Both are option
 ```kay
 --- server
 const greeting = 'Hello'
----
----
+--- script
 const count = signal(0)
 ---
 p {greeting}
@@ -18,6 +17,7 @@ button(onClick={() => count++}) Clicked {count} times
 - `---` holds the component script: imports, props, signals, functions. It runs wherever the component renders.
 - `--- server` exists on pages and layouts only. It runs on the server for each request and never reaches the browser.
 - `--- client` in place of `---` makes the component render in the browser only, generic ones written `--- client <T>`; see [Islands](islands.md#islands).
+- A fence ends on a `---` line, or on a `--- server`, `--- client` or `--- script` line, which opens the next fence. `--- script` is `---` spelled out, for a script that follows another fence.
 
 ## Component script
 

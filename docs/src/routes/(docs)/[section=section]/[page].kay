@@ -17,8 +17,7 @@ const { Content } = entry
 const { title, description } = entry.data
 const sections = entry.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
 const { previous, next } = neighbours(await docs.all(), entry.slug, slug => `/${slug}`)
----
----
+--- script
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'
 ---

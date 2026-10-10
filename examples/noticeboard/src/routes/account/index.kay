@@ -31,8 +31,7 @@ const user = (await ctx.locals.auth.user())!
 const refused = ctx.failed(changeEmail)?.data
 const emailIssue = refused?.errors?.email && EMAIL_WORDS[refused.errors.email]
 const changeFailure = refused?.error && FAILURE_WORDS[refused.error]
----
----
+--- script
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'

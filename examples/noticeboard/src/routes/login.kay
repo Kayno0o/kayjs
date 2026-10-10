@@ -31,8 +31,7 @@ export const mailLink = action(s.Object({
 const redirect = ctx.url.searchParams.get('redirect') ?? '/'
 const signInFailure = ctx.failed(signIn)?.data?.error
 const linkFailure = ctx.failed(mailLink)?.data?.error
----
----
+--- script
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 ---

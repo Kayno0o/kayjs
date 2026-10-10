@@ -1,7 +1,6 @@
 --- server
 const user = await ctx.locals.auth.user()
----
----
+--- script
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import '../app.css'

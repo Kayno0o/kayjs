@@ -3,8 +3,7 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 export const save = action(t.Object({ text: t.String() }), () => undefined)
----
----
+--- script
 import Draft from '../components/draft.kay'
 ---
 head

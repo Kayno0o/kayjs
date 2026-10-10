@@ -13,8 +13,7 @@ export const confirm = action(s.Object({ token: s.String() }), async ({ token },
 })
 
 const token = ctx.query.token ?? ''
----
----
+--- script
 import Button from '@kaynooo/kayjs-ui/button.kay'
 ---
 head

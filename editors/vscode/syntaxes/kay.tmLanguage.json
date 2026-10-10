@@ -51,7 +51,7 @@
   ],
   "repository": {
     "fence": {
-      "begin": "^(---)(?:[ \\t]+(server|client)(?:[ \\t]+(<.*>))?|[ \\t]*(<.*>))?[ \\t]*$",
+      "begin": "^(---)(?:[ \\t]+(server|client|script)(?:[ \\t]+(<.*>))?|[ \\t]*(<.*>))?[ \\t]*$",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.fence.kay"
@@ -76,7 +76,7 @@
           ]
         }
       },
-      "end": "^(---)[ \\t]*$",
+      "end": "^(---)[ \\t]*$|^(?=---[ \\t]*(?:[a-z]|<))",
       "endCaptures": {
         "1": {
           "name": "punctuation.definition.fence.kay"

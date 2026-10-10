@@ -195,8 +195,7 @@ function home({ has, tw }: Setup): string {
   return lines(
     '--- server',
     'const greeting = \'Hello from the server\'',
-    '---',
-    '---',
+    '--- script',
     'import Rocket from \'~icons/tabler/rocket\'',
     'import Counter from \'../components/counter.kay\'',
     has('ws') && 'import Online from \'../components/online.kay\'',

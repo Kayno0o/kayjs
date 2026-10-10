@@ -1,7 +1,6 @@
 --- server
 const site = 'Kay demo'
----
----
+--- script
 import { accent } from '../theme'
 ---
 head

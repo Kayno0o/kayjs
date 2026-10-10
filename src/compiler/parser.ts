@@ -1,9 +1,11 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 
-// `--- server`, `--- client`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
+// `--- server`, `--- client`, `--- script`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
-const CLOSING_FENCE = /^---[ \t]*$/gm
+const CLOSING_FENCE = /^---(?:[ \t]*$|[ \t]*[a-z<])/gm
 const CLOSING_LINE = /---[ \t]*(?=\r?\n|$)/y
+// A labeled fence line, which closes the fence before it and opens its own.
+const NEXT_FENCE_LINE = /---[ \t]*[a-z<]/y
 const BLANK_LINES = /(?:[ \t]*\r?\n)*/y
 const TAG_NAME = /[A-Z][\w-]*/iy
 const CLASS_NAME = /[\w\-:/@!]+/y
@@ -56,7 +58,8 @@ export function parseKay(source: string): KayFile {
   let client: Span | undefined
   let templateStart = 0
 
-  // Fences come first, in any order: `---` holds the component script, `--- client` one rendering in the browser only, `--- server` the code that runs on the server only.
+  // Fences come first, in any order: `---` or `--- script` holds the component script, `--- client` one rendering in the browser only, `--- server` the code that runs on the server only.
+  // A labeled fence line also closes the fence before it, so `--- server` code can run straight into `--- script`.
   while (true) {
     BLANK_LINES.lastIndex = templateStart
     BLANK_LINES.exec(source)
@@ -66,20 +69,20 @@ export function parseKay(source: string): KayFile {
     if (!fence)
       break
 
-    const kind = fence[2] === undefined || fence[2] === 'client' ? 'script' : fence[2]
+    const kind = fence[2] === undefined || fence[2] === 'client' || fence[2] === 'script' ? 'script' : fence[2]
     const spaced = fence[1] !== ''
     const bodyStart = fence.index + fence[0].length
 
     const closing = closingFence(source, bodyStart)
-    const span = { start: bodyStart, end: closing ? closing.index : source.length }
+    const span = { start: bodyStart, end: closing ? closing.start : source.length }
 
-    templateStart = closing ? closing.index + closing[0].length : source.length
+    templateStart = closing ? closing.end : source.length
 
     if (!closing)
       diagnostics.push({ start: fence.index, end: fence.index + 3, message: 'This fence is never closed with a `---` line' })
 
     if (!spaced || (kind !== 'script' && kind !== 'server'))
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` for the component script, `--- client` for one rendering in the browser only, or `--- server` for server code' })
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, or `--- server` for server code' })
     else if (fences[kind])
       diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `A file has one ${kind === 'server' ? '`--- server`' : 'script'} fence` })
     else
@@ -104,20 +107,19 @@ export function parseKay(source: string): KayFile {
   return { source, script: fences.script, server: fences.server, typeParameters, client, templateStart, template: parser.parseTemplate(), diagnostics }
 }
 
-// The `---` line closing a fence, past any inside a template literal or a comment, such as a markdown front matter the code holds.
-// Code that leaves a template literal open falls back to the first `---` line, so the template still parses.
-function closingFence(source: string, bodyStart: number): RegExpExecArray | null {
-  const scanned = new TemplateParser(source, bodyStart, []).closingLine()
-
-  if (scanned !== undefined) {
-    CLOSING_LINE.lastIndex = scanned
-
-    return CLOSING_LINE.exec(source)
-  }
-
+// The line closing a fence, past any inside a template literal or a comment, such as a markdown front matter the code holds: a `---` line, consumed, or a labeled one opening the next fence, left to it.
+// Code that leaves a template literal open falls back to the first such line, so the template still parses.
+function closingFence(source: string, bodyStart: number): Span | undefined {
   CLOSING_FENCE.lastIndex = bodyStart
 
-  return CLOSING_FENCE.exec(source)
+  const start = new TemplateParser(source, bodyStart, []).closingLine() ?? CLOSING_FENCE.exec(source)?.index
+
+  if (start === undefined)
+    return undefined
+
+  CLOSING_LINE.lastIndex = start
+
+  return { start, end: CLOSING_LINE.test(source) ? CLOSING_LINE.lastIndex : start }
 }
 
 class TemplateParser {
@@ -126,15 +128,16 @@ class TemplateParser {
 
   constructor(private readonly src: string, private pos: number, private readonly diagnostics: Diagnostic[]) {}
 
-  // Where the first `---` line outside strings, template literals and comments starts.
+  // Where the first `---` or labeled fence line outside strings, template literals and comments starts.
   closingLine(): number | undefined {
     const start = this.pos
     let i = start
 
     while (i < this.src.length) {
       CLOSING_LINE.lastIndex = i
+      NEXT_FENCE_LINE.lastIndex = i
 
-      if ((i === start || this.src[i - 1] === '\n') && CLOSING_LINE.test(this.src))
+      if ((i === start || this.src[i - 1] === '\n') && (CLOSING_LINE.test(this.src) || NEXT_FENCE_LINE.test(this.src)))
         return i
 
       const char = this.src[i]!

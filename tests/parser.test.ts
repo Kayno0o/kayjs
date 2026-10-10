@@ -75,6 +75,17 @@ describe('fence', () => {
     expect(outline(unclosed)).toEqual([{ tag: 'p', children: [['x']] }])
   })
 
+  it('closes a fence on the labeled line opening the next one, `--- script` naming the component script', () => {
+    const merged = parse('--- server\nconst a = 1\n--- script\nconst b = 2\n---\np {a}\n')
+    const literal = parse('---\nconst b = 2\n--- server\nconst md = `\n--- client\n`\n---\np {b}\n')
+
+    expect([text(merged, merged.server), text(merged, merged.script)]).toEqual(['const a = 1\n', 'const b = 2\n'])
+    expect(outline(merged)).toEqual([{ tag: 'p', children: [['{a}']] }])
+    expect(merged.diagnostics).toEqual([])
+    expect(text(literal, literal.server)).toBe('const md = `\n--- client\n`\n')
+    expect(parse('--- server\nconst a = 1\n--- sever\nx\n---\np\n').diagnostics[0]?.message).toContain('Unknown fence `--- sever`')
+  })
+
   it('reports an unclosed fence', () => {
     expect(parse('---\nconst a = 1\n').diagnostics[0]?.message).toContain('never closed')
   })

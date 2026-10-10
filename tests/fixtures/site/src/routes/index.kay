@@ -13,8 +13,7 @@ export const add = action(t.Object({ title: t.String({ maxLength: 200, minLength
 const todos = await listTodos()
 const open = todos.filter(todo => !todo.done).length
 const failure = ctx.failed(add)
----
----
+--- script
 import Card from '../components/card.kay'
 import Counter from '../components/counter.kay'
 ---

@@ -40,6 +40,7 @@ export function formatKay(source: string): FormatResult {
 
 // Fence bodies stay verbatim, since trimming inside a template literal would change the program; only the fence lines and the blank lines around them are normalized.
 // The bodies are the parser's, which knows a `---` line inside a template literal closes nothing.
+// Adjacent fences share one line, the second one's labeled opening, which closes the first.
 function formatFences(file: KayFile): string[] {
   const out: string[] = []
   const bodies = [file.script, file.server].filter(body => body !== undefined).sort((a, b) => a.start - b.start)
@@ -47,13 +48,13 @@ function formatFences(file: KayFile): string[] {
   for (const body of bodies) {
     const open = FENCE_OPEN.exec(file.source.slice(file.source.lastIndexOf('\n', body.start - 2) + 1, body.start - 1))
 
-    const header = [open?.[1], open?.[2] ?? open?.[3]].filter(part => part !== undefined)
+    const header = [open?.[1] ?? (out.length > 0 ? 'script' : undefined), open?.[2] ?? open?.[3]].filter(part => part !== undefined)
 
     out.push(header.length === 0 ? '---' : `--- ${header.join(' ')}`)
-    out.push(...trimBlankLines(file.source.slice(body.start, body.end).split('\n')), '---')
+    out.push(...trimBlankLines(file.source.slice(body.start, body.end).split('\n')))
   }
 
-  return out
+  return out.length === 0 ? out : [...out, '---']
 }
 
 function formatTemplate(file: KayFile): string[] {

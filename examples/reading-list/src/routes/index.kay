@@ -13,8 +13,7 @@ export const add = action(s.Object({
 })
 
 const books = await listBooks()
----
----
+--- script
 import BookFilter from '../components/book-filter.kay'
 ---
 head

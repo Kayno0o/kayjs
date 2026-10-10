@@ -5,8 +5,7 @@ const delay = Number(ctx.url.searchParams.get('delay') ?? 20)
 const items = defer(new Promise<string[]>(resolve => setTimeout(resolve, delay, ['first', 'second'])))
 const broken = defer(Promise.reject(new Error('Feed down')))
 const now = 'right away'
----
----
+--- script
 import Counter from '../components/counter.kay'
 ---
 h1 Feed

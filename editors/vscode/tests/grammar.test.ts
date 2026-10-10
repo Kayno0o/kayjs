@@ -73,10 +73,18 @@ describe('kay grammar', () => {
   it('embeds TypeScript in both fences and returns to the template after them', () => {
     const lines = tokenize('--- server\nconst open = 1\n---\n---\nconst title = \'x\'\n---\np Hi')
 
-    expect(lines[0]).toEqual(['---: punctuation.definition.fence.kay', 'server: keyword.other.server.kay'])
+    expect(lines[0]).toEqual(['---: punctuation.definition.fence.kay', 'server: keyword.other.fence.kay'])
     expect(lines[1]).toContain('open: variable.other.ts')
     expect(scopesOf('---\nconst title = \'x\'\n---', 'title')).toContain('meta.embedded.block.typescript')
     expect(lines[6]).toEqual(['p: entity.name.tag.kay', 'Hi: meta.element.kay'])
+  })
+
+  it('ends a fence at the labeled line opening the next one', () => {
+    const lines = tokenize('--- server\nconst open = 1\n--- script\nconst title = \'x\'\n---\np Hi')
+
+    expect(lines[2]).toEqual(['---: punctuation.definition.fence.kay', 'script: keyword.other.fence.kay'])
+    expect(scopesOf('--- server\nconst open = 1\n--- script\nconst title = \'x\'\n---', 'title')).toContain('meta.embedded.block.typescript')
+    expect(lines[5]).toEqual(['p: entity.name.tag.kay', 'Hi: meta.element.kay'])
   })
 
   it('reads the type parameters of a generic component on its fence line', () => {

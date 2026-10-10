@@ -66,6 +66,11 @@ describe('formatKay', () => {
     expect(formatKay('---  client\nconst a = 1\n---\np {a}\n').code).toBe('--- client\nconst a = 1\n---\np {a}\n')
   })
 
+  it('joins adjacent fences on the labeled line opening the second', () => {
+    expect(formatKay('--- server\nconst a = 1\n---\n---\nconst b = 2\n---\np {a}\n').code).toBe('--- server\nconst a = 1\n--- script\nconst b = 2\n---\np {a}\n')
+    expect(formatKay('--- client\nconst b = 2\n---\n\n--- server\nconst a = 1\n---\np {a}\n').code).toBe('--- client\nconst b = 2\n--- server\nconst a = 1\n---\np {a}\n')
+  })
+
   it('writes attribute lists canonically, inline ones included', () => {
     expect(format('a( href = \'/x\' ,  disabled {...rest} title=\'say "hi"\' onClick={() => go( 1 )} )\np Hi #[b( x=\'1\' ) there]\n'))
       .toBe('a(href="/x" disabled {...rest} title=\'say "hi"\' onClick={() => go( 1 )})\np Hi #[b(x="1") there]\n')

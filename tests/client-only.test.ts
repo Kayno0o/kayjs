@@ -161,6 +161,12 @@ describe('browser-only globals read while rendering', () => {
     ])
   })
 
+  it('turns a `--- script` fence into `--- client`', () => {
+    const source = '--- script\nconst title = document.title\n---\np {title}\n'
+
+    expect(reads(source)).toEqual([{ text: 'document', message: '`document` exists only in the browser', fixes: [source.replace('--- script', '--- client')] }])
+  })
+
   it('leaves handlers, refs, effects and other callbacks alone, as globals Bun has, shadowed names and types', () => {
     const source = '---\nimport { effect, onMount } from \'kay\'\n\nconst location = \'here\'\nconst later = () => alert(\'later\')\neffect(() => console.log(localStorage.length))\nonMount(() => document.body.focus())\nsetTimeout(() => window.scrollTo(0, 0))\nconst at: Window | undefined = undefined\nconst socket = typeof WebSocket\n---\nbutton(onClick={later} ref={() => window.focus()}) {location} {fetch.name} {URL.name} {crypto.randomUUID()} {String(at)} {socket}\n'
 

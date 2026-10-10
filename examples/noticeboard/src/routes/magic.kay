@@ -14,8 +14,7 @@ export const spend = action(s.Object({ token: s.String() }), async ({ token }, c
 })
 
 const token = ctx.query.token ?? ''
----
----
+--- script
 import Button from '@kaynooo/kayjs-ui/button.kay'
 ---
 head

@@ -28,8 +28,7 @@ export const odd = action(t.Object({}), (_input, ctx) => ctx.fail(409, { retry: 
 
 const tally = { count: 0 }
 const refusedWith = save.failed()?.status
----
----
+--- script
 import Signup from '../components/signup.kay'
 ---
 form(action={save})

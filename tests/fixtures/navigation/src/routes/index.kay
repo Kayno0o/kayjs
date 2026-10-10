@@ -11,8 +11,7 @@ export const bump = action(t.Object({}), () => {
 export const note = action(t.Object({ text: t.String({ maxLength: 5 }) }), () => undefined)
 
 const bumps = store.bumps
----
----
+--- script
 import Box from '../components/box.kay'
 import Bump from '../components/bump.kay'
 ---

@@ -8,8 +8,7 @@ declare const ambient: number
 const rows: Row[] = [{ id: 1 }]
 type First = typeof rows[number]
 const first: First = rows[0]!
----
----
+--- script
 import type { Row } from '../fmt'
 import { fmt } from '../fmt'
 const label: string = fmt(first.id)

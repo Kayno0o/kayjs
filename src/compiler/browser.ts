@@ -31,6 +31,7 @@ const ARRAY_CALLBACKS = new Set(['map', 'flatMap', 'filter', 'find', 'findIndex'
 // TypeScript nodes wrapping a value rather than spelling a type.
 const TS_EXPRESSIONS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
 const FENCE_OPENING = '---'
+const SCRIPT_LABEL = /[ \t]+script\b/y
 const TYPEOF_GLOBAL = /\btypeof\s+([a-z_$][\w$]*)/gi
 // What may render differently on the server and in the browser, worth a scope analysis in an island.
 const VARYING_HINT = /\b(?:Date|Math|toLocale\w*|Intl)\b/
@@ -382,7 +383,7 @@ function effectFix(file: KayFile, code: string, read: Read, toSource: (generated
   return [{ title: `Read \`${read.name}\` in an effect, once the component renders in the browser`, edits: [{ start, end, text: `effect(() => ${expression})` }] }]
 }
 
-// `---` becomes `--- client`; a file without a script gets an empty one.
+// `---` or `--- script` becomes `--- client`; a file without a script gets an empty one.
 function clientFix(file: KayFile): Fix[] {
   const title = 'Render the component in the browser only with `--- client`'
 
@@ -391,5 +392,9 @@ function clientFix(file: KayFile): Fix[] {
 
   const opening = file.source.lastIndexOf(FENCE_OPENING, file.script.start - 1) + FENCE_OPENING.length
 
-  return [{ title, edits: [{ start: opening, end: opening, text: ' client' }] }]
+  SCRIPT_LABEL.lastIndex = opening
+
+  const end = SCRIPT_LABEL.test(file.source) ? SCRIPT_LABEL.lastIndex : opening
+
+  return [{ title, edits: [{ start: opening, end, text: ' client' }] }]
 }

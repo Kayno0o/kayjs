@@ -31,11 +31,12 @@ li(class={size})
 - `---` is the component script: imports, props, signals, functions. It runs wherever the component renders.
 - `--- server` exists on pages and layouts only. It runs on the server for each request and never reaches the browser.
 
+A fence ends on a `---` line, or on a `--- server`, `--- client` or `--- script` line, which opens the next fence. `--- script` is the component script spelled out, for when it follows another fence.
+
 ```kay
 --- server
 const greeting = 'Hello'
----
----
+--- script
 import Badge from './badge.kay'
 ---
 p {greeting}

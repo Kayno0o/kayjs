@@ -155,14 +155,14 @@ describe('kay lsp', () => {
   it('shows hover types for template expressions and server data', async () => {
     await site.open('src/routes/index.kay')
 
-    const hover = await site.request<Hover>('textDocument/hover', 'src/routes/index.kay', 21, 6)
+    const hover = await site.request<Hover>('textDocument/hover', 'src/routes/index.kay', 20, 6)
 
     expect(JSON.stringify(hover.contents)).toContain('open: number')
-    expect(hover.range).toEqual({ start: { line: 21, character: 5 }, end: { line: 21, character: 9 } })
+    expect(hover.range).toEqual({ start: { line: 20, character: 5 }, end: { line: 20, character: 9 } })
   })
 
   it('completes members inside template expressions, without the generated helpers', async () => {
-    const list = await site.request<CompletionList>('textDocument/completion', 'src/routes/index.kay', 24, 46)
+    const list = await site.request<CompletionList>('textDocument/completion', 'src/routes/index.kay', 23, 46)
     const labels = list.items.map(item => item.label)
 
     expect(labels).toContain('title')
@@ -183,13 +183,13 @@ describe('kay lsp', () => {
 
     expect(action).toMatchObject({ targetUri: site.uri('src/routes/index.kay'), targetSelectionRange: { start: { line: 5, character: 13 }, end: { line: 5, character: 16 } } })
 
-    const [component] = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 32, 2)
+    const [component] = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 31, 2)
 
     expect(component?.targetUri).toBe(site.uri('src/components/counter.kay'))
   })
 
   it('goes from a server value in the template to its declaration in the server fence, and to nothing else', async () => {
-    const open = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 21, 6)
+    const open = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 20, 6)
 
     expect(open.map(link => [link.targetUri, ...spots([link.targetSelectionRange])[0]!])).toEqual([[site.uri('src/routes/index.kay'), 13, 6, 10]])
   })
@@ -200,30 +200,30 @@ describe('kay lsp', () => {
     const add = await site.connection.request<Location[]>('textDocument/references', { textDocument: { uri: site.uri('src/routes/index.kay') }, position: { line: 5, character: 14 }, context: { includeDeclaration: true } })
     const open = await site.connection.request<Location[]>('textDocument/references', { textDocument: { uri: site.uri('src/routes/index.kay') }, position: { line: 13, character: 7 }, context: { includeDeclaration: true } })
 
-    expect(spots(add.filter(location => location.uri === site.uri('src/routes/index.kay')).map(location => location.range))).toEqual([[5, 13, 16], [14, 27, 30], [25, 19, 22]])
+    expect(spots(add.filter(location => location.uri === site.uri('src/routes/index.kay')).map(location => location.range))).toEqual([[5, 13, 16], [14, 27, 30], [24, 19, 22]])
     expect(spots(add.filter(location => location.uri === site.uri('src/components/quick-add.kay')).map(location => location.range))).toEqual([[2, 9, 12], [9, 18, 21]])
-    expect(spots(open.map(location => location.range))).toEqual([[13, 6, 10], [21, 5, 9], [32, 15, 19]])
-    expect(spots((await site.request<DocumentHighlight[]>('textDocument/documentHighlight', 'src/routes/index.kay', 21, 6)).map(highlight => highlight.range))).toEqual([[13, 6, 10], [21, 5, 9], [32, 15, 19]])
+    expect(spots(open.map(location => location.range))).toEqual([[13, 6, 10], [20, 5, 9], [31, 15, 19]])
+    expect(spots((await site.request<DocumentHighlight[]>('textDocument/documentHighlight', 'src/routes/index.kay', 20, 6)).map(highlight => highlight.range))).toEqual([[13, 6, 10], [20, 5, 9], [31, 15, 19]])
   })
 
   it('renames a name everywhere the user wrote it, from either end, and nothing generated', async () => {
-    const open = [[13, 6, 10], [21, 5, 9], [32, 15, 19]]
+    const open = [[13, 6, 10], [20, 5, 9], [31, 15, 19]]
 
     const fromDeclaration = await site.rename('src/routes/index.kay', 13, 7, 'pending')
 
     expect(Object.keys(fromDeclaration)).toEqual(['src/routes/index.kay'])
     expect(spots(fromDeclaration['src/routes/index.kay']!)).toEqual(open)
-    expect(spots((await site.rename('src/routes/index.kay', 21, 6, 'pending'))['src/routes/index.kay']!)).toEqual(open)
+    expect(spots((await site.rename('src/routes/index.kay', 20, 6, 'pending'))['src/routes/index.kay']!)).toEqual(open)
     // A loop's item is generated into both its key function and its row.
-    expect(spots((await site.rename('src/routes/index.kay', 23, 9, 'item'))['src/routes/index.kay']!)).toEqual([[23, 8, 12], [23, 27, 31], [24, 28, 32], [24, 41, 45]])
+    expect(spots((await site.rename('src/routes/index.kay', 22, 9, 'item'))['src/routes/index.kay']!)).toEqual([[22, 8, 12], [22, 27, 31], [23, 28, 32], [23, 41, 45]])
 
     await site.open('src/components/card.kay')
 
     const title = await site.rename('src/components/card.kay', 3, 9, 'heading')
 
     expect(spots(title['src/components/card.kay']!)).toEqual([[3, 8, 13], [3, 26, 31], [6, 6, 11]])
-    expect(spots(title['src/routes/index.kay']!)).toEqual([[20, 5, 10]])
-    expect(await site.request('textDocument/prepareRename', 'src/routes/index.kay', 23, 5)).toBeNull()
+    expect(spots(title['src/routes/index.kay']!)).toEqual([[19, 5, 10]])
+    expect(await site.request('textDocument/prepareRename', 'src/routes/index.kay', 22, 5)).toBeNull()
   })
 
   it('renames a generic component\'s type parameter from its fence line and from its uses', async () => {

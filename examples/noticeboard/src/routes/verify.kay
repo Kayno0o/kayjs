@@ -15,8 +15,7 @@ export const confirm = action(s.Object({ token: s.String(), password: s.Optional
 
 const failure = ctx.failed(confirm)?.data?.error
 const token = ctx.query.token ?? ''
----
----
+--- script
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 ---

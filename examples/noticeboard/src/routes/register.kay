@@ -18,8 +18,7 @@ export const join = action(s.Object({
 const refused = ctx.failed(join)?.data
 const errors = refused?.errors ?? {}
 const failure = refused?.error && FAILURE_WORDS[refused.error]
----
----
+--- script
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 ---

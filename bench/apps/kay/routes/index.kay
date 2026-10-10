@@ -2,8 +2,7 @@
 import { PRODUCTS } from '../../../shared/data'
 
 const products = PRODUCTS
----
----
+--- script
 import { formatPrice } from '../../../shared/data'
 import Counter from '../components/counter.kay'
 ---

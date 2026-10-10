@@ -3,8 +3,7 @@ import { posts } from '../../content.config'
 
 const [entry] = await posts.all()
 const { Content } = entry!
----
----
+--- script
 import '../../page.css'
 ---
 article

@@ -3,8 +3,7 @@ import { navigation } from '../../pages'
 
 const nav = await navigation()
 const current = ctx.url.pathname.replace(/\/$/, '') || '/'
----
----
+--- script
 import Shell from '../../components/shell.kay'
 import '../../site.css'
 ---

@@ -14,8 +14,7 @@ const sections = [
   { id: 'api', text: 'API', depth: 2 },
 ]
 const { previous, next } = neighbours(await components.all(), component.slug, slug => `/ui/${slug}`)
----
----
+--- script
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import Pager from '../../../components/pager.kay'

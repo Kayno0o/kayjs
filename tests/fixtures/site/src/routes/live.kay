@@ -3,8 +3,7 @@ import { defer } from 'kay'
 
 const score = defer(new Promise<number>(resolve => setTimeout(resolve, 10, 42)))
 const inner = defer(Promise.resolve('inner'))
----
----
+--- script
 import Counter from '../components/counter.kay'
 ---
 Counter(start={1})

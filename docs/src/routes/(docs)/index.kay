@@ -68,8 +68,7 @@ const features = [
   { title: 'Typed forms', text: 'Actions take a schema, work without JavaScript and are called like functions from islands.', href: '/essentials/forms-and-actions' },
   { title: 'Checked templates', text: 'kay check types every template and reports errors at the .kay line.', href: '/reference/checks' },
 ]
----
----
+--- script
 import Accessible from '~icons/tabler/accessible'
 import Api from '~icons/tabler/api'
 import Bolt from '~icons/tabler/bolt'

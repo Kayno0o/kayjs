@@ -3,7 +3,6 @@ import Player from '../components/player.kay'
 import { Tone } from '../tone'
 
 Tone.provide('layout')
----
 --- server
 const page = ctx.url.pathname
 ---

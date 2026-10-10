@@ -3,8 +3,7 @@ import { notes } from '../../content.config'
 
 const [entry] = await notes.all()
 const { Content } = entry!
----
----
+--- script
 import '../../page.css'
 ---
 article

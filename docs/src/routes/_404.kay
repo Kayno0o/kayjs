@@ -2,8 +2,7 @@
 import { navigation } from '../pages'
 
 const nav = await navigation()
----
----
+--- script
 import Shell from '../components/shell.kay'
 import '../site.css'
 ---

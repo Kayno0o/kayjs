@@ -27,8 +27,7 @@ const refused = ctx.failed(choose)?.data
 const passwordIssue = refused?.errors?.password && PASSWORD_WORDS[refused.errors.password]
 const chooseFailure = refused?.error
 const token = ctx.query.token
----
----
+--- script
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 ---

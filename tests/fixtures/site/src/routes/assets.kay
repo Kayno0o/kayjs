@@ -1,7 +1,6 @@
 --- server
 import { meta } from '../meta'
----
----
+--- script
 import Brand from '../components/brand.kay'
 import logo from '../logo.png'
 ---

@@ -7,8 +7,7 @@ import { stamp } from '../renders'
 export const ask = action(t.Object({ stamp: t.String() }), async () => 'asked', { minTime: '3s' })
 
 const current = stamp()
----
----
+--- script
 import Contact from '../components/contact.kay'
 ---
 h1 Ask

@@ -20,8 +20,7 @@ export const add = action(t.Object({ title: t.String({ maxLength: 200, minLength
 const failure = ctx.failed(add)
 const success = ctx.succeeded(add)
 const titles = store.titles
----
----
+--- script
 import './second.css'
 ---
 head

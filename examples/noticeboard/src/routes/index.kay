@@ -26,8 +26,7 @@ export const post = action(s.Object({
 
 const user = await ctx.locals.auth.user()
 const notices = await latestNotices()
----
----
+--- script
 import Card from '@kaynooo/kayjs-ui/card.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import LiveBoard from '../components/live-board.kay'

@@ -7,8 +7,7 @@ export const send = action(t.Object({ stamp: t.String({ pattern: '^stamp-' }) })
 
 const current = stamp()
 const failure = ctx.failed(send)
----
----
+--- script
 import Contact from '../components/contact.kay'
 import Hero from '../components/hero.kay'
 import Stamped from '../components/stamped.kay'

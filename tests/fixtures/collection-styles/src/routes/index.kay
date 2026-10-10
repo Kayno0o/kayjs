@@ -2,8 +2,7 @@
 import { notes, posts } from '../content.config'
 
 const entries = [...await posts.all(), ...await notes.all()]
----
----
+--- script
 import '../page.css'
 ---
 p {entries.length} entries
