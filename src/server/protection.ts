@@ -48,6 +48,9 @@ const limitLists = new WeakMap<object, ActionLimit[]>()
 // One memory store per limit, so clients flooding one never push another's windows out, such as a login form's.
 const memories = new Map<string, ReturnType<typeof memoryRates>>()
 let warnedUnconfigured = false
+const requestIds = new WeakMap<Request, string>()
+// What an id a proxy passed on may hold, so it can neither forge a log line nor swell one.
+const PASSED_ID = /^[\w.:+/=@-]{1,128}$/
 
 // Each action's `minTime`, read once: `action()` refused one it cannot read.
 const minTimes = new WeakMap<object, ReturnType<typeof minTimeOf>>()
@@ -348,6 +351,34 @@ function forwardedAddress(request: Request, { hops = 1, header }: ProxyConfig): 
   const entries = request.headers.get('x-forwarded-for')?.split(',').map(entry => entry.trim()).filter(entry => entry !== '') ?? []
 
   return entries[Math.max(0, entries.length - hops)]
+}
+
+// The id of a request, on its log lines and its `X-Request-Id` header: the one a proxy the app's `proxy` setting trusts passed on, else one made for it, time-ordered.
+export function requestId(request: Request): string {
+  let id = requestIds.get(request)
+
+  if (id === undefined) {
+    id = passedId(request) ?? Bun.randomUUIDv7('base64url')
+    requestIds.set(request, id)
+  }
+
+  return id
+}
+
+// The id a request kay rewrote had before, as the request served in its place is another.
+export function keepRequestId(request: Request, id: string): void {
+  requestIds.set(request, id)
+}
+
+function passedId(request: Request): string | undefined {
+  const id = request.headers.get('x-request-id')
+
+  if (id === null || !proxies.get(request) || !PASSED_ID.test(id))
+    return undefined
+
+  const address = rewrittenAddress(request) ?? servers.get(request)?.requestIP(request)?.address
+
+  return address === undefined || LOOPBACK_OR_PRIVATE.test(address) ? id : undefined
 }
 
 function warnUnconfigured(): void {

@@ -19,6 +19,7 @@ import { inLocale, isCrossSite, passGuards } from './actions'
 import { importModule } from './bundle'
 import { corsAdmits, corsResponse, corsRule, preflight, withCors } from './cors'
 import { loadGuard } from './guards'
+import { requestId } from './protection'
 import { reportServerError } from './report'
 import { apiMounts, directoriesUp, fileAt } from './routes'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
@@ -172,7 +173,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         .onBeforeHandle(({ request, route: mounted }) => {
           // `/api/echo` rather than the `/api/echo/` a module's `/` route is mounted at.
           const route = mounted.length > 1 ? mounted.replace(TRAILING_SLASH, '') : mounted
-          const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': new URL(request.url).pathname } })
+          const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': new URL(request.url).pathname, 'kay.request.id': requestId(request) } })
 
           if (span)
             spans.set(request, span)

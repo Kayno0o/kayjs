@@ -2,7 +2,9 @@
 
 ## Request logs
 
-With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms`, the method, the path without its query string, which may carry tokens, the status, and the milliseconds until the response was made, a streamed one's headers. kay's own `/_kay/` routes, assets included, and the health route, wherever `health.path` puts it, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration }`, for a log collector; a function receives each `{ method, path, status, duration }` entry instead; `true` logs outside production too, `false` never.
+With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, the method, the path without its query string, which may carry tokens, the status, the milliseconds until the response was made, a streamed one's headers, and the request's id. kay's own `/_kay/` routes, assets included, and the health route, wherever `health.path` puts it, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration, id }`, for a log collector; a function receives each `{ method, path, status, duration, id }` entry instead; `true` logs outside production too, `false` never.
+
+Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header. An error logged while answering a request is headed by the request, `kay: GET /blog/hello, request AZnLe0vUe9qD0uXq9vLwZw`, then its stack, so a line from a user or a log search finds both. `requestId(request)` from `kay/server` gives it, in `onError` or a route, and a server span carries it as `kay.request.id`.
 
 ## Tracing and timing
 

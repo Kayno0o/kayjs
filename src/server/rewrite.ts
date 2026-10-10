@@ -1,6 +1,7 @@
 import type { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { logError } from '../build/sourcemap'
+import { keepRequestId, requestId } from './protection'
 
 // Returns the path, query included, to serve the request from instead, or undefined to serve it as it came.
 export type Rewrite = (url: URL, request: Request) => string | undefined
@@ -9,6 +10,8 @@ export type Rewrite = (url: URL, request: Request) => string | undefined
 const REWRITTEN = 'x-kay-rewritten'
 // The socket's address, which a request dispatched through the server no longer carries.
 const CLIENT = 'x-kay-client'
+// The id of the request rewritten, which its log lines and its answer keep.
+const ID = 'x-kay-request-id'
 const TOKEN = crypto.randomUUID()
 // Read off the marking headers, which are then dropped, so app code never sees the token.
 const addresses = new WeakMap<Request, string>()
@@ -30,11 +33,17 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
     if (request.headers.get(REWRITTEN) === TOKEN) {
       const address = request.headers.get(CLIENT)
 
+      const id = request.headers.get(ID)
+
       if (address !== null)
         addresses.set(request, address)
 
+      if (id !== null)
+        keepRequestId(request, id)
+
       request.headers.delete(REWRITTEN)
       request.headers.delete(CLIENT)
+      request.headers.delete(ID)
 
       return undefined
     }
@@ -64,6 +73,7 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
     const headers = new Headers(request.headers)
 
     headers.set(REWRITTEN, TOKEN)
+    headers.set(ID, requestId(request))
     headers.delete(CLIENT)
 
     const address = addresses.get(request) ?? server?.requestIP(request)?.address

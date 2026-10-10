@@ -1445,7 +1445,7 @@ describe('special pages', () => {
 
       expect(response.status).toBe(500)
       expect(parse(await response.text())).toEqual({ errors: { '': 'Something went wrong on our side; try again later' }, data: undefined })
-      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^Error: Kaboom in an action\n\s+at \S+ \(\S+\/boom\.kay:6:13\)/))
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kay: POST \S+explode, request \S+\nError: Kaboom in an action\n\s+at \S+ \(\S+\/boom\.kay:6:13\)/))
     }
     finally {
       logged.mockRestore()
@@ -1468,7 +1468,7 @@ describe('special pages', () => {
       expect(await (await watched.handle(new Request('http://localhost/boom?later'))).text()).not.toContain('Kaboom')
       expect(await (await watched.handle(new Request('http://localhost/boom'))).text()).toContain('<p>Fine</p>')
       expect(reported).toEqual(['/boom?fail: Kaboom', '/_kay/action/tests/fixtures/site/src/routes/boom.kay/explode: Kaboom in an action', '/boom?later: Kaboom later'])
-      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^Error: Tracker down/))
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kay: onError failed for GET \/boom, request \S+\nError: Tracker down/))
     }
     finally {
       logged.mockRestore()
@@ -1493,7 +1493,7 @@ describe('special pages', () => {
       expect(await (await served.handle(new Request('http://localhost/api/own'))).text()).toBe('Answered by the module')
       expect(reported).toEqual(['/api/items/broken: Secret detail'])
       expect(logged).toHaveBeenCalledTimes(1)
-      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^Error: Secret detail\n/))
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^kay: GET /api/items/broken, request ${broken.headers.get('x-request-id')}\nError: Secret detail\n`)))
 
       const dev = await pages({ routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api'), prebuilt: true, dev: true })
 
@@ -1530,7 +1530,7 @@ describe('special pages', () => {
       expect(status).toBe(500)
       expect(html).toContain('<h1>Error 500</h1><p class="message">Internal Server Error</p>')
       expect(html).not.toContain('Kaboom')
-      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^Error: Kaboom\n\s+at load \(\S+\/boom\.kay:10:13\)/))
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kay: GET \/boom, request \S+\nError: Kaboom\n\s+at load \(\S+\/boom\.kay:10:13\)/))
     }
     finally {
       logged.mockRestore()
@@ -1612,9 +1612,11 @@ describe('tracing and timing in production', () => {
     const { tracer, ended } = recordingTracer()
     const traced = await pages({ routes: 'tests/fixtures/site/src/routes', tracer })
 
-    expect((await traced.handle(new Request('http://localhost/'))).status).toBe(200)
+    const home = await traced.handle(new Request('http://localhost/'))
+
+    expect(home.status).toBe(200)
     expect(ended.toSorted((a, b) => a.name.localeCompare(b.name))).toEqual([
-      { name: 'GET /', parent: undefined, kind: 1, attributes: { 'http.request.method': 'GET', 'http.route': '/', 'url.path': '/', 'http.response.status_code': 200 } },
+      { name: 'GET /', parent: undefined, kind: 1, attributes: { 'http.request.method': 'GET', 'http.route': '/', 'url.path': '/', 'kay.request.id': home.headers.get('x-request-id'), 'http.response.status_code': 200 } },
       { name: 'kay.load tests/fixtures/site/src/routes/_layout.kay', parent: 'GET /', kind: undefined, attributes: {} },
       { name: 'kay.load tests/fixtures/site/src/routes/index.kay', parent: 'GET /', kind: undefined, attributes: {} },
       { name: 'kay.render tests/fixtures/site/src/routes/index.kay', parent: 'GET /', kind: undefined, attributes: {} },
@@ -1652,7 +1654,7 @@ describe('tracing and timing in production', () => {
     const response = await traced.handle(new Request(`http://localhost${url}`, { method: 'POST', headers: { referer: 'http://localhost/survey' }, body: new URLSearchParams('tags=a&count=3') }))
 
     expect(response.status).toBe(303)
-    expect(ended).toEqual([{ name: `POST ${url}`, parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': url, 'url.path': url, 'http.response.status_code': 303 } }])
+    expect(ended).toEqual([{ name: `POST ${url}`, parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': url, 'url.path': url, 'kay.request.id': response.headers.get('x-request-id'), 'http.response.status_code': 303 } }])
   })
 
   it('hands it a span per API request too', async () => {
@@ -1662,7 +1664,7 @@ describe('tracing and timing in production', () => {
     expect(await (await traced.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' }))).text()).toBe('5')
     // Elysia runs the hook ending it once the response is out.
     await new Promise(resolve => setTimeout(resolve, 10))
-    expect(ended).toEqual([{ name: 'POST /api/echo', parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': '/api/echo', 'url.path': '/api/echo', 'http.response.status_code': 200 } }])
+    expect(ended).toEqual([{ name: 'POST /api/echo', parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': '/api/echo', 'url.path': '/api/echo', 'kay.request.id': expect.any(String), 'http.response.status_code': 200 } }])
   })
 })
 

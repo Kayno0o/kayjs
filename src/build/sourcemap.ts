@@ -169,11 +169,16 @@ function mapPosition(file: string, line: string, column: string): string | undef
 }
 
 // Bun would print the compiled code around the throw, so an error goes out as its stack mapped to `.kay` lines, after what to do about a browser-only global.
-export function logError(error: unknown): void {
+// A `heading` goes in the same call, so no other line comes between them.
+export function logError(error: unknown, heading?: string): void {
   const stack = error instanceof Error && error.stack !== undefined && error.stack !== '' ? mapStack(error.stack) : undefined
   const hint = stack !== undefined && stack !== '' ? browserOnlyHint(error, stack) : undefined
+  const text = hint !== undefined && hint !== '' ? `${hint}\n${stack}` : stack
 
-  console.error(hint !== undefined && hint !== '' ? `${hint}\n${stack}` : stack ?? error)
+  if (heading === undefined)
+    console.error(text ?? error)
+  else
+    console.error(`${heading}\n${text ?? Bun.inspect(error)}`)
 }
 
 // What a server render failing on a browser-only global should say: the global, the `.kay` line reading it, and the two ways out.

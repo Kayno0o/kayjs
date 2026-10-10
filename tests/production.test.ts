@@ -13,7 +13,7 @@ import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { action } from '../src/runtime'
 import { sqliteCache } from '../src/runtime/cache.server'
-import { inlineScriptHashes, invalidatePage, pages, shutdown, sqliteJobs, sqliteStore } from '../src/server'
+import { inlineScriptHashes, invalidatePage, pages, requestId, shutdown, sqliteJobs, sqliteStore } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
@@ -1344,15 +1344,51 @@ describe('request logging', () => {
         return 'teapot'
       }).listen(0)
 
-      for (const path of ['/contact?token=secret', '/api/fail', '/_kay/health', '/missing'])
-        await (await fetch(`http://localhost:${app.server!.port}${path}`)).text()
+      const ids: (string | null)[] = []
+
+      for (const path of ['/contact?token=secret', '/api/fail', '/_kay/health', '/missing']) {
+        const response = await fetch(`http://localhost:${app.server!.port}${path}`)
+
+        ids.push(response.headers.get('x-request-id'))
+        await response.text()
+      }
 
       await shutdown(app)
       await written(() => lines.mock.calls.length, 3)
-      expect(lines.mock.calls.map(call => String(call[0]).replace(/\d+ms$/, 'Nms'))).toEqual(['GET /contact 200 Nms', 'GET /api/fail 418 Nms', 'GET /missing 404 Nms'])
+      expect(lines.mock.calls.map(call => String(call[0]).replace(/\d+ms /, 'Nms '))).toEqual([`GET /contact 200 Nms ${ids[0]}`, `GET /api/fail 418 Nms ${ids[1]}`, `GET /missing 404 Nms ${ids[3]}`])
+      expect(new Set(ids).size).toBe(4)
     }
     finally {
       lines.mockRestore()
+    }
+  })
+
+  it('answers each request with an id of its own, the one a trusted proxy passed on, kept across a rewrite and readable from onError', async () => {
+    const ids: string[] = []
+    const passed = { 'x-request-id': 'edge-42' }
+    const open = await pages({ routes, prebuilt: false, rewrite: url => url.pathname === '/old-contact' ? '/contact' : undefined })
+    const behind = await pages({ routes, prebuilt: false, proxy: { hops: 1 }, onError: (_, request) => void ids.push(requestId(request)) })
+    const idOf = async (app: typeof open, path: string, headers: Record<string, string> = {}) => (await app.handle(new Request(`http://localhost${path}`, { headers }))).headers.get('x-request-id')
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const first = await idOf(open, '/contact', passed)
+      const second = await idOf(open, '/contact')
+
+      expect(first).toMatch(/^[\w-]{22}$/)
+      expect(second).not.toBe(first)
+      expect(await idOf(open, '/old-contact')).toMatch(/^[\w-]{22}$/)
+      expect(await idOf(behind, '/contact', passed)).toBe('edge-42')
+      expect(await idOf(behind, '/contact', { 'x-request-id': 'a'.repeat(200) })).not.toBe('a'.repeat(200))
+      expect(await idOf(behind, '/missing')).toMatch(/^[\w-]{22}$/)
+
+      await behind.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { ...passed, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Error', message: 'Broken island', url: '/contact', stack: '' }) }))
+      await Bun.sleep(10)
+      expect(ids).toEqual(['edge-42'])
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kay: POST \/_kay\/error, request edge-42\n/))
+    }
+    finally {
+      logged.mockRestore()
     }
   })
 
@@ -1373,8 +1409,8 @@ describe('request logging', () => {
       }
 
       expect(lines.mock.calls).toHaveLength(1)
-      expect(JSON.parse(String(lines.mock.calls[0]![0]))).toEqual({ time: expect.any(String), method: 'GET', path: '/contact', status: 200, duration: expect.any(Number) })
-      expect(entries).toEqual([{ method: 'GET', path: '/contact', status: 200, duration: expect.any(Number) }])
+      expect(JSON.parse(String(lines.mock.calls[0]![0]))).toEqual({ time: expect.any(String), method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) })
+      expect(entries).toEqual([{ method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) }])
     }
     finally {
       lines.mockRestore()

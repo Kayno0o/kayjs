@@ -13,7 +13,7 @@ bun run build
 NODE_ENV=production bun src/server.ts
 ```
 
-With `NODE_ENV=production`, every request is logged as one line, `GET /blog/hello 200 12ms`.
+With `NODE_ENV=production`, every request is logged as one line, `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, ending with the id its response carries as `X-Request-Id`. An error logged while answering it is headed by the same id, and `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept.
 
 ## One executable
 

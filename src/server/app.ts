@@ -42,7 +42,7 @@ import { openApiDocument, openApiSettings, refuseOpenApiClashes, serveOpenApi } 
 import { assetFiles, hookedResponse } from './page-hook'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes, shapeParams } from './params'
 import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
-import { trustProxy } from './protection'
+import { requestId, trustProxy } from './protection'
 import { servePublic } from './public'
 import { readRedirects, refuseRedirectClashes, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
@@ -262,6 +262,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   if (options.rewrite)
     rewriteRequests(app, options.rewrite, app)
+
+  // After the rewrite, which hands the request served in its place the id it had.
+  app.onRequest(({ request, set }) => {
+    set.headers['x-request-id'] = requestId(request)
+  })
 
   if (base !== '')
     rebaseRedirects(app, base)
@@ -525,7 +530,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
       if (params) {
         const { method } = context.request
 
-        return traced(`${method} ${route.pattern}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': method, 'http.route': route.pattern, 'url.path': url.pathname } }, async (span) => {
+        return traced(`${method} ${route.pattern}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': method, 'http.route': route.pattern, 'url.path': url.pathname, 'kay.request.id': requestId(context.request) } }, async (span) => {
           const response = await servePage(route, params, context, url)
 
           if (span)

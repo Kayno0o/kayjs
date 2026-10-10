@@ -79,10 +79,10 @@ p.status {todo.done ? 'Done' : 'Open'}
 Each error kay logs while answering a request, from a load, a render, a guard, an action, an API route, a streamed block without `catch` or a `try` block's, also goes to the `onError` option of `kay.config.ts` or `pages()`, the place to send it to an error tracker. The response does not wait for a promise it returns, and an error it throws is logged:
 
 ```ts
-import { defineConfig } from 'kay/server'
+import { defineConfig, requestId } from 'kay/server'
 
 export default defineConfig({
-  onError: (error, request) => tracker.capture(error, { url: request.url }),
+  onError: (error, request) => tracker.capture(error, { url: request.url, id: requestId(request) }),
 })
 ```
 
