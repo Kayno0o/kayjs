@@ -1,6 +1,7 @@
 // What islands run on in the browser: DOM built from templates, kept in step with signals, and the server's markup claimed in place when an island hydrates.
 // A dynamic part sits between `<!--[-->` and `<!--]-->` comments unless it is the only content of its element; hydration walks the server's nodes in the order the generated code asks for them.
 
+import { rebasedAttribute } from './base'
 import { flattenClasses } from './classes'
 import { imageSource } from './image'
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
@@ -1117,7 +1118,7 @@ export function attribute(element: Element, name: string, value: unknown): void 
   if (value == null || value === false)
     element.removeAttribute(name)
   else
-    element.setAttribute(name, value === true ? '' : safeUrl(name, String(value)))
+    element.setAttribute(name, value === true ? '' : safeUrl(name, rebasedAttribute(name, String(value))))
 }
 
 // An `img` source, with the variants, `sizes` and size of an imported image; a later source clears what an earlier one set.

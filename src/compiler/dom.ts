@@ -1,6 +1,7 @@
 import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
+import { URL_ATTRIBUTES } from '../runtime/base'
 import { actionOf, describedByOf, formFieldOf, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
@@ -10,6 +11,9 @@ import { childItems, soleDynamic } from './items'
 const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const TRANSITION_PART = 'transition:'
+// A static URL an island sets itself rather than in its template, so the browser puts it under `base` as the server does: a root-relative one, or a `srcset` holding one.
+const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
+const ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
 export function domHelperImport(): string {
   return `import { ${DOM_HELPERS.map(helper => `${helper} as ${domAlias(helper)}`).join(', ')} } from 'kay/dom'\n`
@@ -362,6 +366,8 @@ export class DomTemplate {
             content = attribute.text
           else if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && attributeName === 'value'))
             content = escapeText(decodeEntities(attribute.text))
+          else if (BASED.has(attributeName) && ROOT_PATH.test(attribute.text))
+            own.push(variable => b.add(`KayAttribute(${variable(node)}, ${JSON.stringify(attributeName)}, ${JSON.stringify(decodeEntities(attribute.text))});`))
           else
             html += attribute.text === '' ? ` ${attributeName}` : ` ${attributeName}="${escapeStaticAttribute(decodeEntities(attribute.text))}"`
 

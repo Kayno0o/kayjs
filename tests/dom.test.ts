@@ -848,3 +848,32 @@ describe('the dev patch', () => {
     }
   })
 })
+
+describe('a site under a base', () => {
+  it('puts what an island renders in the browser under it, as the server does, leaving a path already under it and another site\'s URL alone', async () => {
+    const meta = document.createElement('meta')
+
+    meta.name = 'kay-base'
+    meta.content = '/shelf'
+    document.head.append(meta)
+
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal, withBase } from \'kay\'\n\nconst slug = signal(\'dracula\')\n---\na(href={`/books/${slug()}`}) book\na(href="/about") about\nimg(alt="" srcset="/a.png 1x, /b.png 2x")\na(href={withBase(\'/kept\')}) kept\na(href="https://example.com/x") away\na(href="#top") top\nbutton(onClick={() => slug.set(\'emma\')}) next\n',
+    })
+
+    try {
+      const hrefs = () => [...root.querySelectorAll('a')].map(link => link.getAttribute('href'))
+
+      expect(hrefs()).toEqual(['/shelf/books/dracula', '/shelf/about', '/shelf/kept', 'https://example.com/x', '#top'])
+      expect(root.querySelector('img')!.getAttribute('srcset')).toBe('/shelf/a.png 1x, /shelf/b.png 2x')
+
+      root.querySelector('button')!.click()
+      await settle()
+      expect(hrefs()[0]).toBe('/shelf/books/emma')
+    }
+    finally {
+      meta.remove()
+      await dispose()
+    }
+  })
+})

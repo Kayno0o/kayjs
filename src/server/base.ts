@@ -1,12 +1,9 @@
 import type { Elysia } from 'elysia'
-import { joinBase } from '../runtime/base'
+import { joinBase, rebaseSrcset, URL_ATTRIBUTES } from '../runtime/base'
 
 // What may only start a mount point: one slash, then segments; no query, hash or trailing slash.
 const BASE_PATH = /^(?:\/[\w.~-]+)+$/
-const SRCSET_ENTRY = /^(\s*)(\S+)(\s.*)?$/s
 const CSS_URL = /url\(\s*(["']?)(\/(?!\/)[^"')\s]*)\1\s*\)/g
-// The attributes holding a URL a page links to or loads, `data` being an `object`'s.
-const URL_ATTRIBUTES = ['href', 'src', 'action', 'formaction', 'poster', 'data']
 
 // The mount point a config's `base` gives, `''` at the root: `/docs/` reads as `/docs`.
 export function basePath(value: string | undefined): string {
@@ -37,7 +34,7 @@ export function rebaseHtml(response: Response, base: string): Response {
 
   rewriter.on('[srcset]', {
     element(element) {
-      element.setAttribute('srcset', element.getAttribute('srcset')!.split(',').map(entry => entry.replace(SRCSET_ENTRY, (_, space: string, url: string, rest: string | undefined) => `${space}${withBase(url)}${rest ?? ''}`)).join(','))
+      element.setAttribute('srcset', rebaseSrcset(element.getAttribute('srcset')!, withBase))
     },
   })
 

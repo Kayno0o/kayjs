@@ -7,6 +7,11 @@ let base: string | undefined
 export const NOWHERE = 'http://nowhere.invalid'
 
 const BASE_META = 'meta[name="kay-base"]'
+// Each URL of a `srcset`, after the start or a comma.
+const SRCSET_URL = /(^|,)(\s*)([^\s,]+)/g
+
+// The attributes holding a URL a page links to or loads, `data` being an `object`'s; `srcset` holds several.
+export const URL_ATTRIBUTES = ['href', 'src', 'action', 'formaction', 'poster', 'data']
 
 function browserBase(): string {
   return base ??= document.querySelector<HTMLMetaElement>(BASE_META)?.content ?? ''
@@ -15,6 +20,17 @@ function browserBase(): string {
 // A path of the site under its mount point in the browser: `withBase('/about')` is `/docs/about`, for a link a script builds. On the server it is left as it is, since kay puts what a page renders under the mount point as it goes out.
 export function withBase(path: string): string {
   return typeof document === 'undefined' ? path : joinBase(browserBase(), path)
+}
+
+// What an island sets in the browser, put under the mount point as the server puts the page it rendered; a path already under it, from `withBase()` or `localize()`, stays as it is.
+export function rebasedAttribute(name: string, value: string): string {
+  const rebase = (url: string) => withoutBase(url) === url ? withBase(url) : url
+
+  return name === 'srcset' ? rebaseSrcset(value, rebase) : URL_ATTRIBUTES.includes(name) ? rebase(value) : value
+}
+
+export function rebaseSrcset(srcset: string, rebase: (url: string) => string): string {
+  return srcset.replace(SRCSET_URL, (_, comma: string, space: string, url: string) => comma + space + rebase(url))
 }
 
 // The path the browser is at, its mount point taken off, as the routes know it.
