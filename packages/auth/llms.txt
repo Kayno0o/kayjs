@@ -266,12 +266,13 @@ Changing what protects the account takes a `proof`: `changePassword`, `changeEma
 - `{ password }` when the user has a password; otherwise `{ code }`, an authenticator or recovery code, when they have a second factor. `disableTwoFactor` and `regenerateRecoveryCodes` take the `{ code }` even from a user with a password, so the password alone cannot undo what stands behind it.
 - A user with neither proves nothing but a sign-in under ten minutes old: past that, the method answers `'stale'` and the page asks them to sign in again first. A stolen session thus cannot set a password and an address and keep the account.
 - `auth.reprove(proof)` proves the user without changing anything, as before linking a provider. Any proof counts for ten minutes, as a sign-in does.
-- `'proof'` for a wrong or missing proof, `'limited'` after six tries in 15 minutes, `'signed-out'` without a user.
+- `'proof'` for a wrong or missing proof, `'limited'` after six tries in 15 minutes, `'signed-out'` without a user, `'impersonating'` while an admin acts as the user.
 
 ## Account
 
 - `changePassword(proof, password)` sets the password, or a first one (`errors.password` as `register`'s), ends the user's other sessions and bearer tokens, and voids the links mailed before.
 - `changeUsername(username)` names the signed-in user, or renames them, normalised and checked as `register` does: `{ ok: true, user }`, `errors: { username }` with `'length'`, `'characters'`, `'mixed-scripts'`, `'taken'` or `'unchanged'`, or `'signed-out'`. Recasing one's own name is allowed. It takes no proof and sends no mail, a name being no credential, but needs a session: a bearer token answers `'signed-out'`. Renames are not limited, a name being public anyway. A page asks a user without one for it, as after an OAuth sign-up whose name was taken.
+- `exportData()` gives the signed-in user everything kayjs-auth keeps about them, for a download of their data: `{ ok: true, data: { exportedAt, user, identities, sessions, passkeys, tokens, recoveryCodesLeft, audit, app } }`, `user` with `createdAt`, `emailVerifiedAt` and `twoFactorEnabledAt`, no hash, secret or token among it. `onExport(user)` gives `app`, what the app keeps about them. It needs a session: a bearer token answers `'signed-out'`.
 - `unlink(provider, proof)` unlinks a provider: `'not-linked'` when it is not, `'last-way-in'` when the user would have no password, no other provider and no verified address to get a magic link at.
 - `deleteAccount(proof)` deletes the user with everything kayjs-auth keeps for them, calls `onDelete(user)` for the app's own records, and signs out. Asking the user to type their name first is the page's job.
 

@@ -9,6 +9,7 @@ import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
 import type { AuditEntry, AuthEvent, EventContext } from './events'
+import type { DataExport } from './export'
 import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
 import type { OAuthFailure } from './oauth/flow'
@@ -31,6 +32,7 @@ import { admit, captchaRequired } from './captcha'
 import { banned, newUserRecord, publicUser } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithEmailCode, signInWithMagicLink, verifyEmail, verifyEmailCode } from './email'
 import { auditEntries, report } from './events'
+import { exportData } from './export'
 import { createGate, scopeAllows } from './gate'
 import { deriveKeys } from './keys'
 import { DEFAULT_LIMITS } from './limits'
@@ -90,6 +92,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   // Called once a user is deleted, to delete the app's own records for them.
   onDelete?: ((user: User) => void | Promise<void>) | undefined
+  // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders.
+  onExport?: ((user: User) => unknown) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own.
   onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
   // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` in seconds, a year by default.
@@ -612,6 +616,11 @@ export class Auth<Scope extends string = string, Role extends string = string> {
     return actor ? publicUser(actor) : null
   }
 
+  // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `onExport`: for a download of their data.
+  async exportData(): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' }> {
+    return exportData(this[STATE])
+  }
+
   // The signed-in user's bearer tokens, without the tokens themselves.
   async tokens(): Promise<BearerToken[]> {
     return listTokens(this[STATE])
@@ -874,6 +883,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onSignUp: options.onSignUp,
     onProviderProfile: options.onProviderProfile,
     onDelete: options.onDelete,
+    onExport: options.onExport,
     onEvent: options.onEvent,
     audit: options.audit ? { maxAge: (options.audit === true ? undefined : options.audit.maxAge) ?? DEFAULT_AUDIT_MAX_AGE, prunedAt: 0 } : undefined,
   }

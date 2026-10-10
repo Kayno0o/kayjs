@@ -98,6 +98,7 @@ export interface Core {
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   onDelete?: ((user: User) => void | Promise<void>) | undefined
+  onExport?: ((user: User) => unknown) | undefined
   onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
   // Kept with the `audit` option: entries live `maxAge` seconds.
   audit?: { maxAge: number, prunedAt: number } | undefined
