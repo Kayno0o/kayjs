@@ -73,10 +73,16 @@ function translatedPaths(config: I18nConfig): Record<string, Record<string, stri
       if (!path.startsWith('/'))
         throw new Error(`kay: i18n.paths translates ${pattern} for ${locale} as ${path}, which does not start with /`)
 
+      if (path.slice(1).split('/').slice(0, -1).includes('') || path.startsWith('//'))
+        throw new Error(`kay: i18n.paths translates ${pattern} for ${locale} as ${path}, which has an empty segment`)
+
       if (paramsOf(path) !== params)
         throw new Error(`kay: i18n.paths translates ${pattern} for ${locale} as ${path}, whose params are not the page's: each translation names the same :params, and a * as the last segment when the page has one`)
 
-      return [locale, path === '/' ? path : path.split('/').map(segment => segment === '*' || segment.startsWith(':') ? segment : pathSegment(segment)).join('/')]
+      // A trailing slash is the router's to add, as `trailingSlash` says.
+      const trimmed = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
+
+      return [locale, trimmed === '/' ? trimmed : trimmed.split('/').map(segment => segment === '*' || segment.startsWith(':') ? segment : pathSegment(segment)).join('/')]
     }))]
   }))
 }
@@ -128,6 +134,23 @@ export function refuseLocaleClashes(settings: LocaleSettings, routes: Pick<Route
       }
     }
   }
+}
+
+// The settings with each page a translated pattern would also take named as itself, so `/blog/new` keeps its path where `/blog/:slug` is translated, as the router serves it.
+export function routedSettings(settings: LocaleSettings, routes: Pick<Route, 'pattern'>[]): LocaleSettings {
+  if (!settings.paths)
+    return settings
+
+  const paths = { ...settings.paths }
+
+  for (const { pattern } of routes) {
+    const taken = settings.locales.filter(locale => paths[pattern] === undefined && translatedPath(settings, pattern, locale) !== pattern)
+
+    if (taken.length > 0)
+      paths[pattern] = Object.fromEntries(taken.map(locale => [locale, pattern]))
+  }
+
+  return { ...settings, paths }
 }
 
 // The pattern a page is served under in a locale, translated when i18n.paths names it.

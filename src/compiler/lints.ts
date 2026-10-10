@@ -73,7 +73,7 @@ export const LINTS = {
   },
   'missing-state': {
     level: 'deny',
-    summary: 'A `role` with no state it needs to be announced: a `checkbox`, `radio` or `switch` with no `aria-checked`, a `slider` or `meter` with no `aria-valuenow`, a `combobox` with no `aria-expanded`. A native `input` announces its own.',
+    summary: 'A `role` with no state it needs to be announced: a `checkbox`, `radio` or `switch` with no `aria-checked`, a `slider` or `meter` with no `aria-valuenow`, a `combobox` with no `aria-expanded`, a `heading` with no `aria-level`. A native `input` announces its own.',
     wrong: 'div(role="switch" tabindex="0" onClick={toggle}) Dark mode',
     right: 'div(role="switch" aria-checked={dark} tabindex="0" onClick={toggle}) Dark mode',
   },
@@ -127,7 +127,7 @@ export const LINTS = {
   },
   'redundant-alt': {
     level: 'warn',
-    summary: 'Alt text saying it is an image, `image`, `picture` or `photo`, or a filename: a screen reader already announces an image as one, and a filename says nothing of what it shows.',
+    summary: 'Alt text saying it is an image, `image of`, `picture of` or `photo of`, or a filename: a screen reader already announces an image as one, and a filename says nothing of what it shows.',
     wrong: 'img(src="/team.jpg" alt="Photo of the team")',
     right: 'img(src="/team.jpg" alt="The team at the 2025 offsite")',
   },

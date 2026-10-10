@@ -1,5 +1,11 @@
+import type { LocaleSettings } from '../runtime/i18n'
 import type { Route } from './routes'
 import { isCollection } from '../content'
+
+// The locales holding a localized collection's entry, which a page listing it is served in, with every other one when the default locale holds it.
+const ENTRY_LOCALES = Symbol('kay.entryLocales')
+
+export type ListedParams = Record<string, string> & { [ENTRY_LOCALES]?: readonly string[] }
 
 // The headers a prerendered page is served with: the cookies its render set were for no one.
 export function storedHeaders(headers: Headers): Record<string, string> {
@@ -18,7 +24,7 @@ export function pageEtag(html: string): string {
 }
 
 // The paths a page export such as `prerender` lists: `true` for a route without params; a list of params, a function returning one, or a content collection, for a route with some.
-export async function listedParams(route: Route, file: string, name: string, value: unknown): Promise<Record<string, string>[]> {
+export async function listedParams(route: Route, file: string, name: string, value: unknown): Promise<ListedParams[]> {
   if (isCollection(value)) {
     if (route.params.length !== 1)
       throw new Error(`kay: ${file} takes ${route.params.length === 0 ? 'no params' : route.params.join(', ')}, so a collection cannot fill them: its entries give one slug each, for a route with one param`)
@@ -31,7 +37,12 @@ export async function listedParams(route: Route, file: string, name: string, val
       throw new Error(`kay: ${file} takes one segment as ${param}, but the entry ${nested.file} has the slug ${nested.slug}; name the page [...${param}].kay for nested entries`)
 
     // A localized collection lists a slug once, each locale's copy of the page following from it.
-    return [...new Set(entries.map(entry => entry.slug))].map(slug => ({ [param]: slug }))
+    const locales = new Map<string, string[]>()
+
+    for (const entry of entries)
+      locales.set(entry.slug, [...locales.get(entry.slug) ?? [], ...entry.locale === undefined ? [] : [entry.locale]])
+
+    return [...locales].map(([slug, held]) => ({ [param]: slug, ...held.length > 0 && { [ENTRY_LOCALES]: held } }))
   }
 
   if (value === true) {
@@ -66,6 +77,13 @@ function isPathPart(route: Route, param: string, value: unknown): boolean {
 }
 
 // The URL path the params fill in, each segment encoded as the server looks pages up; a catch-all keeps its slashes, an optional param left out leaves its segment out.
+// Whether a listed page is served in a locale: always, unless it lists a localized entry neither that locale nor the default one holds.
+export function listedIn(params: ListedParams, locale: string | undefined, settings: LocaleSettings | undefined): boolean {
+  const held = params[ENTRY_LOCALES]
+
+  return held === undefined || locale === undefined || settings === undefined || held.includes(locale) || held.includes(settings.defaultLocale)
+}
+
 export function pathOf(route: Route, params: Record<string, string>): string {
   const path = route.pattern.split('/').flatMap((segment) => {
     if (segment === '*')

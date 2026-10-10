@@ -29,7 +29,7 @@ import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuards } from './guards'
-import { cookieLocale, hostLocale, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
+import { cookieLocale, hostLocale, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, routedSettings, stateFor } from './i18n'
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
@@ -171,8 +171,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const routes = await Promise.all(scanned.map(loadGuards))
   const i18n = options.i18n ? await loadI18n(root, options.i18n) : undefined
 
-  if (i18n)
+  if (i18n) {
     refuseLocaleClashes(i18n.settings, routes)
+    i18n.settings = routedSettings(i18n.settings, routes)
+  }
 
   const base = basePath(options.base)
   const maxDensity = applyImageConfig(options.images)

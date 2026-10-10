@@ -16,7 +16,7 @@ const FOCUSABLE = new Set(['button', 'select', 'textarea', 'summary', 'iframe'])
 // What HTML forbids inside a link or a button, besides a link and an input that is not hidden.
 const INTERACTIVE = new Set(['button', 'select', 'textarea', 'details', 'iframe', 'embed'])
 // Words a screen reader already says of an image, which its alt text then repeats.
-const REDUNDANT_ALT = /\b(?:image|picture|photo)\b/i
+const REDUNDANT_ALT = /\b(?:image|picture|photo)\s+of\b/i
 const FILENAME_ALT = /^[\w-]+\.(?:png|jpe?g|gif|webp|avif|svg)$/i
 const WHITESPACE = /\s+/
 
@@ -189,7 +189,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     }
 
     // A native input announces its own state, as `input(type="checkbox" role="switch")` does whether it is checked.
-    const missing = element.name === 'input' || applied === undefined ? [] : (REQUIRED_STATES.get(applied) ?? []).filter(state => !has(element, state))
+    const missing = element.name === 'input' || HEADING.test(element.name) || applied === undefined ? [] : (REQUIRED_STATES.get(applied) ?? []).filter(state => !has(element, state))
 
     if (missing.length > 0)
       lint(role.value, 'missing-state', `A \`${applied}\` needs ${missing.map(state => `\`${state}\``).join(' and ')}`, { note: `a screen reader cannot say what state a \`${applied}\` is in without it`, help: `add \`${missing[0]}={...}\`, kept current, or use the native element` })
@@ -270,7 +270,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     const autocomplete = staticValue(element, 'autocomplete')
 
     if (autocomplete !== undefined && (element.name === 'form' ? !['on', 'off'].includes(autocomplete.trim().toLowerCase()) : LABELLED.has(element.name) && !validAutocomplete(autocomplete)))
-      lint(attribute(element, 'autocomplete')!.name, 'invalid-autocomplete', `\`${autocomplete}\` is no \`autocomplete\` value`, { note: 'browsers and password managers fill a field from its `autocomplete`, and ignore one they do not know', help: element.name === 'form' ? 'a form takes `on` or `off`' : 'use one of HTML\'s autofill names, such as `email`, `given-name`, `current-password` or `postal-code`' })
+      lint(attribute(element, 'autocomplete')!.name, 'invalid-autocomplete', autocomplete.trim() === '' ? 'An empty `autocomplete` names no value' : `\`${autocomplete}\` is no \`autocomplete\` value`, { note: 'browsers and password managers fill a field from its `autocomplete`, and ignore one they do not know', help: element.name === 'form' ? 'a form takes `on` or `off`' : 'use one of HTML\'s autofill names, such as `email`, `given-name`, `current-password` or `postal-code`' })
   }
 
   const inside = (element: ElementNode, context: Context): Context => ({

@@ -63,10 +63,10 @@ const listFormats = new Map<string, Intl.ListFormat>()
 const directions = new Map<string, Direction>()
 // Scripts written right to left: Arabic, Hebrew, Thaana, Syriac, N'Ko, Adlam, Hanifi Rohingya, Mandaic and Samaritan.
 const RTL_SCRIPTS: ReadonlySet<string> = new Set(['Arab', 'Hebr', 'Thaa', 'Syrc', 'Nkoo', 'Adlm', 'Rohg', 'Mand', 'Samr'])
-// Each unit with its length in seconds, a relative time taking the largest one the span reaches.
 // Where a link's path ends and its query or fragment starts.
 const PATH_END = /[?#]/
 const OPTIONAL_MARK = /\?$/
+// Each unit with its length in seconds, a relative time taking the largest one the span reaches.
 const RELATIVE_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [['year', 31_536_000], ['month', 2_592_000], ['week', 604_800], ['day', 86_400], ['hour', 3600], ['minute', 60], ['second', 1]]
 
 export type Direction = 'ltr' | 'rtl'
@@ -166,7 +166,8 @@ export function formatRelativeTime(locale: string, value: Date | number, unitOrO
   const seconds = (Number(value) - Number(now ?? Date.now())) / 1000
   const [unit, length] = RELATIVE_UNITS.find(([, length]) => Math.abs(seconds) >= length) ?? ['second', 1]
 
-  return formatter.format(Math.round(seconds / length), unit)
+  // Rounded alike either side of now, so a day and a half reads `2 days ago` as it reads `in 2 days`.
+  return formatter.format(Math.sign(seconds) * Math.round(Math.abs(seconds) / length), unit)
 }
 
 // Items joined as the locale writes a list, `a, b and c`.

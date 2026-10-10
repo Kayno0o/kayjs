@@ -15,11 +15,11 @@ import { scanApi } from './api'
 import { basePath } from './base'
 import { setupCards } from './card'
 import { PRERENDERED_DIR, readInlineStyles, readManifest, writeManifest } from './client'
-import { loadI18n, localeCopies, stateFor } from './i18n'
+import { loadI18n, localeCopies, routedSettings, stateFor } from './i18n'
 import { applyImageConfig } from './image'
 import { registerLoader } from './loader'
 import { loadMatchers, matchedParams } from './params'
-import { listedParams, pageEtag, pathOf, storedHeaders } from './prerendered'
+import { listedIn, listedParams, pageEtag, pathOf, storedHeaders } from './prerendered'
 import { renderPage } from './render'
 import { refuseClashes, scanRoutes } from './routes'
 import { configHead, siteOrigin } from './seo'
@@ -73,6 +73,9 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   const matchers = await loadMatchers(routesDir, routes)
   const i18n = config.i18n ? await loadI18n(root, config.i18n) : undefined
 
+  if (i18n)
+    i18n.settings = routedSettings(i18n.settings, routes)
+
   async function prerenderRoute(route: Route, file: string, marked: boolean): Promise<void> {
     const module = await import(route.file) as Record<string, unknown>
     const revalidate = revalidatePeriod(file, module.revalidate)
@@ -94,7 +97,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         throw new Error(`kay: ${file} lists ${JSON.stringify(params)} in prerender, which its matchers refuse, so no request would reach it`)
 
       // One page per locale, each rendered in it.
-      for (const copy of localeCopies(i18n?.settings, path)) {
+      for (const copy of localeCopies(i18n?.settings, path).filter(copy => listedIn(params, copy.locale, i18n?.settings))) {
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()

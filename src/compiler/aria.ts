@@ -197,6 +197,7 @@ export const ABSTRACT_ROLES: ReadonlySet<string> = new Set(['command', 'composit
 export const REQUIRED_STATES: ReadonlyMap<string, string[]> = new Map([
   ['checkbox', ['aria-checked']],
   ['combobox', ['aria-expanded']],
+  ['heading', ['aria-level']],
   ['menuitemcheckbox', ['aria-checked']],
   ['menuitemradio', ['aria-checked']],
   ['meter', ['aria-valuenow']],

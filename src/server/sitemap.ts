@@ -8,7 +8,7 @@ import process from 'node:process'
 import { escape } from '../runtime/escape'
 import { importModule } from './bundle'
 import { hostLocale, localeCopies } from './i18n'
-import { listedParams, pathOf } from './prerendered'
+import { listedIn, listedParams, pathOf } from './prerendered'
 import { reportServerError } from './report'
 import { servedPaths, slashedPath } from './routes'
 
@@ -87,7 +87,7 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
 
   const absolute = (copy: LocaleCopy) => escape(`${copy.host === undefined ? origin : `https://${copy.host}`}${slashedPath(copy.path, trailingSlash)}`)
   const urls = routes.flatMap((route, index) => lists[index]!.flatMap((params) => {
-    const copies = localeCopies(settings, pathOf(route, params))
+    const copies = localeCopies(settings, pathOf(route, params)).filter(copy => listedIn(params, copy.locale, settings))
     const fallback = copies.find(copy => copy.locale === settings?.defaultLocale)
     const alternates = settings && fallback ? [...copies.map(copy => `<xhtml:link rel="alternate" hreflang="${copy.locale}" href="${absolute(copy)}"/>`), `<xhtml:link rel="alternate" hreflang="x-default" href="${absolute(fallback)}"/>`].join('') : ''
 

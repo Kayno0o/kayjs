@@ -231,6 +231,17 @@ describe('translated paths', () => {
     expect(() => localeSettings({ ...i18n, paths: { '/about': { de: '/uber' } } })).toThrow('de, which is not one of its locales')
     await expect(pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, paths: { '/contact': { en: '/reach-us' } } } })).rejects.toThrow('translates /contact, which no page serves')
     await expect(pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, paths: { '/about': { en: '/' } } } })).rejects.toThrow('are both served at / in en')
+    expect(() => localeSettings({ ...i18n, paths: { '/about': { en: '/about//us' } } })).toThrow('has an empty segment')
+    expect(localeSettings({ ...i18n, paths: { '/about': { en: '/about-us/' } } }).paths).toEqual({ '/about': { en: '/about-us' } })
+  })
+
+  it('keep the path of a page a translated pattern would also take', async () => {
+    const served = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: SITE, i18n: { ...i18n, paths: { '/blog/:slug': { en: '/articles/:slug' } } } }))
+    const sitemap = (await get('/sitemap.xml', served)).html
+
+    expect((await get('/en/blog/new', served)).html).toContain('<h1 class="new">New post</h1>')
+    expect(sitemap).toContain('<loc>https://x.example/en/blog/new</loc>')
+    expect(sitemap).not.toContain('/en/articles/new')
   })
 })
 
@@ -251,7 +262,7 @@ describe('localized content', () => {
     expect(fallback).toContain('<h1 class="entry">Lancement</h1>')
     expect(fallback).toContain('<p class="written">fr</p>')
     expect((await get('/news/hello', served)).html).toContain('<h1 class="entry">Bonjour</h1>')
-    expect((await get('/en/news', served)).html).toContain('<ul class="news"><li>Hello (en)</li><li>Lancement (fr)</li></ul>')
+    expect((await get('/en/news', served)).html).toContain('<ul class="news"><li>English only (en)</li><li>Hello (en)</li><li>Lancement (fr)</li></ul>')
   })
 
   it('serve a feed per locale of the entries written in it, and list every locale\'s copy in the sitemap', async () => {
@@ -267,6 +278,10 @@ describe('localized content', () => {
     expect(french).toContain('<title>Bonjour</title>')
     expect(sitemap).toContain('<loc>https://x.example/en/news/launch</loc>')
     expect(sitemap).toContain('<loc>https://x.example/news/hello</loc>')
+    // An entry the default locale lacks is served only where it is written.
+    expect(sitemap).toContain('<loc>https://x.example/en/news/english-only</loc>')
+    expect(sitemap).not.toContain('<loc>https://x.example/news/english-only</loc>')
+    expect((await get('/news/english-only', served)).status).toBe(404)
 
     const domains = new Elysia().use(await pages({ ...config, i18n: { ...config.i18n, domains: { fr: 'x.fr', en: 'x.com' } } }))
     const onHost = (await get('http://x.com/news/rss.xml', domains)).html
@@ -279,8 +294,8 @@ describe('localized content', () => {
   it('lists every locale\'s entries outside a request, and refuses an entry outside a locale folder', async () => {
     const { news } = await import('./fixtures/i18n-content/src/content.config')
 
-    expect((await news.all()).map(entry => `${entry.locale}/${entry.slug}`)).toEqual(['en/hello', 'fr/hello', 'fr/launch'])
-    expect((await news.all('en')).map(entry => entry.slug)).toEqual(['hello'])
+    expect((await news.all()).map(entry => `${entry.locale}/${entry.slug}`)).toEqual(['en/english-only', 'en/hello', 'fr/hello', 'fr/launch'])
+    expect((await news.all('en')).map(entry => entry.slug)).toEqual(['english-only', 'hello'])
     expect((await news.get('hello', 'fr'))?.data.title).toBe('Bonjour')
 
     const loose = collection({ name: 'loose', load: () => [{ slug: 'hello', data: {} }] }, { schema: t.Object({}), localized: true })

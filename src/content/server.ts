@@ -137,7 +137,8 @@ export function feedPaths(collection: Collection<unknown>, settings: LocaleSetti
   if (localized !== true || !settings || settings.hosts)
     return [{ path: feed.path, locale: undefined }]
 
-  return settings.locales.map(locale => ({ path: localePath(settings, feed.path, locale), locale }))
+  // A feed is no page, so no translated path names it.
+  return settings.locales.map(locale => ({ path: localePath({ ...settings, paths: undefined }, feed.path, locale), locale }))
 }
 
 // Serves each collection's feed at its path; one stays cached for an hour in production.

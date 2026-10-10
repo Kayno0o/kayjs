@@ -165,7 +165,7 @@ describe('a11y lints', () => {
   })
 
   it('reports a role missing a state it needs, unless a native input announces its own', () => {
-    expect(a11y('div(role="checkbox") a\ndiv(role="checkbox" aria-checked={checked}) b\ninput(type="checkbox" role="switch" aria-label="Dark")\ndiv(role="scrollbar" aria-valuenow="3") c\n')).toEqual(['missing-state checkbox', 'missing-state scrollbar'])
+    expect(a11y('div(role="checkbox") a\ndiv(role="checkbox" aria-checked={checked}) b\ninput(type="checkbox" role="switch" aria-label="Dark")\ndiv(role="scrollbar" aria-valuenow="3") c\ndiv(role="heading") d\nh2(role="heading") e\n')).toEqual(['missing-state checkbox', 'missing-state scrollbar', 'missing-state heading'])
   })
 
   it('reports what takes the keyboard under aria-hidden, but not once out of the tab order, disabled, or under `hidden` or `inert`', () => {
@@ -199,7 +199,7 @@ describe('a11y lints', () => {
   })
 
   it('reports alt text naming the image as one, or a filename, as whole words only', () => {
-    expect(a11y('img(src="/a.jpg" alt="Photo of the team")\nimg(src="/b.jpg" alt="team.jpg")\nimg(src="/c.jpg" alt="Photography studio front")\nimg(src="/d.jpg" alt="")\n')).toEqual(['redundant-alt alt', 'redundant-alt alt'])
+    expect(a11y('img(src="/a.jpg" alt="Photo of the team")\nimg(src="/b.jpg" alt="team.jpg")\nimg(src="/c.jpg" alt="Photography studio front")\nimg(src="/d.jpg" alt="")\nimg(src="/e.jpg" alt="Picture frame shop")\n')).toEqual(['redundant-alt alt', 'redundant-alt alt'])
   })
 
   it('reports an autocomplete value HTML does not define, taking sections, address and contact kinds and webauthn', () => {
