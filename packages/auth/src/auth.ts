@@ -3,6 +3,7 @@ import type { Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
 import type { BearerToken } from './bearer'
+import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
 import type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
 import type { Limits } from './limits'
@@ -19,6 +20,8 @@ import { Elysia } from 'elysia'
 import { clientAddress, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { bearerUser, createToken, listTokens, revokeToken, tokenUser } from './bearer'
+import { pwnedPassword } from './breached'
+import { captchaRequired } from './captcha'
 import { publicUser } from './core'
 import { changeEmail, confirmEmailChange, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithMagicLink, verifyEmail } from './email'
 import { createGate } from './gate'
@@ -80,6 +83,10 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   defaultRoles?: NoInfer<Role>[] | undefined
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
   limits?: Partial<Limits> | undefined
+  // A CAPTCHA asked of registering, password sign-in, password resets and magic links: `{ verify: turnstile(secret) }`.
+  captcha?: CaptchaOptions | undefined
+  // Refuses a new password Have I Been Pwned lists, with `true`, or that a check of the app's own finds.
+  breachedPasswords?: boolean | ((password: string) => boolean | Promise<boolean>) | undefined
   // The proxies in front, read as kay.config.ts's `proxy` is, for a plain Elysia app that kay's `pages()` does not serve; a kay app sets it in kay.config.ts instead.
   proxy?: KayConfig['proxy'] | undefined
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
@@ -185,8 +192,8 @@ export class Auth {
   }
 
   // Mails a reset link to that address when an account has it; answers alike when none does.
-  async requestPasswordReset(email: string): Promise<MailRequestResult> {
-    return requestPasswordReset(this[STATE], email)
+  async requestPasswordReset(email: string, options: { captcha?: string | undefined } = {}): Promise<MailRequestResult> {
+    return requestPasswordReset(this[STATE], email, options.captcha)
   }
 
   // Spends a reset link's token on a new password, signing the user out everywhere else and in here.
@@ -195,8 +202,8 @@ export class Auth {
   }
 
   // Mails a sign-in link to that address when an account has it; answers alike when none does.
-  async requestMagicLink(email: string, redirect?: string): Promise<MailRequestResult> {
-    return requestMagicLink(this[STATE], email, redirect)
+  async requestMagicLink(email: string, redirect?: string, options: { captcha?: string | undefined } = {}): Promise<MailRequestResult> {
+    return requestMagicLink(this[STATE], email, redirect, options.captcha)
   }
 
   // Spends a magic link's token, signing its user in.
@@ -224,6 +231,11 @@ export class Auth {
     const record = await this.record()
 
     return record ? (await this.core.store.identities.listByUser(record.id)).map(identity => identity.provider) : []
+  }
+
+  // Whether this client's next `action` needs a CAPTCHA token, for the page to show the widget.
+  async captchaRequired(action: CaptchaAction): Promise<boolean> {
+    return captchaRequired(this[STATE], action)
   }
 
   // Whether this session holds a sign-in waiting for its second factor, for the page that asks for it.
@@ -270,7 +282,7 @@ export class Auth {
   }
 
   // Sets the signed-in user's password, or a first one, and ends their other sessions.
-  async changePassword(proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem } }> {
+  async changePassword(proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }> {
     return changePassword(this[STATE], proof, password)
   }
 
@@ -466,6 +478,8 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     twoFactorPage: options.twoFactorPage ?? '/two-factor',
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: { ...DEFAULT_LIMITS, ...options.limits },
+    captcha: options.captcha,
+    breached: options.breachedPasswords === true ? pwnedPassword : options.breachedPasswords || undefined,
     email: options.email && { ...options.email, requireVerified: options.email.requireVerified ?? false, templates: { ...defaultTemplates, ...options.email.templates } },
     oauth,
     refreshers: new Map(),

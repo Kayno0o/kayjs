@@ -1,3 +1,4 @@
+import type { CaptchaOptions } from './captcha'
 import type { EmailCore } from './email'
 import type { Keys } from './keys'
 import type { Limits } from './limits'
@@ -62,6 +63,9 @@ export interface Core {
   // The site's name, as mails and authenticators show it.
   site: string
   limits: Limits
+  captcha?: CaptchaOptions | undefined
+  // Whether a new password is known from a breach.
+  breached?: ((password: string) => boolean | Promise<boolean>) | undefined
   email?: EmailCore | undefined
   oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<any, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>

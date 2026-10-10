@@ -5,11 +5,13 @@ import type { RequestState } from './state'
 import type { TokenType, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { comparePasswords, hashPassword } from '@kaynooo/utils'
+import { newPasswordProblem } from './breached'
+import { admit } from './captcha'
 import { digest, randomToken } from './keys'
 import { spend } from './limits'
 import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
-import { emailProblem, normalizeEmail, passwordProblem } from './rules'
+import { emailProblem, normalizeEmail } from './rules'
 import { reprove } from './twoFactor'
 
 const MINUTE_MS = 60 * 1000
@@ -35,13 +37,13 @@ export interface EmailOptions {
 export type EmailCore = Required<Omit<EmailOptions, 'templates' | 'requireVerified'>> & { requireVerified: boolean, templates: Templates }
 
 // Sent whether or not an account has that address, so the answer tells nothing of which ones exist.
-export type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'unavailable' }
+export type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'captcha' | 'unavailable' }
 
 export type LinkResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' }
 
 export type VerifyEmailResult = LinkResult | { ok: false, error: 'confirm' }
 
-export type ResetPasswordResult = LinkResult | { ok: false, errors: { password: PasswordProblem } }
+export type ResetPasswordResult = LinkResult | { ok: false, errors: { password: PasswordProblem | 'breached' } }
 
 export type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
 
@@ -97,13 +99,13 @@ async function holdsPassword(state: RequestState, record: UserRecord, password: 
   return await comparePasswords(password, record.passwordHash) ? true : 'confirm'
 }
 
-export async function requestPasswordReset(state: RequestState, email: string): Promise<MailRequestResult> {
-  return mailByAddress(state, email, 'reset-password', null, 'forgot')
+export async function requestPasswordReset(state: RequestState, email: string, captcha?: string): Promise<MailRequestResult> {
+  return mailByAddress(state, email, 'reset-password', null, captcha)
 }
 
 // Sets the password the link was sent for and ends every other session the user held.
 export async function resetPassword(state: RequestState, token: string, password: string): Promise<ResetPasswordResult> {
-  const problem = passwordProblem(password)
+  const problem = await newPasswordProblem(state.core, password)
 
   // Checked before the token is spent, so a refused password leaves the link usable.
   if (problem)
@@ -131,8 +133,8 @@ export async function resetPassword(state: RequestState, token: string, password
   return { ok: true, redirect: await state.complete(record, '/') }
 }
 
-export async function requestMagicLink(state: RequestState, email: string, redirect?: string): Promise<MailRequestResult> {
-  return mailByAddress(state, email, 'magic-link', safeRedirect(redirect), 'magicLink')
+export async function requestMagicLink(state: RequestState, email: string, redirect?: string, captcha?: string): Promise<MailRequestResult> {
+  return mailByAddress(state, email, 'magic-link', safeRedirect(redirect), captcha)
 }
 
 export async function signInWithMagicLink(state: RequestState, token: string): Promise<LinkResult> {
@@ -203,15 +205,20 @@ export async function welcome(state: RequestState, record: UserRecord): Promise<
 }
 
 // Counted by address whether or not an account has it, and mailed off the response's path, so neither the answer nor its time tells which addresses exist.
-async function mailByAddress(state: RequestState, email: string, type: TokenType, redirect: string | null, limit: 'forgot' | 'magicLink'): Promise<MailRequestResult> {
+async function mailByAddress(state: RequestState, email: string, type: 'reset-password' | 'magic-link', redirect: string | null, captcha: string | undefined): Promise<MailRequestResult> {
   const { core } = state
 
   if (!core.email)
     return { ok: false, error: 'unavailable' }
 
   const address = normalizeEmail(email)
+  const limit = type === 'magic-link' ? 'magicLink' : 'forgot'
+  const refused = await admit(state, type === 'magic-link' ? 'magic-link' : 'reset', captcha)
 
-  if (await spend(core.store, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.store, `${limit}:${address}`, core.limits[`${limit}Account`]))
+  if (refused)
+    return { ok: false, error: refused }
+
+  if (await spend(core.store, `${limit}:${address}`, core.limits[`${limit}Account`]))
     return { ok: false, error: 'limited' }
 
   const record = emailProblem(address) ? undefined : await core.store.users.findByEmail(address)
@@ -233,7 +240,7 @@ async function issueQuietly(core: Core, record: UserRecord, type: TokenType, ema
 }
 
 // Counted per client and per account, so neither one sender nor many can flood an inbox.
-async function mailFor(state: RequestState, record: UserRecord, type: TokenType, email: string, redirect: string | null, limit: 'resend' | 'emailChange'): Promise<MailRequestResult> {
+async function mailFor(state: RequestState, record: UserRecord, type: TokenType, email: string, redirect: string | null, limit: 'resend' | 'emailChange'): Promise<{ ok: true } | { ok: false, error: 'limited' | 'unavailable' }> {
   const { core } = state
 
   if (!core.email)

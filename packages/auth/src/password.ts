@@ -3,28 +3,33 @@ import type { EmailProblem, PasswordProblem, UsernameProblem } from './rules'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, hashPassword, passwordNeedsRehash } from '@kaynooo/utils'
+import { newPasswordProblem } from './breached'
+import { admit } from './captcha'
 import { newUserRecord, publicUser } from './core'
 import { welcome } from './email'
 import { randomToken } from './keys'
 import { spend } from './limits'
 import { safeRedirect } from './oauth/redirect'
-import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, passwordProblem, usernameProblem } from './rules'
+import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, usernameProblem } from './rules'
 
 export interface RegisterInput {
   email: string
   password: string
   username?: string
+  // The CAPTCHA widget's token, when the app asks for one.
+  captcha?: string | undefined
 }
 
 // Why a field was refused, by field, as codes a form turns into messages in its own words and language.
 export interface RegisterErrors {
   email?: EmailProblem | 'taken' | undefined
-  password?: PasswordProblem | undefined
+  // `breached` when the app checks for passwords known from a breach.
+  password?: PasswordProblem | 'breached' | undefined
   username?: UsernameProblem | 'taken' | undefined
 }
 
 // `signedIn` is false when the app wants the address verified first.
-export type RegisterResult = { ok: true, user: User, signedIn: boolean } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' }
+export type RegisterResult = { ok: true, user: User, signedIn: boolean } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' }
 
 export interface PasswordSignInInput {
   // An email, or a username when it holds no `@`.
@@ -32,26 +37,28 @@ export interface PasswordSignInInput {
   password: string
   // Where to go once signed in, a path on the site; `/` by default.
   redirect?: string
+  captcha?: string | undefined
 }
 
 // `invalid` whether no account matches or the password is wrong, so the answer tells nothing of which accounts exist.
 // `unverified` once the password is right, when the app wants the address verified first.
-export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'unverified' }
+export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'captcha' | 'unverified' }
 
 let decoy: Promise<string> | undefined
 
 // A new user with a password, signed in on this session.
 export async function register(state: RequestState, input: RegisterInput): Promise<RegisterResult> {
-  const { store, limits } = state.core
+  const { store } = state.core
+  const refused = await admit(state, 'register', input.captcha)
 
-  if (await spend(store, `register:${state.client}`, limits.register))
-    return { ok: false, error: 'limited' }
+  if (refused)
+    return { ok: false, error: refused }
 
   const email = normalizeEmail(input.email)
   const username = input.username === undefined ? null : normalizeUsername(input.username)
   const errors: RegisterErrors = {
     email: emailProblem(email),
-    password: passwordProblem(input.password),
+    password: await newPasswordProblem(state.core, input.password),
     username: username === null ? undefined : usernameProblem(username),
   }
 
@@ -109,8 +116,10 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   const byEmail = input.identifier.includes('@')
   const identifier = byEmail ? normalizeEmail(input.identifier) : normalizeUsername(input.identifier)
 
-  if (await spend(store, `sign-in-client:${state.client}`, limits.signIn))
-    return { ok: false, error: 'limited' }
+  const refused = await admit(state, 'sign-in', input.captcha)
+
+  if (refused)
+    return { ok: false, error: refused }
 
   // No password this long was ever accepted, and hashing it would cost the server for nothing.
   const record = input.password.length > PASSWORD_MAX_LENGTH

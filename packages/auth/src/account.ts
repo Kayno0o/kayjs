@@ -4,15 +4,16 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword } from '@kaynooo/utils'
+import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
 import { revokeBearerTokens } from './email'
 import { notify } from './notify'
-import { normalizeUsername, passwordProblem, usernameProblem } from './rules'
+import { normalizeUsername, usernameProblem } from './rules'
 import { reprove } from './twoFactor'
 
 // Sets the signed-in user's password, or a first one, and ends their other sessions.
-export async function changePassword(state: RequestState, proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem } }> {
-  const problem = passwordProblem(password)
+export async function changePassword(state: RequestState, proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }> {
+  const problem = await newPasswordProblem(state.core, password)
 
   if (problem)
     return { ok: false, errors: { password: problem } }
