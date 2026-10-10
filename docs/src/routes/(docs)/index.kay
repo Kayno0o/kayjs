@@ -73,6 +73,7 @@ import Accessible from '~icons/tabler/accessible'
 import Api from '~icons/tabler/api'
 import Bolt from '~icons/tabler/bolt'
 import Files from '~icons/tabler/files'
+import HandClick from '~icons/tabler/hand-click'
 import Icons from '~icons/tabler/icons'
 import Language from '~icons/tabler/language'
 import Photo from '~icons/tabler/photo'
@@ -142,6 +143,10 @@ head
           @icon
             Bolt
           | Cache a load or a whole page, and stream the slow parts of a page as they resolve.
+        ModuleCard(title="Dev inspector" use="kay dev" href="/reference/cli#inspector")
+          @icon
+            HandClick
+          | Alt+click any element to open the .kay line that wrote it, and watch each island's signals as they change.
         ModuleCard(title="Testing" use="kay/test" href="/guides/testing")
           @icon
             TestPipe
