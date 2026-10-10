@@ -66,6 +66,22 @@ describe('the development outbox page', () => {
     expect((await site.visit('/_kay/mail')).html).toContain('Through the app')
   })
 
+  it('lists the outbox as JSON, oldest first, each mail whole, for a browser test in another process', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+
+    await mail.send({ to: 'ada@example.com', subject: 'First', html: '<p>Hi</p>', headers: { 'X-Kind': 'welcome' }, attachments: [{ filename: 'a.bin', content: new Uint8Array([1, 2, 3]) }] })
+    await mail.send({ to: 'bob@example.com', subject: 'Second', text: 'Only text' })
+
+    const all = await (await get(mail, '/_kay/mail.json')).json() as { subject: string }[]
+    const response = await get(mail, '/_kay/mail.json?to=Ada@Example.com')
+    const [ada] = await response.json() as Record<string, unknown>[]
+
+    expect(all.map(each => each.subject)).toEqual(['First', 'Second'])
+    expect(response.headers.get('content-type')).toStartWith('application/json')
+    expect(ada).toMatchObject({ subject: 'First', text: 'Hi', headers: { 'X-Kind': 'welcome' }, attachments: [{ filename: 'a.bin', content: 'AQID', encoding: 'base64' }] })
+    expect(ada!.html).toContain('<p>Hi</p>')
+  })
+
   it('answers 404 for a mail no longer kept', async () => {
     const mail = mailer({ from: 'dev@example.com' })
 
@@ -78,6 +94,7 @@ describe('the development outbox page', () => {
 
     try {
       expect((await get(mailer({ from: 'dev@example.com' }), '/_kay/mail')).status).toBe(404)
+      expect((await get(mailer({ from: 'dev@example.com' }), '/_kay/mail.json')).status).toBe(404)
     }
     finally {
       process.env.NODE_ENV = 'development'

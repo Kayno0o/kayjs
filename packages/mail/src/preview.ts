@@ -1,5 +1,5 @@
 import type { SentMail } from './outbox'
-import type { Address } from './types'
+import type { Address, Attachment } from './types'
 import { Elysia } from 'elysia'
 import { escapeHtml as escape } from './escape'
 import { outbox } from './outbox'
@@ -64,11 +64,24 @@ function mailPage(mail: SentMail): Response {
   return page(mail.subject, `<p><a href="${PREVIEW_PATH}">Outbox</a></p><h1>${escape(mail.subject)}</h1><table><tbody>${headers.map(([name, value]) => `<tr><th>${name}</th><td>${value}</td></tr>`).join('')}</tbody></table>${html}<h2>Text</h2><pre>${escape(mail.text)}</pre>`)
 }
 
+// An attachment's bytes as base64, which JSON can carry.
+function jsonAttachment({ content, ...rest }: Attachment): object {
+  return typeof content === 'string' ? { ...rest, content } : { ...rest, content: Buffer.from(content).toString('base64'), encoding: 'base64' }
+}
+
+// The outbox for a browser test driving the development server from another process, oldest first as `outbox.mails`, `?to=` keeping the mails to one address.
+function jsonList(to: string | undefined): Response {
+  const mails = to === undefined ? outbox.mails : outbox.to(to)
+
+  return Response.json(mails.map(mail => ({ ...mail, attachments: mail.attachments.map(jsonAttachment) })), { headers: { 'cache-control': 'no-store' } })
+}
+
 const missing = (): Response => page('Not in the outbox', `<p><a href="${PREVIEW_PATH}">Outbox</a></p><p class="empty">This mail is no longer in the outbox: it keeps the last 500, and empties when the server restarts.</p>`, 404)
 
 // The development server's view of the outbox: every mail sent since it started, newest first, each with its headers, html and text.
 export const preview = new Elysia({ name: 'kayjs-mail-preview' })
   .get(PREVIEW_PATH, listPage)
+  .get(`${PREVIEW_PATH}.json`, ({ query }) => jsonList(query.to))
   .get(`${PREVIEW_PATH}/:id`, ({ params }) => {
     const mail = outbox.find(params.id)
 
