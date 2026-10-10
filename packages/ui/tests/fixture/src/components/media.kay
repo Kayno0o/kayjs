@@ -11,7 +11,7 @@ const { onIndexChange, onCrop, onMore } = props<{ onIndexChange: (index: number)
 
 const items: MediaItem[] = [
   { key: 1, kind: 'image', thumb: '/a-thumb.png', preview: '/a.png', full: '/a-full.png', title: 'Mars' },
-  { key: 2, kind: 'video', thumb: '/b-thumb.png', preview: '/b.png', src: '/b.mp4' },
+  { key: 2, kind: 'video', thumb: '/b-thumb.png', preview: '/b.png', src: '/b.mp4', captions: '/b.vtt' },
   { key: 3, kind: 'image', thumb: '/c-thumb.png', preview: '/c.png' },
 ]
 ---

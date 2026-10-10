@@ -9,6 +9,8 @@ export interface MediaItem {
   full?: string
   // A video's source; an `.m3u8` playlist needs the `hls.js` peer in browsers without native HLS.
   src?: string
+  // A video's WebVTT captions, which a deaf visitor reads what is said by.
+  captions?: string
   title?: string
 }
 

@@ -157,6 +157,8 @@ else
       for item of [current()!] key={item.key}
         if isPlayable(item)
           video.kui-media-gallery-frame(ref={element => play(element, item.src)} controls preload="none" poster={item.preview})
+            if item.captions
+              track(kind="captions" src={item.captions} default)
         else
           button.kui-media-gallery-zoom(type="button" aria-label={item.title ? `${openLabel}: ${item.title}` : openLabel} onClick={() => zoomed.set(true)})
             img.kui-media-gallery-frame(src={item.preview} alt={item.title ?? ''})
@@ -178,6 +180,8 @@ else
         for item of [current()!] key={item.key}
           if isPlayable(item)
             video.kui-media-gallery-full(ref={element => play(element, item.src)} controls preload="none" poster={item.preview})
+              if item.captions
+                track(kind="captions" src={item.captions} default)
           else
             img.kui-media-gallery-full(src={item.full ?? item.preview} alt={item.title ?? ''})
         if items.length > 1

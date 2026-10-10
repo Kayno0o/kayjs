@@ -367,7 +367,7 @@ ul
 ### MediaGallery, Carousel, Masonry, WhenVisible, ZoomPane, ImageCropper
 
 - `MediaGallery(items={media})`: a stage, a strip of thumbnails and a lightbox.
-  - An item, typed `MediaItem`, has a `key`, a `kind` (`image` or `video`), a `thumb` for the strip, a `preview` for the stage or a video's poster, a `full` the lightbox opens an image at, a video's `src` and a `title`.
+  - An item, typed `MediaItem`, has a `key`, a `kind` (`image` or `video`), a `thumb` for the strip, a `preview` for the stage or a video's poster, a `full` the lightbox opens an image at, a video's `src`, its WebVTT `captions` and a `title`.
   - The arrows, Home and End turn it while focus is inside it, wrapping, and so do its buttons and a swipe. `index` is the item to start on, and `onIndexChange(index)` reports each turn. The strip keeps the shown thumbnail centred, and the images either side start loading.
   - A video plays in place with `preload="none"`. An `.m3u8` playlist plays through `hls.js` in browsers without native HLS, fetched only once such a video shows: an optional peer, `bun add hls.js`. An app without it still builds, and a playlist it cannot play logs that hls.js is missing.
   - An image opens full size in a lightbox, which turns the same way. `ratio` is the stage's `aspect-ratio`, `16 / 9` by default; `empty` is what it reads with no items.

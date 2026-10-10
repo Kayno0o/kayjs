@@ -81,6 +81,7 @@ describe('MediaGallery', () => {
 
     expect(counter()).toBe('2 / 3')
     expect(gallery.querySelector<HTMLVideoElement>('.kui-media-gallery-stage video')?.src).toEndWith('/b.mp4')
+    expect(gallery.querySelector<HTMLTrackElement>('.kui-media-gallery-stage video track[kind="captions"]')?.getAttribute('src')).toBe('/b.vtt')
 
     press(gallery.querySelector('.kui-media-gallery-thumb')!, 'ArrowLeft')
     press(gallery.querySelector('.kui-media-gallery-thumb')!, 'ArrowLeft')
