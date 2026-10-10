@@ -8,7 +8,7 @@ const store = new AsyncLocalStorage<ServerScope>()
 
 setServerScope(() => store.getStore())
 
-// Renders for `request`: a module's signals keep what this render writes to itself, persisted signals read its cookies, and a `try` block reports what it caught.
+// Renders for `request`: a module's signals keep what this render writes to itself, persisted signals read its cookies and query, and a `try` block reports what it caught.
 // `cookieRead` runs once a persisted signal read a cookie, the page then depending on it.
 export function inServerScope<T>(request: Request, report: (error: unknown) => void, run: () => T, cookieRead?: () => void): T {
   let cookies: Bun.CookieMap | undefined
@@ -22,7 +22,9 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
     return cookies.get(name) ?? undefined
   }
 
-  return store.run({ values: new WeakMap(), cookie, report, path: new URL(request.url).pathname }, run)
+  const url = new URL(request.url)
+
+  return store.run({ values: new WeakMap(), cookie, query: name => url.searchParams.get(name) ?? undefined, report, path: url.pathname }, run)
 }
 
 const outcomes = new AsyncLocalStorage<() => Outcome | null>()

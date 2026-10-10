@@ -1,0 +1,12 @@
+--- server
+import Search from '../components/search.kay'
+
+const sorted = ctx.url.searchParams.get('sort') ?? 'none'
+---
+head
+  title Query
+h1 Query
+div(style="height: 1200px")
+p.sorted Sorted {sorted}
+Search
+div(style="height: 1200px")

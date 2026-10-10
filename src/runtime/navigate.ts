@@ -18,6 +18,9 @@ export interface NavigateOptions {
   replace?: boolean | undefined
 }
 
+// Query params to set on the current page, a null, undefined or empty one dropped.
+export type QueryChanges = Readonly<Record<string, string | number | null | undefined>>
+
 export interface Swap {
   // `push` adds a history entry, `replace` takes the current one's place, `none` leaves history alone, as going back does.
   history: 'push' | 'replace' | 'none'
@@ -115,12 +118,26 @@ export function startNavigation(given: NavigationHooks): void {
   }
 }
 
+// The current page with `query` merged into its own, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
+export async function navigate(to: { query: QueryChanges }, options?: NavigateOptions): Promise<void>
 // Goes to a page as following a link does: one of the app's swapped in place, under the site's mount point as a link is, another site's loaded. A literal path is checked as a link's is.
-export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options: NavigateOptions = {}): Promise<void> {
+// Last, so a path no page serves is reported against it.
+export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<void>
+export async function navigate(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<void> {
   if (typeof document === 'undefined')
     return
 
-  const url = new URL(withBase(href), location.href)
+  // A query change keeps the path and the other params, and leaves the hash out.
+  const url = new URL(typeof to === 'string' ? withBase(to) : location.pathname + location.search, location.href)
+
+  if (typeof to !== 'string') {
+    for (const [name, value] of Object.entries(to.query)) {
+      if (value === null || value === undefined || value === '')
+        url.searchParams.delete(name)
+      else
+        url.searchParams.set(name, String(value))
+    }
+  }
 
   if (!await mayLeave(url))
     return
@@ -132,7 +149,9 @@ export async function navigate<const Href extends string>(href: Href & CheckedHr
     return
   }
 
-  await follow(url, { history: options.replace ? 'replace' : 'push', scroll: 'top' })
+  const history = options.replace ? 'replace' : 'push'
+
+  await follow(url, typeof to === 'string' ? { history, scroll: 'top' } : { history, scroll: 'keep', focus: document.activeElement })
 }
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.

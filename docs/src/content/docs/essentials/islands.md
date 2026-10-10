@@ -84,7 +84,7 @@ export const cart = signal<string[]>([])
 export const theme = persisted('theme', 'light')
 ```
 
-`persisted` keeps its value across pages and visits in a cookie the server reads too, so the first paint is right.
+`persisted` keeps its value across pages and visits in a cookie the server reads too, so the first paint is right. `persisted('q', '', { storage: 'query' })` keeps a string in the page's URL instead, as `?q=...`, so a filter survives a reload and a shared link.
 
 <Callout type="note">
 
@@ -102,6 +102,8 @@ import { navigate } from 'kay'
 ---
 button(onClick={() => navigate('/todos')}) Todos
 ```
+
+`navigate({ query: { sort: 'name', page: null } })` changes the current page's query in place, keeping the scroll and the focus; a null or empty value drops its param.
 
 ## Browser-only code
 

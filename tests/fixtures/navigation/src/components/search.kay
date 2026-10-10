@@ -1,0 +1,8 @@
+---
+import { navigate, persisted } from 'kay'
+
+const search = persisted('q', '', { storage: 'query' })
+---
+input.search(aria-label="Search" value={search()} onInput={event => search.set(event.currentTarget.value)})
+p.searched Searched {search() || 'nothing'}
+button.sort(name="sort" onClick={() => navigate({ query: { sort: 'name' } })}) Sort

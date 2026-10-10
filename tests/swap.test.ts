@@ -250,6 +250,11 @@ describe('page swap, checking a form in the browser', () => {
     expect(signal('x', { storage: 'local' })()).toBe('x')
   })
 
+  it('keeps only a string in the query, which the URL holds', () => {
+    // @ts-expect-error -- a query param is a string
+    expect(persisted('page', 1, { storage: 'query' })()).toBe(1)
+  })
+
   it('leaves markup a try block would not claim to its island, which renders afresh', () => {
     const element = document.createElement('div')
 

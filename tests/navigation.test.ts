@@ -527,6 +527,39 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(warnings).toEqual([])
   })
 
+  it('keeps a persisted signal in the query the server renders with, its default leaving the URL plain, and merges a query into the page in place', async () => {
+    const warnings: string[] = []
+
+    page.on('console', (message) => {
+      if (message.type() === 'warning' || pageError(message))
+        warnings.push(message.text())
+    })
+
+    expect(await (await page.request.get(`${origin}/query?q=kept`)).text()).toContain('Searched <!--[-->kept<!--]-->')
+
+    await page.goto(`${origin}/query?q=kept`)
+    await page.fill('input.search', 'typed')
+    await until(async () => page.evaluate(() => location.search === '?q=typed'))
+    await page.fill('input.search', '')
+    await until(async () => page.evaluate(() => location.search === ''))
+    await page.fill('input.search', 'again')
+
+    const scrolled = await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+      window.scrollTo(0, 1000)
+
+      return scrollY
+    })
+
+    await page.click('button.sort')
+    await page.locator('p.sorted', { hasText: 'Sorted name' }).waitFor()
+
+    expect(await sameDocument()).toBe(true)
+    expect(await page.evaluate(() => [location.search, scrollY, document.activeElement?.className])).toEqual(['?q=again&sort=name', scrolled, 'sort'])
+    expect(await page.textContent('p.searched')).toBe('Searched again')
+    expect(warnings).toEqual([])
+  })
+
   it('focuses the field a post was refused for, described by its message', async () => {
     await page.goto(`${origin}/second`)
     await page.fill('input[name="title"]', 'ab')

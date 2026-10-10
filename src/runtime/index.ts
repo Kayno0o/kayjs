@@ -20,7 +20,7 @@ export interface Signal<T> {
 type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
 export interface PersistedOptions<T> extends SignalOptions<T> {
-  // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated.
+  // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated; `query` keeps a string in the page's URL, the server reading it too.
   storage?: PersistStorage | undefined
 }
 
@@ -33,10 +33,12 @@ export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | und
   return withSetter(read, write)
 }
 
-// A signal whose value is kept across pages and visits under `name`, the cookie's or the localStorage key's.
+// A signal whose value is kept across pages and visits under `name`, the cookie's or the localStorage key's, or in the URL under the query param `name`, which the default leaves out.
+export function persisted<T extends string = string>(name: string, value: NoInfer<T>, options: PersistedOptions<NoInfer<T>> & { storage: 'query' }): Signal<T>
+export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T> & { storage?: 'cookie' | 'local' | undefined }): Signal<T>
 export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T>): Signal<T> {
   const [own, write] = createSignal<T>(value, options)
-  const kept = keepValue(name, options?.storage ?? 'cookie', own, write)
+  const kept = keepValue(name, options?.storage ?? 'cookie', own, write, value as T)
 
   return withSetter(kept.read, (next) => {
     write(next)
@@ -244,7 +246,7 @@ export type { LeaveGuardOptions } from './leave'
 export { guardLeave } from './leave'
 export type { EventReader, EventStream, Jsonified, Resource, ResourceFailure, ResourcePath, ResourceStatus, Socket, SocketPath, SocketStatus, StreamPath, StreamStatus } from './live'
 export { dispatch, resource, socket, stream } from './live'
-export type { NavigateOptions } from './navigate'
+export type { NavigateOptions, QueryChanges } from './navigate'
 export { navigate, refresh } from './navigate'
 export type { PersistStorage } from './persist'
 export { previewing } from './preview'

@@ -20,10 +20,11 @@ interface SignalNode<T> extends Source {
   shared: boolean
 }
 
-// What the server keeps per request it renders: the values its renders wrote to shared signals, its cookies, and where an error a `try` block caught goes.
+// What the server keeps per request it renders: the values its renders wrote to shared signals, its cookies and query, and where an error a `try` block caught goes.
 export interface ServerScope {
   values: WeakMap<object, unknown>
   cookie: (name: string) => string | undefined
+  query: (name: string) => string | undefined
   report: (error: unknown) => void
   // The path of the page being rendered, percent-encoded as requested.
   path: string
