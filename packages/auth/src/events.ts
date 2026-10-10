@@ -9,8 +9,9 @@ import { publicUser } from './core'
 const PRUNE_EVERY_MS = 60 * 60 * 1000
 const AUDIT_PAGE_MAX = 200
 
-// What happens to an account without changing what protects it, handed to `onEvent` but never mailed; the admin's doing for the last six, the admin in the context's `actor`.
-export type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended'
+// What happens to an account without changing what protects it, handed to `onEvent` but never mailed. An admin's doing, a role or a ban, or a manager's in an organization, names them in the context's `actor`.
+// An organization event's detail is its id, then the roles given for `member-joined` and `member-roles-changed`.
+export type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed'
 
 export type AuthEvent = SecurityEvent | ActivityEvent
 

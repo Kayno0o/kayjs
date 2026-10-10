@@ -18,6 +18,7 @@ export type { Mail, MailContent, MailData, Mailer, MailKind, SecurityEvent, Temp
 export * from './memoryStore'
 export * from './oauth'
 export type { OAuthFailure } from './oauth/flow'
+export type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, Organization, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
 export type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 export type { PasswordSignInInput, PasswordSignInResult, RegisterErrors, RegisterInput, RegisterResult } from './password'
 export * from './roles'

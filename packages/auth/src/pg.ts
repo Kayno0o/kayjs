@@ -1,5 +1,5 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
-import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, PasskeyRecord, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
+import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OrganizationRecord, PasskeyRecord, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
 
 // Expired attempt windows are deleted once every so many hits.
@@ -103,6 +103,33 @@ export const AuthAudit = defineTable('auth_audit', t => ({
   at: t.timestamptz().notNull(),
 })).withIndexes([{ columns: ['user_id', 'at'] }, { columns: ['at'] }])
 
+export const AuthOrganizations = defineTable('auth_organization', t => ({
+  id: t.text().primaryKey(),
+  name: t.text().notNull(),
+  slug: t.text().nullable().unique(),
+  created_at: t.timestamptz().notNull(),
+}))
+
+const organizationId = () => AuthOrganizations
+
+export const AuthMembers = defineTable('auth_member', t => ({
+  id: t.serial().primaryKey(),
+  organization_id: t.text().notNull().references(organizationId, 'id', { onDelete: 'cascade' }),
+  user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
+  roles: t.array(t.text()).notNull(),
+  created_at: t.timestamptz().notNull(),
+})).withIndexes([{ columns: ['organization_id', 'user_id'], unique: true }, { columns: ['user_id'] }])
+
+export const AuthInvitations = defineTable('auth_invitation', t => ({
+  id: t.text().primaryKey(),
+  organization_id: t.text().notNull().references(organizationId, 'id', { onDelete: 'cascade' }),
+  email: t.text().notNull(),
+  roles: t.array(t.text()).notNull(),
+  invited_by: t.text().nullable().references(userId, 'id', { onDelete: 'set null' }),
+  created_at: t.timestamptz().notNull(),
+  expires_at: t.timestamptz().notNull(),
+})).withIndexes([{ columns: ['organization_id'] }, { columns: ['email'] }])
+
 export const AuthAttempts = defineTable('auth_attempt', t => ({
   key: t.text().primaryKey(),
   count: t.int4().notNull(),
@@ -110,7 +137,7 @@ export const AuthAttempts = defineTable('auth_attempt', t => ({
 }))
 
 // The tables to list in the app's `new Database({ tables })`, so `db.sync()` creates them.
-export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAudit, AuthAttempts] as const
+export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAudit, AuthOrganizations, AuthMembers, AuthInvitations, AuthAttempts] as const
 
 type UserRow = InferEntity<typeof AuthUsers>
 
@@ -124,6 +151,9 @@ export function pgStore(db: Database): AuthStore {
   const sessions = db.repo(AuthSessions)
   const passkeys = db.repo(AuthPasskeys)
   const audit = db.repo(AuthAudit)
+  const organizations = db.repo(AuthOrganizations)
+  const members = db.repo(AuthMembers)
+  const invitations = db.repo(AuthInvitations)
   const attempts = db.repo(AuthAttempts)
   let hits = 0
 
@@ -209,6 +239,34 @@ export function pgStore(db: Database): AuthStore {
       async prune(before) {
         await audit.write.deleteMany({ at: { lt: before } })
       },
+    },
+    organizations: {
+      async create(organization) {
+        await organizations.write.insertOne({ id: organization.id, name: organization.name, slug: organization.slug, created_at: organization.createdAt })
+      },
+      get: async id => toOrganization(await organizations.read.findById(id)),
+      findBySlug: async slug => toOrganization(await organizations.read.findOne({ slug })),
+      update: async (id, patch) => toOrganization(await organizations.write.updateById(id, withoutUndefined({ name: patch.name, slug: patch.slug }))),
+      delete: async id => await organizations.write.deleteById(id) !== null,
+    },
+    members: {
+      async add(member) {
+        await members.write.insertOne({ organization_id: member.organizationId, user_id: member.userId, roles: member.roles, created_at: member.createdAt })
+      },
+      get: async (organizationId, userId) => toMember(await members.read.findOne({ organization_id: organizationId, user_id: userId })),
+      listByOrganization: async organizationId => (await members.read.findMany(q => q.where({ organization_id: organizationId }).orderBy('created_at', 'asc').orderBy('id', 'asc'))).map(row => toMember(row)!),
+      listByUser: async userId => (await members.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc').orderBy('id', 'asc'))).map(row => toMember(row)!),
+      update: async (organizationId, userId, patch) => toMember(await members.write.updateOne({ roles: patch.roles }, { organization_id: organizationId, user_id: userId })),
+      remove: async (organizationId, userId) => await members.write.deleteOne({ organization_id: organizationId, user_id: userId }) !== null,
+    },
+    invitations: {
+      async create(invitation) {
+        await invitations.write.insertOne({ id: invitation.id, organization_id: invitation.organizationId, email: invitation.email, roles: invitation.roles, invited_by: invitation.invitedBy, created_at: invitation.createdAt, expires_at: invitation.expiresAt })
+      },
+      get: async id => toInvitation(await invitations.read.findById(id)),
+      listByOrganization: async organizationId => (await invitations.read.findMany(q => q.where({ organization_id: organizationId }).orderBy('created_at', 'asc'))).map(row => toInvitation(row)!),
+      listByEmail: async email => (await invitations.read.findMany(q => q.where({ email }).orderBy('created_at', 'asc'))).map(row => toInvitation(row)!),
+      delete: async id => await invitations.write.deleteById(id) !== null,
     },
     bearerTokens: {
       async create(token) {
@@ -325,6 +383,18 @@ function toBearerToken(row: InferEntity<typeof AuthBearerTokens> | null): Bearer
 
 function toSession(row: InferEntity<typeof AuthSessions> | null): SessionRecord | undefined {
   return row ? { id: row.id, userId: row.user_id, version: row.version, userAgent: row.user_agent, ip: row.ip, createdAt: row.created_at, lastSeenAt: row.last_seen_at, maxAge: row.max_age } : undefined
+}
+
+function toOrganization(row: InferEntity<typeof AuthOrganizations> | null): OrganizationRecord | undefined {
+  return row ? { id: row.id, name: row.name, slug: row.slug, createdAt: row.created_at } : undefined
+}
+
+function toMember(row: InferEntity<typeof AuthMembers> | number | null): MemberRecord | undefined {
+  return row !== null && typeof row === 'object' ? { organizationId: row.organization_id, userId: row.user_id, roles: row.roles, createdAt: row.created_at } : undefined
+}
+
+function toInvitation(row: InferEntity<typeof AuthInvitations> | null): InvitationRecord | undefined {
+  return row ? { id: row.id, organizationId: row.organization_id, email: row.email, roles: row.roles, invitedBy: row.invited_by, createdAt: row.created_at, expiresAt: row.expires_at } : undefined
 }
 
 function toAudit(row: InferEntity<typeof AuthAudit>): AuditRecord {

@@ -101,6 +101,38 @@ export interface PasskeyRecord {
   lastUsedAt: Date | null
 }
 
+// A team or a workspace users belong to, each with roles of its own there.
+export interface OrganizationRecord {
+  id: string
+  name: string
+  // Unique when set, lowercase, for URLs such as `/orgs/acme`.
+  slug: string | null
+  createdAt: Date
+}
+
+// A user's place in an organization.
+export interface MemberRecord {
+  organizationId: string
+  userId: string
+  // From the hierarchy of the `organizations` option.
+  roles: string[]
+  createdAt: Date
+}
+
+// An address asked to join an organization; its id is the link mailed, which only an account verified at that address can accept.
+export interface InvitationRecord {
+  id: string
+  organizationId: string
+  // Lowercase.
+  email: string
+  // What the member gets on accepting.
+  roles: string[]
+  // Null once that user is deleted.
+  invitedBy: string | null
+  createdAt: Date
+  expiresAt: Date
+}
+
 // What an emailed link proves once used.
 export type LinkType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email'
 
@@ -132,7 +164,7 @@ export interface AuthStore {
     create: (user: UserRecord) => MaybePromise<UserRecord | void>
     // The user once changed, or undefined when there is none; throws when the change takes an email or a username another user has.
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
-    // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens and recovery codes.
+    // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens, recovery codes and memberships; invitations they sent lose their `invitedBy`.
     delete: (id: string) => MaybePromise<void>
     // Newest first; `search` matches part of the email or the username, whatever its case, or the whole id.
     list: (query: { search?: string, offset: number, limit: number }) => MaybePromise<{ users: UserRecord[], total: number }>
@@ -180,6 +212,39 @@ export interface AuthStore {
     list: (query: { userId?: string, before?: Date, limit: number }) => MaybePromise<AuditRecord[]>
     // Deletes the entries older than `before`.
     prune: (before: Date) => MaybePromise<void>
+  }
+  // Needed only with the `organizations` option, as are `members` and `invitations`.
+  organizations?: {
+    // Throws when the slug is taken.
+    create: (organization: OrganizationRecord) => MaybePromise<void>
+    get: (id: string) => MaybePromise<OrganizationRecord | undefined>
+    findBySlug: (slug: string) => MaybePromise<OrganizationRecord | undefined>
+    // The organization once changed, or undefined when there is none; throws when the change takes a slug another has.
+    update: (id: string, patch: Partial<Pick<OrganizationRecord, 'name' | 'slug'>>) => MaybePromise<OrganizationRecord | undefined>
+    // Deletes it with its members and invitations; false when there is none.
+    delete: (id: string) => MaybePromise<boolean>
+  }
+  members?: {
+    // Throws when the user is a member already.
+    add: (member: MemberRecord) => MaybePromise<void>
+    get: (organizationId: string, userId: string) => MaybePromise<MemberRecord | undefined>
+    // Oldest first.
+    listByOrganization: (organizationId: string) => MaybePromise<MemberRecord[]>
+    // Oldest first.
+    listByUser: (userId: string) => MaybePromise<MemberRecord[]>
+    update: (organizationId: string, userId: string, patch: Pick<MemberRecord, 'roles'>) => MaybePromise<MemberRecord | undefined>
+    // False when the user is no member.
+    remove: (organizationId: string, userId: string) => MaybePromise<boolean>
+  }
+  invitations?: {
+    create: (invitation: InvitationRecord) => MaybePromise<void>
+    get: (id: string) => MaybePromise<InvitationRecord | undefined>
+    // Oldest first, expired ones included.
+    listByOrganization: (organizationId: string) => MaybePromise<InvitationRecord[]>
+    // Oldest first, expired ones included; given an address already normalised.
+    listByEmail: (email: string) => MaybePromise<InvitationRecord[]>
+    // False when there is none.
+    delete: (id: string) => MaybePromise<boolean>
   }
   bearerTokens: {
     create: (token: BearerTokenRecord) => MaybePromise<void>

@@ -13,6 +13,7 @@ import type { DataExport } from './export'
 import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
 import type { OAuthFailure } from './oauth/flow'
+import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
@@ -42,6 +43,7 @@ import { noteSignIn } from './notify'
 import { createOAuthClient } from './oauth/client'
 import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow'
 import { createOAuthTokenRefresher } from './oauth/refresher'
+import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
 import { register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
@@ -68,7 +70,7 @@ export type AuthRequirement<Role extends string> = Requirement<User, Role>
 // The plugin kay's `session()` returns, whichever data the app keeps beside kayjs-auth's.
 export interface SessionPlugin<Data extends AuthSessionData> { '~Ephemeral': { derive: { readonly session: Session<Data> } } }
 
-export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never> {
+export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never> {
   sessions: SessionPlugin<Data>
   // At least 32 characters, from the environment; each use gets its own key derived from it. A list rotates them: the first writes, every one reads.
   secret: string | string[]
@@ -105,6 +107,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   scopes?: readonly Scope[] | undefined
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
   roles?: Record<Role, NoInfer<Role>[]> | undefined
+  // Teams or workspaces users belong to, with roles of their own in each: `{ roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', invitationPage: '/invitation' }`.
+  organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
   // Who may list, ban and impersonate users and grant them roles, such as `'admin'`; nobody without it.
   admin?: AuthRequirement<NoInfer<Role>> | undefined
   // The roles every new user starts with, by password or by provider, such as a site's `user`. An unverified account holding only these counts as given none: see `requireVerified`.
@@ -134,7 +138,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
-export class Auth<Scope extends string = string, Role extends string = string> {
+export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string> {
   readonly [STATE]: RequestState
   private resolving?: Promise<UserRecord | null> | undefined
   private source: 'session' | 'bearer' | null = null
@@ -637,6 +641,92 @@ export class Auth<Scope extends string = string, Role extends string = string> {
     return exportData(this[STATE])
   }
 
+  // A new organization, the signed-in user its owner. `slug`, lowercase letters, digits and dashes, names it in URLs.
+  async createOrganization(input: { name: string, slug?: string | null | undefined }): Promise<CreateOrganizationResult<OrgRole>> {
+    return createOrganization(this[STATE], input) as Promise<CreateOrganizationResult<OrgRole>>
+  }
+
+  // The organizations the signed-in user belongs to, with their roles in each.
+  async organizations(): Promise<Membership<OrgRole>[]> {
+    return listMemberships(this[STATE]) as Promise<Membership<OrgRole>[]>
+  }
+
+  // The organization `ref` names, by id or slug, with the user's roles there; null unless they are a member.
+  async organization(ref: string): Promise<Membership<OrgRole> | null> {
+    return getMembership(this[STATE], ref) as Promise<Membership<OrgRole> | null>
+  }
+
+  // Whether the user is a member of the organization `ref` names, holding `role` there when given.
+  async isMember(ref: string, role?: OrgRole): Promise<boolean> {
+    const record = await this.record()
+
+    return record !== null && holdsInOrganization(this.core, record.id, ref, role)
+  }
+
+  // Renames it, or changes or clears its slug: for members holding `manage`.
+  async updateOrganization(ref: string, patch: { name?: string | undefined, slug?: string | null | undefined }): Promise<UpdateOrganizationResult> {
+    return updateOrganization(this[STATE], ref, patch)
+  }
+
+  // For members holding `owner`.
+  async deleteOrganization(ref: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure }> {
+    return deleteOrganization(this[STATE], ref)
+  }
+
+  // Every member, oldest first, for any member to see.
+  async members(ref: string): Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
+    return listMembers(this[STATE], ref) as Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }>
+  }
+
+  // Replaces a member's roles: for members holding `manage`, giving only roles they hold, to a member holding none above theirs.
+  async setMemberRoles(ref: string, userId: string, roles: OrgRole[]): Promise<MemberResult> {
+    return setMemberRoles(this[STATE], ref, userId, roles)
+  }
+
+  // For members holding `manage`, of a member holding no role above theirs.
+  async removeMember(ref: string, userId: string): Promise<MemberResult> {
+    return removeMember(this[STATE], ref, userId)
+  }
+
+  async leaveOrganization(ref: string): Promise<MemberResult> {
+    const record = await this.record()
+
+    return record ? removeMember(this[STATE], ref, record.id) : { ok: false, error: 'signed-out' }
+  }
+
+  // Mails `email` a link to the `invitationPage`, giving `roles` (`defaultRoles` when none) once accepted: for members holding `manage` and every role it gives.
+  async invite(ref: string, email: string, roles?: OrgRole[]): Promise<InviteResult<OrgRole>> {
+    return invite(this[STATE], ref, email, roles) as Promise<InviteResult<OrgRole>>
+  }
+
+  // The organization's open invitations, for members holding `manage`.
+  async invitations(ref: string): Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
+    return listInvitations(this[STATE], ref) as Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }>
+  }
+
+  async revokeInvitation(ref: string, invitationId: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure }> {
+    return revokeInvitation(this[STATE], ref, invitationId)
+  }
+
+  // The invitations open to the signed-in user's verified address.
+  async myInvitations(): Promise<Invitation<OrgRole>[]> {
+    return myInvitations(this[STATE]) as Promise<Invitation<OrgRole>[]>
+  }
+
+  // What the invitation link's page shows; null once revoked, accepted or expired.
+  async invitation(invitationId: string): Promise<Invitation<OrgRole> | null> {
+    return getInvitation(this[STATE], invitationId) as Promise<Invitation<OrgRole> | null>
+  }
+
+  // For an account verified at the invited address only.
+  async acceptInvitation(invitationId: string): Promise<AcceptResult<OrgRole>> {
+    return acceptInvitation(this[STATE], invitationId) as Promise<AcceptResult<OrgRole>>
+  }
+
+  async declineInvitation(invitationId: string): Promise<boolean> {
+    return declineInvitation(this[STATE], invitationId)
+  }
+
   // The signed-in user's bearer tokens, without the tokens themselves.
   async tokens(): Promise<BearerToken[]> {
     return listTokens(this[STATE])
@@ -722,7 +812,7 @@ export class Auth<Scope extends string = string, Role extends string = string> {
 }
 
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
-export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never>(options: AuthOptions<Data, Role, Prefix, Scope>) {
+export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole>) {
   const core = createCore(options)
   const { hasRole, isGranted } = createRoleHierarchy<User, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 
@@ -740,7 +830,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       const address = clientAddress(ctx.request, ctx.server, options.proxy)
 
-      return { auth: new Auth<Scope, Role>(session, core, ctx.request, rateKey(address), address) }
+      return { auth: new Auth<Scope, Role, OrgRole>(session, core, ctx.request, rateKey(address), address) }
     })
     // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
     .as('global')
@@ -805,11 +895,25 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   if (admin !== undefined)
     core.admin = async user => authorize(user, admin, 'write', {})
 
+  const create = options.organizations?.create
+
+  if (core.organizations && create !== undefined)
+    core.organizations.create = async user => authorize(user, create, 'write', {})
+
   return {
     // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
     plugin,
     hasRole,
     isGranted: (role: Role, user: User) => isGranted(role, user.roles as Role[]),
+
+    // A requirement met by a member of the organization the route's `param` names, by id or slug, holding `role` there when given: `auth: auth.memberOf('admin')`.
+    memberOf(role?: OrgRole, memberOptions: { param?: string } = {}): Predicate<User> {
+      return async (user, ctx) => {
+        const ref: unknown = ctx.params?.[memberOptions.param ?? core.organizations?.param ?? 'org']
+
+        return user !== null && typeof ref === 'string' && holdsInOrganization(core, user.id, ref, role)
+      }
+    },
 
     // The user a bearer token belongs to, for a websocket handshake sending one in its first message.
     async userFromToken(token: string): Promise<User | null> {
@@ -845,7 +949,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
           ctx.deny(401, 'Sign in to continue')
         }
 
-        if (guardOptions.require !== undefined && !(await authorize(user, guardOptions.require, reading ? 'read' : 'write', {})))
+        // A guard sees params only once kay hands them over (kayjs #192); `memberOf` refuses without its own, never skipping the check.
+        if (guardOptions.require !== undefined && !(await authorize(user, guardOptions.require, reading ? 'read' : 'write', { params: 'params' in ctx ? ctx.params as Record<string, string> : undefined })))
           ctx.deny(403)
 
         if (!scopeAllows(await authOf(ctx.locals).scopes(), guardOptions.scope))
@@ -855,7 +960,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   }
 }
 
-function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string>(options: AuthOptions<Data, Role, Prefix, Scope>): Core {
+function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole>): Core {
   const prefix = options.prefix ?? '/auth'
   const oauth: Core['oauth'] = new Map()
   const oauthApps = Object.entries(options.oauth ?? {})
@@ -905,6 +1010,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onDelete: options.onDelete,
     onExport: options.onExport,
     onEvent: options.onEvent,
+    organizations: options.organizations && organizationsCore(options.organizations),
     audit: options.audit ? { maxAge: (options.audit === true ? undefined : options.audit.maxAge) ?? DEFAULT_AUDIT_MAX_AGE, prunedAt: 0 } : undefined,
   }
 

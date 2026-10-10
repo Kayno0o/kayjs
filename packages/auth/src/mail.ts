@@ -5,8 +5,8 @@ import { language, pickLocale } from './locale'
 // A change to what protects an account, mailed to its verified address and given to `onEvent`.
 export type SecurityEvent = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'account-deleted'
 
-// What a mail is about: a link to follow, or news of a change to the account.
-export type MailKind = LinkType | SecurityEvent
+// What a mail is about: a link to follow, news of a change to the account, or an invitation to join an organization.
+export type MailKind = LinkType | SecurityEvent | 'invitation'
 
 export interface MailContent {
   subject: string
@@ -30,7 +30,7 @@ export interface Mailer {
   send: (mail: Mail) => unknown
 }
 
-// What a template is given: the site's name, the address written to, the link and the code when the mail carries them, and the provider or token an event is about.
+// What a template is given: the site's name, the address written to, the link and the code when the mail carries them, and the provider or token an event is about, or the organization an invitation is to.
 export interface MailData {
   site: string
   email: string
@@ -141,6 +141,7 @@ export const defaultTemplates: Templates = {
   'reset-password': data => linkMail(en, data, `Reset your ${data.site} password`, `Someone asked to reset the password of the ${data.site} account for ${data.email}.`, 'Choose a new password', 'The link works for one hour. If you did not ask for it, ignore this mail: your password stays as it is.'),
   'magic-link': data => linkMail(en, data, `Sign in to ${data.site}`, `Here is your ${data.url === undefined ? 'code' : 'link'} to sign in to ${data.site}.`, 'Sign in', `${lasting(en, data, '15 minutes, once')} If you did not ask for it, ignore this mail.`),
   'change-email': data => linkMail(en, data, `Confirm your new email for ${data.site}`, `Confirm ${data.email} as the new address of your ${data.site} account.`, 'Confirm the change', 'The link works for one hour. If you did not ask for this change, ignore this mail.'),
+  'invitation': data => linkMail(en, data, `Join ${data.detail} on ${data.site}`, `You are invited to join ${data.detail} on ${data.site}, with an account at ${data.email}.`, 'See the invitation', 'If you did not expect it, ignore this mail.'),
   'new-sign-in': data => noticeMail(en, data, 'New sign-in', `Your ${data.site} account was just signed into from a device or network it had not used before.`),
   'password-changed': data => noticeMail(en, data, 'Password changed', `The password of your ${data.site} account was changed, and its other sessions signed out.`),
   'email-changed': data => noticeMail(en, data, 'Email changed', `Your ${data.site} account moved from ${data.email} to ${data.detail}. This address no longer signs into it.`, en.contactSite),
@@ -163,6 +164,7 @@ export const frenchTemplates: Templates = {
   'reset-password': data => linkMail(fr, data, `Réinitialisez votre mot de passe ${data.site}`, `Quelqu'un a demandé à réinitialiser le mot de passe du compte ${data.site} de ${data.email}.`, 'Choisir un nouveau mot de passe', 'Le lien est valable une heure. Si vous ne l\'avez pas demandé, ignorez ce message : votre mot de passe reste inchangé.'),
   'magic-link': data => linkMail(fr, data, `Connexion à ${data.site}`, `Voici votre ${data.url === undefined ? 'code' : 'lien'} pour vous connecter à ${data.site}.`, 'Me connecter', `${lasting(fr, data, '15 minutes, une seule fois')} Si vous ne l'avez pas demandé, ignorez ce message.`),
   'change-email': data => linkMail(fr, data, `Confirmez votre nouvelle adresse pour ${data.site}`, `Confirmez ${data.email} comme nouvelle adresse de votre compte ${data.site}.`, 'Confirmer le changement', 'Le lien est valable une heure. Si vous n\'avez pas demandé ce changement, ignorez ce message.'),
+  'invitation': data => linkMail(fr, data, `Rejoignez ${data.detail} sur ${data.site}`, `Vous êtes invité à rejoindre ${data.detail} sur ${data.site}, avec un compte à l'adresse ${data.email}.`, 'Voir l\'invitation', 'Si vous ne l\'attendiez pas, ignorez ce message.'),
   'new-sign-in': data => noticeMail(fr, data, 'Nouvelle connexion', `Votre compte ${data.site} vient d'être utilisé depuis un appareil ou un réseau qu'il n'avait jamais utilisé.`),
   'password-changed': data => noticeMail(fr, data, 'Mot de passe modifié', `Le mot de passe de votre compte ${data.site} a été modifié, et ses autres sessions déconnectées.`),
   'email-changed': data => noticeMail(fr, data, 'Adresse modifiée', `Votre compte ${data.site} est passé de ${data.email} à ${data.detail}. Cette adresse ne permet plus de s'y connecter.`, fr.contactSite),

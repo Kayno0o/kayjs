@@ -7,6 +7,7 @@ import type { createOAuthClient } from './oauth/client'
 import type { OAuthFlow } from './oauth/flow'
 import type { createTokenRefresher, StoredCredential } from './oauth/refresher'
 import type { OAuthProvider, OAuthUser } from './oauth/types'
+import type { OrganizationsCore } from './organizations'
 import type { PasskeyChallenge, Relying } from './passkeys'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Challenge } from './twoFactor'
@@ -106,6 +107,7 @@ export interface Core {
   onDelete?: ((user: User) => void | Promise<void>) | undefined
   onExport?: ((user: User) => unknown) | undefined
   onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
+  organizations?: OrganizationsCore | undefined
   // Kept with the `audit` option: entries live `maxAge` seconds.
   audit?: { maxAge: number, prunedAt: number } | undefined
 }

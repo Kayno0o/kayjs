@@ -60,7 +60,7 @@ The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(
 - `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
 - `prefix`: where the OAuth routes live, `/auth` by default.
 - `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default.
-- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `sessionMaxAge`, `rememberMaxAge`, `browserSessionMaxAge`, `sessionsPage`, `locate`: see Sessions. `passkeys`: see Passkeys. `audit`: see Events and the audit log.
+- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `sessionMaxAge`, `rememberMaxAge`, `browserSessionMaxAge`, `sessionsPage`, `locate`: see Sessions. `passkeys`: see Passkeys. `audit`: see Events and the audit log. `admin`: see Admin. `organizations`: see Organizations.
 
 ## The signed-in user
 
@@ -273,7 +273,7 @@ Changing what protects the account takes a `proof`: `changePassword`, `changeEma
 
 - `changePassword(proof, password)` sets the password, or a first one (`errors.password` as `register`'s), ends the user's other sessions and bearer tokens, and voids the links mailed before.
 - `changeUsername(username)` names the signed-in user, or renames them, normalised and checked as `register` does: `{ ok: true, user }`, `errors: { username }` with `'length'`, `'characters'`, `'mixed-scripts'`, `'taken'` or `'unchanged'`, or `'signed-out'`. Recasing one's own name is allowed. It takes no proof and sends no mail, a name being no credential, but needs a session: a bearer token answers `'signed-out'`. Renames are not limited, a name being public anyway. A page asks a user without one for it, as after an OAuth sign-up whose name was taken.
-- `exportData()` gives the signed-in user everything kayjs-auth keeps about them, for a download of their data: `{ ok: true, data: { exportedAt, user, identities, sessions, passkeys, tokens, recoveryCodesLeft, audit, app } }`, `user` with `createdAt`, `emailVerifiedAt` and `twoFactorEnabledAt`, no hash, secret or token among it. `onExport(user)` gives `app`, what the app keeps about them. It needs a session: a bearer token answers `'signed-out'`.
+- `exportData()` gives the signed-in user everything kayjs-auth keeps about them, for a download of their data: `{ ok: true, data: { exportedAt, user, identities, sessions, passkeys, tokens, recoveryCodesLeft, organizations, audit, app } }`, `user` with `createdAt`, `emailVerifiedAt` and `twoFactorEnabledAt`, no hash, secret or token among it. `onExport(user)` gives `app`, what the app keeps about them. It needs a session: a bearer token answers `'signed-out'`.
 - `unlink(provider, proof)` unlinks a provider: `'not-linked'` when it is not, `'last-way-in'` when the user would have no password, no other provider and no verified address to get a magic link at.
 - `deleteAccount(proof)` deletes the user with everything kayjs-auth keeps for them, calls `onDelete(user)` for the app's own records, and signs out. Asking the user to type their name first is the page's job.
 
@@ -302,6 +302,7 @@ A change to what protects an account is mailed to its verified address, never an
 - `signed-out`; `detail` `everywhere` or `everywhere-else` from `signOutEverywhere`.
 - `sign-in-failed`, for an account that exists only: `detail` `password`, `two-factor` or `passkey`.
 - An admin's doing, `actor` the admin: `role-granted` and `role-revoked`, `detail` the role; `banned`, `detail` the reason; `unbanned`; `impersonation-started` and `impersonation-ended`.
+- In an organization, `detail` its id: `organization-created` and `organization-deleted`; `member-joined` and `member-roles-changed`, `detail` the id then the roles given, space-separated; `member-left`; `member-removed`. A manager's doing names them as `actor`.
 
 `context` is `{ ip, userAgent, actor }`, `actor` the user who acted when it was not the one it happened to, such as an admin.
 
@@ -316,6 +317,33 @@ With `audit: true`, or `{ maxAge }` in seconds (a year by default), the same eve
 - `banUser(id, { reason, until })` bars the user from signing in, for good or until that date (`until` in the past answers `until`), and signs them out everywhere, bearer tokens revoked. Every sign-in of theirs answers `{ ok: false, error: 'banned' }`, an OAuth one `?error=banned`, and `auth.signIn` throws. An admin cannot ban themselves (`self`) or another admin (`admin`): revoke the role first. `unbanUser(id)` lifts it.
 - `impersonate(id)` signs the admin's browser in as the user, keeping the admin's own sign-in; `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs them back in as themselves, or out when their own sign-in ended meanwhile. Meanwhile nothing taking a proof passes (`reprove` answers `impersonating`, and the sign-in counts as stale), no new sign-in mail goes out, and the impersonation ends once the admin is signed out everywhere, banned or no longer an admin. Another admin, oneself and a banned user cannot be impersonated. `signOut()` ends both sign-ins.
 - `adminAuditLog({ userId, before, limit })` gives `{ ok: true, entries }`, everyone's audit log or one user's.
+
+## Organizations
+
+Teams or workspaces users belong to, with roles of their own in each:
+
+```ts
+createAuth({
+  // ...
+  organizations: {
+    roles: { owner: ['admin'], admin: ['member'], member: [] },
+    owner: 'owner',
+    manage: 'admin',
+    defaultRoles: ['member'],
+    invitationPage: '/invitation',
+  },
+})
+```
+
+- `roles` is a hierarchy as the site's `roles` is, typed the same way. Whoever creates an organization holds `owner`: owners alone delete it, and the last one cannot leave, be removed or lose the role (`last-owner`). `manage`, `owner` by default, is what renaming, inviting, removing members and changing their roles take. `create`, any requirement a guard takes, limits who may create one; anyone signed in by default.
+- `createOrganization({ name, slug? })` answers `{ ok: true, membership }`, or `invalid-name` (1 to 100 characters), `invalid-slug` (lowercase letters, digits and dashes, 64 at most, lowercased first) or `slug-taken`. A membership is `{ organization: { id, name, slug, createdAt }, roles, joinedAt }`.
+- `organizations()` lists the user's memberships; `organization(ref)` gives one, by id or slug, null unless a member; `isMember(ref, role?)` says whether they are one, holding `role` when given. `updateOrganization(ref, { name, slug })` renames it, `slug: null` clearing the slug, and `deleteOrganization(ref)` deletes it with its memberships and invitations.
+- `members(ref)` gives `{ ok: true, members }`, each `{ user: { id, email, username }, roles, joinedAt }`, for any member to see. `setMemberRoles(ref, userId, roles)` replaces a member's roles, `removeMember(ref, userId)` removes one, and `leaveOrganization(ref)` leaves. A manager gives only roles they hold, to a member holding none above theirs: an admin cannot make an owner nor demote or remove one (`forbidden`).
+- `invite(ref, email, roles?)` mails the address a link to `invitationPage` + `?invitation=<id>` (`unavailable` without it, or without a mailer, or when the mailer throws), giving `roles`, `defaultRoles` without them, once accepted: `member` when the address belongs to a member already, `limited` past `invite`, 30 an hour per manager. Inviting an address again replaces its invitation. `invitations(ref)` lists the open ones for managers and `revokeInvitation(ref, id)` revokes one. An invitation lasts `invitationMaxAge` seconds, a week by default. The mail's `kind` is `'invitation'`, the organization's name its template's `detail`.
+- The page reads `invitation(id)`, `{ id, organization, email, roles, invitedBy, createdAt, expiresAt }` or null once revoked, accepted or expired, and posts to an action calling `acceptInvitation(id)`: only an account verified at the invited address joins (`wrong-account`, `unverified`), which an invitee without an account reaches by registering with it. `myInvitations()` lists those open to the user's verified address, `declineInvitation(id)` turns one down.
+- Any failure above may also be `signed-out`, `not-found` (no such organization, or one the user is no member of, so its existence does not leak) or `forbidden` (a member whose roles do not reach).
+- `auth.memberOf(role?)` is a requirement met by a member of the organization the route's `org` param names, by id or slug, holding `role` there when given: `.get('/orgs/:org/settings', handler, { auth: auth.memberOf('admin') })` behind a gate. `organizations.param`, or `memberOf(role, { param })`, names another param. A kay guard gets no params yet, so it refuses `memberOf` rather than skip it: check the organization in the page's load and its actions with `isMember(ref, role)`.
+- Deleting a user deletes their memberships; an organization whose last owner deletes their account stays without one. `exportData()` lists the user's memberships as `organizations`.
 
 ## Bots and breached passwords
 
@@ -341,13 +369,14 @@ Attempts are counted in the store, so every process shares them, per client addr
 - `signIn` 40 and `signInAccount` 6 per 15 minutes; the account counts failures only, and a success clears it.
 - `register` 6 per hour.
 - `resend`, `forgot` and `magicLink` 12 per client and 3 per account per hour (`resendAccount`, `forgotAccount` and `magicLinkAccount`, the last two counted per address); `emailChange` 12 and `emailChangeAccount` 5.
+- `invite` 30 per manager per hour.
 - `twoFactor` 30 and `twoFactorAccount` 8 per 15 minutes, for signing in and for turning the factor on; `reprove` 6 per 15 minutes; `link` 40 per hour; `emailCode` 30 per client and `emailCodeAccount` 10 per address per 15 minutes.
 
 ## Stores
 
 - `memoryStore()` keeps everything in the process: for tests, and for trying kayjs-auth before a database is wired.
-- `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps it in Postgres through pg-orm, once `authTables` are among the `Database`'s tables: `auth_user`, `auth_identity`, `auth_token`, `auth_recovery_code`, `auth_bearer_token`, `auth_session`, `auth_passkey`, `auth_audit` and `auth_attempt`, the others but the audit log deleted with their user.
-- Any object with the `AuthStore` methods is a store: `users`, `identities`, `tokens`, `recoveryCodes`, `bearerTokens`, `sessions`, `passkeys` and `attempts`, plus `audit` for the `audit` option, each method sync or async. What must hold is written on each method: emails are looked up exactly, usernames without case; a mailed token, a recovery code and a TOTP step are spent once even by two requests together; deleting a user deletes what kayjs-auth keeps for them; `users.list` pages newest first and searches emails and usernames without case.
+- `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps it in Postgres through pg-orm, once `authTables` are among the `Database`'s tables: `auth_user`, `auth_identity`, `auth_token`, `auth_recovery_code`, `auth_bearer_token`, `auth_session`, `auth_passkey`, `auth_audit`, `auth_organization`, `auth_member`, `auth_invitation` and `auth_attempt`; what belongs to a user, the audit log and their invitations aside, is deleted with them, and members and invitations with their organization.
+- Any object with the `AuthStore` methods is a store: `users`, `identities`, `tokens`, `recoveryCodes`, `bearerTokens`, `sessions`, `passkeys` and `attempts`, plus `audit` for the `audit` option and `organizations`, `members` and `invitations` for the `organizations` option, each method sync or async. What must hold is written on each method: emails are looked up exactly, usernames without case; a mailed token, a recovery code and a TOTP step are spent once even by two requests together; deleting a user deletes what kayjs-auth keeps for them; `users.list` pages newest first and searches emails and usernames without case.
 - A store over an app's own tables: `users.create(user)` answers the user as stored when the store picks its own id, such as a serial column's, `user` whole with only its `id` changed, and kayjs-auth goes on with it (ids are strings, so the store converts); answering nothing keeps the id kayjs-auth picked. TOTP secrets are stored sealed with the auth `secret`: a store whose rows hold plain base32 secrets from before seals each on read with `sealTotpSecret(secret, userId, plain)`, from `@kaynooo/kayjs-auth`, `secret` being the value `createAuth` takes, a list included. A plain base32 value matches `/^[A-Z2-7]+=*$/`, which a sealed one in practice never does, and what kayjs-auth writes afterwards is sealed already.
 
 ## Testing

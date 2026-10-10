@@ -1,11 +1,13 @@
 import type { BearerToken } from './bearer'
 import type { User } from './core'
 import type { AuditEntry } from './events'
+import type { Membership } from './organizations'
 import type { Passkey } from './passkeys'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
 import { listTokens } from './bearer'
 import { publicUser } from './core'
+import { listMemberships } from './organizations'
 import { listPasskeys } from './passkeys'
 import { listSessions } from './sessions'
 
@@ -21,6 +23,8 @@ export interface DataExport {
   passkeys: Passkey[]
   tokens: BearerToken[]
   recoveryCodesLeft: number
+  // Empty without the `organizations` option.
+  organizations: Membership[]
   // Empty without the `audit` option.
   audit: AuditEntry[]
   app: unknown
@@ -45,6 +49,7 @@ export async function exportData(state: RequestState): Promise<{ ok: true, data:
       passkeys: await listPasskeys(state),
       tokens: await listTokens(state),
       recoveryCodesLeft: await core.store.recoveryCodes.count(record.id),
+      organizations: core.organizations ? await listMemberships(state) : [],
       audit: core.audit ? (await core.store.audit!.list({ userId: record.id, limit: AUDIT_EXPORT_MAX })).map(entry => ({ ...entry, event: entry.event as AuditEntry['event'] })) : [],
       app: await core.onExport?.(user) ?? null,
     },

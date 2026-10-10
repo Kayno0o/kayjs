@@ -229,6 +229,48 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.sessions.get('s1')).toBeUndefined()
     })
 
+    test('organizations are found by id and slug, keep slugs unique, and take their members and invitations when deleted', async () => {
+      const at = new Date('2026-01-01T00:00:00Z')
+
+      await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+      await store.users.create(userRecord({ id: 'u2', email: 'grace@example.com' }))
+      await store.organizations!.create({ id: 'o1', name: 'Acme', slug: 'acme', createdAt: at })
+      await store.organizations!.create({ id: 'o2', name: 'Other', slug: null, createdAt: at })
+
+      expect(async () => store.organizations!.create({ id: 'o3', name: 'Copy', slug: 'acme', createdAt: at })).toThrow()
+      expect(await store.organizations!.findBySlug('acme')).toEqual({ id: 'o1', name: 'Acme', slug: 'acme', createdAt: at })
+      expect(await store.organizations!.update('o1', { name: 'Acme Inc' })).toMatchObject({ name: 'Acme Inc', slug: 'acme' })
+      expect(async () => store.organizations!.update('o2', { slug: 'acme' })).toThrow()
+
+      await store.members!.add({ organizationId: 'o1', userId: 'u2', roles: ['member'], createdAt: new Date('2026-01-02T00:00:00Z') })
+      await store.members!.add({ organizationId: 'o1', userId: 'u1', roles: ['owner'], createdAt: at })
+      await store.members!.add({ organizationId: 'o2', userId: 'u1', roles: ['owner'], createdAt: new Date('2026-01-03T00:00:00Z') })
+
+      expect(async () => store.members!.add({ organizationId: 'o1', userId: 'u1', roles: [], createdAt: at })).toThrow()
+      expect((await store.members!.listByOrganization('o1')).map(member => member.userId)).toEqual(['u1', 'u2'])
+      expect((await store.members!.listByUser('u1')).map(member => member.organizationId)).toEqual(['o1', 'o2'])
+      expect(await store.members!.update('o1', 'u2', { roles: ['admin'] })).toMatchObject({ roles: ['admin'] })
+      expect(await store.members!.update('o1', 'nobody', { roles: [] })).toBeUndefined()
+
+      const invitation = { id: 'i1', organizationId: 'o1', email: 'alan@example.com', roles: ['member'], invitedBy: 'u2', createdAt: at, expiresAt: new Date('2026-01-08T00:00:00Z') }
+
+      await store.invitations!.create(invitation)
+
+      expect(await store.invitations!.get('i1')).toEqual(invitation)
+      expect(await store.invitations!.listByEmail('alan@example.com')).toEqual([invitation])
+
+      await store.users.delete('u2')
+
+      expect(await store.members!.get('o1', 'u2')).toBeUndefined()
+      expect(await store.invitations!.get('i1')).toMatchObject({ invitedBy: null })
+      expect(await store.members!.remove('o2', 'u1')).toBe(true)
+      expect(await store.members!.remove('o2', 'u1')).toBe(false)
+      expect(await store.organizations!.delete('o1')).toBe(true)
+      expect(await store.organizations!.delete('o1')).toBe(false)
+      expect(await store.members!.listByUser('u1')).toEqual([])
+      expect(await store.invitations!.listByOrganization('o1')).toEqual([])
+    })
+
     test('attempts count within their window, start over after it, and reset', async () => {
       expect(await store.attempts.count('k')).toBe(0)
       expect(await store.attempts.hit('k', 60)).toBe(1)

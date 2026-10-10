@@ -31,6 +31,8 @@ export const DEFAULT_LIMITS = {
   // Guesses at an emailed code, on top of the few misses each code takes.
   emailCode: { max: 30, window: 15 * MINUTE },
   emailCodeAccount: { max: 10, window: 15 * MINUTE },
+  // Each invitation mails an inbox someone else owns, so a manager may not flood one.
+  invite: { max: 30, window: HOUR },
   // Guessing a token is hopeless; this keeps trying from being free.
   link: { max: 40, window: HOUR },
 } satisfies Record<string, Limit>

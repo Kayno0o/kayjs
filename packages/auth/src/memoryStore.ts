@@ -1,4 +1,4 @@
-import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, PasskeyRecord, SessionRecord, TokenRecord, UserRecord } from './store'
+import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OrganizationRecord, PasskeyRecord, SessionRecord, TokenRecord, UserRecord } from './store'
 
 const SWEEP_EVERY = 1000
 
@@ -11,10 +11,21 @@ export function memoryStore(): AuthStore {
   const bearerTokens = new Map<string, BearerTokenRecord>()
   const sessions = new Map<string, SessionRecord>()
   const passkeys = new Map<string, PasskeyRecord>()
+  const organizations = new Map<string, OrganizationRecord>()
+  const members = new Map<string, MemberRecord>()
+  const invitations = new Map<string, InvitationRecord>()
   let audit: AuditRecord[] = []
   const attempts = new Map<string, { count: number, resetAt: number }>()
   let hits = 0
   const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
+  const memberKey = (organizationId: string, userId: string) => `${organizationId}\n${userId}`
+
+  const claimSlug = (organization: OrganizationRecord) => {
+    for (const other of organizations.values()) {
+      if (organization.slug !== null && other.slug === organization.slug && other.id !== organization.id)
+        throw new Error(`kayjs-auth: the slug ${organization.slug} is taken`)
+    }
+  }
 
   const holder = (field: 'email' | 'username', value: string | null) => {
     if (value === null)
@@ -89,6 +100,16 @@ export function memoryStore(): AuthStore {
         for (const [key, passkey] of passkeys) {
           if (passkey.userId === id)
             passkeys.delete(key)
+        }
+
+        for (const [key, member] of members) {
+          if (member.userId === id)
+            members.delete(key)
+        }
+
+        for (const invitation of invitations.values()) {
+          if (invitation.invitedBy === id)
+            invitation.invitedBy = null
         }
       },
       list({ search, offset, limit }) {
@@ -233,6 +254,74 @@ export function memoryStore(): AuthStore {
       consume: (userId, digest) => recoveryCodes.get(userId)?.delete(digest) ?? false,
       count: userId => recoveryCodes.get(userId)?.size ?? 0,
     },
+    organizations: {
+      create(organization) {
+        claimSlug(organization)
+        organizations.set(organization.id, { ...organization })
+      },
+      get: id => clone(organizations.get(id)),
+      findBySlug: slug => clone([...organizations.values()].find(organization => organization.slug === slug)),
+      update(id, patch) {
+        const organization = organizations.get(id)
+
+        if (!organization)
+          return undefined
+
+        const next = { ...organization, ...patch }
+
+        claimSlug(next)
+        organizations.set(id, next)
+
+        return { ...next }
+      },
+      delete(id) {
+        for (const [key, member] of members) {
+          if (member.organizationId === id)
+            members.delete(key)
+        }
+
+        for (const [key, invitation] of invitations) {
+          if (invitation.organizationId === id)
+            invitations.delete(key)
+        }
+
+        return organizations.delete(id)
+      },
+    },
+    members: {
+      add(member) {
+        const key = memberKey(member.organizationId, member.userId)
+
+        if (members.has(key))
+          throw new Error(`kayjs-auth: user ${member.userId} is a member already`)
+
+        members.set(key, copyMember(member)!)
+      },
+      get: (organizationId, userId) => copyMember(members.get(memberKey(organizationId, userId))),
+      listByOrganization: organizationId => oldestFirst([...members.values()].filter(member => member.organizationId === organizationId)).map(member => copyMember(member)!),
+      listByUser: userId => oldestFirst([...members.values()].filter(member => member.userId === userId)).map(member => copyMember(member)!),
+      update(organizationId, userId, patch) {
+        const key = memberKey(organizationId, userId)
+        const member = members.get(key)
+
+        if (!member)
+          return undefined
+
+        members.set(key, { ...member, roles: [...patch.roles] })
+
+        return copyMember(members.get(key))
+      },
+      remove: (organizationId, userId) => members.delete(memberKey(organizationId, userId)),
+    },
+    invitations: {
+      create(invitation) {
+        invitations.set(invitation.id, copyInvitation(invitation)!)
+      },
+      get: id => copyInvitation(invitations.get(id)),
+      listByOrganization: organizationId => oldestFirst([...invitations.values()].filter(invitation => invitation.organizationId === organizationId)).map(invitation => copyInvitation(invitation)!),
+      listByEmail: email => oldestFirst([...invitations.values()].filter(invitation => invitation.email === email)).map(invitation => copyInvitation(invitation)!),
+      delete: id => invitations.delete(id),
+    },
     attempts: {
       count(key) {
         const entry = attempts.get(key)
@@ -274,6 +363,18 @@ function copyToken(token: BearerTokenRecord | undefined): BearerTokenRecord | un
 
 function copyPasskey(passkey: PasskeyRecord | undefined): PasskeyRecord | undefined {
   return passkey && { ...passkey, transports: [...passkey.transports] }
+}
+
+function copyMember(member: MemberRecord | undefined): MemberRecord | undefined {
+  return member && { ...member, roles: [...member.roles] }
+}
+
+function copyInvitation(invitation: InvitationRecord | undefined): InvitationRecord | undefined {
+  return invitation && { ...invitation, roles: [...invitation.roles] }
+}
+
+function oldestFirst<T extends { createdAt: Date }>(records: T[]): T[] {
+  return records.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
 }
 
 function clone<T extends object>(value: T | undefined): T | undefined {

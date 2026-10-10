@@ -206,7 +206,7 @@ describe('guard', () => {
   }
 
   // The context a kay page would see, built by the same plugin.
-  async function contextOf(plugin: ReturnType<typeof testApp>['auth']['plugin'], cookie = '', headers: Record<string, string> = {}): Promise<object> {
+  async function contextOf(plugin: ReturnType<typeof testApp<never, never>>['auth']['plugin'], cookie = '', headers: Record<string, string> = {}): Promise<object> {
     return new Promise((resolve) => {
       void new Elysia().use(plugin).get('/', (ctx) => {
         resolve(ctx)
