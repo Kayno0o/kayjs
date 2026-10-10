@@ -67,7 +67,7 @@
   },
   "devDependencies": {
     "@kaynooo/eslint": "^6.0.1",
-    "@kaynooo/kayjs-mail": "^0.1.0",
+    "@kaynooo/kayjs-mail": "^0.3.0",
     "@kaynooo/pg-orm": "^7.0.1",
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",

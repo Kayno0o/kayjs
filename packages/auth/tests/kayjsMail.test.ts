@@ -18,7 +18,7 @@ describe('with kayjs-mail', () => {
 
     expect(sent.map(each => each.subject)).toEqual(['Confirm your email for Site'])
     expect(sent[0]!.from).toBe('Site <site@site.test>')
-    expect(sent[0]!.html).toStartWith('<!doctype html><html lang="en">')
+    expect(sent[0]!.html).toStartWith('<!doctype html><html lang="en"')
     expect(sent[0]!.text).toContain('https://site.test/v?token=')
   })
 
