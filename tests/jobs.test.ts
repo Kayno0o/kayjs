@@ -339,8 +339,9 @@ describe('queue', () => {
     }
   })
 
-  it('retries a failing job after a doubling wait, then keeps it as failed and hands it to onFailed', async () => {
+  it('retries a failing job after a doubling wait, logging each retry, then keeps it as failed and hands it to onFailed', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const tries: number[] = []
     const gaveUp: unknown[] = []
     const flaky = queue('flaky', (n: number) => {
@@ -365,7 +366,11 @@ describe('queue', () => {
       expect(tries).toEqual([1, 1, 1])
       expect(gaveUp).toEqual([[1, 'mail server down']])
       expect(await flaky.failed()).toEqual([{ id: expect.any(String), payload: 1, attempts: 3, error: 'mail server down' }])
-      expect(logged).toHaveBeenCalled()
+      expect(logged).toHaveBeenCalledWith('kay: a job of queue(\'flaky\') failed 3 times and is kept as failed')
+      expect(warned.mock.calls).toEqual([
+        ['kay: a job of queue(\'flaky\') failed, attempt 1 of 3, and runs again in 10 s: mail server down'],
+        ['kay: a job of queue(\'flaky\') failed, attempt 2 of 3, and runs again in 20 s: mail server down'],
+      ])
 
       setSystemTime(Date.now() + 3_600_000)
       expect(await flaky.drain()).toBe(0)
@@ -373,6 +378,41 @@ describe('queue', () => {
     finally {
       setSystemTime()
       logged.mockRestore()
+      warned.mockRestore()
+    }
+  })
+
+  it('logs a store that fails once as its outage starts and once as it ends, whatever the concurrency', async () => {
+    const store = memoryJobs()
+    const claim = store.claim.bind(store)
+    let failing = true
+    const ran: number[] = []
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const told = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    store.claim = async (...args) => {
+      if (failing)
+        throw new Error('database is locked')
+
+      return claim(...args)
+    }
+
+    const outage = queue('outage', (n: number) => void ran.push(n), { store, concurrency: 3 })
+    const app = new Elysia().use(outage).listen(0)
+
+    try {
+      await outage.enqueue(1)
+      await until(() => logged.mock.calls.length > 0)
+      await Bun.sleep(50)
+      failing = false
+      await until(() => ran.length > 0)
+      expect(logged.mock.calls.map(call => String(call[0]))).toEqual(['kay: queue(\'outage\') could not read its store; its workers ask it again less and less often until it answers', expect.stringMatching(/^Error: database is locked/)])
+      expect(told.mock.calls).toEqual([['kay: queue(\'outage\') reads its store again']])
+    }
+    finally {
+      await shutdown(app)
+      logged.mockRestore()
+      told.mockRestore()
     }
   })
 

@@ -80,6 +80,8 @@ const DEFAULT_BACKOFF = 10
 const DEFAULT_LOST_AFTER = 600
 // How often an idle worker looks for jobs another process enqueued.
 const POLL_MS = 1000
+// The longest a worker waits between looks at a store that keeps failing.
+const MAX_OUTAGE_MS = 60_000
 const DEFAULT_PATH = 'data/jobs.sqlite'
 
 // What drains each queue made, for `kay/test` to run them all.
@@ -255,7 +257,10 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
       const message = error instanceof Error ? error.message : String(error)
 
       if (job.attempts < attempts) {
-        await store().retry(job.id, Date.now() + backoff * 2 ** (job.attempts - 1), message)
+        const wait = backoff * 2 ** (job.attempts - 1)
+
+        await store().retry(job.id, Date.now() + wait, message)
+        console.warn(`kay: a job of queue('${name}') failed, attempt ${job.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
 
         return true
       }
@@ -269,10 +274,24 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     return true
   }
 
+  // Whether the store failed at the last look, so an outage is logged once as it starts and once as it ends, whatever the concurrency.
+  let storeDown = false
+
   const work = async (signal: AbortSignal) => {
+    let outageWait = 0
+
     while (!signal.aborted) {
       try {
-        if (await runNext())
+        const ran = await runNext()
+
+        if (storeDown) {
+          storeDown = false
+          console.log(`kay: queue('${name}') reads its store again`)
+        }
+
+        outageWait = 0
+
+        if (ran)
           continue
 
         const next = await store().nextRunAt(name)
@@ -280,11 +299,16 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
         await sleep(wait, signal, sleepers)
       }
-      // A store that failed, locked past its timeout say, is logged and asked again at the next look.
+      // A store that failed, locked past its timeout say, is asked again later and later, up to a minute apart.
       catch (error) {
-        console.error(`kay: queue('${name}') could not read its store`)
-        logError(error)
-        await Bun.sleep(POLL_MS)
+        if (!storeDown) {
+          storeDown = true
+          console.error(`kay: queue('${name}') could not read its store; its workers ask it again less and less often until it answers`)
+          logError(error)
+        }
+
+        outageWait = Math.min(outageWait === 0 ? POLL_MS : outageWait * 2, MAX_OUTAGE_MS)
+        await sleep(outageWait, signal, sleepers)
       }
     }
   }
