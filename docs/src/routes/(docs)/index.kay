@@ -1,5 +1,6 @@
 --- server
 import { highlightCode } from 'kay/content'
+import { components } from '../../content.config'
 import { highlight } from '../../highlight'
 
 export const prerender = true
@@ -8,7 +9,10 @@ const SAMPLE = `--- server
 import { t } from 'kay'
 import { addTodo, listTodos } from '../todos'
 
-export const add = action(t.Object({ title: t.String({ minLength: 1 }) }), ({ title }) => addTodo(title))
+export const add = action(
+  t.Object({ title: t.String({ minLength: 1 }) }),
+  ({ title }) => addTodo(title),
+)
 
 const todos = await listTodos()
 ---
@@ -20,7 +24,43 @@ form(action={add})
   input(name="title")
   button Add`
 
+const AUTH = `--- server
+import { t } from 'kay'
+
+const Credentials = t.Object({
+  identifier: t.String({ maxLength: 254 }),
+  password: t.String({ maxLength: 128 }),
+})
+
+export const signIn = action(Credentials, async (input, ctx) => {
+  const result = await ctx.locals.auth.signInWithPassword(input)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+---
+form(action={signIn})
+  input(name="identifier" autocomplete="username")
+  input(name="password" type="password")
+  button Sign in`
+
+const MAIL = `---
+import Button from '@kaynooo/kayjs-mail/button.kay'
+import Layout from '@kaynooo/kayjs-mail/layout.kay'
+import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+
+const { name, url } = props<{ name: string, url: string }>()
+---
+Layout(preheader="Your account is ready")
+  Paragraph Welcome, {name}. Confirm your address to start.
+  Button(href={url}) Confirm my address`
+
 const sample = await highlightCode(SAMPLE, 'kay', { highlight })
+const auth = await highlightCode(AUTH, 'kay', { highlight })
+const mail = await highlightCode(MAIL, 'kay', { highlight })
+const componentCount = (await components.all()).length
 const features = [
   { title: 'One file per component', text: 'TypeScript fences, then an indented template. No JSX, no closing tags.', href: '/essentials/templates' },
   { title: 'HTML first', text: 'Pages render to plain HTML on the server. Only interactive components ship JavaScript.', href: '/essentials/islands' },
@@ -29,8 +69,21 @@ const features = [
 ]
 ---
 ---
+import Accessible from '~icons/tabler/accessible'
+import Api from '~icons/tabler/api'
+import Bolt from '~icons/tabler/bolt'
+import Files from '~icons/tabler/files'
+import Icons from '~icons/tabler/icons'
+import Language from '~icons/tabler/language'
+import Photo from '~icons/tabler/photo'
+import Seo from '~icons/tabler/seo'
+import ShieldLock from '~icons/tabler/shield-lock'
+import TestPipe from '~icons/tabler/test-pipe'
+import ModuleCard from '../../components/module-card.kay'
 import Pager from '../../components/pager.kay'
+import UiShowcase from '../../components/ui-showcase.kay'
 import { FORGE } from '../../pages'
+import '../../ui.css'
 ---
 head
   title(raw) kay, a Bun web framework
@@ -49,4 +102,70 @@ head
           a(href={feature.href})
             strong {feature.title}
             span {feature.text}
+    section.home-section(aria-labelledby="built-in")
+      h2#built-in Built in
+      p.section-lede What a site needs ships with kay, typed and checked like the pages using it.
+      ul.modules
+        ModuleCard(title="i18n" use="kay/i18n" href="/guides/i18n")
+          @icon
+            Language
+          | A prefix per locale, typed messages with plurals, dates, numbers, relative times and lists, and right-to-left pages.
+        ModuleCard(title="Accessibility" use="kay check" href="/reference/checks")
+          @icon
+            Accessible
+          | Missing alt text, misspelt ARIA, unknown roles, nested controls and duplicate ids, reported at the .kay line.
+        ModuleCard(title="SEO" use="kay/seo" href="/essentials/head-and-seo")
+          @icon
+            Seo
+          | Titles a page overrides, canonical and Open Graph tags, share cards, a sitemap, robots.txt and JSON-LD.
+        ModuleCard(title="Images" use="kay/image" href="/essentials/styling-and-assets")
+          @icon
+            Photo
+          | Imported images get WebP and AVIF variants in a srcset, their width and height, and crops to a shape.
+        ModuleCard(title="Content" use="kay/content" href="/guides/content")
+          @icon
+            Files
+          | Markdown, JSON and YAML collections checked against a schema, with components in Markdown, feeds and CMS sources.
+        ModuleCard(title="Sessions and guards" use="kay/server" href="/guides/sessions-and-guards")
+          @icon
+            ShieldLock
+          | Typed locals from your Elysia plugins, sessions sealed in a cookie or kept in a store, and guards on any route.
+        ModuleCard(title="API routes" use="kay/server" href="/guides/api-routes")
+          @icon
+            Api
+          | Elysia modules in src/api, mounted at their path, with server-sent events and websockets.
+        ModuleCard(title="Icons" use="~icons" href="/essentials/styling-and-assets")
+          @icon
+            Icons
+          | Any Iconify set, imported one icon at a time as a tag that sizes to the text and takes its colour.
+        ModuleCard(title="Caching and streaming" use="kay/cache" href="/guides/caching-and-streaming")
+          @icon
+            Bolt
+          | Cache a load or a whole page, and stream the slow parts of a page as they resolve.
+        ModuleCard(title="Testing" use="kay/test" href="/guides/testing")
+          @icon
+            TestPipe
+          | Visit pages, post forms and sign users in from bun test with no server, or open a page in a headless Chrome.
+    section.home-section(aria-labelledby="libraries")
+      h2#libraries Libraries
+      p.section-lede Packages built on kay, installed when a site needs them.
+      .libraries
+        article.library
+          header.library-head
+            h3
+              a(href="/libraries/kayjs-ui") kayjs-ui
+            p {componentCount} components your app compiles as its own: dialogs, tables, forms, charts, a command palette and more, restyled from one stylesheet. Try them:
+          UiShowcase
+        article.library
+          header.library-head
+            h3
+              a(href="/libraries/kayjs-auth") kayjs-auth
+            p Passwords, OAuth, magic links, TOTP two-factor and bearer tokens on kay's sessions. It ships no UI: your pages call it.
+          div(innerHTML={auth})
+        article.library
+          header.library-head
+            h3
+              a(href="/libraries/kayjs-mail") kayjs-mail
+            p Mails written as .kay components, rendered to HTML and text, sent over SMTP or queued with retries. Tests read an outbox.
+          div(innerHTML={mail})
   Pager(next={{ href: '/getting-started/introduction', title: 'Introduction' }} source={`${FORGE}/docs/src/routes/(docs)/index.kay`})

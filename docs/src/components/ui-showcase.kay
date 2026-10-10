@@ -1,0 +1,34 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import Meter from '@kaynooo/kayjs-ui/meter.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+const VISITS: Record<string, number> = { day: 182, week: 1284, month: 5310 }
+const PERIODS = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }]
+
+const period = signal('week')
+const replies = signal(true)
+---
+.ui-stage.showcase-stage
+  .grid.gap-4.sm:grid-cols-2
+    Card(title="Traffic")
+      @head
+        Badge(label="Live" tone="success")
+      .flex.flex-col.gap-4
+        Segmented(options={PERIODS} value={period} label="Period" onChange={period.set})
+        .flex.flex-wrap.gap-6
+          Stat(value={(VISITS[period] ?? 0).toLocaleString('en')} label="visits")
+          Stat(value="4.6" label="rating")
+        Meter(value={82} label="Disk" fillClass="bg-kui-warning")
+    Card(title="Settings")
+      .flex.flex-col.items-start.gap-4
+        Toggle(label="Email me on replies" checked={replies} onChange={replies.set})
+        Rating(value={4.6})
+        .flex.flex-wrap.gap-2
+          Button(label="Save" variant="accent" icon="success")
+          Button(label="Delete" variant="danger" icon="delete")

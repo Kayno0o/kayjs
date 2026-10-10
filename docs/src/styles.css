@@ -740,7 +740,8 @@ pre code {
 
 .features {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  /* min() keeps a column within a phone screen whose text size the reader raised. */
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
   gap: 0.75rem;
   margin: 2rem 0 0;
   padding: 0;
@@ -766,6 +767,117 @@ pre code {
 
 .features strong {
   color: var(--text);
+}
+
+.home-section {
+  margin-top: 4rem;
+}
+
+.home-section h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.section-lede {
+  margin: 0.4rem 0 1.5rem;
+  color: var(--subtext);
+}
+
+.modules {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.module {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 1rem;
+  color: var(--subtext);
+  font-size: 0.925rem;
+  text-decoration: none;
+  background: var(--mantle);
+  border-radius: var(--radius);
+}
+
+.module:hover {
+  background: var(--tint);
+}
+
+.module-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.6rem;
+}
+
+.module-head strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.module-head code {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.module-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--accent);
+  font-size: 1.15rem;
+  background: var(--crust);
+  border-radius: var(--radius);
+}
+
+.libraries {
+  display: grid;
+  gap: 1rem;
+}
+
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  padding: 1.25rem;
+  background: var(--mantle);
+  border-radius: var(--radius);
+}
+
+.library-head h3 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 1.15rem;
+}
+
+.library-head h3 a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.library-head h3 a:hover {
+  color: var(--accent);
+}
+
+.library-head p {
+  margin: 0.35rem 0 0;
+  color: var(--subtext);
+}
+
+.showcase-stage {
+  padding: 1rem;
+  background: var(--base);
+  border-radius: var(--radius);
 }
 
 /* The full reference sits folded at the bottom of the sidebar. */
