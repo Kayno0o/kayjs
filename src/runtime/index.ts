@@ -8,7 +8,7 @@ import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
 import { keepValue } from './persist'
 import { keepParam } from './query-param'
-import { createSignal, memo, onCleanup, provideContext, readContext, tracking, untrack } from './reactive'
+import { createSignal, effect, memo, onCleanup, provideContext, readContext, tracking, untrack } from './reactive'
 
 // Writes a value, or what a function makes of the current one.
 export type Setter<T> = (next: T | ((current: T) => T)) => void
@@ -60,6 +60,38 @@ export function queryParam<T = string | undefined>(name: string): Signal<T> {
   return withSetter(kept.read, (next) => {
     write(next)
     kept.save(untrack(own))
+  })
+}
+
+export interface EveryOptions {
+  // Read as an effect reads: the timer starts as it turns true and stops as it turns false.
+  while?: (() => boolean) | undefined
+}
+
+// Runs `run` every `ms` milliseconds while the island lives, and while `options.while` holds: `every(3000, refresh, { while: () => issuing })` polls the page until nothing is issuing.
+// Nothing runs while the server renders, and a tick is skipped while the promise the last run returned is pending, so a slow refresh never piles up.
+export function every(ms: number, run: () => unknown, options?: EveryOptions): void {
+  effect(() => {
+    if (options?.while && !options.while())
+      return
+
+    let busy = false
+    const tick = async () => {
+      if (busy)
+        return
+
+      busy = true
+
+      try {
+        await untrack(run)
+      }
+      finally {
+        busy = false
+      }
+    }
+    const timer = setInterval(() => void tick(), ms)
+
+    onCleanup(() => clearInterval(timer))
   })
 }
 

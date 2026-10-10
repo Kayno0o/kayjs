@@ -135,6 +135,8 @@ onMount(() => drawMap(center))
 .map
 ```
 
+`every(ms, run)` from `kay` runs `run` on a timer while the island lives, never on the server, and `{ while }` starts and stops it as a condition turns: `every(3000, refresh, { while: () => issuing })` polls the page until nothing is issuing, `every(1000, () => now = Date.now())` ticks a clock.
+
 <Callout type="warning">
 
 Reading a browser global while the component renders throws on the server. `kay check` reports it and the editor offers the fix.

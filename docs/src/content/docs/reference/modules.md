@@ -18,6 +18,7 @@ import { collection } from 'kay/content'
 | Export | Is |
 | --- | --- |
 | `signal`, `memo`, `effect`, `batch`, `untrack`, `onMount`, `onCleanup` | Reactivity |
+| `every` | A timer running while an island lives, and while a condition holds |
 | `persisted`, `queryParam`, `linked`, `selection`, `context` | Signal helpers: stored, one query param of the page read by its schema, derived from a source, one selected key, shared down a tree |
 | `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...) |
 | `action` | A form post or island call checked by a schema. See [Forms and actions](/essentials/forms-and-actions) |

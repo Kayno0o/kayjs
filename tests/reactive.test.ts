@@ -1,7 +1,7 @@
 import type { Action } from '../src/runtime'
-import { describe, expect, it, spyOn } from 'bun:test'
+import { describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
-import { batch, effect, flush, linked, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
+import { batch, effect, every, flush, linked, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
 import { ActionError, actionStub } from '../src/runtime/action'
 import { createSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded } from '../src/runtime/reactive'
 
@@ -383,6 +383,97 @@ describe('optimistic changes', () => {
     }
     finally {
       fetched.mockRestore()
+    }
+  })
+})
+
+describe('every', () => {
+  it('runs every interval until its root goes, starting and stopping as its condition turns', () => {
+    jest.useFakeTimers()
+
+    try {
+      const active = signal(false)
+      let runs = 0
+      const dispose = root((dispose) => {
+        every(100, () => runs++, { while: active })
+
+        return dispose
+      })
+
+      flush()
+      jest.advanceTimersByTime(250)
+      expect(runs).toBe(0)
+
+      active.set(true)
+      flush()
+      jest.advanceTimersByTime(250)
+      expect(runs).toBe(2)
+
+      active.set(false)
+      flush()
+      jest.advanceTimersByTime(250)
+      expect(runs).toBe(2)
+
+      active.set(true)
+      flush()
+      dispose()
+      jest.advanceTimersByTime(250)
+      expect(runs).toBe(2)
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('starts no timer while the server renders', () => {
+    jest.useFakeTimers()
+
+    try {
+      let runs = 0
+
+      renderOnServer(() => every(100, () => runs++))
+      flush()
+      jest.advanceTimersByTime(250)
+      expect([runs, jest.getTimerCount()]).toEqual([0, 0])
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('skips a tick while the last run is pending, and reads no signal of the run as a dependency', async () => {
+    jest.useFakeTimers()
+
+    try {
+      const count = signal(0)
+      let finish: (() => void) | undefined
+      let started = 0
+      const dispose = root((dispose) => {
+        every(100, async () => {
+          started++
+          count.set(count() + 1)
+          await new Promise<void>((resolve) => {
+            finish = resolve
+          })
+        })
+
+        return dispose
+      })
+
+      flush()
+      jest.advanceTimersByTime(350)
+      expect(started).toBe(1)
+
+      finish?.()
+      await Promise.resolve()
+      await Promise.resolve()
+      jest.advanceTimersByTime(100)
+      flush()
+      expect([started, count()]).toEqual([2, 2])
+      dispose()
+    }
+    finally {
+      jest.useRealTimers()
     }
   })
 })
