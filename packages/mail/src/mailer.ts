@@ -2,7 +2,7 @@ import type { EnqueueOptions, KayExtension, QueueOptions } from 'kay/server'
 import type { Address, Delivery, Envelope, Mail, Message, Transport } from './types'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import { t } from 'kay'
+import { s } from 'kay'
 import { defineEnv, queue, renderToString } from 'kay/server'
 import { escapeHtml as escape } from './escape'
 import { addressOf, outbox } from './outbox'
@@ -113,17 +113,17 @@ function delivering(): 'outbox' | 'smtp' {
 
 // SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT`, `SMTP_DKIM_*`, `SMTP_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
 function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, to: string | undefined, missing: () => string[] } {
-  const env = defineEnv(t.Object({
-    SMTP_HOST: optional ? t.Optional(t.String()) : t.String(),
-    SMTP_PORT: t.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
-    SMTP_USER: t.Optional(t.String()),
-    SMTP_PASS: t.Optional(t.String()),
-    SMTP_RATE_LIMIT: t.Optional(t.Integer({ minimum: 1 })),
-    SMTP_DKIM_SELECTOR: t.Optional(t.String()),
-    SMTP_DKIM_PRIVATE_KEY: t.Optional(t.String()),
-    SMTP_DKIM_DOMAIN: t.Optional(t.String()),
-    SMTP_FROM: optional || from !== undefined ? t.Optional(t.String({ pattern: SENDER })) : t.String({ pattern: SENDER }),
-    MAIL_TO: t.Optional(t.String({ pattern: RECIPIENTS })),
+  const env = defineEnv(s.Object({
+    SMTP_HOST: optional ? s.Optional(s.String()) : s.String(),
+    SMTP_PORT: s.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
+    SMTP_USER: s.Optional(s.String()),
+    SMTP_PASS: s.Optional(s.String()),
+    SMTP_RATE_LIMIT: s.Optional(s.Integer({ minimum: 1 })),
+    SMTP_DKIM_SELECTOR: s.Optional(s.String()),
+    SMTP_DKIM_PRIVATE_KEY: s.Optional(s.String()),
+    SMTP_DKIM_DOMAIN: s.Optional(s.String()),
+    SMTP_FROM: optional || from !== undefined ? s.Optional(s.String({ pattern: SENDER })) : s.String({ pattern: SENDER }),
+    MAIL_TO: s.Optional(s.String({ pattern: RECIPIENTS })),
   }))
 
   // Optional both, so reading them never throws under `kay build`, and a server given one without the other stops as it boots.
@@ -162,7 +162,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   }
 }
 
-// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; kay 1.26 or later.
+// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`.
 // It is loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
 export function mailExtension(load: () => Promise<Mailer>): KayExtension<Mailer> {
   return { name: '@kaynooo/kayjs-mail', server: load }
