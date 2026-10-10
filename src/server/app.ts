@@ -94,7 +94,7 @@ async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<str
     if (!paths)
       byRoute.set(page.pattern, paths = new Map<string, ServedPage>())
 
-    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, islands: page.islands, readsSite: page.readsSite, ...loaded[index]! })
+    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, islands: page.islands, stamps: page.stamps, readsSite: page.readsSite, ...loaded[index]! })
   }
 
   return byRoute
@@ -337,7 +337,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, new Set([...publicUrls, ...servedPaths(routes)]), { client, offline: options.dev ? undefined : options.offline, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined).map(([path]) => path) })
+  await serveServiceWorker(app, new Set([...publicUrls, ...servedPaths(routes)]), { client, offline: options.dev ? undefined : options.offline, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
 
   // Their canonical links, social URLs and anything built with `siteUrl()` name the site the build ran for.
   const moved = client.pages.size > 0 && client.site !== site
@@ -387,7 +387,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
     await revalidateStale(page, async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), error => reportServerError(error, context.request, renderOptions.onError))
 
-    return (page.islands && await serveServerIslands(route, page, params, context, url, client, renderOptions)) ?? servePrerendered(route, page, context, client, renderOptions)
+    const served = page.islands !== undefined || page.stamps === true ? await serveServerIslands(route, page, params, context, url, client, renderOptions) : undefined
+
+    return served ?? servePrerendered(route, page, context, client, renderOptions)
   }
 
   // Each path the router serves, with the pages serving it and the locale it is in: a page whose matcher refuses the URL passes it to the next, the one without a matcher last.

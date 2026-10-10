@@ -276,6 +276,11 @@ export function withServerIslands<T>(state: ServerIslands, render: () => T): T {
   }
 }
 
+// Whether this is the build rendering a prerendered page, outside its server islands: what must be new on every request, as a form's stamp, is left for the server to fill in.
+export function prerendering(): boolean {
+  return islands?.scanning === true && islands.inside === 0
+}
+
 function throughServerIslands<P>(state: ServerIslands, fn: (props: P) => unknown, props: P): unknown {
   if (state.inside > 0)
     return scope(() => fn(props))

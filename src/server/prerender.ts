@@ -24,6 +24,7 @@ import { renderPage } from './render'
 import { refuseClashes, scanRoutes } from './routes'
 import { configHead, siteOrigin } from './seo'
 import { serverIslandModes } from './server-islands'
+import { STAMP_HOLE } from './stamp'
 
 const KAY_PREFIX = /^kay: /
 const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
@@ -113,6 +114,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
           throw new Error(`kay: ${copy.path} links an image only the image route resizes, such as one from images.dirs, and no file of it is exported`)
 
         const islands = serverIslandModes(html)
+        const stamps = html.search(STAMP_HOLE) >= 0
         const readsSite = standInReads() > reads
 
         if (options.exportAll && readsSite)
@@ -120,6 +122,9 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
         if (options.exportAll && islands.length > 0)
           throw new Error(`kay: it holds ${islands.length === 1 ? 'a server island' : `${islands.length} server islands`}, which only a server renders per request`)
+
+        if (options.exportAll && stamps)
+          throw new Error('kay: a form in it posts to an action with `minTime`, whose stamp only a server signs per request')
 
         if (islands.includes('defer') && client.entry === undefined)
           throw new Error(`kay: it defers a server island, which kay's browser entry fetches, and with no island and \`navigation: false\` the build has none; mark it \`server\` to render it inline instead`)
@@ -133,7 +138,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         paths.set(name, copy.key)
         await mkdir(join(dir, name, '..'), { recursive: true })
         await Bun.write(join(dir, name), html)
-        pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...readsSite ? { readsSite } : {} }
+        pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {} }
       }
     }
   }

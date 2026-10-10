@@ -38,6 +38,8 @@ export interface PrerenderedPage {
   revalidate?: number | undefined
   // How each of its server islands renders per request, in page order.
   islands?: ServerIslandMode[] | undefined
+  // It holds the stamp of a form posting to an action with `minTime`, which the server signs each time it serves the page.
+  stamps?: boolean | undefined
   // Its render read the site, which the build had none of: the server renders it again before serving it.
   readsSite?: boolean | undefined
 }

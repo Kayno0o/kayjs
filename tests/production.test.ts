@@ -877,6 +877,7 @@ describe('a prerendered page posted to', () => {
   const routes = 'tests/fixtures/production/src/routes'
   // Held in a variable so tsc leaves the .kay import to Bun.
   const NEWSLETTER = './fixtures/production/src/routes/newsletter.kay'
+  const BROCHURE = './fixtures/production/src/routes/brochure.kay'
 
   it('renders for the post a form sent, and for the request carrying how it went, kept by no cache, the built file served before and after', async () => {
     const root = process.cwd()
@@ -928,6 +929,51 @@ describe('a prerendered page posted to', () => {
       expect(after.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
     }
     finally {
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('signs the stamp of a form posting to an action with `minTime` on every visit, the page rendered once at build, kept by no cache', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const start = Date.now()
+
+    try {
+      await prerenderPages(root, { routes }, (await readClient(root))!)
+      expect(await Bun.file(join(root, '.kay/client/pages/brochure.html')).text()).toContain('name="kay_since" value="kay-stamp:')
+
+      const app = await pages({ routes, prebuilt: true, security: false })
+      const { order } = await import(BROCHURE) as { order: Action<{ address: string }, number> }
+      const visit = async (encoding: string) => app.handle(new Request('http://localhost/brochure', { headers: { 'accept-encoding': encoding } }))
+      const stampOf = (html: string) => (/name="kay_since" value="([^"]+)"/).exec(html)![1]!
+      const post = async (stamp: string) => app.handle(new Request(`http://localhost${order.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/brochure' }, body: new URLSearchParams({ address: '1 Main St', kay_since: stamp }) }))
+
+      setSystemTime(start)
+
+      const plain = await visit('identity')
+
+      expect(plain.headers.get('cache-control')).toBe('private, no-store')
+      expect(plain.headers.has('etag')).toBe(false)
+
+      const first = stampOf(await plain.text())
+
+      setSystemTime(start + 1000)
+
+      const zipped = await visit('gzip')
+
+      expect(zipped.headers.get('content-encoding')).toBe('gzip')
+
+      const second = stampOf(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await zipped.arrayBuffer()))))
+
+      expect(second).not.toBe(first)
+      expect((await post(second)).status).toBe(422)
+
+      setSystemTime(start + 3000)
+      expect((await post(first)).status).toBe(303)
+    }
+    finally {
+      setSystemTime()
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }

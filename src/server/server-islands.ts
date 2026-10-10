@@ -6,18 +6,28 @@ import type { RenderOptions, RequestContext, ServedPage } from './render'
 import { SERVER_ISLAND } from '../runtime/html'
 import { ISLAND_HEADER, ISLAND_PARAM } from '../runtime/server-islands'
 import { fixedText, gzipBetween, preferredEncoding } from './compress'
-import { renderServerIslands } from './render'
+import { renderServerIslands, servePrerendered } from './render'
+import { freshStamp, STAMP_HOLE } from './stamp'
 
 const DEFERRED = '<slot data-kay-server='
 const GZIP: ReadonlySet<'gzip'> = new Set(['gzip'])
+
+// What fills a gap of the page per request: a server island, by its place in the page, or a form's stamp, by the action it posts to.
+type Hole = { island: number } | { action: string }
+
+// The page cut at its holes, each part deflated once.
+interface Cut {
+  parts: FixedText[]
+  holes: Hole[]
+}
 
 interface Islands {
   // The page text the parts were cut from: a revalidation replaces it.
   html: ServedPage['html']
   text: Promise<string>
-  // Cut at the inline islands only, deferred ones keeping the copy standing in for them, or at every island.
-  inline?: Promise<FixedText[]>
-  all?: Promise<FixedText[]>
+  // Cut at the inline islands only, deferred ones keeping the copy standing in for them, or at every island; at the stamps either way.
+  inline?: Promise<Cut>
+  all?: Promise<Cut>
 }
 
 const cut = new WeakMap<ServedPage, Islands>()
@@ -29,8 +39,7 @@ export function serverIslandModes(html: string): ServerIslandMode[] {
   return [...html.matchAll(SERVER_ISLAND)].map(modeOf)
 }
 
-// The page around the islands a request renders, each part deflated once.
-async function partsOf(page: ServedPage, all: boolean): Promise<FixedText[]> {
+async function cutOf(page: ServedPage, all: boolean): Promise<Cut> {
   let islands = cut.get(page)
 
   if (islands?.html !== page.html) {
@@ -45,20 +54,33 @@ async function partsOf(page: ServedPage, all: boolean): Promise<FixedText[]> {
   return all ? islands.all ??= cutAt(await text, true) : islands.inline ??= cutAt(await text, false)
 }
 
-async function cutAt(html: string, all: boolean): Promise<FixedText[]> {
+async function cutAt(html: string, all: boolean): Promise<Cut> {
+  const islands = [...html.matchAll(SERVER_ISLAND)].filter(match => all || modeOf(match) === 'inline').map(match => ({ match, hole: { island: Number(match[1]) } }))
+  const stamps = [...html.matchAll(STAMP_HOLE)].map(match => ({ match, hole: { action: decodeURIComponent(match[1]!) } }))
   const parts: string[] = []
+  const holes: Hole[] = []
   let from = 0
 
-  for (const match of html.matchAll(SERVER_ISLAND)) {
-    if (all || modeOf(match) === 'inline') {
-      parts.push(html.slice(from, match.index))
-      from = match.index + match[0].length
-    }
+  for (const { match, hole } of [...islands, ...stamps].sort((a, b) => a.match.index - b.match.index)) {
+    parts.push(html.slice(from, match.index))
+    holes.push(hole)
+    from = match.index + match[0].length
   }
 
   parts.push(html.slice(from))
 
-  return parts.map(fixedText)
+  return { parts: parts.map(fixedText), holes }
+}
+
+// The page with its holes filled for this request, gzipped when the browser takes it.
+async function splice(page: ServedPage, all: boolean, islands: string[], request: Request): Promise<{ body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>, gzip: boolean }> {
+  const { parts, holes } = await cutOf(page, all)
+  const between = holes.map(hole => 'action' in hole ? freshStamp(hole.action) : islands[hole.island] ?? '')
+
+  if (!preferredEncoding(request.headers.get('accept-encoding'), GZIP))
+    return { body: parts.map((part, index) => part.bytes.toString() + (between[index] ?? '')).join(''), gzip: false }
+
+  return { body: await gzipBetween(parts, between), gzip: true }
 }
 
 function modeOf([mark, index]: RegExpExecArray): ServerIslandMode {
@@ -73,8 +95,9 @@ export async function serveServerIslands(route: ServedRoute, page: ServedPage, p
 
   const all = asked !== null && !fetched
 
-  if (asked === null && !page.islands?.includes('inline'))
-    return undefined
+  // A page with no island to render now still has its stamps signed.
+  if (page.islands === undefined || (asked === null && !page.islands.includes('inline')))
+    return page.stamps ? servePrerendered(route, page, context, client, options, async () => splice(page, false, [], context.request)) : undefined
 
   if (fetched && page.islands?.[Number(asked)] !== 'defer')
     return new Response(null, { status: 404 })
@@ -101,13 +124,10 @@ export async function serveServerIslands(route: ServedRoute, page: ServedPage, p
   if (all)
     rendered.headers.set('x-robots-tag', 'noindex')
 
-  const parts = await partsOf(page, all)
-  const between = all ? rendered.html : rendered.html.filter((_, index) => page.islands?.[index] === 'inline')
+  const { body, gzip } = await splice(page, all, rendered.html, context.request)
 
-  if (!preferredEncoding(context.request.headers.get('accept-encoding'), GZIP))
-    return rendered.reply(parts.map((part, index) => part.bytes.toString() + (index < parts.length - 1 ? between[index] ?? '' : '')).join(''))
+  if (gzip)
+    rendered.headers.set('content-encoding', 'gzip')
 
-  rendered.headers.set('content-encoding', 'gzip')
-
-  return rendered.reply(await gzipBetween(parts, between))
+  return rendered.reply(body)
 }
