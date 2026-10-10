@@ -245,7 +245,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       if (response.status !== 200)
         throw new Error(`kay: ${path} answered ${response.status}`)
 
-      return sitemapUrls(await response.text())
+      return sitemapUrls(await withNatives(async () => response.text()))
     },
     fetch: async (path, init = {}) => send(path, init),
     socket: (module, path, ...[options]) => {

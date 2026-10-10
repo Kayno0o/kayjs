@@ -10,6 +10,8 @@ import { ActionError } from '../src/runtime'
 import { readActionResponse } from '../src/runtime/action'
 import { session } from '../src/server/session'
 import { testSite } from '../src/test'
+import { NativeRequest, withNatives } from '../src/test/natives'
+import { readPage } from '../src/test/page'
 import { resetTodos } from './fixtures/site/src/data'
 
 const routes = 'tests/fixtures/site/src/routes'
@@ -103,6 +105,22 @@ describe('kay/test', () => {
       expect(await site.call(add, { title: 'Called under a DOM' })).toBeNumber()
     }
     finally {
+      await GlobalRegistrator.unregister()
+    }
+  })
+
+  it('leaves a function the test stubbed, such as fetch, to the app, while its classes are Bun\'s', async () => {
+    GlobalRegistrator.register()
+    const stub = spyOn(globalThis, 'fetch')
+
+    try {
+      const seen = await withNatives(async () => [(globalThis.fetch as unknown) === stub, globalThis.Request === NativeRequest])
+
+      expect(seen).toEqual([true, true])
+      expect(globalThis.Request).not.toBe(NativeRequest)
+    }
+    finally {
+      stub.mockRestore()
       await GlobalRegistrator.unregister()
     }
   })
@@ -310,6 +328,10 @@ describe('reading a page', () => {
     expect(page.html).toContain('<script')
     expect(page.text()).toContain('Paint <walls> & doors')
     expect(page.text()).not.toContain('{')
+  })
+
+  it('reads past a self-closing script or style, as an inline SVG may hold', () => {
+    expect(readPage('<body><svg><style/><script/></svg><p>Shown</p></body>').text()).toBe('Shown')
   })
 
   it('lists the sitemap\'s URLs, and fails on one that does not answer', async () => {

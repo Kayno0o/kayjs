@@ -18,7 +18,7 @@ export interface PageReading {
   links: () => string[]
   // Every element a CSS selector matches, in page order.
   find: (selector: string) => Found[]
-  // The text a visitor reads in the body, or in the first element `selector` matches, as `find` gives it but without scripts, styles and templates: `Thanks, {name}!` reads as one string, where `html` holds hydration markers inside it.
+  // The text of the body, or of the first element `selector` matches, as `find` gives it but without scripts, styles and templates, with no break between blocks: `Thanks, {name}!` reads as one string, where `html` holds hydration markers inside it.
   text: (selector?: string) => string | undefined
 }
 
@@ -55,6 +55,10 @@ function matches(html: string, selector: string, visible = false): Matched[] {
   if (visible) {
     rewriter.on(UNREAD, {
       element: (element) => {
+        // An inline SVG may hold a self-closing one, with nothing inside.
+        if (!element.canHaveContent || element.selfClosing)
+          return
+
         hidden++
         element.onEndTag(() => {
           hidden--
