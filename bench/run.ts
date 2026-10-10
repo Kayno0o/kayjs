@@ -35,7 +35,13 @@ async function installApps() {
 
 // Measuring only means something when every app renders the same thing, on the server and in the browser.
 async function assertSameMarkup(browser: Browser) {
-  const renders = [...await Promise.all(PATHS.map(async path => ({ what: path, markup: await serverMarkup(path) }))), { what: 'the table rows', markup: await clientRows(browser) }]
+  const renders: { what: string, markup: string[] }[] = []
+
+  // One path at a time: each kay process builds its client into the app's one `.kay/client` as it boots, which two at once would clear under each other.
+  for (const path of PATHS)
+    renders.push({ what: path, markup: await serverMarkup(path) })
+
+  renders.push({ what: 'the table rows', markup: await clientRows(browser) })
 
   for (const { what, markup: [kay, ...others] } of renders) {
     for (const [index, markup] of others.entries()) {
