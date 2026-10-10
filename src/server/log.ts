@@ -1,6 +1,8 @@
 import type { Elysia } from 'elysia'
 import type { LogLevel } from '../runtime/log'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import process from 'node:process'
+import { version } from '../../package.json'
 import { ASSET_PREFIX } from '../build/assets'
 import { describeThrown } from '../build/sourcemap'
 import { setLogSink } from '../runtime/log'
@@ -88,14 +90,18 @@ setLogSink((level, message, error, request) => logMessage(level, message, error,
 
 // Logs one of kay's messages under `request`, or the request being answered; `message` may be empty for an error that says it all.
 export function logMessage(level: LogLevel, message: string, error?: unknown, request = currentRequest()): void {
-  write({
+  write(messageEntry(level, message, error, request))
+}
+
+function messageEntry(level: LogLevel, message: string, error?: unknown, request?: Request): MessageEntry {
+  return {
     type: 'message',
     time: new Date().toISOString(),
     level,
     message: message === '' && error instanceof Error ? error.message : message,
     ...request && { request: { method: request.method, path: pathOf(request.url), id: requestId(request) } },
     ...error !== undefined && { error: thrown(error) },
-  })
+  }
 }
 
 function thrown(error: unknown): NonNullable<MessageEntry['error']> {
@@ -122,6 +128,20 @@ export async function answeringRequest<T>(request: Request, run: () => Promise<T
   finally {
     inFlight.delete(request)
   }
+}
+
+// The server's first line, in the format the `log` option of this `pages()` says: where it listens, which kay runs it in which mode, and how many pages its build prerendered.
+export function announceStart(app: Elysia, logger: Exclude<Logger, false>, prerendered: number): void {
+  const writeLine = writerFor(logger)
+
+  app.onStart((root) => {
+    if (!root.server)
+      return
+
+    const mode = process.env.NODE_ENV === undefined ? '' : ` in ${process.env.NODE_ENV}`
+
+    writeLine(messageEntry('info', `listening on ${root.server.url.origin}, kay ${version}${mode}, ${prerendered} ${prerendered === 1 ? 'page' : 'pages'} prerendered`))
+  })
 }
 
 // Logs one line per request, `GET /blog/hello 200 12ms AZnL...`, in the format the `log` option of this `pages()` says; kay's own `/_kay/` routes and the health route are left out.

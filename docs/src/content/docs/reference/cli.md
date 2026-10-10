@@ -79,7 +79,7 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 14:03:05 the server exited with code 1, waiting for a change
 ```
 
-The entry's own `Listening on http://localhost:3000` line, which the templates print in production, is left out.
+The `Listening on http://localhost:3000` line an entry scaffolded by an older kay prints is left out; kay's own start line only shows in production.
 
 ### Inspector
 

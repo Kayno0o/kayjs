@@ -80,6 +80,9 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     `import process from 'node:process'`,
     `import { probeHealth, registerBundle } from 'kay/internal/server'`,
     '',
+    // For code reading it off `node:process`, as kay does, which the build's `define` leaves alone.
+    'Bun.env.NODE_ENV = \'production\'',
+    '',
     existsSync(configFile) ? `const { default: config } = await import(${JSON.stringify(configFile)})` : 'const config = {}',
     '',
     // Asks the server running beside it, rather than starting one, before any module of the app loads: a container's health check runs it every few seconds.

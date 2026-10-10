@@ -9,7 +9,7 @@ import '../server'
 loadTraverse()
 
 const START_LINE = /^start (\d+)(?: (\d+) ([^\n]*))?/
-// The line an entry prints once it listens, as kay's templates do: `kay dev` prints the address itself, once for every restart.
+// The line an entry prints once it listens, as apps scaffolded before kay printed its own did: `kay dev` prints the address itself, once for every restart.
 const LISTENING_LINE = /^Listening on https?:\/\/[^/\s]+:(\d+)\/?$/
 
 // The first server the entry starts is the one `kay dev` reports.

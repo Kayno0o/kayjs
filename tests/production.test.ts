@@ -10,6 +10,7 @@ import { brotliDecompressSync, constants } from 'node:zlib'
 import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia, t } from 'elysia'
+import { version } from '../package.json'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { action } from '../src/runtime'
@@ -1222,7 +1223,7 @@ describe('footprint', () => {
 })
 
 describe('lifecycle', () => {
-  // A server in a process of its own, with the port it printed and what it prints after.
+  // A server in a process of its own, with the port kay's first line printed and what it prints after.
   async function startServer(env: Record<string, string> = {}) {
     const server = Bun.spawn(['bun', 'tests/fixtures/production/server.ts'], { env: { ...process.env, NODE_ENV: 'production', ...env }, stdout: 'pipe', stderr: 'pipe' })
     const reader = server.stdout.getReader()
@@ -1237,7 +1238,9 @@ describe('lifecycle', () => {
       output += new TextDecoder().decode(value)
     }
 
-    const port = (/port (\d+)/).exec(output)![1]
+    expect(output).toMatch(new RegExp(`^kay: listening on http://localhost:\\d+, kay ${version} in production, 0 pages prerendered\n`))
+
+    const port = (/localhost:(\d+)/).exec(output)![1]
     const rest = (async () => {
       for (;;) {
         const { value, done } = await reader.read()
@@ -1336,7 +1339,7 @@ describe('request logging', () => {
       await Bun.sleep(10)
   }
 
-  it('logs one line per request with its status and duration, leaving kay\'s own routes out', async () => {
+  it('says where it listens and what runs, then logs one line per request with its status and duration, leaving kay\'s own routes out', async () => {
     const lines = spyOn(console, 'log').mockImplementation(() => undefined)
 
     try {
@@ -1355,9 +1358,11 @@ describe('request logging', () => {
         await response.text()
       }
 
+      const port = app.server!.port
+
       await shutdown(app)
-      await written(() => lines.mock.calls.length, 3)
-      expect(lines.mock.calls.map(call => String(call[0]).replace(/\d+ms /, 'Nms '))).toEqual([`GET /contact 200 Nms ${ids[0]}`, `GET /api/fail 418 Nms ${ids[1]}`, `GET /missing 404 Nms ${ids[3]}`])
+      await written(() => lines.mock.calls.length, 4)
+      expect(lines.mock.calls.map(call => String(call[0]).replace(/\d+ms /, 'Nms '))).toEqual([`kay: listening on http://localhost:${port}, kay ${version} in test, 0 pages prerendered`, `GET /contact 200 Nms ${ids[0]}`, `GET /api/fail 418 Nms ${ids[1]}`, `GET /missing 404 Nms ${ids[3]}`])
       expect(new Set(ids).size).toBe(4)
     }
     finally {
@@ -1428,16 +1433,17 @@ describe('request logging', () => {
       const custom = await pages({ routes, prebuilt: false, log: entry => entries.push(entry) })
       const quiet = await pages({ routes, prebuilt: false })
 
-      for (const [app, expected] of [[json, 1], [custom, 2], [quiet, 2]] as const) {
+      for (const [app, expected] of [[json, 2], [custom, 4], [quiet, 4]] as const) {
         app.listen(0)
         await (await fetch(`http://localhost:${app.server!.port}/contact`)).text()
         await shutdown(app)
         await written(() => lines.mock.calls.length + entries.length, expected)
       }
 
-      expect(lines.mock.calls).toHaveLength(1)
-      expect(JSON.parse(String(lines.mock.calls[0]![0]))).toEqual({ type: 'request', time: expect.any(String), level: 'info', method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) })
-      expect(entries).toEqual([{ type: 'request', time: expect.any(String), level: 'info', method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) }])
+      const started = { type: 'message', time: expect.any(String), level: 'info', message: expect.stringMatching(/^listening on http:\/\/localhost:\d+, kay /) }
+
+      expect(lines.mock.calls.map(call => JSON.parse(String(call[0])) as unknown)).toEqual([started, { type: 'request', time: expect.any(String), level: 'info', method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) }])
+      expect(entries).toEqual([started, { type: 'request', time: expect.any(String), level: 'info', method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) }])
     }
     finally {
       lines.mockRestore()

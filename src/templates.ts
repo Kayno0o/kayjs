@@ -262,8 +262,6 @@ import { pages } from 'kay/server'
 
 // Exported for \`kay check\`, which checks links against the routes it serves besides the pages and types \`ctx.locals\` from its plugins.
 export const app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 3000))
-
-console.log(\`Listening on http://localhost:\${app.server?.port}\`)
 `
 
 const WORKFLOW_SETUP = `      - name: Install unzip and git
@@ -563,8 +561,6 @@ import { sessions } from './session'
 
 // Exported for \`kay check\`, which checks links against the routes it serves besides the pages and types \`ctx.locals\` from its plugins.
 export const app = new Elysia().use(sessions).use(await pages()).listen(env.PORT)
-
-console.log(\`Listening on http://localhost:\${app.server?.port}\`)
 `,
     'src/routes/login.kay': `--- server
 import { s } from 'kay'

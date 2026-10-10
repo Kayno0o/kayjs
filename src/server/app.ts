@@ -37,7 +37,7 @@ import { cookieLocale, hostLocale, implicitI18n, loadI18n, localeCookie, localeP
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader, underKayDev } from './loader'
-import { answeringRequest, logRequests, pathOf, useLogger } from './log'
+import { announceStart, answeringRequest, logRequests, pathOf, useLogger } from './log'
 import { serveServiceWorker } from './offline'
 import { openApiDocument, openApiSettings, refuseOpenApiClashes, serveOpenApi } from './openapi'
 import { assetFiles, hookedResponse } from './page-hook'
@@ -442,6 +442,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   for (const pages of prerendered.values())
     trackPrerendered(pages, page => moved || page.readsSite === true)
+
+  // `kay dev` prints its own.
+  if (log !== false && !options.dev)
+    announceStart(app, log, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
 
   const trailingSlash = options.trailingSlash ?? 'never'
   const redirects = readRedirects(options.redirects ?? {})
