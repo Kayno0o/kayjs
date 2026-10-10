@@ -616,6 +616,21 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('accepts a link to a public HTML file without its .html, or to its directory for an index.html, as the server answers both', async () => {
+    const root = await scratchProject({
+      'public/shelf/index.html': 'shelf',
+      'public/shelf/books.html': 'books',
+      'src/routes/index.kay': 'a(href="/shelf") a\na(href="/shelf/books") b\na(href="/shelf/books.html") c\na(href="/shelf/index") d\na(href="/shelf/books/index") e\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message.match(/serves ([^\s;"`]+)/)?.[1]])).toEqual([[5, '/shelf/books/index']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('accepts the directory of an app route ending in a wildcard with its trailing slash, as Elysia serves it', async () => {
     const root = await scratchProject({
       'src/app.ts': 'import { Elysia } from \'elysia\'\n\nexport const app = new Elysia().get(\'/files/*\', () => \'file\')\n\ndeclare module \'kay\' {\n  interface Register {\n    app: typeof app\n  }\n}\n',

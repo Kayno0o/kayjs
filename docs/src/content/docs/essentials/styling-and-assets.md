@@ -37,6 +37,8 @@ Import `src/app.css` from the root `_layout.kay`. It needs only `@import 'tailwi
 
 A file in `public/` is served at its path as it is: `public/robots.txt` is `/robots.txt`. Use it for anything that needs a fixed URL.
 
+An HTML file is also served without its `.html`, and an `index.html` at its directory, as a static host does: `public/shelf/books.html` at `/shelf/books`, `public/shelf/index.html` at `/shelf`. A site exported into `public/` keeps its links that way. A file or a page at that exact path wins.
+
 ## Imported images
 
 Import an image for its URL, a content-named path served with a year of immutable caching:

@@ -1204,6 +1204,33 @@ describe('public files', () => {
     }
   })
 
+  it('serves an HTML file without its .html, and an index.html at its directory, as a static host does, a file or a page at that path winning', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-public-'))
+
+    try {
+      const files = { 'books.html': 'books', 'books/index.html': 'books index', 'shelf/index.html': 'shelf', 'notes': 'notes', 'notes.html': 'notes html', 'about.html': 'about html', 'index.html': 'home html' }
+
+      for (const [name, body] of Object.entries(files))
+        await Bun.write(join(dir, name), body)
+
+      const served = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: dir, prebuilt: true })
+      const visit = async (path: string) => (await served.handle(new Request(`http://localhost${path}`))).text()
+
+      expect(await visit('/books')).toBe('books')
+      expect(await visit('/books/index')).toBe('books index')
+      expect(await visit('/shelf')).toBe('shelf')
+      expect(await visit('/shelf/index.html')).toBe('shelf')
+      expect(await visit('/notes')).toBe('notes')
+      expect(await visit('/notes.html')).toBe('notes html')
+      expect(await visit('/about')).not.toBe('about html')
+      expect(await visit('/')).not.toBe('home html')
+      expect(await visit('/about.html')).toBe('about html')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('refuses to boot when a file and a page share a path', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-public-'))
 

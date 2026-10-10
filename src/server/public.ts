@@ -13,9 +13,16 @@ const SENT_AS_IS = /%(?:40|2B|2C|3B|3D|26|24|5B|5D|7C)/g
 // What `encodeURIComponent` keeps but Elysia reads as a wildcard or breaks the code it generates on.
 const ROUTER_SYNTAX = /['*]/g
 const WEAK_PREFIX = /^W\//
+const HTML = '.html'
+const INDEX = '/index.html'
+
+export interface PublicFile {
+  path: string
+  url: string
+}
 
 // Every file under the directory with the URL path it is served at, written the way a browser sends it: `/logo@2x.png`, `/c%3Ad.txt`.
-export async function publicFiles(dir: string): Promise<{ path: string, url: string }[]> {
+export async function publicFiles(dir: string): Promise<PublicFile[]> {
   if (!existsSync(dir))
     return []
 
@@ -32,12 +39,29 @@ function urlSegment(name: string): string {
   return encodeURIComponent(name).replace(SENT_AS_IS, decodeURIComponent).replace(ROUTER_SYNTAX, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
 }
 
-export function refusePublicClashes(files: { path: string, url: string }[], routes: Route[]): void {
+export function refusePublicClashes(files: PublicFile[], routes: Route[]): void {
   const pages = servedPaths(routes)
   const clash = files.find(file => pages.has(file.url))
 
   if (clash)
     throw new Error(`kay: ${relative(process.cwd(), clash.path)} and a page both serve ${clash.url}`)
+}
+
+// The paths a static host's `try_files $uri $uri.html $uri/index.html` serves an HTML file at besides its own: `/x` for `x.html`, else for `x/index.html`, so a site exported under the directory keeps its links without `.html`.
+// What a file or a page already serves stays theirs.
+export function htmlFallbacks(files: PublicFile[], pages: Set<string>): PublicFile[] {
+  const taken = new Set([...pages, ...files.map(file => file.url)])
+  const html = files.filter(file => file.url.endsWith(HTML) && !file.url.endsWith(`/${HTML}`))
+  const fallbacks = new Map(html.map(file => [file.url.slice(0, -HTML.length), file.path]))
+
+  for (const { path, url } of html) {
+    const dir = url.endsWith(INDEX) ? url.slice(0, -INDEX.length) || '/' : undefined
+
+    if (dir !== undefined && !fallbacks.has(dir))
+      fallbacks.set(dir, path)
+  }
+
+  return [...fallbacks].filter(([url]) => !taken.has(url)).map(([url, path]) => ({ path, url }))
 }
 
 // Caches and proxies may send several tags, a weak one or `*`; a revalidation compares them weakly.
@@ -62,12 +86,14 @@ export async function servePublic(app: Elysia, dir: string, routes: Route[]): Pr
 
   refusePublicClashes(files, routes)
 
-  for (const { path, url } of files) {
+  const served = [...files, ...htmlFallbacks(files, servedPaths(routes))]
+
+  for (const { path, url } of served) {
     const { size, mtimeMs } = await stat(path)
     const etag = `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
 
     app.get(url, ({ request }) => revalidated(request, etag, () => Bun.file(path)))
   }
 
-  return new Set(files.map(file => file.url))
+  return new Set(served.map(file => file.url))
 }

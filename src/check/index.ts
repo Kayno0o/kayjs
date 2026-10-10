@@ -32,9 +32,9 @@ import { scanApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
 import { localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
-import { publicFiles } from '../server/public'
+import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
-import { patternShapes, routeOf, scanRoutes } from '../server/routes'
+import { patternShapes, routeOf, scanRoutes, servedPaths } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { bootProblems } from './boot'
 import { islandOnlyComponents } from './island-only'
@@ -151,7 +151,8 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push(fromCompile(file, source, diagnostic))
   }
 
-  const [routes, publicPaths, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
+  const [routes, found, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
+  const publicPaths = [...found, ...htmlFallbacks(found, servedPaths(routes))]
 
   // A param a matcher kay ships checks is named after it, `:integer`, so a link filling it with a literal is checked as the matcher would; any other is `:`.
   const shapesOf = (route: Route, pattern: string) => patternShapes(pattern).map(shape => shape.replace(PARAM_SEGMENT, (_, name: string) => {
