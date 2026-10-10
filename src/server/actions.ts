@@ -114,7 +114,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
           const call = isCall(context.request)
           // A call may send a form's fields, read as a plain form post's are.
           const asForm = !call || isFormCall(context.request)
-          const refusal = await protectionRefusal(value, context.request, context.body, asForm, context.server)
+          const refusal = await protectionRefusal(value, context.request, context.body, asForm, context.server, !call)
 
           if (refusal === PRETEND)
             throw new Refusal(pretended(value, context.request))

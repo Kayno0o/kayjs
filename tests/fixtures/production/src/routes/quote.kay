@@ -1,0 +1,24 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+// A person takes 3 s to ask; a post sooner is refused, or answered as sent for `quick`.
+export const ask = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { minTime: '3s' })
+export const quick = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { minTime: { after: '3s', maxAge: '1h', pretend: true } })
+
+const failure = ctx.failed(ask)
+const asked = ctx.succeeded(ask)
+const sent = ctx.succeeded(quick)
+---
+form(action={ask})
+  input(name="message" aria-label="Message")
+  button Ask
+if failure
+  p.error {failure.status} {Object.values(failure.errors).join(' ')}
+if asked
+  p.asked Asked {asked.data}
+form(action={quick})
+  input(name="message" aria-label="Message")
+  button Send
+if sent
+  p.sent Sent {sent.data}

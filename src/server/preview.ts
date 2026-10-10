@@ -8,6 +8,7 @@ import { durationSeconds } from '../runtime/duration'
 import { setPreviewScope } from '../runtime/preview'
 import { overHttps } from './actions'
 import { nodeCrypto } from './builtins'
+import { useStampSecret } from './stamp'
 
 // Where a preview link enters preview mode, or `?exit` leaves it.
 export const PREVIEW_ROUTE = '/_kay/preview'
@@ -41,6 +42,7 @@ export function setupPreview(config: PreviewConfig | undefined, base: string): v
   if (typeof config.secret !== 'string' || config.secret.length < MIN_SECRET_LENGTH)
     throw new Error(`kay: preview.secret in kay.config.ts is ${typeof config.secret === 'string' ? `${config.secret.length} characters long` : 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
 
+  useStampSecret(config.secret, 'preview')
   settings = { secret: config.secret, maxAge: durationSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
 }
 

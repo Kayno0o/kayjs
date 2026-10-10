@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { Elysia } from 'elysia'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
-import { encodeCall, readActionResponse } from '../runtime/action'
+import { encodeCall, readActionResponse, STAMP_FIELD } from '../runtime/action'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { servePages } from '../server/app'
@@ -58,7 +58,7 @@ type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : nev
 export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
-  // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser. A `Visit` as `from` posts where its form does, from the URL the browser shows it at, the action's own for a page a refused post answered.
+  // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser. A `Visit` as `from` posts where its form does, with the stamp `minTime` reads, from the URL the browser shows it at, the action's own for a page a refused post answered.
   submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
   call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit) => Promise<Success<ResultOf<Target>>>
@@ -261,6 +261,12 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       const url = target === undefined ? undefined : new URL(target, ORIGIN)
       const posted = url === undefined ? action.url : url.pathname + url.search
       const form = new FormData()
+
+      // The stamp `minTime` reads goes with the post, as the browser sends the form it was rendered in.
+      const stamp = url === undefined ? undefined : page?.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value
+
+      if (stamp !== undefined && !(STAMP_FIELD in fields))
+        form.set(STAMP_FIELD, stamp)
 
       for (const [name, value] of Object.entries(fields as Record<string, FormValue | FormValue[] | undefined>)) {
         for (const item of Array.isArray(value) ? value : [value]) {

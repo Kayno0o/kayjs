@@ -12,6 +12,7 @@ import { FAILURE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
 import { decodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
+const DAY = 86_400
 const FAILURE = Symbol.for('kay.failure')
 
 // Type only: what the handler returns, failures included, so a page can type `ctx.failed(action)`.
@@ -68,12 +69,23 @@ export interface HoneypotOptions<Field extends string = string> {
   pretend?: boolean | undefined
 }
 
+export interface MinTimeOptions {
+  // The least time between the page rendering the form and its post, seconds or a string such as '3s'.
+  after: Duration
+  // The most, past which a post is refused as sent from a page left open too long or a copied stamp: a day by default.
+  maxAge?: Duration | undefined
+  // Answers a post sent too soon as if it went through, the handler never running, rather than refusing it.
+  pretend?: boolean | undefined
+}
+
 export interface ActionProtection<Field extends string = never> {
   // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
   // Several limits all apply, such as one on every attempt and a tighter one on the posts that went through.
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
   // A field a form posting to the action renders out of sight by itself, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.
   honeypot?: Field | HoneypotOptions<Field> | undefined
+  // The least time a person takes to fill the form in, `'3s'`: a form posting to the action carries a signed stamp of when it rendered, and a post sooner than this, or with a stamp missing, forged or too old, fails with 422 without reaching the handler.
+  minTime?: Duration | MinTimeOptions | undefined
   // The most bytes a post may send, files included, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.
   bodyLimit?: number | undefined
   // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
@@ -84,6 +96,7 @@ export interface ProtectionMessages {
   // Given the seconds until the client may post again.
   rateLimit?: (string | ((wait: number) => string)) | undefined
   honeypot?: string | undefined
+  minTime?: string | undefined
   // Given the most bytes a post may send.
   bodyLimit?: (string | ((bytes: number) => string)) | undefined
 }
@@ -218,6 +231,9 @@ export function actionUrl(moduleId: string, name: string): string {
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Awaited<Output>, Honeypot> {
   // Refused as the module loads, rather than on the first post.
+  if (protection?.minTime !== undefined)
+    minTimeOf(protection)
+
   for (const limit of [protection?.rateLimit ?? []].flat()) {
     durationSeconds(limit.window, 'rateLimit.window')
 
@@ -302,11 +318,43 @@ export function formValue(target: unknown, name: string): string | undefined {
   return untrack((target as FormTarget).failed)?.values[name]
 }
 
-// The honeypot field a form posting to `target` renders, out of sight and out of reach of the keyboard, screen readers and password managers, whose autofill would otherwise refuse a person; empty for an action with none.
-export function formHoneypot(target: unknown): string {
-  const field = isAction(target) ? honeypotField(target.protection) : undefined
+// The field carrying when a form posting to an action with `minTime` rendered.
+export const STAMP_FIELD = 'kay_since'
 
-  return field === undefined ? '' : `<div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert><input name="${escapeAttribute(field)}" type="text" tabindex="-1" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore></div>`
+// Signs that stamp, or gives back the one a refused post sent while it is still good; the server sets it, holding the secret.
+let stamper: ((action: string, sent: string | undefined, maxAge: number) => string) | undefined
+
+// What a form posting to `target` renders besides its own fields: the honeypot, out of sight and out of reach of the keyboard, screen readers and password managers, whose autofill would otherwise refuse a person, and the stamp `minTime` reads.
+export function formProtection(target: unknown): string {
+  if (!isAction(target))
+    return ''
+
+  const field = honeypotField(target.protection)
+  const honeypot = field === undefined ? '' : `<div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert><input name="${escapeAttribute(field)}" type="text" tabindex="-1" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore></div>`
+
+  if (target.protection?.minTime === undefined || !stamper)
+    return honeypot
+
+  // A refused post keeps the time its form rendered at, so the visitor is not sent back to zero.
+  const sent = untrack((target as FormTarget).failed)?.values[STAMP_FIELD]
+
+  return `${honeypot}<input type="hidden" name="${STAMP_FIELD}" value="${escapeAttribute(stamper(target.url, sent, minTimeOf(target.protection)!.maxAge))}">`
+}
+
+export function setStamper(sign: typeof stamper): void {
+  stamper = sign
+}
+
+// `minTime` in milliseconds, read once it is set.
+export function minTimeOf(protection: ActionProtection<string>): { after: number, maxAge: number, pretend: boolean } | undefined {
+  const { minTime } = protection
+
+  if (minTime === undefined)
+    return undefined
+
+  const options = typeof minTime === 'object' ? minTime : { after: minTime }
+
+  return { after: durationSeconds(options.after, 'minTime') * 1000, maxAge: durationSeconds(options.maxAge ?? DAY, 'minTime.maxAge') * 1000, pretend: options.pretend === true }
 }
 
 export function honeypotField(protection: ActionProtection<string> | undefined): string | undefined {

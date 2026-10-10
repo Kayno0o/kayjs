@@ -5,6 +5,7 @@ import { durationSeconds } from '../runtime/duration'
 import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
 import { nodeCrypto } from './builtins'
+import { useStampSecret } from './stamp'
 
 export type SessionData = Record<string, unknown>
 
@@ -68,6 +69,8 @@ export function session<Data extends object = SessionData>(options: SessionOptio
     throw new Error(`kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
 
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
+
+  useStampSecret(secrets[0]!, 'session')
   const domain = options.domain?.trim().toLowerCase().replace(LEADING_DOT, '')
 
   if (domain !== undefined && !COOKIE_DOMAIN.test(domain))

@@ -3,10 +3,11 @@ import type { Elysia, TSchema } from 'elysia'
 import type { ProxyConfig } from '../config'
 import type { ActionRateLimit, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
-import { honeypotField } from '../runtime/action'
+import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { openSqlite } from '../runtime/sqlite.server'
 import { rewrittenAddress } from './rewrite'
+import { stampTime } from './stamp'
 
 export interface ProtectionRefusal {
   status: number
@@ -47,6 +48,16 @@ const limitLists = new WeakMap<object, ActionLimit[]>()
 // One memory store per limit, so clients flooding one never push another's windows out, such as a login form's.
 const memories = new Map<string, ReturnType<typeof memoryRates>>()
 let warnedUnconfigured = false
+
+// Each action's `minTime`, read once: `action()` refused one it cannot read.
+const minTimes = new WeakMap<object, ReturnType<typeof minTimeOf>>()
+
+function minTimesOf(protection: NonNullable<ServerAction<TSchema, unknown>['protection']>): ReturnType<typeof minTimeOf> {
+  if (!minTimes.has(protection))
+    minTimes.set(protection, minTimeOf(protection))
+
+  return minTimes.get(protection)
+}
 
 // Each rate limit's window in milliseconds, read once: `action()` refused one it cannot read.
 const windowLengths = new WeakMap<object, number>()
@@ -156,15 +167,31 @@ function waitFor(window: { count: number, resetAt: number }, max: number): numbe
 }
 
 // Why a post must not reach the handler, `PRETEND` for a bot to answer as if it went through, or undefined when it may.
-export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
+// `plain` is a post the browser sent itself, which a form posting to the action always sends with its stamp; a call from kay's script may come from an island's form, which renders none.
+export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, body: unknown, form: boolean, server: Server<unknown> | null | undefined, plain = form): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
   const { honeypot, messages } = action.protection ?? {}
   const field = honeypotField(action.protection)
+  const fields = typeof body === 'object' && body !== null ? body as Record<string, unknown> : {}
 
-  if (form && field !== undefined && typeof body === 'object' && body !== null && filledIn((body as Record<string, unknown>)[field])) {
+  if (form && field !== undefined && filledIn(fields[field])) {
     if (typeof honeypot === 'object' && honeypot.pretend)
       return PRETEND
 
     return { status: 422, field, message: messages?.honeypot ?? 'Leave this field empty' }
+  }
+
+  const minTime = action.protection && minTimesOf(action.protection)
+
+  if (minTime && form && (plain || fields[STAMP_FIELD] !== undefined)) {
+    const time = stampTime(action.url, fields[STAMP_FIELD])
+    const age = time === undefined ? undefined : Date.now() - time
+
+    if (age === undefined || age < minTime.after || age > minTime.maxAge) {
+      if (minTime.pretend)
+        return PRETEND
+
+      return { status: 422, field: '', message: messages?.minTime ?? (age !== undefined && age > minTime.maxAge ? 'This form was open too long; send it again' : 'Sent too fast; take a moment, then send it again') }
+    }
   }
 
   const limits = actionLimits(action)

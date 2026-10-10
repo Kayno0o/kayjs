@@ -617,7 +617,7 @@ export class HtmlTemplate {
   }
 
   private honeypotField(element: ElementNode): void {
-    this.b.add('KayFormHoneypot((').addSource(actionOf(element, this.src)!.expression).add('))')
+    this.b.add('KayFormProtection((').addSource(actionOf(element, this.src)!.expression).add('))')
   }
 
   // An element with a spread renders through `element`, which reads every attribute the spread brings at render time.

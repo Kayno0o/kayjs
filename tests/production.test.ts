@@ -18,6 +18,7 @@ import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { probeHealth } from '../src/server/lifecycle'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
+import { signStamp, stampTime, useStampSecret } from '../src/server/stamp'
 import { CspViolation } from '../src/server/violations'
 import { testSite } from '../src/test'
 
@@ -217,6 +218,7 @@ describe('action protection', () => {
   // Held in a variable so tsc leaves the .kay import to Bun.
   const CONTACT = './fixtures/production/src/routes/contact.kay'
   const ENQUIRY = './fixtures/production/src/routes/enquiry.kay'
+  const QUOTE = './fixtures/production/src/routes/quote.kay'
 
   it('refuses a form whose honeypot is filled in, with a message on the field, the handler never running', async () => {
     const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
@@ -244,9 +246,9 @@ describe('action protection', () => {
 
     const form = 'form(action={send})\n  input(name="message" aria-label="Message")\n'
 
-    expect(compileKay(form, 'page.kay', { output: 'html' }).tsx).toContain('KayFormHoneypot((send))')
-    expect(compileKay('form(action={send} {...rest})\n  input(name="message" aria-label="Message")\n', 'page.kay', { output: 'html' }).tsx).toContain('() => KayFormHoneypot((send)) + (')
-    expect(compileKay(form, 'page.kay', { output: 'html', hydratable: true, twinBuild: true }).tsx).not.toContain('KayFormHoneypot((send))')
+    expect(compileKay(form, 'page.kay', { output: 'html' }).tsx).toContain('KayFormProtection((send))')
+    expect(compileKay('form(action={send} {...rest})\n  input(name="message" aria-label="Message")\n', 'page.kay', { output: 'html' }).tsx).toContain('() => KayFormProtection((send)) + (')
+    expect(compileKay(form, 'page.kay', { output: 'html', hydratable: true, twinBuild: true }).tsx).not.toContain('KayFormProtection((send))')
   })
 
   it('counts only the posts that went through on a limit saying so, every attempt still counting on the others', async () => {
@@ -320,6 +322,96 @@ describe('action protection', () => {
     expect(call.status).toBe(200)
     expect(await call.text()).toBe('')
     expect((await site.submit(enquire, { message: 'fail', nectar: 'https://spam.example' }, { from: '/enquiry' })).html).toContain('<p class="sent">Sent</p>')
+  })
+
+  it('refuses a form posted sooner than `minTime` after its page rendered, then lets it through from the page that refused it once the time has passed', async () => {
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
+    const { ask } = await import(QUOTE) as { ask: Action<{ message: string }, number> }
+    const start = Date.now()
+
+    try {
+      setSystemTime(start)
+
+      const page = await site.visit('/quote')
+      const stamp = page.find(`form[action^="${ask.url}"] input[name="kay_since"]`)[0]?.attributes.value
+
+      expect(page.html).toContain(`<input type="hidden" name="kay_since" value="${stamp}"><input name="message"`)
+
+      setSystemTime(start + 1000)
+
+      const early = await site.submit(ask, { message: 'hello' }, { from: page })
+
+      expect(early.html).toContain('<p class="error">422 Sent too fast; take a moment, then send it again</p>')
+      // The refused page keeps the time the form first rendered at, so the visitor does not wait again from zero.
+      expect(early.find(`form[action^="${ask.url}"] input[name="kay_since"]`)[0]?.attributes.value).toBe(stamp)
+
+      setSystemTime(start + 3000)
+      expect((await site.submit(ask, { message: 'hello' }, { from: early })).html).toContain('<p class="asked">Asked 5</p>')
+    }
+    finally {
+      setSystemTime()
+    }
+  })
+
+  it('refuses a plain post whose stamp is missing, forged, another action\'s or too old, and lets a call from kay\'s script through without one', async () => {
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
+    const { ask, quick } = await import(QUOTE) as { ask: Action<{ message: string }, number>, quick: Action<{ message: string }, number> }
+    const start = Date.now()
+    const refusal = async (fields: Record<string, unknown>, plain = true) => (await refusalOf(ask as never, new Request('http://localhost/'), fields, true, null, plain))?.message
+
+    try {
+      setSystemTime(start - 86_400_000 - 1000)
+
+      const stale = (await site.visit('/quote')).find(`form[action^="${ask.url}"] input[name="kay_since"]`)[0]!.attributes.value
+
+      setSystemTime(start - 5000)
+
+      const page = await site.visit('/quote')
+      const own = page.find(`form[action^="${ask.url}"] input[name="kay_since"]`)[0]!.attributes.value!
+      const other = page.find(`form[action="${quick.url}"] input[name="kay_since"]`)[0]!.attributes.value
+
+      setSystemTime(start)
+      expect(await refusal({ message: 'hi', kay_since: own })).toBeUndefined()
+
+      for (const kay_since of [undefined, `${(start - 5000).toString(36)}.forged`, `${(start - 9000).toString(36)}.${own.slice(own.indexOf('.') + 1)}`, other])
+        expect(await refusal({ message: 'hi', kay_since })).toBe('Sent too fast; take a moment, then send it again')
+
+      expect(await refusal({ message: 'hi', kay_since: stale })).toBe('This form was open too long; send it again')
+      expect((await site.submit(ask, { message: 'hello' }, { from: '/quote' })).html).toContain('<p class="error">422 Sent too fast; take a moment, then send it again</p>')
+
+      // An island's form renders no stamp; one it sends is still checked.
+      expect(await refusal({ message: 'hi' }, false)).toBeUndefined()
+      expect(await refusal({ message: 'hi', kay_since: 'forged' }, false)).toBe('Sent too fast; take a moment, then send it again')
+      expect(await site.call(ask, { message: 'hello' })).toBe(5)
+    }
+    finally {
+      setSystemTime()
+    }
+  })
+
+  it('answers a post sent too soon as if it went through, when `minTime` says so', async () => {
+    const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
+    const { quick } = await import(QUOTE) as { quick: Action<{ message: string }, number> }
+    const page = await site.visit('/quote')
+
+    // The handler would have answered the message's length.
+    expect((await site.submit(quick, { message: 'hello' }, { from: page })).html).toContain('<p class="sent">Sent </p>')
+  })
+
+  it('signs the stamps with the preview secret over a session\'s, which replaces only the key of the process', () => {
+    const stamp = signStamp('/_kay/action/a', 1000)
+
+    expect(stampTime('/_kay/action/a', stamp)).toBe(1000)
+    expect(stampTime('/_kay/action/b', stamp)).toBeUndefined()
+
+    useStampSecret('the preview secret, long enough', 'preview')
+
+    const preview = signStamp('/_kay/action/a', 1000)
+
+    expect(stampTime('/_kay/action/a', stamp)).toBeUndefined()
+
+    useStampSecret('a session secret, long enough too', 'session')
+    expect(stampTime('/_kay/action/a', preview)).toBe(1000)
   })
 
   it('lets a client post as often as the limit allows in a window, then answers 429 with when to retry', async () => {
