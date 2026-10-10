@@ -41,7 +41,7 @@ export async function listedParams(route: Route, file: string, name: string, val
     return Array.from({ length: pages }, (_, index) => {
       const held = settings ? [...counts].filter(([, count]) => count > index).map(([locale]) => locale!) : []
 
-      return { ...index > 0 && { [param!]: String(index + 1) }, ...held.length < counts.size && { [PAGE_LOCALES]: held } }
+      return { ...index > 0 && { [param!]: String(index + 1) }, ...settings && held.length < counts.size && { [PAGE_LOCALES]: held } }
     })
   }
 
@@ -96,7 +96,6 @@ function isPathPart(route: Route, param: string, value: unknown): boolean {
   return typeof value === 'string' && (param === route.catchAll ? value.split('/') : [value]).every(segment => segment !== '' && segment !== '.' && segment !== '..')
 }
 
-// The URL path the params fill in, each segment encoded as the server looks pages up; a catch-all keeps its slashes, an optional param left out leaves its segment out.
 // Whether a listed page is served in a locale: always, unless it lists a localized entry neither that locale nor the default one holds, or a page of a list that locale has fewer pages of.
 export function listedIn(params: ListedParams, locale: string | undefined, settings: LocaleSettings | undefined): boolean {
   const held = params[ENTRY_LOCALES]
@@ -107,6 +106,7 @@ export function listedIn(params: ListedParams, locale: string | undefined, setti
   return held === undefined || locale === undefined || settings === undefined || held.includes(locale) || held.includes(settings.defaultLocale)
 }
 
+// The URL path the params fill in, each segment encoded as the server looks pages up; a catch-all keeps its slashes, an optional param left out leaves its segment out.
 export function pathOf(route: Route, params: Record<string, string>): string {
   const path = route.pattern.split('/').flatMap((segment) => {
     if (segment === '*')

@@ -60,6 +60,16 @@ const LOCALIZED: Record<string, string> = {
   'src/content/posts/fr/e.md': post('e'),
 }
 
+// URLs ending with a slash, and a list the sitemap names that prerenders nothing.
+const SLASHED: Record<string, string> = {
+  'package.json': JSON.stringify({ name: 'app' }),
+  'tsconfig.json': TSCONFIG,
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ site: \'https://example.com\', trailingSlash: \'always\' })\n',
+  'src/content.config.ts': CONTENT.replace('LOCALIZED', 'false'),
+  'src/routes/blog/[[page=integer]].kay': LIST.replace('export const prerender = blog', 'export const sitemap = blog'),
+  ...Object.fromEntries(['a', 'b', 'c'].map(slug => [`src/content/posts/${slug}.md`, post(slug)])),
+}
+
 // What each path answers, its status and its body.
 function serve(paths: string[]) {
   return `import { pages } from 'kay/server'
@@ -88,6 +98,7 @@ beforeAll(async () => {
   for (const [name, files, paths] of [
     ['paged', PAGED, ['/blog', '/blog/2', '/blog/3', '/blog/4', '/blog/1', '/blog/0', '/blog/abc', '/sitemap.xml']],
     ['localized', LOCALIZED, ['/blog/2', '/blog/3', '/fr/blog/2', '/fr/blog/3', '/sitemap.xml']],
+    ['slashed', SLASHED, ['/blog/', '/blog/2/', '/sitemap.xml']],
   ] as const) {
     const dir = await mkdtemp(join(base, `paginate-${name}-`))
 
@@ -171,6 +182,14 @@ describe('a paginated list', () => {
     expect(items(await Bun.file(join(root, 'dist/fr/blog/3.html')).text())).toEqual(['e'])
     expect(await Bun.file(join(root, 'dist/blog/3.html')).exists()).toBe(false)
   }, 60_000)
+
+  it('ends its links with a slash where the site\'s URLs do, and exported as sitemap alone lists its pages there', async () => {
+    const answers = await served('slashed')
+
+    expect(answers['/blog/']!.body).toContain('<a class="next" href="/blog/2/">next</a>')
+    expect(answers['/blog/2/']!.body).toContain('<a class="prev" href="/blog/">prev</a>')
+    expect([...answers['/sitemap.xml']!.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1])).toEqual(['https://example.com/blog/', 'https://example.com/blog/2/'])
+  })
 
   it('passes kay check, its page typed by its source', async () => {
     const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], projects.get('paged')!)
