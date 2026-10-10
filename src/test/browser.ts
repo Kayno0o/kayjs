@@ -249,17 +249,32 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     a11y: async selector => serial(async () => {
       // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
       if (!await view.evaluate<boolean>('!!window.axe')) {
-        const { exceptionDetails } = await view.cdp<{ exceptionDetails?: { text: string } }>('Runtime.evaluate', { expression: await axeSource() })
+        const { exceptionDetails } = await view.cdp<{ exceptionDetails?: { text: string, exception?: { description?: string } } }>('Runtime.evaluate', { expression: await axeSource() })
 
         if (exceptionDetails)
-          throw new Error(`kay: axe-core did not load in the page: ${exceptionDetails.text}`)
+          throw new Error(`kay: axe-core did not load in the page: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`)
       }
 
-      return view.evaluate<A11yViolation[]>(script(async (context?: string) => {
-        const { violations } = await (window as unknown as { axe: Axe }).axe.run(context ?? document, { resultTypes: ['violations'] })
+      const violations = await view.evaluate<A11yViolation[] | null>(script(async (context?: string) => {
+        const { axe } = window as unknown as { axe: Axe }
+
+        if (context !== undefined && document.querySelector(context) === null)
+          return null
+
+        // A dev server's own check may be running, and axe-core runs one at a time.
+        while (axe._running)
+          await new Promise(resolve => setTimeout(resolve, 25))
+
+        // Leaving out the problem panel and the inspector of a dev server.
+        const { violations } = await axe.run({ include: context === undefined ? document : [[context]], exclude: [['kay-problems'], ['[data-kay-inspector]']] }, { resultTypes: ['violations'] })
 
         return violations.map(({ id, impact, help, helpUrl, nodes }) => ({ id, impact, help, helpUrl, nodes: nodes.map(node => ({ target: node.target.map(part => Array.isArray(part) ? part.join(' >>> ') : part).join(' '), html: node.html })) }))
       }, [selector]))
+
+      if (violations === null)
+        throw new Error(`kay: nothing matches ${selector} to check`)
+
+      return violations
     }),
     waitUntil: async (condition, wait = {}, ...args) => serial(async () => poll(script(condition, args), 'the condition to hold', wait.timeout)),
     back: async () => serial(async () => traverse('history.back()')),
@@ -297,14 +312,15 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 }
 
 interface Axe {
+  _running?: boolean
   run: (context: unknown, options: unknown) => Promise<{ violations: (Omit<A11yViolation, 'nodes'> & { nodes: { target: (string | string[])[], html: string }[] })[] }>
 }
 
-let axe: Promise<string> | undefined
+let axe: string | undefined
 
 // axe-core's browser build, read once where the dependency installed.
 async function axeSource(): Promise<string> {
-  axe ??= Bun.file(fileURLToPath(import.meta.resolve('axe-core/axe.min.js'))).text()
+  axe ??= await Bun.file(fileURLToPath(import.meta.resolve('axe-core/axe.min.js'))).text()
 
   return axe
 }

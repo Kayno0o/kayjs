@@ -4,6 +4,7 @@ const AXE_URL = '/_kay/dev/axe.js'
 // The panel and the inspector kay dev adds, which are no part of the page.
 const KAY_DEV = ['kay-problems', '[data-kay-inspector]']
 const MAX_ELEMENTS = 5
+const WAIT_MS = 25
 
 export interface AxeViolation {
   id: string
@@ -13,6 +14,7 @@ export interface AxeViolation {
 }
 
 interface Axe {
+  _running?: boolean
   run: (context: unknown, options: unknown) => Promise<{ violations: AxeViolation[] }>
 }
 
@@ -31,27 +33,16 @@ export function startA11y(doc: Document = document): () => void {
   let running = false
   let again = false
 
-  const load = async () => new Promise<Axe>((resolve, reject) => {
-    if (win.axe) {
-      resolve(win.axe)
+  // Imported, its browser build setting `window.axe`, rather than added as a script element, which the live reload would find in a head the server never sent.
+  const load = async () => {
+    if (!win.axe)
+      await import(AXE_URL)
 
-      return
-    }
+    if (!win.axe)
+      throw new Error('axe-core did not load')
 
-    const script = doc.createElement('script')
-
-    // Gone once run, leaving the head as the server sent it, which the live reload compares.
-    script.src = AXE_URL
-    script.onload = script.onerror = () => {
-      script.remove()
-
-      if (win.axe)
-        resolve(win.axe)
-      else
-        reject(new Error('axe-core did not load'))
-    }
-    doc.head.append(script)
-  })
+    return win.axe
+  }
 
   const check = async () => {
     again = running
@@ -65,8 +56,13 @@ export function startA11y(doc: Document = document): () => void {
       do {
         again = false
         axe ??= load()
+        const loaded = await axe
 
-        const { violations } = await (await axe).run({ exclude: KAY_DEV.map(selector => [selector]) }, { resultTypes: ['violations'] })
+        // A test's `page.a11y()` may be running, and axe-core runs one at a time.
+        while (loaded._running)
+          await new Promise(resolve => win.setTimeout(resolve, WAIT_MS))
+
+        const { violations } = await loaded.run({ exclude: KAY_DEV.map(selector => [selector]) }, { resultTypes: ['violations'] })
 
         for (const violation of violations)
           console.warn(a11yProblem(violation))
@@ -79,6 +75,10 @@ export function startA11y(doc: Document = document): () => void {
     finally {
       running = false
     }
+
+    // A swap during a check that failed.
+    if (again)
+      win.setTimeout(() => void check())
   }
 
   // Once nothing more urgent waits, so the check never slows the page down.
@@ -87,7 +87,7 @@ export function startA11y(doc: Document = document): () => void {
   // A page swap marks the document busy until the new page is in.
   const swaps = new MutationObserver(() => {
     if (!doc.documentElement.hasAttribute('aria-busy'))
-      idle()
+      win.setTimeout(() => void check())
   })
 
   swaps.observe(doc.documentElement, { attributeFilter: ['aria-busy'] })

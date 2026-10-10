@@ -176,6 +176,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     await page.goto('/contrast')
 
     expect((await page.a11y('main')).map(violation => violation.id)).toEqual(['color-contrast'])
+    await expect(page.a11y('.nowhere')).rejects.toThrow('kay: nothing matches .nowhere to check')
   })
 })
 
@@ -234,9 +235,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev ch
     try {
       const shown = await dev.open('/contrast', { strict: false })
 
+      // At once, as the dev server's own check starts: the two take turns.
+      expect((await shown.a11y()).map(violation => violation.id)).toContain('color-contrast')
+
       await shown.waitUntil(() => document.querySelector('kay-problems')?.shadowRoot!.textContent.includes('a11y color-contrast'))
 
       expect(await shown.evaluate(() => [...document.querySelector('kay-problems')!.shadowRoot!.querySelectorAll('pre')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
+      // The panel is kay's, no part of the page a test checks.
+      expect((await shown.a11y()).flatMap(violation => violation.nodes.map(node => node.target))).not.toContainEqual(expect.stringContaining('kay-problems'))
+      expect(shown.errors).toEqual([])
     }
     finally {
       await dev.close()
