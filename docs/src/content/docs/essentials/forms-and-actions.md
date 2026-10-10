@@ -26,6 +26,8 @@ form(action={add})
 
 `form(action={add})` posts without JavaScript, and `kay check` verifies every field `name` against the schema. With kay's script the form posts without a reload.
 
+Text reaches the schema trimmed, so `minLength` counts what was typed, and an optional field left blank counts as left out. A field named like a password keeps its spaces, as does `t.String({ trim: false })`.
+
 ## Showing errors
 
 A post the schema refuses renders the page again with the failure's status. The fields keep what was sent, and `add.error('title')` reads the message of a field.
@@ -57,6 +59,8 @@ export const add = action(schema, async ({ title }, ctx) => {
 if add.failed()?.data as data
   p.error {data.message}
 ```
+
+A handler that throws, a mail server down say, is logged and answered the same way, with status 500 and `Something went wrong on our side; try again later` under the form, so it needs no `try`/`catch` of its own. `messages: { serverError: '...' }` in the third argument of `action` words it for the site.
 
 ## Redirecting after success
 
@@ -98,16 +102,19 @@ Once a call goes through, the page's loads run again, so the list it shows is up
 
 Use `t.File()` in the schema and `input(type="file" name="avatar")` in the form, and the handler receives a `File`. A post carries 1 MB at most, so raise `bodyLimit` in the third argument of `action`.
 
-## Rate limit and honeypot
+## Rate limit, honeypot and minimum time
 
-The third argument of `action` protects it from scripts. `rateLimit` answers 429 past `max` posts per `window`, and `honeypot` names a hidden field that kay renders for you and bots fill in.
+The third argument of `action` protects it from scripts. `rateLimit` answers 429 past `max` posts per `window`, `honeypot` names a hidden field that kay renders for you and bots fill in, and `minTime` refuses a form posted sooner than that after its page rendered, through a stamp kay signs into the form itself, a prerendered page included.
 
 ```kay
 export const contact = action(schema, send, {
   rateLimit: { max: 5, window: '1m' },
   honeypot: 'website',
+  minTime: '3s',
   bodyLimit: 5 * 1024 * 1024,
 })
 ```
+
+`messages` in the same argument words each of these refusals in the site's language.
 
 <ReadMore href="/llms/actions">Optimistic calls, custom browser validation, shared rate limit stores, messages and body limits are in the full actions reference.</ReadMore>

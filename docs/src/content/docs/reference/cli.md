@@ -47,7 +47,7 @@ In a terminal with none of these options, `kay new` asks for a preset, then for 
 
 A project with no server entry, such as a static site, gets a server of kay's own on `PORT` (3000 by default).
 
-The terminal shows the address once, then one line per restart, naming what changed and how long the new server took to listen, and says so when the server exits on its own:
+The terminal shows the address once, then one line per restart, naming what changed and how long the new server took to listen, with `, now on <address>` when the address changed, and says so when the server exits on its own:
 
 ```
 kay dev: http://localhost:3000 (ready in 412 ms)
