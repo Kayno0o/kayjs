@@ -838,6 +838,23 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('leaves out a git worktree inside the project, another checkout of it, and keeps a submodule', async () => {
+    const root = await scratchProject({
+      'src/a.kay': 'p hi\n',
+      '.claude/worktrees/fix/.git': 'gitdir: /repo/.git/worktrees/fix\n',
+      '.claude/worktrees/fix/src/a.kay': 'p other\n',
+      'vendor/ui/.git': 'gitdir: ../../.git/modules/ui\n',
+      'vendor/ui/b.kay': 'p ui\n',
+    })
+
+    try {
+      expect((await findKayFiles(root, { project: true })).map(file => file.slice(root.length + 1))).toEqual(['src/a.kay', 'vendor/ui/b.kay'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('walks past a directory it cannot read, as a container-owned data directory bind-mounted into the project is', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'data-dev/postgres/keep': '' })
 

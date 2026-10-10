@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs'
-import { mkdir, readdir } from 'node:fs/promises'
+import { mkdir, readdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 // Never source at any depth: dependencies, kay's own output and version control.
@@ -15,6 +15,8 @@ const TYPESCRIPT = /\.[cm]?ts$/
 const TSX = /\.tsx$/
 const JSX = /\.jsx$/
 const KAY_FILE = /\.kay$/
+// The `.git` file of a linked worktree, another checkout of the repository; a submodule's points under `.git/modules`.
+const WORKTREE_GIT = /^gitdir:.*[\\/]worktrees[\\/]/
 const transpilers = new Map<Bun.JavaScriptLoader, Bun.Transpiler>()
 
 // One transpiler per loader, shared by everything reading a module's imports.
@@ -59,7 +61,7 @@ export async function findProjectFiles(root: string, matches: RegExp, { project 
   const walk = async (dir: string) => {
     const entries = await readable(dir)
 
-    if (dir !== root && entries.some(entry => entry.isFile() && ((ownOnly && entry.name === TSCONFIG) || (ownKayOnly && entry.name === KAY_CONFIG))))
+    if (dir !== root && (entries.some(entry => entry.isFile() && ((ownOnly && entry.name === TSCONFIG) || (ownKayOnly && entry.name === KAY_CONFIG))) || await isWorktree(dir, entries)))
       return
 
     await Promise.all(entries.map(async (entry) => {
@@ -78,6 +80,19 @@ export async function findProjectFiles(root: string, matches: RegExp, { project 
   await walk(root)
 
   return files.sort()
+}
+
+// A git worktree inside the project, as Claude Code keeps them under `.claude/worktrees`, holds another version of its files.
+async function isWorktree(dir: string, entries: Dirent[]): Promise<boolean> {
+  if (!entries.some(entry => entry.isFile() && entry.name === '.git'))
+    return false
+
+  try {
+    return WORKTREE_GIT.test(await readFile(join(dir, '.git'), 'utf8'))
+  }
+  catch {
+    return false
+  }
 }
 
 // A directory the user cannot read holds nothing the project could compile: a container writes one into a repository when a service bind-mounts its data there.
