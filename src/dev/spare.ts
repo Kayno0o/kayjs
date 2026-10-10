@@ -1,3 +1,4 @@
+import type { Server } from 'bun'
 import process from 'node:process'
 import { loadTraverse } from '../compiler/rewrite'
 import '../server'
@@ -7,6 +8,30 @@ import '../server'
 loadTraverse()
 
 const START_LINE = /^start (\d+)(?: (\d+) ([^\n]*))?/
+// The line an entry prints once it listens, as kay's templates do: `kay dev` prints the address itself, once for every restart.
+const LISTENING_LINE = /^Listening on https?:\/\/[^/\s]+:(\d+)\/?$/
+
+// The first server the entry starts is the one `kay dev` reports.
+let port: number | undefined
+const serve = Bun.serve.bind(Bun)
+
+Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
+  const server: Server<unknown> = serve(options)
+
+  if (port === undefined && server.port !== undefined) {
+    port = server.port
+    process.send?.({ listening: server.url.href })
+  }
+
+  return server
+}) as typeof Bun.serve
+
+const log = console.log.bind(console)
+
+console.log = (...data: unknown[]) => {
+  if (data.length !== 1 || typeof data[0] !== 'string' || LISTENING_LINE.exec(data[0])?.[1] !== String(port))
+    log(...data)
+}
 
 const reader = Bun.stdin.stream().getReader()
 const decoder = new TextDecoder()

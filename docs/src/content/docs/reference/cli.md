@@ -47,6 +47,17 @@ In a terminal with none of these options, `kay new` asks for a preset, then for 
 
 A project with no server entry, such as a static site, gets a server of kay's own on `PORT` (3000 by default).
 
+The terminal shows the address once, then one line per restart, naming what changed and how long the new server took to listen, and says so when the server exits on its own:
+
+```
+kay dev: http://localhost:3000 (ready in 412 ms)
+14:02:31 src/routes/index.kay: restarted in 58 ms
+14:02:47 src/app.css and 1 more: restarted in 61 ms
+14:03:05 the server exited with code 1, waiting for a change
+```
+
+The entry's own `Listening on http://localhost:3000` line, which the templates print in production, is left out.
+
 ## kay build
 
 ```sh

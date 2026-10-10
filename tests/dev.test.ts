@@ -317,6 +317,58 @@ describe('kay dev', () => {
     }
   })
 
+  it('reports the address once, then each restart with what changed, and a server exiting on its own', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+    const free = Bun.serve({ port: 0, fetch: () => new Response() })
+    const port = free.port!
+
+    await free.stop()
+    await Bun.write(join(root, 'src/server.ts'), `if (await Bun.file('src/exit.ts').exists()) process.exit(3)\nBun.serve({ port: ${port}, fetch: () => new Response('ok') })\n`)
+    const stop = await dev(root, { log: line => lines.push(line) })
+
+    try {
+      await until(() => lines.length === 1)
+      expect(lines[0]).toMatch(new RegExp(`^kay dev: http://localhost:${port} \\(ready in \\d+ ms\\)$`))
+
+      await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
+      await until(() => lines.length === 2)
+      expect(lines[1]).toMatch(/^\d\d:\d\d:\d\d src\/routes\/about\.kay: restarted in \d+ ms$/)
+
+      await Bun.write(join(root, 'src/exit.ts'), '')
+      await until(() => lines.length === 3)
+      expect(lines[2]).toMatch(/^\d\d:\d\d:\d\d the server exited with code 3, waiting for a change$/)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+    expect(lines).toHaveLength(3)
+  })
+
+  it('drops the line an entry prints once it listens, which kay dev prints itself', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const messages: unknown[] = []
+
+    await Bun.write(join(root, 'server.ts'), 'const server = Bun.serve({ port: 0, fetch: () => new Response() })\nconsole.log(`Listening on http://localhost:${server.port}`)\nconsole.log(`Listening on http://localhost:${server.port + 1}`)\nconsole.log(\'Listening on\', server.port)\nawait server.stop()\n')
+    const child = Bun.spawn([process.execPath, '--preload', join(import.meta.dir, '../src/dev/spare.ts'), join(root, 'server.ts')], { cwd: root, stdin: 'pipe', stdout: 'pipe', stderr: 'inherit', ipc: message => messages.push(message) })
+
+    try {
+      void child.stdin.write('start 0\n')
+      void child.stdin.flush()
+      const output = await new Response(child.stdout).text()
+      const [listening] = messages as { listening: string }[]
+      const port = Number(new URL(listening!.listening).port)
+
+      expect(await child.exited).toBe(0)
+      expect(output).toBe(`Listening on http://localhost:${port + 1}\nListening on ${port}\n`)
+    }
+    finally {
+      child.kill()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('serves the compile errors of a project that failed to boot, and the reload stream', async () => {
     const source = 'p ok\nelse\n  p no\n'
     const error = new KayCompileError([{ file: join(process.cwd(), 'src/broken.kay'), source, start: 5, end: 9, message: '`else` must directly follow an `if`' }])

@@ -17,6 +17,8 @@ export interface DevOptions {
   settings?: Record<string, string> | undefined
   // Called with each server process once it is spawned.
   onRestart?: ((child: Subprocess) => void) | undefined
+  // Where the address, each restart and a server exiting on its own are reported, `console.log` by default.
+  log?: ((line: string) => void) | undefined
 }
 
 // Long enough to gather the few events one save makes.
@@ -38,6 +40,8 @@ const TEST_DIRS = new Set(['tests', 'test', '__tests__', 'e2e'])
 const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/
 // Past this, as after a checkout, the files changed are not passed on, and open pages reload.
 const MAX_CHANGED_FILES = 200
+// The address of a server listening on the root path, as kay's do, reads better without its slash.
+const ROOT_PATH = /(?<=\/\/[^/]+)\/$/
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
 // Resolves once watching, with a function stopping the watchers and the server.
@@ -52,11 +56,47 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // Bun reads these as a process starts, so changing one needs a process started after it.
   let startupChanged = false
   let restarting: Promise<void> | undefined
+  let stopping = false
   // Counts every change but a stylesheet's: an open page whose server comes back with the same count only needs its stylesheets again.
   let codeVersion = 0
   // The count the last server started with, and the files changed since: a page on that count may swap in what changed.
   let startedAt = 0
   let changedFiles = new Set<string>()
+  // Every file changed since the last restart began, stylesheets included, then what the last one came from and when it began: what its report names.
+  let touched = new Set<string>()
+  let restartedFor: string[] = []
+  let restartedAt = performance.now()
+  let address: string | undefined
+  const log = options.log ?? console.log
+  const color = options.log === undefined && process.stdout.isTTY && process.env.NO_COLOR === undefined
+  const stamp = () => {
+    const time = new Date().toLocaleTimeString('en-GB')
+
+    return color ? `\x1B[2m${time}\x1B[22m` : time
+  }
+  // A server reports its address over IPC from the preload; only the one running counts, and only the first time it listens.
+  const listened = (server: Subprocess, message: unknown) => {
+    if (server !== child || typeof message !== 'object' || message === null || !('listening' in message) || typeof message.listening !== 'string')
+      return
+
+    const url = message.listening.replace(ROOT_PATH, '')
+    const took = `${Math.round(performance.now() - restartedAt)} ms`
+
+    if (address === undefined)
+      log(`kay dev: ${url} (ready in ${took})`)
+    else
+      log(`${stamp()} ${describe(restartedFor)}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
+
+    address = url
+  }
+
+  // A server killed for a restart or by `kay dev` stopping exits as expected; one exiting on its own leaves nothing serving until the next change.
+  const reportExit = async (server: Subprocess) => {
+    const code = await server.exited
+
+    if (server === child && !stopping)
+      log(`${stamp()} the server exited with code ${code}, waiting for a change`)
+  }
 
   const env = await environmentWithoutDotenv()
   // Chosen again for each process, so a `src/server.ts` written or deleted while running takes over at the next restart.
@@ -64,7 +104,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const spawn = () => {
     spareEntry = entryToRun()
 
-    return Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' })
+    return Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => listened(server, message) })
   }
   // Each restart takes the process waiting with kay loaded, and readies the next one.
   const start = () => {
@@ -81,11 +121,19 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     void child.stdin.flush()
     spare = spawn()
     options.onRestart?.(child)
+    void reportExit(child)
   }
   // The server never reads the generated types, only the editor and `kay check` do, so it starts before they are rewritten.
   const restart = async () => {
-    child?.kill()
-    await child?.exited
+    restartedAt = performance.now()
+    restartedFor = changedFilesNamed(root, [...touched])
+    touched = new Set()
+
+    const previous = child
+
+    child = undefined
+    previous?.kill()
+    await previous?.exited
     start()
     await regenerateTypes(root, options)
   }
@@ -106,6 +154,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       changedFiles.add(file)
     }
 
+    touched.add(file)
+
     clearTimeout(timer)
     timer = setTimeout(() => {
       changed = true
@@ -117,6 +167,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   start()
 
   return async () => {
+    stopping = true
     clearTimeout(timer)
     stopWatching()
     await restarting
@@ -124,6 +175,23 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     spare?.kill()
     await Promise.all([child?.exited, spare?.exited])
   }
+}
+
+// The files a change left in place, which leaves out the directories holding them and an editor's temporary files; a deletion names what is gone.
+function changedFilesNamed(root: string, files: string[]): string[] {
+  const kept = files.filter(file => statSync(join(root, file), { throwIfNoEntry: false })?.isFile() === true)
+
+  return kept.length > 0 ? kept : files.filter(file => !files.some(other => other.startsWith(`${file}/`)))
+}
+
+// The files a restart came from, as its report names them.
+function describe(files: string[]): string {
+  const [first] = files
+
+  if (first === undefined)
+    return 'a change'
+
+  return files.length === 1 ? first : `${first} and ${files.length - 1} more`
 }
 
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
