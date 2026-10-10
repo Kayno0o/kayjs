@@ -4,6 +4,8 @@ import { testSite } from 'kay/test'
 
 // The fixture is an app installing the library, linked back to this repository by scripts/link-fixture.ts.
 const ROOT = join(import.meta.dir, '..')
+// kay check prints this line on success since kay 1.18, nothing before.
+const CLEAN = /^(?:checked with no problems in \d+ ms\n)?$/
 const site = await testSite({ root: ROOT })
 
 // The element with that id, as rendered.
@@ -22,7 +24,7 @@ async function element(path: string, id: string): Promise<string> {
 test('kay check passes on the fixture, the library\'s components it renders and this test included', async () => {
   const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
 
-  expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toBe('')
+  expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toMatch(CLEAN)
   expect(await check.exited).toBe(0)
 }, 60_000)
 
