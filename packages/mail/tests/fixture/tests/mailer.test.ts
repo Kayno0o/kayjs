@@ -107,6 +107,27 @@ describe('the outbox', () => {
   })
 })
 
+describe('the outbox helpers', () => {
+  it('gives the links a mail carries, each once, from its html or else its text', async () => {
+    await mail.send({ to: 'ada@example.com', subject: 'Welcome', view: Welcome, props: { name: 'Ada', url: URL } })
+    await mail.send({ to: 'bob@example.com', subject: 'Reset', text: 'Reset it at https://fixture.test/reset?t=1 (or https://fixture.test/help).' })
+
+    expect(outbox.links(outbox.to('ada@example.com')[0]!)).toEqual([URL])
+    expect(outbox.links(outbox.to('bob@example.com')[0]!)).toEqual(['https://fixture.test/reset?t=1', 'https://fixture.test/help'])
+  })
+
+  it('waits for a mail to an address, returning one already there at once, and fails after its timeout', async () => {
+    const waiting = outbox.waitFor('Ada@Example.com')
+
+    await mail.send({ to: 'bob@example.com', subject: 'Not this one', text: 'Hi' })
+    setTimeout(() => void mail.send({ to: 'ada@example.com', subject: 'This one', text: 'Hi' }), 20)
+
+    expect((await waiting).subject).toBe('This one')
+    expect((await outbox.waitFor('bob@example.com')).subject).toBe('Not this one')
+    await expect(outbox.waitFor('carol@example.com', { timeout: 0.05 })).rejects.toThrow('no mail to carol@example.com reached the outbox within 50 ms')
+  })
+})
+
 describe('the queue', () => {
   it('renders a mail when enqueued and sends it once drained, retrying a failure', async () => {
     const sent: Mail[] = []

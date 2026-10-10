@@ -113,6 +113,20 @@ export function htmlToText(html: string): string {
   return tidy(text).replace(KEPT, (_, index: string) => kept[Number(index)]!)
 }
 
+// Every link's address in the html, in order, each once.
+export function linksOf(html: string): string[] {
+  const links = new Set<string>()
+
+  for (const [, , closing, name, attributes] of html.matchAll(TOKEN)) {
+    const href = name?.toLowerCase() === 'a' && !closing ? attribute(attributes!, 'href') : undefined
+
+    if (href !== undefined)
+      links.add(href)
+  }
+
+  return [...links]
+}
+
 function attribute(attributes: string, name: string): string | undefined {
   for (const [, key, double, single, bare] of attributes.matchAll(ATTRIBUTE)) {
     if (key!.toLowerCase() === name)

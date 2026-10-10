@@ -2,6 +2,7 @@ import type { Duration } from 'kay'
 import type { Delivery, Mail, Transport } from './types'
 import { createPrivateKey } from 'node:crypto'
 import { createTransport } from 'nodemailer'
+import { milliseconds } from './duration'
 
 // Signs each mail for a relay that does not, its public key published in DNS at `<selector>._domainkey.<domain>`.
 export interface DkimSettings {
@@ -33,18 +34,6 @@ const DEFAULT_PORT = 465
 const DEFAULT_TIMEOUT_MS = 10_000
 // How long connections stay open after the last mail went: a burst reuses them, and a script still ends soon after its last mail.
 const IDLE_MS = 1000
-const UNITS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 }
-const DURATION = /^(\d+(?:\.\d+)?)([smhdw])$/
-
-function milliseconds(duration: Duration): number {
-  const match = typeof duration === 'string' ? DURATION.exec(duration) : null
-  const ms = typeof duration === 'number' ? duration * 1000 : match ? Number(match[1]) * UNITS[match[2]!]! : Number.NaN
-
-  if (!Number.isFinite(ms) || ms <= 0)
-    throw new Error(`kayjs-mail: smtp()'s timeout is ${String(duration)}; it takes a positive duration, seconds or a string such as '30s'`)
-
-  return ms
-}
 
 // Throws naming `what` unless `key` is a private key, so a broken one fails where it is given rather than at the first mail.
 export function checkKey(key: string, what: string): void {
@@ -73,7 +62,7 @@ export function smtp(settings: SmtpSettings): Transport {
     checkKey(settings.dkim.privateKey, 'smtp()\'s dkim.privateKey')
 
   // Read now, so a timeout that is no duration fails where the transport is made rather than at its first mail.
-  const wait = settings.timeout === undefined ? DEFAULT_TIMEOUT_MS : milliseconds(settings.timeout)
+  const wait = settings.timeout === undefined ? DEFAULT_TIMEOUT_MS : milliseconds(settings.timeout, 'smtp()\'s timeout')
   let transporter: ReturnType<typeof open> | undefined
   let sending = 0
   let idle: ReturnType<typeof setTimeout> | undefined
