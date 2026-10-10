@@ -1,7 +1,7 @@
 import type { FontConfig, FontsourceConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
 import { existsSync, readFileSync } from 'node:fs'
-import { extname, isAbsolute, join, resolve } from 'node:path'
+import { dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { writeAsset } from '../build/assets'
 
 // What every page carries for the fonts: their `@font-face` rules and the files to preload.
@@ -17,6 +17,9 @@ const FORMATS: Record<string, string> = { '.woff2': 'woff2', '.woff': 'woff', '.
 const QUOTE = /["\\]/g
 const RELATIVE = /^\.{1,2}\//
 const VARIABLE_SCOPE = '@fontsource-variable/'
+const NORMAL_STYLE = /-normal$/
+// A rule of a Fontsource stylesheet: its woff2 file and its range.
+const FACE_RANGE = /url\(([^)]+?\.woff2)\)[^}]*?unicode-range:([^;}]+)/g
 
 // Writes each font as a content-named asset, and records the rules declaring them beside the client build for a server that only reads it.
 export async function prepareFonts(root: string, fonts: (FontConfig | FontsourceConfig)[], dir: string): Promise<FontAssets> {
@@ -80,6 +83,8 @@ interface FontsourceMetadata {
   styles: string[]
   subsets: string[]
   defSubset: string
+  // Recent packages list each subset's range; older ones only write it in their CSS.
+  unicodeRange?: Record<string, string> | null
   variable?: { wght?: { min: string, max: string } } | false
 }
 
@@ -96,7 +101,7 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
   }
 
   const metadata = JSON.parse(readFileSync(file, 'utf8')) as FontsourceMetadata
-  const subset = font.subset ?? metadata.defSubset
+  const subsets = typeof font.subset === 'string' ? [font.subset] : font.subset ?? [metadata.defSubset]
   // A static package's metadata describes the family's variable axes too: only a `@fontsource-variable` package ships them.
   const variable = fontsource.startsWith(VARIABLE_SCOPE) ? metadata.variable !== undefined && metadata.variable !== false ? metadata.variable.wght : undefined : undefined
 
@@ -105,8 +110,19 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
 
   const faces: FontConfig[] = []
 
-  if (!metadata.subsets.includes(subset))
-    throw new Error(`kay: ${fontsource} has no subset ${subset}; it has ${metadata.subsets.join(', ')}`)
+  for (const subset of subsets) {
+    if (!metadata.subsets.includes(subset))
+      throw new Error(`kay: ${fontsource} has no subset ${subset}; it has ${metadata.subsets.join(', ')}`)
+  }
+
+  // One subset needs no range, its file holding every character the site uses.
+  const ranged = subsets.length > 1
+  const facesOf = (name: string, face: Omit<FontConfig, 'src' | 'family'>) => subsets.map(subset => ({
+    family: metadata.family,
+    src: `${fontsource}/files/${metadata.id}-${subset}-${name}.woff2`,
+    ...face,
+    ...ranged ? { unicodeRange: subsetRange(file, metadata, subset, name) } : {},
+  }))
 
   for (const style of styles) {
     if (!metadata.styles.includes(style))
@@ -116,7 +132,7 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
       if (weights !== undefined)
         throw new Error(`kay: ${fontsource} is variable, one face spanning weights ${variable.min} to ${variable.max}, so its entry lists no weights`)
 
-      faces.push({ family: metadata.family, src: `${fontsource}/files/${metadata.id}-${subset}-wght-${style}.woff2`, weight: `${variable.min} ${variable.max}`, style, display })
+      faces.push(...facesOf(`wght-${style}`, { weight: `${variable.min} ${variable.max}`, style, display }))
 
       continue
     }
@@ -128,11 +144,30 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
       if (!metadata.weights.includes(weight))
         throw new Error(`kay: ${fontsource} has no weight ${weight}; it has ${metadata.weights.join(', ')}`)
 
-      faces.push({ family: metadata.family, src: `${fontsource}/files/${metadata.id}-${subset}-${weight}-${style}.woff2`, weight, style, display })
+      faces.push(...facesOf(`${weight}-${style}`, { weight, style, display }))
     }
   }
 
   return faces
+}
+
+// The characters a subset's file holds, from the package's metadata, or else from the stylesheet Fontsource writes for the face, `400.css` or `wght-italic.css`.
+function subsetRange(metadataFile: string, metadata: FontsourceMetadata, subset: string, face: string): string {
+  const listed = metadata.unicodeRange?.[subset]
+
+  if (listed !== undefined)
+    return listed
+
+  const stylesheet = join(dirname(metadataFile), `${face.replace(NORMAL_STYLE, '')}.css`)
+  const css = existsSync(stylesheet) ? readFileSync(stylesheet, 'utf8') : ''
+  const file = `${metadata.id}-${subset}-${face}.woff2`
+
+  for (const [, src, range] of css.matchAll(FACE_RANGE)) {
+    if (src!.endsWith(`/${file}`))
+      return range!.trim()
+  }
+
+  throw new Error(`kay: the package of ${metadata.family} names no unicode-range for its ${subset} subset, which a face of several subsets needs`)
 }
 
 // A path relative to the root, or a file of an installed package such as `@fontsource-variable/inter/files/inter-latin-wght-normal.woff2`.

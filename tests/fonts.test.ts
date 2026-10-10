@@ -99,6 +99,37 @@ describe('fonts', () => {
     await expect(prepareFonts(root, [{ fontsource: '@fontsource/missing', weights: [400] }], scratch)).rejects.toThrow('bun add @fontsource/missing')
   })
 
+  it('gives each face of several Fontsource subsets its range, from the package\'s metadata or else its stylesheet', async () => {
+    const root = join(scratch, 'subsets')
+    const display = Bun.file('tests/fixtures/seo/src/fonts/display.woff2')
+    const exports = { './metadata.json': './metadata.json', './files/*': './files/*' }
+    const metadata = (id: string, family: string, unicodeRange: Record<string, string> | null) => JSON.stringify({ id, family, subsets: ['latin', 'latin-ext', 'greek'], weights: [400], styles: ['normal'], defSubset: 'latin', unicodeRange, variable: { wght: { default: '400', min: '100', max: '900', step: '1' } } })
+    const rule = (id: string, face: string, range: string) => `/* ${id}-${face} */\n@font-face {\n  src: url(./files/${id}-${face}.woff2) format('woff2'), url(./files/${id}-${face}.woff) format('woff');\n  unicode-range: ${range};\n}\n`
+
+    await Promise.all([
+      Bun.write(join(root, 'node_modules/@fontsource/anton/package.json'), JSON.stringify({ name: '@fontsource/anton', exports })),
+      Bun.write(join(root, 'node_modules/@fontsource/anton/metadata.json'), metadata('anton', 'Anton', null)),
+      Bun.write(join(root, 'node_modules/@fontsource/anton/400.css'), rule('anton', 'latin-ext-400-normal', 'U+0100-02BA') + rule('anton', 'latin-400-normal', 'U+0000-00FF')),
+      ...['latin', 'latin-ext'].map(async subset => Bun.write(join(root, `node_modules/@fontsource/anton/files/anton-${subset}-400-normal.woff2`), display)),
+      Bun.write(join(root, 'node_modules/@fontsource-variable/grotesk/package.json'), JSON.stringify({ name: '@fontsource-variable/grotesk', exports })),
+      Bun.write(join(root, 'node_modules/@fontsource-variable/grotesk/metadata.json'), metadata('grotesk', 'Grotesk', { 'latin': 'U+0000-00FF', 'latin-ext': 'U+0100-02BA' })),
+      ...['latin', 'latin-ext', 'greek'].map(async subset => Bun.write(join(root, `node_modules/@fontsource-variable/grotesk/files/grotesk-${subset}-wght-normal.woff2`), display)),
+    ])
+
+    const { css } = await prepareFonts(root, [{ fontsource: '@fontsource/anton', weights: [400], subset: ['latin', 'latin-ext'] }, { fontsource: '@fontsource-variable/grotesk', subset: ['latin', 'latin-ext'] }], join(root, 'out'))
+    const faces = css.split(/(?<=\})(?=@)/).map(rule => rule.replace(/url\("[^"]+"\)/, 'url()'))
+
+    expect(faces).toEqual([
+      '@font-face{font-family:"Anton";src:url() format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0000-00FF}',
+      '@font-face{font-family:"Anton";src:url() format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0100-02BA}',
+      '@font-face{font-family:"Grotesk";src:url() format("woff2");font-weight:100 900;font-style:normal;font-display:swap;unicode-range:U+0000-00FF}',
+      '@font-face{font-family:"Grotesk";src:url() format("woff2");font-weight:100 900;font-style:normal;font-display:swap;unicode-range:U+0100-02BA}',
+    ])
+
+    await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subset: ['latin', 'cyrillic'] }], scratch)).rejects.toThrow('has no subset cyrillic')
+    await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subset: ['latin', 'greek'] }], scratch)).rejects.toThrow('names no unicode-range for its greek subset')
+  })
+
   it('names a font that is missing or no font file', async () => {
     await expect(prepareFonts(process.cwd(), [{ family: 'X', src: '@fontsource/nothing/files/x.woff2' }], scratch)).rejects.toThrow('kay: the font @fontsource/nothing/files/x.woff2 is neither a file under the project nor one of an installed package')
     await expect(prepareFonts(process.cwd(), [{ family: 'X', src: '@iconify-json/tabler/icons.json' }], scratch)).rejects.toThrow('kay: the font @iconify-json/tabler/icons.json is no .woff2, .woff, .ttf or .otf file')

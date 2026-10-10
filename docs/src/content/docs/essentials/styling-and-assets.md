@@ -86,6 +86,8 @@ export default defineConfig({
 })
 ```
 
+`subset: ['latin', 'latin-ext']` on a Fontsource entry declares each subset with its `unicode-range`, so a page downloads only the files its text needs.
+
 Then use the family as usual: `font-family: Inter, system-ui, sans-serif`, or with Tailwind `@theme { --font-sans: Inter, system-ui, sans-serif; }`.
 
 <Callout type="note">

@@ -167,8 +167,8 @@ export interface FontsourceConfig {
   weights?: number[] | undefined
   // Defaults to `['normal']`.
   styles?: ('normal' | 'italic')[] | undefined
-  // Defaults to the package's own, `latin` for most.
-  subset?: string | undefined
+  // Defaults to the package's own, `latin` for most; several, `['latin', 'latin-ext']`, give each face its subset's `unicode-range`, so a page loads only the files its text needs.
+  subset?: string | string[] | undefined
   display?: FontConfig['display'] | undefined
 }
 
