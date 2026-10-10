@@ -1,8 +1,11 @@
 // What pages, layouts and static components render to on the server: markup built as strings, with no reactive runtime.
 // A rendered value is `{ t: markup }`: what a component or an island rendered goes into its parent's markup as it is.
 
+import type { FieldSchema } from './form'
+import { isAction } from './action'
 import { flattenClasses } from './classes'
 import { escape, escapeAttribute } from './escape'
+import { nativeConstraints } from './form'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
 import { localeState } from './locale-state'
@@ -473,6 +476,25 @@ export function refillOptions(posted: string | undefined, markup: string, value?
     return selectOptions(posted, markup, true)
 
   return value ? selectOptions(value(), markup) : markup
+}
+
+// The constraints a `field` checks in the browser without JavaScript, read off the schema of the action its form posts to; those the template writes itself are left to it.
+export function formConstraints(target: unknown, name: string, written: readonly string[]): string {
+  const schema = isAction(target) ? (target as { schema?: { properties?: Record<string, FieldSchema>, required?: string[] } }).schema : undefined
+  const field = schema?.properties?.[name]
+
+  if (!field)
+    return ''
+
+  return nativeConstraints(field, schema.required?.includes(name) === true)
+    .filter(([attribute]) => !written.includes(attribute))
+    .map(([attribute, value]) => value === '' ? ` ${attribute}` : ` ${attribute}="${escapeAttribute(value)}"`)
+    .join('')
+}
+
+// The `p` an `error` line shows a refused form's message in, nothing while there is none.
+export function errorParagraph(message: string | undefined, id: string, classes: string): string {
+  return message === undefined ? '' : `<p${id === '' ? '' : ` id="${escapeAttribute(id)}"`} class="${escapeAttribute(classes)}">${escape(message)}</p>`
 }
 
 function decode(text: string): string {

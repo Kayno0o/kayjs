@@ -1,6 +1,7 @@
+import type { FieldSchema } from '../src/runtime/form'
 import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
-import { formInput } from '../src/runtime/form'
+import { formInput, nativeConstraints } from '../src/runtime/form'
 import { defineEnv } from '../src/server'
 import { buildingWithoutEnv, publicEnvModule, servePublicEnv } from '../src/server/env'
 import { readQuery } from '../src/server/query'
@@ -112,6 +113,33 @@ describe('formInput', () => {
 
   it('leaves text without a line break as it is', () => {
     expect(formInput(schema, { message: 'plain', name: 'Ada' })).toEqual({ message: 'plain', name: 'Ada' })
+  })
+})
+
+describe('nativeConstraints', () => {
+  const of = (field: unknown, required = true) => Object.fromEntries(nativeConstraints(field as FieldSchema, required))
+
+  it('requires only a field the server would refuse left blank', () => {
+    expect(of(t.String())).toEqual({})
+    expect(of(t.String({ minLength: 1 }))).toEqual({ required: '', minlength: '1' })
+    expect(of(t.String({ minLength: 1 }), false)).toEqual({ minlength: '1' })
+    expect(of(t.Integer())).toEqual({ required: '' })
+    expect(of(t.Boolean())).toEqual({})
+    expect(of(t.Array(t.String()))).toEqual({})
+    expect(of(t.File())).toEqual({ required: '' })
+    expect(of(t.Union([t.Literal('a'), t.Literal('b')]))).toEqual({ required: '' })
+    expect(of(t.Union([t.Literal(''), t.Literal('b')]))).toEqual({})
+  })
+
+  it('anchors a pattern the schema matches anywhere, and drops one the browser\'s v flag cannot read', () => {
+    expect(of(t.String({ pattern: '^[a-z]+$' }))).toEqual({ required: '', pattern: '^[a-z]+$' })
+    expect(of(t.String({ pattern: '\\d' }))).toEqual({ required: '', pattern: '[\\s\\S]*(?:\\d)[\\s\\S]*' })
+    expect(of(t.String({ pattern: '^[\\w-]*$' }))).toEqual({})
+  })
+
+  it('bounds a number, s.Numeric included, and types an email field', () => {
+    expect(of(t.Numeric({ minimum: 1, maximum: 9 }), false)).toEqual({ min: '1', max: '9' })
+    expect(of(t.String({ format: 'email', maxLength: 80 }))).toEqual({ required: '', maxlength: '80', type: 'email' })
   })
 })
 

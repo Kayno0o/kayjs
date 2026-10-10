@@ -135,7 +135,18 @@ export interface ConstNode extends Span {
   value: Span
 }
 
-export type Node = ElementNode | TextNode | IfNode | ForNode | AwaitNode | TryNode | SlotNode | ConstNode
+// `error title` inside a form posting to an action: the message a refused post gives that field, in a `p.error` the field's `aria-describedby` names; a bare `error` shows the form's own.
+export interface ErrorNode extends Span {
+  kind: 'error'
+  // `error.text-sm title`: classes the `p` takes besides `error`.
+  classes: Span[]
+  // As written, quoted or not; none for the form's own message.
+  field?: Span | undefined
+  // The field's name, '' for the form's own message.
+  name: string
+}
+
+export type Node = ElementNode | TextNode | IfNode | ForNode | AwaitNode | TryNode | SlotNode | ConstNode | ErrorNode
 
 // An attribute written with a name, which a spread is not.
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
@@ -225,6 +236,7 @@ export function* elementsIn(nodes: readonly Node[]): Generator<ElementNode> {
 
         break
       case 'const':
+      case 'error':
         break
     }
   }
@@ -233,11 +245,15 @@ export function* elementsIn(nodes: readonly Node[]): Generator<ElementNode> {
 // A field of a form posting to an action: what a refused post fills back in, and whether it can be marked invalid.
 export interface FormField {
   name: string
+  // Named by `field`, which also writes the constraints the action's schema gives it.
+  marked: boolean
   fill?: 'value' | 'checked' | 'content' | 'selected' | undefined
   invalid: boolean
 }
 
-const FIELD_ELEMENTS = new Set(['input', 'textarea', 'select'])
+export const FIELD_ELEMENTS = new Set(['input', 'textarea', 'select'])
+// `input(field="title")` inside `form(action={add})`: `name="title"`, plus the constraints `add`'s schema gives `title`.
+export const FIELD_ATTRIBUTE = 'field'
 // A password or a file is never sent back; the others post no text the visitor typed.
 const UNFILLED_TYPES = new Set(['password', 'file', 'hidden', 'submit', 'button', 'reset', 'image'])
 const UNCHECKED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
@@ -248,7 +264,7 @@ export function formFieldOf(element: ElementNode, source: string): FormField | u
     return undefined
 
   const attributes = new Map((element.attributes as NamedAttribute[]).map(attribute => [source.slice(attribute.name.start, attribute.name.end), attribute]))
-  const name = attributes.get('name')
+  const name = attributes.get('name') ?? attributes.get(FIELD_ATTRIBUTE)
   const type = attributes.get('type')
 
   if (name?.kind !== 'static' || (type !== undefined && type.kind !== 'static'))
@@ -256,7 +272,7 @@ export function formFieldOf(element: ElementNode, source: string): FormField | u
 
   const bound = [...attributes.keys()].some(attribute => attribute.startsWith('bind:'))
   const inputType = type?.text.toLowerCase() ?? 'text'
-  const field: FormField = { name: name.text, invalid: !attributes.has('aria-invalid') && (element.name !== 'input' || !UNCHECKED_TYPES.has(inputType)) }
+  const field: FormField = { name: name.text, marked: !attributes.has('name'), invalid: !attributes.has('aria-invalid') && (element.name !== 'input' || !UNCHECKED_TYPES.has(inputType)) }
 
   // A disabled field posts nothing, so it would come back empty or unticked.
   if (bound || attributes.has('disabled'))
@@ -278,6 +294,8 @@ export function formFieldOf(element: ElementNode, source: string): FormField | u
 export interface ErrorMessages {
   // Generated ids, for elements with none of their own.
   ids: Map<ElementNode, string>
+  // The id of each `error` line, which a loop renders without.
+  lines: Map<ErrorNode, string>
   // Keyed by `errorKey`.
   describing: Map<string, string>
 }
@@ -290,11 +308,16 @@ function errorKey(action: string, field: string): string {
   return `${action.replace(WHITESPACE, '')}\n${field}`
 }
 
-// `if add.error('title') as message` and `p {add.error('title')}`: the element shown holds the message, outside a `for`, which would repeat its id, for an action a form of the file posts to.
+function errorId(action: string, field: string): string {
+  return `${action.replaceAll('.', '-')}-${field ? `${field.replace(ID_UNSAFE, '-')}-` : ''}error`
+}
+
+// An `error` line names the message its field is described by; failing one, as before it, the element `if add.error('title') as message` and `p {add.error('title')}`: the element shown holds the message, outside a `for`, which would repeat its id, for an action a form of the file posts to.
 export function errorMessages(nodes: Node[], source: string): ErrorMessages {
-  const found: ErrorMessages = { ids: new Map(), describing: new Map() }
+  const found: ErrorMessages = { ids: new Map(), lines: new Map(), describing: new Map() }
   const posted = new Set<string>()
   const shown: { element: ElementNode, action: string, field: string }[] = []
+  const lines: { node: ErrorNode, action: string }[] = []
   const text = (span: Span) => source.slice(span.start, span.end)
 
   const shows = (element: ElementNode | undefined, span: Span, loop: boolean) => {
@@ -304,14 +327,16 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
       shown.push({ element, action: match[1]!, field: match[3] ?? '' })
   }
 
-  const visit = (children: Node[], loop: boolean) => {
+  // `form`: the action the form around these nodes posts to.
+  const visit = (children: Node[], loop: boolean, form: string | undefined) => {
     for (const node of children) {
       switch (node.kind) {
         case 'element': {
           const action = actionOf(node, source)
+          const posts = action ? text(action.expression).replace(WHITESPACE, '') : undefined
 
-          if (action)
-            posted.add(text(action.expression).replace(WHITESPACE, ''))
+          if (posts !== undefined)
+            posted.add(posts)
 
           for (const child of node.children) {
             if (child.kind === 'text') {
@@ -322,7 +347,7 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
             }
           }
 
-          visit(node.children, loop)
+          visit(node.children, loop, posts ?? form)
 
           break
         }
@@ -331,37 +356,53 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
             if (branch.test)
               shows(branch.children.find((child): child is ElementNode => child.kind === 'element'), branch.test, loop)
 
-            visit(branch.children, loop)
+            visit(branch.children, loop, form)
           }
 
           break
         case 'for':
-          visit([...node.children, ...node.fallback ?? []], true)
+          visit([...node.children, ...node.fallback ?? []], true, form)
 
           break
         case 'await':
           for (const block of awaitBlocks(node))
-            visit(block, loop)
+            visit(block, loop, form)
 
           break
         case 'try':
           for (const block of tryBlocks(node))
-            visit(block, loop)
+            visit(block, loop, form)
 
           break
         case 'slot':
-          visit(node.children, loop)
+          visit(node.children, loop, form)
+
+          break
+        case 'error':
+          if (form !== undefined && !loop)
+            lines.push({ node, action: form })
 
           break
         case 'text':
-          break
         case 'const':
           break
       }
     }
   }
 
-  visit(nodes, false)
+  visit(nodes, false, undefined)
+
+  for (const { node, action } of lines) {
+    const key = errorKey(action, node.name)
+
+    if (found.describing.has(key))
+      continue
+
+    const id = errorId(action, node.name)
+
+    found.lines.set(node, id)
+    found.describing.set(key, id)
+  }
 
   for (const { element, action, field } of shown) {
     const key = errorKey(action, field)
@@ -373,7 +414,7 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
     let id = element.id ? text(element.id) : own?.text
 
     if (id === undefined) {
-      id = `${action.replaceAll('.', '-')}-${field ? `${field.replace(ID_UNSAFE, '-')}-` : ''}error`
+      id = errorId(action, field)
       found.ids.set(element, id)
     }
 
@@ -471,6 +512,7 @@ export function drawIcons(nodes: Node[], icons: ReadonlySet<string>): void {
 
         break
       case 'const':
+      case 'error':
         break
     }
   }
@@ -502,7 +544,7 @@ export function visitNodes(nodes: Node[], each: (node: Node) => void): void {
         visitNodes(block, each)
       }
     }
-    else if (node.kind !== 'const') {
+    else if (node.kind !== 'const' && node.kind !== 'error') {
       visitNodes([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], each)
     }
   }

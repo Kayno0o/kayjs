@@ -7,6 +7,10 @@ export interface FieldSchema {
   format?: unknown
   pattern?: unknown
   minLength?: unknown
+  maxLength?: unknown
+  minimum?: unknown
+  maximum?: unknown
+  const?: unknown
   anyOf?: FieldSchema[]
   // `false` keeps the spaces around what was typed, as a field named like a password keeps them anyway.
   trim?: unknown
@@ -97,6 +101,74 @@ function fromText(field: FieldSchema | undefined, value: unknown): unknown {
 // `s.Number()`, or `s.Integer()` and `s.Numeric()`, which Elysia writes as a number or a numeric string; `s.Date()` takes a number too, but not only.
 function isNumeric(field: FieldSchema): boolean {
   return field.type === 'number' || field.type === 'integer' || (field.anyOf?.every(member => isNumeric(member) || NUMERIC_FORMATS.has(member.format)) ?? false)
+}
+
+// The attributes a browser checks a field against without JavaScript, where a keyword of its schema has one; `required` only where the server would refuse the field left blank, as it never does an unticked checkbox.
+export function nativeConstraints(field: FieldSchema, required: boolean): [name: string, value: string][] {
+  const found: [string, string][] = []
+
+  if (required && refusesBlank(field))
+    found.push(['required', ''])
+
+  if (field.type === 'string') {
+    if (typeof field.minLength === 'number' && field.minLength > 0)
+      found.push(['minlength', String(field.minLength)])
+
+    if (typeof field.maxLength === 'number')
+      found.push(['maxlength', String(field.maxLength)])
+
+    const pattern = typeof field.pattern === 'string' ? wholeValuePattern(field.pattern) : undefined
+
+    if (pattern !== undefined)
+      found.push(['pattern', pattern])
+
+    if (field.format === 'email')
+      found.push(['type', 'email'])
+  }
+
+  if (isNumeric(field)) {
+    if (typeof field.minimum === 'number')
+      found.push(['min', String(field.minimum)])
+
+    if (typeof field.maximum === 'number')
+      found.push(['max', String(field.maximum)])
+  }
+
+  return found
+}
+
+function refusesBlank(field: FieldSchema): boolean {
+  if (field.const !== undefined)
+    return field.const !== ''
+
+  if (field.anyOf)
+    return field.anyOf.length > 0 && field.anyOf.every(refusesBlank)
+
+  if (field.type === 'string')
+    return field.format !== undefined || (typeof field.minLength === 'number' && field.minLength > 0) || (typeof field.pattern === 'string' && matches(field.pattern, 'u', '') === false)
+
+  // A required list may be empty, but not a required file list.
+  if (field.type === 'array')
+    return field.items?.format === 'binary'
+
+  return field.type === 'number' || field.type === 'integer' || field.type === 'Date'
+}
+
+// A schema pattern matches anywhere in the text, where a `pattern` attribute matches all of it, read with the `v` flag: one that flag refuses would be ignored by the browser anyway.
+function wholeValuePattern(pattern: string): string | undefined {
+  const whole = pattern.startsWith('^') && pattern.endsWith('$') && !pattern.endsWith('\\$') ? pattern : `[\\s\\S]*(?:${pattern})[\\s\\S]*`
+
+  return matches(whole, 'v', '') === undefined ? undefined : whole
+}
+
+// Whether the pattern matches the text, undefined for one the flag cannot read.
+function matches(pattern: string, flag: 'u' | 'v', text: string): boolean | undefined {
+  try {
+    return new RegExp(pattern, flag).test(text)
+  }
+  catch {
+    return undefined
+  }
 }
 
 // A field never echoed back to the form, as a password is.

@@ -226,6 +226,26 @@ export function text(parent: Node, data: string): void {
     parent.appendChild(document.createTextNode(data))
 }
 
+let paragraph: (() => Element) | undefined
+
+// The `p` an `error` line shows a refused form's message in, claimed from the server markup when hydrating; nothing while there is none.
+export function errorParagraph(message: string | undefined, id: string, classes: string): Element | undefined {
+  if (message === undefined)
+    return undefined
+
+  const element = (paragraph ??= template('<p></p>'))()
+
+  if (id !== '')
+    element.id = id
+
+  element.className = classes
+
+  if (element.textContent !== message)
+    element.textContent = message
+
+  return element
+}
+
 // The markers around a dynamic part of a block.
 export function markers(parent: Node): [start: Node, end: Node] {
   if (claim) {

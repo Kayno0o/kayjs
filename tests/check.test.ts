@@ -482,6 +482,38 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('types the field an error line or a field attribute names, and refuses either outside a form posting to an action', async () => {
+    const page = [
+      '--- server',
+      'import { t } from \'elysia\'',
+      'import { action } from \'kay\'',
+      '',
+      'export const save = action(t.Object({ code: t.String({ maxLength: 200 }) }), async () => 1)',
+      '---',
+      'form(action={save})',
+      '  label Code',
+      '    input(field="code")',
+      '  error code',
+      '  error',
+      '  error cod',
+      '  label Other',
+      '    input(field="cod")',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/other.kay': 'p\n  error code\n' })
+
+    try {
+      expect((await check(root)).map(d => [d.file.split('/').at(-1), d.line, d.code ?? firstLine(d.message)])).toEqual([
+        ['other.kay', 2, '`error` shows the message of a form posting to an action, so it sits inside one'],
+        ['index.kay', 12, 'TS2345'],
+        ['index.kay', 14, 'TS2345'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('refuses a literal ctx.fail status, redirect target or cached ttl the server would refuse when it runs', async () => {
     const page = [
       '--- server',

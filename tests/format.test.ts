@@ -120,6 +120,10 @@ describe('formatKay', () => {
     expect(format('ul\n    slot row(\n      item,\n    )\n        li x\n    {label}\n    slot\n')).toBe('ul\n  slot row(\n    item,\n  )\n    li x\n  {label}\n  slot\n')
   })
 
+  it('re-indents an error line with its block', () => {
+    expect(format('form\n    error.text-sm title\n    error\n')).toBe('form\n  error.text-sm title\n  error\n')
+  })
+
   it('indents a try and its catch block like any block', () => {
     expect(format('try\n    p {\n      a\n    }\ncatch error\n      p b\n')).toBe('try\n  p {\n    a\n  }\ncatch error\n  p b\n')
   })

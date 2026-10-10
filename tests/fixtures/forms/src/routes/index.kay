@@ -24,6 +24,13 @@ export const busy = action(t.Object({
   note: t.Optional(t.String({ maxLength: 3, error: 'Too long' })),
 }), (_input, ctx) => ctx.fail(503, 'Try later'))
 
+export const enrol = action(t.Object({
+  title: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
+  email: t.String({ format: 'email', maxLength: 200 }),
+  age: t.Optional(t.Numeric({ minimum: 1, maximum: 120 })),
+  agree: t.Boolean(),
+}), (_input, ctx) => ctx.fail(409, 'Full'))
+
 export const odd = action(t.Object({}), (_input, ctx) => ctx.fail(409, { retry: () => 'later' }))
 
 const tally = { count: 0 }
@@ -65,6 +72,14 @@ form.busy(action={busy})
   if busy.error() as message
     p.busy-error {message}
   button Busy
+form.enrol(action={enrol})
+  error
+  input(field="title")
+  error title
+  input(field="email")
+  input(field="age" type="number")
+  input(field="agree" type="checkbox")
+  button Enrol
 Signup
 p.tally {tally.count}
 a.other(href="/other") Other

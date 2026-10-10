@@ -1,5 +1,5 @@
 import type * as t from '@babel/types'
-import type { AwaitNode, ConstNode, ElementNode, ForNode, IfNode, Node, TextExpression, TryNode } from './ast'
+import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, Node, TextExpression, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import { parseExpression } from '@babel/parser'
 import { isHead, isSlot } from './ast'
@@ -17,6 +17,7 @@ export type Item
     | { kind: 'await', node: AwaitNode }
     | { kind: 'try', node: TryNode }
     | { kind: 'const', node: ConstNode }
+    | { kind: 'error', node: ErrorNode }
 
 export type DynamicItem = Exclude<Item, { kind: 'text' | 'element' | 'const' }>
 
@@ -74,6 +75,7 @@ export function childItems(nodes: Node[]): Item[] {
       case 'for':
       case 'await':
       case 'try':
+      case 'error':
         items.push({ kind: node.kind, node } as Item)
 
         break
@@ -160,6 +162,11 @@ export function slotValue(b: CodeBuilder, slot: ElementNode): void {
 
   if (slot.outlet.args)
     b.add('?.(').addSource(slot.outlet.args).add(')')
+}
+
+// The arguments of the `errorParagraph` an `error` line renders, past the message: its id, none in a loop, and its classes.
+export function errorParagraphArguments(node: ErrorNode, src: string, id: string | undefined): string {
+  return `${JSON.stringify(id ?? '')}, ${JSON.stringify(['error', ...node.classes.map(span => src.slice(span.start, span.end))].join(' '))}`
 }
 
 // A lone dynamic part of an element owns all of its content, so it needs no markers around it.

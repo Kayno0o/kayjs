@@ -2,13 +2,13 @@ import type { Attribute, AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNo
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import { URL_ATTRIBUTES } from '../runtime/base'
-import { actionOf, describedByOf, formFieldOf, marksServerIsland } from './ast'
+import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
-import { childItems, constDeclaration, slotValue, soleDynamic } from './items'
+import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const TRANSITION_PART = 'transition:'
 // A static URL an island sets itself rather than in its template, so the browser puts it under `base` as the server does: a root-relative one, or a `srcset` holding one.
@@ -144,6 +144,16 @@ export class DomTemplate {
         break
       case 'try':
         b.wrap(item.node, () => this.try(item.node, at))
+
+        break
+      case 'error':
+        if (this.formTarget) {
+          const target = this.formTarget
+
+          b.wrap(item.node, () => {
+            b.add(`KayInsert(${at}, () => ${domAlias('errorParagraph')}(KayFormError((`).addSource(target).add(`), ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, this.errors?.lines.get(item.node))}));`)
+          })
+        }
 
         break
     }
@@ -385,7 +395,9 @@ export class DomTemplate {
         }
 
         if (attribute.kind === 'static') {
-          if (attributeName === 'innerHTML')
+          if (attributeName === FIELD_ATTRIBUTE && FIELD_ELEMENTS.has(name))
+            html += ` name="${escapeStaticAttribute(decodeEntities(attribute.text))}"`
+          else if (attributeName === 'innerHTML')
             content = attribute.text
           else if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && attributeName === 'value'))
             content = escapeText(decodeEntities(attribute.text))

@@ -389,6 +389,11 @@ export function formInvalid(target: unknown, name: string): 'true' | undefined {
   return isAction(target) && (target as FormTarget).error(name) !== undefined ? 'true' : undefined
 }
 
+// The message a refused post or call gave `field` of a form posting to `target`, or under '' the form's own: what an `error` line shows.
+export function formError(target: unknown, field: string): string | undefined {
+  return isAction(target) ? (target as FormTarget).error(field) : undefined
+}
+
 // The post a page with islands was rendered in answer to, read again once a swap brings another page.
 let pageRead: [Element | null, Outcome | undefined] | undefined
 

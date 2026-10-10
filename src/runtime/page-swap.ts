@@ -1,7 +1,7 @@
 import type { Swap } from './navigate'
 import type { FetchedPage } from './swap'
 import { withoutBase } from './base'
-import { busyForms, leave, navigation, pageKey, restoreScroll, saveScroll, submitNatively, swappable, writeHistory } from './navigate'
+import { busyForms, checkedForms, leave, navigation, pageKey, restoreScroll, saveScroll, submitNatively, swappable, takeFormChecks, writeHistory } from './navigate'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
 import { decodeValue } from './wire'
 
@@ -187,6 +187,7 @@ async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () =
     navigation.shown = pageKey(target)
     restoreScroll(swap, hash)
     moveFocus(swap)
+    takeFormChecks(document)
     navigation.hooks!.hydrate(document.body)
   }
 
@@ -596,7 +597,10 @@ function optsIn(rules: CSSRuleList): boolean {
 
 // Checks the form, already marked busy, then posts it.
 export async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url: URL): Promise<void> {
-  if (form.noValidate || submitter?.hasAttribute('formnovalidate') || await passes(form, withoutBase(url.pathname))) {
+  const ours = checkedForms.has(form)
+
+  // Past the schema, the constraints the template writes itself, which the browser no longer checks once kay took the form.
+  if ((form.noValidate && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname)) && (!ours || form.reportValidity()))) {
     await send(form, submitter, url)
 
     return

@@ -168,6 +168,9 @@ function multiLineSpans(nodes: Node[]): Span[] {
     if (node.kind === 'const')
       return [node.pattern, node.value]
 
+    if (node.kind === 'error')
+      return []
+
     return [...(node.params ? [node.params] : []), ...multiLineSpans(node.children)]
   })
 }
@@ -222,6 +225,7 @@ function trailingTextEnds(nodes: Node[]): Set<number> {
 
         break
       case 'const':
+      case 'error':
         break
     }
   }
@@ -282,7 +286,7 @@ function elementsOf(nodes: Node[]): ElementNode[] {
     if (node.kind === 'try')
       return elementsOf(tryBlocks(node).flat())
 
-    if (node.kind === 'const')
+    if (node.kind === 'const' || node.kind === 'error')
       return []
 
     return elementsOf(node.children)

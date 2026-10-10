@@ -1,9 +1,9 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { LintName } from './lints'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, awaitBlocks, errorMessages, isChildrenSlot, isHead, isSlot, serverIslandOf, tryBlocks } from './ast'
+import { actionOf, awaitBlocks, errorMessages, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isChildrenSlot, isHead, isSlot, serverIslandOf, tryBlocks } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression, mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -174,7 +174,7 @@ class Generator {
 
     // What fills a form's fields back in once a post was refused.
     if (runnable && kayHelpers.includes('formAction'))
-      kayHelpers.push('formValue', 'formChecked', 'formInvalid')
+      kayHelpers.push('formValue', 'formChecked', 'formInvalid', 'formError')
 
     if (html && kayHelpers.includes('formAction'))
       kayHelpers.push('formProtection')
@@ -730,6 +730,10 @@ class Generator {
           this.reportSlot(node)
 
           break
+        case 'error':
+          this.emitError(node)
+
+          break
       }
 
       previous = node
@@ -754,6 +758,31 @@ class Generator {
     b.add(' return ')
     this.emitRoot(rest)
     b.add(' })()}')
+  }
+
+  // The field's name is typed as a `name` is: one of the action's input.
+  private emitError(node: ErrorNode) {
+    const { b } = this
+
+    if (!this.formTarget) {
+      this.error(node, '`error` shows the message of a form posting to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
+
+      return
+    }
+
+    if (!this.options.check)
+      return
+
+    b.wrap(node, () => {
+      b.add('{KayFormError((').addSource(this.formTarget!).add(')')
+
+      if (node.field) {
+        b.add(', ')
+        b.wrap(node.field, () => b.add(JSON.stringify(node.name)))
+      }
+
+      b.add(')}')
+    })
   }
 
   private emitIf(node: IfNode, index: number) {
@@ -1148,10 +1177,42 @@ class Generator {
       return true
     }
 
-    if (!this.options.check || !this.formTarget || attribute.kind !== 'static' || element.component || !FORM_FIELDS.has(element.name) || this.text(attribute.name) !== 'name')
+    if (attribute.kind === 'spread' || element.component)
       return false
 
-    b.addSource(attribute.name).add('={KayField((').addSource(this.formTarget).add('), ')
+    const name = this.text(attribute.name)
+
+    if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !FORM_FIELDS.has(element.name))
+      return false
+
+    // `field` writes `name`, and the constraints of the action's schema, which only a form posting to one has.
+    if (name === FIELD_ATTRIBUTE) {
+      const named = element.attributes.find((other): other is NamedAttribute => other.kind !== 'spread' && this.text(other.name) === 'name')
+
+      if (!this.formTarget)
+        this.error(attribute.name, '`field` names a field of a form posting to an action, so it sits inside one', { help: 'write `name` for a form posting elsewhere' })
+      else if (attribute.kind !== 'static')
+        this.error(attribute.name, '`field` takes the field\'s name as written text', { note: 'its constraints are read off the action\'s schema by that name', help: 'write `field="title"`, or `name={...}` for a name computed at render' })
+      else if (named)
+        this.error(attribute.name, 'A field has `field` or `name`, not both', { related: [{ ...named.name, label: 'named here' }], help: 'drop `name`: `field` writes it' })
+
+      if (attribute.kind !== 'static' || named) {
+        b.add('{...{}}')
+
+        return true
+      }
+    }
+
+    if (!this.options.check || !this.formTarget || attribute.kind !== 'static') {
+      if (name !== FIELD_ATTRIBUTE)
+        return false
+
+      b.wrap(attribute.name, () => b.add('name')).add(`=${JSON.stringify(attribute.kind === 'static' ? attribute.text : '')}`)
+
+      return true
+    }
+
+    b.wrap(attribute.name, () => b.add('name')).add('={KayField((').addSource(this.formTarget).add('), ')
     b.wrap(attribute.value, () => b.add(JSON.stringify(attribute.text)))
     b.add(')}')
 
@@ -1531,6 +1592,7 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
       case 'slot':
         return visit(node.children)
       case 'const':
+      case 'error':
         return false
     }
 
@@ -1561,6 +1623,7 @@ export function mayPromote(file: KayFile, script: ScriptAnalysis): boolean {
       case 'slot':
         return visit(node.children)
       case 'const':
+      case 'error':
         return false
     }
 
@@ -1570,7 +1633,7 @@ export function mayPromote(file: KayFile, script: ScriptAnalysis): boolean {
   return visit(file.template)
 }
 
-type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer'
+type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer'
 
 function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
@@ -1595,6 +1658,7 @@ function formHelpers(file: KayFile): KayHelper[] {
       case 'slot':
         return hasActionForm(node.children)
       case 'const':
+      case 'error':
         return false
     }
 
@@ -1643,6 +1707,7 @@ function awaitedNames(nodes: Node[], source: string, found = new Set<string>()):
 
         break
       case 'const':
+      case 'error':
         break
     }
   }
@@ -1681,6 +1746,7 @@ function usesSlot(nodes: Node[], found: (node: Node) => boolean): boolean {
       case 'try':
         return tryBlocks(node).some(uses)
       case 'const':
+      case 'error':
         return false
     }
 
@@ -1705,6 +1771,7 @@ function usesAwait(nodes: Node[]): boolean {
       case 'try':
         return tryBlocks(node).some(usesAwait)
       case 'const':
+      case 'error':
         return false
     }
 
@@ -1729,6 +1796,7 @@ function usesTry(nodes: Node[]): boolean {
       case 'await':
         return awaitBlocks(node).some(usesTry)
       case 'const':
+      case 'error':
         return false
     }
 

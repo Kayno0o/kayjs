@@ -63,6 +63,8 @@ export const leaveGuards = new Set<LeaveGuard>()
 export const busyForms = new WeakSet<HTMLFormElement>()
 // A form handed back to the browser after the swap could not send it, which the next submit event lets through.
 export const nativeSubmits = new WeakSet<HTMLFormElement>()
+// The forms kay set `novalidate` on to check them itself; an author's own `novalidate` still skips the check.
+export const checkedForms = new WeakSet<HTMLFormElement>()
 
 let eagerness: Eagerness = false
 let scrollTimer: ReturnType<typeof setTimeout> | undefined
@@ -98,6 +100,7 @@ export function startNavigation(given: NavigationHooks): void {
   for (const script of document.querySelectorAll(SPECULATION))
     script.remove()
 
+  takeFormChecks(document)
   history.scrollRestoration = 'manual'
   document.addEventListener('click', onClick)
   document.addEventListener('submit', onSubmit)
@@ -497,9 +500,37 @@ export function submitNatively(form: HTMLFormElement, submitter: HTMLElement | n
   form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : null)
 }
 
+// Forms posting to an action are checked by kay once it runs, so the schema's own messages show rather than the browser's for the constraints their fields write for a visit without JavaScript.
+export function takeFormChecks(root: ParentNode): void {
+  for (const form of root.querySelectorAll('form'))
+    takeFormCheck(form)
+}
+
+function takeFormCheck(form: HTMLFormElement): void {
+  if (form.noValidate)
+    return
+
+  try {
+    if (!actionUrl(form, null))
+      return
+  }
+  catch {
+    // An action the page cannot resolve is left to the browser, which posts it natively.
+    return
+  }
+
+  form.noValidate = true
+  checkedForms.add(form)
+}
+
+// An island may render a form after the page loaded, taken once it gets focus.
 function onFormFocus(event: FocusEvent): void {
-  if (event.target instanceof Element && event.target.closest('form'))
+  const form = event.target instanceof Element ? event.target.closest('form') : null
+
+  if (form) {
+    takeFormCheck(form)
     void preloadChecks()
+  }
 }
 
 // A form taking focus is about to be posted: the swap and the form checks load then, so a page with no form never fetches them.

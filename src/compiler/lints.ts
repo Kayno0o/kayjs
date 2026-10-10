@@ -403,7 +403,7 @@ export function templateLints(file: KayFile): Diagnostic[] {
       else if (node.kind === 'try') {
         visit(tryBlocks(node).flat())
       }
-      else if (node.kind !== 'text' && node.kind !== 'const') {
+      else if (node.kind !== 'text' && node.kind !== 'const' && node.kind !== 'error') {
         visit(node.children)
       }
     }

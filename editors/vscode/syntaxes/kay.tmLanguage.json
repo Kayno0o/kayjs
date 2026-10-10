@@ -28,6 +28,9 @@
       "include": "#const"
     },
     {
+      "include": "#error-line"
+    },
+    {
       "include": "#for"
     },
     {
@@ -194,6 +197,20 @@
               "include": "source.ts"
             }
           ]
+        }
+      }
+    },
+    "error-line": {
+      "match": "^[ \\t]*(error)((?:\\.[\\w\\-:/@!]+)*)(?:[ \\t]+(\"[^\"]*\"|'[^']*'|[\\w$-]+))?[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.error.kay"
+        },
+        "2": {
+          "name": "entity.other.attribute-name.class.kay"
+        },
+        "3": {
+          "name": "variable.other.field.kay"
         }
       }
     },

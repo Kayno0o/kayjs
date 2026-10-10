@@ -129,7 +129,21 @@ State several islands share, or one kept across visits, is a signal in a `.ts` m
 
 ## Forms
 
-A page's server fence exports an action, a schema and a handler; `form(action={comment})` posts to it without JavaScript, and a refused post renders the page again, the fields holding what was sent and `ctx.failed(comment)` telling why. With kay's script, the form posts without a reload, checked first in the browser against the schema with the browser's own bubbles.
+A page's server fence exports an action, a schema and a handler; `form(action={comment})` posts to it without JavaScript, and a refused post renders the page again, the fields holding what was sent and `ctx.failed(comment)` telling why. Each field names itself with `field`, which writes its `name` and the constraints the schema gives it, so the browser checks them without JavaScript, and an `error` line shows the message a refused post gave that field, the field described by it for screen readers; a bare `error` shows the form's own:
+
+```kay
+form(action={comment})
+  error
+  label(for="name") Name
+  input#name(field="name")
+  error name
+  label(for="text") Comment
+  textarea#text(field="text")
+  error text
+  button Send
+```
+
+With kay's script, the form posts without a reload, checked first in the browser against the schema, each refused field showing the schema's `error` message in the browser's bubble.
 
 To show the same rules as text next to each field, before posting and after a post the server refused, keep them in a module both sides import, `src/comment.ts` here:
 

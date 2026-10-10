@@ -171,6 +171,14 @@ describe('kay grammar', () => {
     expect(lines[3]![0]).toBe('var: entity.name.tag.kay')
   })
 
+  it('reads an error line, its classes and the field it names, and leaves an errors element alone', () => {
+    const lines = tokenize(['form', '  error', '  error.text-sm title', '  errors x'].join('\n'))
+
+    expect(lines[1]).toEqual(['error: keyword.control.error.kay'])
+    expect(lines[2]).toEqual(['error: keyword.control.error.kay', '.text-sm: entity.other.attribute-name.class.kay', 'title: variable.other.field.kay'])
+    expect(lines[3]![0]).toBe('errors: entity.name.tag.kay')
+  })
+
   it('reads a try block with its catch branch', () => {
     const lines = tokenize(['try', '  p Fine', 'catch error'].join('\n'))
 

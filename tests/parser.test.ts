@@ -43,6 +43,8 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
         return { slot: text(file, node.name), ...(node.params && { params: text(file, node.params) }), children: outline(file, node.children) }
       case 'const':
         return { const: text(file, node.pattern), value: text(file, node.value) }
+      case 'error':
+        return { error: node.name, ...(node.classes.length > 0 && { classes: node.classes.map(span => text(file, span)) }) }
     }
 
     return node
@@ -186,6 +188,23 @@ describe('elements', () => {
     expect(at('doctype html\np')).toEqual([['doctype', '`doctype` is pug syntax kay does not hav']])
     expect(at('div\n  include a.pug')).toEqual([['include', '`include` is pug syntax kay does not hav']])
     expect(at('blockquote each one\np while\n')).toEqual([])
+  })
+})
+
+describe('error', () => {
+  it('names the field whose message it shows, quoted or not, none for the form\'s own, with classes of its own', () => {
+    const file = parse('form\n  error\n  error title\n  error.text-sm.mt-1 "first name"\n  error \'x-y\'')
+
+    expect(file.diagnostics).toEqual([])
+    expect(outline(file)).toEqual([{ tag: 'form', children: [{ error: '' }, { error: 'title' }, { error: 'first name', classes: ['text-sm', 'mt-1'] }, { error: 'x-y' }] }])
+  })
+
+  it('rejects a second word and children, leaving an element named error-like alone', () => {
+    const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
+
+    expect(at('error title body')).toEqual([['body', 'An `error` line names one field']])
+    expect(at('error title\n  p x')).toEqual([['p x', 'An `error` line has no children: it shows the message the action gives']])
+    expect(outline(parse('errors x'))).toEqual([{ tag: 'errors', children: [['x']] }])
   })
 })
 

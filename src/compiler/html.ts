@@ -1,12 +1,12 @@
-import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ErrorNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, describedByOf, formFieldOf, marksServerIsland, serverIslandOf } from './ast'
+import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, marksServerIsland, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
-import { childItems, constDeclaration, slotValue, soleDynamic } from './items'
+import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -204,7 +204,26 @@ export class HtmlTemplate {
         this.try(item.node)
 
         break
+      case 'error':
+        this.error(item.node)
+
+        break
     }
+  }
+
+  // Outside a form posting to an action, which `kay check` reports, it renders nothing.
+  private error(node: ErrorNode): void {
+    const { b } = this
+
+    if (!this.formTarget) {
+      b.add('""')
+
+      return
+    }
+
+    b.wrap(node, () => {
+      b.add(`${htmlAlias('errorParagraph')}(KayFormError((`).addSource(this.formTarget!).add(`), ${JSON.stringify(node.name)}), ${errorParagraphArguments(node, this.src, this.options.errors?.lines.get(node))})`)
+    })
   }
 
   private if(node: IfNode, index: number): void {
@@ -435,6 +454,12 @@ export class HtmlTemplate {
       }
 
       if (attribute.kind === 'static') {
+        if (attributeName === FIELD_ATTRIBUTE && FIELD_ELEMENTS.has(name)) {
+          markup.text(` name="${escapeStaticAttribute(decodeEntities(attribute.text))}"`)
+
+          continue
+        }
+
         if (field?.fill === 'content' && attributeName === 'value') {
           content = () => void b.add(JSON.stringify(decodeEntities(attribute.text)))
 
@@ -515,6 +540,17 @@ export class HtmlTemplate {
 
     if (field) {
       const fieldArguments = () => void b.add('((').addSource(target).add(`), ${JSON.stringify(field.name)}`)
+
+      if (field.marked) {
+        // Only an input takes a `type`, such as `email`.
+        const written = [...(element.attributes as NamedAttribute[]).map(attribute => this.source(attribute.name)), ...name === 'input' ? [] : ['type']]
+
+        markup.dynamic(() => {
+          b.add(htmlAlias('formConstraints'))
+          fieldArguments()
+          b.add(`, ${JSON.stringify(written)})`)
+        })
+      }
 
       if (filled) {
         markup.dynamic(() => {

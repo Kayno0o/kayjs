@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 
 // `--- server`, `--- client`, `--- script`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
@@ -21,6 +21,10 @@ const CONST_HEAD = /const(?=[ \t]|\r?\n|$)/y
 const REASSIGNABLE = /(let|var)[ \t]+[A-Z_$][\w$]*[ \t]*=(?!=)/iy
 const CONST_NAME = /[A-Z_$][\w$]*/iy
 const CONST_HELP = '`const name = value`, or `const { a, b } = value` to destructure it'
+// `error title`, `error.text-sm title` or a bare `error`.
+const ERROR_HEAD = /error(?=[. \t]|\r?\n|$)/y
+const FIELD_NAME = /[\w$-]+|"[^"\n]*"|'[^'\n]*'/y
+const ERROR_HELP = '`error title` shows the message of the field posted as `title`, a bare `error` the form\'s own'
 // Pug lines kay has no counterpart for, which would otherwise read as an element named after the keyword.
 const PUG_KEYWORD = /(each|while|unless|case|when|include|extends|block|mixin|doctype)(?=[ \t]|\r?\n|$)/y
 const PUG_HINTS: Record<string, string> = {
@@ -235,6 +239,14 @@ class TemplateParser {
 
     if (this.src[start] === '@') {
       siblings.push(this.parseSlot(indent))
+
+      return
+    }
+
+    ERROR_HEAD.lastIndex = start
+
+    if (ERROR_HEAD.test(this.src)) {
+      siblings.push(this.parseError(indent))
 
       return
     }
@@ -581,6 +593,51 @@ class TemplateParser {
     const children = this.parseBlock(indent)
 
     return { kind: 'for', start, end: this.lastContentEnd(), item, index, each, key, children }
+  }
+
+  private parseError(indent: number): ErrorNode {
+    const start = this.pos
+    const classes: Span[] = []
+
+    this.pos += 'error'.length
+
+    while (this.src[this.pos] === '.') {
+      CLASS_NAME.lastIndex = this.pos + 1
+      const match = CLASS_NAME.exec(this.src)
+
+      if (!match) {
+        this.error(this.pos, this.pos + 1, 'Expected a class name after `.`')
+        this.pos++
+
+        break
+      }
+
+      classes.push({ start: this.pos + 1, end: this.pos + 1 + match[0].length })
+      this.pos += 1 + match[0].length
+    }
+
+    this.skipSpaces()
+
+    let field: Span | undefined
+    let name = ''
+
+    if (!this.atLineEnd()) {
+      FIELD_NAME.lastIndex = this.pos
+      const match = FIELD_NAME.exec(this.src)
+
+      if (match) {
+        field = { start: this.pos, end: this.pos + match[0].length }
+        name = match[0][0] === '"' || match[0][0] === '\'' ? match[0].slice(1, -1) : match[0]
+        this.pos = field.end
+      }
+    }
+
+    const end = field?.end ?? classes.at(-1)?.end ?? start + 'error'.length
+
+    this.expectLineEnd('An `error` line names one field', { help: ERROR_HELP })
+    this.rejectChildren(indent, 'An `error` line has no children: it shows the message the action gives')
+
+    return { kind: 'error', start, end, classes, field, name }
   }
 
   private parseConst(indent: number): ConstNode | undefined {

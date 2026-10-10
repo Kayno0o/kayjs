@@ -20,27 +20,27 @@ export const add = action(newTodo, async ({ title }) => {
 })
 ---
 form(action={add})
-  input(name="title" placeholder="New todo")
+  input(field="title" placeholder="New todo")
   button Add
 ```
 
-`form(action={add})` posts without JavaScript, and `kay check` verifies every field `name` against the schema. With kay's script the form posts without a reload.
+`form(action={add})` posts without JavaScript. `field="title"` names the input `title`, and `kay check` verifies the name against the schema. It also writes what the schema asks of `title` as attributes the browser checks without JavaScript: here `required`, `minlength` and `maxlength`. With kay's script the form posts without a reload, checked against the schema first, so the browser shows the schema's `error` message.
 
 Text reaches the schema trimmed, so `minLength` counts what was typed, and an optional field left blank counts as left out. A field named like a password keeps its spaces, as does `s.String({ trim: false })`.
 
 ## Showing errors
 
-A post the schema refuses renders the page again with the failure's status. The fields keep what was sent, and `add.error('title')` reads the message of a field.
+A post the schema refuses renders the page again with the failure's status. The fields keep what was sent, and an `error` line shows the message of a field. A bare `error` shows the form-wide one.
 
 ```kay
 form(action={add})
-  input(name="title")
-  if add.error('title') as message
-    p.error {message}
+  error
+  input(field="title")
+  error title
   button Add
 ```
 
-The refused field also gets `aria-invalid` and `aria-describedby` by itself.
+While the post is refused, `error title` renders `p.error` with the message, and the field gets `aria-invalid` and an `aria-describedby` naming that paragraph. `error.text-sm title` adds classes. Anywhere else, `add.error('title')` reads the message.
 
 ## Failing on purpose
 

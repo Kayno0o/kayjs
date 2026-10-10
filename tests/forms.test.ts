@@ -9,11 +9,12 @@ import { compileKay } from '../src/compiler'
 import { browserPath, testSite } from '../src/test'
 
 const site = await testSite({ routes: 'tests/fixtures/forms/src/routes' })
-const { save, ping, busy, odd } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/index.kay')) as {
+const { save, ping, busy, odd, enrol } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/index.kay')) as {
   save: Action<Record<string, string | boolean>, unknown, 'website'>
   ping: Action<Record<string, never>, string>
   busy: Action<Record<string, string>, unknown>
   odd: Action<Record<string, never>, unknown>
+  enrol: Action<Record<string, string>, unknown>
 }
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 const REFUSED = { name: 'A', password: 'hunter2', bio: 'Hi <b>', plan: 'pro', size: 'l', news: 'on', website: '' }
@@ -136,6 +137,63 @@ describe('the messages a refused form is described by', () => {
   })
 })
 
+describe('a form naming its fields with field and showing their messages with error lines', () => {
+  const FORM = `form(action={add})
+  error
+  input(field="title" maxlength="10")
+  error.text-sm title
+  textarea(field="body")
+  for row of rows
+    error title
+  if add.error('title') as message
+    p.old {message}
+`
+
+  it('writes the name and the schema\'s constraints, the template\'s own kept', () => {
+    const { tsx } = compileKay(FORM, 'page.kay', { output: 'html' })
+
+    expect(tsx).toContain('"<input name=\\"title\\" maxlength=\\"10\\"" + KayFormConstraints((add), "title", ["field","maxlength"])')
+    expect(tsx).toContain('"<textarea name=\\"body\\"" + KayFormConstraints((add), "body", ["field","type"])')
+    expect(tsx).not.toContain('field=')
+  })
+
+  it('renders the messages in error lines the field and the form are described by, before an if block showing one', () => {
+    const { tsx } = compileKay(FORM, 'page.kay', { output: 'html' })
+
+    expect(tsx).toContain('KayErrorParagraph(KayFormError((add), ""), "add-error", "error")')
+    expect(tsx).toContain('KayErrorParagraph(KayFormError((add), "title"), "add-title-error", "error text-sm")')
+    expect(tsx).toContain('KayErrorParagraph(KayFormError((add), "title"), "", "error")')
+    expect(tsx).toContain('KayFormInvalid((add), "title") ? "add-title-error" : undefined')
+    expect(tsx).toContain('KayFormInvalid((add), "") ? "add-error" : undefined')
+    expect(tsx).toContain('<p class=\\"old\\">')
+  })
+
+  it('renders an island\'s alike, without constraints, which kay\'s own check takes care of in the browser', () => {
+    const { tsx } = compileKay(FORM, 'page.kay', { output: 'dom' })
+
+    expect(tsx).toContain('KayErrorParagraph(KayFormError((add), "title"), "add-title-error", "error text-sm")')
+    expect(tsx).toContain('<input name=\\"title\\" maxlength=\\"10\\">')
+    expect(tsx).not.toContain('Constraints')
+  })
+
+  it('checks in the browser without JavaScript what the schema says, and shows the refused messages', async () => {
+    const page = await site.visit('/')
+
+    expect(page.html).toContain('<input name="title" required minlength="3" maxlength="40">')
+    expect(page.html).toContain('<input name="email" required maxlength="200" type="email">')
+    expect(page.html).toContain('<input name="age" type="number" min="1" max="120">')
+    expect(page.html).toContain('<input name="agree" type="checkbox">')
+    expect(page.html).not.toContain('enrol-title-error')
+
+    const { status, html } = await site.submit(enrol, { title: 'ab', email: 'a@b.co', agree: 'on' }, { from: '/' })
+
+    expect(status).toBe(422)
+    expect(html).toContain('<input name="title" required minlength="3" maxlength="40" value="ab" aria-invalid="true" aria-describedby="enrol-title-error">')
+    expect(html).toContain('<p id="enrol-title-error" class="error">Too short</p>')
+    expect((await site.submit(enrol, { title: 'abc', email: 'a@b.co', agree: 'on' }, { from: '/' })).html).toContain('<p id="enrol-error" class="error">Full</p>')
+  })
+})
+
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island form posting to an action', () => {
   let browser: TestSite
 
@@ -171,6 +229,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     await page.click('button.post')
     await page.waitFor('p.signup-error', { text: 'Not an email' })
 
+    expect(await page.evaluate(() => document.querySelector('p.joined')?.outerHTML)).toBe('<p id="join-email-error" class="error joined">Not an email</p>')
     expect(await page.value('form.signup input')).toBe('nope')
     expect(await page.evaluate(() => document.querySelector('form.signup input')?.getAttribute('aria-invalid'))).toBe('true')
     expect(page.errors).toEqual([])
@@ -217,6 +276,20 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     expect(page.errors).toEqual([])
   })
 
+  it('takes the forms posting to an action from the browser\'s own check, so the schema\'s messages show', async () => {
+    const page = await browser.open('/')
+
+    expect(await page.evaluate(() => [...document.forms].map(form => form.noValidate))).toEqual([true, true, true, true, true])
+
+    await page.fill('form.enrol input[name="title"]', 'ab')
+    await page.fill('form.enrol input[name="email"]', 'a@b.co')
+    await page.click('form.enrol button')
+    await page.waitUntil(() => (document.querySelector('form.enrol input[name="title"]') as HTMLInputElement).validationMessage === 'Too short')
+
+    expect(await page.path()).toBe('/')
+    expect(page.errors).toEqual([])
+  })
+
   it('shows what a call was refused for, reactively', async () => {
     const page = await browser.open('/')
 
@@ -227,7 +300,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
     expect(await page.evaluate(() => document.querySelector('form.signup input')?.getAttribute('aria-invalid'))).toBe('true')
     expect(await page.evaluate(() => document.querySelector('form.signup input')?.getAttribute('aria-describedby'))).toBe('join-email-error')
-    expect(await page.evaluate(() => document.querySelector('p.signup-error')?.id)).toBe('join-email-error')
+    // The error line names the message, before the element an if block shows.
+    expect(await page.evaluate(() => document.querySelector('p.joined')?.outerHTML)).toBe('<p id="join-email-error" class="error joined">Not an email</p>')
+    expect(await page.evaluate(() => document.querySelector('p.signup-error')?.id)).toBe('')
     expect(page.errors).toEqual([])
   })
 })

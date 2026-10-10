@@ -24,6 +24,7 @@ form.signup(action={join})
   input(name="email")
   if join.error('email') as message
     p.signup-error {message}
+  error.joined email
   button.post(formnovalidate) Join
   button.call(type="button" onClick={call} data-calls={calls()}) Call
 button.bump(type="button" onClick={() => void bump({})}) Bump

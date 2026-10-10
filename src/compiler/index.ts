@@ -221,6 +221,10 @@ function shorthandClasses(nodes: Node[], source: string, found: string[] = []): 
     else if (node.kind === 'try') {
       shorthandClasses(tryBlocks(node).flat(), source, found)
     }
+    else if (node.kind === 'error') {
+      for (const span of node.classes)
+        found.push(source.slice(span.start, span.end))
+    }
     else if (node.kind !== 'const') {
       shorthandClasses([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], source, found)
     }
