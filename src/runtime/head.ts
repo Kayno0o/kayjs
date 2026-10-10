@@ -12,7 +12,18 @@ export interface HeadOptions {
   // Wraps a title a layout or the page sets, such as `%s | Site`; a title from the defaults, or one marked `raw`, stays as it is.
   titleTemplate?: string | undefined
   // Fills the social tags a page leaves out from the ones it sets, `og:title` from its title for instance, with `/` URLs made absolute against `origin`.
-  social?: { origin?: string | undefined } | undefined
+  social?: SocialOptions | undefined
+}
+
+export interface SocialOptions {
+  origin?: string | undefined
+  // The pixel size of a card image the site serves, by its path, for `og:image:width` and `og:image:height`.
+  sizeOf?: ((path: string) => ImageSize | undefined) | undefined
+}
+
+export interface ImageSize {
+  width: number
+  height: number
 }
 
 export interface RenderedHead {
@@ -38,6 +49,8 @@ const JSON_TYPE = /json/i
 const ABSOLUTE_PATH = /^\/(?!\/)/
 const STYLE_END = /<\/(style)/gi
 const VIEWPORT = 'meta:name:viewport'
+const OG_IMAGE = 'meta:property:og:image'
+const IMAGE_DETAILS = ['meta:property:og:image:width', 'meta:property:og:image:height', 'meta:property:og:image:alt', 'meta:name:twitter:image:alt']
 const CHARSET = 'charset'
 
 // Renders are synchronous, so the head of the one in progress can live here; a `head` outside a page render sets nothing.
@@ -121,7 +134,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
 
   // Social cards show the site name on their own, so they take the title without the template.
   if (options.social)
-    fillSocial(winners, ownTitle, options.social.origin)
+    fillSocial(winners, ownTitle, options.social, options.defaults ?? [])
 
   let prelude = ''
   let viewportTag = ''
@@ -156,8 +169,13 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
 }
 
 // Open Graph and Twitter read their own tags only, so the title, description and canonical URL a page sets are repeated there unless it sets those too.
-function fillSocial(winners: Map<string, HeadTag[]>, title: string | undefined, origin: string | undefined): void {
+function fillSocial(winners: Map<string, HeadTag[]>, title: string | undefined, { origin, sizeOf }: SocialOptions, defaults: HeadTag[]): void {
   const content = (identity: string) => winners.get(identity)?.[0]?.props.content as string | undefined
+  const fromDefaults = (identity: string) => {
+    const tag = winners.get(identity)?.[0]
+
+    return tag !== undefined && defaults.includes(tag)
+  }
   const fill = (key: 'name' | 'property', name: string, value: string | undefined) => {
     const identity = `meta:${key}:${name}`
 
@@ -171,6 +189,22 @@ function fillSocial(winners: Map<string, HeadTag[]>, title: string | undefined, 
     if (origin !== undefined && tags)
       winners.set(identity, tags.map(tag => typeof tag.props[attribute] === 'string' && ABSOLUTE_PATH.test(tag.props[attribute]) ? { tag: tag.tag, props: { ...tag.props, [attribute]: origin + tag.props[attribute] } } : tag))
   }
+
+  const image = content(OG_IMAGE)
+
+  // An image the page sets takes neither the alt text nor the size of the site's.
+  if (image !== undefined && !fromDefaults(OG_IMAGE)) {
+    for (const identity of IMAGE_DETAILS) {
+      if (fromDefaults(identity))
+        winners.delete(identity)
+    }
+  }
+
+  const size = image !== undefined && ABSOLUTE_PATH.test(image) && !winners.has('meta:property:og:image:width') ? sizeOf?.(image) : undefined
+
+  fill('property', 'og:image:width', size && String(size.width))
+  fill('property', 'og:image:height', size && String(size.height))
+  fill('name', 'twitter:image:alt', content('meta:property:og:image:alt'))
 
   absolute('link:canonical', 'href')
   absolute('meta:property:og:image', 'content')

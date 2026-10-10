@@ -93,6 +93,8 @@ export interface SeoConfig {
   description?: string | undefined
   // The social card image, a URL or a path such as an imported asset's.
   image?: string | undefined
+  // What the card image shows, for `og:image:alt` and `twitter:image:alt`.
+  imageAlt?: string | undefined
   // The site's Twitter handle, `@site`.
   twitter?: string | undefined
   // `og:locale`, such as `fr_FR`.

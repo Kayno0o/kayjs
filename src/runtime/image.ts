@@ -190,6 +190,11 @@ export function registerImage(url: string, width: number, height: number): strin
   return url
 }
 
+// The size `registerImage` recorded for an imported image's URL.
+export function importedSize(url: string): { width: number, height: number } | undefined {
+  return sizes.get(url)
+}
+
 // An imported image, or one from a directory in `images.dirs` or a host in `images.remote` given its size, served as WebP variants at each width of the ladder up to its own.
 export function image(src: string, options: ImageOptions = {}): ImageProps {
   const own = sizes.get(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)

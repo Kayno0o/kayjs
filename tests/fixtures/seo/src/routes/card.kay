@@ -1,0 +1,8 @@
+---
+import mark from '../favicon.png'
+---
+head
+  title Card
+  meta(property="og:image" content={mark})
+  meta(property="og:image:alt" content="The kay mark")
+h1 Card

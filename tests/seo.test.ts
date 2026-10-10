@@ -10,12 +10,14 @@ const HEAD = /<head>([\s\S]*)<\/head>/
 const app = await pages({
   routes: ROUTES,
   prebuilt: false,
+  publicDir: 'tests/fixtures/seo/share',
   site: 'https://example.com/',
   seo: {
     name: 'Kay site',
     titleTemplate: '%s | Kay site',
     description: 'A site built with kay',
     image: '/og.png',
+    imageAlt: 'The kay site',
     twitter: '@kay',
     locale: 'en_GB',
     jsonLd: [{ '@context': 'https://schema.org', '@type': 'WebSite', 'name': 'Kay </script> site' }],
@@ -48,6 +50,25 @@ describe('seo head', () => {
     expect(head).toContain('<meta property="og:locale" content="en_GB">')
     expect(head).toContain('<meta name="twitter:site" content="@kay">')
     expect(head).toContain('<meta name="twitter:card" content="summary_large_image">')
+    // Its size read from the public file, its alt text from the config.
+    expect(head).toContain('<meta property="og:image:width" content="1000"><meta property="og:image:height" content="600">')
+    expect(head).toContain('<meta property="og:image:alt" content="The kay site">')
+    expect(head).toContain('<meta name="twitter:image:alt" content="The kay site">')
+  })
+
+  it('gives the image a page sets its own size and alt text, not the site image\'s', async () => {
+    const card = (await headOf('/card')).head
+
+    expect(card).toContain('<meta property="og:image:width" content="512"><meta property="og:image:height" content="512">')
+    expect(card).toContain('<meta property="og:image:alt" content="The kay mark">')
+    expect(card).toContain('<meta name="twitter:image:alt" content="The kay mark">')
+    expect((await headOf('/share')).head).toContain('<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">')
+
+    // One whose size is unknown goes without, and without the site image's alt text.
+    const custom = (await headOf('/custom')).head
+
+    expect(custom).not.toContain('og:image:width')
+    expect(custom).not.toContain('image:alt')
   })
 
   it('wraps the title a page sets in the template, and repeats its own title and description on its card', async () => {
@@ -183,10 +204,12 @@ describe('sitemap and robots', () => {
       'https://example.com/blank',
       'https://example.com/blog/a%20%26%20b',
       'https://example.com/blog/first',
+      'https://example.com/card',
       'https://example.com/custom',
       'https://example.com/docs/guide/start',
       'https://example.com/members',
       'https://example.com/missing',
+      'https://example.com/share',
       'https://example.com/trail',
     ])
   })

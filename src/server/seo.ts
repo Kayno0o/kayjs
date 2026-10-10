@@ -1,13 +1,15 @@
 import type { KayConfig, SeoConfig, TrailingSlash } from '../config'
-import type { HeadOptions, HeadTag } from '../runtime/head'
+import type { HeadOptions, HeadTag, ImageSize } from '../runtime/head'
 import type { LocaleCopy } from './i18n'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { jsonLd } from '../runtime/seo'
 import { basePath } from './base'
 import { faviconTags } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
 import { localeCopies } from './i18n'
+import { publicFiles } from './public'
 import { slashedPath } from './routes'
 
 // The head options of one response, from its URL and status.
@@ -33,12 +35,38 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   if (config.favicon !== false)
     extra.push(...faviconTags(config.manifest))
 
-  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base)), styles }
+  const social = config.site !== undefined || config.seo !== undefined
+  const sizeOf = social ? await cardImageSizes(resolve(root, config.publicDir ?? 'public')) : undefined
+
+  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf), styles }
+}
+
+// The pixel size of a card image named by its path: an imported image's, a public file's, read once here, and a share card's 1200x630.
+async function cardImageSizes(publicDir: string): Promise<(path: string) => ImageSize | undefined> {
+  const sizes = new Map<string, ImageSize>()
+
+  await Promise.all((await publicFiles(publicDir)).filter(file => RESIZABLE.test(file.path)).map(async ({ path, url }) => {
+    try {
+      const { width, height } = await new Bun.Image(path).metadata()
+
+      sizes.set(url, { width, height })
+    }
+    catch {}
+  }))
+
+  return (path) => {
+    const { pathname, searchParams } = new URL(path, 'http://localhost')
+
+    if ((pathname === IMAGE_ROUTE && searchParams.has('card')) || pathname.startsWith(CARD_ROUTE) || (pathname.startsWith(VARIANTS) && pathname.endsWith('-card.jpg')))
+      return CARD
+
+    return importedSize(path) ?? sizes.get(pathname)
+  }
 }
 
 // What `site`, `seo` and other settings such as the favicon give every page's head, or undefined when the project sets none and pages keep only their own tags.
 // Every URL it makes absolute goes under `base`, the site's mount point.
-export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = [], trailingSlash?: TrailingSlash, base = ''): SeoHead | undefined {
+export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: HeadTag[] = [], trailingSlash?: TrailingSlash, base = '', sizeOf?: (path: string) => ImageSize | undefined): SeoHead | undefined {
   const origin = site === undefined ? undefined : siteOrigin(site) + base
 
   // Fonts or a favicon alone give a page no social card.
@@ -58,6 +86,9 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
   if (seo.image !== undefined)
     tags.push(meta('property', 'og:image', seo.image))
 
+  if (seo.image !== undefined && seo.imageAlt !== undefined)
+    tags.push(meta('property', 'og:image:alt', seo.imageAlt))
+
   if (seo.twitter !== undefined)
     tags.push(meta('name', 'twitter:site', seo.twitter))
 
@@ -71,7 +102,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
   return (url, status) => ({
     defaults: origin !== undefined && status === 200 ? [...tags, ...pageLinks(origin, url, trailingSlash)] : tags,
     titleTemplate: seo.titleTemplate,
-    social: social ? { origin } : undefined,
+    social: social ? { origin, sizeOf } : undefined,
   })
 }
 

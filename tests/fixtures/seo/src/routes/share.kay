@@ -1,0 +1,8 @@
+---
+import { shareImage } from 'kay/image'
+import mark from '../favicon.png'
+---
+head
+  title Share
+  meta(property="og:image" content={shareImage(mark)})
+h1 Share
