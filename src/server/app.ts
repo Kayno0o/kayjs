@@ -11,7 +11,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
-import { pageHooks } from '../config'
+import { extensionServers, pageHooks } from '../config'
 import { projectCollections, serveFeeds } from '../content/server'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { IMAGE_ROUTE } from '../runtime/image'
@@ -283,6 +283,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
       app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
     }
   }
+
+  // After kay's own hooks, so their routes are logged and compressed as the pages are, and before the pages, actions and API modules whose context they derive.
+  for (const server of await extensionServers(options.extensions))
+    app.use(server)
 
   const clientFiles = await filesUnder(client.dir)
   const assetCopies = encodedCopies(clientFiles)

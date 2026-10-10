@@ -1,4 +1,5 @@
 import type { BunPlugin } from 'bun'
+import type { AnyElysia } from 'elysia'
 import type { LintLevels } from './compiler/lints'
 import type { Duration } from './runtime/duration'
 import type { HeadTag } from './runtime/head'
@@ -235,9 +236,12 @@ export interface I18nConfig {
   messages?: string | undefined
 }
 
-// What a library hands the app to list in `extensions`: pages it serves, the texts they show and the config it needs, as if they were the app's own.
-export interface KayExtension {
+// What a library hands the app to list in `extensions`: pages it serves, the texts they show, the config it needs and the server plugin they run on, as if they were the app's own.
+export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   name: string
+  // An Elysia plugin `pages()` uses before the pages, actions and API modules, so its derives reach their `ctx.locals` and `kay check` types them; scoped or global hooks reach them, local ones only the plugin's own routes.
+  // Given as a function, it is called only when `pages()` builds the app, never when `kay check`, the editor or `kay build` read the config: the way to hand a plugin built on a database or the server's environment.
+  server?: Server | (() => Server | Promise<Server>) | undefined
   // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`.
   config?: Omit<KayConfig, 'extensions'> | undefined
   // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
@@ -249,6 +253,11 @@ export interface KayExtension {
   messages?: string | undefined
   // Called with each page `kay build` prerenders, once the files it links are written and before it is compressed, and again when the server renders it afresh: returns the HTML to write.
   transformPage?: PageHook | undefined
+}
+
+// The server plugins the extensions carry, in their order, those given as a function built now.
+export async function extensionServers(extensions: KayExtension[] | undefined): Promise<AnyElysia[]> {
+  return Promise.all((extensions ?? []).flatMap(({ server }) => server === undefined ? [] : [(async () => typeof server === 'function' ? server() : server)()]))
 }
 
 // The page hooks the extensions carry, in their order.

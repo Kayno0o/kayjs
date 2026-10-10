@@ -1,4 +1,4 @@
-import type { Elysia } from 'elysia'
+import type { AnyElysia, Elysia } from 'elysia'
 import type { Duration } from './duration'
 import type { Component, JSX } from './jsx'
 
@@ -24,11 +24,19 @@ export type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Elem
 // Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every page route, public file and API module, and by the app with `locals: LocalsOf<typeof auth>` and `app: typeof app`.
 export interface Register {}
 
-// What `kay check` reads off the server entry exporting `app`, standing in for what `Register` leaves out.
+// What `kay check` reads off the server entry exporting `app`, standing in for what `Register` leaves out, and off the extensions' server plugins in `kay.config.ts`.
 export interface Inferred {}
 
-// Nothing is readable off `ctx.locals` until the app registers its type, or exports its app from the server entry.
-export type Locals = Register extends { locals: infer Values extends object } ? Values : Inferred extends { locals: infer Values extends object } ? Values : object
+// The server plugins a config's extensions hand `pages()`, each awaited out of the function giving it.
+export type ExtensionServersOf<Config> = Config extends { extensions?: readonly (infer Extension)[] | undefined } ? ServersOf<Extension> : never
+type ServersOf<Extension> = Extension extends { server?: infer Server } ? Server extends (...args: never[]) => infer Built ? Awaited<Built> : Server extends AnyElysia ? Server : never : never
+type ExtensionServers = Inferred extends { extensions: infer Servers } ? Servers : never
+type Intersected<Union> = (Union extends unknown ? (value: Union) => void : never) extends (value: infer Each) => void ? Each : never
+type ServerLocals<Server> = Server extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'> ? LocalsOf<Server> : never
+
+// Nothing is readable off `ctx.locals` until the app registers its type, exports its app from the server entry or lists an extension with a server plugin, whose locals add to the app's.
+export type Locals = (Register extends { locals: infer Values extends object } ? Values : Inferred extends { locals: infer Values extends object } ? Values : object)
+  & ([ExtensionServers] extends [never] ? unknown : Intersected<ServerLocals<ExtensionServers>>)
 
 // The values an Elysia instance adds to every handler's context.
 export type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'>> = App['~Singleton']['decorator'] & App['~Singleton']['derive'] & App['~Singleton']['resolve']
@@ -75,12 +83,13 @@ type TreeMatches<Segments extends readonly string[], Tree, Slash extends boolean
   | ('*' extends keyof Tree ? ServesGet<Tree['*']> : false)
   : ServesGet<Tree> | (Slash extends true ? '*' extends keyof Tree ? ServesGet<Tree['*']> : false : false)
 type ServedByApp<Path extends string> = [AppRoutes] extends [never] ? false : TreeMatches<SegmentsOf<Path>, AppRoutes, EndsWithSlash<Path>>
+type ServedByServer<Path extends string, Server> = Server extends { '~Routes': infer Routes } ? TreeMatches<SegmentsOf<Path>, Routes, EndsWithSlash<Path>> : false
 // The modules under `src/api`, each tree under its mount, as `kay check` registers them.
 type ApiRoutes = Register extends { api: infer Routes } ? Routes : never
 type ServedByApi<Path extends string> = [ApiRoutes] extends [never] ? false : TreeMatches<SegmentsOf<Path>, ApiRoutes, EndsWithSlash<Path>>
 type IsRoute<Path extends string> = [RoutePatterns] extends [never]
   ? true
-  : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns, EndsWithSlash<Path>> | (Path extends PublicFiles ? true : false) | ServedByApp<Path> | ServedByApi<Path> ? true : false
+  : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns, EndsWithSlash<Path>> | (Path extends PublicFiles ? true : false) | ServedByApp<Path> | ServedByServer<Path, ExtensionServers> | ServedByApi<Path> ? true : false
 
 // The route tree of a module under `src/api`, from its default export.
 export type ApiRoutesOf<Module> = Module extends { default: { '~Routes': infer Routes } } ? Routes : Record<never, never>

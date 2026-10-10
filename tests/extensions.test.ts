@@ -220,6 +220,62 @@ console.log(JSON.stringify({
 process.exit(0)
 `
 
+// An app listing two libraries' server plugins and no server entry: one handed as it is, one built from a function only when the app is.
+const SERVED_PLUGINS: Record<string, string> = {
+  'package.json': JSON.stringify({ name: 'app', dependencies: { 'kay-lib': '*' } }),
+  'tsconfig.json': TSCONFIG,
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { accounts, greeter } from \'kay-lib\'\n\nexport default defineConfig({ extensions: [greeter, accounts()] })\n',
+  'src/routes/index.kay': `--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const who = action(t.Object({}), (_, ctx) => ({ account: ctx.locals.account, visitor: ctx.locals.visitor }))
+
+const greeting: string = ctx.locals.greeting
+const account: string = ctx.locals.account
+---
+p.home {greeting} {account}
+a(href="/greeter/ping") ping
+form(action={who})
+  button Who
+`,
+  // Served, though its link and its local's type fail the check.
+  'src/routes/wrong.kay': '--- server\nconst count: number = ctx.locals.greeting\n---\np {count}\na(href="/greeter/nope") nope\n',
+  'src/api/me.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ account, visitor }) => ({ account, visitor }))\n',
+  'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', type: 'module', exports: { '.': './index.ts' }, peerDependencies: { kay: '*' } }),
+  'node_modules/kay-lib/index.ts': `import type { KayExtension } from 'kay/server'
+import { Elysia } from 'elysia'
+
+const greeting = new Elysia({ name: 'kay-lib-greeter' })
+  .decorate('greeting', 'hello')
+  .derive({ as: 'scoped' }, ({ request }) => ({ visitor: request.headers.get('x-visitor') ?? 'anonymous' }))
+  .get('/greeter/ping', () => 'pong')
+
+export const greeter: KayExtension<typeof greeting> = { name: 'kay-lib-greeter', server: greeting }
+
+export const accounts = (): KayExtension<typeof import('./accounts').accounts> => ({ name: 'kay-lib-accounts', server: async () => (await import('./accounts')).accounts })
+`,
+  'node_modules/kay-lib/accounts.ts': `import { Elysia } from 'elysia'
+
+console.log('accounts built')
+
+export const accounts = new Elysia({ name: 'kay-lib-accounts' }).derive({ as: 'global' }, ({ request }) => ({ account: request.headers.get('x-account') ?? 'nobody' }))
+`,
+}
+
+const SERVE_PLUGINS = `import { parse, stringify } from 'devalue'
+import { pages } from 'kay/server'
+
+const app = await pages()
+const get = async (path: string) => app.handle(new Request(\`http://localhost\${path}\`, { headers: { 'x-account': 'ada', 'x-visitor': 'bob' } }))
+const home = await (await get('/')).text()
+const action = (/<form[^>]*action="([^"]+)"/).exec(home)?.[1] ?? ''
+const posted = await app.handle(new Request(\`http://localhost\${action}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-account': 'ada', 'x-visitor': 'bob' }, body: stringify({}) }))
+
+console.log(JSON.stringify({ home, ping: await (await get('/greeter/ping')).text(), me: await (await get('/api/me')).json(), posted: parse(await posted.text()) }))
+process.exit(0)
+`
+
 const projects = new Map<string, string>()
 
 beforeAll(async () => {
@@ -227,7 +283,7 @@ beforeAll(async () => {
 
   await mkdir(base, { recursive: true })
 
-  for (const [name, files] of [['routes', { ...FILES, 'serve.ts': SERVE }], ['messages', { ...LOCALIZED, 'serve.ts': SERVE_LOCALIZED }], ['implicit', { ...IMPLICIT, 'serve.ts': SERVE_IMPLICIT }], ['borrowed', { ...BORROWED, 'serve.ts': SERVE_LOGIN }], ['outside', OUTSIDE], ['api', { ...SERVED_API, 'serve.ts': SERVE_API }]] as const) {
+  for (const [name, files] of [['routes', { ...FILES, 'serve.ts': SERVE }], ['messages', { ...LOCALIZED, 'serve.ts': SERVE_LOCALIZED }], ['implicit', { ...IMPLICIT, 'serve.ts': SERVE_IMPLICIT }], ['borrowed', { ...BORROWED, 'serve.ts': SERVE_LOGIN }], ['outside', OUTSIDE], ['api', { ...SERVED_API, 'serve.ts': SERVE_API }], ['plugins', { ...SERVED_PLUGINS, 'serve.ts': SERVE_PLUGINS }]] as const) {
     const dir = await mkdtemp(join(base, `extension-${name}-`))
 
     await Promise.all(Object.entries(files).filter(([, content]) => content !== undefined).map(async ([path, content]) => Bun.write(join(dir, path), content)))
@@ -387,6 +443,37 @@ describe('a library\'s API modules and config', () => {
 
     expect(`${stdout}${stderr}`).not.toContain('error')
     expect(code).toBe(0)
+  })
+})
+
+describe('a library\'s server plugin', () => {
+  const root = () => projects.get('plugins')!
+
+  it('is used before the pages, actions and API modules, which read what it adds as ctx.locals, and serves its own routes', async () => {
+    const { code, stdout, stderr } = await run([process.execPath, 'serve.ts'], root())
+
+    expect(stderr).not.toContain('error')
+    expect(code).toBe(0)
+    const { home, ping, me, posted } = JSON.parse(stdout.slice(stdout.indexOf('{'))) as { home: string, ping: string, me: unknown, posted: unknown }
+
+    expect(stdout.split('accounts built').length).toBe(2)
+    expect(home).toContain('<p class="home">hello ada</p>')
+    expect(ping).toBe('pong')
+    expect(me).toEqual({ account: 'ada', visitor: 'bob' })
+    expect(posted).toEqual({ account: 'ada', visitor: 'bob' })
+  })
+
+  it('types the app\'s ctx.locals and links in kay check with no Register of the app\'s, building none given as a function', async () => {
+    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root())
+    const output = `${stdout}${stderr}`
+
+    expect(code).toBe(1)
+    expect(output).not.toContain('accounts built')
+    expect(output).not.toContain('index.kay')
+    expect(output).toContain('src/routes/wrong.kay')
+    expect(output).toContain('/greeter/nope')
+    expect(output).toMatch(/Type 'string' is not assignable to type 'number'/)
+    expect(output).toMatch(/2 errors/)
   })
 })
 
