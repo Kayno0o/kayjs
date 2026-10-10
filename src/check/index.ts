@@ -186,6 +186,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const config = existsSync(join(root, CONFIG_FILE)) ? relative(dirname(environmentPath), join(root, CONFIG_FILE)).replace(TS_EXTENSION, '') : undefined
   const entry = resolve(root, options.entry ?? SERVER_ENTRY)
   const app = await exportsApp(entry) ? relative(dirname(environmentPath), entry).replace(TS_EXTENSION, '') : undefined
+  const servers = (options.extensions ?? []).some(extension => extension.server !== undefined)
   const contentConfig = resolve(root, options.content ?? CONTENT_CONFIG)
   const content = existsSync(contentConfig) ? relative(dirname(environmentPath), contentConfig).replace(TS_EXTENSION, '') : undefined
 
@@ -194,7 +195,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const catalogs = [...extensionMessageFiles(root, options.extensions, textLocale), messagesFile(root, options.i18n ?? {}, textLocale)].filter(file => existsSync(file)).map(file => relative(dirname(environmentPath), file).replace(TS_EXTENSION, ''))
   const texts = options.i18n ? settings && { locales: options.i18n.locales, prefixes, messages: catalogs } : catalogs.length > 0 ? { locales: [textLocale], prefixes: [], messages: catalogs } : undefined
 
-  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, texts, config, app, content))
+  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, texts, config, app, content, servers))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS]
@@ -404,7 +405,7 @@ function i18nSettings(root: string, config: I18nConfig, diagnostics: CheckDiagno
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   // The collections' feeds are served as files are, a localized one's under each locale's prefix too.
   const feed = content === undefined ? undefined : `FeedPathsOf<typeof import(${importSpecifier(content)})>`
@@ -416,15 +417,19 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: ${messages}` : ''
   const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
   const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
+  const inferred = [
+    ...app === undefined ? [] : [`app: typeof import(${importSpecifier(app)}).app`, `locals: LocalsOf<typeof import(${importSpecifier(app)}).app>`],
+    ...!servers || config === undefined ? [] : [`extensions: ExtensionServersOf<typeof import(${importSpecifier(config)}).default>`],
+  ]
 
   return [
-    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, FieldName, FunctionProp, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',
     'declare module \'kay\' {',
     `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules}${publicEnv} }`,
-    ...app === undefined ? [] : [`  interface Inferred { app: typeof import(${importSpecifier(app)}).app, locals: LocalsOf<typeof import(${importSpecifier(app)}).app> }`],
+    ...inferred.length === 0 ? [] : [`  interface Inferred { ${inferred.join(', ')} }`],
     '}',
     '',
     'declare global {',
@@ -509,19 +514,20 @@ function spellings(path: string): string[] {
   return [...new Set([path, written.replace(NOT_IN_URL, encodeURI), ...(UNWRITABLE.test(written) ? [] : [written])])]
 }
 
-// Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
-// What `check` reads of kay.config.ts.
 export function configCheckOptions(config: KayConfig): CheckOptions {
   const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon } = config
 
   return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon }
 }
 
+// Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const { files, diagnostics, unreached, libraries, settings, exports } = await writeShadowTypes(root, options)
 
-  diagnostics.push(...lintConfigProblems(root, options.lints), ...configSeoLints(options, join(root, CONFIG_FILE), [...files.values()].map(file => file.source)).filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code)))
+  const seo = configSeoLints(options, join(root, CONFIG_FILE), [...files.values()].map(file => file.source))
+
+  diagnostics.push(...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code)))
   const settingsFile = join(resolve(root), SHADOW_DIR, SETTINGS_CHECK)
   const exportsFile = join(resolve(root), SHADOW_DIR, EXPORTS_CHECK)
   const contentFile = join(resolve(root), SHADOW_DIR, CONTENT_CHECK)

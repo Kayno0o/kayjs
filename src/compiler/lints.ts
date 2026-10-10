@@ -472,7 +472,12 @@ export function lintList(group?: LintGroup): string {
 }
 
 export function isLaunchLint(code: string | undefined): boolean {
-  return isLint(code) && (LINTS[code] as Lint).launch === true
+  if (!isLint(code))
+    return false
+
+  const lint: Lint = LINTS[code]
+
+  return lint.launch === true
 }
 
 // What `kay explain <lint>` prints: what it reports, an example it reports and the same written right, and how to change its level.

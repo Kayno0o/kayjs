@@ -52,12 +52,12 @@ it('changes the accent on a click', async () => {
 })
 `
 
-// Stands in for `bun install` of a packed kay: its source and what `prepack` emits, the declarations and the ESLint processor, beside this checkout's dependencies.
 // What `kay check` reports of the project, kay.config.ts read as it reads it: a warning fails the `check` script a scaffold writes.
 async function checked(dir: string) {
   return check(dir, configCheckOptions(await loadConfig(dir)))
 }
 
+// Stands in for `bun install` of a packed kay: its source and what `prepack` emits, the declarations and the ESLint processor, beside this checkout's dependencies.
 async function installKay(dir: string) {
   const modules = join(dir, 'node_modules')
   const kay = join(modules, 'kay')
