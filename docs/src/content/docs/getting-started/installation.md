@@ -24,7 +24,7 @@ bun install
 bun run dev
 ```
 
-The app is at `http://localhost:3000` and reloads on every change. Run in a terminal, `kay new` asks for a preset, then for each feature. Pass `--template` to skip the questions.
+The app is at `http://localhost:3000` and reloads on every change, and Alt+click on an element opens its `.kay` line in your editor (see the [inspector](/reference/cli#inspector)). Run in a terminal, `kay new` asks for a preset, then for each feature. Pass `--template` to skip the questions.
 
 | Preset | What you get |
 | --- | --- |

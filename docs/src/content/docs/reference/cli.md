@@ -58,6 +58,22 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 
 The entry's own `Listening on http://localhost:3000` line, which the templates print in production, is left out.
 
+### Inspector
+
+Every page `kay dev` serves knows which `.kay` line wrote each element:
+
+- Hold Alt to outline the element under the pointer with its file, line and column, such as `h1 src/routes/index.kay:12:3`.
+- Alt+click opens that line in the editor. The click never reaches the page, so a link is not followed.
+- On a page with islands, the button at the bottom left lists each island's component, a click opening its file, with the values its signals hold now. The signals are numbered in the order its script creates them, and hovering a row outlines the island.
+
+The editor is `KAY_EDITOR`, else `VISUAL` or `EDITOR` when they name VS Code, Cursor, Zed, Sublime Text or a JetBrains IDE, else the first of them on the `PATH`. `KAY_EDITOR` may be any command, which gets the file appended:
+
+```sh
+KAY_EDITOR=zed bun run dev
+```
+
+With no editor found the page says so, and the terminal prints the position. Tests, `pages({ dev: true })` and production builds carry none of it.
+
 ## kay build
 
 ```sh
