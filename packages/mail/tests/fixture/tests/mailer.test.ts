@@ -50,6 +50,18 @@ describe('rendering', () => {
     await expect(mail.render({ to: 'ada@example.com\r\nBcc: spam@example.com', subject: 'Spam', text: 'Hi' })).rejects.toThrow('"Spam" has an address holding a line break')
     await expect(mail.render({ to: 'ada@example.com', replyTo: { name: 'Ada', address: 'ada@example.com\nBcc: spam@example.com' }, subject: 'Spam', text: 'Hi' })).rejects.toThrow('line break')
   })
+
+  it('refuses a mail with no recipient before rendering its component', async () => {
+    let rendered = false
+    const view = () => {
+      rendered = true
+
+      return 'Hi'
+    }
+
+    await expect(mail.render({ to: [], subject: 'Nobody', view })).rejects.toThrow('has no recipient')
+    expect(rendered).toBe(false)
+  })
 })
 
 describe('the outbox', () => {
@@ -137,6 +149,19 @@ describe('configuration', () => {
     process.env.SMTP_HOST = 'smtp.example.com'
     process.env.SMTP_FROM = 'site@example.com'
     expect(mailer({ optional: true, queue: { name: 'optional-set' } }).configured).toBe(true)
+  })
+
+  it('stops a production boot on a SMTP_FROM that is no address', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.SMTP_HOST = 'smtp.example.com'
+    process.env.SMTP_FROM = 'Site'
+
+    expect(() => mailer({ queue: { name: 'malformed-from' } })).toThrow('SMTP_FROM')
+
+    for (const valid of ['site@example.com', 'Site <site@example.com>']) {
+      process.env.SMTP_FROM = valid
+      expect(() => mailer({ queue: { name: 'valid-from' } })).not.toThrow()
+    }
   })
 
   it('stops the boot of a server given a user without a password, or the other way round', () => {

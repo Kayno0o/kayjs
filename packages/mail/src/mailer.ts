@@ -49,6 +49,8 @@ export type Mailer = Elysia & {
 const DOCTYPE = /^\s*<!doctype/i
 const HTML_ROOT = /^\s*<html[\s>]/i
 const LINE_BREAK = /[\r\n]/
+// `Name <address>` or a bare address, as `SMTP_FROM` holds one.
+const SENDER = '^(?:[^<>]*<[^\\s<>@]+@[^\\s<>@]+>|[^\\s<>@]+@[^\\s<>@]+)$'
 // Keeps Outlook for Windows from scaling the mail on a high-DPI screen and from switching to its own typography.
 const OUTLOOK_SETTINGS = '<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings><w:WordDocument><w:DontUseAdvancedTypographyReadingMail/></w:WordDocument></xml></noscript><![endif]-->'
 
@@ -89,7 +91,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
     SMTP_PORT: t.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
     SMTP_USER: t.Optional(t.String()),
     SMTP_PASS: t.Optional(t.String()),
-    SMTP_FROM: optional || from !== undefined ? t.Optional(t.String()) : t.String(),
+    SMTP_FROM: optional || from !== undefined ? t.Optional(t.String({ pattern: SENDER })) : t.String({ pattern: SENDER }),
   }))
 
   // Optional both, so reading them never throws under `kay build`, and a server given one without the other stops as it boots.
@@ -138,8 +140,6 @@ export function mailer(options: MailerOptions = {}): Mailer {
   }
 
   const render = async <P extends object>(message: Message<P>): Promise<Mail> => {
-    const markup = message.view ? await renderToString(message.view, ...[message.props] as never) : message.html
-    const html = markup === undefined ? undefined : asDocument(markup, message.subject, lang)
     const to = list(message.to)
 
     if (to.length === 0)
@@ -150,6 +150,9 @@ export function mailer(options: MailerOptions = {}): Mailer {
       if (LINE_BREAK.test(addressOf(address)))
         throw new Error(`kayjs-mail: "${message.subject}" has an address holding a line break`)
     }
+
+    const markup = message.view ? await renderToString(message.view, ...[message.props] as never) : message.html
+    const html = markup === undefined ? undefined : asDocument(markup, message.subject, lang)
 
     return {
       from: message.from ?? sender(),
