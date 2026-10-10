@@ -45,7 +45,7 @@ import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './rende
 import { reportServerError } from './report'
 import { revalidateStale, trackPrerendered } from './revalidate'
 import { rewriteRequests } from './rewrite'
-import { decodePath, refuseClashes, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
+import { decodePath, refuseClashes, routeMounts, routeTrees, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
 import { headerCopies, ownHeaders, securityHeaders, setSecurityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
 import { serveServerIslands } from './server-islands'
@@ -158,6 +158,7 @@ function remembered(response: Response, request: Request, locale: string): Respo
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(root: string, options: PagesOptions, loadClient: () => Promise<ClientBuild>) {
   const routesDir = resolve(root, options.routes ?? 'src/routes')
+  const mounts = routeMounts(root, options.extensions)
 
   // An executable carries its routes and modules compiled; anything else finds them on disk and compiles them as they load.
   const bundle = bundled()
@@ -165,7 +166,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (!bundle)
     await registerLoader(root, options.settings)
 
-  const [scanned, client] = await Promise.all([bundle?.routes ?? scanRoutes(routesDir), loadClient()])
+  const [scanned, client] = await Promise.all([bundle?.routes ?? scanRoutes(routesDir, mounts), loadClient()])
 
   refuseClashes(routesDir, scanned)
   const routes = await Promise.all(scanned.map(loadGuards))
@@ -510,7 +511,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     })
   }
 
-  const fallback = bundle?.fallback ?? specialPagesOf(routesDir, routesDir)
+  const fallback = bundle?.fallback ?? specialPagesOf(routeTrees(routesDir, mounts), '')
 
   // Every route above wins over this one, so it only answers what no page serves, in the locale its prefix or its host names.
   if (fallback.notFound ?? fallback.error) {

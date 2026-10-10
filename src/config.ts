@@ -82,6 +82,8 @@ export interface KayConfig {
   preview?: PreviewConfig | undefined
   // Receives every error a load, a render, a guard or an action throws, as it is logged: the place to send them to an error tracker.
   onError?: ((error: unknown, request: Request) => void | Promise<void>) | undefined
+  // What libraries add to the app, each listed once: `extensions: [authPages()]`.
+  extensions?: KayExtension[] | undefined
 }
 
 // What every page's head starts from; a layout or the page setting the same tag wins.
@@ -217,6 +219,15 @@ export interface I18nConfig {
   // A page's path in the locales naming it their own way, by the pattern the page is served under: `{ '/about': { fr: '/a-propos' }, '/blog/:slug': { fr: '/articles/:slug' } }`; its untranslated path in that locale redirects there.
   paths?: Record<string, Record<string, string>> | undefined
   // The directory of the `<locale>.ts` message files, relative to the root: `src/messages` by default.
+  messages?: string | undefined
+}
+
+// What a library hands the app to list in `extensions`: pages it serves and the texts they show, as if they were the app's own.
+export interface KayExtension {
+  name: string
+  // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
+  routes?: { dir: string, prefix?: string | undefined } | undefined
+  // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.
   messages?: string | undefined
 }
 

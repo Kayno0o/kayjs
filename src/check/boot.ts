@@ -12,7 +12,7 @@ import { localeSettings, refuseLocaleClashes } from '../server/i18n'
 import { shutdownSeconds } from '../server/lifecycle'
 import { publicFiles, refusePublicClashes } from '../server/public'
 import { readRedirects, refuseRedirectClashes } from '../server/redirects'
-import { refuseClashes, scanRoutes } from '../server/routes'
+import { refuseClashes, routeMounts, scanRoutes } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 
 // What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree.
@@ -22,7 +22,7 @@ export async function bootProblems(root: string, options: CheckOptions): Promise
   const config = join(root, CONFIG_FILE)
   const routesDir = resolve(root, options.routes ?? 'src/routes')
   const publicDir = resolve(root, options.publicDir ?? 'public')
-  const [routes, files] = await Promise.all([scanRoutes(routesDir), publicFiles(publicDir)])
+  const [routes, files] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(publicDir)])
 
   const refused = (file: string, run: () => void) => {
     try {

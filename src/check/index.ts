@@ -2,7 +2,7 @@ import type { KayLibrary, SettingsReplacement } from '../build/libraries'
 import type { Diagnostic, Fix } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
 import type { LintLevel, LintLevels, TypeLint } from '../compiler/lints'
-import type { I18nConfig } from '../config'
+import type { I18nConfig, KayExtension } from '../config'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { Duration } from '../runtime/duration'
@@ -34,7 +34,7 @@ import { localePattern, localePrefixes, localeSettings, messagesFile } from '../
 import { HEALTH_PATH } from '../server/lifecycle'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
-import { patternShapes, routeOf, scanRoutes, servedPaths } from '../server/routes'
+import { patternShapes, routeMounts, routeOf, scanRoutes, servedPaths } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { bootProblems } from './boot'
 import { islandOnlyComponents } from './island-only'
@@ -56,6 +56,8 @@ export interface CheckOptions {
   entry?: string | undefined
   // Page directory relative to the root, so `ctx.params` is typed per route.
   routes?: string | undefined
+  // The libraries whose routes the app mounts, which links may point at too.
+  extensions?: KayExtension[] | undefined
   // Public file directory relative to the root, whose files links may point at.
   publicDir?: string | undefined
   // API directory relative to the root, whose modules' GET routes links may point at.
@@ -151,7 +153,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push(fromCompile(file, source, diagnostic))
   }
 
-  const [routes, found, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
+  const [routes, found, apiModules] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
   const publicPaths = [...found, ...htmlFallbacks(found, servedPaths(routes))]
 
   // A param a matcher kay ships checks is named after it, `:integer`, so a link filling it with a literal is checked as the matcher would; any other is `:`.

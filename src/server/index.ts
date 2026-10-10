@@ -11,7 +11,7 @@ import { readClient } from './client'
 import { bootFailure } from './dev'
 import { underKayDev } from './loader'
 
-export type { KayConfig } from '../config'
+export type { KayConfig, KayExtension } from '../config'
 export { defineConfig } from '../config'
 export type { ApiModule, ApiOptions } from './api'
 export { api, eventStream } from './api'
@@ -91,5 +91,5 @@ async function clientFor(root: string, options: PagesOptions): Promise<ClientBui
   // Imported only to bundle, as it brings the compiler, which a server reading a build never needs.
   const { buildClient } = await import('../build/client')
 
-  return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes, api: options.api, navigation: options.navigation, sourcemap: options.dev, hot: options.dev, inspect: underKayDev(), base: basePath(options.base), settings: options.settings, publicEnv: options.publicEnv !== undefined, lints: options.lints })
+  return buildClient(root, { minify: options.minify, plugins: options.plugins, routes: options.routes, extensions: options.extensions, api: options.api, navigation: options.navigation, sourcemap: options.dev, hot: options.dev, inspect: underKayDev(), base: basePath(options.base), settings: options.settings, publicEnv: options.publicEnv !== undefined, lints: options.lints })
 }

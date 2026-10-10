@@ -21,7 +21,7 @@ import { registerLoader } from './loader'
 import { loadMatchers, matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pathOf, storedHeaders } from './prerendered'
 import { renderPage } from './render'
-import { refuseClashes, scanRoutes } from './routes'
+import { refuseClashes, routeMounts, scanRoutes } from './routes'
 import { configHead, siteOrigin } from './seo'
 import { serverIslandModes } from './server-islands'
 import { STAMP_HOLE } from './stamp'
@@ -67,7 +67,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   const paths = new Map<string, string>()
 
   const routesDir = resolve(root, config.routes ?? 'src/routes')
-  const routes = await scanRoutes(routesDir)
+  const routes = await scanRoutes(routesDir, routeMounts(root, config.extensions))
 
   refuseClashes(routesDir, routes)
   const matchers = await loadMatchers(routesDir, routes)

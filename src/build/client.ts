@@ -1,5 +1,6 @@
 import type { BunPlugin } from 'bun'
 import type { LintLevels } from '../compiler/lints'
+import type { KayExtension } from '../config'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { KayLibrary } from './libraries'
 import type { ChunkInputs } from './report'
@@ -14,9 +15,10 @@ import { apiStubs, scanApi } from '../server/api'
 import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env'
+import { routeMounts } from '../server/routes'
 import { ASSET_PREFIX, clientDir } from './assets'
 import { findKayFiles, writeIfChanged } from './files'
-import { findKayLibraries, reachableLibraryFiles, sourceWords } from './libraries'
+import { findKayLibraries, reachableLibraryFiles, sourceWords, throughLinks } from './libraries'
 import { kay } from './plugin'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
@@ -30,6 +32,8 @@ export interface ClientOptions {
   plugins?: BunPlugin[] | undefined
   // Page directory relative to the root: its pages and layouts are where stylesheets are gathered from.
   routes?: string | undefined
+  // The libraries whose routes the app mounts, built as its own pages are.
+  extensions?: KayExtension[] | undefined
   // API directory relative to the root: an island importing a module there gets where its routes are served, not its code.
   api?: string | undefined
   // Links each island chunk to a map of its `.kay` sources, for the browser's devtools; the server points a map at them as it first serves it.
@@ -75,9 +79,12 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   const diagnostics: FileDiagnostic[] = []
   // A library's components the app reaches compile with its own; a kay project nested inside, such as an example, builds on its own.
   const own = await findKayFiles(root, { project: true, ownKayOnly: true })
+  // The pages of the libraries the app mounts, which it reaches through its config rather than an import.
+  const ownFiles = new Set(own)
+  const mounted = (await Promise.all(routeMounts(root, options.extensions).map(async mount => existsSync(mount.dir) ? findKayFiles(mount.dir) : []))).flat().filter(file => !ownFiles.has(file))
   const libraries = await findKayLibraries(root)
-  const fromLibraries = await reachableLibraryFiles(root, libraries, own)
-  const files = [...own, ...fromLibraries.components]
+  const fromLibraries = await reachableLibraryFiles(root, libraries, [...own, ...mounted])
+  const files = [...own, ...mounted, ...fromLibraries.components]
   const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
   const cacheDir = join(root, '.kay', 'cache')
@@ -127,7 +134,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
 
   const [scripts, styles] = await Promise.all([
     buildIslands(root, base, islands, options),
-    buildStyles(root, dir, existsSync(routesDir) ? await findKayFiles(routesDir) : [], libraries, options),
+    buildStyles(root, dir, [...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted], libraries, options),
   ])
   const manifest: ClientManifest = { ...scripts.manifest, styles }
 
@@ -344,7 +351,7 @@ function islandPath(root: string, input: string): string {
 
 // Bun names entry points relative to the working directory or to the build's root, so both are tried.
 function entryFile(root: string, entryPoint: string, files: Set<string>): string | undefined {
-  return [resolve(root, entryPoint), resolve(entryPoint)].find(file => files.has(file))
+  return [resolve(root, entryPoint), resolve(entryPoint), throughLinks(root, resolve(entryPoint))].find(file => files.has(file))
 }
 
 function assetUrl(output: string): string {

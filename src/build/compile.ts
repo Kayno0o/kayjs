@@ -9,7 +9,7 @@ import { scanApi } from '../server/api'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
 import { messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
-import { refuseClashes, scanRoutes, specialPagesOf } from '../server/routes'
+import { refuseClashes, routeMounts, routeTrees, scanRoutes, specialPagesOf } from '../server/routes'
 import { kay } from './plugin'
 import { runtimeConfig, withoutPlugins } from './runtime-config'
 import { withoutStyles } from './styles'
@@ -54,11 +54,12 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   if (basename(publicDir) === CLIENT_ASSETS)
     throw new Error(`kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
 
-  const routes = await scanRoutes(routesDir)
+  const mounts = routeMounts(root, config.extensions)
+  const routes = await scanRoutes(routesDir, mounts)
 
   refuseClashes(routesDir, routes)
 
-  const fallback = specialPagesOf(routesDir, routesDir)
+  const fallback = specialPagesOf(routeTrees(routesDir, mounts), '')
   const contentConfig = resolve(root, config.content ?? CONTENT_CONFIG)
   // The content config too, which the server reads the collections and their feeds from, the project's own param matchers and its messages.
   const matcherFiles = [...new Set(routes.flatMap(route => Object.values(route.matchers ?? {})))].map(name => matcherFile(routesDir, name)).filter(file => existsSync(file))

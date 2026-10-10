@@ -176,8 +176,8 @@ async function runCheck(args: string[]): Promise<number> {
 // Prints what `kay check` finds in the project, as it finds it, and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
 // With `fix`, applies the safe fixes first, then checks again and prints what is left.
 async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string, { denyWarnings = false, fix = false } = {}): Promise<{ failing: number, found: number }> {
-  const { routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints } = config
-  const options = { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints }
+  const { routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints, extensions } = config
+  const options = { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, settings, base, site, shutdownTimeout, lints, extensions }
   let diagnostics = await check(root, options)
   const fixed = fix ? await applySafeFixes(root, diagnostics) : 0
 
@@ -349,7 +349,7 @@ async function bundleClient(root: string, config: KayConfig, exported: boolean, 
   if (exported)
     refuseStaticConfig(config)
 
-  const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined, report: analyze ? 'modules' : 'sizes' })
+  const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, extensions: config.extensions, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined, report: analyze ? 'modules' : 'sizes' })
 
   // A static host cannot pick a format by `Accept`, so an export links WebP alone.
   const avif = exported ? undefined : avifQuality(config.images)
@@ -582,8 +582,8 @@ async function runDev(args: string[]): Promise<number> {
 
   warnOtherKay('dev', root)
   const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
-  const { routes, publicDir, api, settings } = await loadConfig(root)
-  const stop = await dev(root, { entry, routes, publicDir, api, settings })
+  const { routes, extensions, publicDir, api, settings } = await loadConfig(root)
+  const stop = await dev(root, { entry, routes, extensions, publicDir, api, settings })
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)

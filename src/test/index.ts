@@ -139,7 +139,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production.
   const config = { ...loaded, site: loaded.site ?? ORIGIN }
   const client: ClientBuild = options.browser !== undefined && options.browser !== false
-    ? await buildClient(root, { plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
+    ? await buildClient(root, { plugins: config.plugins, routes: config.routes, extensions: config.extensions, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
     : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(root, '.kay', 'client', 'dist') }
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const pages = await servePages(root, config, async () => client)
