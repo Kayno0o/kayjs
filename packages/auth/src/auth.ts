@@ -14,13 +14,14 @@ import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
 import type { OAuthFailure } from './oauth/flow'
 import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
+import type { AuthFeatures, AuthPagesOptions } from './pages'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
 import type { PasswordProblem } from './rules'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
-import type { AuthStore, UserRecord } from './store'
+import type { AuthStore, LinkType, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
@@ -44,6 +45,7 @@ import { createOAuthClient } from './oauth/client'
 import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow'
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
+import { featuresOf, pagePaths, pagesOf } from './pages'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
 import { register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
@@ -61,6 +63,7 @@ const DEFAULT_REMEMBER_MAX_AGE = 90 * 24 * 60 * 60
 // kay's own lifetime of a session whose cookie dies with the browser, a day.
 const DEFAULT_BROWSER_SESSION_MAX_AGE = 24 * 60 * 60
 const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
+const LINK_TYPES: LinkType[] = ['verify-email', 'reset-password', 'magic-link', 'change-email']
 // What a provider posting back to the callback may say, carried over to the GET.
 const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 
@@ -81,10 +84,12 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   prefix?: Prefix | undefined
   // The site's name, as mails and authenticator apps show it; the URL's host by default.
   site?: string | undefined
-  // Where a sign-in that failed goes, with `?error=` saying why; `/` by default.
+  // Where a sign-in that failed goes, with `?error=` saying why; the prebuilt sign-in page with `pages`, else `/`.
   signInPage?: string | undefined
   // Where a sign-in goes to ask for the second factor, `/two-factor` by default: a page whose form posts the code to an action calling `verifyTwoFactor`.
   twoFactorPage?: string | undefined
+  // The prebuilt pages, `authPages()` as kay.config.ts lists it or `true` for its defaults: the sign-in, two-factor and sessions pages and the mailed links default to them.
+  pages?: boolean | AuthPagesOptions | undefined
   // Mail for email verification, password resets, magic links and email changes.
   email?: EmailOptions | undefined
   // OAuth apps by the name their routes take: `{ discord: { provider: discordProvider(), clientId, clientSecret } }`.
@@ -362,6 +367,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     this.resolving = Promise.resolve(await this.core.store.users.update(record.id, { locale }) ?? { ...record, locale })
 
     return true
+  }
+
+  // What the config enables, for a page to show only what works: the providers, mail, passkeys, scopes and the prebuilt pages.
+  features(): AuthFeatures {
+    return featuresOf(this.core)
   }
 
   // The providers the signed-in user has linked.
@@ -834,6 +844,18 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     })
     // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
     .as('global')
+    // The signed-in user's data as a JSON download, linked from their account page.
+    .get(`${core.prefix}/export` as `${Prefix}/export`, async ({ auth, set, status }) => {
+      const exported = await auth.exportData()
+
+      if (!exported.ok)
+        return status(401, 'Sign in to continue')
+
+      set.headers['content-disposition'] = `attachment; filename="${core.site.replaceAll(/[^\w.-]/g, '-')}-data.json"`
+      set.headers['cache-control'] = 'no-store'
+
+      return exported.data
+    })
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
     // Typed as their literal paths, so `kay check` checks links to them once the app registers its Elysia app.
     .get(`${core.prefix}/:provider` as `${Prefix}/:provider`, async ({ auth, params, query, redirect, status }) => {
@@ -935,16 +957,18 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => gate(app.use(plugin))
     },
 
-    // A `_guard.ts` default export. An anonymous visitor goes to `redirect` with where they were going as `?redirect=`, or gets a 401 without one, as does any post; a user who does not meet `require` gets a 403.
+    // A `_guard.ts` default export. An anonymous visitor goes to `redirect`, the prebuilt sign-in page with `pages`, with where they were going as `?redirect=`, or gets a 401 without one, as does any post; a user who does not meet `require` gets a 403.
     // A scoped bearer token passes only with one of `scope`.
     guard(guardOptions: { redirect?: string, require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> } = {}): Guard {
+      const redirect = guardOptions.redirect ?? (core.pages && core.signInPage)
+
       return async (ctx) => {
         const user = await authOf(ctx.locals).user()
         const reading = READ_METHODS.has(ctx.request.method)
 
         if (!user) {
-          if (guardOptions.redirect !== undefined && reading)
-            ctx.redirect(withQuery(guardOptions.redirect, `redirect=${encodeURIComponent(ctx.url.pathname + ctx.url.search)}`))
+          if (redirect !== undefined && reading)
+            ctx.redirect(withQuery(redirect, `redirect=${encodeURIComponent(ctx.url.pathname + ctx.url.search)}`))
 
           ctx.deny(401, 'Sign in to continue')
         }
@@ -966,6 +990,8 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   const oauthApps = Object.entries(options.oauth ?? {})
   const url = options.url?.replace(TRAILING_SLASH, '')
   const locales = options.email?.locales?.length ? [...options.email.locales] : ['en']
+  const pages = pagesOf(options.pages)
+  const paths = pages && pagePaths(pages.prefix)
 
   if ((oauthApps.length > 0 || options.email) && url === undefined)
     throw new Error('kayjs-auth: OAuth sign-in and mailed links need `url`, the site\'s public origin, to build their URLs')
@@ -978,14 +1004,15 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     keys: deriveKeys(options.secret),
     url,
     prefix,
-    signInPage: options.signInPage ?? '/',
-    twoFactorPage: options.twoFactorPage ?? '/two-factor',
+    signInPage: options.signInPage ?? paths?.signIn ?? '/',
+    twoFactorPage: options.twoFactorPage ?? paths?.twoFactor ?? '/two-factor',
+    pages,
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: { ...DEFAULT_LIMITS, ...options.limits },
     sessionMaxAge: options.sessionMaxAge ?? DEFAULT_SESSION_MAX_AGE,
     rememberMaxAge: options.rememberMaxAge ?? DEFAULT_REMEMBER_MAX_AGE,
     browserSessionMaxAge: options.browserSessionMaxAge ?? DEFAULT_BROWSER_SESSION_MAX_AGE,
-    sessionsPage: options.sessionsPage,
+    sessionsPage: options.sessionsPage ?? paths?.sessions,
     locate: options.locate,
     scopes: new Set(options.scopes),
     passkeys: url === undefined
@@ -995,6 +1022,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     breached: options.breachedPasswords === true ? pwnedPassword : options.breachedPasswords || undefined,
     email: options.email && {
       ...options.email,
+      links: emailLinks(options.email.links, paths?.links),
       requireVerified: options.email.requireVerified ?? false,
       locales,
       templates: localeTemplates(locales, options.email.templates, options.email.translations),
@@ -1039,6 +1067,17 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
 // A query value as text: a name repeated in the URL arrives as a list, which no flow takes.
 function text(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
+}
+
+// The page each mailed link opens: the app's, else the prebuilt one.
+function emailLinks(links: Partial<Record<LinkType, string>> | undefined, pages: Record<LinkType, string> | undefined): Record<LinkType, string> {
+  const merged = Object.fromEntries(LINK_TYPES.map(type => [type, links?.[type] ?? pages?.[type]]))
+  const missing = LINK_TYPES.filter(type => merged[type] === undefined)
+
+  if (missing.length > 0)
+    throw new Error(`kayjs-auth: email.links needs a page for ${missing.join(', ')}, or \`pages\` for the prebuilt ones`)
+
+  return merged as Record<LinkType, string>
 }
 
 function withQuery(path: string, query: string): string {

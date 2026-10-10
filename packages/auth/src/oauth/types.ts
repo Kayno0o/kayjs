@@ -36,6 +36,8 @@ export interface OAuthEndpoints {
 /** A provider's OAuth endpoints plus how to parse its token/user responses. */
 export interface OAuthProvider<Raw = any, User = OAuthUser> extends OAuthEndpoints {
   name: string
+  /** The provider's name as a sign-in button shows it, `GitHub`; `name` without it. */
+  label?: string
   /** Endpoints read from the provider on first use, such as an OpenID Connect discovery document, over the ones set here. */
   discover?: () => Promise<OAuthEndpoints>
   scopes: string[]

@@ -45,6 +45,8 @@ export interface OAuthApp {
   clientId: string
   // Left out for Apple, whose preset signs its own, or a public client.
   clientSecret?: string | undefined
+  // What a sign-in button calls the provider, over the preset's own label.
+  label?: string | undefined
 }
 
 // A provider account as kayjs-auth reads it; `email` is set only when the provider says it is verified.
@@ -73,6 +75,8 @@ export interface Core {
   prefix: string
   signInPage: string
   twoFactorPage: string
+  // The prebuilt pages' prefix and home, with the `pages` option.
+  pages?: { prefix: string, home: string } | undefined
   // The site's name, as mails and authenticators show it.
   site: string
   limits: Limits

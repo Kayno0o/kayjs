@@ -24,6 +24,7 @@ export function discordProvider(opts: { scopes?: string[], apiBase?: string } = 
 
   return {
     name: 'discord',
+    label: 'Discord',
     authorizeUrl: 'https://discord.com/oauth2/authorize',
     tokenUrl: `${apiBase}/oauth2/token`,
     userUrl: `${apiBase}/users/@me`,
@@ -51,6 +52,7 @@ interface GithubRawUser {
 export function githubProvider(opts: { scopes?: string[] } = {}): OAuthProvider<GithubRawUser> {
   return {
     name: 'github',
+    label: 'GitHub',
     authorizeUrl: 'https://github.com/login/oauth/authorize',
     tokenUrl: 'https://github.com/login/oauth/access_token',
     userUrl: 'https://api.github.com/user',
@@ -132,6 +134,7 @@ export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: stri
 export function googleProvider(opts: OpenIdOptions = {}): OAuthProvider<OpenIdClaims> {
   return {
     name: 'google',
+    label: 'Google',
     authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
     openId: { issuer: ['https://accounts.google.com', 'accounts.google.com'], jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs' },
@@ -150,6 +153,7 @@ export function microsoftProvider(opts: OpenIdOptions & { tenant?: string } = {}
 
   return {
     name: 'microsoft',
+    label: 'Microsoft',
     authorizeUrl: `${base}/oauth2/v2.0/authorize`,
     tokenUrl: `${base}/oauth2/v2.0/token`,
     // The issuer names the account's own tenant, so a multi-tenant app checks it against the token's `tid`.
@@ -191,6 +195,7 @@ export function gitlabProvider(opts: OpenIdOptions & { url?: string } = {}): OAu
 
   return {
     name: 'gitlab',
+    label: 'GitLab',
     authorizeUrl: `${base}/oauth/authorize`,
     tokenUrl: `${base}/oauth/token`,
     userUrl: `${base}/oauth/userinfo`,
@@ -209,6 +214,7 @@ export function appleProvider(opts: { teamId: string, keyId: string, privateKey:
 
   return {
     name: 'apple',
+    label: 'Apple',
     authorizeUrl: 'https://appleid.apple.com/auth/authorize',
     tokenUrl: 'https://appleid.apple.com/auth/token',
     openId: { issuer: 'https://appleid.apple.com', jwksUrl: 'https://appleid.apple.com/auth/keys' },

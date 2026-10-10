@@ -14,6 +14,16 @@ export interface CaptchaOptions {
   verify: (token: string, action: CaptchaAction) => boolean | Promise<boolean>
   // When each request asks for one: `'always'`, a number to ask only once this client made that many of it in its attempt window, or false. Every request asks always by default.
   on?: Partial<Record<CaptchaAction, 'always' | number | false>> | undefined
+  // The widget the prebuilt pages show where one is needed: `turnstileWidget(siteKey)` or `hcaptchaWidget(siteKey)`.
+  widget?: CaptchaWidget | undefined
+}
+
+// A provider's widget: its script, the element it fills, carrying the site key, and the field its token posts as.
+export interface CaptchaWidget {
+  script: string
+  class: string
+  siteKey: string
+  field: 'cf-turnstile-response' | 'h-captcha-response'
 }
 
 // Each request's client limit, whose attempt count a threshold reads.
@@ -29,9 +39,17 @@ export function turnstile(secret: string): CaptchaOptions['verify'] {
   return async token => siteverify(TURNSTILE_URL, secret, token)
 }
 
+export function turnstileWidget(siteKey: string): CaptchaWidget {
+  return { script: 'https://challenges.cloudflare.com/turnstile/v0/api.js', class: 'cf-turnstile', siteKey, field: 'cf-turnstile-response' }
+}
+
 // hCaptcha's server check; the widget posts its token as `h-captcha-response`.
 export function hcaptcha(secret: string): CaptchaOptions['verify'] {
   return async token => siteverify(HCAPTCHA_URL, secret, token)
+}
+
+export function hcaptchaWidget(siteKey: string): CaptchaWidget {
+  return { script: 'https://js.hcaptcha.com/1/api.js', class: 'h-captcha', siteKey, field: 'h-captcha-response' }
 }
 
 // Whether the next `action` from this client needs a CAPTCHA token, for the page to show the widget.

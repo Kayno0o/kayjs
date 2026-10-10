@@ -45,8 +45,8 @@ export type CodeMode = 'link' | 'code' | 'both'
 
 export interface EmailOptions {
   mailer: Mailer
-  // The app's page each link opens, the token in `?token=`. Each shows a button, or the new password's form, posting the token to an action, so a mail scanner opening the link spends nothing.
-  links: Record<LinkType, string>
+  // The app's page each link opens, the token in `?token=`, the prebuilt one by default with `pages`. Each shows a button, or the new password's form, posting the token to an action, so a mail scanner opening the link spends nothing.
+  links?: Partial<Record<LinkType, string>> | undefined
   // Over kayjs-auth's own templates in every language.
   templates?: Partial<Templates> | undefined
   // The languages mails are written in, the first for a user whose language is none of them: `['en', 'fr']`. English only by default; kayjs-auth writes English and French, `translations` any other.
@@ -59,7 +59,7 @@ export interface EmailOptions {
   codes?: CodeMode | Partial<Record<CodedLink, CodeMode>> | undefined
 }
 
-export type EmailCore = Required<Omit<EmailOptions, 'templates' | 'requireVerified' | 'codes' | 'locales' | 'translations'>> & { requireVerified: boolean, locales: string[], templates: Record<string, Templates>, codes: Record<CodedLink, CodeMode> }
+export type EmailCore = Required<Omit<EmailOptions, 'links' | 'templates' | 'requireVerified' | 'codes' | 'locales' | 'translations'>> & { links: Record<LinkType, string>, requireVerified: boolean, locales: string[], templates: Record<string, Templates>, codes: Record<CodedLink, CodeMode> }
 
 // A code waiting in the session that asked for it, which alone can spend it.
 export interface PendingCode {
