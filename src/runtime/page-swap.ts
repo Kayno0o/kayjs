@@ -18,6 +18,8 @@ interface Answer {
 
 const ISLAND = 'slot[data-component]'
 const PERSISTENT = 'slot[data-persist]'
+// What the morph never keeps across pages: islands are kept by `persist` or a refresh alone, and a script or a template is put in afresh.
+const OPAQUE = 'slot[data-component],slot[data-kay-server],script,template'
 const PREFETCH_TTL_MS = 30_000
 const STYLESHEET_TIMEOUT_MS = 3000
 const HTML = /^text\/html\b/
@@ -299,7 +301,7 @@ async function loaded(link: HTMLLinkElement): Promise<void> {
   })
 }
 
-// The next page's body in place of this one, with the islands that live on moved over before anything is taken away, so a playing video or an open socket never notices.
+// The next page's body morphed into this one: what it renders again stays the same element, so a layout's sidebar keeps its scroll, and the islands that live on are moved over before anything is taken away, so a playing video or an open socket never notices.
 function swapBody(next: Document, swap: Swap): void {
   const body = document.adoptNode(next.body)
   const old = document.body
@@ -341,7 +343,10 @@ function swapBody(next: Document, swap: Swap): void {
     }
   }
 
+  // Every island left is taken away, as the morph never keeps one.
   navigation.hooks!.dispose(old)
+
+  const opened = [...old.querySelectorAll(':popover-open')]
 
   // What ran already, the hydration script for one, runs once.
   const ran = new Set([...document.scripts].map(script => script.outerHTML))
@@ -353,7 +358,124 @@ function swapBody(next: Document, swap: Swap): void {
       script.replaceWith(runnable(script))
   }
 
-  old.replaceWith(body)
+  morph(old, body)
+
+  // A drawer or a menu left open closes as the page changes, as it would on a page loaded afresh.
+  for (const popover of opened) {
+    if (popover.isConnected && popover instanceof HTMLElement && popover.matches(':popover-open'))
+      popover.hidePopover()
+  }
+
+  // A new page starts at the top in the element holding its heading too, such as a main column scrolling on its own.
+  if (swap.scroll === 'top') {
+    for (let parent = (document.querySelector('[autofocus]') ?? document.querySelector('h1'))?.parentElement; parent && parent !== document.body; parent = parent.parentElement)
+      parent.scrollTo(0, 0)
+  }
+}
+
+// Two nodes the morph makes one of: of one kind and tag, and for an element, the same id and class.
+function alike(live: Node, next: Node): boolean {
+  if (live.nodeType !== next.nodeType || live.nodeName !== next.nodeName)
+    return false
+
+  if (!(live instanceof Element))
+    return true
+
+  const other = next as Element
+
+  return !live.matches(OPAQUE) && !other.matches(OPAQUE) && live.id === other.id && live.getAttribute('class') === other.getAttribute('class')
+}
+
+// Makes the live node read as the next one, keeping it and each child of it the next page renders again.
+function morph(live: Node, next: Node): void {
+  if (!(live instanceof Element)) {
+    if (live.nodeValue !== next.nodeValue)
+      live.nodeValue = next.nodeValue
+
+    return
+  }
+
+  const other = next as Element
+
+  // An element's open state is closed through it, as the attribute alone would leave a modal dialog blocking the page.
+  if (live instanceof HTMLDialogElement && live.open && !other.hasAttribute('open'))
+    live.close()
+
+  for (const { name, value } of other.attributes) {
+    if (live.getAttribute(name) !== value)
+      live.setAttribute(name, value)
+  }
+
+  for (const name of live.getAttributeNames()) {
+    if (!other.hasAttribute(name))
+      live.removeAttribute(name)
+  }
+
+  morphChildren(live, other)
+
+  // A field shows what the next page renders, as a page loaded afresh does, rather than what was typed into it.
+  if (live instanceof HTMLInputElement) {
+    live.value = (other as HTMLInputElement).value
+    live.checked = (other as HTMLInputElement).checked
+  }
+  else if (live instanceof HTMLTextAreaElement) {
+    live.value = (other as HTMLTextAreaElement).value
+  }
+  else if (live instanceof HTMLOptionElement) {
+    live.selected = (other as HTMLOptionElement).selected
+  }
+}
+
+// Pairs the children in order: a live child alike the next one is morphed into it, one the next page dropped is removed, and the rest of the next page's children are moved in.
+function morphChildren(live: Element, next: Element): void {
+  let cursor = live.firstChild
+  let incoming = next.firstChild
+
+  while (incoming) {
+    const following: ChildNode | null = incoming.nextSibling
+
+    if (cursor && alike(cursor, incoming)) {
+      morph(cursor, incoming)
+      cursor = cursor.nextSibling
+    }
+    else {
+      const ahead = cursor && !later(following, cursor) ? later(cursor.nextSibling, incoming) : undefined
+
+      if (ahead) {
+        while (cursor !== ahead) {
+          const after: ChildNode | null = cursor!.nextSibling
+
+          cursor!.remove()
+          cursor = after
+        }
+
+        morph(ahead, incoming)
+        cursor = ahead.nextSibling
+      }
+      else {
+        live.insertBefore(incoming, cursor)
+      }
+    }
+
+    incoming = following
+  }
+
+  while (cursor) {
+    const after: ChildNode | null = cursor.nextSibling
+
+    cursor.remove()
+    cursor = after
+  }
+}
+
+// The first of a node's siblings from `from` on that is alike it.
+function later(from: ChildNode | null, node: Node): ChildNode | undefined {
+  for (let sibling = from; sibling; sibling = sibling.nextSibling) {
+    if (alike(sibling, node))
+      return sibling
+  }
+
+  return undefined
 }
 
 // The element focused before, found again on a refreshed page; on a new page its autofocus field or its heading, so a screen reader starts there, the title announced.

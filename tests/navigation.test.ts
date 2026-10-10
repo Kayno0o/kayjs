@@ -278,6 +278,28 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.waitForFunction(() => scrollY === 700)
   })
 
+  it('keeps what the next page renders again, a scrolled sidebar keeping its scroll, and gives it the next page\'s attributes', async () => {
+    await page.goto(origin)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+      const side = document.querySelector<HTMLElement & { kayMark?: string }>('#side')!
+
+      side.kayMark = 'kept'
+      side.scrollTop = 200
+      document.querySelector<HTMLElement>('#drawer')!.showPopover()
+      document.querySelector<HTMLElement>('a.second')!.click()
+    })
+    await page.locator('h1', { hasText: 'Second' }).waitFor()
+
+    expect(await sameDocument()).toBe(true)
+    expect(await page.evaluate(() => (document.querySelector('#side') as HTMLElement & { kayMark?: string }).kayMark)).toBe('kept')
+    expect(await page.evaluate(() => document.querySelector('#side')!.scrollTop)).toBe(200)
+    expect(await page.getAttribute('a.second', 'aria-current')).toBe('page')
+    expect(await page.getAttribute('a.home', 'aria-current')).toBeNull()
+    // A drawer left open closes as the page changes.
+    expect(await page.evaluate(() => document.querySelector('#drawer')!.matches(':popover-open'))).toBe(false)
+  })
+
   it('goes back to a jump within the page by scrolling, the page left as it is', async () => {
     await page.goto(origin)
     await page.evaluate(() => {
