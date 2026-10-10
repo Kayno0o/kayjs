@@ -1,3 +1,4 @@
+import type { SizeReport } from '../build/report'
 import type { ServerIslandMode } from '../runtime/html'
 import { join, resolve } from 'node:path'
 import { ASSET_PREFIX, clientDir } from '../build/assets'
@@ -53,6 +54,8 @@ export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {
   pages: Map<string, PrerenderedPage>
   // With `inlineStyles`, the text each stylesheet URL is written into heads as.
   inlineStyles?: Map<string, string> | undefined
+  // What the browser loads for islands, when the build was asked to measure it.
+  report?: SizeReport | undefined
 }
 
 // Quoted, spaces included, or bare.

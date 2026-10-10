@@ -64,7 +64,10 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `--static` | Also writes the whole site as static files |
 | `--outdir <dir>` | Where `--static` writes, `dist` by default |
 | `--no-check` | Skips the check |
+| `--analyze` | Lists the modules weighing most in the entry and each island |
 | `-p <tsconfig>` | Names another tsconfig |
+
+The build prints the JavaScript a page with islands loads, gzip and minified: the entry, then what each island adds.
 
 ## kay check
 

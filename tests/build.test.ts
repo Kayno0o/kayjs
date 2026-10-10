@@ -9,6 +9,7 @@ import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, writeAsset } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
+import { formatSizeReport } from '../src/build/report'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
@@ -623,3 +624,40 @@ async function printed(child: { stdout: ReadableStream<Uint8Array>, stderr: Read
 
   return [stdout + stderr, code]
 }
+
+describe('the size report', () => {
+  it('weighs the entry and what each island loads beyond it, the heaviest first, and breaks them down by module', async () => {
+    const root = await scratchProject({
+      'src/data.ts': `export const words = ${JSON.stringify(Array.from({ length: 400 }, (_, index) => `word-${index}-${(index * 7919).toString(36)}`))}\n`,
+      'src/big.kay': '---\nimport { signal } from \'kay\'\nimport { words } from \'./data\'\n\nconst shown = signal(0)\n---\nbutton(type="button" onClick={() => shown.set(shown() + 1)}) {words[shown()]}\n',
+      'src/small.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
+      'src/routes/index.kay': '---\nimport Big from \'../big.kay\'\nimport Small from \'../small.kay\'\n---\nBig\nSmall\n',
+    })
+
+    try {
+      const { report, dir, entry, entryImports } = await buildClient(root, { minify: true, report: 'modules' })
+      const gzip = async (url: string) => Bun.gzipSync(await Bun.file(join(dir, url.replace('/_kay/', ''))).bytes(), { level: 9 }).length
+      const entryGzip = (await Promise.all([entry!, ...entryImports].map(gzip))).reduce((sum, size) => sum + size, 0)
+
+      expect(report!.entry!.size.gzip).toBe(entryGzip)
+      expect(report!.entry!.modules!.map(module => module.name)).toContain('kay/src/runtime/dom.ts')
+      expect(report!.islands.map(island => island.file)).toEqual(['src/big.kay', 'src/small.kay'])
+      expect(report!.islands[0]!.size.gzip).toBeGreaterThan(report!.islands[1]!.size.gzip)
+      expect(report!.islands[0]!.modules![0]).toEqual({ name: 'src/data.ts', bytes: expect.any(Number) })
+
+      const printed = formatSizeReport(report!)
+
+      expect(printed).toMatch(/^ {2}entry, loaded by every page with an island {2}\d+\.\d KB \(\d+\.\d KB\)$/m)
+      expect(printed).toMatch(/^ {2}src\/big\.kay +\+\d+\.\d KB \(\d+\.\d KB\)\n {6}src\/data\.ts {2}\d+\.\d KB$/m)
+      // An island holding only itself is not broken down.
+      expect(printed.split('\n').at(-1)).toMatch(/^ {2}src\/small\.kay +\+/)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports no JavaScript for a site with no island', () => {
+    expect(formatSizeReport({ islands: [] })).toBe('no JavaScript: no page has an island')
+  })
+})

@@ -13,6 +13,7 @@ import { parseArgs } from 'node:util'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
 import { buildClient } from './build/client'
 import { compileServer } from './build/compile'
+import { formatSizeReport } from './build/report'
 import { exportStatic, refuseStaticConfig } from './build/static'
 import { KayCompileError } from './build/transform'
 import { applySafeFixes, check, formatCheckDiagnostic } from './check'
@@ -42,7 +43,7 @@ const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const stderrColors = createColors({ stream: process.stderr })
 const toStderr: Paint = (styles, text) => styles.reduce((paint, style) => paint[style], stderrColors)(text)
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -207,7 +208,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
 // It checks the project as `kay check` does while it bundles for the browser, runs no page, API module or guard until that passed, and leaves the last build in place when either fails, unless `--no-check` says not to check.
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server.
 async function build(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'project': { type: 'string', short: 'p' } }, 1)
+  const parsed = parseCommand(args, { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'project': { type: 'string', short: 'p' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
@@ -260,7 +261,7 @@ async function build(args: string[]): Promise<number> {
     await rm(previous, { recursive: true, force: true })
 
   const started = performance.now()
-  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined) : { failing: 0, found: 0 }, bundleClient(root, config, exported)])
+  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined) : { failing: 0, found: 0 }, bundleClient(root, config, exported, parsed.values.analyze === true)])
 
   if (checked.status === 'rejected' || checked.value.failing > 0) {
     await putBack(output, previous)
@@ -284,6 +285,9 @@ async function build(args: string[]): Promise<number> {
     const { prerendered, entries } = await finishOutput(root, config, exported, client)
 
     done('built', `${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''}`, started)
+
+    if (client.report)
+      console.log(formatSizeReport(client.report))
   }
   catch (error) {
     if (checking)
@@ -341,11 +345,11 @@ function buildError(error: unknown): unknown {
 }
 
 // The browser bundles and the variants of the images they import, which run no page, API module or guard, so they build while the check runs.
-async function bundleClient(root: string, config: KayConfig, exported: boolean): Promise<ClientBuild> {
+async function bundleClient(root: string, config: KayConfig, exported: boolean, analyze: boolean): Promise<ClientBuild> {
   if (exported)
     refuseStaticConfig(config)
 
-  const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
+  const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined, report: analyze ? 'modules' : 'sizes' })
 
   // A static host cannot pick a format by `Accept`, so an export links WebP alone.
   const avif = exported ? undefined : avifQuality(config.images)

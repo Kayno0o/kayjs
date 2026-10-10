@@ -2,6 +2,7 @@ import type { BunPlugin } from 'bun'
 import type { LintLevels } from '../compiler/lints'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { KayLibrary } from './libraries'
+import type { ChunkInputs } from './report'
 import type { FileDiagnostic } from './transform'
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
@@ -17,6 +18,7 @@ import { ASSET_PREFIX, clientDir } from './assets'
 import { findKayFiles, writeIfChanged } from './files'
 import { findKayLibraries, reachableLibraryFiles, sourceWords } from './libraries'
 import { kay } from './plugin'
+import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
 import { forgetBundleMaps } from './sourcemap'
@@ -44,6 +46,8 @@ export interface ClientOptions {
   publicEnv?: boolean | undefined
   // The level of each lint the problems panel shows in development.
   lints?: LintLevels | undefined
+  // Measures what the browser loads for islands, `modules` breaking each chunk down by the modules it holds.
+  report?: 'sizes' | 'modules' | undefined
 }
 
 interface MetafileOutput {
@@ -123,18 +127,23 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
     buildIslands(root, base, islands, options),
     buildStyles(root, dir, existsSync(routesDir) ? await findKayFiles(routesDir) : [], libraries, options),
   ])
-  const manifest: ClientManifest = { ...scripts, styles }
+  const manifest: ClientManifest = { ...scripts.manifest, styles }
 
   await writeManifest(root, manifest)
 
-  return options.hot ? { ...fromManifest(root, manifest), problems } : fromManifest(root, manifest)
+  const built = options.hot ? { ...fromManifest(root, manifest), problems } : fromManifest(root, manifest)
+
+  if (options.report !== undefined)
+    built.report = await sizeReport(root, dir, scripts.manifest, islands, options.report === 'modules' ? scripts.inputs : undefined)
+
+  return built
 }
 
-async function buildIslands(root: string, base: string, islands: Map<string, string>, options: ClientOptions): Promise<Omit<ClientManifest, 'styles'>> {
+async function buildIslands(root: string, base: string, islands: Map<string, string>, options: ClientOptions): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs }> {
   const navigation = options.navigation ?? true
 
   if (islands.size === 0 && !navigation)
-    return { entryImports: [], islands: {} }
+    return { manifest: { entryImports: [], islands: {} }, inputs: {} }
 
   const entryFile = join(base, 'entry.ts')
   const bootFile = join(base, 'boot.ts')
@@ -212,7 +221,9 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   if (publicEnv !== undefined)
     manifest.entryImports.push(PUBLIC_ENV_PATH)
 
-  return { ...manifest, navigation }
+  const inputs = Object.fromEntries(Object.entries(build.metafile!.outputs).map(([output, meta]) => [output.replace(LEADING_DOT_SLASH, ''), meta.inputs]))
+
+  return { manifest: { ...manifest, navigation }, inputs }
 }
 
 // Bun names the module importing a builtin a browser lacks, not the island reaching it: the same build with every builtin left out, in memory, gives the imports leading there.
