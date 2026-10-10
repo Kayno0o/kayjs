@@ -12,12 +12,12 @@
         "@types/bun": "^1.4.2",
         "@typescript/native-preview": "^7.0.0-dev.20260707.2",
         "elysia": "^1.4.30",
-        "kay": "npm:@kaynooo/kayjs@~1.30.0",
+        "kay": "npm:@kaynooo/kayjs@~1.31.0",
         "typescript": "^6.0.3",
       },
       "peerDependencies": {
         "elysia": "^1.4.30",
-        "kay": "~1.28.0 || ~1.29.0 || ~1.30.0",
+        "kay": "~1.28.0 || ~1.29.0 || ~1.30.0 || ~1.31.0",
       },
     },
   },
@@ -642,7 +642,7 @@
 
     "katex": ["katex@0.16.47", "", { "dependencies": { "commander": "^8.3.0" }, "bin": { "katex": "cli.js" } }, "sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg=="],
 
-    "kay": ["@kaynooo/kayjs@1.30.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fkayjs/-/1.30.0/kayjs-1.30.0.tgz", { "dependencies": { "@babel/parser": "^7.29.7", "@babel/traverse": "^7.29.7", "@babel/types": "^7.29.7", "@jsquash/avif": "2.1.1", "@kaynooo/utils": "^2.29.0", "@typescript/native-preview": "^7.0.0-dev.20260707.2", "axe-core": "^4.14.0", "devalue": "^6.0.2", "elysia": "^1.4.30" }, "peerDependencies": { "@types/bun": "^1.4.2" }, "bin": { "kay": "src/cli.ts" } }, "sha512-tUDYU8IaMqu2l5DcMbJNmogjEx6LDUN6btrl9XkzsmVMsh5uSr5BeEX16wQJE308r9wbs5/frzTbehaFnb+HJQ=="],
+    "kay": ["@kaynooo/kayjs@1.31.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fkayjs/-/1.31.0/kayjs-1.31.0.tgz", { "dependencies": { "@babel/parser": "^7.29.7", "@babel/traverse": "^7.29.7", "@babel/types": "^7.29.7", "@jsquash/avif": "2.1.1", "@kaynooo/utils": "^2.29.0", "@typescript/native-preview": "^7.0.0-dev.20260707.2", "axe-core": "^4.14.0", "devalue": "^6.0.2", "elysia": "^1.4.30" }, "peerDependencies": { "@types/bun": "^1.4.2" }, "bin": { "kay": "src/cli.ts" } }, "sha512-bBCTHNB0UtAfmXskkbT+ReuLe9Me+oC/ZJPP7umJX+oYNyhWKTAivXFdnZnRv8DxnNsqibkDFt4wod2M1tEO2w=="],
 
     "kebab-case": ["kebab-case@1.0.2", "", {}, "sha512-7n6wXq4gNgBELfDCpzKc+mRrZFs7D+wgfF5WRFLNAr4DA/qtr9Js8uOAVAfHhuLMfAcQ0pRKqbpjx+TcJVdE1Q=="],
 
