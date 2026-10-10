@@ -95,6 +95,25 @@ export function every(ms: number, run: () => unknown, options?: EveryOptions): v
   })
 }
 
+// The events `listen` types its handler by, per kind of target.
+type EventMapOf<T> = T extends Window ? WindowEventMap : T extends Document ? DocumentEventMap : T extends HTMLElement ? HTMLElementEventMap : T extends MediaQueryList ? MediaQueryListEventMap : Record<string, Event>
+
+// Listens to `type` events on `target`, `window` or `document` for instance, while the island lives; nothing listens while the server renders.
+// In a `.kay` file the compiler hands `target` over as a function, so `listen(window, ...)` never reads `window` on the server; a `.ts` module writes `listen(() => window, ...)`. A target read from a signal listens to its new value as it changes.
+export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions): void {
+  effect(() => {
+    const at = typeof target === 'function' ? target() : target
+
+    if (!at)
+      return
+
+    const listener = handler as EventListener
+
+    at.addEventListener(type, listener, options)
+    onCleanup(() => at.removeEventListener(type, listener, options))
+  })
+}
+
 // A signal an island edits locally that takes `source`'s value again whenever it changes: `const tiers = linked(() => board.tiers)` follows the prop once the page brings a new board.
 export function linked<T>(source: () => T): Signal<T> {
   const from = memo(source)

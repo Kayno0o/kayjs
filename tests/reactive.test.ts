@@ -1,7 +1,7 @@
 import type { Action } from '../src/runtime'
 import { describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
-import { batch, effect, every, flush, linked, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
+import { batch, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
 import { ActionError, actionStub } from '../src/runtime/action'
 import { createSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded } from '../src/runtime/reactive'
 
@@ -475,5 +475,49 @@ describe('every', () => {
     finally {
       jest.useRealTimers()
     }
+  })
+})
+
+describe('listen', () => {
+  it('listens while its root lives, to the target its function returns as that changes, with the options given', () => {
+    const first = new EventTarget()
+    const second = new EventTarget()
+    const target = signal<EventTarget | undefined>(first)
+    const heard: string[] = []
+    const dispose = root((dispose) => {
+      listen(target, 'ping', event => heard.push(event.type))
+      listen(first, 'once', event => heard.push(event.type), { once: true })
+
+      return dispose
+    })
+
+    flush()
+    first.dispatchEvent(new Event('ping'))
+    first.dispatchEvent(new Event('once'))
+    first.dispatchEvent(new Event('once'))
+    target.set(second)
+    flush()
+    first.dispatchEvent(new Event('ping'))
+    second.dispatchEvent(new Event('ping'))
+    target.set(undefined)
+    flush()
+    second.dispatchEvent(new Event('ping'))
+    target.set(first)
+    flush()
+    dispose()
+    first.dispatchEvent(new Event('ping'))
+    expect(heard).toEqual(['ping', 'once', 'ping'])
+  })
+
+  it('reads no target while the server renders', () => {
+    let reads = 0
+
+    renderOnServer(() => listen(() => {
+      reads++
+
+      return new EventTarget()
+    }, 'ping', () => undefined))
+    flush()
+    expect(reads).toBe(0)
   })
 })

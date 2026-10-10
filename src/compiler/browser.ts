@@ -4,7 +4,7 @@ import type { Diagnostic, Fix, KayFile, Span } from './ast'
 import { parse } from '@babel/parser'
 import { visitNodes } from './ast'
 import { browserGlobals } from './globals'
-import { loadTraverse } from './rewrite'
+import { importedFromKay, loadTraverse } from './rewrite'
 
 // One part of the program `browserReads` analyzes: generated text standing for the source from `source` on, character for character.
 interface Segment {
@@ -122,7 +122,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
       Identifier(path) {
         const { name } = path.node
 
-        if (!names.has(name) || !path.isReferencedIdentifier() || path.scope.hasBinding(name, true) || inType(path))
+        if (!names.has(name) || !path.isReferencedIdentifier() || path.scope.hasBinding(name, true) || inType(path) || listenTarget(path))
           return
 
         const typeOf = path.parentPath.isUnaryExpression({ operator: 'typeof' })
@@ -226,6 +226,11 @@ function varyingValue(path: NodePath<t.CallExpression | t.NewExpression>): Omit<
 // Options written out without the key; computed ones are taken as setting it.
 function lacksOption(options: t.Node | undefined, key: string): boolean {
   return options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type === 'ObjectProperty' && !property.computed && !(property.key.type === 'Identifier' && property.key.name === key) && !(property.key.type === 'StringLiteral' && property.key.value === key)))
+}
+
+// A read in the target of `listen(window, 'keydown', ...)`, which the compiler hands `listen` as a function the browser calls.
+function listenTarget(path: NodePath): boolean {
+  return path.find(parent => parent.parentPath?.isCallExpression() === true && parent.parentPath.node.arguments[0] === parent.node && importedFromKay(parent.scope, parent.parentPath.node.callee) === 'listen') !== null
 }
 
 // `memo(() => ...)` and `rows.map(row => ...)` run the function they take before they return.

@@ -174,6 +174,20 @@ describe('browser-only globals read while rendering', () => {
     expect(reads('--- server\nconst status = \'ok\'\n---\np {status}\nfor event of [status] key={event}\n  span {event}\n')).toEqual([])
   })
 
+  it('leaves the target of `listen` alone, which the compiler hands over as a function the server never calls', () => {
+    const source = '---\nimport { listen, signal } from \'kay\'\n\nconst key = signal(\'\')\nlisten(window, \'keydown\', event => key.set(event.key))\nlisten(window.visualViewport!, \'resize\', () => key.set(\'\'))\n---\np {key()}\n'
+    const compiled = (output: 'dom' | 'html') => compileKay(source, join(process.cwd(), 'widget.kay'), { output, hydratable: true }).tsx
+
+    expect(reads(source)).toEqual([])
+    expect(reads(source.replace('listen(window,', 'listen(document.title.length ? window : window,'))).toEqual([])
+    expect(reads(source.replace('listen(window,', 'listen(window[localStorage.key(0)!] as Window, document.title,')).map(read => read.text)).toEqual(['document'])
+
+    for (const output of ['dom', 'html'] as const) {
+      expect(compiled(output)).toContain('listen(() => (window), \'keydown\'')
+      expect(compiled(output)).toContain('listen(() => (window.visualViewport!), \'resize\'')
+    }
+  })
+
   it('reports `typeof window` while an island renders as a hydration mismatch, but not in a static component', () => {
     const island = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst server = typeof window === \'undefined\'\n---\nbutton(onClick={() => count.set(c => c + 1)}) {server ? \'server\' : count()}\n'
     const page = '---\nconst server = typeof window === \'undefined\'\n---\np {server}\n'

@@ -268,6 +268,22 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
           signalBinding(binding, name, kind)
       }
     },
+    CallExpression: (path) => {
+      const target = path.node.arguments[0]
+
+      // `listen(window, ...)` takes its target as a function, so a server render never reads `window`.
+      if (!target || target.type === 'ArrowFunctionExpression' || target.type === 'FunctionExpression' || target.type === 'SpreadElement' || importedFromKay(path.scope, path.node.callee) !== 'listen' || !map.isExact(target.start!) || !map.isExact(target.end! - 1))
+        return
+
+      const start = map.toSource(target.start!)
+      const last = map.toSource(target.end! - 1)
+
+      if (start === undefined || last === undefined)
+        return
+
+      insert(start, '() => (')
+      insert(last + 1, ')')
+    },
     ArrowFunctionExpression: (path) => {
       for (const [index, param] of path.node.params.entries()) {
         if (param.type !== 'Identifier' || !accessorSites.has(param.start!))
@@ -367,7 +383,7 @@ function sourceSpan(map: SourceMap, node: t.Node | undefined): Span | undefined 
 }
 
 // The name `kay` exports that `callee` imports, such as `signal`.
-function importedFromKay(scope: Scope, callee: t.Node): string | undefined {
+export function importedFromKay(scope: Scope, callee: t.Node): string | undefined {
   const specifier = callee.type === 'Identifier' ? scope.getBinding(callee.name)?.path : undefined
   const declaration = specifier?.parent
 

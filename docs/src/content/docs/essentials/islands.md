@@ -135,7 +135,7 @@ onMount(() => drawMap(center))
 .map
 ```
 
-`every(ms, run)` from `kay` runs `run` on a timer while the island lives, never on the server, and `{ while }` starts and stops it as a condition turns: `every(3000, refresh, { while: () => issuing })` polls the page until nothing is issuing, `every(1000, () => now = Date.now())` ticks a clock.
+`every(ms, run)` from `kay` runs `run` on a timer while the island lives, never on the server, and `{ while }` starts and stops it as a condition turns: `every(3000, refresh, { while: () => issuing })` polls the page until nothing is issuing, `every(1000, () => now = Date.now())` ticks a clock. `listen(window, 'keydown', event => ...)` listens to an event of `window` or `document` the same way, its handler typed by the target's events and its listener removed when the island ends.
 
 <Callout type="warning">
 
