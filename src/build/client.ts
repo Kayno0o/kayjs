@@ -11,11 +11,11 @@ import { builtinModules } from 'node:module'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { formatDiagnostic } from '../compiler'
-import { apiStubs, projectApi } from '../server/api'
+import { apiStubs, apiTrees } from '../server/api'
 import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env'
-import { apiMounts, routeMounts } from '../server/routes'
+import { routeMounts } from '../server/routes'
 import { ASSET_PREFIX, clientDir, outputDir } from './assets'
 import { findKayFiles, writeIfChanged } from './files'
 import { findKayLibraries, reachableLibraryFiles, sourceWords } from './libraries'
@@ -157,7 +157,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 
   const entryFile = join(base, 'entry.ts')
   const bootFile = join(base, 'boot.ts')
-  const apiDirs = [resolve(root, options.api ?? 'src/api'), ...apiMounts(root, options.extensions).map(mount => mount.dir)]
+  const api = apiStubs(apiTrees(root, options))
   const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
 
   // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`.
@@ -190,7 +190,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
   const define = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = async (anchor?: string) => [withoutStyles(), apiStubs(apiDirs, await projectApi(root, options)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings, anchor, inspect: options.inspect }), ...options.plugins ?? []]
+  const plugins = async (anchor?: string) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings, anchor, inspect: options.inspect }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 
