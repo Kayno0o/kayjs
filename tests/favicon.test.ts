@@ -95,7 +95,7 @@ describe('favicon', () => {
 
     const svg = await plain.handle(new Request('http://localhost/favicon.svg'))
 
-    expect(await icon.bytes()).toEqual((await faviconFiles('src/server/favicon.png')).get('/icon-512.png')!)
+    expect(await icon.bytes()).toEqual((await faviconFiles({ image: 'src/server/favicon.png' })).get('/icon-512.png')!)
     expect(svg.headers.get('content-type')).toBe('image/svg+xml')
     expect(await svg.text()).toBe(await Bun.file('src/server/favicon.svg').text())
     expect(await (await plain.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
@@ -103,6 +103,24 @@ describe('favicon', () => {
 
     for (const path of ['/favicon.ico', '/favicon.svg', '/manifest.webmanifest'])
       expect((await off.handle(new Request(`http://localhost${path}`))).status).toBe(404)
+  })
+
+  it('serves and links a project\'s own SVG beside the icons its image makes, and writes it for a build', async () => {
+    const svg = join(scratch, 'favicon.svg')
+
+    await Bun.write(svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"/>')
+
+    const own = await pages({ routes: ROUTES, prebuilt: false, favicon: { image: SOURCE, svg } })
+    const served = await own.handle(new Request('http://localhost/favicon.svg'))
+
+    expect(served.headers.get('content-type')).toBe('image/svg+xml')
+    expect(await served.text()).toBe(await Bun.file(svg).text())
+    expect(await widthOf(await (await own.handle(new Request('http://localhost/icon-512.png'))).bytes())).toBe(512)
+    expect(await (await own.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
+
+    await writeFavicons({ image: SOURCE, svg }, join(scratch, 'built-svg'))
+
+    expect(await Bun.file(join(scratch, 'built-svg/favicon.svg')).text()).toBe(await Bun.file(svg).text())
   })
 
   it('gives every page the theme colour with the favicon turned off, the site linking its own', async () => {
@@ -117,12 +135,12 @@ describe('favicon', () => {
 
     await Bun.write(wide, await new Bun.Image(SOURCE).resize(512, 256).png().bytes())
     await Bun.write(small, await new Bun.Image(SOURCE).resize(256, 256).png().bytes())
-    await expect(faviconFiles(wide)).rejects.toThrow('is 512x256; it has to be square')
+    await expect(faviconFiles({ image: wide })).rejects.toThrow('is 512x256; it has to be square')
 
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      const files = await faviconFiles(small)
+      const files = await faviconFiles({ image: small })
 
       expect(await widthOf(files.get('/icon-512.png')!)).toBe(512)
       expect(warned).toHaveBeenCalledWith(`[kay] the favicon ${small} is 256x256, enlarged to the icons up to 512x512, which look blurred; a source of 512x512 or more keeps them sharp`)
@@ -131,7 +149,7 @@ describe('favicon', () => {
       warned.mockRestore()
     }
 
-    await writeFavicons(SOURCE, join(scratch, 'built'))
+    await writeFavicons({ image: SOURCE }, join(scratch, 'built'))
 
     expect((await readdir(join(scratch, 'built'))).sort()).toEqual(['apple-touch-icon.png', 'favicon.ico', 'icon-192.png', 'icon-512.png'])
   })

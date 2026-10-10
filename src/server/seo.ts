@@ -33,7 +33,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   }
 
   if (config.favicon !== false)
-    extra.push(...faviconTags(config.favicon === undefined))
+    extra.push(...faviconTags(config.favicon))
 
   // A site linking its own icons still colours the browser around its pages.
   if (config.manifest?.themeColor !== undefined)

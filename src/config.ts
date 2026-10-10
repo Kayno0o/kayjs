@@ -27,8 +27,8 @@ export interface KayConfig {
   site?: string | undefined
   seo?: SeoConfig | undefined
   images?: ImagesConfig | undefined
-  // A square image, relative to the root, 512 pixels wide or more for sharp icons, a smaller one enlarged with a warning: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. Defaults to kay's own mark; `false` serves none.
-  favicon?: string | false | undefined
+  // A square image, relative to the root, 512 pixels wide or more for sharp icons, a smaller one enlarged with a warning: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. `{ image, svg }` adds an SVG of it, served as `/favicon.svg` and linked after the ICO. Defaults to kay's own mark; `false` serves none.
+  favicon?: string | FaviconConfig | false | undefined
   // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
   manifest?: ManifestConfig | undefined
   // A service worker keeping the build's files and some pages for a visitor offline, `true` or what it keeps; off by default.
@@ -163,6 +163,12 @@ export interface FontsourceConfig {
   // Defaults to the package's own, `latin` for most.
   subset?: string | undefined
   display?: FontConfig['display'] | undefined
+}
+
+// A favicon with an SVG of it: kay makes the ICO and the PNG icons from `image`, since it draws no SVG, and serves `svg` as it is.
+export interface FaviconConfig {
+  image: string
+  svg: string
 }
 
 export interface ManifestConfig {

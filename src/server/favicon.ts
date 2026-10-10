@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import type { ManifestConfig } from '../config'
+import type { FaviconConfig, ManifestConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -18,28 +18,41 @@ const ICO_SIZES = [16, 32, 48]
 const LARGEST = 512
 const ICO = '/favicon.ico'
 
-// Every path the favicon serves, kay's mark adding its SVG.
+// Every path the favicon serves, an SVG one adding its SVG.
 export const FAVICON_PATHS = [ICO, ...Object.keys(PNG_FILES), MANIFEST, SVG]
 
+// The image the icons are made from and the SVG served beside it, both absolute.
+export interface FaviconSource {
+  image: string
+  svg?: string | undefined
+}
+
+// Whether a `favicon` setting serves an SVG: kay's mark does, and a project's own when it names one.
+function servesSvg(favicon: string | FaviconConfig | undefined): boolean {
+  return typeof favicon !== 'string'
+}
+
 // The paths a project's `favicon` setting serves.
-export function faviconPaths(favicon: string | false | undefined): string[] {
+export function faviconPaths(favicon: string | FaviconConfig | false | undefined): string[] {
   if (favicon === false)
     return []
 
-  return favicon === undefined ? FAVICON_PATHS : FAVICON_PATHS.filter(path => path !== SVG)
+  return servesSvg(favicon) ? FAVICON_PATHS : FAVICON_PATHS.filter(path => path !== SVG)
 }
 
-// The favicon's source, absolute: the project's own, kay's mark when it names none, or none once turned off.
-export function faviconSource(root: string, favicon: string | false | undefined): string | undefined {
+// The favicon's source: the project's own, kay's mark when it names none, or none once turned off.
+export function faviconSource(root: string, favicon: string | FaviconConfig | false | undefined): FaviconSource | undefined {
   if (favicon === false)
     return undefined
 
-  return favicon === undefined ? DEFAULT_FAVICON : resolve(root, favicon)
+  if (favicon === undefined)
+    return { image: DEFAULT_FAVICON, svg: DEFAULT_SVG }
+
+  return typeof favicon === 'string' ? { image: resolve(root, favicon) } : { image: resolve(root, favicon.image), svg: resolve(root, favicon.svg) }
 }
 
 export interface FaviconOptions {
-  // The square source image, absolute.
-  source: string
+  source: FaviconSource
   // Where `kay build` wrote the files, read instead of the source when there.
   builtDir: string
   name?: string | undefined
@@ -50,7 +63,7 @@ export interface FaviconOptions {
 }
 
 // The favicon in the sizes browsers ask for: an ICO of PNGs, the Apple touch icon and the manifest's icons.
-export async function faviconFiles(source: string): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
+export async function faviconFiles({ image: source, svg }: FaviconSource): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
   const { width, height } = await new Bun.Image(source).metadata()
 
   if (width !== height)
@@ -68,13 +81,13 @@ export async function faviconFiles(source: string): Promise<Map<string, Uint8Arr
 
   files.set(ICO, ico(await Promise.all(ICO_SIZES.map(png)), ICO_SIZES))
 
-  if (source === DEFAULT_FAVICON)
-    files.set(SVG, await Bun.file(DEFAULT_SVG).bytes())
+  if (svg !== undefined)
+    files.set(SVG, await Bun.file(svg).bytes())
 
   return files
 }
 
-export async function writeFavicons(source: string, dir: string): Promise<void> {
+export async function writeFavicons(source: FaviconSource, dir: string): Promise<void> {
   await mkdir(dir, { recursive: true })
 
   for (const [path, bytes] of await faviconFiles(source))
@@ -107,11 +120,11 @@ function ico(images: Uint8Array[], sizes: number[]): Uint8Array<ArrayBuffer> {
   return bytes
 }
 
-// The links every page carries for them, which a page's own replace; kay's mark links its SVG after the ICO, which browsers drawing SVG icons then prefer.
-export function faviconTags(mark = false): HeadTag[] {
+// The links every page carries for them, which a page's own replace; an SVG is linked after the ICO, which browsers drawing SVG icons then prefer.
+export function faviconTags(favicon: string | FaviconConfig | undefined): HeadTag[] {
   return [
     { tag: 'link', props: { rel: 'icon', href: ICO, sizes: ICO_SIZES.map(size => `${size}x${size}`).join(' ') } },
-    ...mark ? [{ tag: 'link', props: { rel: 'icon', href: SVG, type: 'image/svg+xml' } } satisfies HeadTag] : [],
+    ...servesSvg(favicon) ? [{ tag: 'link', props: { rel: 'icon', href: SVG, type: 'image/svg+xml' } } satisfies HeadTag] : [],
     { tag: 'link', props: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
     { tag: 'link', props: { rel: 'manifest', href: MANIFEST } },
   ]
@@ -134,7 +147,7 @@ export function manifestJson(name: string | undefined, description: string | und
 // Serves the favicon files and the manifest at their paths, except one a public file or a page already serves; made from the source on first request unless `kay build` wrote them.
 export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconOptions): void {
   let files: Promise<Map<string, Uint8Array<ArrayBuffer>>> | undefined
-  const paths = [...Object.keys(PNG_FILES), ICO, ...options.source === DEFAULT_FAVICON ? [SVG] : []]
+  const paths = [...Object.keys(PNG_FILES), ICO, ...options.source.svg === undefined ? [] : [SVG]]
   const read = async () => {
     const built = new Map<string, Uint8Array<ArrayBuffer>>()
 
