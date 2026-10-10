@@ -98,7 +98,16 @@ describe('formInput', () => {
     // A form posts CRLF for every line break, so ten characters typed arrive as eleven and a `maxLength` of ten would refuse them.
     expect(formInput(schema, { message: 'a\r\nb', name: 'x\r\n\r\ny' })).toEqual({ message: 'a\nb', name: 'x\n\ny' })
     expect(formInput(schema, { message: 'a\rb' })).toEqual({ message: 'a\nb' })
-    expect((formInput(schema, { message: '12345678\r\n' }) as { message: string }).message).toHaveLength(9)
+    expect((formInput(schema, { message: '1234\r\n5678' }) as { message: string }).message).toHaveLength(9)
+  })
+
+  it('drops the spaces around what was typed and reads an optional field left blank as left out, a password and a field saying so kept as typed', () => {
+    const fields = t.Object({ name: t.String({ minLength: 2 }), note: t.Optional(t.String()), tags: t.Array(t.String()), password: t.String(), code: t.Optional(t.String({ trim: false })) })
+
+    expect(formInput(fields, { name: '  Ada \r\n', note: '   ', tags: [' a', 'b '], password: ' secret ', code: '  indented' })).toEqual({ name: 'Ada', tags: ['a', 'b'], password: ' secret ', code: '  indented' })
+    expect(formInput(fields, { name: 'Ada', note: '', tags: [], password: 'x', code: '' })).toEqual({ name: 'Ada', tags: [], password: 'x' })
+    // Not a form: a variable keeps the spaces it was given, and a blank plain string.
+    expect(formInput(fields, { name: ' Ada ', note: '', tags: [], password: 'x' }, false)).toEqual({ name: ' Ada ', note: '', tags: [], password: 'x' })
   })
 
   it('leaves text without a line break as it is', () => {

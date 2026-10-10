@@ -3,7 +3,7 @@ import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import { parse } from '@babel/parser'
-import { isSecret } from '../server/flash'
+import { isSecret } from '../runtime/form'
 import { SENDABLE_CLASSES } from './expression'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 

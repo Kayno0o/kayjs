@@ -120,6 +120,9 @@ describe('kay/test', () => {
     expect(failed.html).toContain('<p class="error">Write a title</p>')
     expect(site.cookies.has('kay_flash')).toBe(false)
     expect((await site.submit(add, { title: 'Tested without a server' })).html).toContain('Tested without a server</a></li>')
+    // Spaces are no title, and those around one are dropped.
+    expect((await site.submit(add, { title: '   ' })).html).toContain('<p class="error">Write a title</p>')
+    expect((await site.submit(add, { title: '  Trimmed  ' })).html).toContain('>Trimmed</a></li>')
   })
 
   it('shows the message an action gives for a handler that throws under its form, keeping what was typed, and logs the error', async () => {

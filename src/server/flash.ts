@@ -1,4 +1,5 @@
 import type { CookieMap } from 'bun'
+import { isSecret } from '../runtime/form'
 import { decodeValue, encodeValue, unsendable } from '../runtime/wire'
 
 // A plain form post that succeeded goes back to its page through a redirect; this cookie carries what it returned, for that one page render.
@@ -21,14 +22,6 @@ export interface SuccessFlash {
 
 // Under the 4 KB browsers keep per cookie, the other cookies of the response included.
 const MAX_LENGTH = 3800
-// A field name holding one of these anywhere is a secret: `newPassword`, `accessToken`.
-const SECRET_PART = /password|passwd|passphrase|passcode|secret|token|apikey|cvc|cvv|pass(?![a-z])/i
-// These only as a whole word of the name, so `passenger` and `shipping` are echoed: `pin`, `card_number`, `apiKey`.
-const SECRET_WORDS = new Set(['pass', 'pwd', 'pin', 'otp', 'ssn', 'cvc', 'cvv', 'csc', 'key', 'card', 'iban'])
-// The words of a camelCase, snake_case or kebab-case name, an acronym such as `API` counting as one.
-const WORD = /[A-Z]?[a-z\d]+|[A-Z]+(?![a-z])/g
-// `pin2` is a pin.
-const TRAILING_DIGITS = /\d+$/
 
 // A refused plain form post's page renders as a visit through the app; this header names how the post went, kept in memory under an id nobody can guess, for that one render.
 const HANDED_OVER = 'x-kay-refused'
@@ -112,9 +105,4 @@ export function submittedValues(body: unknown): Record<string, string> {
   }
 
   return values
-}
-
-// A field never echoed back to the form, as a password is.
-export function isSecret(name: string): boolean {
-  return SECRET_PART.test(name) || (name.match(WORD) ?? []).some(word => SECRET_WORDS.has(word.toLowerCase().replace(TRAILING_DIGITS, '')))
 }

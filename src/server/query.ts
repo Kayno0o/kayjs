@@ -33,8 +33,8 @@ export function readQuery(schema: unknown, url: URL): Readonly<Record<string, un
 }
 
 // Text read the way a form's fields are, a top-level field left out taking its schema's default, then checked and decoded: the value, or a message per field refused.
-// `absentAsEmpty` is `formInput`'s: a GET form leaves an unticked checkbox out of its query, while nothing leaves a variable out of the environment on purpose.
-export function readFields(schema: TSchema, input: Record<string, unknown>, absentAsEmpty = true): ReadFields {
+// `form` is `formInput`'s: a GET form leaves an unticked checkbox out of its query, while nothing leaves a variable out of the environment on purpose, nor pads it with spaces by mistake.
+export function readFields(schema: TSchema, input: Record<string, unknown>, form = true): ReadFields {
   const filled = { ...input }
 
   for (const [name, field] of Object.entries((schema as ObjectSchema).properties ?? {})) {
@@ -42,7 +42,7 @@ export function readFields(schema: TSchema, input: Record<string, unknown>, abse
       filled[name] = structuredClone(field.default)
   }
 
-  const value = formInput(schema, filled, absentAsEmpty) as Record<string, unknown>
+  const value = formInput(schema, filled, form) as Record<string, unknown>
   let check = checks.get(schema)
 
   if (!check)
