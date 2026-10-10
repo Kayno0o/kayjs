@@ -1,5 +1,6 @@
 import type { Diagnostic, Node, Span } from './ast'
 import type { LintLevels } from './lints'
+import type { ImportedSignals, SignalKind } from './module-signals'
 import type { FoundRewrites } from './rewrite'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
@@ -43,6 +44,8 @@ export interface CompileOptions {
   clientOnly?: boolean | undefined
   // Type-checking a static component only islands render: its children render inline with it, so the props it passes them are not serialized.
   insideIsland?: boolean | undefined
+  // The signals and memos of the modules the component imports, which its template reads by name: `importedSignals` from kay's build finds them.
+  importedSignals?: ImportedSignals | undefined
   // Development: every element carries `data-kay-src`, its file and position, for `kay dev`'s inspector.
   inspect?: boolean | undefined
 }
@@ -100,15 +103,20 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
+  const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
+    const kind = binding.typeOnly ? undefined : options.importedSignals?.[binding.source]?.[binding.imported]
+
+    return kind ? [[binding.local, kind] as const] : []
+  }))
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.
   const values = options.output === undefined
-  let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, analysis.constSites, bindings, name, values, file.templateStart)
+  let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, analysis.constSites, bindings, name, values, file.templateStart, imported)
 
   // A `date.kay` declaring `function Date` would break the `new Date()` its template reads.
   while (found.shadowsName) {
     name = `${name}Page`
     analysis = generate(file, script, server, { ...generateOptions, name })
-    found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, analysis.constSites, bindings, name, values, file.templateStart)
+    found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, analysis.constSites, bindings, name, values, file.templateStart, imported)
   }
 
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.rewrites, translates: found.translates })

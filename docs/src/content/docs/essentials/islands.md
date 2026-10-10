@@ -10,12 +10,12 @@ A component is an island when it is interactive: an element has an `on*` handler
 ---
 const count = signal(0)
 ---
-button(onClick={() => count.set(c => c + 1)}) Clicked {count} times
+button(onClick={() => count++}) Clicked {count} times
 ```
 
 ## Signals, memos and effects
 
-A signal is read by its name in the template and by calling it in the script. `memo` derives a value, `effect` runs once the render is done and again when what it read changes.
+A signal is read by its name in the template and by calling it in the script, and written by assigning it, `count++` or `open = !open`, in both. `memo` derives a value, `effect` runs once the render is done and again when what it read changes.
 
 ```kay
 ---
@@ -88,7 +88,7 @@ export const theme = persisted('theme', 'light')
 
 <Callout type="note">
 
-Outside a component, a signal is read by calling it, `cart()`, and written with `cart.set(...)`. Only a signal the component script itself declares is read by name.
+Outside a component, a signal is read by calling it, `cart()`, and written with `cart.set(...)`. A component importing one its module exports as `export const` reads and writes it by name, `{cart}` and `cart = []`, as its own; a prop typed `Signal<T>` from `kay` does too.
 
 </Callout>
 

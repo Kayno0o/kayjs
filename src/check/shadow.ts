@@ -1,8 +1,10 @@
 import type { Diagnostic, SourceMap } from '../compiler'
 import type { LintLevels } from '../compiler/lints'
+import type { ImportedSignals } from '../compiler/module-signals'
 import type { Route } from '../server/routes'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
+import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
 import * as builtInMatchers from '../runtime/params'
 import { matcherFile } from '../server/params'
@@ -50,7 +52,7 @@ export function readShadowSettings(root: string): ShadowSettings {
 }
 
 // Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`; `insideIsland` for a static component only islands render.
-export function compileShadow(root: string, routesDir: string, file: string, source: string, insideIsland = false, lints?: LintLevels): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
+export function compileShadow(root: string, routesDir: string, file: string, source: string, insideIsland = false, lints?: LintLevels, signals: ImportedSignals = importedSignals(file, source)): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
   const route = file.startsWith(routesDir + sep) ? routeOf(routesDir, file) : undefined
   const shadowDir = dirname(shadowPath(root, file))
   // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
@@ -66,7 +68,7 @@ export function compileShadow(root: string, routesDir: string, file: string, sou
 
     return relative(shadowDir, target)
   }
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, insideIsland, relocateImport, lints })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, insideIsland, relocateImport, lints, importedSignals: signals })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 

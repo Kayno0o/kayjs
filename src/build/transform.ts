@@ -11,6 +11,7 @@ import { analyzeScript } from '../compiler/script'
 import { readCacheEntry, writeCacheEntry } from './cache'
 import { throughLinks } from './links'
 import { importsBrowserOnly, mayImportPackage } from './probe'
+import { importedSignals } from './signals'
 import { registerSourceMap } from './sourcemap'
 
 export type Target = 'dom' | 'ssr'
@@ -76,7 +77,7 @@ export async function transformKayCached(source: string, filename: string, given
     return transformKay(source, filename, options)
 
   const hydratable = options.hydratable ?? false
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${JSON.stringify(importedSignals(withoutTwin(filename), source))}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   if (cached !== undefined) {
@@ -99,13 +100,14 @@ export async function transformKayCached(source: string, filename: string, given
 // The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept. `check` adds the problems only `kay check` reports otherwise, flagged `checkOnly`.
 export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false, lints?: LintLevels): Promise<Analysis> {
   // The id the file goes by is part of what it compiles to, and a link may change it.
-  const entry = cacheEntry(cacheDir, filename, check ? 'analysis-check' : 'analysis', `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${source}`)
+  const signals = importedSignals(filename, source)
+  const entry = cacheEntry(cacheDir, filename, check ? 'analysis-check' : 'analysis', `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${source}`)
   const cached = await readCacheEntry<Analysis>(entry)
 
   if (cached !== undefined)
     return cached
 
-  const { island, promote, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints })
+  const { island, promote, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals })
   const analysis = { island, promote, classes, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly))
@@ -128,7 +130,7 @@ function compile(source: string, filename: string, options: TransformOptions): C
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, importedSignals: importedSignals(file, source) })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))

@@ -3,6 +3,7 @@ import type { Binding, NodePath, Scope } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import type { Rewrite, SourceMap } from './mapping'
+import type { SignalKind } from './module-signals'
 import type { PropsBinding } from './script'
 import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
@@ -62,7 +63,8 @@ export interface FoundRewrites {
 // `values`: code only read by the type checker, where a row or an alias is its value rather than an accessor to it, so TypeScript narrows it; its reads stay as written, its assignments are still reported.
 // `templateStart`: where the template begins in the source, past which a signal's name reads its value.
 // `constSites`: where the template's `const` lines declare their names, which then hide no other name.
-export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, constSites: Set<number>, bindings: PropsBinding[], componentName: string, values: boolean, templateStart: number): FoundRewrites {
+// `imported`: the signals and memos the component imports from its own modules, by local name.
+export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, constSites: Set<number>, bindings: PropsBinding[], componentName: string, values: boolean, templateStart: number, imported: ReadonlyMap<string, SignalKind> = new Map()): FoundRewrites {
   const rewrites: Rewrites = new Map()
   const diagnostics: Diagnostic[] = []
   const unread = new Set<number>()
@@ -78,6 +80,10 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
   }
 
   const propsByLocal = new Map<number, { binding: PropsBinding, index: number }>()
+  // The names whose writes are handled: written as signals, or reported as read-only.
+  const known = new Set<Binding>()
+  // Writes to a constant or an import, reported once every name kay knows is found.
+  const assigned: { binding: Binding, identifier: t.Identifier }[] = []
   let shadowsName = false
   let translates = false
 
@@ -85,12 +91,14 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     propsByLocal.set(binding.local.start, { binding, index })
 
   // `typeOf` spells the type of the value the name stands for, when `typeof name` cannot read it through the rewritten name.
-  // `rewrite` gives what a read becomes, or nothing to leave it as written.
-  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Read | undefined, readOnly: ReadOnly, typeOf?: string) => {
+  // `rewrite` gives what a read becomes, or nothing to leave it as written; `readOnly` reports a write, left out when the caller writes it.
+  const visitBinding = (scope: Scope, name: string, rewrite: (reference: NodePath) => Read | undefined, readOnly: ReadOnly | undefined, typeOf?: string) => {
     const binding = scope.getBinding(name)
 
     if (!binding)
       return
+
+    known.add(binding)
 
     for (const reference of binding.referencePaths) {
       const node = reference.node
@@ -127,7 +135,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       const identifier = assignedIdentifier(violation.node, name)
       const source = identifier?.start == null ? undefined : map.toSource(identifier.start)
 
-      if (source !== undefined)
+      if (source !== undefined && readOnly)
         diagnostics.push({ start: source, end: source + name.length, ...readOnly })
     }
   }
@@ -144,6 +152,74 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       return false
 
     return !((parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression') && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && parent.property.name === 'set')
+  }
+
+  // Text added at `at`, after a rewrite ending there or before one starting there.
+  const insert = (at: number, text: string) => {
+    const found = rewrites.get(at)
+
+    rewrites.set(at, !found ? { after: text, end: at } : found.end === at ? { ...found, after: `${found.after ?? ''}${text}` } : { ...found, before: `${text}${found.before ?? ''}` })
+  }
+
+  // An assignment to a signal writes it: `count = 1` through `count.set(1)`, `count += 1` and `count++` through an updater, so an effect writing it does not track it too.
+  // `access` spells the signal itself, as a prop's is read off `__props`.
+  const signalWrite = (violation: NodePath, name: string, kind: SignalKind, access: Rewrite) => {
+    const { node } = violation
+    const identifier = assignedIdentifier(node, name)
+    const at = identifier && map.isExact(identifier.start!) ? map.toSource(identifier.start!) : undefined
+
+    if (at === undefined)
+      return
+
+    const span = { start: at, end: at + name.length }
+    const target = node.type === 'AssignmentExpression' ? node.left : node.type === 'UpdateExpression' ? node.argument : undefined
+    const right = node.type === 'AssignmentExpression' ? node.right : undefined
+    const start = map.isExact(node.start!) ? map.toSource(node.start!) : undefined
+    const rightStart = right && map.isExact(right.start!) ? map.toSource(right.start!) : undefined
+    const rightEnd = right && map.isExact(right.end! - 1) ? map.toSource(right.end! - 1) : undefined
+
+    if (kind === 'memo') {
+      diagnostics.push({ ...span, message: `\`${name}\` is a memo, which cannot be written`, help: 'write the signals it is derived from' })
+
+      return
+    }
+
+    if (target !== identifier || start === undefined || (right && (rightStart === undefined || rightEnd === undefined))) {
+      diagnostics.push({ ...span, message: `\`${name}\` is a signal, written by assigning its name`, help: `\`${name} = value\`, or \`${name}.set(value)\`` })
+
+      return
+    }
+
+    if (node.type === 'UpdateExpression') {
+      if (node.prefix)
+        rewrites.set(start, { replace: '', end: at })
+      else
+        rewrites.set(span.end, { replace: '', end: start + node.end! - node.start! })
+
+      rewrites.set(at, { ...access, after: `${access.after ?? ''}.set((KayCurrent) => KayCurrent ${node.operator[0]} 1)`, end: span.end })
+
+      return
+    }
+
+    const operator = (node as t.AssignmentExpression).operator.slice(0, -1)
+
+    rewrites.set(at, { ...access, after: `${access.after ?? ''}.set(${operator === '' ? '' : `(KayCurrent) => KayCurrent ${operator} (`}`, end: span.end })
+    rewrites.set(span.end, { replace: '', end: rightStart! })
+    insert(rightEnd! + 1, operator === '' ? ')' : '))')
+  }
+
+  // A signal or memo kay sees made: in the template its name reads its value, and an assignment to a signal writes it.
+  const signalBinding = (binding: Binding, name: string, kind: SignalKind) => {
+    known.add(binding)
+
+    for (const reference of binding.referencePaths) {
+      const source = templateRead(reference) ? map.toSource(reference.node.start!) : undefined
+
+      if (source !== undefined)
+        rewrites.set(source, { ...withShorthand(reference, name, { after: '()' }), end: source + name.length })
+    }
+    for (const violation of binding.constantViolations)
+      signalWrite(violation, name, kind, {})
   }
 
   // A template `const`: each name it declares is new to the template, never reassigned, and, as `accessor`, read through the memo it is.
@@ -171,11 +247,26 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     }
   }
 
+  const assignment = (path: NodePath<t.AssignmentExpression | t.UpdateExpression>) => {
+    const target = path.node.type === 'AssignmentExpression' ? path.node.left : path.node.argument
+    const binding = target.type === 'Identifier' ? path.scope.getBinding(target.name) : undefined
+
+    if (target.type === 'Identifier' && (binding?.kind === 'const' || binding?.kind === 'module') && map.isExact(target.start!))
+      assigned.push({ binding, identifier: target })
+  }
+
   traverse(ast, {
     Program: (path) => {
       // The export of the function counts as a reference to it, and a tag of that name is the component rendering itself; neither is a read of a global.
       translates = Object.hasOwn(path.scope.globals, 't')
       shadowsName = path.scope.getBinding(componentName)?.referencePaths.some(reference => reference.isIdentifier() && !inIslandExport(reference) && tagPosition(reference) === undefined) ?? false
+
+      for (const [name, kind] of imported) {
+        const binding = path.scope.getBinding(name)
+
+        if (binding?.kind === 'module')
+          signalBinding(binding, name, kind)
+      }
     },
     ArrowFunctionExpression: (path) => {
       for (const [index, param] of path.node.params.entries()) {
@@ -205,14 +296,10 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       const start = id.type === 'Identifier' && map.isExact(id.start!) ? map.toSource(id.start!) : undefined
       const made = id.type === 'Identifier' && init?.type === 'CallExpression' ? importedFromKay(path.scope, init.callee) : undefined
 
-      if (id.type === 'Identifier' && made !== undefined && ACCESSORS.has(made)) {
-        for (const reference of path.scope.getBinding(id.name)?.referencePaths ?? []) {
-          const source = templateRead(reference) ? map.toSource(reference.node.start!) : undefined
+      const binding = id.type === 'Identifier' ? path.scope.getBinding(id.name) : undefined
 
-          if (source !== undefined)
-            rewrites.set(source, { ...withShorthand(reference, id.name, { after: '()' }), end: source + id.name.length })
-        }
-      }
+      if (id.type === 'Identifier' && binding && made !== undefined && ACCESSORS.has(made))
+        signalBinding(binding, id.name, made === 'memo' ? 'memo' : 'signal')
 
       if (start !== undefined && id.type === 'Identifier' && init?.type === 'CallExpression' && made === 'signal' && onlyRead(path.scope.getBinding(id.name), templateRead))
         constantSignals.set(start, { name: { start, end: start + id.name.length }, value: sourceSpan(map, init.arguments[0]) })
@@ -231,13 +318,23 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
           continue
 
         const name = property.value.name
+        const access = propRead(prop.binding, prop.index, name)
+        const { signal } = prop.binding
 
-        visitBinding(path.scope, name, reference => withShorthand(reference, name, propRead(prop.binding, prop.index, name)), { message: `\`${name}\` is a prop, and props are read-only`, help: 'copy it into a signal to change it locally' }, propType(prop.binding))
+        // A prop typed `Signal<T>` or `Memo<T>` reads its value by the name in the template, as the script's own signals do.
+        visitBinding(path.scope, name, reference => withShorthand(reference, name, signal && templateRead(reference) ? { ...access, after: `${access.after ?? ''}()` } : access), signal ? undefined : { message: `\`${name}\` is a prop, and props are read-only`, help: 'copy it into a signal to change it locally' }, propType(prop.binding))
+
+        if (signal) {
+          for (const violation of path.scope.getBinding(name)?.constantViolations ?? [])
+            signalWrite(violation, name, signal, access)
+        }
 
         if (path.scope.getBinding(name)?.referencePaths.length === 0)
           unread.add(source!)
       }
     },
+    AssignmentExpression: assignment,
+    UpdateExpression: assignment,
     // `load` ends handing the fence's names to the template; any other read of one is the fence's own.
     FunctionDeclaration: (path) => {
       if (path.node.id?.name !== 'load' || !path.parentPath.isExportNamedDeclaration())
@@ -251,6 +348,13 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       }
     },
   })
+
+  for (const { binding, identifier } of assigned) {
+    const start = map.toSource(identifier.start!)
+
+    if (!known.has(binding) && start !== undefined)
+      diagnostics.push({ start, end: start + identifier.name.length, message: `\`${identifier.name}\` is not a signal kay can tell, so it cannot be assigned`, note: 'kay writes a name through `.set` when it sees the signal made: by `signal`, `persisted` or `linked` in this script, as a module\'s `export const`, or as a prop typed `Signal<T>`', help: `write \`${identifier.name}.set(...)\` if it holds a signal` })
+  }
 
   return { rewrites, diagnostics, shadowsName, unread, serverReads, constantSignals: [...constantSignals.values()], translates }
 }

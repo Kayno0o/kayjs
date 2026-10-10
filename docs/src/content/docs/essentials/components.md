@@ -95,14 +95,14 @@ Card(title="Todos")
 
 ## Signals
 
-`signal(value)` holds state. In the template it is read by its name, in the script by calling it, and written with `.set`. `memo(fn)` caches a derived value.
+`signal(value)` holds state. In the template it is read by its name, in the script by calling it, and written in both by assigning it, `count++`, or with `.set`. `memo(fn)` caches a derived value.
 
 ```kay
 ---
 const count = signal(0)
 const double = memo(() => count() * 2)
 ---
-button(onClick={() => count.set(c => c + 1)}) {count} x 2 = {double}
+button(onClick={() => count++}) {count} x 2 = {double}
 ```
 
 A component using signals or handlers becomes an island: see [Islands](/essentials/islands).

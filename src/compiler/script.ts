@@ -2,6 +2,7 @@ import type { ParseResult } from '@babel/parser'
 import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
+import type { SignalKind } from './module-signals'
 import { parse } from '@babel/parser'
 import { isSecret } from '../runtime/form'
 import { SENDABLE_CLASSES } from './expression'
@@ -10,6 +11,7 @@ import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 const REACTIVE_MODULES = new Set(['kay'])
 // What `kay` exports that a static component may use and stay static.
 const STATIC_EXPORTS = new Set(['uid', 'sanitizeHtml', 'trustHtml', 'defer'])
+const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
 export const SCRIPT_GLOBALS = ['signal', 'memo', 'effect', 'onMount']
@@ -24,6 +26,8 @@ export interface PropsBinding {
   fallback?: Span | undefined
   // What leaves the destructuring without it, separator included, when another name stays.
   removal?: Span | undefined
+  // Typed `Signal<T>` or `Memo<T>` where the props are declared, so the template reads the value by the name and writes it by assigning.
+  signal?: SignalKind | undefined
 }
 
 export interface PropsDeclaration {
@@ -96,7 +100,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
       if (span.start > cursor)
         analysis.body.push({ start: cursor, end: span.start })
 
-      const props = propsDeclaration(statement, shift, analysis.diagnostics)
+      const props = propsDeclaration(statement, ast.program.body, shift, analysis.diagnostics)
 
       if (props) {
         if (analysis.props)
@@ -792,7 +796,7 @@ function isPropsCall(node: t.Node | null | undefined): node is t.CallExpression 
   return node?.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'props'
 }
 
-function propsDeclaration(statement: t.Statement, shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): PropsDeclaration | undefined {
+function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): PropsDeclaration | undefined {
   if (statement.type !== 'VariableDeclaration' || statement.declarations.length !== 1)
     return undefined
 
@@ -823,6 +827,7 @@ function propsDeclaration(statement: t.Statement, shift: (node: t.Node) => Span,
   }
 
   const properties = declarator.id.properties
+  const signals = signalProps(typeArgument, body)
 
   for (const [index, property] of properties.entries()) {
     if (property.type === 'RestElement') {
@@ -845,10 +850,46 @@ function propsDeclaration(statement: t.Statement, shift: (node: t.Node) => Span,
     const previous = properties[index - 1]
     const removal = next ? { start: shift(property).start, end: shift(next).start } : previous ? { start: shift(previous).end, end: shift(property).end } : undefined
 
-    declaration.bindings.push({ local: shift(local), key, fallback: value.type === 'AssignmentPattern' ? shift(value.right) : undefined, removal })
+    declaration.bindings.push({ local: shift(local), key, fallback: value.type === 'AssignmentPattern' ? shift(value.right) : undefined, removal, signal: signals.get(key) })
   }
 
   return declaration
+}
+
+// The props a props type writes as `Signal<T>` or `Memo<T>` from `kay`, inline or through an interface or a type alias of the script: those the template reads by name.
+function signalProps(type: t.TSType | undefined, body: t.Statement[]): Map<string, SignalKind> {
+  const kinds = new Map<string, SignalKind>()
+  const found = new Map<string, SignalKind>()
+
+  for (const statement of body) {
+    if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay')
+      continue
+
+    for (const specifier of statement.specifiers) {
+      const imported = specifier.type === 'ImportSpecifier' ? specifier.imported : undefined
+      const name = imported?.type === 'Identifier' ? imported.name : imported?.value
+      const kind = name === undefined ? undefined : SIGNAL_TYPES[name]
+
+      if (kind)
+        kinds.set(specifier.local.name, kind)
+    }
+  }
+
+  const named = type?.type === 'TSTypeReference' && type.typeName.type === 'Identifier' && !type.typeParameters ? type.typeName.name : undefined
+  const declared = named === undefined ? undefined : body.map(typeDeclaration).find(declaration => declaration?.id.name === named)
+  const literal = declared?.type === 'TSTypeAliasDeclaration' ? declared.typeAnnotation : type
+  const members = declared?.type === 'TSInterfaceDeclaration' ? declared.body.body : literal?.type === 'TSTypeLiteral' ? literal.members : []
+
+  for (const member of members) {
+    const annotation = member.type === 'TSPropertySignature' && !member.optional && !member.computed ? member.typeAnnotation?.typeAnnotation : undefined
+    const key = member.type === 'TSPropertySignature' ? member.key.type === 'Identifier' ? member.key.name : member.key.type === 'StringLiteral' ? member.key.value : undefined : undefined
+    const kind = annotation?.type === 'TSTypeReference' && annotation.typeName.type === 'Identifier' ? kinds.get(annotation.typeName.name) : undefined
+
+    if (key !== undefined && kind)
+      found.set(key, kind)
+  }
+
+  return found
 }
 
 function reportMisplacedProps(ast: t.File, analysis: ScriptAnalysis, shift: (node: t.Node) => Span) {

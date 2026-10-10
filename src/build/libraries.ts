@@ -259,7 +259,7 @@ export async function importsOf(file: string, source?: string): Promise<string[]
   }
 }
 
-function fences(source: string): string {
+export function fences(source: string): string {
   const { script, server } = parseKay(source)
 
   return [script, server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')

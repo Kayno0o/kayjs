@@ -220,16 +220,30 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('tells to call an imported signal read by name where its value goes, its text rendering as it is', async () => {
+  it('reads by name a signal a module exports as `export const`, and writes it by assigning', async () => {
     const root = await scratchProject({
-      'src/accent.ts': 'import { signal } from \'kay\'\n\nexport const accent = signal(\'red\')\n',
+      'src/accent.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
+      'src/routes/index.kay': '---\nimport { accent, loud } from \'../accent\'\n---\np {accent}\nif accent === \'red\'\n  span on\np {accent.toUpperCase()} {loud.length}\nbutton(onClick={() => accent = \'blue\'}) blue\nbutton(onClick={() => accent += \'!\'}) more\n',
+    })
+
+    try {
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('tells to call a signal it does not see made, read by name where its value goes, its text rendering as it is', async () => {
+    const root = await scratchProject({
+      'src/accent.ts': 'import { signal } from \'kay\'\n\nconst made = signal(\'red\')\n\nexport { made as accent }\n',
       'src/routes/index.kay': '---\nimport { accent } from \'../accent\'\n---\np {accent}\nif accent\n  span on\np {accent.toUpperCase()}\n',
     })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.help])).toEqual([
-        [5, 'TS2774', 'a function is always true here, so its value is read by calling it, `accent()`: only a signal or memo the script declares reads by its name'],
-        [7, 'TS2339', 'only a signal or memo the script declares reads by its name; one imported or held by a prop is read by calling it, `accent()`'],
+        [5, 'TS2774', 'a function is always true here, so its value is read by calling it, `accent()`: a signal or memo reads by its name only where kay sees it made'],
+        [7, 'TS2339', 'a signal or memo reads by its name only where kay sees it made, in the script, as a module\'s `export const` or as a prop typed `Signal<T>`; any other is read by calling it, `accent()`'],
       ])
     }
     finally {

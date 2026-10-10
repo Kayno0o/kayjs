@@ -292,6 +292,38 @@ describe('signals in the template', () => {
   })
 })
 
+describe('signal writes', () => {
+  it('assigns a signal by name, its own, a module\'s and one a prop holds, and reads them all by name', async () => {
+    const { root, dispose } = await mountKay({
+      'theme.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
+      'toggle.kay': '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton.toggle(onClick={() => open = !open}) {open ? \'open\' : \'closed\'}\n',
+      'main.kay': '---\nimport { accent, loud } from \'./theme\'\nimport Toggle from \'./toggle.kay\'\n\nconst count = signal(0)\nconst open = signal(false)\nconst openState = open\n\nfunction reset() {\n  count = 0\n}\n---\nbutton.more(onClick={() => count++}) {count}\nbutton.ten(onClick={() => count += 10}) ten\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = accent === \'red\' ? \'blue\' : \'red\'}) {accent} {loud}\nToggle(open={openState})\np.state {open ? \'yes\' : \'no\'}\n',
+    })
+    const text = (selector: string) => root.querySelector(selector)!.textContent
+    const click = async (selector: string) => {
+      root.querySelector<HTMLElement>(selector)!.click()
+      await settle()
+    }
+
+    try {
+      await click('.more')
+      await click('.more')
+      await click('.ten')
+      expect(text('.more')).toBe('12')
+      await click('.reset')
+      expect(text('.more')).toBe('0')
+      await click('.accent')
+      expect(text('.accent')).toBe('blue BLUE')
+      expect([text('.toggle'), text('.state')]).toEqual(['closed', 'no'])
+      await click('.toggle')
+      expect([text('.toggle'), text('.state')]).toEqual(['open', 'yes'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('loops', () => {
   it('keeps rendering components a loop iterates over as the list changes', async () => {
     const { root, dispose } = await mountKay({

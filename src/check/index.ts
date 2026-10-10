@@ -21,6 +21,7 @@ import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { findKayFiles, findProjectFiles, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacements, throughNodeModules } from '../build/libraries'
+import { importedSignals } from '../build/signals'
 import { cacheEntry } from '../build/transform'
 import { componentName, rendersAsIsland, SourceMap } from '../compiler'
 import { formatReport } from '../compiler/frame'
@@ -272,17 +273,18 @@ async function rendersAsIslandCached(cacheDir: string, file: string, source: str
   return island
 }
 
-// `compileShadow` through the build's cache of compiles. A page's params are typed by the matchers they name, so where each one is found, if anywhere, is part of the key.
+// `compileShadow` through the build's cache of compiles. A page's params are typed by the matchers they name, so where each one is found, if anywhere, is part of the key, as are the signals of the modules it imports.
 async function compileShadowCached(cacheDir: string, root: string, routesDir: string, file: string, source: string, insideIsland: boolean, lints?: LintLevels): Promise<ReturnType<typeof compileShadow>> {
   const route = file.startsWith(routesDir + sep) ? routeOf(routesDir, file) : undefined
   const matchers = Object.values(route?.matchers ?? {}).map(matcher => matcherSource(routesDir, matcher) ?? '')
-  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, insideIsland, lints ?? {}, matchers, source]))
+  const signals = importedSignals(file, source)
+  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, insideIsland, lints ?? {}, matchers, signals, source]))
   const cached = await readCacheEntry<{ tsx: string, map: ReturnType<SourceMap['toJSON']>, diagnostics: Diagnostic[] }>(slot)
 
   if (cached !== undefined)
     return { shadow: { source, file, tsx: cached.tsx, map: SourceMap.fromJSON(cached.map) }, diagnostics: cached.diagnostics }
 
-  const compiled = compileShadow(root, routesDir, file, source, insideIsland, lints)
+  const compiled = compileShadow(root, routesDir, file, source, insideIsland, lints, signals)
 
   await writeCacheEntry(slot, { tsx: compiled.shadow.tsx, map: compiled.shadow.map, diagnostics: compiled.diagnostics })
 
@@ -834,7 +836,7 @@ function remap(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): Che
   return remapped.help === undefined && unreadSignal(diagnostic) ? { ...remapped, help: signalHelp(diagnostic, signalName(diagnostic, shadow.source, source)) } : remapped
 }
 
-// A condition always true for a function, or a signal where its value goes: what reading an imported signal, or one a prop holds, by its name gives.
+// A condition always true for a function, or a signal where its value goes: what reading by its name a signal kay does not see made gives.
 function unreadSignal(diagnostic: CheckDiagnostic): boolean {
   return diagnostic.code === ALWAYS_DEFINED || diagnostic.message.includes('\'Signal<')
 }
@@ -851,7 +853,7 @@ function signalName(diagnostic: CheckDiagnostic, source: string, offset: number)
 function signalHelp(diagnostic: CheckDiagnostic, name: string | undefined): string {
   const call = name === undefined ? 'calling it' : `calling it, \`${name}()\``
 
-  return diagnostic.code === ALWAYS_DEFINED ? `a function is always true here, so its value is read by ${call}: only a signal or memo the script declares reads by its name` : `only a signal or memo the script declares reads by its name; one imported or held by a prop is read by ${call}`
+  return diagnostic.code === ALWAYS_DEFINED ? `a function is always true here, so its value is read by ${call}: a signal or memo reads by its name only where kay sees it made` : `a signal or memo reads by its name only where kay sees it made, in the script, as a module's \`export const\` or as a prop typed \`Signal<T>\`; any other is read by ${call}`
 }
 
 // With a code frame when the file's source is given.

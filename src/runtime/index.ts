@@ -16,6 +16,9 @@ export interface Signal<T> {
   set: Setter<T>
 }
 
+// What `memo` makes: a prop typed `Memo<T>` reads by its name in the template, as a signal does.
+export type Memo<T> = () => T
+
 // A function passed to `set` is an updater, so a signal holds no functions.
 type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 

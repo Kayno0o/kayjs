@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { compileKay, componentName } from '../src/compiler'
+import { moduleSignals } from '../src/compiler/module-signals'
 
 function tsx(source: string): string {
   const result = compileKay(source, 'test.kay')
@@ -565,6 +566,45 @@ describe('read-only diagnostics', () => {
     const found = compileKay(source, 'test.kay').diagnostics.map(d => source.slice(d.start, d.end))
 
     expect(found).toEqual(['a', 'b', 'd', 'c', 'a'])
+  })
+})
+
+describe('signal writes', () => {
+  it('assign a signal through .set, a compound one or ++ through an updater', () => {
+    const code = tsx('---\nconst count = signal(0)\nconst open = signal(false)\nfunction f() {\n  count=count() + 1\n  count *= 2\n  --count\n}\n---\nbutton(onClick={() => { count++; open = !open }}) {count}')
+
+    expect(code).toContain('count.set(count() + 1)\n  count.set((KayCurrent) => KayCurrent * (2))\n  count.set((KayCurrent) => KayCurrent - 1)')
+    expect(code).toContain('count.set((KayCurrent) => KayCurrent + 1); open.set(!open())')
+  })
+
+  it('read and write by name a prop typed Signal, inline or through a type of the script, and a signal a module exports', () => {
+    const typed = '---\nimport type { Signal as S } from \'kay\'\ninterface Props { open: S<boolean>, label: string }\nconst { open, label } = props<Props>()\n---\nbutton(onClick={() => open = false}) {open} {label}'
+
+    expect(jsx(typed)).toBe('<button onClick={() => __props.open.set(false)}>{__props.open()} {__props.label}</button>')
+
+    const imported = compileKay('---\nimport { accent as tone } from \'./theme\'\n---\nbutton(onClick={() => tone += \'!\'}) {tone}', 'test.kay', { importedSignals: { './theme': { accent: 'signal' } } })
+
+    expect(imported.tsx).toContain('<button onClick={() => tone.set((KayCurrent) => KayCurrent + (\'!\'))}>{tone()}</button>')
+  })
+
+  it('reject a write to a memo, a signal written by destructuring and a name kay cannot tell is a signal', () => {
+    const source = '---\nimport { other, loud } from \'./theme\'\nconst count = signal(0)\nconst double = memo(() => count() * 2)\nconst plain = 1\nlet free = 0\nfunction f() {\n  double = 3\n  loud++\n  other = 2\n  plain += 1\n  free++\n  ;[count] = [signal(1)]\n}\n---\np x'
+    const found = compileKay(source, 'test.kay', { importedSignals: { './theme': { loud: 'memo' } } }).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
+
+    expect(found).toEqual([
+      ['double', '`double` is a memo, which cannot be written'],
+      ['loud', '`loud` is a memo, which cannot be written'],
+      ['other', '`other` is not a signal kay can tell, so it cannot be assigned'],
+      ['plain', '`plain` is not a signal kay can tell, so it cannot be assigned'],
+      ['count', '`count` is a signal, written by assigning its name'],
+    ])
+  })
+})
+
+describe('module signals', () => {
+  it('finds the signals and memos a module exports as export const, made by kay\'s functions', () => {
+    expect(moduleSignals('import { signal as s, memo, persisted } from \'kay\'\nimport { linked } from \'other\'\n\nexport const a = s(1), b = memo(() => a())\nexport const c = persisted(\'c\', 0)\nexport const d = linked(() => 1)\nconst e = s(2)\nexport let f = s(3)\nexport { e }\n')).toEqual({ a: 'signal', b: 'memo', c: 'signal' })
+    expect(moduleSignals('export const a = signal(1)\n')).toEqual({})
   })
 })
 

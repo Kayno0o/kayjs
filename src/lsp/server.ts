@@ -10,6 +10,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { findKayFiles, TSCONFIG } from '../build/files'
+import { importedSignals } from '../build/signals'
 import { TSGO, UNUSED_CODES, writeShadowTypes } from '../check'
 import { compileShadow, SHADOW_DIR, shadowPath } from '../check/shadow'
 import { formatKay } from '../compiler/format'
@@ -45,6 +46,8 @@ interface Document extends ShadowFile {
   diagnostics: KayDiagnostic[]
   // Compiled as rendered inline with the islands that alone render it.
   insideIsland: boolean
+  // The signals of the modules it imports, as compiled with: a module changing them compiles the file again.
+  signals: string
 }
 
 const KAY_FILE = /^file:.*\.kay$/
@@ -182,6 +185,12 @@ export class KayLanguageServer {
       await this.saved()
     else if (others.length > 0)
       this.scheduleDiagnostics()
+
+    // An open component reads by name the signals a changed module now exports, or stops.
+    for (const previous of others.length > 0 ? this.documents.values() : []) {
+      if (JSON.stringify(importedSignals(fileURLToPath(previous.uri), previous.source)) !== previous.signals)
+        this.refresh(previous)
+    }
   }
 
   private open(item: TextDocumentItem) {
@@ -225,11 +234,8 @@ export class KayLanguageServer {
     for (const previous of this.documents.values()) {
       const file = fileURLToPath(previous.uri)
 
-      if ((this.projects.get(projectRoot(this.root, file))?.islandOnly.has(file) ?? false) !== previous.insideIsland) {
-        const document = this.compile(previous.uri, previous.source, previous.version)
-
-        this.server.notify('textDocument/didChange', { textDocument: { uri: document.shadowUri, version: document.version }, contentChanges: [{ text: document.tsx }] })
-      }
+      if ((this.projects.get(projectRoot(this.root, file))?.islandOnly.has(file) ?? false) !== previous.insideIsland)
+        this.refresh(previous)
     }
     this.scheduleDiagnostics()
   }
@@ -290,12 +296,20 @@ export class KayLanguageServer {
     return [...this.projects.values()].find(project => path.startsWith(project.shadowTree))
   }
 
+  // An open file compiled again from the same text, for what changed around it.
+  private refresh(previous: Document) {
+    const document = this.compile(previous.uri, previous.source, previous.version)
+
+    this.server.notify('textDocument/didChange', { textDocument: { uri: document.shadowUri, version: document.version }, contentChanges: [{ text: document.tsx }] })
+  }
+
   private compile(uri: string, source: string, version: number): Document {
     const file = fileURLToPath(uri)
     const project = this.projectAt(projectRoot(this.root, file))
     const insideIsland = project.islandOnly.has(file)
-    const { shadow, diagnostics } = compileShadow(project.root, project.routesDir, file, source, insideIsland, project.options.lints)
-    const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics, insideIsland }
+    const signals = importedSignals(file, source)
+    const { shadow, diagnostics } = compileShadow(project.root, project.routesDir, file, source, insideIsland, project.options.lints, signals)
+    const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals) }
 
     this.documents.set(uri, document)
 
