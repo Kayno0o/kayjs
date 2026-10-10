@@ -120,7 +120,7 @@ const server = startServer(variant)
 let browser: Browser | undefined
 
 try {
-  await waitReady(variant)
+  await waitReady(variant, server)
   browser = await chromium.launch({ headless: true })
 
   const samples = new Map<string, Sample[]>(rewrites.map(([name]) => [name, []]))

@@ -12,21 +12,26 @@ const VM_HWM = /VmHWM:\s+(\d+)/
 const MODULES = process.env.NGINX_MODULES ?? '/usr/lib/nginx/modules'
 const NOT_WORD = /\W/g
 
+// Where a variant's server writes its stderr, the last start's only.
+function serverLog(variant: Variant): string {
+  return join(variant.dir, 'server.log')
+}
+
 // A variant's server as production runs it: Astro's standalone entry under Bun (its image aliases node to bun), kay's compiled executable.
 export function startServer(variant: Variant): Subprocess {
   return Bun.spawn(variant.kind === 'astro' ? ['bun', 'dist/server/entry.mjs'] : ['./server'], {
     cwd: variant.dir,
     stdout: 'ignore',
-    stderr: 'ignore',
+    stderr: Bun.file(serverLog(variant)),
     env: { PATH: process.env.PATH!, HOME: process.env.HOME!, NODE_ENV: 'production', HOST: '127.0.0.1', PORT: String(variant.ports.backend), CACHE_PATH: ':memory:', ...variant.site.env },
   })
 }
 
-// Milliseconds until the server answers its home page with a 200.
-export async function waitReady(variant: Variant): Promise<number> {
+// Milliseconds until the server answers its home page with a 200; what it printed on stderr if it exits or never does.
+export async function waitReady(variant: Variant, server: Subprocess): Promise<number> {
   const started = performance.now()
 
-  while (performance.now() - started < READY_TIMEOUT_MS) {
+  while (performance.now() - started < READY_TIMEOUT_MS && server.exitCode === null) {
     try {
       const response = await fetch(`http://127.0.0.1:${variant.ports.backend}/`)
 
@@ -39,7 +44,11 @@ export async function waitReady(variant: Variant): Promise<number> {
     await Bun.sleep(2)
   }
 
-  throw new Error(`${variant.dir} did not answer on ${variant.ports.backend}`)
+  server.kill()
+  await server.exited
+  const stderr = (await Bun.file(serverLog(variant)).text()).slice(-2000)
+
+  throw new Error(`${variant.dir} did not answer on ${variant.ports.backend}, exit code ${server.exitCode}:\n${stderr}`)
 }
 
 // Resident and peak memory of a process, in bytes.
@@ -119,7 +128,7 @@ export async function startAll(): Promise<{ servers: Map<Variant, Subprocess>, n
 
   try {
     for (const variant of VARIANTS)
-      await waitReady(variant)
+      await waitReady(variant, servers.get(variant)!)
   }
   catch (error) {
     stop()
