@@ -6,6 +6,8 @@ import { auth, mails } from '../src/auth'
 
 // The fixture is served the way an app serves itself: kayjs-auth's plugin, then kay's pages.
 const ROOT = join(import.meta.dir, '..')
+// kay check prints this line on success since kay 1.18, nothing before.
+const CLEAN = /^(?:checked with no problems in \d+ ms\n)?$/
 const realFetch = globalThis.fetch
 const text = (html: string, id: string) => new RegExp(`id="${id}"[^>]*>([^<]*)<`).exec(html)?.[1]
 
@@ -26,7 +28,7 @@ afterEach(() => {
 test('kay check passes on the fixture, its links to kayjs-auth routes, its use of ctx.locals.auth and this test included', async () => {
   const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
 
-  expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toBe('')
+  expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toMatch(CLEAN)
   expect(await check.exited).toBe(0)
 }, 60_000)
 
