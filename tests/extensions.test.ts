@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { parse } from 'devalue'
@@ -35,20 +35,25 @@ const FILES: Record<string, string> = {
   'node_modules/kay-lib/routes/lib.css': '.lib { color: teal }\n',
   'node_modules/kay-lib/routes/register.kay': 'p.register theirs\n',
   'node_modules/kay-lib/routes/login.kay': LOGIN,
+  'node_modules/kay-lib/routes/terms.kay': '--- server\nexport const prerender = true\n---\np.terms terms\n',
+  // The library's own check reports this one, not the app's.
+  'node_modules/kay-lib/routes/broken.kay': '---\nconst wrong: number = \'x\'\n---\np {wrong}\n',
   'node_modules/kay-lib/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton.count(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
 }
 
-// A process serves one project, so the app is served in its own, reporting what each page answered.
+// A process serves one project, so the app is served in its own, reporting what each page answered: run by Bun from the project, or compiled as the executable's entry.
 const SERVE = `import { stringify } from 'devalue'
 import { pages } from 'kay/server'
 
-const app = await pages({ root: import.meta.dir, prebuilt: true })
+const app = await pages({ prebuilt: true })
 const visit = async (path: string) => (await app.handle(new Request(\`http://localhost\${path}\`))).text()
 const login = await visit('/auth/login')
 const action = (/<form[^>]*action="([^"]+)"/).exec(login)?.[1] ?? ''
 const posted = await app.handle(new Request(\`http://localhost\${action}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({ name: 'Ada' }) }))
 
-console.log(JSON.stringify({ login, action, posted: await posted.text(), register: await visit('/auth/register'), home: await visit('/') }))
+const style = await visit((/rel="stylesheet" href="([^"]+)"/).exec(login)?.[1] ?? '/none.css')
+
+console.log(JSON.stringify({ login, action, posted: await posted.text(), style, register: await visit('/auth/register'), home: await visit('/') }))
 process.exit(0)
 `
 
@@ -66,36 +71,80 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-async function run(...command: string[]): Promise<{ code: number, stdout: string, stderr: string }> {
-  const child = Bun.spawn([process.execPath, ...command], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+async function run(command: string[], cwd = root): Promise<{ code: number, stdout: string, stderr: string }> {
+  const child = Bun.spawn(command, { cwd, stdout: 'pipe', stderr: 'pipe' })
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { code, stdout, stderr }
 }
 
+// What `SERVE` reports, checked the same whichever way it ran.
+function expectServed({ code, stdout, stderr }: { code: number, stdout: string, stderr: string }) {
+  expect(stderr).not.toContain('error')
+  expect(code).toBe(0)
+  const { login, action, posted, style, register, home } = JSON.parse(stdout) as { login: string, action: string, posted: string, style: string, register: string, home: string }
+
+  expect(login).toContain('<header class="app">App</header>')
+  expect(login).toMatch(/<section class="lib">.*<form/s)
+  // Its island hydrates, bundled with the app's.
+  expect(login).toContain('data-component="node_modules/kay-lib/counter.kay"')
+  expect(login).toMatch(/rel="modulepreload" href="\/_kay\/counter-/)
+  // So does its layout's stylesheet.
+  expect(login).toMatch(/rel="stylesheet" href="\/_kay\/_layout-[^"]+\.css"/)
+  expect(style).toContain('teal')
+  expect(register).toContain('<p class="register">mine</p>')
+  expect(home).toContain('<p class="home">home</p>')
+  expect(action).toBe('/_kay/action/node_modules/kay-lib/routes/login.kay/signIn')
+  expect(parse(posted)).toEqual({ signedIn: 'Ada' })
+}
+
 describe('a library\'s routes', () => {
   it('serve under their prefix inside the app\'s layouts, a library layout filling a level the app has none at, and an app page at the same path replacing the library\'s', async () => {
-    const { code, stdout, stderr } = await run('serve.ts')
-
-    expect(stderr).not.toContain('error')
-    expect(code).toBe(0)
-    const { login, action, posted, register, home } = JSON.parse(stdout) as { login: string, action: string, posted: string, register: string, home: string }
-
-    expect(login).toContain('<header class="app">App</header>')
-    expect(login).toMatch(/<section class="lib">.*<form/s)
-    // Its island hydrates, bundled with the app's.
-    expect(login).toContain('data-component="node_modules/kay-lib/counter.kay"')
-    expect(login).toMatch(/rel="modulepreload" href="\/_kay\/counter-/)
-    // So does its layout's stylesheet.
-    expect(login).toMatch(/rel="stylesheet" href="\/_kay\/_layout-[^"]+\.css"/)
-    expect(register).toContain('<p class="register">mine</p>')
-    expect(home).toContain('<p class="home">home</p>')
-    expect(action).toBe('/_kay/action/node_modules/kay-lib/routes/login.kay/signIn')
-    expect(parse(posted)).toEqual({ signedIn: 'Ada' })
+    expectServed(await run([process.execPath, 'serve.ts']))
   })
 
-  it('are pages kay check lets a link point at', async () => {
-    const { code, stdout, stderr } = await run(CLI, 'check')
+  it('are carried by the executable, which serves them with nothing of the project to read', async () => {
+    // Its link to `/auth/nope` fails the check, which the test below covers.
+    const build = await run([process.execPath, CLI, 'build', '--no-check', '--compile', 'server', '--entry', 'serve.ts'])
+
+    expect(build.stderr).not.toContain('error')
+    expect(build.code).toBe(0)
+    const elsewhere = join(root, '..', `${basename(root)}-elsewhere`)
+
+    await mkdir(elsewhere, { recursive: true })
+
+    try {
+      expectServed(await run([join(root, 'server')], elsewhere))
+    }
+    finally {
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('are written by a static export when prerendered, which refuses one taking an action unless the app replaces it', async () => {
+    const export_ = async () => run([process.execPath, CLI, 'build', '--no-check', '--static', '--outdir', 'dist'])
+    const refused = await export_()
+
+    expect(refused.code).toBe(1)
+    expect(refused.stderr).toContain('node_modules/kay-lib/routes/login.kay: it exports the action signIn')
+    const override = join(root, 'src/routes/auth/login.kay')
+
+    await Bun.write(override, 'p.login static\n')
+
+    try {
+      const build = await export_()
+
+      expect(build.stderr).not.toContain('error')
+      expect(build.code).toBe(0)
+      expect(await Bun.file(join(root, 'dist/auth/terms.html')).text()).toMatch(/<header class="app">App<\/header><main><section class="lib"><p class="terms">terms<\/p>/)
+    }
+    finally {
+      await rm(override)
+    }
+  }, 60_000)
+
+  it('are pages kay check lets a link point at, leaving the errors inside them to the library', async () => {
+    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'])
     const output = `${stdout}${stderr}`
 
     expect(code).toBe(1)
