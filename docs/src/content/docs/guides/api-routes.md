@@ -28,7 +28,17 @@ export default api()
 
 <Callout type="note">
 
-A request other than GET that another site's page sends is refused with 403, and so is a websocket upgrade. A route other sites call from the browser belongs on your own Elysia instance.
+A request other than GET that another site's page sends is refused with 403, and so is a websocket upgrade. A module other sites' pages call from the browser names their origins:
+
+```ts
+// src/api/catalog.ts
+import { api } from 'kay/server'
+
+export default api({ cors: { origins: ['https://shop.example.com', 'https://*.partner.example'], credentials: true } })
+  .get('/items', () => [{ id: 1, name: 'Pen' }])
+```
+
+kay answers the browser's preflight before the guards run, with the module's methods, and lets those pages' requests through, cookies included with `credentials: true`. `origins: '*'` opens it to any site, without cookies. `headers` limits the request headers allowed, `expose` names the response headers a page may read, and `maxAge` sets how long a browser keeps the preflight's answer, an hour by default.
 
 </Callout>
 

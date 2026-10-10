@@ -3,6 +3,7 @@ import type { Locals } from '../runtime'
 import type { EventStream } from '../runtime/live'
 import type { ActionOptions } from './actions'
 import type { BodyLimit } from './body'
+import type { CorsOptions, CorsRule } from './cors'
 import type { LoadedGuard } from './guards'
 import type { Span } from './trace'
 import { existsSync } from 'node:fs'
@@ -13,6 +14,7 @@ import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { inLocale, isCrossSite, passGuards } from './actions'
 import { importModule } from './bundle'
+import { corsAdmits, corsHeaders, corsRule, preflight } from './cors'
 import { loadGuard } from './guards'
 import { reportServerError } from './report'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
@@ -42,6 +44,8 @@ const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Where `api({ bodyLimit })` keeps its limit on the instance it makes.
 const BODY_LIMIT = Symbol.for('kay.bodyLimit')
+// Where `api({ cors })` keeps the origins it lets in.
+const CORS = Symbol.for('kay.cors')
 
 // Where a failing event stream reports its error: logged, and handed to `onError` once the route answering with it is known.
 const streamReporters = new WeakMap<Response, { report: (error: unknown) => void }>()
@@ -89,7 +93,7 @@ const TRAILING_SLASH = /\/$/
 // The span of each API request in flight.
 const spans = new WeakMap<Request, Span>()
 
-// Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused.
+// Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused, unless the module's `cors` lets that site in.
 // Gives back the body limit of each module by the path it is mounted at.
 export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<Map<string, BodyLimit>> {
   const limits = new Map<string, BodyLimit>()
@@ -104,42 +108,52 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     limits.set(module.mount, { bytes: (instance as { [BODY_LIMIT]?: number })[BODY_LIMIT], refuse: tooLarge })
 
     const guards = await Promise.all(module.guards.map(async file => loadGuard({ file, special: {} })))
+    const cors = (instance as { [CORS]?: CorsRule })[CORS]
 
-    app.group(module.mount, group => group
-      // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
-      .onBeforeHandle(({ request, route: mounted }) => {
-        // `/api/echo` rather than the `/api/echo/` a module's `/` route is mounted at.
-        const route = mounted.length > 1 ? mounted.replace(TRAILING_SLASH, '') : mounted
-        const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': new URL(request.url).pathname } })
+    app.group(module.mount, (group) => {
+      // Registered before the hooks, so a preflight, which carries no credentials, never meets the guards.
+      if (cors) {
+        const methods = [...new Set(instance.routes.map(route => route.method.toUpperCase()).filter(method => method !== 'OPTIONS' && method !== 'WS'))]
 
-        if (span)
-          spans.set(request, span)
-      })
-      .onBeforeHandle(async context => inLocale(context.request, options, async () => admit(guards, context, options)))
-      .mapResponse(({ responseValue, set }) => withBigints(responseValue, set))
-      .onError(({ request, error }) => {
-        const span = spans.get(request)
+        group.options('/', ({ request }) => preflight(cors, methods, request)).options('/*', ({ request }) => preflight(cors, methods, request))
+      }
 
-        if (span)
-          failed(span, error)
-      })
-      .onAfterResponse(({ request, set, responseValue }) => {
-        const span = spans.get(request)
+      return group
+        // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
+        .onBeforeHandle(({ request, route: mounted }) => {
+          // `/api/echo` rather than the `/api/echo/` a module's `/` route is mounted at.
+          const route = mounted.length > 1 ? mounted.replace(TRAILING_SLASH, '') : mounted
+          const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': new URL(request.url).pathname } })
 
-        if (!span)
-          return
+          if (span)
+            spans.set(request, span)
+        })
+        .onBeforeHandle(async context => inLocale(context.request, options, async () => admit(guards, context, options, cors)))
+        .mapResponse(({ responseValue, set }) => withBigints(responseValue, set))
+        .onError(({ request, error }) => {
+          const span = spans.get(request)
 
-        spans.delete(request)
-        answered(span, responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200)
-        span.end()
-      })
-      .onAfterHandle(({ request, responseValue }) => {
-        const reporter = responseValue instanceof Response ? streamReporters.get(responseValue) : undefined
+          if (span)
+            failed(span, error)
+        })
+        .onAfterResponse(({ request, set, responseValue }) => {
+          const span = spans.get(request)
 
-        if (reporter)
-          reporter.report = error => reportServerError(error, request, options.onError)
-      })
-      .use(instance))
+          if (!span)
+            return
+
+          spans.delete(request)
+          answered(span, responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200)
+          span.end()
+        })
+        .onAfterHandle(({ request, responseValue }) => {
+          const reporter = responseValue instanceof Response ? streamReporters.get(responseValue) : undefined
+
+          if (reporter)
+            reporter.report = error => reportServerError(error, request, options.onError)
+        })
+        .use(instance)
+    })
   }
 
   return limits
@@ -182,14 +196,17 @@ function tooLarge(): Response {
 
 // Guards first, so a request without credentials gets their answer whatever its origin; what they set on the response goes out with the route's.
 // They read the params of the module's route the request matched.
-async function admit(guards: LoadedGuard[], context: { request: Request, params?: Record<string, unknown>, set: { headers: Record<string, unknown> } }, options: ActionOptions): Promise<Response | undefined> {
+async function admit(guards: LoadedGuard[], context: { request: Request, params?: Record<string, unknown>, set: { headers: Record<string, unknown> } }, options: ActionOptions, cors: CorsRule | undefined): Promise<Response | undefined> {
+  if (cors)
+    Object.assign(context.set.headers, corsHeaders(cors, context.request))
+
   const passed = guards.length > 0 ? await passGuards(guards, context, context.params ?? {}, options) : undefined
 
   if (passed instanceof Response)
     return passed
 
   // A browser lets any page open a websocket or post a form to any host, the user's cookies attached; a request with neither header, such as a webhook, is no browser's.
-  if ((!SAFE_METHODS.has(context.request.method) || context.request.headers.get('upgrade')?.toLowerCase() === 'websocket') && isCrossSite(context.request))
+  if ((!SAFE_METHODS.has(context.request.method) || context.request.headers.get('upgrade')?.toLowerCase() === 'websocket') && isCrossSite(context.request) && !(cors && corsAdmits(cors, context.request)))
     return new Response('Cross-site request refused', { status: 403 })
 
   if (!passed)
@@ -217,6 +234,8 @@ type Empty = Record<never, never>
 export interface ApiOptions {
   // The most bytes a request to the module's routes may send, in place of the app's `bodyLimit`.
   bodyLimit?: number | undefined
+  // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`.
+  cors?: CorsOptions | undefined
 }
 
 // An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is.
@@ -225,6 +244,9 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
 
   if (options.bodyLimit !== undefined)
     Object.defineProperty(instance, BODY_LIMIT, { value: options.bodyLimit })
+
+  if (options.cors !== undefined)
+    Object.defineProperty(instance, CORS, { value: corsRule(options.cors) })
 
   return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
 }
