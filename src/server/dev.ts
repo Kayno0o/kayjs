@@ -4,6 +4,7 @@ import type { ClientBuild } from './client'
 import { readFileSync, statSync } from 'node:fs'
 import { basename, isAbsolute, relative, resolve } from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { Elysia } from 'elysia'
 import { isCrossSite } from './actions'
 import { editorCommand } from './editor'
@@ -14,8 +15,11 @@ export const DEV_EVENTS = '/_kay/dev/events'
 export const DEV_PATCH = '/_kay/dev/patch.js'
 export const DEV_INSPECTOR = '/_kay/dev/inspector.js'
 export const DEV_OPEN = '/_kay/dev/open'
+export const DEV_A11Y = '/_kay/dev/a11y.js'
+export const DEV_AXE = '/_kay/dev/axe.js'
 const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
 const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
+const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
 const OPEN_HEADER = 'x-kay-dev'
 const POSITION = /^(.+\.kay):(\d+):(\d+)$/
@@ -93,6 +97,22 @@ export function devInspector(): Response {
   inspectorModule ??= `${new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(INSPECTOR_SOURCE, 'utf8'))}\nstartInspector()\n`
 
   return new Response(inspectorModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
+}
+
+// Checks each page the dev server serves with axe-core once it settles, its violations showing in the problem panel.
+export const A11Y_SCRIPT = `<script type="module" src="${DEV_A11Y}"></script>`
+
+let a11yModule: string | undefined
+
+export function devA11y(): Response {
+  a11yModule ??= `${new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(A11Y_SOURCE, 'utf8'))}\nstartA11y()\n`
+
+  return new Response(a11yModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
+}
+
+// Read where the dependency installed, never imported, so a compiled server leaves it out.
+export function devAxe(): Response {
+  return new Response(Bun.file(fileURLToPath(import.meta.resolve('axe-core/axe.min.js'))), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' } })
 }
 
 // How long the editor command gets to fail before it counts as opened: a launcher such as `code -g` or `tmux new-window` exits at once, an editor keeping its process runs on.

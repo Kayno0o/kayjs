@@ -29,7 +29,7 @@ import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocke
 import { readPage, sitemapUrls } from './page'
 import { testRoot } from './root'
 
-export type { BrowserOptions, TestPage, WaitForOptions, WaitOptions } from './browser'
+export type { A11yViolation, BrowserOptions, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
 export type { Mounted } from './mount'
 export { mount, settle } from './mount'

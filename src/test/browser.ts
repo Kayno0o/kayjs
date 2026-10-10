@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 
 export interface BrowserOptions {
   // The Chrome or Chromium executable, else `BUN_CHROME_PATH`, else the first one found on the PATH or where it usually installs.
@@ -21,6 +22,18 @@ export interface WaitForOptions extends WaitOptions {
   text?: string | undefined
   // Waits for no element to match instead.
   gone?: boolean | undefined
+}
+
+// A rule of axe-core the page breaks, and the elements breaking it.
+export interface A11yViolation {
+  // The rule, such as `color-contrast` or `label`.
+  id: string
+  impact: 'minor' | 'moderate' | 'serious' | 'critical' | null
+  help: string
+  // Where axe-core explains the rule and how to meet it.
+  helpUrl: string
+  // Each element's CSS selector and markup.
+  nodes: { target: string, html: string }[]
 }
 
 export interface TestPage {
@@ -47,6 +60,8 @@ export interface TestPage {
   // Runs a function in the page, its arguments and result crossing as JSON. Only its source crosses: it sees no variable of the test, only its arguments.
   evaluate: <Args extends unknown[], Result>(run: (...args: Args) => Result | Promise<Result>, ...args: Args) => Promise<Result>
   waitFor: (selector: string, options?: WaitForOptions) => Promise<void>
+  // Checks the page as it stands, or only the elements `selector` matches, with axe-core: what it breaks, none when it passes.
+  a11y: (selector?: string) => Promise<A11yViolation[]>
   // Waits for a function run in the page, as `evaluate` runs it, to return something truthy.
   waitUntil: <Args extends unknown[]>(condition: (...args: Args) => unknown, options?: WaitOptions, ...args: Args) => Promise<void>
   // Back and forward go through history, swapped pages included, resolving as `goto` does.
@@ -231,6 +246,21 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       await poll(wait.gone ? `!${found}` : found, `${selector}${wait.text === undefined ? '' : ` with text "${wait.text}"`}${wait.gone ? ' to be gone' : ''}`, wait.timeout)
     }),
+    a11y: async selector => serial(async () => {
+      // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
+      if (!await view.evaluate<boolean>('!!window.axe')) {
+        const { exceptionDetails } = await view.cdp<{ exceptionDetails?: { text: string } }>('Runtime.evaluate', { expression: await axeSource() })
+
+        if (exceptionDetails)
+          throw new Error(`kay: axe-core did not load in the page: ${exceptionDetails.text}`)
+      }
+
+      return view.evaluate<A11yViolation[]>(script(async (context?: string) => {
+        const { violations } = await (window as unknown as { axe: Axe }).axe.run(context ?? document, { resultTypes: ['violations'] })
+
+        return violations.map(({ id, impact, help, helpUrl, nodes }) => ({ id, impact, help, helpUrl, nodes: nodes.map(node => ({ target: node.target.map(part => Array.isArray(part) ? part.join(' >>> ') : part).join(' '), html: node.html })) }))
+      }, [selector]))
+    }),
     waitUntil: async (condition, wait = {}, ...args) => serial(async () => poll(script(condition, args), 'the condition to hold', wait.timeout)),
     back: async () => serial(async () => traverse('history.back()')),
     forward: async () => serial(async () => traverse('history.forward()')),
@@ -264,6 +294,19 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }
 
   return page
+}
+
+interface Axe {
+  run: (context: unknown, options: unknown) => Promise<{ violations: (Omit<A11yViolation, 'nodes'> & { nodes: { target: (string | string[])[], html: string }[] })[] }>
+}
+
+let axe: Promise<string> | undefined
+
+// axe-core's browser build, read once where the dependency installed.
+async function axeSource(): Promise<string> {
+  axe ??= Bun.file(fileURLToPath(import.meta.resolve('axe-core/axe.min.js'))).text()
+
+  return axe
 }
 
 // A call of `run` in the page, an undefined argument kept as such rather than sent as JSON's null.

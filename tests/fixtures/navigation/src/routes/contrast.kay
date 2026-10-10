@@ -1,0 +1,5 @@
+head
+  title Contrast
+main
+  button.faint(style="color: #ccc; background: #fff") Faint
+  button.plain Plain

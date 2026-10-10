@@ -162,7 +162,27 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(page.errors).toEqual([])
     await expect(page.click('a.nowhere', { timeout: 100 })).rejects.toThrow('kay: timed out after 100ms waiting for a.nowhere')
   })
+
+  it('checks a page with axe-core, the whole of it or what a selector matches, again after a navigation', async () => {
+    await page.goto('/contrast')
+
+    const contrast = (await page.a11y()).find(violation => violation.id === 'color-contrast')
+
+    expect(contrast?.impact).toBe('serious')
+    expect(contrast?.nodes).toEqual([{ target: '.faint', html: '<button class="faint" style="color: #ccc; background: #fff">Faint</button>' }])
+    expect(await page.a11y('button.plain')).toEqual([])
+
+    await page.goto('/plain')
+    await page.goto('/contrast')
+
+    expect((await page.a11y('main')).map(violation => violation.id)).toEqual(['color-contrast'])
+  })
 })
+
+// The problems the panel lists, but the accessibility check's.
+async function logged(shown: TestPage): Promise<string[]> {
+  return shown.evaluate(() => [...document.querySelector('kay-problems')?.shadowRoot!.querySelectorAll('pre') ?? []].map(pre => pre.textContent).filter(problem => !problem.startsWith('a11y ')))
+}
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in a browser', () => {
   it('shows each problem kay recovers from on the page, a page swap leaving them behind', async () => {
@@ -171,9 +191,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     try {
       const shown = await dev.open('/mismatch', { strict: false })
 
-      await shown.waitFor('kay-problems')
+      // The accessibility check lists its own problems once the page settles.
+      await shown.waitUntil(() => [...document.querySelector('kay-problems')?.shadowRoot!.querySelectorAll('pre') ?? []].some(pre => pre.textContent.startsWith('a11y ')))
 
-      expect(await shown.evaluate(() => document.querySelector('kay-problems')!.shadowRoot!.textContent)).toMatch(/^1 kay problemDismissisland tests\/fixtures\/navigation\/src\/components\/mismatch\.kay did not match its server markup, rendering it again: /)
+      expect(await logged(shown)).toEqual([expect.stringMatching(/^island tests\/fixtures\/navigation\/src\/components\/mismatch\.kay did not match its server markup, rendering it again: /)])
       expect(shown.errors).toHaveLength(1)
 
       // A problem logged again is listed once, a warning counts, anything not kay's is left to the console.
@@ -182,9 +203,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
         console.warn('[kay] the persisted signal note could not be kept')
         console.error('not kay')
       })
-      await shown.waitUntil(() => document.querySelector('kay-problems')!.shadowRoot!.textContent.startsWith('2 kay problems'))
+      await shown.waitUntil(() => document.querySelector('kay-problems')!.shadowRoot!.textContent.includes('the persisted signal'))
 
-      expect(await shown.evaluate(() => [...document.querySelector('kay-problems')!.shadowRoot!.querySelectorAll('pre')].map(pre => pre.textContent.slice(0, 20)))).toEqual(['island tests/fixture', 'the persisted signal'])
+      expect((await logged(shown)).map(problem => problem.slice(0, 20))).toEqual(['island tests/fixture', 'the persisted signal'])
 
       await shown.evaluate(() => document.querySelector('kay-problems')!.shadowRoot!.querySelector('button')!.click())
 
@@ -198,7 +219,24 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
       await shown.click('a.home')
       await shown.waitFor('h1', { text: 'Home' })
 
-      expect(await shown.count('kay-problems')).toBe(0)
+      expect(await logged(shown)).toEqual([])
+    }
+    finally {
+      await dev.close()
+    }
+  }, 60_000)
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev checking accessibility', () => {
+  it('shows what axe-core finds on the rendered page in the problem panel', async () => {
+    const dev = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, dev: true, onError: () => undefined })
+
+    try {
+      const shown = await dev.open('/contrast', { strict: false })
+
+      await shown.waitUntil(() => document.querySelector('kay-problems')?.shadowRoot!.textContent.includes('a11y color-contrast'))
+
+      expect(await shown.evaluate(() => [...document.querySelector('kay-problems')!.shadowRoot!.querySelectorAll('pre')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
     }
     finally {
       await dev.close()
@@ -213,8 +251,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev pa
     try {
       const shown = await dev.open('/')
 
-      // The page ships the live reload but no entry script, and the module comes from the server.
-      expect(await shown.count('script[src]')).toBe(0)
+      // The page ships the live reload and kay dev's own scripts but no entry script, and the module comes from the server.
+      expect(await shown.count('script[src]:not([src^="/_kay/dev/"])')).toBe(0)
 
       const outcome = await shown.evaluate(async () => {
         const module = '/_kay/dev/patch.js'
