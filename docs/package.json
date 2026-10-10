@@ -3,6 +3,6 @@
   "private": true,
   "devDependencies": {
     "@iconify-json/tabler": "^1.2.41",
-    "@kaynooo/kayjs-ui": "^0.4.17"
+    "@kaynooo/kayjs-ui": "^0.4.23"
   }
 }
