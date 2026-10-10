@@ -1,6 +1,16 @@
 import type { Duration } from 'kay'
 import type { Delivery, Mail, Transport } from './types'
+import { createPrivateKey } from 'node:crypto'
 import { createTransport } from 'nodemailer'
+
+// Signs each mail for a relay that does not, its public key published in DNS at `<selector>._domainkey.<domain>`.
+export interface DkimSettings {
+  // The domain the signature vouches for, the sender's own.
+  domain: string
+  selector: string
+  // PEM, as `openssl genrsa` writes it.
+  privateKey: string
+}
 
 export interface SmtpSettings {
   host: string
@@ -16,6 +26,7 @@ export interface SmtpSettings {
   maxConnections?: number | undefined
   // The most mails sent in a second, for a provider capping the rate. Unlimited by default.
   rateLimit?: number | undefined
+  dkim?: DkimSettings | undefined
 }
 
 const DEFAULT_PORT = 465
@@ -35,6 +46,16 @@ function milliseconds(duration: Duration): number {
   return ms
 }
 
+// Throws naming `what` unless `key` is a private key, so a broken one fails where it is given rather than at the first mail.
+export function checkKey(key: string, what: string): void {
+  try {
+    createPrivateKey(key)
+  }
+  catch {
+    throw new Error(`kayjs-mail: ${what} is no private key; it takes one in PEM, as 'openssl genrsa' writes it`)
+  }
+}
+
 function positiveInteger(name: string, value: number | undefined): void {
   if (value !== undefined && (!Number.isInteger(value) || value < 1))
     throw new Error(`kayjs-mail: smtp()'s ${name} is ${value}; it takes a whole number of at least 1`)
@@ -47,6 +68,9 @@ export function smtp(settings: SmtpSettings): Transport {
 
   positiveInteger('maxConnections', settings.maxConnections)
   positiveInteger('rateLimit', settings.rateLimit)
+
+  if (settings.dkim !== undefined)
+    checkKey(settings.dkim.privateKey, 'smtp()\'s dkim.privateKey')
 
   // Read now, so a timeout that is no duration fails where the transport is made rather than at its first mail.
   const wait = settings.timeout === undefined ? DEFAULT_TIMEOUT_MS : milliseconds(settings.timeout)
@@ -93,7 +117,7 @@ export function smtp(settings: SmtpSettings): Transport {
   }
 }
 
-function open({ host, port = DEFAULT_PORT, user, pass, name, maxConnections, rateLimit }: SmtpSettings, wait: number) {
+function open({ host, port = DEFAULT_PORT, user, pass, name, maxConnections, rateLimit, dkim }: SmtpSettings, wait: number) {
   const auth = user === undefined || pass === undefined ? undefined : { user, pass }
 
   return createTransport({
@@ -107,6 +131,7 @@ function open({ host, port = DEFAULT_PORT, user, pass, name, maxConnections, rat
     // With a password to send, a server whose STARTTLS was stripped on the way is refused rather than sent it in clear.
     requireTLS: auth !== undefined && port !== 465,
     auth,
+    dkim: dkim && { domainName: dkim.domain, keySelector: dkim.selector, privateKey: dkim.privateKey },
     connectionTimeout: wait,
     greetingTimeout: wait,
     socketTimeout: wait,

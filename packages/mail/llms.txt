@@ -45,6 +45,8 @@ In production the mailer reads, as the server boots, through kay's `defineEnv`:
 | `SMTP_PORT` | `465` by default: TLS from the start; another port upgrades with STARTTLS |
 | `SMTP_USER`, `SMTP_PASS` | both or neither, for a server needing no login; with a password and a port other than 465, a server not offering STARTTLS is refused |
 | `SMTP_RATE_LIMIT` | optional: the most mails a second, for a provider capping the rate |
+| `SMTP_DKIM_SELECTOR`, `SMTP_DKIM_PRIVATE_KEY` | both or neither: signs each mail with DKIM, for a relay that does not, the public key published at `<selector>._domainkey.<domain>`; the PEM key's line breaks may be written `\n` to hold it on one line |
+| `SMTP_DKIM_DOMAIN` | the domain the signature vouches for, the sender's by default |
 | `SMTP_FROM` | required unless `mailer({ from })` gives the sender: `Name <address>` or a bare address |
 
 A missing or refused variable stops the boot, naming each one. `kay build` runs without them and leaves them to the server. The client greets the server with the sender's domain, not the container's hostname, and gives up on a server silent for 10 seconds. It keeps up to 5 connections open while mails keep coming, so a burst reuses them, and closes them a second after the last mail, so a script ends. Development and tests need none of them.
@@ -130,7 +132,7 @@ Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged wit
 
 ## Other transports
 
-`transport` takes any `{ send(mail) }` resolving with a `Delivery`, such as a provider's HTTP API. `smtp({ host, port, user, pass, name, timeout, maxConnections, rateLimit })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.
+`transport` takes any `{ send(mail) }` resolving with a `Delivery`, such as a provider's HTTP API. `smtp({ host, port, user, pass, name, timeout, maxConnections, rateLimit, dkim: { domain, selector, privateKey } })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.
 
 ## kayjs-auth
 

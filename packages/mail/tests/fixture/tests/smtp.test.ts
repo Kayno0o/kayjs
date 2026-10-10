@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto'
 import process from 'node:process'
 import { mailer, smtp } from '@kaynooo/kayjs-mail'
 import { afterAll, describe, expect, it } from 'bun:test'
@@ -5,6 +6,7 @@ import { bodyText, startSmtp } from '../../helpers/smtp'
 import Welcome from '../src/mails/welcome.kay'
 
 const server = startSmtp()
+const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } })
 
 afterAll(() => server.stop())
 
@@ -78,6 +80,20 @@ describe('smtp', () => {
     expect(() => smtp({ host: '127.0.0.1', rateLimit: 0.5 })).toThrow('rateLimit is 0.5')
   })
 
+  it('signs each mail with DKIM when given a key, and refuses a key that is none where the transport is made', async () => {
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, dkim: { domain: 'fixture.test', selector: 'mail', privateKey } }) })
+
+    await mail.send({ to: 'ada@example.com', subject: 'Signed', text: 'Hi' })
+
+    const { data } = server.received.at(-1)!
+    const headers = data.slice(0, data.indexOf('\n\n'))
+
+    expect(headers).toStartWith('DKIM-Signature: ')
+    expect(headers).toContain('d=fixture.test;')
+    expect(headers).toContain('s=mail;')
+    expect(() => smtp({ host: '127.0.0.1', dkim: { domain: 'fixture.test', selector: 'mail', privateKey: 'not a key' } })).toThrow('dkim.privateKey is no private key')
+  })
+
   it('refuses a timeout that is no positive duration where the transport is made', () => {
     expect(() => smtp({ host: '127.0.0.1', timeout: 'soon' as '10s' })).toThrow('takes a positive duration')
     expect(() => smtp({ host: '127.0.0.1', timeout: 0 })).toThrow('takes a positive duration')
@@ -100,5 +116,35 @@ describe('smtp', () => {
     expect(server.received.at(-1)?.from).toBe('<site@env.test>')
     expect(server.received.at(-1)?.data).toContain('From: "Site, Env" <site@env.test>')
     expect(bodyText(server.received.at(-1)!)).toBe('Hello\n')
+  })
+
+  it('signs with the DKIM key the environment gives, its line breaks written \\n, for the sender\'s domain', async () => {
+    const saved = { ...process.env }
+
+    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_FROM: 'site@env.test', SMTP_DKIM_SELECTOR: 'mail', SMTP_DKIM_PRIVATE_KEY: privateKey.replaceAll('\n', '\\n') })
+
+    try {
+      await mailer({ queue: { name: 'dkim-env' } }).send({ to: 'bob@example.com', subject: 'Signed from env', text: 'Hello' })
+    }
+    finally {
+      process.env = saved
+    }
+
+    expect(server.received.at(-1)!.data).toContain('d=env.test;')
+  })
+
+  it('stops the boot on a DKIM selector without a key, or a key that is none', () => {
+    const saved = { ...process.env }
+
+    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_FROM: 'site@env.test', SMTP_DKIM_SELECTOR: 'mail' })
+
+    try {
+      expect(() => mailer({ queue: { name: 'dkim-half' } })).toThrow('SMTP_DKIM_SELECTOR and SMTP_DKIM_PRIVATE_KEY go together')
+      process.env.SMTP_DKIM_PRIVATE_KEY = 'not a key'
+      expect(() => mailer({ queue: { name: 'dkim-broken' } })).toThrow('SMTP_DKIM_PRIVATE_KEY is no private key')
+    }
+    finally {
+      process.env = saved
+    }
   })
 })

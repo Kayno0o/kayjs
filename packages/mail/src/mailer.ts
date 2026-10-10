@@ -7,7 +7,7 @@ import { defineEnv, queue, renderToString } from 'kay/server'
 import { escapeHtml as escape } from './escape'
 import { addressOf, outbox } from './outbox'
 import { preview } from './preview'
-import { smtp } from './smtp'
+import { checkKey, smtp } from './smtp'
 import { htmlToText } from './text'
 
 export interface MailerOptions {
@@ -84,7 +84,7 @@ function delivering(): 'outbox' | 'smtp' {
   return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? 'outbox' : 'smtp'
 }
 
-// SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT` and `SMTP_FROM`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
+// SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT`, `SMTP_DKIM_*` and `SMTP_FROM`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
 function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, missing: () => string[] } {
   const env = defineEnv(t.Object({
     SMTP_HOST: optional ? t.Optional(t.String()) : t.String(),
@@ -92,12 +92,24 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
     SMTP_USER: t.Optional(t.String()),
     SMTP_PASS: t.Optional(t.String()),
     SMTP_RATE_LIMIT: t.Optional(t.Integer({ minimum: 1 })),
+    SMTP_DKIM_SELECTOR: t.Optional(t.String()),
+    SMTP_DKIM_PRIVATE_KEY: t.Optional(t.String()),
+    SMTP_DKIM_DOMAIN: t.Optional(t.String()),
     SMTP_FROM: optional || from !== undefined ? t.Optional(t.String({ pattern: SENDER })) : t.String({ pattern: SENDER }),
   }))
 
   // Optional both, so reading them never throws under `kay build`, and a server given one without the other stops as it boots.
   if ((env.SMTP_USER === undefined) !== (env.SMTP_PASS === undefined))
     throw new Error('kayjs-mail: SMTP_USER and SMTP_PASS go together: set both, or neither for a server that needs no login')
+
+  if ((env.SMTP_DKIM_SELECTOR === undefined) !== (env.SMTP_DKIM_PRIVATE_KEY === undefined))
+    throw new Error('kayjs-mail: SMTP_DKIM_SELECTOR and SMTP_DKIM_PRIVATE_KEY go together: set both to sign mails, or neither')
+
+  // A `.env` file often holds the key on one line, its line breaks written `\\n`.
+  const dkimKey = env.SMTP_DKIM_PRIVATE_KEY?.replaceAll('\\n', '\n')
+
+  if (dkimKey !== undefined)
+    checkKey(dkimKey, 'SMTP_DKIM_PRIVATE_KEY')
 
   let transport: Transport | undefined
   const sender = () => from ?? named(env.SMTP_FROM!, fromName)
@@ -107,7 +119,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   return {
     transport: {
       send: async (mail) => {
-        transport ??= smtp({ host: env.SMTP_HOST!, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()) })
+        transport ??= smtp({ host: env.SMTP_HOST!, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
 
         return transport.send(mail)
       },
