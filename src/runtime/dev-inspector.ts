@@ -42,7 +42,7 @@ export function startInspector(doc: Document = document): Inspector {
   }
   const host = make('div', 'all:initial')
   const root = host.attachShadow({ mode: 'open' })
-  const outline = make('div', 'position:fixed;z-index:2147483646;pointer-events:none;border:2px solid #7c3aed;background:rgba(124,58,237,.08);border-radius:2px')
+  const outline = make('div', 'position:fixed;z-index:2147483646;pointer-events:none;box-sizing:border-box;border:2px solid #7c3aed;background:rgba(124,58,237,.08);border-radius:2px')
   const label = make('div', `position:fixed;z-index:2147483647;pointer-events:none;padding:2px 6px;background:#7c3aed;color:#fff;border-radius:3px;white-space:nowrap;${FONT}`)
   const toggle = make('button', `position:fixed;left:.75rem;bottom:.75rem;z-index:2147483647;padding:.25rem .6rem;border:1px solid #7c3aed;border-radius:999px;background:#fff;color:#4c1d95;cursor:pointer;${FONT}`)
   const panel = make('div', `position:fixed;left:.75rem;bottom:2.75rem;z-index:2147483647;width:min(28rem,calc(100vw - 1.5rem));max-height:50vh;overflow:auto;padding:.5rem;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;box-shadow:0 4px 16px rgba(0,0,0,.15);${FONT}`)

@@ -149,6 +149,24 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.locator('button.extra', { hasText: 'Extra on' }).waitFor()
   }, 60_000)
 
+  it('outlines the element under a resting pointer on Alt, over its exact box', async () => {
+    await page.hover('h1')
+    await page.keyboard.down('Alt')
+
+    try {
+      const [outlined, heading] = await page.evaluate(() => {
+        const outline = document.querySelector('[data-kay-inspector]')!.shadowRoot!.firstElementChild!
+
+        return [outline, document.querySelector('h1')!].map(element => JSON.stringify(element.getBoundingClientRect()))
+      })
+
+      expect(outlined).toBe(heading)
+    }
+    finally {
+      await page.keyboard.up('Alt')
+    }
+  })
+
   it('opens the line an element came from on Alt+click, and lists the islands with the values of their signals', async () => {
     await page.click('h1', { modifiers: ['Alt'] })
     await until(() => existsSync(join(root, '.opened')))
