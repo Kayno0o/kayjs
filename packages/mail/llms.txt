@@ -33,7 +33,7 @@ export default defineConfig({ extensions: [mailExtension(async () => (await impo
 - An Elysia app not served by `pages()`, or kay before 1.26, uses it as a plugin instead: `new Elysia().use(mail)`.
 
 - `mailer(options)` returns an Elysia plugin: the server using it, through `mailExtension` or `.use(mail)`, runs the queue `enqueue` fills and, in development, serves the outbox page. A script that only sends need not use it.
-- Options: `from`, the default sender, `SMTP_FROM` when left out; `fromName`, the name shown beside a bare `SMTP_FROM`; `lang`, the `<html lang>` of the mail documents, `en` by default; `transport`, where mails go in place of the default; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment.
+- Options: `from`, the default sender, `SMTP_FROM` when left out; `fromName`, the name shown beside a bare `SMTP_FROM`; `lang`, the `<html lang>` of the mail documents, `en` by default, which a message's own `lang` replaces; `transport`, where mails go in place of the default; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment.
 
 ## Environment
 
@@ -92,7 +92,8 @@ export const signUp = action(t.Object({ name: t.String({ maxLength: 100 }), emai
 ---
 ```
 
-- A message takes `to`, `cc` and `bcc` (an address or a list), `replyTo`, `from`, `subject`, `headers` and `attachments` (`{ filename, content, contentType?, cid? }`, `content` a string or bytes), and its content: `view` and `props` for a component (`props` left out when it takes none required), `html` for markup made elsewhere, or `text` alone.
+- A message takes `to`, `cc` and `bcc` (an address or a list), `replyTo`, `from`, `subject`, `lang`, `headers` and `attachments` (`{ filename, content, contentType?, cid? }`, `content` a string or bytes), and its content: `view` and `props` for a component (`props` left out when it takes none required), `html` for markup made elsewhere, or `text` alone.
+- A message's `lang` is its `<html lang>` and the locale its component renders in, so `t()` and the formatters from `kay/i18n` read the recipient's language: one of the site's locales, `renderToString` refusing another. Without it the component renders in the site's default locale, or the request's while one runs.
 - An address is `'Name <address>'`, a bare address, or `{ name, address }`, which needs no quoting of a name holding a comma.
 - Every mail with html goes out with a text part too: the one `text` gives, else one written from the html, links followed by their address, list items dashed, what the html hides, such as the preheader, left out. `htmlToText(html)` is exported.
 - `send(message)` renders and sends now, resolving with `{ messageId, accepted, rejected, response }`. `enqueue(message, { delay })` renders now and queues it, resolving with the job's id; a failed send is retried as kay's queues retry, 5 attempts by default, each wait twice the last from 10 seconds. `render(message)` gives the rendered `Mail` without sending it. `drain()` sends every queued mail due, here and now, for a script.

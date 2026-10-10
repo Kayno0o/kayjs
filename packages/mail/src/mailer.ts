@@ -151,8 +151,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
         throw new Error(`kayjs-mail: "${message.subject}" has an address holding a line break`)
     }
 
-    const markup = message.view ? await renderToString(message.view, ...[message.props] as never) : message.html
-    const html = markup === undefined ? undefined : asDocument(markup, message.subject, lang)
+    const markup = message.view ? await renderToString(message.view, ...[message.props, message.lang === undefined ? undefined : { locale: message.lang }] as never) : message.html
+    const html = markup === undefined ? undefined : asDocument(markup, message.subject, message.lang ?? lang)
 
     return {
       from: message.from ?? sender(),

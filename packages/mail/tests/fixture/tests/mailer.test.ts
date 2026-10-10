@@ -3,6 +3,7 @@ import process from 'node:process'
 import { mailer, MailNotConfigured, outbox } from '@kaynooo/kayjs-mail'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { mail } from '../src/mail'
+import Hello from '../src/mails/hello.kay'
 import Plain from '../src/mails/plain.kay'
 import Welcome from '../src/mails/welcome.kay'
 
@@ -37,6 +38,17 @@ describe('rendering', () => {
 
     expect(html).toContain(`Your account is ready${'\u034F\u200C\u00A0'.repeat(100)}</div>`)
     expect(text).not.toContain('\u034F')
+  })
+
+  it('renders a mail in the language it is given, its component reading that locale\'s messages', async () => {
+    const french = await mail.render({ to: 'ada@example.com', subject: 'Salut', view: Hello, lang: 'fr' })
+    const english = await mailer({ from: 'hello@fixture.test', queue: { name: 'english-mail' } }).render({ to: 'ada@example.com', subject: 'Hi', view: Hello })
+
+    expect(french.html).toContain('<html lang="fr"')
+    expect(french.text).toBe('Bonjour')
+    expect(english.html).toContain('<html lang="en"')
+    expect(english.text).toBe('Hello')
+    await expect(mail.render({ to: 'ada@example.com', subject: 'Hallo', view: Hello, lang: 'de' })).rejects.toThrow('none of the site\'s locales')
   })
 
   it('takes no props for a mail without required ones, and the text it is given over the one written from the html', async () => {
