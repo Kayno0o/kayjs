@@ -27,12 +27,12 @@ onPagesInvalidated((paths) => {
   markStale(path => paths.includes(path))
 })
 
-// `stale` has every page wait for a fresh render on its first request, as when the build rendered them for another site.
-export function trackPrerendered(pages: Map<string, ServedPage>, stale = false): void {
+// A page `stale` picks waits for a fresh render on its first request, as one the build rendered for another site.
+export function trackPrerendered(pages: Map<string, ServedPage>, stale: (page: ServedPage) => boolean = () => false): void {
   served.add(pages)
 
-  if (stale) {
-    for (const page of pages.values())
+  for (const page of pages.values()) {
+    if (stale(page))
       revalidationOf(page).invalidatedAt = ++invalidations
   }
 }

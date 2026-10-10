@@ -94,7 +94,7 @@ async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<str
     if (!paths)
       byRoute.set(page.pattern, paths = new Map<string, ServedPage>())
 
-    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, islands: page.islands, ...loaded[index]! })
+    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, islands: page.islands, readsSite: page.readsSite, ...loaded[index]! })
   }
 
   return byRoute
@@ -346,7 +346,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     console.warn(`[kay] kay build rendered its pages for ${client.site ?? 'no site'} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
 
   for (const pages of prerendered.values())
-    trackPrerendered(pages, moved)
+    trackPrerendered(pages, page => moved || page.readsSite === true)
 
   const matchers = await loadMatchers(routesDir, routes)
   const trailingSlash = options.trailingSlash ?? 'never'

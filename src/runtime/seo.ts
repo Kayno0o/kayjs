@@ -1,5 +1,5 @@
 import { withBase } from './base'
-import { configuredSite } from './site'
+import { renderedSite } from './site'
 
 // Schema.org structured data: `@type` names what it describes, every other property is the vocabulary's own.
 export interface JsonLd {
@@ -24,7 +24,7 @@ export function siteUrl(path = '/'): string {
   if (typeof document !== 'undefined')
     return window.location.origin + withBase(path)
 
-  const site = configuredSite()
+  const site = renderedSite()
 
   if (site === undefined)
     throw unsetSite('siteUrl()')
@@ -38,7 +38,7 @@ export function siteOrigin(): string {
   if (typeof document !== 'undefined')
     return window.location.origin
 
-  const site = configuredSite()
+  const site = renderedSite()
 
   if (site === undefined)
     throw unsetSite('siteOrigin()')

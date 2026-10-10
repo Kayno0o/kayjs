@@ -10,7 +10,7 @@ import { isAction } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { runInLocale } from '../runtime/locale-state'
-import { setSite } from '../runtime/site'
+import { setSite, standInReads } from '../runtime/site'
 import { scanApi } from './api'
 import { basePath } from './base'
 import { setupCards } from './card'
@@ -60,7 +60,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   const site = config.site === undefined ? undefined : siteOrigin(config.site) + basePath(config.base)
 
-  setSite(site, config.trailingSlash)
+  setSite(site, config.trailingSlash, true)
   const maxDensity = applyImageConfig(config.images)
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
@@ -96,6 +96,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
       for (const copy of localeCopies(i18n?.settings, path)) {
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
+        const reads = standInReads()
         const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head, base: basePath(config.base), maxDensity, offline: config.offline !== undefined })
         const response = await (i18n && copy.locale !== undefined ? runInLocale(stateFor(i18n, copy.locale, path, request), render) : render())
 
@@ -112,6 +113,10 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
           throw new Error(`kay: ${copy.path} links an image only the image route resizes, such as one from images.dirs, and no file of it is exported`)
 
         const islands = serverIslandModes(html)
+        const readsSite = standInReads() > reads
+
+        if (options.exportAll && readsSite)
+          throw new Error('kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts nor SITE_URL sets')
 
         if (options.exportAll && islands.length > 0)
           throw new Error(`kay: it holds ${islands.length === 1 ? 'a server island' : `${islands.length} server islands`}, which only a server renders per request`)
@@ -128,7 +133,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         paths.set(name, copy.key)
         await mkdir(join(dir, name, '..'), { recursive: true })
         await Bun.write(join(dir, name), html)
-        pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {} }
+        pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...readsSite ? { readsSite } : {} }
       }
     }
   }
@@ -160,6 +165,11 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   if (problems.length > 0 || apiProblems.length > 0)
     throw new ExportError(`kay: ${[count(problems.length, 'page'), count(apiProblems.length, 'API module')].filter(part => part !== '').join(' and ')} cannot be exported to static files, which no server answers for:\n${[...problems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)
+
+  const siteless = Object.keys(pages).filter(path => pages[path]!.readsSite)
+
+  if (siteless.length > 0)
+    console.warn(`[kay] ${siteless.join(', ')} read the site, which neither \`site\` in kay.config.ts nor SITE_URL sets at build: the server renders ${siteless.length === 1 ? 'it' : 'each'} again on its first request`)
 
   await writeManifest(root, { ...manifest, pages, site })
   client.pages = new Map(Object.entries(pages))

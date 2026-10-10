@@ -792,6 +792,29 @@ describe('revalidation', () => {
     }
   })
 
+  it('builds a page reading the site with none set, and renders it again for the site the server runs for', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      await prerenderPages(root, { routes }, (await readClient(root))!)
+
+      expect((await readManifest(root))!.pages!['/origin']!.readsSite).toBe(true)
+      expect(warned).toHaveBeenCalledWith('[kay] /origin read the site, which neither `site` in kay.config.ts nor SITE_URL sets at build: the server renders it again on its first request')
+
+      const app = await pages({ routes, prebuilt: true, security: false, site: 'https://example.com' })
+
+      expect(await (await app.handle(new Request('http://localhost/origin'))).text()).toContain('<p class="origin">https://example.com</p>')
+      await expect(prerenderPages(root, { routes }, (await readClient(root))!, { exportAll: true })).rejects.toThrow('origin.kay: it reads the site, through siteUrl() or siteOrigin()')
+    }
+    finally {
+      warned.mockRestore()
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
   it('renders a page an action invalidated before the next request gets it, whatever its revalidate period', async () => {
     const root = process.cwd()
     const manifest = (await readManifest(root))!

@@ -1,0 +1,8 @@
+--- server
+import { siteOrigin } from 'kay/seo'
+
+export const prerender = true
+
+const origin = siteOrigin()
+---
+p.origin {origin}
