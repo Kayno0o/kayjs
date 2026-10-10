@@ -11,7 +11,7 @@ description: Send mail from kay apps with SMTP, mails written as .kay components
 bun add @kaynooo/kayjs-mail
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc`. kay and Elysia are peers.
+The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc` (a project made by `kay new` has it). kay 1.28 or later and Elysia are peers.
 
 ## Setup
 
@@ -23,13 +23,19 @@ import { mailer } from '@kaynooo/kayjs-mail'
 export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'en' })
 ```
 
-It is an Elysia plugin, so the server uses it to run the queue and, in development, serve the outbox at `/_kay/mail`:
+Listed in `kay.config.ts`, the server uses it to run the queue and, in development, serve the outbox at `/_kay/mail`:
 
 ```ts
-export const app = new Elysia().use(mail).use(await pages()).listen(3000)
+import { mailExtension } from '@kaynooo/kayjs-mail'
+
+export default defineConfig({
+  extensions: [
+    mailExtension(async () => (await import('./src/mail')).mail),
+  ],
+})
 ```
 
-In production the mailer reads `SMTP_HOST` (required), `SMTP_PORT` (465 by default), `SMTP_USER` and `SMTP_PASS`, and `SMTP_FROM` unless `from` is set. A missing one stops the boot.
+In production the mailer reads `SMTP_HOST` (required), `SMTP_PORT` (465 by default), `SMTP_USER` and `SMTP_PASS`, and `SMTP_FROM` unless `from` is set. A missing one stops the boot. `MAIL_TO` is where a mail naming no recipient goes, such as a contact form's, and DKIM signing and a rate limit have variables of their own.
 
 ## Writing a mail
 
@@ -49,6 +55,8 @@ Layout(preheader="Your account is ready")
   Paragraph Confirm your address to start.
   Button(href={url}) Confirm my address
 ```
+
+Besides `Layout`, `Heading`, `Paragraph` and `Button`, it ships `Code`, `Divider`, `Image`, `Link`, and `Row` with `Column` for columns that stack on a phone. They hold in Outlook for Windows, and switch to dark colours in a client's dark mode, derived from the light ones unless `settings.dark` gives them.
 
 <Callout type="note">
 
@@ -82,7 +90,21 @@ export const signUp = action(newUser, async ({ name, email }) => {
 ---
 ```
 
-A message also takes `cc`, `bcc`, `replyTo`, `attachments`, or `html` and `text` in place of `view`.
+A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `lang`, `unsubscribe` for one-click unsubscribe, or `html` and `text` in place of `view`. Left without `to`, it goes to `MAIL_TO`.
+
+## Previewing
+
+In development, `/_kay/mail` lists the mails sent, each with its html at desktop or phone width, its text and its size. `/_kay/mail/samples` renders every mail under `src/mails` without sending it, with the props a `.preview.ts` beside it default-exports:
+
+```ts
+// src/mails/welcome.preview.ts
+import type Welcome from './welcome.kay'
+
+export default {
+  name: 'Ada',
+  url: 'https://example.com/confirm',
+} satisfies Parameters<typeof Welcome>[0]
+```
 
 ## Testing
 
@@ -103,6 +125,8 @@ await site.runJobs()
 
 expect(outbox.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
 ```
+
+`outbox.waitFor(address)` waits for a mail to arrive, and `outbox.links(mail)` gives the links it carries, such as a confirmation link to visit next.
 
 [kayjs-auth](/libraries/kayjs-auth) takes the mailer's `enqueue` as its `email.mailer.send`.
 
