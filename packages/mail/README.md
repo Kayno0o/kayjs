@@ -27,8 +27,10 @@ export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'fr' })
 ```
 
 ```ts
-// src/server.ts: runs the queue, and lists the outbox at /_kay/mail in development
-export const app = new Elysia().use(mail).use(await pages()).listen(3000)
+// kay.config.ts: the server runs the queue, and lists the outbox at /_kay/mail in development (kay 1.26 or later; before, `new Elysia().use(mail)` in src/server.ts)
+import { mail } from './src/mail'
+
+export default defineConfig({ extensions: [mail.extension] })
 ```
 
 ```kay

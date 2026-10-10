@@ -1,4 +1,4 @@
-import type { EnqueueOptions, QueueOptions } from 'kay/server'
+import type { EnqueueOptions, KayExtension, QueueOptions } from 'kay/server'
 import type { Address, Delivery, Mail, Message, Transport } from './types'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -44,6 +44,8 @@ export type Mailer = Elysia & {
   render: <P extends object>(message: Message<P>) => Promise<Mail>
   // Sends every queued mail whose time has come, here and now, as a script or a test does without the server running the queue.
   drain: () => Promise<number>
+  // Listed in `kay.config.ts`'s `extensions`, so `pages()` uses the mailer and the server needs no `.use(mail)`; kay 1.26 or later.
+  extension: KayExtension
 }
 
 const DOCTYPE = /^\s*<!doctype/i
@@ -186,6 +188,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
     render,
     drain: jobs.drain,
+    extension: { name: '@kaynooo/kayjs-mail', server: plugin },
   })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.

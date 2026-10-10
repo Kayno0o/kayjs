@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
 
@@ -53,6 +54,15 @@ describe('the development outbox page', () => {
 
     expect(second).toContain('<th>Reply-To</th><td>visitor@example.com</td>')
     expect(second).not.toContain('<iframe')
+  })
+
+  it('is served by an app listing the mailer as an extension, with no .use of its own', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+    const site = await testSite({ root: 'tests/fixture', extensions: [mail.extension] })
+
+    await mail.send({ to: 'ada@example.com', subject: 'Through the app', text: 'Hello' })
+
+    expect((await site.visit('/_kay/mail')).html).toContain('Through the app')
   })
 
   it('answers 404 for a mail no longer kept', async () => {
