@@ -4,7 +4,7 @@ import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as
 import { insideIsland, noteMessage } from './island.server'
 import { localeState } from './locale-state'
 
-export type { Direction, Locale, LocaleSettings, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions } from './i18n'
+export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions } from './i18n'
 export { defineMessages } from './i18n'
 
 function current(name: string): LocaleState {

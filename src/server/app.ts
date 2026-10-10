@@ -172,7 +172,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   refuseClashes(routesDir, scanned)
   const routes = await Promise.all(scanned.map(loadGuards))
-  const i18n = options.i18n ? await loadI18n(root, options.i18n) : undefined
+  const i18n = options.i18n ? await loadI18n(root, options.i18n, options.extensions) : undefined
 
   if (i18n) {
     refuseLocaleClashes(i18n.settings, routes)

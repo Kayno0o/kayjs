@@ -1,10 +1,11 @@
-import type { I18nConfig } from '../config'
+import type { I18nConfig, KayExtension } from '../config'
 import type { LocaleSettings, Message, MessageTree, Translations } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
 import type { Route } from './routes'
 import { existsSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
+import { throughLinks } from '../build/libraries'
 import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { bundled, importModule } from './bundle'
@@ -27,6 +28,11 @@ export interface I18n {
 
 export function messagesFile(root: string, config: I18nConfig, locale: string): string {
   return join(resolve(root, config.messages ?? MESSAGES_DIR), `${locale}.ts`)
+}
+
+// The catalogs the extensions give a locale, in the order they are listed, the app's own laid over them.
+export function extensionMessageFiles(root: string, extensions: KayExtension[] | undefined, locale: string): string[] {
+  return (extensions ?? []).flatMap(extension => extension.messages === undefined ? [] : [join(throughLinks(root, resolve(extension.messages)), `${locale}.ts`)])
 }
 
 // The settings the config gives, refused when they cannot serve a page: a default outside the locales, a tag no browser sends, a domain for no locale.
@@ -164,24 +170,34 @@ function firstSegment(path: string): string {
   return end === -1 ? path.slice(1) : path.slice(1, end)
 }
 
-// Every locale's messages, the default locale's standing in for a key another lacks.
-export async function loadI18n(root: string, config: I18nConfig): Promise<I18n> {
+// Every locale's messages, the app's laid over its extensions' key by key, the default locale's standing in for a key another lacks.
+export async function loadI18n(root: string, config: I18nConfig, extensions?: KayExtension[]): Promise<I18n> {
   const settings = localeSettings(config)
   const bundle = bundled()
+  const exists = (file: string) => bundle ? file in bundle.modules : existsSync(file)
   const flat = new Map<string, Map<string, Message>>()
 
   for (const locale of settings.locales) {
     const file = messagesFile(root, config, locale)
 
-    if (!(bundle ? file in bundle.modules : existsSync(file)))
+    if (!exists(file))
       throw new Error(`kay: i18n lists ${locale}, so its messages go in ${relative(process.cwd(), file)}: export default defineMessages({ ... })`)
 
-    const tree = (await importModule<{ default?: unknown }>(file)).default
+    const messages = new Map<string, Message>()
 
-    if (typeof tree !== 'object' || tree === null)
-      throw new Error(`kay: ${relative(process.cwd(), file)} must export its messages by default: export default defineMessages({ ... })`)
+    const libraries = bundle ? bundle.extensionMessages?.[locale] ?? [] : extensionMessageFiles(root, extensions, locale).filter(exists)
 
-    flat.set(locale, flattenMessages(tree as MessageTree))
+    for (const catalog of [...libraries, file]) {
+      const tree = (await importModule<{ default?: unknown }>(catalog)).default
+
+      if (typeof tree !== 'object' || tree === null)
+        throw new Error(`kay: ${relative(process.cwd(), catalog)} must export its messages by default: export default defineMessages({ ... })`)
+
+      for (const [key, message] of flattenMessages(tree as MessageTree))
+        messages.set(key, message)
+    }
+
+    flat.set(locale, messages)
   }
 
   const fallback = flat.get(settings.defaultLocale)!

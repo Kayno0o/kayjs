@@ -50,6 +50,13 @@ export type MessageKey = [Messages] extends [never] ? string : KeysOf<Messages>
 export type Translate = [Messages] extends [never]
   ? (key: string, params?: Record<string, MessageValue>) => string
   : <Key extends KeysOf<Messages>>(key: Key, ...params: ParamArgs<At<Messages, Key>>) => string
+// The messages `b` lays over `a`, key by key: a library's catalog under the app's, which `kay check` registers when an extension brings messages.
+export type MergeMessages<A, B> = {
+  readonly [Key in keyof A | keyof B]: Key extends keyof B
+    ? Key extends keyof A ? IsGroup<A[Key]> extends true ? IsGroup<B[Key]> extends true ? MergeMessages<A[Key], B[Key]> : B[Key] : B[Key] : B[Key]
+    : Key extends keyof A ? A[Key] : never
+}
+type IsGroup<Value> = Value extends string ? false : IsPlural<Value> extends true ? false : true
 export type Localize = <const Href extends string>(href: Href & CheckedHref<Href>, locale?: Locale) => string
 
 const PLACEHOLDER = /\{(\w+)\}/g

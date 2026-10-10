@@ -1,6 +1,6 @@
 import type { Subprocess } from 'bun'
 import type { FSWatcher } from 'node:fs'
-import type { KayExtension } from '../config'
+import type { I18nConfig, KayExtension } from '../config'
 import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -14,6 +14,8 @@ export interface DevOptions {
   routes?: string | undefined
   extensions?: KayExtension[] | undefined
   publicDir?: string | undefined
+  // The locales, which prefix the routes links are checked against and type `t()`'s keys.
+  i18n?: I18nConfig | undefined
   api?: string | undefined
   // The app's modules for its libraries' settings, for the settings check in `.kay/types`.
   settings?: Record<string, string> | undefined
@@ -203,9 +205,9 @@ function describe(files: string[]): string {
 }
 
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
-async function regenerateTypes(root: string, { entry, routes, extensions, publicDir, api, settings }: DevOptions) {
+async function regenerateTypes(root: string, { entry, routes, extensions, publicDir, api, settings, i18n }: DevOptions) {
   try {
-    await writeShadowTypes(root, { entry, routes, extensions, publicDir, api, settings })
+    await writeShadowTypes(root, { entry, routes, extensions, publicDir, api, settings, i18n })
   }
   catch (error) {
     console.error(error)

@@ -84,3 +84,33 @@ Using one:
 - A library imports an optional peer with `import()` inside a `try` block, or followed by `.catch`: Bun builds an app without the peer then, and fails on a bare `import()` of a package it cannot find.
 - `settings` in `kay.config.ts` replaces a library's settings module with the app's, by the library's name, on the server and in the browser: `settings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`, a module default-exporting the library's `Settings`, which may spread the library's defaults to change a few: `export default { ...defaults, tone: 'text-red-500' }`. `kay check` checks it against the defaults it replaces. One process renders with one set of settings: `kay test`, the server and `kay build` all read them from `kay.config.ts`.
 - A library linked rather than installed, `"@kaynooo/kayjs-ui": "link:../kayjs-ui"`, works the same, and so does one installed in a `node_modules` above the project, as a workspace hoists it: the app's own `package.json` names it either way.
+
+### Extensions
+
+A library hands the app one value to list in `extensions` in `kay.config.ts`, typed `KayExtension` from `kay/server`, and the app needs no other line:
+
+```ts
+// The library's index.ts
+import type { KayExtension } from 'kay/server'
+
+export function authPages({ prefix = '/auth' } = {}): KayExtension {
+  return { name: '@kaynooo/kayjs-auth', routes: { dir: `${import.meta.dir}/routes`, prefix }, messages: `${import.meta.dir}/messages` }
+}
+```
+
+```ts
+// The app's kay.config.ts
+import { authPages } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({ extensions: [authPages()] })
+```
+
+- `routes` lays a directory of the library's `.kay` pages, layouts, guards and special pages over the app's `src/routes` at `prefix`, the root by default: `routes/login.kay` serves `/auth/login`, its server fence, load and actions included, as if it were `src/routes/auth/login.kay`.
+- A file of the app at the same path replaces the library's: `src/routes/auth/login.kay` serves `/auth/login` in its place, and the library's other pages stay.
+- Layouts, guards, `_404.kay` and `_error.kay` resolve per URL directory across both trees, the app's file winning at a level both have one: the app's root layout wraps a library page, and a library `_layout.kay` wraps its pages, an app page replacing one of them included, unless the app has its own `_layout.kay` in `src/routes/auth`.
+- Its islands and stylesheets are bundled with the app's, and `kay build --compile` and `--static` carry its pages; a static export refuses a library page taking an action, as it refuses the app's, unless the app replaces it.
+- `kay check` lets links point at its pages; type errors inside its files are the library's own check's.
+- Param matchers a library route names come from the app's `src/params` or kay's built-ins.
+- `messages` names a directory of catalogs, `<locale>.ts` each, laid under the app's `src/messages` key by key: see [Locales](locales.md).
+- `transformPage` rewrites each prerendered page before it is written: see [Page hooks](routing.md#page-hooks).

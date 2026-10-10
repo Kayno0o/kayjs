@@ -12,6 +12,8 @@ export interface Bundle {
   // The modules under the API directory, mounted under `/api`.
   api?: ApiModule[]
   modules: Record<string, unknown>
+  // The message catalogs the extensions gave each locale, found where the build ran: an extension names its own under the executable's.
+  extensionMessages?: Record<string, string[]>
   config: KayConfig
   clientDir: string
   publicDir: string

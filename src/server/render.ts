@@ -4,6 +4,7 @@ import type { Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
 import type { HeadOptions } from '../runtime/head'
 import type { ServerIslandMode } from '../runtime/html'
+import type { Locale } from '../runtime/i18n'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Encoding } from './compress'
 import type { Flash, SuccessFlash } from './flash'
@@ -370,7 +371,8 @@ function createRendering(context: RequestContext, params: Record<string, unknown
     ctx: {
       request,
       url,
-      locale: localeState()?.locale ?? lang,
+      // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them
+      locale: (localeState()?.locale ?? lang) as Locale,
       params,
       get query() {
         return query ??= readQuery(undefined, url)

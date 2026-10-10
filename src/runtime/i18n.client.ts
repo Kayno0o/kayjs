@@ -2,7 +2,7 @@ import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue
 import { withBase, withoutBase } from './base'
 import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 
-export type { Direction, Locale, LocaleSettings, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions } from './i18n'
+export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions } from './i18n'
 export { defineMessages } from './i18n'
 
 // What the server writes for a page's islands, one script per part of a streamed page: the locale, and the messages its islands use.

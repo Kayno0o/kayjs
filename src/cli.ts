@@ -584,8 +584,8 @@ async function runDev(args: string[]): Promise<number> {
 
   warnOtherKay('dev', root)
   const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
-  const { routes, extensions, publicDir, api, settings } = await loadConfig(root)
-  const stop = await dev(root, { entry, routes, extensions, publicDir, api, settings })
+  const { routes, extensions, publicDir, api, settings, i18n } = await loadConfig(root)
+  const stop = await dev(root, { entry, routes, extensions, publicDir, api, settings, i18n })
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)

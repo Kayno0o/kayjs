@@ -30,7 +30,7 @@ import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
 import { scanApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
-import { localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
+import { extensionMessageFiles, localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
@@ -180,7 +180,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const contentConfig = resolve(root, options.content ?? CONTENT_CONFIG)
   const content = existsSync(contentConfig) ? relative(dirname(environmentPath), contentConfig).replace(TS_EXTENSION, '') : undefined
 
-  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, prefixes, messages: relative(dirname(environmentPath), messagesFile(root, options.i18n, options.i18n.defaultLocale)).replace(TS_EXTENSION, '') }, config, app, content))
+  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, settings && options.i18n && { locales: options.i18n.locales, prefixes, messages: [...extensionMessageFiles(root, options.extensions, options.i18n.defaultLocale).filter(file => existsSync(file)), messagesFile(root, options.i18n, options.i18n.defaultLocale)].map(file => relative(dirname(environmentPath), file).replace(TS_EXTENSION, '')) }, config, app, content))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS]
@@ -390,20 +390,23 @@ function i18nSettings(root: string, config: I18nConfig, diagnostics: CheckDiagno
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string }, config?: string, app?: string, content?: string): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   // The collections' feeds are served as files are, a localized one's under each locale's prefix too.
   const feed = content === undefined ? undefined : `FeedPathsOf<typeof import(${importSpecifier(content)})>`
   const prefixes = i18n?.prefixes.map(locale => JSON.stringify(`/${locale}`)).join(' | ')
   const feeds = feed === undefined ? [] : [feed, ...prefixes === undefined || prefixes === '' ? [] : [`\`\${${prefixes}}\${${feed}}\``]]
   const paths = [...files.flatMap(spellings).map(file => JSON.stringify(file)), ...feeds].join(' | ') || 'never'
-  const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: typeof import(${importSpecifier(i18n.messages)}).default` : ''
+  // The app's catalog laid over its extensions', key by key.
+  const messages = i18n?.messages.map(file => `typeof import(${importSpecifier(file)}).default`).reduce((under, over) => `MergeMessages<${under}, ${over}>`)
+  const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: ${messages}` : ''
   const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
   const publicEnv = config === undefined ? '' : `, publicEnv: PublicEnvOf<typeof import(${importSpecifier(config)}).default>`
 
   return [
     'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, FieldName, FunctionProp, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
+    ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',
     'declare module \'kay\' {',
     `  interface Register { routes: ${routes}, files: ${paths}${locales}${modules}${publicEnv} }`,
@@ -509,7 +512,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
   const shown = await resolvedConfig(root, tsconfig)
   const projectUnused = unusedCodesOf(shown)
-  const [{ output, errors, code }, messages, boot] = await Promise.all([typecheck(root, tsconfig, shown), checkMessages(root, options.i18n), bootProblems(resolve(root), options)])
+  const [{ output, errors, code }, messages, boot] = await Promise.all([typecheck(root, tsconfig, shown), checkMessages(root, options.i18n, options.extensions), bootProblems(resolve(root), options)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
@@ -586,11 +589,11 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 }
 
 // Each locale's messages against the default locale's, read in a process of its own so an edited file is read afresh.
-async function checkMessages(root: string, config: I18nConfig | undefined): Promise<CheckDiagnostic[]> {
+async function checkMessages(root: string, config: I18nConfig | undefined, extensions: KayExtension[] = []): Promise<CheckDiagnostic[]> {
   if (!config)
     return []
 
-  const child = Bun.spawn([process.execPath, MESSAGE_PROBLEMS, resolve(root), JSON.stringify(config)], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, MESSAGE_PROBLEMS, resolve(root), JSON.stringify(config), JSON.stringify(extensions.map(({ name, messages }) => ({ name, messages })))], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   if (code !== 0)

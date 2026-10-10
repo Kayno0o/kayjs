@@ -30,6 +30,8 @@ export default defineMessages({
 })
 ```
 
+A library listed in `extensions` can bring catalogs of its own, `<locale>.ts` each in the directory its `messages` names (see [Extensions](components.md#extensions)): every locale reads the library's messages with the app's laid over them key by key, so `auth: { title: 'Connexion' }` in `src/messages/fr.ts` replaces that one text of the library and keeps the rest. `t()` types the keys of both, and `kay check` holds each locale to the default one's keys, the library's included, so a locale the library does not translate is the app's to fill.
+
 `kay/i18n` works anywhere a request is served from: loads, templates, components, islands, actions and guards.
 
 - `t('greeting', { name })` gives a message in the request's locale, its key and placeholders typed from the default locale's file. A number fills a placeholder formatted for the locale, `1 234` in French, and a date with `dateStyle: 'medium'`. An object of plural forms is picked by `count` through `Intl.PluralRules`, `zero` taking 0 whenever it is given. A key no locale has renders as itself.

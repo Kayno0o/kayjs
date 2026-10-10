@@ -51,6 +51,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `base` | Where the site is mounted when not at its host's root, `/docs` |
 | `trailingSlash` | `never` (the default), `always` or `ignore` |
 | `prefetch` | When links are fetched ahead: `moderate` (on hover) by default |
+| `extensions` | What libraries add: their pages under a prefix, which an app file at the same path replaces, their message catalogs, and page hooks. See [Routing](/essentials/routing#pages-from-a-library) |
 | `navigation` | The in-place page swap, on by default. `false` loads every page fully. See [Islands](/essentials/islands) |
 
 ## Content and i18n

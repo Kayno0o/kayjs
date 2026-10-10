@@ -71,7 +71,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   refuseClashes(routesDir, routes)
   const matchers = await loadMatchers(routesDir, routes)
-  const i18n = config.i18n ? await loadI18n(root, config.i18n) : undefined
+  const i18n = config.i18n ? await loadI18n(root, config.i18n, config.extensions) : undefined
 
   if (i18n)
     i18n.settings = routedSettings(i18n.settings, routes)
