@@ -14,11 +14,22 @@ describe('rendering', () => {
   it('renders a .kay mail as a whole html document, themed by the app\'s settings, and writes its text from it', async () => {
     const rendered = await mail.render({ to: 'ada@example.com', subject: 'Welcome <Ada>', view: Welcome, props: { name: 'Ada', url: URL } })
 
-    expect(rendered.html).toStartWith('<!doctype html><html lang="fr"><head><meta charset="utf-8">')
+    expect(rendered.html).toStartWith('<!doctype html><html lang="fr" xmlns:v="urn:schemas-microsoft-com:vml"')
     expect(rendered.html).toContain('<title>Welcome &lt;Ada&gt;</title>')
     expect(rendered.html).toContain('background:#0047ff')
     expect(rendered.text).toBe(`Welcome, Ada\n\nYour account is ready. Confirm your address to start.\n\nConfirm my address (${URL})\n\nOr paste ${URL} into your browser.\n\nSent by the fixture site`)
     expect(rendered).toMatchObject({ from: 'Fixture <hello@fixture.test>', to: ['ada@example.com'], cc: [], bcc: [], subject: 'Welcome <Ada>' })
+  })
+
+  it('holds in Outlook for Windows: its settings in the head, the card in a fixed-width table, the button padded by hidden spaces', async () => {
+    const { html } = await mail.render({ to: 'ada@example.com', subject: 'Welcome', view: Welcome, props: { name: 'Ada', url: URL } })
+
+    expect(html).toContain('<o:PixelsPerInch>96</o:PixelsPerInch>')
+    expect(html).toContain('<!--[if true]><table role="presentation" width="560" align="center"')
+    expect(html).toContain('style="max-width:560px;margin:0 auto"')
+    expect(html).toContain('bgcolor="#ffffff"')
+    expect(html).toContain('mso-hide:all')
+    expect(html).toContain('<!--[if mso]><i style="mso-font-width:125%;mso-text-raise:150%" hidden>&emsp;</i><span style="mso-text-raise:75%"><![endif]-->Confirm my address<!--[if mso]></span>')
   })
 
   it('takes no props for a mail without required ones, and the text it is given over the one written from the html', async () => {

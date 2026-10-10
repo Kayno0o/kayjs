@@ -1,8 +1,14 @@
 ---
+import { mso } from './mso'
 import settings from './settings'
 
 const { href } = props<{ href: string }>()
 ---
-div(style="margin:24px 0")
-  a(href={href} style={`display:inline-block;padding:12px 20px;background:${settings.accent};color:${settings.onAccent};text-decoration:none;font-weight:600;border-radius:${settings.radius}`})
-    slot
+table(role="presentation" cellpadding="0" cellspacing="0" border="0")
+  tr
+    td(style="padding:24px 0")
+      // Outlook drops an inline link's padding: hidden em spaces widened by `mso-font-width` and raised text stand in for it, so the whole button stays coloured and clickable.
+      a(href={href} style={`display:inline-block;padding:0.75em 1.25em;font-size:16px;font-weight:600;background:${settings.accent};color:${settings.onAccent};text-decoration:none;border-radius:${settings.radius};mso-padding-alt:0;text-underline-color:${settings.accent}`})
+        {mso('<i style="mso-font-width:125%;mso-text-raise:150%" hidden>&emsp;</i><span style="mso-text-raise:75%">')}
+        slot
+        {mso('</span><i style="mso-font-width:125%" hidden>&emsp;&#8203;</i>')}

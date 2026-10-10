@@ -49,6 +49,8 @@ export type Mailer = Elysia & {
 const DOCTYPE = /^\s*<!doctype/i
 const HTML_ROOT = /^\s*<html[\s>]/i
 const LINE_BREAK = /[\r\n]/
+// Keeps Outlook for Windows from scaling the mail on a high-DPI screen and from switching to its own typography.
+const OUTLOOK_SETTINGS = '<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings><w:WordDocument><w:DontUseAdvancedTypographyReadingMail/></w:WordDocument></xml></noscript><![endif]-->'
 
 function list(addresses: Address | Address[] | undefined): Address[] {
   return addresses === undefined ? [] : Array.isArray(addresses) ? addresses : [addresses]
@@ -69,7 +71,7 @@ function asDocument(html: string, subject: string, lang: string): string {
   if (HTML_ROOT.test(html))
     return `<!doctype html>${html}`
 
-  return `<!doctype html><html lang="${escape(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(subject)}</title></head><body style="margin:0;padding:0">${html}</body></html>`
+  return `<!doctype html><html lang="${escape(lang)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting" content="true"><title>${escape(subject)}</title>${OUTLOOK_SETTINGS}</head><body style="margin:0;padding:0">${html}</body></html>`
 }
 
 function named(address: string, name: string | undefined): Address {

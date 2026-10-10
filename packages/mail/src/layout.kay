@@ -1,14 +1,26 @@
 ---
 import type { JSX } from 'kay'
+import { ghostTable } from './mso'
 import settings from './settings'
 
 const { preheader, footer } = props<{ preheader?: string | undefined, footer?: JSX.Element }>()
+const [open, close] = ghostTable(settings.width)
 ---
-div(style={`background:${settings.background};padding:24px 12px;font-family:${settings.font};color:${settings.text}`})
-  if preheader
-    div(style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0" aria-hidden="true") {preheader}
-  div(style={`max-width:${settings.width}px;margin:0 auto;background:${settings.surface};border:1px solid ${settings.border};border-radius:${settings.radius};padding:32px 28px`})
-    slot
-  if footer
-    div(style={`max-width:${settings.width}px;margin:16px auto 0;font-size:12px;line-height:1.5;color:${settings.muted};text-align:center`})
-      | {footer}
+table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor={settings.background} style={`background:${settings.background}`})
+  tr
+    td(align="center" style={`padding:24px 12px;font-family:${settings.font};color:${settings.text}`})
+      if preheader
+        div(style="display:none;mso-hide:all;max-height:0;max-width:0;overflow:hidden;opacity:0" aria-hidden="true") {preheader}
+      {open}
+      table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style={`max-width:${settings.width}px;margin:0 auto`})
+        tr
+          td(align="left" bgcolor={settings.surface} style={`background:${settings.surface};border:1px solid ${settings.border};border-radius:${settings.radius};padding:32px 28px;font-family:${settings.font};color:${settings.text}`})
+            slot
+      {close}
+      if footer
+        {open}
+        table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style={`max-width:${settings.width}px;margin:0 auto`})
+          tr
+            td(align="center" style={`padding-top:16px;font-family:${settings.font};font-size:12px;line-height:1.5;color:${settings.muted}`})
+              | {footer}
+        {close}
