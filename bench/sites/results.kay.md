@@ -12,11 +12,13 @@ cromignon24 and jb-peinture as they last ran on Astro, then on kay, each built a
 
 Average over every page: text as brotli at quality 11 sends it, images as served at each viewport (desktop 1280 px at 1x, phone 390 px at 3x), and the fonts the stylesheets can load for Latin text.
 
+Inline `<script>` bodies count as JS, weighed as what they add to the page's brotli (kayjs #158). These figures predate that change, so their HTML and JS rows were corrected from the cached builds of the same commits. cromignon24's home page is not prerendered, so its share is the average of its other pages'.
+
 |  | cromignon24 kay | jb-peinture kay |
 | --- | --- | --- |
-| HTML | 5.2 KB | 6.9 KB |
+| HTML | 5.1 KB | 6.8 KB |
 | CSS | 5.3 KB | 6.8 KB |
-| JS | 10.0 KB | 10.3 KB |
+| JS | 10.1 KB | 10.4 KB |
 | JS files | 2.0 | 5.0 |
 | images, desktop | 55.2 KB | 36.4 KB |
 | images, phone | 114.5 KB | 105.2 KB |

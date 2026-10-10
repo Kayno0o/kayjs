@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { latinFontUrls, pickImage, slotWidth } from './weigh'
+import { latinFontUrls, pickImage, slotWidth, splitInlineScripts } from './weigh'
 
 const PHONE = { name: 'phone', width: 390, dpr: 3 }
 const DESKTOP = { name: 'desktop', width: 1280, dpr: 1 }
@@ -57,5 +57,27 @@ describe('latinFontUrls', () => {
     ].join('\n')
 
     expect(latinFontUrls(css, '/_astro/fonts.css')).toEqual(['/a-latin.woff2', '/_astro/b.woff'])
+  })
+})
+
+describe('splitInlineScripts', () => {
+  const page = (body: string) => new TextEncoder().encode(`<!doctype html><html><head><title>A page</title>${body}</head><body><main><h1>Hello</h1><p>Some text for the page.</p></main></body></html>`)
+
+  it('moves what inline scripts add to the page from HTML to JS', async () => {
+    const plain = await splitInlineScripts(page(''))
+    const scripted = await splitInlineScripts(page('<script type="module">const menu = document.querySelector("#menu"); menu?.addEventListener("click", () => menu.classList.toggle("open"))</script><script>window.dataLayer = []</script>'))
+
+    expect(plain.js).toBe(0)
+    expect(scripted.scripts).toHaveLength(2)
+    expect(scripted.js).toBeGreaterThan(0)
+    // Once the bodies are out, the markup is the plain page plus two empty script tags.
+    expect(scripted.html - plain.html).toBeLessThan(scripted.js)
+  })
+
+  it('leaves external scripts and data blocks in the HTML', async () => {
+    const weight = await splitInlineScripts(page('<script type="module" src="/app.js"></script><script type="application/ld+json">{"@type":"Organization","name":"A"}</script>'))
+
+    expect(weight.js).toBe(0)
+    expect(weight.scripts).toEqual([])
   })
 })

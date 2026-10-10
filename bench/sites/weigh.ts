@@ -41,6 +41,40 @@ function brotli(body: Uint8Array): number {
   return brotliCompressSync(body, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }).length
 }
 
+// A page's inline scripts, and its brotli weight split between its markup and those scripts: what they add to the page's brotli is JS, the rest HTML. JSON-LD and other data blocks stay HTML.
+export async function splitInlineScripts(page: Uint8Array<ArrayBuffer>): Promise<{ html: number, js: number, scripts: string[] }> {
+  const scripts: string[] = []
+  let script: string | undefined
+
+  const markup = await new HTMLRewriter()
+    .on('script', {
+      element(el) {
+        const src = el.getAttribute('src')
+        const type = el.getAttribute('type')
+
+        if ((src === null || src === '') && (type === null || type === '' || type === 'module')) {
+          script = ''
+          el.onEndTag(() => {
+            scripts.push(script!)
+            script = undefined
+          })
+        }
+      },
+      text(chunk) {
+        if (script === undefined)
+          return
+
+        script += chunk.text
+        chunk.remove()
+      },
+    })
+    .transform(new Response(page))
+    .bytes()
+  const html = brotli(markup)
+
+  return { html, js: scripts.some(text => text.trim() !== '') ? brotli(page) - html : 0, scripts }
+}
+
 // HTMLRewriter hands attribute values over as written, entities included.
 function resolve(url: string, base: string): string {
   const resolved = new URL(url.replaceAll('&amp;', '&'), new URL(base, 'http://site'))
@@ -238,34 +272,13 @@ export async function weigh(variant: Variant, path: string): Promise<Weight> {
   const islands = islandChunks(variant)
   const stylesheets: string[] = []
   const scripts: string[] = []
-  const inline: string[] = []
   const images: { src: string | null, srcset: string | null, sizes: string | null }[] = []
-  let script: string | undefined
+  const inline = await splitInlineScripts(page)
 
   await new HTMLRewriter()
     .on('link[rel="stylesheet"]', { element: el => void stylesheets.push(resolve(el.getAttribute('href')!, path)) })
     .on('link[rel="modulepreload"]', { element: el => void scripts.push(resolve(el.getAttribute('href')!, path)) })
-    .on('script', {
-      element(el) {
-        const src = el.getAttribute('src')
-        const type = el.getAttribute('type')
-
-        if (src !== null && src !== '') {
-          scripts.push(resolve(src, path))
-        }
-        else if (type === null || type === '' || type === 'module') {
-          script = ''
-          el.onEndTag(() => {
-            inline.push(script!)
-            script = undefined
-          })
-        }
-      },
-      text(chunk) {
-        if (script !== undefined)
-          script += chunk.text
-      },
-    })
+    .on('script[src]:not([src=""])', { element: el => void scripts.push(resolve(el.getAttribute('src')!, path)) })
     .on('astro-island', { element: el => void scripts.push(...['component-url', 'renderer-url'].map(name => el.getAttribute(name)).filter(url => url !== null).map(url => resolve(url, path))) })
     .on('slot[data-component]', {
       element(el) {
@@ -279,8 +292,8 @@ export async function weigh(variant: Variant, path: string): Promise<Weight> {
     .transform(new Response(page))
     .text()
 
-  const weight: Weight = { html: brotli(page), css: 0, js: 0, jsFiles: 0, fonts: 0, images: {} }
-  const queue = [...scripts, ...inline.flatMap(text => [...text.matchAll(STATIC_IMPORT)].map(([, url]) => resolve(url!, path)))]
+  const weight: Weight = { html: inline.html, css: 0, js: inline.js, jsFiles: 0, fonts: 0, images: {} }
+  const queue = [...scripts, ...inline.scripts.flatMap(text => [...text.matchAll(STATIC_IMPORT)].map(([, url]) => resolve(url!, path)))]
   const seen = new Set<string>()
 
   // Scripts, then every module they import statically.
