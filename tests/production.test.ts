@@ -17,6 +17,7 @@ import { inlineScriptHashes, invalidatePage, pages, shutdown, sqliteJobs, sqlite
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
+import { hookPrerendered } from '../src/server/page-hook'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
 import { signStamp, stampTime, useStampSecret } from '../src/server/stamp'
@@ -873,6 +874,39 @@ describe('revalidation', () => {
       expect(await (await visit()).text()).toContain('<h1>Edition 5</h1>')
       news.edition = 6
       expect(await (await visit()).text()).toContain('<h1>Edition 5</h1>')
+    }
+    finally {
+      news.edition = 1
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('runs the page hook of an extension over a page the server renders again, as the build ran it', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const { news } = await import('./fixtures/production/src/news')
+    const extensions = [{ name: 'signed', transformPage: ({ path, html }: { path: string, html: string }) => html.replace('</body>', `<!--signed ${path}--></body>`) }]
+
+    try {
+      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await hookPrerendered(root, extensions.map(extension => extension.transformPage), { clientDir: (await readClient(root))!.dir, publicDir: join(root, 'public'), base: '' })
+
+      const app = await pages({ routes, prebuilt: true, security: false, extensions })
+      const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
+      const built = await visit()
+
+      expect(built).toContain('<h1>Edition 1</h1>')
+      expect(built).toContain('<!--signed /news--></body>')
+      expect(built.match(/<!--signed/g)).toHaveLength(1)
+
+      news.edition = 2
+      invalidatePage('/news')
+
+      const fresh = await visit()
+
+      expect(fresh).toContain('<h1>Edition 2</h1>')
+      expect(fresh).toContain('<!--signed /news--></body>')
     }
     finally {
       news.edition = 1

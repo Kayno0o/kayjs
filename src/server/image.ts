@@ -306,6 +306,24 @@ function requestedVariant(url: URL, own: { width: number, height: number }, allo
   return aspect ? { width, aspect } : { width }
 }
 
+// The WebP variant `kay build` wrote for an image route URL naming an imported image, or undefined for any other.
+export async function builtVariant(url: URL, clientDir: string, aspects?: readonly string[]): Promise<string | undefined> {
+  const source = sourceFile(url.searchParams.get('src') ?? '', { clientDir, cacheDir: clientDir })
+
+  if (!source?.immutable)
+    return undefined
+
+  try {
+    const variant = requestedVariant(url, await new Bun.Image(Bun.file(source.path)).metadata(), new Set((aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!))))
+    const file = typeof variant === 'string' ? undefined : join(clientDir, VARIANTS_DIR, variantName(source.path, variant))
+
+    return file !== undefined && await Bun.file(file).exists() ? file : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
 // The file a `src` names, a remote image's downloaded copy included, or why the remote one is refused.
 export async function findSource(src: string, options: ImageRouteOptions, client?: string): Promise<{ path: string, immutable: boolean, key?: string } | { status: number, message: string } | undefined> {
   const local = sourceFile(src, options)

@@ -19,7 +19,7 @@ import { KayCompileError } from './build/transform'
 import { applySafeFixes, check, formatCheckDiagnostic } from './check'
 import { formatDiagnostic } from './compiler'
 import { explainLint, isLint, lintList } from './compiler/lints'
-import { loadConfig } from './config'
+import { loadConfig, pageHooks } from './config'
 import { writeContentManifests } from './content/server'
 import { ContentError } from './content/validate'
 import { dev } from './dev'
@@ -36,6 +36,7 @@ import { compressFiles } from './server/compress'
 import { buildingWithoutEnv } from './server/env'
 import { FAVICON_DIR, faviconSource, writeFavicons } from './server/favicon'
 import { avifQuality, writeImageVariants, writeRemoteVariants } from './server/image'
+import { hookPrerendered } from './server/page-hook'
 import { ExportError, prerenderPages } from './server/prerender'
 import { remoteImages, remotePatterns } from './server/remote'
 
@@ -385,6 +386,7 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   if (favicon !== undefined)
     await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR))
 
+  await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: resolve(root, config.publicDir ?? 'public'), base: basePath(config.base), aspects: config.images?.aspects })
   await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 
   return { prerendered, entries }

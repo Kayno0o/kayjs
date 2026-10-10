@@ -4,6 +4,7 @@ import type { Duration } from './runtime/duration'
 import type { JsonLd } from './runtime/seo'
 import type { EnvSchema } from './server/env'
 import type { RequestLogger } from './server/log'
+import type { PageHook } from './server/page-hook'
 import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
@@ -229,6 +230,13 @@ export interface KayExtension {
   routes?: { dir: string, prefix?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.
   messages?: string | undefined
+  // Called with each page `kay build` prerenders, once the files it links are written and before it is compressed, and again when the server renders it afresh: returns the HTML to write.
+  transformPage?: PageHook | undefined
+}
+
+// The page hooks the extensions carry, in their order.
+export function pageHooks(extensions: KayExtension[] | undefined): PageHook[] {
+  return (extensions ?? []).flatMap(extension => extension.transformPage === undefined ? [] : [extension.transformPage])
 }
 
 export const CONFIG_FILE = 'kay.config.ts'

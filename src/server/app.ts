@@ -10,6 +10,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
+import { pageHooks } from '../config'
 import { projectCollections, serveFeeds } from '../content/server'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { IMAGE_ROUTE } from '../runtime/image'
@@ -35,6 +36,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader, underKayDev } from './loader'
 import { logRequests, pathOf } from './log'
 import { serveServiceWorker } from './offline'
+import { assetFiles, hookedResponse } from './page-hook'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
 import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
 import { trustProxy } from './protection'
@@ -364,6 +366,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (moved && client.site !== undefined)
     console.warn(`[kay] kay build rendered its pages for ${client.site} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
 
+  // What the extensions' page hooks did to the prerendered pages, done again to each the server renders afresh.
+  const transforms = pageHooks(options.extensions)
+  const pageFile = assetFiles({ clientDir: client.dir, publicDir: resolve(root, options.publicDir ?? 'public'), base, aspects: options.images?.aspects })
+
   for (const pages of prerendered.values())
     trackPrerendered(pages, page => moved || page.readsSite === true)
 
@@ -387,7 +393,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     }
 
     // A path `kay build` rendered is served from its file; any other path of the route renders per request.
-    const page = prerendered.get(route.pattern)?.get(prerenderKey(i18n?.settings, localeState()?.locale, canonicalPath(withoutSlash(url.pathname))))
+    const key = prerenderKey(i18n?.settings, localeState()?.locale, canonicalPath(withoutSlash(url.pathname)))
+    const page = prerendered.get(route.pattern)?.get(key)
 
     if (!page)
       return renderPage(route, context, params, client, renderOptions)
@@ -403,7 +410,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     }
 
     // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
-    await revalidateStale(page, async () => renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), error => reportServerError(error, context.request, renderOptions.onError))
+    await revalidateStale(page, async () => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), transforms, key, pageFile), error => reportServerError(error, context.request, renderOptions.onError))
 
     const served = page.islands !== undefined || page.stamps === true ? await serveServerIslands(route, page, params, context, url, client, renderOptions) : undefined
 

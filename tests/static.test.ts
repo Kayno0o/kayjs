@@ -133,6 +133,19 @@ describe('kay build --static', () => {
     expect(await Bun.file(join(out, 'index.html.gz')).exists()).toBe(true)
   })
 
+  it('hands each page to the page hook of an extension once the files it links are written, before compressing it', async () => {
+    const home = (await get('/')).text
+    const linked = (/<!--linked from \/: ([^>]*)-->/).exec(home)![1]!.split(' ')
+    const named = (pattern: RegExp) => pattern.exec(home)![1]!
+
+    expect(linked).toContain(named(/<link rel="stylesheet" href="\/repo\/_kay\/([\w-]+\.css)">/))
+    expect(linked).toContain(named(/<script type="module" src="\/repo\/_kay\/(entry-[\w-]+\.js)">/))
+    expect(linked).toContain(named(/<img src="\/repo\/_kay\/images\/([\w-]+-1x1\.webp)"/))
+    expect(linked).toContain('favicon.svg')
+    expect(new TextDecoder().decode(Bun.gunzipSync(await Bun.file(join(out, 'index.html.gz')).bytes()))).toContain('<!--linked from /: ')
+    expect((await get('/about')).text).toContain('<!--linked from /about: ')
+  })
+
   it('ships none of the persisted signal code to an island calling signal() alone', async () => {
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
     const code = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))
