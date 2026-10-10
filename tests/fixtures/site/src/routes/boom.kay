@@ -10,7 +10,20 @@ if (ctx.url.searchParams.has('fail'))
   throw new Error('Kaboom')
 
 const later = defer(ctx.url.searchParams.has('later') ? Promise.reject(new Error('Kaboom later')) : Promise.resolve('Fine'))
+
+export const send = action(t.Object({ message: t.String({ maxLength: 1000 }) }), () => {
+  throw new Error('Mail server down')
+}, { messages: { serverError: 'Not sent; write to hello@example.com instead' } })
 ---
+form(action={send})
+  textarea(name="message" aria-label="Message")
+  button Send
+if send.error()
+  p.error {send.error()}
+form(action={explode})
+  button Explode
+if explode.error()
+  p.error {explode.error()}
 // kay-allow uncaught-await
 await later then value
   p {value}

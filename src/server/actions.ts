@@ -42,6 +42,8 @@ class Refusal {
 // What the guards set on the response, carried to the handler they let through.
 const guarded = new WeakMap<Request, GuardedRequest>()
 const TEXT = 'text/plain; charset=utf-8'
+// What a visitor reads when the handler throws and its action words nothing of its own.
+const SERVER_ERROR = 'Something went wrong on our side; try again later'
 // What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
 const SAME_SITE_FETCH = new Set(['same-origin', 'none'])
 // The first proxy's `X-Forwarded-Proto` saying the browser came over https.
@@ -384,7 +386,13 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     if (error instanceof Redirect)
       await countGoneThrough(action, request, context.server, options)
 
-    return stopped(error, request, state, options)
+    if (error instanceof Redirect || error instanceof Denied)
+      return stopped(error, request, state, options)
+
+    // A mistake, or a service the handler relies on gone down: logged as any server error, and told the visitor beside the form they keep, as a refusal is.
+    reportServerError(error, request, options.onError)
+
+    return failed(request, headers, jar.cookies, { action: action.url, status: 500, values: submittedValues(context.body), errors: { '': action.protection?.messages?.serverError ?? SERVER_ERROR } }, context.server, back)
   }
 }
 

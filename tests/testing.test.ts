@@ -120,6 +120,25 @@ describe('kay/test', () => {
     expect((await site.submit(add, { title: 'Tested without a server' })).html).toContain('Tested without a server</a></li>')
   })
 
+  it('shows the message an action gives for a handler that throws under its form, keeping what was typed, and logs the error', async () => {
+    const { send, explode } = await import(join(import.meta.dir, 'fixtures/site/src/routes/boom.kay')) as { send: Action<{ message: string }, never>, explode: Action<Record<string, never>, never> }
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const failed = await site.submit(send, { message: 'Hello there' }, { from: '/boom' })
+
+      expect(failed).toMatchObject({ url: '/boom', status: 500 })
+      expect(failed.html).toContain('<p id="send-error" class="error">Not sent; write to hello@example.com instead</p>')
+      expect(failed.find('textarea[name="message"]')[0]!.text).toBe('Hello there')
+      expect((await site.submit(explode, {}, { from: '/boom' })).html).toContain('<p id="explode-error" class="error">Something went wrong on our side; try again later</p>')
+      await expect(site.call(send, { message: 'Hello' })).rejects.toMatchObject({ status: 500, errors: { '': 'Not sent; write to hello@example.com instead' } })
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('Error: Mail server down'))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('submits again from the page a refused post answered, refused or not', async () => {
     const failed = await site.submit(add, { title: '' }, { from: '/' })
     const again = await site.submit(add, { title: '' }, { from: failed })

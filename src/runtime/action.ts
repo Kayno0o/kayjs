@@ -102,6 +102,8 @@ export interface ProtectionMessages {
   minTime?: (string | ((reason: MinTimeRefusal) => string)) | undefined
   // Given the most bytes a post may send.
   bodyLimit?: (string | ((bytes: number) => string)) | undefined
+  // When the handler throws, a service it sends to being down say: the error is logged, and the visitor reads this instead.
+  serverError?: string | undefined
 }
 
 export interface ActionContext {

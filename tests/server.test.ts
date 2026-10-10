@@ -1233,7 +1233,7 @@ describe('problems kay check reports', () => {
 })
 
 describe('special pages', () => {
-  it('answers a failing action with a generic 500 and logs its stack at the .kay line', async () => {
+  it('answers a throwing action with a 500 and a message for the whole form, and logs its stack at the .kay line', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1244,7 +1244,7 @@ describe('special pages', () => {
       }))
 
       expect(response.status).toBe(500)
-      expect(await response.text()).toBe('Internal Server Error')
+      expect(parse(await response.text())).toEqual({ errors: { '': 'Something went wrong on our side; try again later' }, data: undefined })
       expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^Error: Kaboom in an action\n\s+at \S+ \(\S+\/boom\.kay:6:13\)/))
     }
     finally {
@@ -1474,7 +1474,7 @@ describe('action input', () => {
     expect(await refused.text()).toContain('<p>Survey</p>')
   })
 
-  it('answers a call returning nothing with an empty body, and a redirect holding a line break with a generic 500', async () => {
+  it('answers a call returning nothing with an empty body, and a redirect holding a line break as a server error', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1486,7 +1486,7 @@ describe('action input', () => {
       const away = await post('away', stringify({ to: '/x\r\nset-cookie: a=b' }), { 'content-type': 'application/json', 'x-kay-action': '1' })
 
       expect(away.status).toBe(500)
-      expect(await away.text()).toBe('Internal Server Error')
+      expect(parse(await away.text())).toEqual({ errors: { '': 'Something went wrong on our side; try again later' }, data: undefined })
       expect((await bare.handle(new Request(`http://localhost/?next=${encodeURIComponent('/x\r\nset-cookie: a=b')}`))).status).toBe(500)
       expect(logged).toHaveBeenCalledWith(expect.stringContaining('holds a line break'))
 
@@ -1494,7 +1494,7 @@ describe('action input', () => {
       for (const to of ['/a\0b', 'javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,x']) {
         const refused = await post('away', stringify({ to }), { 'content-type': 'application/json', 'x-kay-action': '1' })
 
-        expect([refused.status, await refused.text()]).toEqual([500, 'Internal Server Error'])
+        expect([refused.status, (parse(await refused.text()) as { errors: Record<string, string> }).errors['']]).toEqual([500, 'Something went wrong on our side; try again later'])
       }
 
       expect((await post('away', stringify({ to: 'https://example.com/x' }), { 'content-type': 'application/json', 'x-kay-action': '1' })).headers.get('x-kay-redirect')).toBe('https://example.com/x')
