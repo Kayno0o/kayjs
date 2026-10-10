@@ -13,9 +13,14 @@ const TOKEN = crypto.randomUUID()
 // Read off the marking headers, which are then dropped, so app code never sees the token.
 const addresses = new WeakMap<Request, string>()
 
-// The socket address of a request kay rewrote, or undefined for any other request.
+// The socket address of a request kay rewrote or kay/test sent, or undefined for any other request.
 export function rewrittenAddress(request: Request): string | undefined {
   return addresses.get(request)
+}
+
+// Where a request sent without a socket comes from, as kay/test gives each test a client of its own.
+export function sendFrom(request: Request, address: string): void {
+  addresses.set(request, address)
 }
 
 // Serves a request from the path `rewrite` gives, through the whole app again, the browser keeping its URL; kay's own `/_kay/` routes are never rewritten.
@@ -61,7 +66,7 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
     headers.set(REWRITTEN, TOKEN)
     headers.delete(CLIENT)
 
-    const address = server?.requestIP(request)?.address
+    const address = addresses.get(request) ?? server?.requestIP(request)?.address
 
     if (address !== undefined)
       headers.set(CLIENT, address)

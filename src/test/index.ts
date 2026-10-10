@@ -6,6 +6,7 @@ import type { ClientBuild } from '../server/client'
 import type { BrowserOptions, TestPage } from './browser'
 import type { PageReading } from './page'
 import { join } from 'node:path'
+import { beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
@@ -16,6 +17,7 @@ import { servePages } from '../server/app'
 import { basePath } from '../server/base'
 import { shutdown } from '../server/lifecycle'
 import { drainQueues } from '../server/queue'
+import { sendFrom } from '../server/rewrite'
 import { SITEMAP } from '../server/sitemap'
 import { servedThrough } from '../server/visit'
 import { browse } from './browser'
@@ -101,6 +103,14 @@ const ORIGIN = 'http://localhost'
 // The DOM typings of WebSocket hide the options Bun takes, the upgrade's headers among them.
 const BunWebSocket = NativeWebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
 const MAX_REDIRECTS = 10
+// Each test's client, counted across the run as rate limits are. A private address reads as a proxy's, so a test sending the header the app's `proxy` names still posts as the client it gives.
+let clients = 0
+
+function nextClient(): string {
+  clients++
+
+  return `10.${clients >> 16 & 255}.${clients >> 8 & 255}.${clients & 255}`
+}
 
 // The project's pages and actions without a server, and without a browser build unless `browser` is set: pages then render their islands' markup and no scripts.
 export async function testSite(options: TestOptions = {}): Promise<TestSite> {
@@ -117,6 +127,15 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
   const cookies = new Bun.CookieMap()
+  let address = nextClient()
+
+  // A site made at the top of a file or a describe posts as a new client in each test, so no test meets the rate limits another one's posts counted; one made inside a test, or outside bun test, keeps one.
+  try {
+    beforeEach(() => {
+      address = nextClient()
+    })
+  }
+  catch {}
 
   const cookieHeader = (headers: Headers) => {
     const sent = [...cookies].map(([name, value]) => `${name}=${value}`).join('; ')
@@ -137,7 +156,11 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
     const headers = cookieHeader(new NativeHeaders(init.headers))
 
-    const response = await handle(new NativeRequest(new NativeURL(path, ORIGIN), { ...init, headers, redirect: 'manual' }))
+    const request = new NativeRequest(new NativeURL(path, ORIGIN), { ...init, headers, redirect: 'manual' })
+
+    sendFrom(request, address)
+
+    const response = await handle(request)
 
     for (const header of response.headers.getSetCookie()) {
       const cookie = Bun.Cookie.parse(header)

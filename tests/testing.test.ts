@@ -20,6 +20,8 @@ const MARKERS = /<!--[$/]-->/g
 // A 1x1 PNG, which Elysia's `t.File({ type: 'image/png' })` recognises from its bytes.
 const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
 const site = await testSite({ routes, publicDir: 'tests/fixtures/site/public', locals: request => ({ user: request.headers.get('x-user') ?? undefined }) })
+// Made at the top of the file as `site` is, so each test posts to it as a client of its own.
+const sessions = await testSite({ routes: 'tests/fixtures/session/src/routes', use: [session({ secret: 'a test secret of at least 32 characters' })] })
 // Imported once the site is up, which registers the `.kay` loader this process needs.
 const { add } = await import(join(import.meta.dir, 'fixtures/site/src/routes/index.kay')) as { add: Action<{ title: string }, number> }
 const { schedule, leak } = await import(join(import.meta.dir, 'fixtures/site/src/routes/events.kay')) as {
@@ -324,5 +326,30 @@ describe('the test preload', () => {
     finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('a client per test', () => {
+  const limit = async () => (await import(join(import.meta.dir, 'fixtures/session/src/routes/index.kay')) as { limited: Action<Record<string, never>, string> }).limited
+
+  it('counts a rate limit over the posts one test sends', async () => {
+    const limited = await limit()
+
+    expect(await sessions.call(limited, {})).toBe('ok')
+    await expect(sessions.call(limited, {})).rejects.toMatchObject({ status: 429 })
+  })
+
+  it('posts as another client in the next test, whatever the one before sent', async () => {
+    expect(await sessions.call(await limit(), {})).toBe('ok')
+  })
+
+  it('posts as the client the header of a trusted proxy names', async () => {
+    const limited = await limit()
+    const proxied = await testSite({ routes: 'tests/fixtures/session/src/routes', use: [session({ secret: 'a test secret of at least 32 characters' })], proxy: { header: 'x-real-ip' } })
+    const from = (address: string) => ({ headers: { 'x-real-ip': address } })
+
+    expect(await proxied.call(limited, {}, from('203.0.113.9'))).toBe('ok')
+    await expect(proxied.call(limited, {}, from('203.0.113.9'))).rejects.toMatchObject({ status: 429 })
+    expect(await proxied.call(limited, {}, from('203.0.113.10'))).toBe('ok')
   })
 })
