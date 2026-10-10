@@ -88,7 +88,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `bodyLimit` | The most bytes an action or API request may send, 1 MB by default |
 | `openapi` | An OpenAPI document of the API modules at `/api/openapi.json`, and a reference page. See [API routes](/guides/api-routes#openapi) |
 | `shutdownTimeout` | How long a stopping server lets open requests finish, 10 seconds by default |
-| `onError` | Receives every error a load, render, guard or action throws, for an error tracker |
+| `onError` | Receives every error a load, render, guard, action or API route throws, for an error tracker |
 | `serverTiming`, `tracer` | A `Server-Timing` header, and OpenTelemetry spans |
 
 <ReadMore href="/llms/project">Every option and its exact behaviour are in the full project reference, with the head, locales and production references for the topics above.</ReadMore>

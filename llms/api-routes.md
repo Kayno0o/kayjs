@@ -23,6 +23,7 @@ export default api()
   )
 ```
 
+- A handler, guard or hook that throws is logged and handed to `onError`, answering 500 with `Internal Server Error` in production, its message in development; a module's own `onError` answering it comes first, and refused input or a thrown `status()` keeps Elysia's answer, unlogged.
 - A route answering a plain object or array holding a bigint, as a database's bigint ids are, gives JSON with each written as its digits, `{"id":"9007199254740993"}`, where `JSON.stringify` would throw; `resource()` types such a field as a `string`.
 - `api()` is a `new Elysia()` whose handlers read the app's locals, typed as `ctx.locals` is (see [Locals](server.md#locals)): `({ user })`, `ws.data.user`. A plain `new Elysia()` is mounted the same way.
 - A `_guard.ts` in `src/api/` or below runs before every route of the modules in its directory and below, outermost first, a websocket upgrade included, as it does for pages and actions: a redirect or a denial answers the request, and the cookies and headers it sets go out with the route's response.

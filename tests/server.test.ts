@@ -1475,6 +1475,36 @@ describe('special pages', () => {
     }
   })
 
+  it('logs an API route that throws and hands it to onError, answering a generic 500 in production, unless its module answers it', async () => {
+    const dir = await mkdtemp(join(process.cwd(), '.kay/api-'))
+    const reported: string[] = []
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await Bun.write(join(dir, 'api/items.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api()\n  .get(\'/broken\', () => { throw new Error(\'Secret detail\') })\n  .get(\'/teapot\', ({ status }) => { throw status(418, \'Short and stout\') })\n  .post(\'/\', ({ body }) => body, { body: t.Object({ name: t.String() }) })\n')
+      await Bun.write(join(dir, 'api/own.ts'), 'import { api } from \'kay/server\'\n\nexport default api().onError(() => \'Answered by the module\').get(\'/\', () => { throw new Error(\'Handled\') })\n')
+      const served = await pages({ routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api'), prebuilt: true, onError: (error, request) => void reported.push(`${new URL(request.url).pathname}: ${(error as Error).message}`) })
+      const broken = await served.handle(new Request('http://localhost/api/items/broken'))
+
+      expect(broken.status).toBe(500)
+      expect(await broken.text()).toBe('Internal Server Error')
+      expect((await served.handle(new Request('http://localhost/api/items/teapot'))).status).toBe(418)
+      expect((await served.handle(new Request('http://localhost/api/items', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }))).status).toBe(422)
+      expect(await (await served.handle(new Request('http://localhost/api/own'))).text()).toBe('Answered by the module')
+      expect(reported).toEqual(['/api/items/broken: Secret detail'])
+      expect(logged).toHaveBeenCalledTimes(1)
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^Error: Secret detail\n/))
+
+      const dev = await pages({ routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api'), prebuilt: true, dev: true })
+
+      expect(await (await dev.handle(new Request('http://localhost/api/items/broken'))).text()).toBe('Secret detail')
+    }
+    finally {
+      logged.mockRestore()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('renders the nearest _404.kay inside its layouts, for notFound and for URLs no page serves', async () => {
     const missingTodo = await get('/todos/9')
     const unmatched = await get('/no/such/page')

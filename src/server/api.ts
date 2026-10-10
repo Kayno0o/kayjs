@@ -212,10 +212,29 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
             reporter.report = error => reportServerError(error, request, options.onError)
         })
         .use(instance)
+        // After the module's own `onError`, which may answer the error itself.
+        .onError(({ request, error, code, set }) => reportThrown({ request, error, code, set }, options))
     })
   }
 
   return { limits, mounted }
+}
+
+// Logs an error a route threw and hands it to `onError`, keeping its message out of a production answer, where Elysia would send it.
+// Refused input, an unknown route or a status the handler threw are answered as Elysia means them.
+function reportThrown({ request, error, code, set }: { request: Request, error: unknown, code: unknown, set: { status?: number | string, headers: Record<string, unknown> } }, options: ActionOptions): string | undefined {
+  if (code !== 'UNKNOWN' && code !== 'INTERNAL_SERVER_ERROR')
+    return undefined
+
+  reportServerError(error, request, options.onError)
+
+  if (options.dev)
+    return undefined
+
+  set.status = 500
+  set.headers['content-type'] = TEXT['content-type']
+
+  return 'Internal Server Error'
 }
 
 // JSON has no bigint, which JSON.stringify throws on: a plain object or array holding one is answered with each written as its digits, as a database's bigint ids usually are.
