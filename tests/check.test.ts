@@ -1,5 +1,6 @@
 import type { CheckOptions } from '../src/check'
 import { chmod, mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { basename, join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
@@ -82,6 +83,23 @@ describe('kay check', () => {
     expect(code).toBe(1)
     expect(errors).toContain('26 errors')
     expect(errors).toContain('2 | const id = Number(ctx.params.slug)\n  |                              ^')
+    expect(errors).not.toContain('but the project imports')
+  })
+
+  it('warns when the project imports another copy of kay than the one running the command', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-other-'))
+
+    try {
+      await Bun.write(join(root, 'node_modules/kay/package.json'), JSON.stringify({ name: 'kay', exports: { '.': './src/runtime/index.ts' } }))
+      await Bun.write(join(root, 'node_modules/kay/src/runtime/index.ts'), 'export {}\n')
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root], { stdout: 'pipe', stderr: 'pipe' })
+      const [errors] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+      expect(errors).toContain(`kay check: this is the kay at ${join(import.meta.dir, '..')}, but the project imports the one at ${join(root, 'node_modules/kay')}`)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('refuses a path that is no directory, for check and build alike', async () => {

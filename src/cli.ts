@@ -4,7 +4,7 @@ import type { Paint } from './compiler/frame'
 import type { KayConfig } from './config'
 import type { Feature, Preset } from './new'
 import type { ClientBuild } from './server/client'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, realpathSync, statSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
 import { join, relative, resolve } from 'node:path'
@@ -394,12 +394,32 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
 function projectRoot(command: string, path = '.'): string | undefined {
   const root = resolve(path)
 
-  if (statSync(root, { throwIfNoEntry: false })?.isDirectory())
+  if (statSync(root, { throwIfNoEntry: false })?.isDirectory()) {
+    warnOtherKay(command, root)
+
     return root
+  }
 
   console.error(`kay ${command}: ${path} is not a directory`)
 
   return undefined
+}
+
+// A project importing another copy of kay than the one running the command ends up with two of kay's module states, one losing what the other set up, such as where content collections live or the head a page adds; a global `kay`, or a `.bin` link copied from another project, does that.
+function warnOtherKay(command: string, root: string): void {
+  let imported: string
+
+  try {
+    imported = realpathSync(Bun.resolveSync('kay', root))
+  }
+  catch {
+    return
+  }
+
+  const running = realpathSync(resolve(import.meta.dir, 'runtime/index.ts'))
+
+  if (imported !== running)
+    console.warn(`kay ${command}: this is the kay at ${resolve(running, '../../..')}, but the project imports the one at ${resolve(imported, '../../..')}; run the project's own, \`bun node_modules/kay/src/cli.ts\`, or reinstall if its node_modules/.bin/kay links elsewhere`)
 }
 
 // What a command did, on stdout so a terminal does not take it for an error: the verb in green, the timing dimmed.
@@ -555,6 +575,8 @@ async function runDev(args: string[]): Promise<number> {
   }
 
   const root = resolve(inDir ? path : '.')
+
+  warnOtherKay('dev', root)
   const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
   const { routes, publicDir, api, settings } = await loadConfig(root)
   const stop = await dev(root, { entry, routes, publicDir, api, settings })
