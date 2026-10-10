@@ -33,7 +33,11 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   }
 
   if (config.favicon !== false)
-    extra.push(...faviconTags(config.manifest))
+    extra.push(...faviconTags())
+
+  // A site linking its own icons still colours the browser around its pages.
+  if (config.manifest?.themeColor !== undefined)
+    extra.push({ tag: 'meta', props: { name: 'theme-color', content: config.manifest.themeColor } })
 
   const social = config.site !== undefined || config.seo !== undefined
   const sizeOf = social ? await cardImageSizes(resolve(root, config.publicDir ?? 'public')) : undefined

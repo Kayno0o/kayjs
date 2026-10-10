@@ -91,17 +91,12 @@ function ico(images: Uint8Array[], sizes: number[]): Uint8Array<ArrayBuffer> {
 }
 
 // The links every page carries for them, which a page's own replace.
-export function faviconTags(manifest?: ManifestConfig): HeadTag[] {
-  const tags: HeadTag[] = [
+export function faviconTags(): HeadTag[] {
+  return [
     { tag: 'link', props: { rel: 'icon', href: ICO, sizes: ICO_SIZES.map(size => `${size}x${size}`).join(' ') } },
     { tag: 'link', props: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
     { tag: 'link', props: { rel: 'manifest', href: MANIFEST } },
   ]
-
-  if (manifest?.themeColor !== undefined)
-    tags.push({ tag: 'meta', props: { name: 'theme-color', content: manifest.themeColor } })
-
-  return tags
 }
 
 // Its icons and start page under the site's mount point.

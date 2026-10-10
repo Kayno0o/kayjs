@@ -89,7 +89,7 @@ export default defineConfig({
 })
 ```
 
-The manifest is named after `seo.name`, `shortName` defaulting to it, and described by `seo.description`; `themeColor` is also every page's `theme-color`.
+The manifest is named after `seo.name`, `shortName` defaulting to it, and described by `seo.description`; `themeColor` is also every page's `theme-color`, `favicon: false` included.
 
 ## Offline
 

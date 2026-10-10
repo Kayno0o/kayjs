@@ -96,6 +96,12 @@ describe('favicon', () => {
       expect((await off.handle(new Request(`http://localhost${path}`))).status).toBe(404)
   })
 
+  it('gives every page the theme colour with the favicon turned off, the site linking its own', async () => {
+    const off = await pages({ routes: ROUTES, prebuilt: false, favicon: false, manifest: { themeColor: '#1e1e2e' } })
+
+    expect(await (await off.handle(new Request('http://localhost/about'))).text()).toContain('<meta name="theme-color" content="#1e1e2e">')
+  })
+
   it('refuses a source that is not square or smaller than the largest icon, and writes the files for a build', async () => {
     const wide = join(scratch, 'wide.png')
     const small = join(scratch, 'small.png')
