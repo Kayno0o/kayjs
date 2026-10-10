@@ -25,6 +25,8 @@ const heroUrl = decodeURIComponent((/src=%2F_kay%2Fassets%2F([^&]+)&amp;/).exec(
 
 afterAll(async () => {
   await rm(uploads, { recursive: true, force: true })
+  // The AVIF decoder, built for a page, sets a global `location` of an empty href, which a later file's island runtime would resolve its fetches against.
+  Reflect.deleteProperty(globalThis, 'location')
 })
 
 function pngChunk(type: string, data: Uint8Array): Uint8Array {
