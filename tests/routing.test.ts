@@ -5,10 +5,13 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { check } from '../src/check'
 import { localPath } from '../src/runtime/base'
+import { integer } from '../src/runtime/params'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { routerShapes, shapeParams } from '../src/server/params'
 import { prerenderPages } from '../src/server/prerender'
 import { readRedirects, redirectProblems } from '../src/server/redirects'
+import { routeOf } from '../src/server/routes'
 
 const FIXTURE = 'tests/fixtures/routing'
 const routes = `${FIXTURE}/src/routes`
@@ -81,6 +84,42 @@ describe('param matchers', () => {
     finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('the page an action was posted from', () => {
+  const matchers = new Map([['integer', integer]])
+  const paramsOf = (file: string, path: string, prefix = '', pattern?: string) => {
+    const route = { ...routeOf('/r', `/r/${file}`)!, layouts: [], special: {}, guards: [] }
+
+    for (const shape of routerShapes(route, prefix, pattern ?? route.pattern)) {
+      const params = shapeParams(shape, route, path, matchers)
+
+      if (params)
+        return params
+    }
+
+    return undefined
+  }
+
+  it('reads its params as a request of it would give them, decoded and matched', () => {
+    expect(paramsOf('orgs/[org].kay', '/orgs/acme')).toEqual({ org: 'acme' })
+    expect(paramsOf('orgs/[org].kay', '/orgs/acme/')).toEqual({ org: 'acme' })
+    expect(paramsOf('orgs/[org].kay', '/orgs/a%20b')).toEqual({ org: 'a b' })
+    expect(paramsOf('orgs/[org].kay', '/orgs/a%2Fb')).toEqual({ org: 'a/b' })
+    expect(paramsOf('docs/[...slug].kay', '/docs/a/b%20c')).toEqual({ slug: 'a/b c' })
+    expect(paramsOf('blog/[[page]].kay', '/blog')).toEqual({})
+    expect(paramsOf('blog/[[page]].kay', '/blog/2')).toEqual({ page: '2' })
+    expect(paramsOf('items/[id=integer].kay', '/items/7')).toEqual({ id: 7 })
+    expect(paramsOf('orgs/[org].kay', '/fr/organisations/acme', '/fr', '/organisations/:org')).toEqual({ org: 'acme' })
+  })
+
+  it('reads none from a page its route does not serve', () => {
+    for (const path of ['/orgs', '/orgs/', '/orgs//x', '/orgs/acme/x', '/orgs/%E0', '/teams/acme'])
+      expect(paramsOf('orgs/[org].kay', path)).toBeUndefined()
+
+    expect(paramsOf('items/[id=integer].kay', '/items/x')).toBeUndefined()
+    expect(paramsOf('orgs/[org].kay', '/orgs/acme', '/fr', '/organisations/:org')).toBeUndefined()
   })
 })
 

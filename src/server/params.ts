@@ -118,7 +118,7 @@ export function matchedParams(route: Route, params: Record<string, string>, matc
   return matched
 }
 
-// The params `path` gives the route through `shape`, read as the router and `positionalParams` read a request's: undefined when the shape does not serve the path or a matcher refuses it.
+// The params `path` gives the route through `shape`, decoded and matched as a request's are: undefined when the shape cannot serve the path or a matcher refuses it. Looser than the router, a catch-all taking an empty rest and a static segment its decoded text, which reads no params a valid page would not give.
 export function shapeParams(shape: RouterShape, route: Route, path: string, matchers: Map<string, Matcher>): Record<string, unknown> | undefined {
   const pattern = shape.path.split('/')
   const segments = withoutSlash(path).split('/')

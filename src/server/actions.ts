@@ -18,6 +18,7 @@ import { localeState, runInLocale } from '../runtime/locale-state'
 import { configuredSite } from '../runtime/site'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { encodeValue, unsendable } from '../runtime/wire'
+import { routerPath } from './base'
 import { sizeText } from './body'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
@@ -213,11 +214,15 @@ function actionFiles(routes: ServedRoute[]): Map<string, ActionPage & { guards: 
 
 // The params of the page the post came from, kept for its guards and its action; a post reading params whose page is not one of the file's, or names none, is refused before anything runs, so no guard checking them is ever skipped.
 function readPage(request: Request, page: ActionPage, match: RouteMatch, { base = '' }: ActionOptions): void {
-  const from = postedFrom(request)
-  const path = from === undefined ? undefined : withoutBase(new URL(from).pathname, base)
+  // Nothing to read, so the project's matchers never run on a page that has nothing to do with the action.
+  if (page.params.length === 0)
+    return
 
-  for (const route of path === undefined ? [] : page.routes) {
-    const params = match(route, path!)
+  const from = postedFrom(request)
+  const path = routerPath(new URL(from ?? '/', request.url).pathname, base)
+
+  for (const route of from === undefined ? [] : page.routes) {
+    const params = match(route, path)
 
     if (params) {
       pageParams.set(request, Object.fromEntries(Object.entries(params).filter(([name]) => page.params.includes(name))))
@@ -226,13 +231,7 @@ function readPage(request: Request, page: ActionPage, match: RouteMatch, { base 
     }
   }
 
-  if (page.params.length > 0)
-    throw new Refusal(new Response('Action posted from no page of its route', { status: 400, headers: { 'content-type': TEXT } }))
-}
-
-// A path as the router reads it, from where a request under `base` names it.
-function withoutBase(path: string, base: string): string {
-  return base !== '' && (path === base || path.startsWith(`${base}/`)) ? path.slice(base.length) || '/' : path
+  throw new Refusal(new Response('Action posted from no page of its route', { status: 400, headers: { 'content-type': TEXT } }))
 }
 
 // A call's input comes encoded, multipart when it carries files; input that does not decode is answered 400.
@@ -548,7 +547,7 @@ async function failed(request: Request, headers: Headers, cookies: CookieMap, fl
 // It answers the post itself, with the failure's status: a reload posts again, as after any form a server answers in place, and without the page swap a `base` keeps relative links pointing where they did on the page.
 async function renderBack(app: Elysia, base: string, request: Request, headers: Headers, flash: Flash, server: Server | null): Promise<Response> {
   const from = new URL(backTo(request), request.url)
-  const path = withoutBase(from.pathname, base)
+  const path = routerPath(from.pathname, base)
   const sent = visitHeaders(request)
   const forget = handOver(sent, flash)
   let page: Response

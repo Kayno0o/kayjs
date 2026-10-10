@@ -656,6 +656,20 @@ describe('route params in guards and actions', () => {
   it('gives a layout\'s action the params every page it wraps names', async () => {
     expect(await post('orgs/_org_/_layout.kay', 'leave', '/orgs/acme/7')).toEqual({ status: 200, guarded: '{"org":"acme"}', body: { org: 'acme' } })
     expect(await post('orgs/_org_/_layout.kay', 'leave', '/orgs/acme')).toEqual({ status: 200, guarded: '{"org":"acme"}', body: { org: 'acme' } })
+    // No page serves it, the team's matcher refusing `x`.
+    expect(await post('orgs/_org_/_layout.kay', 'leave', '/orgs/acme/x')).toEqual({ status: 400, guarded: null, body: 'Action posted from no page of its route' })
+  })
+
+  it('reads the page under the mount point the site is served at', async () => {
+    const mounted = await pages({ routes: dir, prebuilt: true, base: '/repo' })
+    const response = await mounted.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/orgs/_org_/index.kay/rename`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/repo/orgs/acme' },
+      body: stringify({}),
+    }))
+
+    expect(response.status).toBe(200)
+    expect(parse(await response.text())).toEqual({ org: 'acme' })
   })
 
   it('refuses an action reading params posted from no page of its route, before its guards run', async () => {

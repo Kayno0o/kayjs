@@ -206,7 +206,7 @@ export interface ErrorPageContext<Params extends Record<string, unknown> = Recor
 }
 
 // What a `_guard.ts` decides from: who is asking, and the params of the page asked for, each matcher's value in place of its text.
-// For an action, `url` is the action's and `params` those of the page it was posted from; for an API route, its own.
+// For an action, `url` is the action's and `params` those of the page it was posted from; for an API route, its own as Elysia hands them to the handler.
 export type GuardContext = Pick<PageContext<RouteParams>, 'request' | 'url' | 'locale' | 'params' | 'cookies' | 'locals' | 'headers' | 'redirect' | 'deny'>
 
 export type Guard = (ctx: GuardContext) => void | Promise<void>

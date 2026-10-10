@@ -5,6 +5,11 @@ import { joinBase, rebaseSrcset, URL_ATTRIBUTES } from '../runtime/base'
 const BASE_PATH = /^(?:\/[\w.~-]+)+$/
 const CSS_URL = /url\(\s*(["']?)(\/(?!\/)[^"')\s]*)\1\s*\)/g
 
+// A path as the router reads it, from where a browser under `base` names it.
+export function routerPath(path: string, base: string): string {
+  return base !== '' && (path === base || path.startsWith(`${base}/`)) ? path.slice(base.length) || '/' : path
+}
+
 // The mount point a config's `base` gives, `''` at the root: `/docs/` reads as `/docs`.
 export function basePath(value: string | undefined): string {
   if (value === undefined || value === '' || value === '/')
