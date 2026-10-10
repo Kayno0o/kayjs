@@ -9,6 +9,7 @@ import { check } from '../src/check'
 const CLI = join(import.meta.dir, '../src/cli.ts')
 const APP = join(import.meta.dir, '../examples/noticeboard')
 const LISTENING = /localhost:(\d+)/
+const SOME_PASSED = / [1-9]\d* pass/
 // A Postgres whose user may create databases, as the app template's tests take: CI sets it.
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
 const SECRETS = { SESSION_SECRET: 'only-for-tests-0123456789abcdefghijklmnop', AUTH_SECRET: 'only-for-tests-too-abcdefghijklmnop0123456789' }
@@ -31,9 +32,9 @@ describe('the noticeboard example', () => {
     const tests = Bun.spawn([process.execPath, 'test', '--isolate'], { cwd: APP, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, DATABASE_URL: database.href } })
     const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
-    expect(report).toMatch(/ [1-9]\d* pass/)
-    expect(report).toContain(' 0 fail')
-    expect(code).toBe(0)
+    // Thrown rather than asserted, so the report prints line by line instead of escaped into one string.
+    if (code !== 0 || !SOME_PASSED.test(report))
+      throw new Error(`the example's own tests failed:\n${report}`)
   }, 120_000)
 
   it('compiles to one executable serving its pages with the libraries\' components and styles', async () => {
@@ -41,10 +42,10 @@ describe('the noticeboard example', () => {
 
     try {
       const build = Bun.spawn([process.execPath, CLI, 'build', '--compile', join(dir, 'server')], { cwd: APP, stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(build.stdout).text(), build.exited])
+      const [report, errors, code] = await Promise.all([new Response(build.stdout).text(), new Response(build.stderr).text(), build.exited])
 
-      expect(report).toContain('compiled ')
-      expect(code).toBe(0)
+      if (code !== 0 || !report.includes('compiled '))
+        throw new Error(`kay build --compile failed:\n${report}${errors}`)
 
       // Nothing reaches the database or a mail server until a page asks: the sign-in page needs neither.
       const server = Bun.spawn([join(dir, 'server')], { cwd: dir, env: { PATH: process.env.PATH, PORT: '0', ...SECRETS, DATABASE_URL: 'postgres://app:app@127.0.0.1:1/none', SMTP_HOST: 'localhost' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })

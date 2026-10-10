@@ -7,9 +7,10 @@ export const EMAIL_WORDS: Record<EmailProblem | 'taken' | 'unchanged', string> =
   unchanged: 'This is your address already',
 }
 
-export const PASSWORD_WORDS: Record<PasswordProblem, string> = {
+export const PASSWORD_WORDS: Record<PasswordProblem | 'breached', string> = {
   'too-short': 'Write at least 10 characters',
   'too-long': 'Write at most 128 characters',
+  'breached': 'This password appears in known data breaches; choose another',
 }
 
 export const USERNAME_WORDS: Record<UsernameProblem | 'taken', string> = {
