@@ -24,6 +24,8 @@ export interface SessionOptions {
   cookie?: string | undefined
   // How long a session lasts without being used, seconds or a string such as '30d', 30 days by default; one used past half of it is extended.
   maxAge?: Duration | undefined
+  // How long a session whose cookie dies with the browser, through `lifetime('browser')`, lasts without being used, a day by default.
+  browserMaxAge?: Duration | undefined
   // The parent domain sibling hosts share the session under, `example.com` for `app.example.com` and `auth.example.com`, the visited host or a parent of it; the cookie is the visited host's only without it.
   domain?: string | undefined
   // Keeps the data server-side, the cookie carrying only an id; without one the data travels sealed in the cookie, about 3.5 KB at most.
@@ -38,6 +40,8 @@ export interface Session<Data extends object> {
   destroy: () => Promise<void>
   // Moves the data to a new id, for right after signing in, so an id planted before it is worth nothing.
   regenerate: () => Promise<void>
+  // This session's own lifetime in place of `maxAge`, kept until it is destroyed, for "remember me": seconds or a string such as '90d', or 'browser' for a cookie the browser drops on closing, lasting `browserMaxAge` without being used.
+  lifetime: (maxAge: Duration | 'browser') => Promise<void>
 }
 
 interface Sealed {
@@ -46,9 +50,13 @@ interface Sealed {
   id?: string
   // When the cookie was written, in seconds since the epoch.
   issued: number
+  // A lifetime `lifetime()` set, in seconds, and whether the cookie dies with the browser.
+  maxAge?: number
+  browser?: true
 }
 
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 30
+const DEFAULT_BROWSER_MAX_AGE = 60 * 60 * 24
 const MIN_SECRET_LENGTH = 32
 // A host name, the form a cookie's Domain takes once trimmed, lowercased and its leading dot dropped.
 const COOKIE_DOMAIN = /^[a-z\d-]+(?:\.[a-z\d-]+)*$/
@@ -76,7 +84,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (domain !== undefined && !COOKIE_DOMAIN.test(domain))
     throw new Error(`kay: the session domain is ${JSON.stringify(options.domain)}, which is no host name such as example.com`)
 
-  const config = { name: options.cookie ?? 'session', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : durationSeconds(options.maxAge, 'the session maxAge'), domain, store: options.store, keys }
+  const config = { name: options.cookie ?? 'session', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : durationSeconds(options.maxAge, 'the session maxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : durationSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
 
   return new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
@@ -104,6 +112,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 interface SessionConfig {
   name: string
   maxAge: number
+  browserMaxAge: number
   domain?: string | undefined
   store?: SessionStore | undefined
   keys: Buffer[]
@@ -114,6 +123,7 @@ class RequestSession<Data extends object> implements Session<Data> {
   private data: SessionData = {}
   private id: string | undefined
   private issued: number | undefined
+  private own: Pick<Sealed, 'maxAge' | 'browser'> = {}
   private changed = false
   // An id `regenerate` or `destroy` left behind, deleted from the store on commit.
   private retired: string | undefined
@@ -144,6 +154,7 @@ class RequestSession<Data extends object> implements Session<Data> {
     this.retired = this.id
     this.id = undefined
     this.data = {}
+    this.own = {}
     this.changed = true
   }
 
@@ -154,13 +165,20 @@ class RequestSession<Data extends object> implements Session<Data> {
     this.changed = true
   }
 
+  async lifetime(maxAge: Duration | 'browser'): Promise<void> {
+    await this.load()
+    this.own = maxAge === 'browser' ? { maxAge: this.config.browserMaxAge, browser: true } : { maxAge: durationSeconds(maxAge, 'a session lifetime') }
+    this.changed = true
+  }
+
   // The Set-Cookie value to send, or undefined when the session needs none.
   async commit(): Promise<string | undefined> {
     if (!this.loading)
       return undefined
 
     await this.loading
-    const { store, maxAge, name } = this.config
+    const { store, name } = this.config
+    const maxAge = this.own.maxAge ?? this.config.maxAge
     const now = Math.floor(Date.now() / 1000)
     const empty = Object.keys(this.data).length === 0
     // Past half its life, or sealed with a secret the app is rotating out.
@@ -179,15 +197,15 @@ class RequestSession<Data extends object> implements Session<Data> {
       return this.issued === undefined && this.retired === undefined ? undefined : this.cookie('', 0)
     }
 
-    let sealed: Sealed = { data: this.data, issued: now }
+    let sealed: Sealed = { data: this.data, issued: now, ...this.own }
 
     if (store) {
       this.id ??= nodeCrypto().randomBytes(32).toString('base64url')
       await store.set(this.id, this.data, maxAge)
-      sealed = { id: this.id, issued: now }
+      sealed = { id: this.id, issued: now, ...this.own }
     }
 
-    const cookie = this.cookie(seal(stringify(sealed), this.config.keys[0]!, name), maxAge)
+    const cookie = this.cookie(seal(stringify(sealed), this.config.keys[0]!, name), this.own.browser ? undefined : maxAge)
 
     if (cookie.length > MAX_COOKIE_LENGTH)
       throw new Error(`kay: the session cookie ${name} would take ${cookie.length} bytes, more than a browser keeps; hold less in it, or give session() a store`)
@@ -206,7 +224,7 @@ class RequestSession<Data extends object> implements Session<Data> {
     const opening = value !== null && value !== '' ? opened(value, this.config.keys, this.config.name) : undefined
     const sealed = opening?.sealed
 
-    if (!sealed || sealed.issued + this.config.maxAge < Date.now() / 1000) {
+    if (!sealed || sealed.issued + (sealed.maxAge ?? this.config.maxAge) < Date.now() / 1000) {
       // An expired or forged cookie is cleared with the next write.
       this.issued = value !== null && value !== '' ? 0 : undefined
 
@@ -215,6 +233,7 @@ class RequestSession<Data extends object> implements Session<Data> {
 
     this.issued = sealed.issued
     this.oldKey = opening.oldKey
+    this.own = { ...sealed.maxAge === undefined ? {} : { maxAge: sealed.maxAge }, ...sealed.browser ? { browser: true } : {} }
 
     if (!this.config.store) {
       this.data = sealed.data ?? {}
@@ -230,8 +249,9 @@ class RequestSession<Data extends object> implements Session<Data> {
     }
   }
 
-  private cookie(value: string, maxAge: number): string {
-    return new Bun.Cookie(this.config.name, value, { path: '/', ...this.config.domain === undefined ? {} : { domain: this.config.domain }, httpOnly: true, sameSite: 'lax', secure: overHttps(this.request), maxAge }).serialize()
+  // Without `maxAge`, a cookie the browser drops on closing.
+  private cookie(value: string, maxAge: number | undefined): string {
+    return new Bun.Cookie(this.config.name, value, { path: '/', ...this.config.domain === undefined ? {} : { domain: this.config.domain }, httpOnly: true, sameSite: 'lax', secure: overHttps(this.request), ...maxAge === undefined ? {} : { maxAge } }).serialize()
   }
 }
 

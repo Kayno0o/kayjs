@@ -52,6 +52,11 @@ function counter(options: Partial<Parameters<typeof session>[0]> = {}) {
 
       return 'rotated'
     })
+    .get('/remember/:lifetime', async ({ session, params }) => {
+      await session.lifetime(params.lifetime === 'browser' ? 'browser' : Number(params.lifetime))
+
+      return 'remembered'
+    })
 }
 
 describe('sessions', () => {
@@ -148,6 +153,57 @@ describe('sessions', () => {
     expect((await visit('/peek')).text).toBe('1')
     setSystemTime(Date.now() + 101_000)
     expect((await visit('/peek')).text).toBe('none')
+  })
+
+  it('keeps a lifetime a session chose through its extensions and a regenerate, until it is destroyed', async () => {
+    const visit = browser(counter({ maxAge: 100 }))
+
+    await visit('/count')
+    expect((await visit('/remember/300')).set).toMatch(/Max-Age=300;/)
+    setSystemTime(Date.now() + 160_000)
+    expect((await visit('/peek')).set).toMatch(/Max-Age=300;/)
+    expect((await visit('/rotate')).set).toMatch(/Max-Age=300;/)
+    setSystemTime(Date.now() + 290_000)
+    expect((await visit('/peek')).text).toBe('1')
+    await visit('/out')
+    expect((await visit('/count')).set).toMatch(/Max-Age=100;/)
+    setSystemTime(Date.now() + 101_000)
+    expect((await visit('/peek')).text).toBe('none')
+  })
+
+  it('gives a browser session a cookie without Max-Age, kept browserMaxAge unused, a store told so', async () => {
+    const lifetimes: number[] = []
+    const memory = memoryStore()
+    const visit = browser(counter({ maxAge: '30d', browserMaxAge: 50, store: { ...memory, async set(id, data, maxAge) {
+      lifetimes.push(maxAge)
+      await memory.set(id, data, maxAge)
+    } } }))
+
+    await visit('/count')
+
+    const set = (await visit('/remember/browser')).set!
+
+    expect(set).not.toMatch(/Max-Age|Expires/i)
+    expect(lifetimes).toEqual([60 * 60 * 24 * 30, 50])
+    setSystemTime(Date.now() + 40_000)
+    expect((await visit('/peek')).text).toBe('1')
+    setSystemTime(Date.now() + 51_000)
+    expect((await visit('/peek')).text).toBe('none')
+  })
+
+  it('refuses a session lifetime that is no positive duration', async () => {
+    const app = new Elysia().use(session({ secret: SECRET })).get('/', async ({ session }) => {
+      try {
+        await session.lifetime('forever' as never)
+
+        return 'kept'
+      }
+      catch (error) {
+        return (error as Error).message
+      }
+    })
+
+    expect(await (await app.handle(new Request('http://localhost/'))).text()).toBe('kay: a session lifetime is \'forever\'; it takes a positive duration, seconds or a string such as \'5m\', \'12h\' or \'30d\'')
   })
 
   it('takes a maxAge with its unit, refusing one it cannot read', async () => {
