@@ -982,6 +982,23 @@ pre code {
   font-size: 0.85rem;
 }
 
+.site-foot {
+  max-width: 72rem;
+  margin-top: 3rem;
+  padding-top: 1rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+
+.site-foot p {
+  margin: 0;
+}
+
+.site-foot a {
+  color: inherit;
+}
+
 @media (max-width: 56rem) {
   :root {
     --bar: 3.5rem;

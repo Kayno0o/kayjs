@@ -35,4 +35,6 @@ a.skip-link(href="#content") Skip to the content
               a(href={link.href}) {link.title}
   main#content
     slot
+    footer.site-foot
+      p Built with #[a(href="https://git.kaynooo.fr/kaynooo/kayjs") kay]. #[span(data-page-weight)]
 CodeCopy(persist)
