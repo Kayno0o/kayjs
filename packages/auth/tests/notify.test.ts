@@ -1,4 +1,5 @@
-import type { Mail, SecurityEvent } from '../src/mail'
+import type { AuthEvent } from '../src/events'
+import type { Mail } from '../src/mail'
 import { describe, expect, test } from 'bun:test'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp } from './helpers/app'
@@ -9,7 +10,7 @@ const LINKS = { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m'
 // A verified user, and every mail and event from then on.
 async function verified() {
   const mails: Mail[] = []
-  const events: { event: SecurityEvent, detail: string | undefined }[] = []
+  const events: { event: AuthEvent, detail: string | undefined }[] = []
   const app = testApp({
     url: 'https://site.test',
     site: 'Site',
@@ -97,7 +98,7 @@ describe('changes to what protects the account', () => {
 
   test('an unverified address is never mailed a notice, though the app still hears of it', async () => {
     const mails: Mail[] = []
-    const events: SecurityEvent[] = []
+    const events: AuthEvent[] = []
     const { browser } = testApp({ url: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS }, onEvent: event => void events.push(event) })
     const ada = browser()
 
@@ -105,6 +106,6 @@ describe('changes to what protects the account', () => {
     await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')
 
     expect(mails.map(mail => mail.kind)).toEqual(['verify-email'])
-    expect(events).toEqual(['password-changed'])
+    expect(events).toEqual(['signed-in', 'password-changed'])
   })
 })

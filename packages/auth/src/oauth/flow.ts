@@ -121,7 +121,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     const linked = await adoptEmail(core, current, profile)
 
     if (!identity)
-      await notify(core, current, 'provider-linked', provider)
+      await notify(state, current, 'provider-linked', provider)
 
     await heardProfile(core, linked, profile)
 
@@ -143,7 +143,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
 
   await heardProfile(core, record, profile)
 
-  return { redirect: await state.complete(record, flow.redirect) }
+  return { redirect: await state.complete(record, flow.redirect, `oauth:${provider}`) }
 }
 
 // What else the provider came back with, such as Apple's `user` naming the user on their first sign-in.

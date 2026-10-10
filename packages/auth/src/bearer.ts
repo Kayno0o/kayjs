@@ -66,7 +66,7 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
     lastUsedAt: null,
     expiresAt: options.expiresIn === undefined ? null : new Date(Date.now() + options.expiresIn * 1000),
   })
-  await notify(state.core, proved.record, 'token-created', name)
+  await notify(state, proved.record, 'token-created', name)
 
   return { ok: true, token, id }
 }

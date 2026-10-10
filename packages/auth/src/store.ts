@@ -60,6 +60,18 @@ export interface SessionRecord {
   lastSeenAt: Date
 }
 
+// A line of the audit log, kept past its user's deletion so the log still tells what happened.
+export interface AuditRecord {
+  id: string
+  userId: string
+  event: string
+  detail: string | null
+  ip: string
+  userAgent: string
+  actorId: string | null
+  at: Date
+}
+
 // A passkey: a WebAuthn credential the user signs in with, by its credential id.
 export interface PasskeyRecord {
   // The credential id, base64url.
@@ -148,6 +160,14 @@ export interface AuthStore {
     update: (id: string, patch: Partial<Pick<PasskeyRecord, 'name' | 'counter' | 'backedUp' | 'lastUsedAt'>>) => MaybePromise<void>
     // Deletes the user's passkey with that id; false when they have none.
     delete: (userId: string, id: string) => MaybePromise<boolean>
+  }
+  // Needed only with the `audit` option.
+  audit?: {
+    add: (entry: AuditRecord) => MaybePromise<void>
+    // Newest first; `before` excludes that instant.
+    list: (query: { userId?: string, before?: Date, limit: number }) => MaybePromise<AuditRecord[]>
+    // Deletes the entries older than `before`.
+    prune: (before: Date) => MaybePromise<void>
   }
   bearerTokens: {
     create: (token: BearerTokenRecord) => MaybePromise<void>

@@ -157,9 +157,9 @@ export async function resetPassword(state: RequestState, token: string, password
   // Recovering an account ends every way into it the user did not just prove, devices included.
   await store.tokens.deleteForUser(record.id)
   await revokeBearerTokens(state.core, record.id)
-  await notify(state.core, record, 'password-changed')
+  await notify(state, record, 'password-changed')
 
-  return { ok: true, redirect: await state.complete(record, '/') }
+  return { ok: true, redirect: await state.complete(record, '/', 'reset-password') }
 }
 
 export async function requestMagicLink(state: RequestState, email: string, redirect?: string, captcha?: string): Promise<MailRequestResult> {
@@ -176,7 +176,7 @@ export async function signInWithMagicLink(state: RequestState, token: string): P
     ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
     : spent.record
 
-  return { ok: true, redirect: await state.complete(record, spent.token.redirect ?? '/') }
+  return { ok: true, redirect: await state.complete(record, spent.token.redirect ?? '/', 'magic-link') }
 }
 
 // Mails the new address a link confirming it; the account keeps the old one until then.
@@ -222,7 +222,7 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
   await store.tokens.deleteForUser(record.id)
   await state.renew(record)
   // To the address the account left, which is the one a thief would want silent.
-  await notify(state.core, record, 'email-changed', record.email!, spent.record.emailVerifiedAt === null ? null : spent.record.email)
+  await notify(state, record, 'email-changed', record.email!, spent.record.emailVerifiedAt === null ? null : spent.record.email)
 
   return { ok: true, redirect: '/' }
 }
@@ -244,7 +244,7 @@ export async function signInWithEmailCode(state: RequestState, code: string): Pr
     ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
     : spent.record
 
-  return { ok: true, redirect: await state.complete(record, spent.token.redirect ?? '/') }
+  return { ok: true, redirect: await state.complete(record, spent.token.redirect ?? '/', 'email-code') }
 }
 
 // Verifies the address with the code its verification mail carried, in the session that asked for it, which registered the account or is signed in as it.

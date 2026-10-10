@@ -30,7 +30,7 @@ export async function changePassword(state: RequestState, proof: Proof, password
     await state.core.store.tokens.deleteForUser(updated.id)
     await revokeBearerTokens(state.core, updated.id)
     await state.renew(updated)
-    await notify(state.core, updated, 'password-changed')
+    await notify(state, updated, 'password-changed')
   }
 
   return { ok: true }
@@ -103,7 +103,7 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
     return { ok: false, error: 'last-way-in' }
 
   await state.core.store.identities.delete(identity.provider, identity.providerId)
-  await notify(state.core, record, 'provider-unlinked', provider)
+  await notify(state, record, 'provider-unlinked', provider)
 
   return { ok: true }
 }
@@ -115,7 +115,7 @@ export async function deleteAccount(state: RequestState, proof: Proof, signOut: 
   if (!proved.ok)
     return proved
 
-  await notify(state.core, proved.record, 'account-deleted')
+  await notify(state, proved.record, 'account-deleted')
   await state.core.store.users.delete(proved.record.id)
   await state.core.onDelete?.(publicUser(proved.record))
   await signOut()

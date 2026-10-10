@@ -178,6 +178,23 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.passkeys.get('p1')).toBeUndefined()
     })
 
+    test('the audit log lists newest first, by user and before an instant, and is pruned by age', async () => {
+      const entry = (id: string, userId: string, at: string) => ({ id, userId, event: 'signed-in', detail: 'password', ip: '10.0.0.1', userAgent: 'Firefox', actorId: null, at: new Date(at) })
+
+      await store.audit!.add(entry('a1', 'u1', '2026-01-01T00:00:00Z'))
+      await store.audit!.add(entry('a2', 'u2', '2026-01-02T00:00:00Z'))
+      await store.audit!.add(entry('a3', 'u1', '2026-01-03T00:00:00Z'))
+
+      expect((await store.audit!.list({ limit: 10 })).map(found => found.id)).toEqual(['a3', 'a2', 'a1'])
+      expect((await store.audit!.list({ userId: 'u1', limit: 10 })).map(found => found.id)).toEqual(['a3', 'a1'])
+      expect((await store.audit!.list({ before: new Date('2026-01-03T00:00:00Z'), limit: 1 })).map(found => found.id)).toEqual(['a2'])
+      expect(await store.audit!.list({ userId: 'u2', limit: 10 })).toEqual([entry('a2', 'u2', '2026-01-02T00:00:00Z')])
+
+      await store.audit!.prune(new Date('2026-01-02T00:00:00Z'))
+
+      expect((await store.audit!.list({ limit: 10 })).map(found => found.id)).toEqual(['a3', 'a2'])
+    })
+
     test('deleting a user takes everything kept for them', async () => {
       await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
       await store.identities.create(identity('discord', '1', 'u1'))

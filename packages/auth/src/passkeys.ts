@@ -6,6 +6,7 @@ import type { Proof, ProofFailure, TwoFactorResult } from './twoFactor'
 import { Buffer } from 'node:buffer'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from '@simplewebauthn/server'
 import { readDevice } from './device'
+import { report } from './events'
 import { spend } from './limits'
 import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
@@ -122,7 +123,7 @@ export async function registerPasskey(state: RequestState, response: Registratio
   }
 
   await core.store.passkeys.create(passkey)
-  await notify(core, record, 'passkey-added', passkey.name)
+  await notify(state, record, 'passkey-added', passkey.name)
 
   return { ok: true, passkey: publicPasskey(passkey) }
 }
@@ -167,7 +168,7 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
     return { ok: false, error: 'last-way-in' }
 
   await core.store.passkeys.delete(record.id, id)
-  await notify(core, record, 'passkey-removed', passkey.name)
+  await notify(state, record, 'passkey-removed', passkey.name)
 
   return { ok: true }
 }
@@ -182,7 +183,7 @@ export async function passkeySignInOptions(state: RequestState): Promise<PublicK
 }
 
 // Signs in the user whose passkey answered `passkeySignInOptions`. A passkey with user verification is two factors in one, so no second factor is asked after it.
-export async function signInWithPasskey(state: RequestState, response: AuthenticationResponseJSON, redirect: string | undefined, signIn: (record: UserRecord) => Promise<void>): Promise<PasskeySignInResult> {
+export async function signInWithPasskey(state: RequestState, response: AuthenticationResponseJSON, redirect: string | undefined, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<PasskeySignInResult> {
   const { core } = state
 
   if (await spend(core.store, `passkey:${state.client}`, core.limits.signIn))
@@ -200,10 +201,13 @@ export async function signInWithPasskey(state: RequestState, response: Authentic
   if (!passkey || !record || (response.response.userHandle !== undefined && response.response.userHandle !== userHandle(record.id)))
     return { ok: false, error: 'invalid' }
 
-  if (!(await check(core, passkey, response, challenge, true)))
-    return { ok: false, error: 'invalid' }
+  if (!(await check(core, passkey, response, challenge, true))) {
+    await report(state, record, 'sign-in-failed', 'passkey')
 
-  await signIn(record)
+    return { ok: false, error: 'invalid' }
+  }
+
+  await signIn(record, 'passkey')
 
   return { ok: true, redirect: safeRedirect(redirect) }
 }
@@ -220,7 +224,7 @@ export async function twoFactorPasskeyOptions(state: RequestState): Promise<Pass
 }
 
 // Answers a pending sign-in's second factor with a passkey, in place of an authenticator code.
-export async function verifyTwoFactorPasskey(state: RequestState, response: AuthenticationResponseJSON, signIn: (record: UserRecord) => Promise<void>): Promise<TwoFactorResult> {
+export async function verifyTwoFactorPasskey(state: RequestState, response: AuthenticationResponseJSON, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<TwoFactorResult> {
   const { store, limits } = state.core
   const pending = await state.session.get('authChallenge')
   const record = pending && pending.expires > Date.now() ? await store.users.get(pending.user) : undefined
@@ -238,12 +242,15 @@ export async function verifyTwoFactorPasskey(state: RequestState, response: Auth
 
   const passkey = await store.passkeys.get(response.id)
 
-  if (passkey?.userId !== record.id || !(await check(state.core, passkey, response, challenge, false)))
+  if (passkey?.userId !== record.id || !(await check(state.core, passkey, response, challenge, false))) {
+    await report(state, record, 'sign-in-failed', 'two-factor')
+
     return { ok: false, error: 'invalid' }
+  }
 
   await store.attempts.reset(`two-factor:${record.id}`)
   await state.session.unset('authChallenge')
-  await signIn(record)
+  await signIn(record, pending.method ?? 'unknown')
 
   return { ok: true, redirect: pending.redirect }
 }

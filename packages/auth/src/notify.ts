@@ -1,17 +1,14 @@
-import type { Core } from './core'
 import type { SecurityEvent } from './mail'
+import type { RequestState } from './state'
 import type { UserRecord } from './store'
-import { publicUser } from './core'
+import { report } from './events'
 
 // Tells the user and the app of a change to what protects the account; mail goes to a verified address only, so a typo never warns a stranger.
 // A failure is logged, not thrown: the change is made by then, and a mail outage must not turn every sign-in into an error.
-export async function notify(core: Core, record: UserRecord, event: SecurityEvent, detail?: string, to = record.emailVerifiedAt === null ? null : record.email): Promise<void> {
-  try {
-    await core.onEvent?.(event, publicUser(record), detail)
-  }
-  catch (error) {
-    console.error(`kayjs-auth: onEvent failed for ${event}`, error)
-  }
+export async function notify(state: RequestState, record: UserRecord, event: SecurityEvent, detail?: string, to = record.emailVerifiedAt === null ? null : record.email): Promise<void> {
+  const { core } = state
+
+  await report(state, record, event, detail)
 
   const mail = core.email
 
@@ -30,8 +27,9 @@ export async function notify(core: Core, record: UserRecord, event: SecurityEven
 }
 
 // Mails a sign-in from a device or network the account has not used before, then remembers this one.
-export async function noteSignIn(core: Core, record: UserRecord, client: string, userAgent: string): Promise<void> {
-  const fingerprint = core.keys.fingerprint(`${client}\n${userAgent}`)
+export async function noteSignIn(state: RequestState, record: UserRecord): Promise<void> {
+  const { core } = state
+  const fingerprint = core.keys.fingerprint(`${state.client}\n${state.userAgent}`)
 
   if (record.lastSignIn === fingerprint)
     return
@@ -40,5 +38,5 @@ export async function noteSignIn(core: Core, record: UserRecord, client: string,
 
   // The first sign-in has nothing to compare against.
   if (record.lastSignIn !== null)
-    await notify(core, record, 'new-sign-in')
+    await notify(state, record, 'new-sign-in')
 }

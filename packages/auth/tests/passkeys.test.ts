@@ -1,4 +1,4 @@
-import type { SecurityEvent } from '../src/mail'
+import type { AuthEvent } from '../src/events'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'
@@ -10,7 +10,7 @@ afterEach(() => {
 })
 
 async function setup() {
-  const events: { event: SecurityEvent, detail: string | undefined }[] = []
+  const events: { event: AuthEvent, detail: string | undefined }[] = []
   const app = testApp({
     url: 'https://site.test',
     site: 'Site',

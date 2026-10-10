@@ -1,4 +1,4 @@
-import type { AuthStore, BearerTokenRecord, IdentityRecord, PasskeyRecord, SessionRecord, TokenRecord, UserRecord } from './store'
+import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, PasskeyRecord, SessionRecord, TokenRecord, UserRecord } from './store'
 
 const SWEEP_EVERY = 1000
 
@@ -11,6 +11,7 @@ export function memoryStore(): AuthStore {
   const bearerTokens = new Map<string, BearerTokenRecord>()
   const sessions = new Map<string, SessionRecord>()
   const passkeys = new Map<string, PasskeyRecord>()
+  let audit: AuditRecord[] = []
   const attempts = new Map<string, { count: number, resetAt: number }>()
   let hits = 0
   const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
@@ -183,6 +184,19 @@ export function memoryStore(): AuthStore {
           return false
 
         return passkeys.delete(id)
+      },
+    },
+    audit: {
+      add(entry) {
+        audit.push({ ...entry })
+      },
+      list: ({ userId, before, limit }) => audit
+        .filter(entry => (userId === undefined || entry.userId === userId) && (before === undefined || entry.at < before))
+        .sort((a, b) => b.at.getTime() - a.at.getTime())
+        .slice(0, limit)
+        .map(entry => ({ ...entry })),
+      prune(before) {
+        audit = audit.filter(entry => entry.at >= before)
       },
     },
     bearerTokens: {

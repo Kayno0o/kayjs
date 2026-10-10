@@ -7,9 +7,9 @@ import type { BearerToken, CreateTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
+import type { AuditEntry, AuthEvent, EventContext } from './events'
 import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
-import type { SecurityEvent } from './mail'
 import type { OAuthFailure } from './oauth/flow'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
@@ -28,6 +28,7 @@ import { pwnedPassword } from './breached'
 import { captchaRequired } from './captcha'
 import { publicUser } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithEmailCode, signInWithMagicLink, verifyEmail, verifyEmailCode } from './email'
+import { auditEntries, report } from './events'
 import { createGate, scopeAllows } from './gate'
 import { deriveKeys } from './keys'
 import { DEFAULT_LIMITS } from './limits'
@@ -49,6 +50,7 @@ const STATE = Symbol('kayjs-auth.state')
 const TRAILING_SLASH = /\/$/
 // kay's own session lifetime, 30 days.
 const DEFAULT_SESSION_MAX_AGE = 30 * 24 * 60 * 60
+const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
 // What a provider posting back to the callback may say, carried over to the GET.
 const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 
@@ -85,8 +87,10 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   // Called once a user is deleted, to delete the app's own records for them.
   onDelete?: ((user: User) => void | Promise<void>) | undefined
-  // Called with every change to what protects an account, the ones mailed to the user, for an audit log of the app's own.
-  onEvent?: ((event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>) | undefined
+  // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own.
+  onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
+  // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` in seconds, a year by default.
+  audit?: boolean | { maxAge?: number } | undefined
   // What a bearer token may be limited to, such as `['posts:read', 'posts:write']`: a route asks for one with `scope:`.
   scopes?: readonly Scope[] | undefined
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
@@ -129,7 +133,7 @@ export class Auth<Scope extends string = string> {
       userAgent: request.headers.get('user-agent') ?? '',
       current: () => this.record(),
       via: () => this.source,
-      complete: async (record, redirect) => completeSignIn(this[STATE], record, redirect, signedIn => this.establish(signedIn)),
+      complete: async (record, redirect, method) => completeSignIn(this[STATE], record, redirect, method, (signedIn, how) => this.establish(signedIn, how)),
       renew: async (record) => {
         // Read off the session, not through `record()`: the version it holds is the one just raised past.
         const signedIn = await this.session.get('auth')
@@ -168,11 +172,22 @@ export class Auth<Scope extends string = string> {
     if (!record)
       throw new Error(`kayjs-auth: no user ${user.id} to sign in`)
 
-    await this.establish(record)
+    await this.establish(record, 'app')
   }
 
   // Signs this session out. A session held in the cookie alone stays valid wherever it was copied until it expires; `signOutEverywhere` ends those too.
   async signOut(): Promise<void> {
+    const signedIn = await this.session.get('auth')
+    const record = signedIn && await this.core.store.users.get(signedIn.user)
+
+    if (record)
+      await report(this[STATE], record, 'signed-out')
+
+    await this.leave()
+  }
+
+  // Signs this session out without a word to `onEvent`.
+  private async leave(): Promise<void> {
     const signedIn = await this.session.get('auth')
 
     if (signedIn?.session !== undefined)
@@ -197,10 +212,12 @@ export class Auth<Scope extends string = string> {
     // A device token is a session too, and one minted from a stolen session would outlive it.
     await revokeBearerTokens(this.core, record.id)
 
+    await report(this[STATE], record, 'signed-out', options.keepThisOne ? 'everywhere-else' : 'everywhere')
+
     if (updated && options.keepThisOne)
       await this[STATE].renew(updated)
     else
-      await this.signOut()
+      await this.leave()
   }
 
   // A new user with an email and a password, signed in on this session; field errors come back as codes.
@@ -292,7 +309,7 @@ export class Auth<Scope extends string = string> {
 
   // Finishes a sign-in waiting for its second factor with an authenticator code or a recovery code.
   async verifyTwoFactor(code: string): Promise<TwoFactorResult> {
-    return verifyTwoFactor(this[STATE], code, record => this.establish(record))
+    return verifyTwoFactor(this[STATE], code, (record, method) => this.establish(record, method))
   }
 
   // Re-proves the signed-in user, as before linking a provider: a proof counts for ten minutes, as a sign-in does.
@@ -416,7 +433,7 @@ export class Auth<Scope extends string = string> {
 
   // Signs in with the passkey that answered `passkeySignInOptions`, with no second factor after it.
   async signInWithPasskey(response: AuthenticationResponseJSON, redirect?: string): Promise<PasskeySignInResult> {
-    return signInWithPasskey(this[STATE], response, redirect, record => this.establish(record))
+    return signInWithPasskey(this[STATE], response, redirect, (record, method) => this.establish(record, method))
   }
 
   // The options for answering a pending sign-in's second factor with a passkey; `none` when the user has none.
@@ -425,12 +442,19 @@ export class Auth<Scope extends string = string> {
   }
 
   async verifyTwoFactorPasskey(response: AuthenticationResponseJSON): Promise<TwoFactorResult> {
-    return verifyTwoFactorPasskey(this[STATE], response, record => this.establish(record))
+    return verifyTwoFactorPasskey(this[STATE], response, (record, method) => this.establish(record, method))
   }
 
   // The options for re-proving with a passkey, its answer then passed as `{ passkey }` wherever a proof is asked.
   async passkeyProofOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
     return passkeyProofOptions(this[STATE])
+  }
+
+  // The signed-in user's own audit log, newest first, a page of `limit` (50 by default) before `before`; empty without the `audit` option.
+  async auditLog(options: { before?: Date, limit?: number } = {}): Promise<AuditEntry[]> {
+    const record = await this.record()
+
+    return record ? auditEntries(this.core, { ...options, userId: record.id }) : []
   }
 
   // The signed-in user's bearer tokens, without the tokens themselves.
@@ -442,8 +466,8 @@ export class Auth<Scope extends string = string> {
     return revokeToken(this[STATE], id)
   }
 
-  // Under a new session id, so one planted before is worth nothing.
-  private async establish(record: UserRecord): Promise<void> {
+  // Under a new session id, so one planted before is worth nothing; `method` says how, for the `signed-in` event.
+  private async establish(record: UserRecord, method: string): Promise<void> {
     const previous = await this.session.get('auth')
 
     // Signing in again, as another user or the same, replaces the sign-in this browser held.
@@ -458,7 +482,8 @@ export class Auth<Scope extends string = string> {
     await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now(), session })
     this.source = 'session'
     this.resolving = Promise.resolve(record)
-    await noteSignIn(this.core, record, this[STATE].client, this[STATE].userAgent)
+    await noteSignIn(this[STATE], record)
+    await report(this[STATE], record, 'signed-in', method)
   }
 
   // Whether the sign-in's session is still on the user's list; one from before kayjs-auth kept them is put on it.
@@ -676,6 +701,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onProviderProfile: options.onProviderProfile,
     onDelete: options.onDelete,
     onEvent: options.onEvent,
+    audit: options.audit ? { maxAge: (options.audit === true ? undefined : options.audit.maxAge) ?? DEFAULT_AUDIT_MAX_AGE, prunedAt: 0 } : undefined,
   }
 
   for (const [name, { client }] of oauth) {

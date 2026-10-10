@@ -4,6 +4,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, nanoid } from '@kaynooo/utils'
 import { qrCodeDataUri } from '@kaynooo/utils/tools'
+import { report } from './events'
 import { deriveKeys, digest } from './keys'
 import { spend } from './limits'
 import { notify } from './notify'
@@ -46,20 +47,22 @@ export interface Challenge {
   user: string
   version: number
   redirect: string
+  // How the first factor was proved, for the `signed-in` event.
+  method?: string
   expires: number
 }
 
 export type TwoFactorResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' }
 
 // Signs `record` in, or when it has a second factor parks the sign-in until the code, and answers where the browser goes next.
-export async function completeSignIn(state: RequestState, record: UserRecord, redirect: string, signIn: (record: UserRecord) => Promise<void>): Promise<string> {
+export async function completeSignIn(state: RequestState, record: UserRecord, redirect: string, method: string, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<string> {
   if (record.totpEnabledAt === null) {
-    await signIn(record)
+    await signIn(record, method)
 
     return redirect
   }
 
-  await state.session.set('authChallenge', { user: record.id, version: record.sessionVersion, redirect, expires: Date.now() + CHALLENGE_MAX_AGE_MS })
+  await state.session.set('authChallenge', { user: record.id, version: record.sessionVersion, redirect, method, expires: Date.now() + CHALLENGE_MAX_AGE_MS })
 
   return state.core.twoFactorPage
 }
@@ -71,7 +74,7 @@ export async function challenged(state: RequestState): Promise<boolean> {
   return challenge !== undefined && challenge.expires > Date.now()
 }
 
-export async function verifyTwoFactor(state: RequestState, code: string, signIn: (record: UserRecord) => Promise<void>): Promise<TwoFactorResult> {
+export async function verifyTwoFactor(state: RequestState, code: string, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<TwoFactorResult> {
   const { store, limits } = state.core
   const challenge = await state.session.get('authChallenge')
   const record = challenge && challenge.expires > Date.now() ? await store.users.get(challenge.user) : undefined
@@ -83,12 +86,15 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
   if (await spend(store, `two-factor:${state.client}`, limits.twoFactor) || await spend(store, `two-factor:${record.id}`, limits.twoFactorAccount))
     return { ok: false, error: 'limited' }
 
-  if (!(await spendSecondFactor(state.core, record, code)))
+  if (!(await spendSecondFactor(state, record, code))) {
+    await report(state, record, 'sign-in-failed', 'two-factor')
+
     return { ok: false, error: 'invalid' }
+  }
 
   await store.attempts.reset(`two-factor:${record.id}`)
   await state.session.unset('authChallenge')
-  await signIn(record)
+  await signIn(record, challenge.method ?? 'unknown')
 
   return { ok: true, redirect: challenge.redirect }
 }
@@ -116,7 +122,7 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
   else if (record.passwordHash !== null && !(options.secondFactor && twoFactor))
     proved = await comparePasswords(proof.password ?? '', record.passwordHash)
   else
-    proved = await spendSecondFactor(state.core, record, proof.code ?? '')
+    proved = await spendSecondFactor(state, record, proof.code ?? '')
 
   if (!proved)
     return { ok: false, error: 'proof' }
@@ -186,7 +192,7 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
 
   if (updated) {
     await state.renew(updated)
-    await notify(state.core, updated, 'two-factor-enabled')
+    await notify(state, updated, 'two-factor-enabled')
   }
 
   return { ok: true, recoveryCodes: await issueRecoveryCodes(state.core, record.id) }
@@ -200,7 +206,7 @@ export async function disableTwoFactor(state: RequestState, proof: Proof): Promi
 
   await state.core.store.users.update(proved.record.id, { totpSecret: null, totpEnabledAt: null })
   await state.core.store.recoveryCodes.replace(proved.record.id, [])
-  await notify(state.core, proved.record, 'two-factor-disabled')
+  await notify(state, proved.record, 'two-factor-disabled')
 
   return { ok: true }
 }
@@ -217,13 +223,14 @@ export async function regenerateRecoveryCodes(state: RequestState, proof: Proof)
 
   const recoveryCodes = await issueRecoveryCodes(state.core, proved.record.id)
 
-  await notify(state.core, proved.record, 'recovery-codes-regenerated')
+  await notify(state, proved.record, 'recovery-codes-regenerated')
 
   return { ok: true, recoveryCodes }
 }
 
 // An authenticator code, its step recorded so it works once; or a recovery code, spent.
-async function spendSecondFactor(core: Core, record: UserRecord, code: string): Promise<'totp' | 'recovery' | undefined> {
+async function spendSecondFactor(state: RequestState, record: UserRecord, code: string): Promise<'totp' | 'recovery' | undefined> {
+  const { core } = state
   const secret = record.totpSecret === null ? undefined : core.keys.decrypt(record.totpSecret, totpContext(record.id))
   const step = secret === undefined ? undefined : await verifyTotp(secret, code)
 
@@ -235,7 +242,7 @@ async function spendSecondFactor(core: Core, record: UserRecord, code: string): 
   if (normalized.length !== RECOVERY_CODE_LENGTH || !(await core.store.recoveryCodes.consume(record.id, digest(normalized))))
     return undefined
 
-  await notify(core, record, 'recovery-code-used')
+  await notify(state, record, 'recovery-code-used')
 
   return 'recovery'
 }

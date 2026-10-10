@@ -7,6 +7,7 @@ import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { newUserRecord, publicUser } from './core'
 import { welcome } from './email'
+import { report } from './events'
 import { randomToken } from './keys'
 import { spend } from './limits'
 import { safeRedirect } from './oauth/redirect'
@@ -106,7 +107,7 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   if (requireVerified)
     return { ok: true, user, signedIn: false }
 
-  await state.complete(record, '/')
+  await state.complete(record, '/', 'register')
 
   return { ok: true, user, signedIn: true }
 }
@@ -132,8 +133,12 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   if (await spend(store, accountKey, limits.signInAccount))
     return { ok: false, error: 'limited' }
 
-  if (input.password.length > PASSWORD_MAX_LENGTH || !(await passwordMatches(record, input.password)))
+  if (input.password.length > PASSWORD_MAX_LENGTH || !(await passwordMatches(record, input.password))) {
+    if (record)
+      await report(state, record, 'sign-in-failed', 'password')
+
     return { ok: false, error: 'invalid' }
+  }
 
   await store.attempts.reset(accountKey)
 
@@ -148,7 +153,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   if (passwordNeedsRehash(record!.passwordHash!))
     await store.users.update(record!.id, { passwordHash: await hashPassword(input.password) })
 
-  return { ok: true, redirect: await state.complete(record!, safeRedirect(input.redirect)) }
+  return { ok: true, redirect: await state.complete(record!, safeRedirect(input.redirect), 'password') }
 }
 
 // Spends as long on an account without a password as on a wrong one, so the time taken tells nothing either.

@@ -1,5 +1,5 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
-import type { AuthStore, BearerTokenRecord, IdentityRecord, PasskeyRecord, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
+import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, PasskeyRecord, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
 
 // Expired attempt windows are deleted once every so many hits.
@@ -85,6 +85,18 @@ export const AuthPasskeys = defineTable('auth_passkey', t => ({
   last_used_at: t.timestamptz().nullable(),
 })).withIndexes([{ columns: ['user_id'] }])
 
+// No reference to the user: the log outlives them.
+export const AuthAudit = defineTable('auth_audit', t => ({
+  id: t.text().primaryKey(),
+  user_id: t.text().notNull(),
+  event: t.text().notNull(),
+  detail: t.text().nullable(),
+  ip: t.text().notNull(),
+  user_agent: t.text().notNull(),
+  actor_id: t.text().nullable(),
+  at: t.timestamptz().notNull(),
+})).withIndexes([{ columns: ['user_id', 'at'] }, { columns: ['at'] }])
+
 export const AuthAttempts = defineTable('auth_attempt', t => ({
   key: t.text().primaryKey(),
   count: t.int4().notNull(),
@@ -92,7 +104,7 @@ export const AuthAttempts = defineTable('auth_attempt', t => ({
 }))
 
 // The tables to list in the app's `new Database({ tables })`, so `db.sync()` creates them.
-export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAttempts] as const
+export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAudit, AuthAttempts] as const
 
 type UserRow = InferEntity<typeof AuthUsers>
 
@@ -105,6 +117,7 @@ export function pgStore(db: Database): AuthStore {
   const bearerTokens = db.repo(AuthBearerTokens)
   const sessions = db.repo(AuthSessions)
   const passkeys = db.repo(AuthPasskeys)
+  const audit = db.repo(AuthAudit)
   const attempts = db.repo(AuthAttempts)
   let hits = 0
 
@@ -173,6 +186,15 @@ export function pgStore(db: Database): AuthStore {
         await passkeys.write.updateById(id, withoutUndefined({ name: patch.name, counter: patch.counter === undefined ? undefined : BigInt(patch.counter), backed_up: patch.backedUp, last_used_at: patch.lastUsedAt }))
       },
       delete: async (userId, id) => await passkeys.write.deleteOne({ id, user_id: userId }) !== null,
+    },
+    audit: {
+      async add(entry) {
+        await audit.write.insertOne({ id: entry.id, user_id: entry.userId, event: entry.event, detail: entry.detail, ip: entry.ip, user_agent: entry.userAgent, actor_id: entry.actorId, at: entry.at })
+      },
+      list: async ({ userId, before, limit }) => (await audit.read.findMany(q => q.where({ ...userId === undefined ? {} : { user_id: userId }, ...before === undefined ? {} : { at: { lt: before } } }).orderBy('at', 'desc').limit(limit))).map(row => toAudit(row)),
+      async prune(before) {
+        await audit.write.deleteMany({ at: { lt: before } })
+      },
     },
     bearerTokens: {
       async create(token) {
@@ -279,6 +301,10 @@ function toBearerToken(row: InferEntity<typeof AuthBearerTokens> | null): Bearer
 
 function toSession(row: InferEntity<typeof AuthSessions> | null): SessionRecord | undefined {
   return row ? { id: row.id, userId: row.user_id, version: row.version, userAgent: row.user_agent, ip: row.ip, createdAt: row.created_at, lastSeenAt: row.last_seen_at } : undefined
+}
+
+function toAudit(row: InferEntity<typeof AuthAudit>): AuditRecord {
+  return { id: row.id, userId: row.user_id, event: row.event, detail: row.detail, ip: row.ip, userAgent: row.user_agent, actorId: row.actor_id, at: row.at }
 }
 
 function toPasskey(row: InferEntity<typeof AuthPasskeys> | null): PasskeyRecord | undefined {

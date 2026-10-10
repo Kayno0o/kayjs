@@ -1,8 +1,8 @@
 import type { CaptchaOptions } from './captcha'
 import type { EmailCore, PendingCode } from './email'
+import type { AuthEvent, EventContext } from './events'
 import type { Keys } from './keys'
 import type { Limits } from './limits'
-import type { SecurityEvent } from './mail'
 import type { createOAuthClient } from './oauth/client'
 import type { OAuthFlow } from './oauth/flow'
 import type { createTokenRefresher, StoredCredential } from './oauth/refresher'
@@ -90,7 +90,9 @@ export interface Core {
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   onDelete?: ((user: User) => void | Promise<void>) | undefined
-  onEvent?: ((event: SecurityEvent, user: User, detail: string | undefined) => void | Promise<void>) | undefined
+  onEvent?: ((event: AuthEvent, user: User, detail: string | undefined, context: EventContext) => void | Promise<void>) | undefined
+  // Kept with the `audit` option: entries live `maxAge` seconds.
+  audit?: { maxAge: number, prunedAt: number } | undefined
 }
 
 // What a provider token refresh works on: the identity, and its tokens opened.

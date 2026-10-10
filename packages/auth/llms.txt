@@ -60,7 +60,7 @@ The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(
 - `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
 - `prefix`: where the OAuth routes live, `/auth` by default.
 - `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default.
-- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `sessionMaxAge`, `sessionsPage`, `locate`: see Sessions. `passkeys`: see Passkeys.
+- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `sessionMaxAge`, `sessionsPage`, `locate`: see Sessions. `passkeys`: see Passkeys. `audit`: see Events and the audit log.
 
 ## The signed-in user
 
@@ -278,12 +278,24 @@ Changing what protects the account takes a `proof`: `changePassword`, `changeEma
 
 ## Security mails
 
-A change to what protects an account is mailed to its verified address, never an unverified one, and handed to `onEvent(event, user, detail)` for the app's audit log. A mailer or an `onEvent` that throws is logged, never turned into a failed sign-in:
+A change to what protects an account is mailed to its verified address, never an unverified one, and handed to `onEvent` (see Events and the audit log). A mailer or an `onEvent` that throws is logged, never turned into a failed sign-in:
 
 - `new-sign-in`: a device or network the account had not used before; the first sign-in has nothing to compare against. The mail links to `sessionsPage` when the app has one.
 - `password-changed`, `two-factor-enabled`, `two-factor-disabled`, `recovery-code-used`, `recovery-codes-regenerated`, `account-deleted`.
 - `email-changed`, mailed to the address left, `detail` the new one.
 - `provider-linked` and `provider-unlinked`, `detail` the provider; `passkey-added` and `passkey-removed`, `detail` its name; `token-created`, `detail` its label.
+
+## Events and the audit log
+
+`onEvent(event, user, detail, context)` hears every security mail's event above, mailed or not, and these, never mailed:
+
+- `signed-in`, `detail` how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `oauth:<provider>`, `passkey`, or `app` for `auth.signIn`. A sign-in through the second factor is heard once it is answered, with its first factor.
+- `signed-out`; `detail` `everywhere` or `everywhere-else` from `signOutEverywhere`.
+- `sign-in-failed`, for an account that exists only: `detail` `password`, `two-factor` or `passkey`.
+
+`context` is `{ ip, userAgent, actor }`, `actor` the user who acted when it was not the one it happened to, such as an admin.
+
+With `audit: true`, or `{ maxAge }` in seconds (a year by default), the same events are kept in the store's audit log too, pruned of older ones at most hourly. `auditLog({ before, limit })` gives the signed-in user their own, newest first: `{ id, userId, event, detail, ip, userAgent, actorId, at }`. The log is kept past a user's deletion, so it still says what happened. Writing it never fails what it records: a failure is logged.
 
 ## Bots and breached passwords
 
@@ -314,8 +326,8 @@ Attempts are counted in the store, so every process shares them, per client addr
 ## Stores
 
 - `memoryStore()` keeps everything in the process: for tests, and for trying kayjs-auth before a database is wired.
-- `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps it in Postgres through pg-orm, once `authTables` are among the `Database`'s tables: `auth_user`, `auth_identity`, `auth_token`, `auth_recovery_code`, `auth_bearer_token`, `auth_session`, `auth_passkey` and `auth_attempt`, the others deleted with their user.
-- Any object with the `AuthStore` methods is a store: `users`, `identities`, `tokens`, `recoveryCodes`, `bearerTokens`, `sessions`, `passkeys` and `attempts`, each method sync or async. What must hold is written on each method: emails are looked up exactly, usernames without case; a mailed token, a recovery code and a TOTP step are spent once even by two requests together; deleting a user deletes what kayjs-auth keeps for them.
+- `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps it in Postgres through pg-orm, once `authTables` are among the `Database`'s tables: `auth_user`, `auth_identity`, `auth_token`, `auth_recovery_code`, `auth_bearer_token`, `auth_session`, `auth_passkey`, `auth_audit` and `auth_attempt`, the others but the audit log deleted with their user.
+- Any object with the `AuthStore` methods is a store: `users`, `identities`, `tokens`, `recoveryCodes`, `bearerTokens`, `sessions`, `passkeys` and `attempts`, plus `audit` for the `audit` option, each method sync or async. What must hold is written on each method: emails are looked up exactly, usernames without case; a mailed token, a recovery code and a TOTP step are spent once even by two requests together; deleting a user deletes what kayjs-auth keeps for them.
 - A store over an app's own tables: `users.create(user)` answers the user as stored when the store picks its own id, such as a serial column's, `user` whole with only its `id` changed, and kayjs-auth goes on with it (ids are strings, so the store converts); answering nothing keeps the id kayjs-auth picked. TOTP secrets are stored sealed with the auth `secret`: a store whose rows hold plain base32 secrets from before seals each on read with `sealTotpSecret(secret, userId, plain)`, from `@kaynooo/kayjs-auth`, `secret` being the value `createAuth` takes, a list included. A plain base32 value matches `/^[A-Z2-7]+=*$/`, which a sealed one in practice never does, and what kayjs-auth writes afterwards is sealed already.
 
 ## Testing

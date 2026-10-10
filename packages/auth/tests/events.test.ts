@@ -1,0 +1,134 @@
+import type { User } from '../src/auth'
+import type { AuthEvent, EventContext } from '../src/events'
+import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { totpCode, totpStep } from '../src/totp'
+import { testApp } from './helpers/app'
+
+const PASSWORD = 'correct horse battery'
+const ACTIVITY = new Set<AuthEvent>(['signed-in', 'signed-out', 'sign-in-failed'])
+
+afterEach(() => {
+  setSystemTime()
+})
+
+function setup(options: Parameters<typeof testApp>[0] = {}) {
+  const events: { event: AuthEvent, user: User, detail: string | undefined, context: EventContext }[] = []
+  const app = testApp({
+    onEvent: (event, user, detail, context) => {
+      events.push({ event, user, detail, context })
+    },
+    ...options,
+  })
+  // Sign-ins, sign-outs and failures only, without the mails' events.
+  const said = () => events.filter(entry => ACTIVITY.has(entry.event)).map(entry => [entry.event, entry.detail])
+
+  return { ...app, events, said }
+}
+
+function from(address: string, body: unknown) {
+  return { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': address, 'user-agent': 'Firefox' }, body: JSON.stringify(body) }
+}
+
+describe('events', () => {
+  test('sign-ins say how, sign-outs and failed sign-ins of a known account are heard, with where they came from', async () => {
+    const { browser, said, events } = setup()
+
+    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await browser().json('/password', from('10.0.0.1', { identifier: 'ada@example.com', password: 'wrong password' }))
+    // No account: nobody to tell.
+    await browser().json('/password', from('10.0.0.1', { identifier: 'bob@example.com', password: PASSWORD }))
+
+    const ada = browser()
+
+    await ada.json('/password', from('10.0.0.2', { identifier: 'ada@example.com', password: PASSWORD }))
+    await ada.fetch('/sign-out', { method: 'POST' })
+
+    expect(said()).toEqual([['signed-in', 'register'], ['sign-in-failed', 'password'], ['signed-in', 'password'], ['signed-out', undefined]])
+    expect(events.find(entry => entry.event === 'sign-in-failed')).toMatchObject({ user: { email: 'ada@example.com' }, context: { ip: '10.0.0.1', userAgent: 'Firefox', actor: null } })
+  })
+
+  test('a sign-in through the second factor says its first, and a wrong code is a failed sign-in', async () => {
+    const { browser, said, store } = setup()
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { setup: totp } = await ada.call('setUpTwoFactor', { password: PASSWORD })
+
+    await ada.call('enableTwoFactor', await totpCode(totp.secret, totpStep()))
+    await store.users.update((await store.users.findByEmail('ada@example.com'))!.id, { totpLastStep: 0 })
+
+    const phone = browser()
+
+    await phone.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+    await phone.call('verifyTwoFactor', '000000')
+    await phone.call('verifyTwoFactor', await totpCode(totp.secret, totpStep()))
+
+    expect(said().slice(-2)).toEqual([['sign-in-failed', 'two-factor'], ['signed-in', 'password']])
+  })
+
+  test('signing out everywhere says whether this session stayed', async () => {
+    const { browser, said } = setup()
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
+    await ada.fetch('/sign-out-everywhere', { method: 'POST' })
+
+    expect(said().slice(1)).toEqual([['signed-out', 'everywhere-else'], ['signed-out', 'everywhere']])
+  })
+
+  test('an onEvent that throws is logged, and the sign-in goes on', async () => {
+    const { browser } = testApp({
+      onEvent: () => {
+        throw new Error('down')
+      },
+    })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
+  })
+})
+
+describe('the audit log', () => {
+  test('keeps every event of the user\'s, read back newest first by the user only', async () => {
+    const { browser } = setup({ audit: true })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')
+
+    const bob = browser()
+
+    await bob.call('register', { email: 'bob@example.com', password: PASSWORD })
+
+    const log = await ada.call('auditLog')
+
+    expect(log.map((entry: { event: string }) => entry.event)).toEqual(['password-changed', 'signed-in'])
+    expect(log[0]).toMatchObject({ detail: null, ip: 'unknown', actorId: null })
+    expect(await ada.call('auditLog', { limit: 1 })).toHaveLength(1)
+    expect(await browser().call('auditLog')).toEqual([])
+  })
+
+  test('is not kept without the option', async () => {
+    const { browser, store } = setup()
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    expect(await ada.call('auditLog')).toEqual([])
+    expect(await store.audit!.list({ limit: 10 })).toEqual([])
+  })
+
+  test('forgets what is older than its age, an hour at most after', async () => {
+    const { browser, store } = setup({ audit: { maxAge: 60 } })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    setSystemTime(new Date(Date.now() + 2 * 60 * 60 * 1000))
+    await ada.fetch('/sign-out', { method: 'POST' })
+
+    expect((await store.audit!.list({ limit: 10 })).map(entry => entry.event)).toEqual(['signed-out'])
+  })
+})
