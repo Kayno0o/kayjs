@@ -69,6 +69,8 @@ export interface HoneypotOptions<Field extends string = string> {
   pretend?: boolean | undefined
 }
 
+export type MinTimeRefusal = 'early' | 'expired'
+
 export interface MinTimeOptions {
   // The least time between the page rendering the form and its post, seconds or a string such as '3s'.
   after: Duration
@@ -96,7 +98,8 @@ export interface ProtectionMessages {
   // Given the seconds until the client may post again.
   rateLimit?: (string | ((wait: number) => string)) | undefined
   honeypot?: string | undefined
-  minTime?: string | undefined
+  // Given `early` for a post sent sooner than `minTime`, `expired` for a stamp missing, forged or past `maxAge`.
+  minTime?: (string | ((reason: MinTimeRefusal) => string)) | undefined
   // Given the most bytes a post may send.
   bodyLimit?: (string | ((bytes: number) => string)) | undefined
 }

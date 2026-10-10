@@ -81,6 +81,12 @@ describe('kay/test', () => {
     await expect(signed.call(profile, form([['age', '1'], ['website', 'spam']]))).rejects.toMatchObject({ status: 422, errors: { website: 'Leave this field empty' } })
   })
 
+  it('serves a project setting no site at its own origin, as pages reading it render', async () => {
+    const unset = await testSite({ routes: 'tests/fixtures/production/src/routes', security: false })
+
+    expect((await unset.visit('/origin')).html).toContain('<p class="origin">http://localhost</p>')
+  })
+
   it('stops at a redirect to another site', async () => {
     const bare = await testSite({ routes: 'tests/fixtures/bare/src/routes' })
     const away = await bare.visit(`/?next=${encodeURIComponent('https://example.com/about')}`)

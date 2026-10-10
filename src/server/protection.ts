@@ -190,7 +190,11 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
       if (minTime.pretend)
         return PRETEND
 
-      return { status: 422, field: '', message: messages?.minTime ?? (age !== undefined && age > minTime.maxAge ? 'This form was open too long; send it again' : 'Sent too fast; take a moment, then send it again') }
+      // A stamp missing or forged is most often a page from before a restart, which changed the key: expired too.
+      const reason = age !== undefined && age < minTime.after ? 'early' : 'expired'
+      const message = messages?.minTime ?? (refusal => refusal === 'early' ? 'Sent too fast; take a moment, then send it again' : 'This form has expired; send it again')
+
+      return { status: 422, field: '', message: typeof message === 'string' ? message : message(reason) }
     }
   }
 
