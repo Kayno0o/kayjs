@@ -19,6 +19,9 @@ release level:
 	  exit 1
 	fi
 
+worktree name: # a worktree at HEAD in .claude/worktrees/<name>, its dependencies installed, as Claude Code's own are made
+	bun .claude/hooks/worktree.ts create {{name}}
+
 extension: # build kay.vsix and install it in code-server
 	cd editors/vscode && bun run package
 	code-server --install-extension editors/vscode/kay.vsix
