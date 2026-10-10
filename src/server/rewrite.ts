@@ -1,6 +1,6 @@
 import type { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
-import { logError } from '../build/sourcemap'
+import { kayLog } from '../runtime/log'
 import { keepRequestId, requestId } from './protection'
 
 // Returns the path, query included, to serve the request from instead, or undefined to serve it as it came.
@@ -60,7 +60,7 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
       return undefined
 
     if (!target.startsWith('/') || target.startsWith('//')) {
-      logError(new Error(`kay: rewrite returned ${JSON.stringify(target)} for ${url.pathname}; it returns a path starting with one /`))
+      kayLog('error', `rewrite returned ${JSON.stringify(target)} for ${url.pathname}; it returns a path starting with one /`)
 
       return new Response('Internal Server Error', { status: 500 })
     }

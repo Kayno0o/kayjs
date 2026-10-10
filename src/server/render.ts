@@ -24,6 +24,7 @@ import { component, newServerIslands, withServerIslands } from '../runtime/html'
 import { textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
+import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule } from './bundle'
@@ -576,7 +577,7 @@ function outcomeScript(outcome: Outcome | null): string {
     text = encodeValue(outcome.succeeded ? outcome : { ...outcome, values: {} })
   }
   catch (error) {
-    console.warn(`kay: what ${outcome.action} ${outcome.succeeded ? 'returned' : 'passed to ctx.fail'} cannot reach the page's islands: ${unsendable(error) ?? String(error)}`)
+    kayLog('warn', `what ${outcome.action} ${outcome.succeeded ? 'returned' : 'passed to ctx.fail'} cannot reach the page's islands: ${unsendable(error) ?? String(error)}`)
 
     return ''
   }

@@ -1,4 +1,4 @@
-import { logError } from '../build/sourcemap'
+import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 
 // What a room sends a connection through: Elysia's `ws`, read through its raw socket, the one object that stays the same from `open` to `close`.
@@ -155,8 +155,7 @@ function guarded(what: string, run: () => void): () => void {
       run()
     }
     catch (error) {
-      console.error(`kay: ${what} failed`)
-      logError(error)
+      kayLog('error', `${what} failed`, error)
     }
   }
 }

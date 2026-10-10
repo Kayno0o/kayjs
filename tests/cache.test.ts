@@ -232,7 +232,7 @@ describe('cached with a store', () => {
       setSystemTime(Date.now() + 61_000)
       expect(await cached('feed', 60, () => value, { store })).toBe('plain')
       await Bun.sleep(0)
-      expect(logged.mock.calls[0]![1]).toMatchObject({ message: expect.stringContaining('cannot keep its value in a store') })
+      expect(logged.mock.calls[0]![0]).toContain('cannot keep its value in a store')
       expect(store.get('feed')!.text).toBe('["plain"]')
 
       const failing = { ...store, set: () => {

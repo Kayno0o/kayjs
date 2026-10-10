@@ -5,7 +5,7 @@ import type { Duration } from './runtime/duration'
 import type { HeadTag } from './runtime/head'
 import type { JsonLd } from './runtime/seo'
 import type { EnvSchema } from './server/env'
-import type { RequestLogger } from './server/log'
+import type { Logger } from './server/log'
 import type { OpenApiConfig } from './server/openapi'
 import type { PageHook } from './server/page-hook'
 import type { Redirects } from './server/redirects'
@@ -52,8 +52,8 @@ export interface KayConfig {
   compress?: boolean | undefined
   // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
   health?: HealthConfig | false | undefined
-  // One line per request on stdout, on by default when NODE_ENV is production: `'json'` for one JSON object instead, a function to send each entry elsewhere, `false` for none.
-  log?: RequestLogger | undefined
+  // One line per request on stdout, on by default when NODE_ENV is production, `false` for none; `'json'` writes it and kay's own messages as one JSON object each instead, and a function receives them all.
+  log?: Logger | undefined
   // A `Server-Timing` header on each page rendered per request, timing its loads and its render for the browser's network panel: on in development, off otherwise unless set.
   serverTiming?: boolean | undefined
   // An OpenTelemetry tracer, `trace.getTracer('my-site')` from @opentelemetry/api: a span per page request with one per load and the render in it, and one per API request. None by default, which costs nothing.

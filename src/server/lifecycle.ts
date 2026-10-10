@@ -2,10 +2,10 @@ import type { AnyElysia, Elysia } from 'elysia'
 import type { HealthConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import process from 'node:process'
-import { logError } from '../build/sourcemap'
 import { durationSeconds } from '../runtime/duration'
+import { kayLog } from '../runtime/log'
 import { wholeResponse } from './compress'
-import { pathOf } from './log'
+import { logMessage } from './log'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
@@ -33,8 +33,7 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, config: HealthCon
         return wholeResponse('unhealthy', { status: 503, headers })
     }
     catch (error) {
-      console.error(`kay: the health check failed for ${pathOf(request.url)}`)
-      logError(error)
+      logMessage('error', 'the health check failed', error, request)
 
       return wholeResponse('unhealthy', { status: 503, headers })
     }
@@ -66,10 +65,10 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
         return
 
       lifecycle.draining = true
-      console.log(`kay: ${signal} received; finishing open requests`)
+      kayLog('info', `${signal} received; finishing open requests`)
 
       const forced = setTimeout(() => {
-        console.error(`kay: requests still open after ${timeout} s; closing them`)
+        kayLog('error', `requests still open after ${timeout} s; closing them`)
         void root.server?.stop(true)
         process.exit(1)
       }, timeout * 1000)
@@ -124,7 +123,7 @@ export async function shutdown(app: AnyElysia): Promise<void> {
       await hook.fn(app)
     }
     catch (error) {
-      logError(error)
+      kayLog('error', 'an onStop hook failed', error)
       process.exitCode = 1
     }
   }
@@ -133,7 +132,7 @@ export async function shutdown(app: AnyElysia): Promise<void> {
 // What `<executable> --health` exits with: 0 when the server running beside it answers its health route, on `PORT` or 3000, else 1, for a container image with no curl.
 export async function probeHealth(config: HealthConfig | false | undefined, port = process.env.PORT ?? '3000'): Promise<number> {
   if (config === false) {
-    console.error('kay: health is false in kay.config.ts, so the server has no health route to ask')
+    kayLog('error', 'health is false in kay.config.ts, so the server has no health route to ask')
 
     return 1
   }

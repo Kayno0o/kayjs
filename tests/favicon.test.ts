@@ -143,7 +143,7 @@ describe('favicon', () => {
       const files = await faviconFiles({ image: small })
 
       expect(await widthOf(files.get('/icon-512.png')!)).toBe(512)
-      expect(warned).toHaveBeenCalledWith(`[kay] the favicon ${small} is 256x256, enlarged to the icons up to 512x512, which look blurred; a source of 512x512 or more keeps them sharp`)
+      expect(warned).toHaveBeenCalledWith(`kay: the favicon ${small} is 256x256, enlarged to the icons up to 512x512, which look blurred; a source of 512x512 or more keeps them sharp`)
     }
     finally {
       warned.mockRestore()

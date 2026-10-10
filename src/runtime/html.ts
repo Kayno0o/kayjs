@@ -9,6 +9,7 @@ import { nativeConstraints } from './form'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
 import { localeState } from './locale-state'
+import { kayLog } from './log'
 import { currentServerScope, scope } from './reactive'
 import { ISLAND_PARAM } from './server-islands'
 import { failedIds, idMark } from './uid'
@@ -407,7 +408,7 @@ export function attempt(render: () => string, fallback?: (error: unknown) => str
     if (server)
       server.report(error)
     else
-      console.error(error)
+      kayLog('error', 'a block failed to render', error)
 
     return FAILED_MARKER + failedIds(mark, () => fallback?.(error) ?? '')
   }

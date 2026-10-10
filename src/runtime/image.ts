@@ -1,3 +1,4 @@
+import { kayLog } from './log'
 // The widths an image is resized to, the only ones the image route makes: a fixed ladder keeps how many files one image can turn into bounded.
 export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560, 3840] as const
 export const IMAGE_ROUTE = '/_kay/image'
@@ -82,7 +83,7 @@ function unlisted(src: string, caller: string): boolean {
 
   if (!warnedHosts.has(host)) {
     warnedHosts.add(host)
-    console.warn(`[kay] ${caller} was given ${src}, on a host images.remote in kay.config.ts does not list, so it is not resized`)
+    kayLog('warn', `${caller} was given ${src}, on a host images.remote in kay.config.ts does not list, so it is not resized`)
   }
 
   return true

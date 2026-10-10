@@ -1,5 +1,6 @@
 import type { ServerScope } from './reactive'
 import { withBase } from './base'
+import { kayLog } from './log'
 import { currentServerScope, whenHydrated } from './reactive'
 import { sendValue } from './send'
 import { decodeValue } from './wire'
@@ -139,7 +140,7 @@ function saveCookie(name: string, value: unknown): void {
   const text = encodeURIComponent(sendValue(value))
 
   if (text.length + name.length > MAX_COOKIE_BYTES) {
-    console.warn(`[kay] the value of the persisted signal ${name} is over ${MAX_COOKIE_BYTES} bytes encoded, too big for a cookie, so it was not kept; persist it with { storage: 'local' }`)
+    kayLog('warn', `the value of the persisted signal ${name} is over ${MAX_COOKIE_BYTES} bytes encoded, too big for a cookie, so it was not kept; persist it with { storage: 'local' }`)
 
     return
   }
@@ -164,7 +165,7 @@ function saveLocal(key: string, value: unknown): void {
     localStorage.setItem(key, sendValue(value))
   }
   catch (error) {
-    console.warn(`[kay] the persisted signal ${key} could not be kept in localStorage: ${error instanceof Error ? error.message : String(error)}`)
+    kayLog('warn', `the persisted signal ${key} could not be kept in localStorage: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 

@@ -1,5 +1,6 @@
 import type { Server } from 'bun'
 import type { Action } from '../src/runtime'
+import type { LogEntry } from '../src/server/log'
 import type { ProtectionRefusal } from '../src/server/protection'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -17,6 +18,7 @@ import { inlineScriptHashes, invalidatePage, pages, requestId, shutdown, sqliteJ
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
+import { useLogger } from '../src/server/log'
 import { hookPrerendered } from '../src/server/page-hook'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
@@ -802,7 +804,7 @@ describe('revalidation', () => {
 
       // Built where the variable naming the host is unset, run where it is.
       expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' }))).toBe('http://127.0.0.1:4173/news')
-      expect(warned).toHaveBeenCalledWith('[kay] kay build rendered its pages for https://example.com and this server runs for http://127.0.0.1:4173: each renders again on its first request')
+      expect(warned).toHaveBeenCalledWith('kay: kay build rendered its pages for https://example.com and this server runs for http://127.0.0.1:4173: each renders again on its first request')
 
       // Once rendered again, it goes out as small as the build would have written it.
       const moved = await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' })
@@ -1270,7 +1272,7 @@ describe('lifecycle', () => {
 
     try {
       expect((await failing.handle(new Request('http://localhost/_kay/health?token=secret'))).status).toBe(503)
-      expect(logged.mock.calls.map(call => String(call[0]))).toEqual(['kay: the health check failed for /_kay/health', expect.stringMatching(/^Error: Database down/)])
+      expect(logged.mock.calls.map(call => String(call[0]))).toEqual([expect.stringMatching(/^kay: GET \/_kay\/health, request \S+: the health check failed\nError: Database down\n/)])
     }
     finally {
       logged.mockRestore()
@@ -1392,6 +1394,31 @@ describe('request logging', () => {
     }
   })
 
+  it('writes kay\'s own messages in the same format, under the request they were logged for', async () => {
+    const health = { check: () => {
+      throw new Error('Database down')
+    } }
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const entries: LogEntry[] = []
+
+    try {
+      const json = await pages({ routes, prebuilt: false, log: 'json', health })
+
+      await json.handle(new Request('http://localhost/_kay/health?token=secret'))
+      expect(JSON.parse(String(logged.mock.calls[0]![0]))).toEqual({ type: 'message', time: expect.any(String), level: 'error', message: 'the health check failed', request: { method: 'GET', path: '/_kay/health', id: expect.any(String) }, error: { name: 'Error', message: 'Database down', stack: expect.stringMatching(/^Error: Database down\n\s+at check \(\S+production\.test\.ts:\d+:\d+\)/) } })
+
+      const custom = await pages({ routes, prebuilt: false, log: entry => void entries.push(entry), health })
+
+      await custom.handle(new Request('http://localhost/_kay/health'))
+      expect(logged).toHaveBeenCalledTimes(1)
+      expect(entries).toEqual([{ type: 'message', time: expect.any(String), level: 'error', message: 'the health check failed', request: { method: 'GET', path: '/_kay/health', id: expect.any(String) }, error: { name: 'Error', message: 'Database down', stack: expect.any(String) } }])
+    }
+    finally {
+      logged.mockRestore()
+      useLogger(true)
+    }
+  })
+
   it('writes JSON, or hands each entry to a function', async () => {
     const lines = spyOn(console, 'log').mockImplementation(() => undefined)
     const entries: unknown[] = []
@@ -1409,8 +1436,8 @@ describe('request logging', () => {
       }
 
       expect(lines.mock.calls).toHaveLength(1)
-      expect(JSON.parse(String(lines.mock.calls[0]![0]))).toEqual({ time: expect.any(String), method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) })
-      expect(entries).toEqual([{ method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) }])
+      expect(JSON.parse(String(lines.mock.calls[0]![0]))).toEqual({ type: 'request', time: expect.any(String), level: 'info', method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) })
+      expect(entries).toEqual([{ type: 'request', time: expect.any(String), level: 'info', method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) }])
     }
     finally {
       lines.mockRestore()

@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { escapeAttribute } from '../runtime/escape'
 import { textDirection } from '../runtime/i18n'
+import { kayLog } from '../runtime/log'
 import { PUBLIC_ENV_PATH } from './env'
 import { DEFAULT_LANG } from './i18n'
 
@@ -186,11 +187,11 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
 
   // Pages with server islands are not kept offline by default: an island needs the server, and an offline copy would keep one visitor's render.
   if (rendered.length > 0)
-    console.warn(`[kay] offline.pages lists ${rendered.join(', ')}, whose server islands render per request: offline, a visitor gets the copy cached when the worker installed`)
+    kayLog('warn', `offline.pages lists ${rendered.join(', ')}, whose server islands render per request: offline, a visitor gets the copy cached when the worker installed`)
 
   // Each one is fetched on every deploy's install, by every visitor who has the worker.
   if (config.pages === undefined && pages.length > MANY_PAGES)
-    console.warn(`[kay] offline keeps every prerendered page, ${pages.length} of them, which each visitor downloads on every deploy; list the ones worth reading offline in offline.pages`)
+    kayLog('warn', `offline keeps every prerendered page, ${pages.length} of them, which each visitor downloads on every deploy; list the ones worth reading offline in offline.pages`)
 
   const fallback = config.fallback === undefined ? undefined : `${base}${config.fallback}`
   // Changes with the build, its prerendered pages and the worker, so a deploy installs a new one, which drops the old cache.

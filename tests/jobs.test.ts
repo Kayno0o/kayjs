@@ -366,7 +366,7 @@ describe('queue', () => {
       expect(tries).toEqual([1, 1, 1])
       expect(gaveUp).toEqual([[1, 'mail server down']])
       expect(await flaky.failed()).toEqual([{ id: expect.any(String), payload: 1, attempts: 3, error: 'mail server down' }])
-      expect(logged).toHaveBeenCalledWith('kay: a job of queue(\'flaky\') failed 3 times and is kept as failed')
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kay: a job of queue\('flaky'\) failed 3 times and is kept as failed\nError: mail server down\n/))
       expect(warned.mock.calls).toEqual([
         ['kay: a job of queue(\'flaky\') failed, attempt 1 of 3, and runs again in 10 s: mail server down'],
         ['kay: a job of queue(\'flaky\') failed, attempt 2 of 3, and runs again in 20 s: mail server down'],
@@ -406,7 +406,7 @@ describe('queue', () => {
       await Bun.sleep(50)
       failing = false
       await until(() => ran.length > 0)
-      expect(logged.mock.calls.map(call => String(call[0]))).toEqual(['kay: queue(\'outage\') could not read its store; its workers ask it again less and less often until it answers', expect.stringMatching(/^Error: database is locked/)])
+      expect(logged.mock.calls).toEqual([[expect.stringMatching(/^kay: queue\('outage'\) could not read its store; its workers ask it again less and less often until it answers\nError: database is locked\n/)]])
       expect(told.mock.calls).toEqual([['kay: queue(\'outage\') reads its store again']])
     }
     finally {

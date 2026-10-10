@@ -300,7 +300,7 @@ describe('kay/test', () => {
       await expect(site.call(leak, {})).rejects.toMatchObject({ status: 500 })
       expect(logged).toHaveBeenCalledWith(expect.stringContaining(`kay: what ${leak.url} returned cannot reach the browser: Cannot stringify arbitrary non-POJOs at .format`))
       expect(await site.submit(leak, {}, { from: '/events' })).toMatchObject({ url: '/events', status: 200 })
-      expect(warned).toHaveBeenCalledWith(expect.stringContaining(`kay: what ${leak.url} returned cannot reach the page through its cookie`))
+      expect(warned).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^kay: POST ${leak.url}, request \\S+: what ${leak.url} returned cannot reach the page through its cookie`)))
     }
     finally {
       logged.mockRestore()

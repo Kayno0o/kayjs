@@ -12,8 +12,8 @@ import type { Span } from './trace'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { Elysia } from 'elysia'
-import { logError } from '../build/sourcemap'
 import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
+import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { inLocale, isCrossSite, passGuards } from './actions'
 import { importModule } from './bundle'
@@ -148,6 +148,18 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   const limits = new Map<string, BodyLimit>()
   const mounted: MountedApi[] = []
 
+  // Global: a group's own afterResponse hook never runs once the app holds a global one, as the request log does.
+  app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue }) => {
+    const span = spans.get(request)
+
+    if (!span)
+      return
+
+    spans.delete(request)
+    answered(span, responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200)
+    span.end()
+  })
+
   for (const module of modules) {
     const instance = (await importModule<{ default?: unknown }>(module.file)).default
 
@@ -191,16 +203,6 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           if (span)
             failed(span, error)
-        })
-        .onAfterResponse(({ request, set, responseValue }) => {
-          const span = spans.get(request)
-
-          if (!span)
-            return
-
-          spans.delete(request)
-          answered(span, responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200)
-          span.end()
         })
         .onAfterHandle(({ request, responseValue, set }) => {
           // A Vary the route set itself keeps Origin.
@@ -337,7 +339,7 @@ export function eventStream<T>(source: AsyncIterable<T> | Iterable<T>): EventStr
   let heartbeat: ReturnType<typeof setInterval> | undefined
   let cancelled = false
   const encoder = new TextEncoder()
-  const reporter = { report: logError }
+  const reporter = { report: (error: unknown) => kayLog('error', 'an event stream failed', error) }
 
   const finish = (controller: ReadableStreamDefaultController<Uint8Array>, event: string) => {
     clearInterval(heartbeat)

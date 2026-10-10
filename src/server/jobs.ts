@@ -2,8 +2,8 @@ import type { CronSchedule, PositiveDuration } from '../runtime/checks'
 import type { Duration } from '../runtime/duration'
 import type { JobStore } from './queue'
 import { Elysia } from 'elysia'
-import { logError } from '../build/sourcemap'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
+import { kayLog } from '../runtime/log'
 import { defaultJobStore } from './queue'
 
 export interface ScheduleOptions {
@@ -102,8 +102,7 @@ function scheduledRun(label: string, slotMs: number, job: () => unknown, options
       await job()
     }
     catch (error) {
-      console.error(`kay: the job scheduled ${label} failed`)
-      logError(error)
+      kayLog('error', `the job scheduled ${label} failed`, error)
     }
   }
 }
@@ -128,8 +127,7 @@ export function background(work: (signal: AbortSignal) => unknown) {
         }
         catch (error) {
           if (!started.signal.aborted) {
-            console.error('kay: a background job failed')
-            logError(error)
+            kayLog('error', 'a background job failed', error)
           }
         }
       })()

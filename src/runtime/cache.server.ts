@@ -1,5 +1,6 @@
 import type { CacheStore } from './cache'
 import { trackStore } from './cache'
+import { kayLog } from './log'
 import { openSqlite } from './sqlite.server'
 
 // How often a process reads what the others sharing a store invalidated, and how long a message is kept for one that reads late.
@@ -58,7 +59,7 @@ export function sqliteCache(path: string): CacheStore {
           }
         }
         catch (error) {
-          console.error('kay: reading what the other processes invalidated failed; trying again', error)
+          kayLog('error', 'reading what the other processes invalidated failed; trying again', error)
         }
       }, POLL_MS).unref()
     },

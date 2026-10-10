@@ -16,6 +16,7 @@ import { projectCollections, serveFeeds } from '../content/server'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
+import { kayLog } from '../runtime/log'
 import { setSite } from '../runtime/site'
 import { overHttps, registerActionRoutes } from './actions'
 import { projectApi, serveApi, sharedGuards } from './api'
@@ -36,7 +37,7 @@ import { cookieLocale, hostLocale, implicitI18n, loadI18n, localeCookie, localeP
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader, underKayDev } from './loader'
-import { logRequests, pathOf } from './log'
+import { answeringRequest, logRequests, pathOf, useLogger } from './log'
 import { serveServiceWorker } from './offline'
 import { openApiDocument, openApiSettings, refuseOpenApiClashes, serveOpenApi } from './openapi'
 import { assetFiles, hookedResponse } from './page-hook'
@@ -257,6 +258,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   const log = options.log ?? process.env.NODE_ENV === 'production'
 
+  // kay's own messages go out whether requests are logged or not.
+  useLogger(typeof log === 'boolean' || log)
+
   if (log !== false)
     logRequests(app, log, options.health === false ? undefined : options.health?.path ?? HEALTH_PATH)
 
@@ -430,7 +434,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   // A build with no site, for a server given one at boot, is the way to serve several hosts; a site that changed, or none at all, is worth a word.
   if (moved && client.site !== undefined)
-    console.warn(`[kay] kay build rendered its pages for ${client.site} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
+    kayLog('warn', `kay build rendered its pages for ${client.site} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
 
   // What the extensions' page hooks did to the prerendered pages, done again to each the server renders afresh.
   const transforms = pageHooks(options.extensions)
@@ -561,7 +565,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
         return redirect
 
       if (!i18n || !settings)
-        return inImplicitLocale(url, context.request, async () => answer(served!.candidates, context, url))
+        return inImplicitLocale(url, context.request, async () => answeringRequest(context.request, async () => answer(served!.candidates, context, url)))
 
       // With every locale prefixed, a path without one goes to the visitor's.
       if (locale === undefined)
@@ -577,7 +581,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
       if (!served)
         return runInLocale(state, async () => renderUnmatched(locales.values().next().value!.candidates.at(-1)!.route.special, context, client, renderOptions))
 
-      const response = await runInLocale(state, async () => answer(served.candidates, context, url))
+      const response = await runInLocale(state, async () => answeringRequest(context.request, async () => answer(served.candidates, context, url)))
 
       return settings.prefixDefault ? remembered(response, context.request, locale) : response
     })

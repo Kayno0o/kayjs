@@ -2,7 +2,12 @@
 
 ## Request logs
 
-With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, the method, the path without its query string, which may carry tokens, the status, the milliseconds until the response was made, a streamed one's headers, and the request's id. kay's own `/_kay/` routes, assets included, and the health route, wherever `health.path` puts it, are left out. `log` in kay.config.ts changes it: `'json'` writes one JSON object per line, `{ time, method, path, status, duration, id }`, for a log collector; a function receives each `{ method, path, status, duration, id }` entry instead; `true` logs outside production too, `false` never.
+With NODE_ENV=production, every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, the method, the path without its query string, which may carry tokens, the status, the milliseconds until the response was made, a streamed one's headers, and the request's id. kay's own `/_kay/` routes, assets included, and the health route, wherever `health.path` puts it, are left out. `true` in kay.config.ts's `log` logs them outside production too, `false` never.
+
+kay's own messages, an error it caught, a warning about the app, a shutdown notice, go out in any mode, as `kay: ` and the message, an error's source-mapped stack on the lines below. `log` sets the format of both: `'json'` writes one JSON object per line for a log collector, on stdout for info and on stderr for warnings and errors, and a function receives each entry instead, typed `LogEntry` from `kay/server`:
+
+- a request, `{ type: 'request', time, level: 'info', method, path, status, duration, id }`;
+- a message, `{ type: 'message', time, level: 'info' | 'warn' | 'error', message, request?: { method, path, id }, error?: { name, message, stack } }`, `request` when it was logged while answering one.
 
 Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header. An error logged while answering a request is headed by the request, `kay: GET /blog/hello, request AZnLe0vUe9qD0uXq9vLwZw`, then its stack, so a line from a user or a log search finds both. `requestId(request)` from `kay/server` gives it, in `onError` or a route, and a server span carries it as `kay.request.id`.
 

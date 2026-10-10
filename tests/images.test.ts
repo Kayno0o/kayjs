@@ -620,7 +620,7 @@ describe('remote images', () => {
         expect(image('https://elsewhere.example.com/a.jpg', { width: 1000, height: 600 })).toEqual({ src: 'https://elsewhere.example.com/a.jpg', width: 1000, height: 600 })
         expect(image('https://elsewhere.example.com/b.jpg', { width: 10, height: 10 }).srcset).toBeUndefined()
         expect(shareImage('https://elsewhere.example.com/a.jpg')).toBe('https://elsewhere.example.com/a.jpg')
-        expect(warned.mock.calls.map(call => call[0] as string)).toEqual(['[kay] image() was given https://elsewhere.example.com/a.jpg, on a host images.remote in kay.config.ts does not list, so it is not resized'])
+        expect(warned.mock.calls.map(call => call[0] as string)).toEqual(['kay: image() was given https://elsewhere.example.com/a.jpg, on a host images.remote in kay.config.ts does not list, so it is not resized'])
       }
       finally {
         warned.mockRestore()

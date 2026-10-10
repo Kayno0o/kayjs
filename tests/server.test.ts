@@ -1468,7 +1468,7 @@ describe('special pages', () => {
       expect(await (await watched.handle(new Request('http://localhost/boom?later'))).text()).not.toContain('Kaboom')
       expect(await (await watched.handle(new Request('http://localhost/boom'))).text()).toContain('<p>Fine</p>')
       expect(reported).toEqual(['/boom?fail: Kaboom', '/_kay/action/tests/fixtures/site/src/routes/boom.kay/explode: Kaboom in an action', '/boom?later: Kaboom later'])
-      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kay: onError failed for GET \/boom, request \S+\nError: Tracker down/))
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kay: GET \/boom, request \S+: onError failed\nError: Tracker down/))
     }
     finally {
       logged.mockRestore()
@@ -1657,14 +1657,23 @@ describe('tracing and timing in production', () => {
     expect(ended).toEqual([{ name: `POST ${url}`, parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': url, 'url.path': url, 'kay.request.id': response.headers.get('x-request-id'), 'http.response.status_code': 303 } }])
   })
 
-  it('hands it a span per API request too', async () => {
-    const { tracer, ended } = recordingTracer()
-    const traced = await pages({ routes: 'tests/fixtures/production/src/routes', api: 'tests/fixtures/production/src/api', prebuilt: false, tracer })
+  it('hands it a span per API request too, requests logged or not', async () => {
+    const lines = spyOn(console, 'log').mockImplementation(() => undefined)
 
-    expect(await (await traced.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' }))).text()).toBe('5')
-    // Elysia runs the hook ending it once the response is out.
-    await new Promise(resolve => setTimeout(resolve, 10))
-    expect(ended).toEqual([{ name: 'POST /api/echo', parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': '/api/echo', 'url.path': '/api/echo', 'kay.request.id': expect.any(String), 'http.response.status_code': 200 } }])
+    try {
+      for (const log of [false, true]) {
+        const { tracer, ended } = recordingTracer()
+        const traced = await pages({ routes: 'tests/fixtures/production/src/routes', api: 'tests/fixtures/production/src/api', prebuilt: false, tracer, log })
+
+        expect(await (await traced.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' }))).text()).toBe('5')
+        // Elysia runs the hook ending it once the response is out.
+        await new Promise(resolve => setTimeout(resolve, 10))
+        expect(ended).toEqual([{ name: 'POST /api/echo', parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': '/api/echo', 'url.path': '/api/echo', 'kay.request.id': expect.any(String), 'http.response.status_code': 200 } }])
+      }
+    }
+    finally {
+      lines.mockRestore()
+    }
   })
 })
 

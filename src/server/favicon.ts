@@ -3,6 +3,7 @@ import type { FaviconConfig, ManifestConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { kayLog } from '../runtime/log'
 import { revalidated } from './public'
 
 export const FAVICON_DIR = 'favicon'
@@ -71,7 +72,7 @@ export async function faviconFiles({ image: source, svg }: FaviconSource): Promi
 
   // Enlarged to the sizes it lacks, so the manifest keeps the 192 and 512 icons a browser asks for before it offers to install the site.
   if (width < LARGEST)
-    console.warn(`[kay] the favicon ${source} is ${width}x${height}, enlarged to the icons up to ${LARGEST}x${LARGEST}, which look blurred; a source of ${LARGEST}x${LARGEST} or more keeps them sharp`)
+    kayLog('warn', `the favicon ${source} is ${width}x${height}, enlarged to the icons up to ${LARGEST}x${LARGEST}, which look blurred; a source of ${LARGEST}x${LARGEST} or more keeps them sharp`)
 
   const files = new Map<string, Uint8Array<ArrayBuffer>>()
   const png = async (size: number) => new Uint8Array(await new Bun.Image(source).resize(size, size).png().bytes())

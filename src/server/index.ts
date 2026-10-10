@@ -2,8 +2,8 @@ import type { PagesOptions } from './app'
 import type { ClientBuild } from './client'
 import { resolve } from 'node:path'
 import process from 'node:process'
-import { logError } from '../build/sourcemap'
 import { mergeConfig, withConfig } from '../config'
+import { kayLog } from '../runtime/log'
 import { servePages } from './app'
 import { basePath } from './base'
 import { bundled } from './bundle'
@@ -26,6 +26,7 @@ export { imageSize, processImage } from './image'
 export type { EveryOptions, ScheduleOptions } from './jobs'
 export { background, schedule } from './jobs'
 export { shutdown } from './lifecycle'
+export type { LogEntry, Logger, MessageEntry, RequestEntry } from './log'
 export type { PageHook, RenderedPage } from './page-hook'
 export { enterPreview, exitPreview, previewUrl } from './preview'
 export type { RateLimiter } from './protection'
@@ -75,7 +76,7 @@ export async function pages(options: PagesOptions = {}) {
     return await servePages(root, config, loadClient)
   }
   catch (error) {
-    logError(error)
+    kayLog('error', 'the server could not start', error)
 
     return bootFailure(error, root)
   }
@@ -88,7 +89,7 @@ async function clientFor(root: string, options: PagesOptions): Promise<ClientBui
     if (built)
       return built
 
-    console.warn('kay: no client build in .kay/client, bundling now; run `kay build` before starting in production')
+    kayLog('warn', 'no client build in .kay/client, bundling now; run `kay build` before starting in production')
   }
 
   // Imported only to bundle, as it brings the compiler, which a server reading a build never needs.

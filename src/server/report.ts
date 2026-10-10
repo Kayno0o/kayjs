@@ -1,24 +1,20 @@
 import type { KayConfig } from '../config'
-import { logError } from '../build/sourcemap'
-import { pathOf } from './log'
-import { requestId } from './protection'
+import { logMessage } from './log'
 
-// Logs an error kay caught while answering `request`, under the request it belongs to, and hands it to the app's `onError`, without holding the response for it.
+// Logs an error kay caught while answering `request`, under that request, and hands it to the app's `onError`, without holding the response for it.
 export function reportServerError(error: unknown, request: Request, onError: KayConfig['onError']): void {
-  const answering = `${request.method} ${pathOf(request.url)}, request ${requestId(request)}`
-
-  logError(error, `kay: ${answering}`)
+  logMessage('error', '', error, request)
 
   if (onError)
-    void deliver(error, request, onError, answering)
+    void deliver(error, request, onError)
 }
 
-async function deliver(error: unknown, request: Request, onError: NonNullable<KayConfig['onError']>, answering: string): Promise<void> {
+async function deliver(error: unknown, request: Request, onError: NonNullable<KayConfig['onError']>): Promise<void> {
   try {
     await onError(error, request)
   }
   // A failing reporter is logged, never left to crash the process as an unhandled rejection.
   catch (failure) {
-    logError(failure, `kay: onError failed for ${answering}`)
+    logMessage('error', 'onError failed', failure, request)
   }
 }

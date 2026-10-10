@@ -5,6 +5,7 @@ import type { ActionRateLimit, RateLimit, RateStore, RateWindow, ServerAction } 
 import type { Duration } from '../runtime/duration'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
+import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { rewrittenAddress } from './rewrite'
 import { stampTime } from './stamp'
@@ -386,5 +387,5 @@ function warnUnconfigured(): void {
     return
 
   warnedUnconfigured = true
-  console.warn('kay: requests come through a proxy, as their X-Forwarded-For shows, but kay.config.ts sets no proxy, so rate limits count every visitor as the proxy; set proxy: { hops: 1 } for one proxy such as nginx, or proxy: { header } for the header a proxy sets to the client\'s address')
+  kayLog('warn', 'requests come through a proxy, as their X-Forwarded-For shows, but kay.config.ts sets no proxy, so rate limits count every visitor as the proxy; set proxy: { hops: 1 } for one proxy such as nginx, or proxy: { header } for the header a proxy sets to the client\'s address')
 }

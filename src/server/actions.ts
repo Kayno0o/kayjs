@@ -25,6 +25,7 @@ import { cookieJar } from './cookies'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { runGuards } from './guards'
 import { requestLocale, stateFor } from './i18n'
+import { answeringRequest } from './log'
 import { countSucceeded, PRETEND, protectionRefusal, requestId } from './protection'
 import { reportServerError } from './report'
 import { Denied, Redirect } from './signals'
@@ -109,7 +110,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }, async (span) => {
-        const response = await inLocale(context.request, options, async () => runAction(value, context, options, back, () => readPage(context.request, page, match, options)))
+        const response = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => runAction(value, context, options, back, () => readPage(context.request, page, match, options))))
 
         if (span)
           answered(span, response.status)

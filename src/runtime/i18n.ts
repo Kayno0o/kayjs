@@ -1,5 +1,6 @@
 import type { CheckedHref, Register } from './checks'
 import type { JSX } from './jsx'
+import { kayLog } from './log'
 
 // What the server and the browser share of i18n: message lookup, formatting through `Intl`, and locale paths.
 
@@ -191,7 +192,7 @@ function missingMessage(key: string): string {
   if (typeof window === 'undefined')
     throw new Error(`kay: no locale has the message ${JSON.stringify(key)}; production would show the key itself`)
 
-  console.error(`[kay] no locale has the message ${JSON.stringify(key)}; production shows the key itself`)
+  kayLog('error', `no locale has the message ${JSON.stringify(key)}; production shows the key itself`)
 
   return key
 }

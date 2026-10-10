@@ -4,8 +4,8 @@ import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
-import { logError } from '../build/sourcemap'
 import { durationSeconds } from '../runtime/duration'
+import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 
 // A job as a store keeps it, its payload as devalue text.
@@ -237,7 +237,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
       await options.onFailed?.(parse(job.payload) as Payload, error)
     }
     catch (failure) {
-      logError(failure)
+      kayLog('error', `onFailed of queue('${name}') failed`, failure)
     }
   }
 
@@ -260,14 +260,13 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
         const wait = backoff * 2 ** (job.attempts - 1)
 
         await store().retry(job.id, Date.now() + wait, message)
-        console.warn(`kay: a job of queue('${name}') failed, attempt ${job.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
+        kayLog('warn', `a job of queue('${name}') failed, attempt ${job.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
 
         return true
       }
 
       await store().fail(job.id, message)
-      console.error(`kay: a job of queue('${name}') failed ${job.attempts} times and is kept as failed`)
-      logError(error)
+      kayLog('error', `a job of queue('${name}') failed ${job.attempts} times and is kept as failed`, error)
       await reportFailed(job, error)
     }
 
@@ -286,7 +285,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
         if (storeDown) {
           storeDown = false
-          console.log(`kay: queue('${name}') reads its store again`)
+          kayLog('info', `queue('${name}') reads its store again`)
         }
 
         outageWait = 0
@@ -303,8 +302,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
       catch (error) {
         if (!storeDown) {
           storeDown = true
-          console.error(`kay: queue('${name}') could not read its store; its workers ask it again less and less often until it answers`)
-          logError(error)
+          kayLog('error', `queue('${name}') could not read its store; its workers ask it again less and less often until it answers`, error)
         }
 
         outageWait = Math.min(outageWait === 0 ? POLL_MS : outageWait * 2, MAX_OUTAGE_MS)

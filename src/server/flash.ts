@@ -1,5 +1,6 @@
 import type { CookieMap } from 'bun'
 import { isSecret } from '../runtime/form'
+import { kayLog } from '../runtime/log'
 import { decodeValue, encodeValue, unsendable } from '../runtime/wire'
 
 // A plain form post that succeeded goes back to its page through a redirect; this cookie carries what it returned, for that one page render.
@@ -48,7 +49,7 @@ export function writeSuccess(cookies: CookieMap, success: SuccessFlash, secure =
   const refusal = setFlash(cookies, success, secure)
 
   if (refusal !== undefined)
-    console.warn(`kay: what ${success.action} returned cannot reach the page through its cookie: ${refusal}`)
+    kayLog('warn', `what ${success.action} returned cannot reach the page through its cookie: ${refusal}`)
 }
 
 // Sets the cookie, or says why it cannot: too big, or holding what has no encoding.

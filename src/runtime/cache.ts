@@ -2,6 +2,7 @@ import type { PositiveDuration } from './checks'
 import type { Duration } from './duration'
 import { parse, stringify } from 'devalue'
 import { durationSeconds } from './duration'
+import { kayLog } from './log'
 import { previewing } from './preview'
 
 // Where `cached` also keeps a value, so it outlives the process: read when a key is missing from memory, written on each load. Synchronous, so `invalidate` is done when it returns.
@@ -129,7 +130,7 @@ export function broadcast(invalidation: Invalidation): void {
       store.publish?.(message)
     }
     catch (error) {
-      console.error('kay: an invalidation could not reach the other processes', error)
+      kayLog('error', 'an invalidation could not reach the other processes', error)
     }
   }
 }
@@ -184,7 +185,7 @@ async function refresh(key: string, ttl: number, entry: Entry, load: () => unkno
   }
   catch (error) {
     entry.freshUntil = Date.now() + Math.min(ttl * 1000, RETRY_MS)
-    console.error(`kay: refreshing cached('${key}') failed; keeping the stale value`, error)
+    kayLog('error', `refreshing cached('${key}') failed; keeping the stale value`, error)
   }
   finally {
     entry.loading = undefined
@@ -207,7 +208,7 @@ function keep(key: string, entry: Entry, store: CacheStore | undefined): void {
       store.set(key, text, entry.freshUntil)
     }
     catch (error) {
-      console.error(`kay: cached('${key}') could not write its store; keeping the value in memory`, error)
+      kayLog('error', `cached('${key}') could not write its store; keeping the value in memory`, error)
     }
   }
 
