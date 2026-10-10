@@ -1,7 +1,7 @@
 export type { Settings } from './defaults'
 export { default as defaults } from './defaults'
 export type { Mailer, MailerOptions } from './mailer'
-export { mailer, MailNotConfigured } from './mailer'
+export { mailer, mailExtension, MailNotConfigured } from './mailer'
 export type { Outbox, SentMail } from './outbox'
 export { outbox } from './outbox'
 export type { SmtpSettings } from './smtp'

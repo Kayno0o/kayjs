@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
-import { mailer } from '../src/mailer'
+import { mailer, mailExtension } from '../src/mailer'
 import { outbox } from '../src/outbox'
 
 const saved = process.env.NODE_ENV
@@ -58,7 +58,7 @@ describe('the development outbox page', () => {
 
   it('is served by an app listing the mailer as an extension, with no .use of its own', async () => {
     const mail = mailer({ from: 'dev@example.com' })
-    const site = await testSite({ root: 'tests/fixture', extensions: [mail.extension] })
+    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtension(async () => mail)] })
 
     await mail.send({ to: 'ada@example.com', subject: 'Through the app', text: 'Hello' })
 

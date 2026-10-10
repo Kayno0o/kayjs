@@ -44,8 +44,6 @@ export type Mailer = Elysia & {
   render: <P extends object>(message: Message<P>) => Promise<Mail>
   // Sends every queued mail whose time has come, here and now, as a script or a test does without the server running the queue.
   drain: () => Promise<number>
-  // Listed in `kay.config.ts`'s `extensions`, so `pages()` uses the mailer and the server needs no `.use(mail)`; kay 1.26 or later.
-  extension: KayExtension
 }
 
 const DOCTYPE = /^\s*<!doctype/i
@@ -114,6 +112,12 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
     },
     missing,
   }
+}
+
+// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; kay 1.26 or later.
+// It is loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
+export function mailExtension(load: () => Promise<Mailer>): KayExtension<Mailer> {
+  return { name: '@kaynooo/kayjs-mail', server: load }
 }
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and in development lists the outbox at `/_kay/mail`.
@@ -188,7 +192,6 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
     render,
     drain: jobs.drain,
-    extension: { name: '@kaynooo/kayjs-mail', server: plugin },
   })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.

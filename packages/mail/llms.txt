@@ -8,7 +8,7 @@
 - `from` is the site's own address, whose domain the SMTP server signs for: a visitor's address goes in `replyTo`, never in `from`, or SPF and DKIM fail and the mail lands in spam.
 - In development (`NODE_ENV=development`) and under `bun test` (`NODE_ENV=test`) no mail leaves the process: they go to the outbox, which the development server lists at `/_kay/mail` and a test reads through `outbox`. Only another `NODE_ENV`, production, sends over SMTP.
 - `send()` throws when the server refuses the mail or cannot be reached. An action whose point is not the mail itself uses `enqueue()`, so a mail server outage never fails the visitor's action, and the queue retries it.
-- `enqueue()` renders the mail at once and queues the result: the queue runs only in a server that uses the mailer, listed in `kay.config.ts` as `extensions: [mail.extension]` or used as `new Elysia().use(mail)`.
+- `enqueue()` renders the mail at once and queues the result: the queue runs only in a server that uses the mailer, listed in `kay.config.ts` with `mailExtension` or used as `new Elysia().use(mail)`.
 
 ## Setup
 
@@ -23,16 +23,16 @@ export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'fr' })
 
 ```ts
 // kay.config.ts
+import { mailExtension } from '@kaynooo/kayjs-mail'
 import { defineConfig } from 'kay/server'
-import { mail } from './src/mail'
 
-export default defineConfig({ extensions: [mail.extension] })
+export default defineConfig({ extensions: [mailExtension(async () => (await import('./src/mail')).mail)] })
 ```
 
-- `mail.extension` hands the mailer to `pages()`, which uses it before the pages (kay 1.26 or later): `src/server.ts` needs no `.use(mail)`. Building it reads the environment but connects to nothing, and its queue starts with the server, so `kay check`, the editor and `kay build` can import it with `kay.config.ts`.
+- `mailExtension(load)` hands the mailer to `pages()`, which uses it before the pages (kay 1.26 or later): `src/server.ts` needs no `.use(mail)`. `load` imports the module only as `pages()` builds the app, never as `kay check`, the editor or `kay build` read the config: a `.kay` mail imported while the config loads comes before kay compiles any, so `kay.config.ts` never imports `src/mail.ts` itself.
 - An Elysia app not served by `pages()`, or kay before 1.26, uses it as a plugin instead: `new Elysia().use(mail)`.
 
-- `mailer(options)` returns an Elysia plugin: the server using it, through `mail.extension` or `.use(mail)`, runs the queue `enqueue` fills and, in development, serves the outbox page. A script that only sends need not use it.
+- `mailer(options)` returns an Elysia plugin: the server using it, through `mailExtension` or `.use(mail)`, runs the queue `enqueue` fills and, in development, serves the outbox page. A script that only sends need not use it.
 - Options: `from`, the default sender, `SMTP_FROM` when left out; `fromName`, the name shown beside a bare `SMTP_FROM`; `lang`, the `<html lang>` of the mail documents, `en` by default; `transport`, where mails go in place of the default; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment.
 
 ## Environment
