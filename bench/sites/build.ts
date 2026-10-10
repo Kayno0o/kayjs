@@ -48,7 +48,7 @@ export async function timeBuild(variant: Variant, command: string[]): Promise<Bu
 
   // The servers run what the last build left, the executable included.
   if (variant.kind === 'kay')
-    run(['bunx', 'kay', 'build', '--compile', 'server'], variant.dir)
+    run(['bunx', 'kay', 'build', '--compile', 'server'], variant.dir, variant.site.env)
 
   return { command: runs[0]!.command, wall: median(runs.map(r => r.wall)), cpu: median(runs.map(r => r.cpu)), rss: median(runs.map(r => r.rss)) }
 }
