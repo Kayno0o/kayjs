@@ -172,7 +172,7 @@ export function serveFeeds(app: Elysia, collections: Collection<unknown>[], orig
             return item && { ...item, path: localePath(settings, item.path, written, host) }
           } }
 
-          return new Response(feedXml(entries, localized, host === undefined ? origin : onHost(origin, host)), { headers })
+          return new Response(feedXml(entries, localized, host === undefined ? origin : onHost(origin, host), localePath(settings, '/', written, host)), { headers })
         })
       })
     }

@@ -306,6 +306,8 @@ describe('localized content', () => {
 
     expect(english).toContain('<atom:link href="https://x.example/en/news/rss.xml" rel="self" type="application/rss+xml"/>')
     expect(english).toContain('<link>https://x.example/en/news/hello</link>')
+    expect(english).toContain('<channel>\n<title>News</title>\n<link>https://x.example/en</link>')
+    expect(french).toContain('<link>https://x.example/</link>')
     expect(english).not.toContain('Lancement')
     expect(french).toContain('<link>https://x.example/news/launch</link>')
     expect(french).toContain('<title>Bonjour</title>')
@@ -321,6 +323,7 @@ describe('localized content', () => {
 
     expect(onHost).toContain('<atom:link href="https://x.com/news/rss.xml" rel="self" type="application/rss+xml"/>')
     expect(onHost).toContain('<link>https://x.com/news/hello</link>')
+    expect(onHost).toContain('<link>https://x.com/</link>')
     expect(onHost).not.toContain('Lancement')
   })
 

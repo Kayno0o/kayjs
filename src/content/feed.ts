@@ -30,8 +30,8 @@ const DEFAULT_LIMIT = 20
 // eslint-disable-next-line no-control-regex
 const INVALID_XML = /[\u0000-\u0008\v\f\u000E-\u001F\uFFFE\uFFFF]/g
 
-// The feed's XML: its items newest first, every link absolute on the site's origin.
-export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>, origin: string): string {
+// The feed's XML: its items newest first, every link absolute on the site's origin, the site's own at `home`, its locale's home page for a localized feed.
+export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>, origin: string, home = '/'): string {
   const items = entries.flatMap((entry) => {
     const item = options.item(entry)
 
@@ -48,7 +48,7 @@ export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>
     return `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 <title>${escape(options.title)}</title>${options.description === undefined ? '' : `\n<subtitle>${escape(options.description)}</subtitle>`}
-<link href="${escapeAttribute(origin)}/"/>
+<link href="${escapeAttribute(origin + home)}"/>
 <link rel="self" href="${escapeAttribute(self)}"/>
 <id>${escape(self)}</id>
 <updated>${updated.toISOString()}</updated>
@@ -66,7 +66,7 @@ ${items.map((item) => {
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
 <title>${escape(options.title)}</title>
-<link>${escape(origin)}/</link>
+<link>${escape(origin + home)}</link>
 <description>${escape(options.description ?? options.title)}</description>
 <atom:link href="${escapeAttribute(self)}" rel="self" type="application/rss+xml"/>
 <lastBuildDate>${updated.toUTCString()}</lastBuildDate>
