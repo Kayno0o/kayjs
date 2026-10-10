@@ -24,7 +24,7 @@ bun install
 bun run dev
 ```
 
-`-y` takes the default `server` preset; without it, `kay new` asks in the terminal for a preset and then for each feature. `kay dev` serves it on http://localhost:3000 and reloads the page on every change. Pages live in `src/routes/`, one `.kay` file per page: `src/routes/index.kay` is `/`.
+`-y` takes the default `server` preset; without it, `kay new` asks in the terminal for a preset and then for each feature. `kay dev` serves it on http://localhost:3000 and reloads the page on every change, and Alt+click on any element opens the `.kay` line that wrote it in your editor (see the [inspector](/reference/cli#inspector)). Pages live in `src/routes/`, one `.kay` file per page: `src/routes/index.kay` is `/`.
 
 ## Keep the books in a module
 

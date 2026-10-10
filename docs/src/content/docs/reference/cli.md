@@ -75,7 +75,7 @@ KAY_EDITOR="tmux new-window nvim" bun run dev
 
 On a Linux machine with no display, as a server reached over SSH while the browser runs on another machine, only code-server can open a window: the file opens in the code-server window already open on the project, else the last one used, unless `KAY_EDITOR` names another command, such as the tmux one above.
 
-With no editor found the page says so, and the terminal prints the position. An editor command that exits with an error shows its error in the terminal, and the page says it failed. Tests, `pages({ dev: true })` and production builds carry none of it.
+With no editor found the page says so, and the terminal prints the position. An editor command that exits with an error within two seconds shows its error in the terminal, and the page says it failed. Tests, `pages({ dev: true })` and production builds carry none of it.
 
 ## kay build
 
