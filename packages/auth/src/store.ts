@@ -43,9 +43,14 @@ export interface BearerTokenRecord {
 }
 
 // What an emailed link proves once used.
-export type TokenType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email'
+export type LinkType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email'
 
-// A link kayjs-auth emailed, stored as the digest of the token it carries.
+// What an emailed code proves once typed: the sign-in or the address of the mail it came in.
+export type CodeType = 'sign-in-code' | 'verify-code'
+
+export type TokenType = LinkType | CodeType
+
+// A link or a code kayjs-auth emailed, stored as the digest of the token it carries, or the keyed digest of the code bound to the session that asked for it.
 export interface TokenRecord {
   digest: string
   type: TokenType

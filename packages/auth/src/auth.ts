@@ -5,7 +5,7 @@ import type { ChangeUsernameResult } from './account'
 import type { BearerToken } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
-import type { ChangeEmailResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
+import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
 import type { Limits } from './limits'
 import type { SecurityEvent } from './mail'
 import type { OAuthFailure } from './oauth/flow'
@@ -23,7 +23,7 @@ import { bearerUser, createToken, listTokens, revokeToken, tokenUser } from './b
 import { pwnedPassword } from './breached'
 import { captchaRequired } from './captcha'
 import { publicUser } from './core'
-import { changeEmail, confirmEmailChange, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithMagicLink, verifyEmail } from './email'
+import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithEmailCode, signInWithMagicLink, verifyEmail, verifyEmailCode } from './email'
 import { createGate } from './gate'
 import { deriveKeys } from './keys'
 import { DEFAULT_LIMITS } from './limits'
@@ -209,6 +209,21 @@ export class Auth {
   // Spends a magic link's token, signing its user in.
   async signInWithMagicLink(token: string): Promise<LinkResult> {
     return signInWithMagicLink(this[STATE], token)
+  }
+
+  // Signs in with the code a magic link mail carried, typed in the browser that asked for it.
+  async signInWithEmailCode(code: string): Promise<CodeResult> {
+    return signInWithEmailCode(this[STATE], code)
+  }
+
+  // Verifies the address with the code its verification mail carried, typed in the browser that asked for it.
+  async verifyEmailCode(code: string): Promise<CodeResult> {
+    return verifyEmailCode(this[STATE], code)
+  }
+
+  // The code this browser waits for, sign-in or verification, and the address it went to; null when none.
+  async emailCodePending(): Promise<{ type: 'sign-in' | 'verify', email: string } | null> {
+    return pendingCode(this[STATE])
   }
 
   // Mails the signed-in user's new address a link confirming it.
@@ -480,7 +495,12 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     limits: { ...DEFAULT_LIMITS, ...options.limits },
     captcha: options.captcha,
     breached: options.breachedPasswords === true ? pwnedPassword : options.breachedPasswords || undefined,
-    email: options.email && { ...options.email, requireVerified: options.email.requireVerified ?? false, templates: { ...defaultTemplates, ...options.email.templates } },
+    email: options.email && {
+      ...options.email,
+      requireVerified: options.email.requireVerified ?? false,
+      templates: { ...defaultTemplates, ...options.email.templates },
+      codes: typeof options.email.codes === 'string' ? { 'magic-link': options.email.codes, 'verify-email': options.email.codes } : { 'magic-link': 'link', 'verify-email': 'link', ...options.email.codes },
+    },
     oauth,
     refreshers: new Map(),
     allow: options.allow,

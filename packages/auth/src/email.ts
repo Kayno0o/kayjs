@@ -2,9 +2,9 @@ import type { Core } from './core'
 import type { Mailer, Templates } from './mail'
 import type { EmailProblem, PasswordProblem } from './rules'
 import type { RequestState } from './state'
-import type { TokenType, UserRecord } from './store'
+import type { CodeType, LinkType, TokenType, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
-import { comparePasswords, hashPassword } from '@kaynooo/utils'
+import { comparePasswords, hashPassword, nanoid } from '@kaynooo/utils'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { digest, randomToken } from './keys'
@@ -17,24 +17,53 @@ import { reprove } from './twoFactor'
 const MINUTE_MS = 60 * 1000
 const HOUR_MS = 60 * MINUTE_MS
 
-// How long each link works.
+// How long each link and code works.
 const TOKEN_LIFETIME_MS: Record<TokenType, number> = {
   'verify-email': 24 * HOUR_MS,
   'reset-password': HOUR_MS,
   'magic-link': 15 * MINUTE_MS,
   'change-email': HOUR_MS,
+  'sign-in-code': 10 * MINUTE_MS,
+  'verify-code': 10 * MINUTE_MS,
 }
+
+const CODE_LENGTH = 6
+// Wrong guesses one code takes before it dies, whatever the limits leave.
+const CODE_MISSES = 5
+const DIGITS = '0123456789'
+const NOT_DIGITS = /\D/g
+
+// The mails that can carry a code, and the code each carries.
+export type CodedLink = 'magic-link' | 'verify-email'
+const CODE_OF: Record<CodedLink, CodeType> = { 'magic-link': 'sign-in-code', 'verify-email': 'verify-code' }
+const LINK_OF: Record<CodeType, CodedLink> = { 'sign-in-code': 'magic-link', 'verify-code': 'verify-email' }
+
+// What a sign-in or verification mail carries: a link, a code typed on the device that asked for it, or both.
+export type CodeMode = 'link' | 'code' | 'both'
 
 export interface EmailOptions {
   mailer: Mailer
   // The app's page each link opens, the token in `?token=`. Each shows a button, or the new password's form, posting the token to an action, so a mail scanner opening the link spends nothing.
-  links: Record<TokenType, string>
+  links: Record<LinkType, string>
   templates?: Partial<Templates> | undefined
   // Refuses password sign-in until the address is verified, and signs no one in on registering.
   requireVerified?: boolean | undefined
+  // Whether magic links and verification mails carry a code, for both kinds at once or for each: `'both'`, `{ 'magic-link': 'code' }`. A link only by default.
+  codes?: CodeMode | Partial<Record<CodedLink, CodeMode>> | undefined
 }
 
-export type EmailCore = Required<Omit<EmailOptions, 'templates' | 'requireVerified'>> & { requireVerified: boolean, templates: Templates }
+export type EmailCore = Required<Omit<EmailOptions, 'templates' | 'requireVerified' | 'codes'>> & { requireVerified: boolean, templates: Templates, codes: Record<CodedLink, CodeMode> }
+
+// A code waiting in the session that asked for it, which alone can spend it.
+export interface PendingCode {
+  type: CodeType
+  email: string
+  // Mixed into the code's digest, so the code works in this session only.
+  nonce: string
+  expires: number
+}
+
+export type CodeResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' }
 
 // Sent whether or not an account has that address, so the answer tells nothing of which ones exist.
 export type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'captcha' | 'unavailable' }
@@ -201,7 +230,96 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
 // On registering: the verification mail, when the app sends mail.
 export async function welcome(state: RequestState, record: UserRecord): Promise<void> {
   if (state.core.email && record.email)
-    await issue(state.core, record, 'verify-email', record.email, null)
+    await issue(state.core, record, 'verify-email', record.email, null, await bindCode(state, 'verify-email', record.email))
+}
+
+// Signs in with the code a magic link mail carried, in the session that asked for it.
+export async function signInWithEmailCode(state: RequestState, code: string): Promise<CodeResult> {
+  const spent = await spendCode(state, 'sign-in-code', code)
+
+  if (!spent.ok)
+    return spent
+
+  const record = spent.record.emailVerifiedAt === null
+    ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
+    : spent.record
+
+  return { ok: true, redirect: await state.complete(record, spent.token.redirect ?? '/') }
+}
+
+// Verifies the address with the code its verification mail carried, in the session that asked for it, which registered the account or is signed in as it.
+export async function verifyEmailCode(state: RequestState, code: string): Promise<CodeResult> {
+  const spent = await spendCode(state, 'verify-code', code)
+
+  if (!spent.ok)
+    return spent
+
+  await state.core.store.users.update(spent.record.id, { emailVerifiedAt: new Date() })
+
+  return { ok: true, redirect: (await state.current())?.id === spent.record.id ? '/' : state.core.signInPage }
+}
+
+// The code this session waits for, for the page that asks for it.
+export async function pendingCode(state: RequestState): Promise<{ type: 'sign-in' | 'verify', email: string } | null> {
+  const pending = await state.session.get('authEmailCode')
+
+  if (!pending || pending.expires < Date.now())
+    return null
+
+  return { type: pending.type === 'sign-in-code' ? 'sign-in' : 'verify', email: pending.email }
+}
+
+// Parks the code a mail is about to carry in this session, answering the nonce bound into it; undefined when the app sends links only.
+async function bindCode(state: RequestState, type: LinkType, email: string): Promise<string | undefined> {
+  if (!(type in CODE_OF) || state.core.email?.codes[type as CodedLink] === 'link')
+    return undefined
+
+  const nonce = randomToken()
+  const codeType = CODE_OF[type as CodedLink]
+
+  await state.session.set('authEmailCode', { type: codeType, email, nonce, expires: Date.now() + TOKEN_LIFETIME_MS[codeType] })
+
+  return nonce
+}
+
+// Spends the code this session waits for; a code dies after a few misses, and the guesses count per client and per address.
+async function spendCode(state: RequestState, type: CodeType, code: string) {
+  const { core } = state
+  const pending = await state.session.get('authEmailCode')
+
+  if (!pending || pending.type !== type || pending.expires < Date.now())
+    return { ok: false, error: 'expired' } as const
+
+  if (await spend(core.store, `email-code:${state.client}`, core.limits.emailCode) || await spend(core.store, `email-code:${pending.email}`, core.limits.emailCodeAccount))
+    return { ok: false, error: 'limited' } as const
+
+  const spent = await core.store.tokens.consume(codeDigest(state.core, pending.nonce, code.replace(NOT_DIGITS, '')), type)
+  const record = spent && await core.store.users.get(spent.userId)
+
+  if (!spent || !record || record.email !== spent.email) {
+    if (await core.store.attempts.hit(`email-code-miss:${pending.nonce}`, TOKEN_LIFETIME_MS[type] / 1000) < CODE_MISSES)
+      return { ok: false, error: 'invalid' } as const
+
+    await state.session.unset('authEmailCode')
+
+    const holder = await core.store.users.findByEmail(pending.email)
+
+    if (holder)
+      await core.store.tokens.deleteForUser(holder.id, type)
+
+    return { ok: false, error: 'expired' } as const
+  }
+
+  await state.session.unset('authEmailCode')
+  // The link the same mail carried is spent with it.
+  await core.store.tokens.deleteForUser(record.id, LINK_OF[type])
+
+  return { ok: true, token: spent, record } as const
+}
+
+// Keyed, since six digits are no secret to whoever reads a plain digest out of the store.
+function codeDigest(core: Core, nonce: string, code: string): string {
+  return core.keys.fingerprint(`email-code\n${nonce}\n${code}`)
 }
 
 // Counted by address whether or not an account has it, and mailed off the response's path, so neither the answer nor its time tells which addresses exist.
@@ -221,18 +339,20 @@ async function mailByAddress(state: RequestState, email: string, type: 'reset-pa
   if (await spend(core.store, `${limit}:${address}`, core.limits[`${limit}Account`]))
     return { ok: false, error: 'limited' }
 
+  // Parked whether or not an account has the address, so this session looks the same either way.
+  const nonce = await bindCode(state, type, address)
   const record = emailProblem(address) ? undefined : await core.store.users.findByEmail(address)
 
   if (record)
-    void issueQuietly(core, record, type, address, redirect)
+    void issueQuietly(core, record, type, address, redirect, nonce)
 
   return { ok: true }
 }
 
 // Off the response's path, where no one is left to answer a failure to: logged.
-async function issueQuietly(core: Core, record: UserRecord, type: TokenType, email: string, redirect: string | null): Promise<void> {
+async function issueQuietly(core: Core, record: UserRecord, type: LinkType, email: string, redirect: string | null, nonce: string | undefined): Promise<void> {
   try {
-    await issue(core, record, type, email, redirect)
+    await issue(core, record, type, email, redirect, nonce)
   }
   catch (error) {
     console.error(`kayjs-auth: mailing a ${type} link failed`, error)
@@ -240,7 +360,7 @@ async function issueQuietly(core: Core, record: UserRecord, type: TokenType, ema
 }
 
 // Counted per client and per account, so neither one sender nor many can flood an inbox.
-async function mailFor(state: RequestState, record: UserRecord, type: TokenType, email: string, redirect: string | null, limit: 'resend' | 'emailChange'): Promise<{ ok: true } | { ok: false, error: 'limited' | 'unavailable' }> {
+async function mailFor(state: RequestState, record: UserRecord, type: LinkType, email: string, redirect: string | null, limit: 'resend' | 'emailChange'): Promise<{ ok: true } | { ok: false, error: 'limited' | 'unavailable' }> {
   const { core } = state
 
   if (!core.email)
@@ -249,24 +369,40 @@ async function mailFor(state: RequestState, record: UserRecord, type: TokenType,
   if (await spend(core.store, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.store, `${limit}:${record.id}`, core.limits[`${limit}Account`]))
     return { ok: false, error: 'limited' }
 
-  await issue(core, record, type, email, redirect)
+  await issue(core, record, type, email, redirect, await bindCode(state, type, email))
 
   return { ok: true }
 }
 
-// One live link per kind and user: a new one replaces the last.
-async function issue(core: Core, record: UserRecord, type: TokenType, email: string, redirect: string | null): Promise<void> {
+// One live link and code per kind and user: a new one replaces the last. A code goes only with the nonce of the session that asked for it.
+async function issue(core: Core, record: UserRecord, type: LinkType, email: string, redirect: string | null, nonce: string | undefined): Promise<void> {
   const mail = core.email!
-  const token = randomToken()
-  const url = `${core.url}${mail.links[type]}?token=${token}`
+  const mode = type in CODE_OF ? mail.codes[type as CodedLink] : 'link'
+  const content: { url?: string, code?: string } = {}
 
   await core.store.tokens.deleteForUser(record.id, type)
-  await core.store.tokens.create({ digest: digest(token), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[type]) })
-  await mail.mailer.send({ to: email, kind: type, url, ...mail.templates[type]({ site: core.site, email, url }) })
+
+  if (mode !== 'code') {
+    const token = randomToken()
+
+    content.url = `${core.url}${mail.links[type]}?token=${token}`
+    await core.store.tokens.create({ digest: digest(token), type, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[type]) })
+  }
+
+  if (mode !== 'link' && nonce !== undefined) {
+    const codeType = CODE_OF[type as CodedLink]
+    const code = nanoid(CODE_LENGTH, DIGITS)
+
+    content.code = code
+    await core.store.tokens.deleteForUser(record.id, codeType)
+    await core.store.tokens.create({ digest: codeDigest(core, nonce, code), type: codeType, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[codeType]) })
+  }
+
+  await mail.mailer.send({ to: email, kind: type, ...content, ...mail.templates[type]({ site: core.site, email, ...content }) })
 }
 
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.
-async function spendLink(state: RequestState, token: string, type: TokenType) {
+async function spendLink(state: RequestState, token: string, type: LinkType) {
   const { store, limits } = state.core
 
   if (await spend(store, `link:${state.client}`, limits.link))
@@ -277,6 +413,10 @@ async function spendLink(state: RequestState, token: string, type: TokenType) {
 
   if (!spent || !record || (type !== 'change-email' && record.email !== spent.email))
     return { ok: false, error: 'invalid' } as const
+
+  // The code the same mail carried is spent with it.
+  if (type in CODE_OF)
+    await store.tokens.deleteForUser(record.id, CODE_OF[type as CodedLink])
 
   return { ok: true, token: spent, record } as const
 }

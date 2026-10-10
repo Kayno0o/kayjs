@@ -1,5 +1,5 @@
 import type { CaptchaOptions } from './captcha'
-import type { EmailCore } from './email'
+import type { EmailCore, PendingCode } from './email'
 import type { Keys } from './keys'
 import type { Limits } from './limits'
 import type { SecurityEvent } from './mail'
@@ -17,6 +17,7 @@ export interface AuthSessionData {
   auth?: SignedIn
   authOAuth?: OAuthFlow
   authChallenge?: Challenge
+  authEmailCode?: PendingCode
   // The account this browser registered, or proved the password of while its address was unverified: it may have the link resent and verify it without signing in.
   authRegistered?: string
 }

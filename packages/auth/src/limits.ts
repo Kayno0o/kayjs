@@ -28,6 +28,9 @@ export const DEFAULT_LIMITS = {
   twoFactorAccount: { max: 8, window: 15 * MINUTE },
   // Re-proving is a password guess like any other.
   reprove: { max: 6, window: 15 * MINUTE },
+  // Guesses at an emailed code, on top of the few misses each code takes.
+  emailCode: { max: 30, window: 15 * MINUTE },
+  emailCodeAccount: { max: 10, window: 15 * MINUTE },
   // Guessing a token is hopeless; this keeps trying from being free.
   link: { max: 40, window: HOUR },
 } satisfies Record<string, Limit>
