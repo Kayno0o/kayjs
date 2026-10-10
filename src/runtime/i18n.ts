@@ -1,4 +1,5 @@
 import type { CheckedHref, Register } from './checks'
+import type { JSX } from './jsx'
 
 // What the server and the browser share of i18n: message lookup, formatting through `Intl`, and locale paths.
 
@@ -43,7 +44,12 @@ type At<Tree, Key extends string> = Key extends `${infer Head}.${infer Rest}` ? 
 type Placeholders<Text> = Text extends `${string}{${infer Name}}${infer Rest}` ? Name | Placeholders<Rest> : never
 type ParamsOf<Value> = Value extends string ? Placeholders<Value> : 'count' | Placeholders<Value[keyof Value] & string>
 // A plural's `count` picks its form, so it is a number; any other placeholder takes text, a number or a date.
-type ParamArgs<Value, Names extends string = ParamsOf<Value>> = [Names] extends [never] ? [] : [params: { [Name in Names]: Name extends 'count' ? Value extends string ? MessageValue : number : MessageValue }]
+type Params<Value> = { [Name in ParamsOf<Value>]: Name extends 'count' ? Value extends string ? MessageValue : number : MessageValue }
+type ParamArgs<Value> = [ParamsOf<Value>] extends [never] ? [] : [params: Params<Value>]
+type Tags<Text> = Text extends `${string}<${infer Name}>${infer Rest}` ? Name extends `/${string}` ? Tags<Rest> : Name | Tags<Rest> : never
+type TagsOf<Value> = Value extends string ? Tags<Value> : Tags<Value[keyof Value] & string>
+// What a tag of a message renders its text with, an `@about(text)` block.
+type Block = (text: string) => JSX.Element
 
 export type MessageKey = [Messages] extends [never] ? string : KeysOf<Messages>
 // A key of the default locale's messages, then the values its placeholders take; without registered messages, any key and any values.
@@ -57,9 +63,16 @@ export type MergeMessages<A, B> = {
     : Key extends keyof A ? A[Key] : never
 }
 type IsGroup<Value> = Value extends string ? false : IsPlural<Value> extends true ? false : true
+// `T(key="intro" name={name})` with an `@about(text)` block per tag of the message: its key, its placeholders and its tags typed from the default locale's file.
+export type RichText = [Messages] extends [never]
+  ? (props: { key: string } & Record<string, MessageValue | Block>) => JSX.Element
+  : <Key extends KeysOf<Messages>>(props: { key: Key } & Params<At<Messages, Key>> & Record<TagsOf<At<Messages, Key>>, Block>) => JSX.Element
 export type Localize = <const Href extends string>(href: Href & CheckedHref<Href>, locale?: Locale) => string
 
 const PLACEHOLDER = /\{(\w+)\}/g
+
+// A tag of a message, `<about>our story</about>`, which `T` renders through the block of its name; tags do not nest.
+export const MESSAGE_TAG = /<(\w[\w-]*)>(.*?)<\/\1>/gs
 
 const PLURAL_CATEGORIES: ReadonlySet<string> = new Set<PluralCategory>(['zero', 'one', 'two', 'few', 'many', 'other'])
 const numberFormats = new Map<string, Intl.NumberFormat>()
@@ -113,14 +126,58 @@ export function isPlural(value: unknown): value is Plural {
 
 // The message at `key` with its placeholders filled.
 export function translate(translations: Translations, key: string, params: Record<string, MessageValue> = {}): string {
+  const text = messageText(translations, key, params.count)
+
+  return text === undefined ? missingMessage(key) : fill(translations.locale, text, params)
+}
+
+// The message at `key` as text and the blocks its tags render through, each tag's text filled before its block gets it, so a value holding `<b>` stays text; a tag no block fills renders its text.
+// Each block renders when its turn comes, so a hydrating island claims the nodes in order.
+export function richMessage(translations: Translations, key: string, props: Readonly<Record<string, unknown>>): unknown[] {
+  const params = props as Record<string, MessageValue>
+  const text = messageText(translations, key, params.count)
+
+  if (text === undefined)
+    return [missingMessage(key)]
+
+  const parts: unknown[] = []
+  let end = 0
+  const add = (part: unknown) => {
+    if (part === '')
+      return
+
+    if (typeof part === 'string' && typeof parts.at(-1) === 'string')
+      parts[parts.length - 1] = `${parts.at(-1) as string}${part}`
+    else
+      parts.push(part)
+  }
+
+  for (const match of text.matchAll(MESSAGE_TAG)) {
+    const [, name, tagged] = match as unknown as [string, string, string]
+    const inner = fill(translations.locale, tagged, params)
+
+    add(fill(translations.locale, text.slice(end, match.index), params))
+    add(() => {
+      const block = props[name]
+
+      return typeof block === 'function' ? (block as (text: string) => unknown)(inner) : block ?? inner
+    })
+    end = match.index + match[0].length
+  }
+
+  add(fill(translations.locale, text.slice(end), params))
+
+  return parts
+}
+
+function messageText(translations: Translations, key: string, count: MessageValue | undefined): string | undefined {
   const message = translations.messages.get(key) ?? translations.fallback?.get(key)
 
-  if (message === undefined)
-    return missingMessage(key)
+  return message === undefined || typeof message === 'string' ? message : pluralForm(translations.locale, message, count)
+}
 
-  const text = typeof message === 'string' ? message : pluralForm(translations.locale, message, params.count)
-
-  return text.replace(PLACEHOLDER, (placeholder, name: string) => name in params ? formatValue(translations.locale, params[name]!) : placeholder)
+function fill(locale: string, text: string, params: Record<string, MessageValue>): string {
+  return text.replace(PLACEHOLDER, (placeholder, name: string) => name in params ? formatValue(locale, params[name]!) : placeholder)
 }
 
 // A key no locale has, which `kay check` cannot see when the key is computed. Production shows it as itself rather than failing the page; development and tests fail the render on the server, and log it in the browser, where a test page fails on it.

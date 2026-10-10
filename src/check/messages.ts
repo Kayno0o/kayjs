@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { PROBLEMS_MARKER } from '../content/server'
-import { flattenMessages, isPlural } from '../runtime/i18n'
+import { flattenMessages, isPlural, MESSAGE_TAG } from '../runtime/i18n'
 import { buildingWithoutEnv } from '../server/env'
 import { extensionMessageFiles, messagesFile } from '../server/i18n'
 
@@ -110,6 +110,19 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
         if (!expected.has(name))
           problems.push({ file: own.file, line, message: `gives ${key} a {${name}}, which ${from} has not, so nothing fills it` })
       }
+
+      const tagged = tags(message)
+      const ownTags = tags(own.message)
+
+      for (const name of tagged) {
+        if (!ownTags.has(name))
+          problems.push({ file: own.file, line, message: `gives ${key} without <${name}>, which ${from} has, so its block renders nothing` })
+      }
+
+      for (const name of ownTags) {
+        if (!tagged.has(name))
+          problems.push({ file: own.file, line, message: `gives ${key} a <${name}>, which ${from} has not, so no block renders it` })
+      }
     }
 
     for (const [key, own] of entries) {
@@ -130,6 +143,13 @@ function placeholders(message: Message): Set<string> {
     names.add('count')
 
   return names
+}
+
+// Every tag of a message, a plural's forms together, as `T` reads them.
+function tags(message: Message): Set<string> {
+  const texts = typeof message === 'string' ? [message] : Object.values(message)
+
+  return new Set(texts.flatMap(text => Array.from(text.matchAll(MESSAGE_TAG), match => match[1]!)))
 }
 
 // The line a dotted key is written on, each part found after the one before it; the file's first line when the source spells it in a way this cannot follow.

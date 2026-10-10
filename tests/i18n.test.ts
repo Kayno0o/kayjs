@@ -1,11 +1,14 @@
 import type { I18nConfig } from '../src/config'
+import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
+import { chromium } from 'playwright-core'
 import { check } from '../src/check'
+import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
 import { flattenMessages, localePath, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
@@ -13,12 +16,15 @@ import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { acceptedLocale, localeSettings, requestLocale } from '../src/server/i18n'
 import { prerenderPages } from '../src/server/prerender'
+import { browserPath, testSite } from '../src/test'
 
 const FIXTURE = 'tests/fixtures/i18n'
 const routes = `${FIXTURE}/src/routes`
 const messages = `${FIXTURE}/src/messages`
 const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages }
 const SITE = 'https://x.example'
+// Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the browser tests.
+const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 const app = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.example', i18n }))
 
 async function get(path: string, served: { handle: (request: Request) => Promise<Response> } = app, headers: Record<string, string> = {}): Promise<{ status: number, html: string, location: string | null, cookie: string | null, vary: string | null, etag: string | null }> {
@@ -71,6 +77,12 @@ describe('locale prefixes', () => {
     expect(english.html).toContain('<p class="direction">ltr rtl</p>')
   })
 
+  it('render a message\'s tags through T\'s blocks, its placeholders filled and escaped inside a tag and out', async () => {
+    expect((await get('/')).html).toContain('<p class="intro">Lisez <strong>notre histoire</strong>, &lt;Ada>, ou <em>la doc de &lt;Ada></em>.</p>')
+    expect((await get('/en')).html).toContain('<p class="intro">Read <strong>our story</strong>, &lt;Ada>, or <em>the docs of &lt;Ada></em>.</p>')
+    expect(islandMessages('T(key="intro" name={name})\nT(name={name} key=\'rich.other\')\np {t(\'nav.home\')}')).toBe(', ["intro","rich.other","nav.home"]')
+  })
+
   it('write dir="rtl" on a page in a locale written right to left, and nothing on one written left to right', async () => {
     expect(['ar', 'he', 'fa-IR', 'ur', 'yi', 'en', 'fr', 'az-Arab', 'zz-invalid-tag-!'].map(textDirection)).toEqual(['rtl', 'rtl', 'rtl', 'rtl', 'rtl', 'ltr', 'ltr', 'rtl', 'ltr'])
 
@@ -83,7 +95,7 @@ describe('locale prefixes', () => {
   it('send an island only the messages it uses', async () => {
     const { html } = await get('/en')
 
-    expect(html).toContain('<script type="application/json" data-kay-i18n>{"locale":"en","settings":{"locales":["fr","en"],"defaultLocale":"fr","prefixDefault":false},"messages":{"counter.label":"Counter"}}</script>')
+    expect(html).toContain('<script type="application/json" data-kay-i18n>{"locale":"en","settings":{"locales":["fr","en"],"defaultLocale":"fr","prefixDefault":false},"messages":{"counter.label":"Counter","intro":"Read \\u003cabout>our story\\u003c/about>, {name}, or \\u003cdocs>the docs of {name}\\u003c/docs>."}}</script>')
     expect(html).toContain('<button><!--[-->Counter<!--]--> <!--[-->0<!--]--></button>')
   })
 
@@ -91,7 +103,7 @@ describe('locale prefixes', () => {
     const { html } = await get('/en/streamed')
 
     expect(html).toContain('<p class="later">Home later</p>')
-    expect(html).toContain('<script type="application/json" data-kay-i18n>{"locale":"en","settings":{"locales":["fr","en"],"defaultLocale":"fr","prefixDefault":false},"messages":{"counter.label":"Counter"}}</script>')
+    expect(html).toContain('<script type="application/json" data-kay-i18n>{"locale":"en","settings":{"locales":["fr","en"],"defaultLocale":"fr","prefixDefault":false},"messages":{"counter.label":"Counter","intro":"Read \\u003cabout>our story\\u003c/about>, {name}, or \\u003cdocs>the docs of {name}\\u003c/docs>."}}</script>')
   })
 
   it('list every locale\'s copy of a page in the head and the sitemap', async () => {
@@ -447,6 +459,50 @@ describe('kay check', () => {
     }
   })
 
+  it('types T\'s key, placeholders and blocks, and holds every locale to the default one\'s tags', async () => {
+    const english = join(FIXTURE, 'src/messages/en.ts')
+    const page = join(FIXTURE, 'src/routes/rich.kay')
+    const source = await Bun.file(english).text()
+
+    try {
+      await Bun.write(english, source.replace('Read <about>our story</about>, {name}, or <docs>the docs of {name}</docs>.', 'Read <story>our story</story>, {name}, or the docs of {name}.'))
+      await Bun.write(page, [
+        '--- server',
+        'import { T } from \'kay/i18n\'',
+        '---',
+        'T(key="intro" name="Ada")',
+        '  @about(text)',
+        '    strong {text}',
+        '  @docs(text)',
+        '    em {text.toUpperCase()}',
+        'T(key="intro" name="Ada")',
+        '  @about(text)',
+        '    strong {text}',
+        'T(key="intro" nom="Ada")',
+        '  @about(text)',
+        '    strong {text}',
+        '  @docs(text)',
+        '    em {text}',
+        'T(key="intr" name="Ada")',
+        'T(key="greeting" name="Ada")',
+        '  @about(text)',
+        '    strong {text}',
+        '',
+      ].join('\n'))
+
+      const diagnostics = (await check(FIXTURE, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
+
+      expect(diagnostics).toContainEqual({ file: english, line: 9, message: 'gives intro without <about>, which src/messages/fr.ts has, so its block renders nothing' })
+      expect(diagnostics).toContainEqual({ file: english, line: 9, message: 'gives intro without <docs>, which src/messages/fr.ts has, so its block renders nothing' })
+      expect(diagnostics).toContainEqual({ file: english, line: 9, message: 'gives intro a <story>, which src/messages/fr.ts has not, so no block renders it' })
+      expect(diagnostics.filter(diagnostic => diagnostic.file === page).map(diagnostic => diagnostic.line)).toEqual([9, 12, 17, 19])
+    }
+    finally {
+      await Bun.write(english, source)
+      await rm(page, { force: true })
+    }
+  })
+
   it('checks a link against the path its locale gives the page, and reports a translation another page takes', async () => {
     const paths = { '/about': { en: '/about-us' } }
     const page = join(FIXTURE, 'src/routes/links.kay')
@@ -493,9 +549,38 @@ describe('in the browser', () => {
       document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"messages":{"items":{"one":"{count} item","other":"{count} items"}}}</script>'
 
       expect(t('items', { count: 2 })).toBe('2 items')
+
+      const { T } = await import('../src/runtime/i18n.client')
+      const { render } = await import('../src/runtime/dom')
+      const container = document.createElement('p')
+
+      document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"messages":{"intro":"Read <about>our story</about>, {name}, or <b>{name}</b>."}}</script>'
+      render(() => T({ key: 'intro', name: '<Ada>', about: text => Object.assign(document.createElement('strong'), { textContent: text }) }), container)
+
+      expect(container.innerHTML).toBe('<!--[-->Read <strong>our story</strong>, &lt;Ada&gt;, or &lt;Ada&gt;.<!--]-->')
     }
     finally {
       await GlobalRegistrator.unregister()
     }
   })
+})
+
+// CI installs Chromium for this: there, a missing browser fails rather than skipping.
+describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an island in a browser', () => {
+  it('hydrates T\'s blocks and fills them again when a placeholder changes', async () => {
+    const site = await testSite({ routes, i18n, browser: { path: chrome } })
+
+    try {
+      const page = await site.open('/en')
+
+      expect(await page.text('p.rich')).toBe('Read our story, 0, or the docs of 0.')
+      await page.click('button')
+      expect(await page.text('p.rich')).toBe('Read our story, 1, or the docs of 1.')
+      expect(await page.text('p.rich em')).toBe('the docs of 1')
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
 })

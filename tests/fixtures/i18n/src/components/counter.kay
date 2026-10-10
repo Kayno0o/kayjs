@@ -1,7 +1,14 @@
 ---
 import { signal } from 'kay'
-import { t } from 'kay/i18n'
+import { T, t } from 'kay/i18n'
 
 const count = signal(0)
 ---
-button(onClick={() => count.set(value => value + 1)}) {t('counter.label')} {count()}
+div
+  button(onClick={() => count.set(value => value + 1)}) {t('counter.label')} {count()}
+  p.rich
+    T(key="intro" name={String(count())})
+      @about(text)
+        strong {text}
+      @docs(text)
+        em {text}

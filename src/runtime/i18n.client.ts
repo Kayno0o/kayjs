@@ -1,8 +1,9 @@
-import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue, RelativeTimeOptions, Translate } from './i18n'
+import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { fragment, insert, markers } from './dom'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 
-export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions } from './i18n'
+export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions, RichText } from './i18n'
 export { defineMessages } from './i18n'
 
 // What the server writes for a page's islands, one script per part of a streamed page: the locale, and the messages its islands use.
@@ -48,6 +49,18 @@ export const t = ((key: string, params?: Record<string, MessageValue>) => {
 
   return translate(translations(), key, params)
 }) as Translate
+
+// Rendered again when a placeholder it fills changes.
+export const T = ((props: { key: string }) => fragment((parent) => {
+  const [start, end] = markers(parent)
+
+  insert(null, start, end, () => {
+    if (!messages.has(props.key))
+      load()
+
+    return richMessage(translations(), props.key, props)
+  })
+})) as RichText
 
 export function locale(): Locale {
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them

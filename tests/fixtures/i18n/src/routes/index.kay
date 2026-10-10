@@ -1,5 +1,5 @@
 --- server
-import { direction, formatList, formatNumber, formatRelativeTime, t } from 'kay/i18n'
+import { direction, formatList, formatNumber, formatRelativeTime, T, t } from 'kay/i18n'
 import Counter from '../components/counter.kay'
 
 export const prerender = true
@@ -24,4 +24,10 @@ p.locale {locale}
 p.ago {ago}
 p.listed {listed}
 p.direction {written}
+p.intro
+  T(key="intro" name="<Ada>")
+    @about(text)
+      strong {text}
+    @docs(text)
+      em {text}
 Counter

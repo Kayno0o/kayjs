@@ -1,10 +1,11 @@
-import type { Direction, Locale, Localize, MessageValue, RelativeTimeOptions, Translate } from './i18n'
+import type { Direction, Locale, Localize, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
+import type { JSX } from './jsx'
 import type { LocaleState } from './locale-state'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, textDirection, translate } from './i18n'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, richMessage, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState } from './locale-state'
 
-export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions } from './i18n'
+export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions, RichText } from './i18n'
 export { defineMessages } from './i18n'
 
 function current(name: string): LocaleState {
@@ -25,6 +26,19 @@ export const t = ((key: string, params?: Record<string, MessageValue>) => {
 
   return translate(state, key, params)
 }) as Translate
+
+// The message at `key` with each of its tags rendered through the block of that name: `T(key="intro")` with `@about(text)` for `<about>our story</about>`.
+export const T = ((props: { key: string }) => {
+  const state = current('T')
+
+  if (!insideIsland())
+    return richMessage(state, props.key, props) as JSX.Element
+
+  noteMessage(props.key)
+
+  // The markers the browser's T fills again between, when a placeholder changes.
+  return [{ t: '<!--[-->' }, richMessage(state, props.key, props), { t: '<!--]-->' }] as JSX.Element
+}) as RichText
 
 export function locale(): Locale {
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them

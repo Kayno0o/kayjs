@@ -80,8 +80,8 @@ const PRERENDER = 'prerender'
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 // The page's query schema, which types and validates `ctx.query`.
 const QUERY = 'query'
-// `t('nav.home')`: a message key an island's source names as it is written.
-const MESSAGE_KEY = /\bt\(\s*(['"`])([\w.-]+)\1/g
+// `t('nav.home')` or `T(key="intro")`: a message key an island's source names as it is written.
+const MESSAGE_KEY = /(?:\bt\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
 // The server exports that are no actions; `sitemap` lists the page in the sitemap, `noindex` keeps it out of search engines, `revalidate` renders a prerendered page again once stale.
 const NOT_ACTIONS = new Set([PRERENDER, QUERY, 'sitemap', 'noindex', 'revalidate', 'layouts'])
 // What only a static parent passes an island.
