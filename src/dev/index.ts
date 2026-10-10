@@ -59,9 +59,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let restarting: Promise<void> | undefined
   let stopping = false
   // Counts every change but a stylesheet's: an open page whose server comes back with the same count only needs its stylesheets again.
-  let codeVersion = 0
+  // It starts from the clock, so a page left open across two `kay dev` runs never takes the new run's count for its own.
+  let codeVersion = Date.now()
   // The count the last server started with, and the files changed since: a page on that count may swap in what changed.
-  let startedAt = 0
+  let startedAt = codeVersion
   let changedFiles = new Set<string>()
   // Every file changed since the last restart began, stylesheets included.
   let touched = new Set<string>()

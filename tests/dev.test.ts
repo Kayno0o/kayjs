@@ -284,7 +284,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('tells each server how many changes other than to stylesheets came before it', async () => {
+  it('tells each server how many changes other than to stylesheets came before it, counting on from the last run', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     // Hidden, so writing it restarts nothing.
     const seen = join(root, '.seen')
@@ -292,7 +292,7 @@ describe('kay dev', () => {
 
     await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(seen)}, process.env.KAY_DEV_CODE ?? '')\nsetInterval(() => undefined, 1000)\n`)
     await Bun.write(join(root, 'src/app.css'), 'p { color: red }\n')
-    const stop = await dev(root, { onRestart: child => children.push(child) })
+    let stop = await dev(root, { onRestart: child => children.push(child) })
     const restartAfter = async (file: string, content: string) => {
       const count = children.length
 
@@ -308,9 +308,19 @@ describe('kay dev', () => {
 
     try {
       await until(() => existsSync(seen))
-      expect(await Bun.file(seen).text()).toBe('0')
-      expect(await restartAfter('src/app.css', 'p { color: blue }\n')).toBe('0')
-      expect(Number(await restartAfter('src/routes/index.kay', 'p Home\n'))).toBeGreaterThan(0)
+      const first = await Bun.file(seen).text()
+
+      expect(await restartAfter('src/app.css', 'p { color: blue }\n')).toBe(first)
+      const edited = Number(await restartAfter('src/routes/index.kay', 'p Home\n'))
+
+      expect(edited).toBeGreaterThan(Number(first))
+
+      // A page left open across two runs takes the next run's count for new code.
+      await stop()
+      await rm(seen, { force: true })
+      stop = await dev(root, { onRestart: child => children.push(child) })
+      await until(() => existsSync(seen))
+      expect(Number(await Bun.file(seen).text())).toBeGreaterThan(edited)
     }
     finally {
       await stop()
@@ -486,7 +496,9 @@ describe('hot swap', () => {
 
     try {
       await until(() => existsSync(seen))
-      expect(await Bun.file(seen).text()).toBe('0 []')
+      const [first, none] = (await Bun.file(seen).text()).split(' ')
+
+      expect(none).toBe('[]')
 
       await rm(seen)
       await Bun.write(join(root, 'src/island.kay'), 'p x\n')
@@ -494,7 +506,7 @@ describe('hot swap', () => {
 
       const [from, changed] = (await Bun.file(seen).text()).split(' ')
 
-      expect(from).toBe('0')
+      expect(from).toBe(first)
       expect(JSON.parse(changed!)).toContain('src/island.kay')
     }
     finally {
