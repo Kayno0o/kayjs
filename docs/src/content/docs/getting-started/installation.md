@@ -48,6 +48,23 @@ bun run start   # the production server, after a build
 
 ## Editor
 
-The `.kay` extension for VS Code (`editors/vscode` in the kay repository) adds highlighting, errors, completion, go-to-definition and formatting through `kay lsp`.
+The `.kay` extension for VS Code, in `editors/vscode` of the kay repository, highlights `.kay` files and runs `kay lsp` for errors, hover, completion with auto-import, go-to-definition, references, rename, quick fixes and formatting. It is not on the Marketplace: build it from a checkout of the repository and install the file it writes.
+
+```sh
+cd editors/vscode
+bun install
+bun run package   # writes kay.vsix
+code --install-extension kay.vsix
+```
+
+The extension runs the language server of the kay the workspace installed, so it always matches the compiler the project builds with, and asks for nothing more in a project made by `kay new`. Three settings change that:
+
+| Setting | What it does |
+| --- | --- |
+| `kay.bun.path` | The Bun executable running the server, `bun` by default |
+| `kay.server.path` | The kay CLI to run, absolute or relative to the workspace, when it is not the workspace's own |
+| `kay.routes` | The pages directory, so route params and links are typed; by default the one `kay.config.ts` names, else `src/routes` |
+
+Any other editor speaking the Language Server Protocol, such as Neovim, Helix or Zed, can run the same server: start `bunx kay lsp --stdio` in the project root for `.kay` files. The TextMate grammar ships as `kay/kay.tmLanguage.json` for an editor or highlighter that takes one.
 
 <ReadMore href="/llms/project">Every `kay` command, the `kay new` features and the tsconfig details are in the project reference.</ReadMore>

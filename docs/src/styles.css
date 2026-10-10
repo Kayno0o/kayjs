@@ -700,6 +700,12 @@ pre code {
   --callout: var(--accent);
 }
 
+/* min-width: 0 lets a code block inside scroll instead of widening the callout. */
+.callout-body {
+  flex: 1;
+  min-width: 0;
+}
+
 .callout-body > * {
   margin: 0;
 }
