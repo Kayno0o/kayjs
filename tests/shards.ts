@@ -13,7 +13,8 @@ const print = limiter(1)
 
 async function run(command: string[], cwd: string): Promise<{ output: string, code: number }> {
   // One pipe for both streams, so a failure stays next to the test that printed it.
-  const child = Bun.spawn(['sh', '-c', 'exec "$@" 2>&1', 'sh', ...command], { cwd, stdout: 'pipe', stdin: 'ignore' })
+  // A copy has no `.git`, so a test reading the repository's history reads this checkout's through KAY_CHECKOUT.
+  const child = Bun.spawn(['sh', '-c', 'exec "$@" 2>&1', 'sh', ...command], { cwd, stdout: 'pipe', stdin: 'ignore', env: { ...process.env, KAY_CHECKOUT: ROOT } })
   const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
   return { output, code }
