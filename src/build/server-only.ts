@@ -1,10 +1,12 @@
 import type { NodePath, Scope } from '@babel/traverse'
 import type * as t from '@babel/types'
-import { basename, relative, resolve, sep } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { parse } from '@babel/parser'
 import { parseKay } from '../compiler/parser'
 import { loadTraverse } from '../compiler/rewrite'
+import { readCacheEntry, writeCacheEntry } from './cache'
 
 // Globals a server has and a browser has not: reading one in a chunk the page loads throws as the chunk evaluates, before anything of it runs.
 const SERVER_ONLY = new Set(['process', 'Bun'])
@@ -21,6 +23,12 @@ const SCHEMA_SPECIFIER = /^[st](?:\s+as\s+\w+)?$/
 // Bun's refusal of a builtin in a browser build, which names the module importing it and not the island that reached it.
 const BUILTIN_REFUSAL = /^Browser build cannot import (?:Node\.js|Bun) builtin/
 const PACKAGE_PATH = /node_modules\/((?:@[^/]+\/)?[^/]+)/
+// Under the build cache: each chunk's scan by a hash of its content, its server-only names or null where it did not parse.
+const SCANS_FILE = 'server-only.json'
+const SCANNER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json']
+let scannerKey: string | undefined
+
+type Scans = Record<string, string[] | null>
 
 export interface ServerOnlyRead {
   name: string
@@ -39,8 +47,11 @@ interface Output {
 // The server-only globals a built chunk reads where a browser would run it, each with the modules it came from.
 // A read a `typeof` asks about first is how a module written for both sides reaches for one, so it is left alone.
 export function serverOnlyReads(code: string, modules = new Map<string, string>()): ServerOnlyRead[] {
-  const names: Set<string> = serverOnlyNames(code) ?? new Set()
+  return readersOf(serverOnlyNames(code) ?? new Set(), modules)
+}
 
+// Each name, with the modules whose own source reads it.
+function readersOf(names: Set<string>, modules: Map<string, string>): ServerOnlyRead[] {
   if (names.size === 0)
     return []
 
@@ -54,21 +65,21 @@ export function serverOnlyNames(code: string): Set<string> | undefined {
   if (!MENTIONED.test(code))
     return new Set()
 
-  return parsed(code, false) === undefined ? undefined : readsIn(code, false)
+  const program = parsed(code, false)
+
+  return program === undefined ? undefined : namesIn(program)
 }
 
 // `fenced` reads a `.kay` file, whose script and server fences hold the JavaScript of it.
 function readsIn(code: string, fenced: boolean): Set<string> {
-  const found = new Set<string>()
   const source = fenced ? fences(code) : code
+  const program = MENTIONED.test(source) ? parsed(source, fenced) : undefined
 
-  if (!MENTIONED.test(source))
-    return found
+  return program === undefined ? new Set() : namesIn(program)
+}
 
-  const program = parsed(source, fenced)
-
-  if (program === undefined)
-    return found
+function namesIn(program: t.File): Set<string> {
+  const found = new Set<string>()
 
   loadTraverse()(program, {
     Identifier(path: NodePath<t.Identifier>) {
@@ -229,9 +240,13 @@ function asksTypeof(node: t.Node, name: string): boolean {
 
 // Refuses a client build whose chunks read a server-only global: such a chunk throws as the browser evaluates it, so every island in it stays dead.
 // `dir` is where the bundler wrote them, the metafile naming each chunk relative to it and each module relative to where the build ran.
-export async function refuseServerOnlyReads(root: string, dir: string, outputs: Record<string, Output>): Promise<void> {
+// With `cacheDir`, a chunk scanned by the build before, its content unchanged, is not parsed again.
+export async function refuseServerOnlyReads(root: string, dir: string, outputs: Record<string, Output>, cacheDir?: string): Promise<void> {
   const problems: string[] = []
   const schemaBuilders = new Set<string>()
+  const slot = cacheDir === undefined ? undefined : { file: join(cacheDir, SCANS_FILE), key: scanKey() }
+  const cached = (slot && await readCacheEntry<Scans>(slot)) ?? {}
+  const scans: Scans = {}
   // Only the modules whose code is in a chunk: a tree-shaken one is listed with none of it.
   const modulesOf = async (meta: Output) => new Map((await Promise.all(Object.entries(meta.inputs ?? {}).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(async ([input]) => {
     const path = resolve(process.cwd(), input)
@@ -252,7 +267,7 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
     if (code === undefined)
       return unchecked('could not be read')
 
-    const names = serverOnlyNames(code)
+    const names = scanned(code, cached, scans)
 
     if (names === undefined)
       return unchecked('could not be parsed')
@@ -262,9 +277,12 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
     if (names.size === 0)
       return
 
-    for (const { name, modules } of serverOnlyReads(code, await modulesOf(meta)))
+    for (const { name, modules } of readersOf(names, await modulesOf(meta)))
       problems.push(`\`${name}\` in ${basename(file)}, read by ${modules.length > 0 ? modules.join(', ') : 'a module of it kay could not pin down'}`)
   }))
+
+  if (slot)
+    await writeCacheEntry(slot, scans)
 
   // The browser's `s` sits with the runtime, and the modules taking it in any chunk.
   if (buildsSchemas) {
@@ -289,6 +307,27 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
 
   if (refusals.length > 0)
     throw new Error(`kay: ${refusals.join(' And ')}`)
+}
+
+// A chunk's server-only names, taken from the last build's scans when they hold its content, and recorded in this build's.
+function scanned(code: string, cached: Scans, scans: Scans): Set<string> | undefined {
+  if (!MENTIONED.test(code))
+    return new Set()
+
+  const hash = Bun.hash(code).toString(36)
+  const known = cached[hash]
+  const names = known === undefined ? serverOnlyNames(code) : known === null ? undefined : new Set(known)
+
+  scans[hash] = names === undefined ? null : [...names]
+
+  return names
+}
+
+// What a scan depends on besides the chunk: this module, and the parser and traverse it runs through.
+function scanKey(): string {
+  scannerKey ??= Bun.hash([import.meta.path, ...SCANNER_PACKAGES.map(manifest => Bun.resolveSync(manifest, import.meta.dir))].map(file => readFileSync(file, 'utf8')).join('\0')).toString(36)
+
+  return scannerKey
 }
 
 // Whether a module imports `s` (or `t`) itself from 'kay', not as a type.

@@ -1,5 +1,8 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { serverOnlyReads } from '../src/build/server-only'
+import { refuseServerOnlyReads, serverOnlyReads } from '../src/build/server-only'
 
 const names = (code: string) => serverOnlyReads(code).map(read => read.name)
 
@@ -72,5 +75,35 @@ describe('the modules a chunk read it from', () => {
 
   it('says so when no module of the chunk owns up to the read', () => {
     expect(serverOnlyReads('var s = process.env.X;\n', new Map([['src/a.ts', 'export const x = 1\n']]))).toEqual([{ name: 'process', modules: [] }])
+  })
+})
+
+describe('the scans a build keeps', () => {
+  it('reads a chunk scanned before off the cache, and scans one whose content changed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-server-only-'))
+    const dir = join(root, 'dist')
+    const file = join(root, 'cache', 'server-only.json')
+    const refuse = async () => refuseServerOnlyReads(root, dir, { 'chunk.js': {}, 'quiet.js': {} }, join(root, 'cache'))
+
+    try {
+      await Bun.write(join(dir, 'chunk.js'), 'var s = process.env.SITE;\n')
+      await Bun.write(join(dir, 'quiet.js'), 'var s = 1;\n')
+      await expect(refuse()).rejects.toThrow('`process` in chunk.js')
+
+      const entry = await Bun.file(file).json() as { key: string, value: Record<string, string[] | null> }
+
+      // Only the chunk worth parsing is kept, with what its scan found.
+      expect(Object.values(entry.value)).toEqual([['process']])
+
+      // A cache saying the chunk reads nothing is believed, which only a read off it would do.
+      await Bun.write(file, JSON.stringify({ key: entry.key, value: Object.fromEntries(Object.keys(entry.value).map(hash => [hash, []])) }))
+      await refuse()
+
+      await Bun.write(join(dir, 'chunk.js'), 'var s = process.env.OTHER;\n')
+      await expect(refuse()).rejects.toThrow('`process` in chunk.js')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

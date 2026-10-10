@@ -1,5 +1,5 @@
 import type { KayExtension } from 'kay/server'
-import { brotliCompressSync, constants } from 'node:zlib'
+import { brotliCompress, constants } from 'node:zlib'
 
 const SLOT = '<span data-page-weight></span>'
 const TAG = /<(img|script|link)\b[^>]*>/g
@@ -45,6 +45,11 @@ function linkedUrls(html: string): Set<string> {
   return urls
 }
 
+// Off the main thread, so the pages the build hooks at once compress in parallel; strongest unless a quality is given.
+async function brotliSize(input: string | Uint8Array, quality?: number): Promise<number> {
+  return new Promise((resolve, reject) => brotliCompress(input, quality === undefined ? {} : { params: { [constants.BROTLI_PARAM_QUALITY]: quality } }, (error, result) => error ? reject(error) : resolve(result.length)))
+}
+
 // Most pages link the same stylesheets and scripts: each is measured once per version of it rather than once per page, brotli at its strongest costing tens of milliseconds a file.
 const measured = new Map<string, Promise<number>>()
 
@@ -52,7 +57,7 @@ const measured = new Map<string, Promise<number>>()
 async function measure(path: string): Promise<number> {
   const bytes = await Bun.file(path).bytes()
 
-  return COMPRESSED.test(path) ? brotliCompressSync(bytes).length : bytes.length
+  return COMPRESSED.test(path) ? brotliSize(bytes) : bytes.length
 }
 
 async function servedSize(path: string): Promise<number> {
@@ -80,8 +85,10 @@ export const pageWeight: KayExtension = {
     const sizes = await Promise.all(paths.filter(path => path !== undefined).map(async path => servedSize(path)))
     const linked = sizes.reduce((sum, size) => sum + size, 0)
     // A quick brotli only picks the digits; the page is measured at full strength once, with the line in place, which it adds a few bytes to.
-    const estimate = html.replace(SLOT, () => line(brotliCompressSync(html, { params: { [constants.BROTLI_PARAM_QUALITY]: 5 } }).length + linked))
+    const quick = await brotliSize(html, 5)
+    const estimate = html.replace(SLOT, () => line(quick + linked))
+    const full = await brotliSize(estimate)
 
-    return html.replace(SLOT, () => line(brotliCompressSync(estimate).length + linked))
+    return html.replace(SLOT, () => line(full + linked))
   },
 }

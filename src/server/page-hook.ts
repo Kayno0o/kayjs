@@ -4,6 +4,7 @@ import { IMAGE_ROUTE } from '../runtime/image'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { FAVICON_DIR, FAVICON_PATHS } from './favicon'
 import { builtVariant } from './image'
+import { limiter } from './limit'
 import { pageEtag } from './prerendered'
 import { decodePath } from './routes'
 
@@ -27,6 +28,8 @@ export interface AssetDirs {
 }
 
 const ORIGIN = 'http://localhost'
+// Enough for a hook compressing or reading files to keep the cores busy, few enough that the pages and their encoders are not all held at once.
+const PAGES_AT_ONCE = 8
 
 // Finds the file behind a root-relative URL as the server would serve it, the base taken off first.
 export function assetFiles(dirs: AssetDirs): RenderedPage['file'] {
@@ -70,7 +73,7 @@ export async function applyPageHooks(hooks: PageHook[], path: string, html: stri
   return result
 }
 
-// Runs the hooks over every page `kay build` prerendered, once the files they link are written and before they are compressed.
+// Runs the hooks over every page `kay build` prerendered, several pages at once, once the files they link are written and before they are compressed.
 export async function hookPrerendered(root: string, hooks: PageHook[], dirs: AssetDirs): Promise<void> {
   const manifest = await readManifest(root)
 
@@ -78,14 +81,15 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
     return
 
   const file = assetFiles(dirs)
+  const hooking = limiter(PAGES_AT_ONCE)
 
-  for (const [path, page] of Object.entries(manifest.pages)) {
+  await Promise.all(Object.entries(manifest.pages).map(async ([path, page]) => hooking(async () => {
     const name = join(outputDir(root), PRERENDERED_DIR, page.file)
     const html = await applyPageHooks(hooks, path, await Bun.file(name).text(), file)
 
     await Bun.write(name, html)
     page.etag = pageEtag(html)
-  }
+  })))
 
   await writeManifest(root, manifest)
 }

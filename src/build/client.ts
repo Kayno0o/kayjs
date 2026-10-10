@@ -225,7 +225,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     throw new AggregateError(build.logs, 'kay: client build failed')
   }
 
-  await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs)
+  await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs, join(root, '.kay', 'cache'))
 
   const manifest = islandManifest(root, build.metafile!.outputs, islands, entryFile, options.hot === true)
 

@@ -2,7 +2,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { applyPageHooks, assetFiles } from '../src/server/page-hook'
+import { PRERENDERED_DIR, readManifest, writeManifest } from '../src/server/client'
+import { applyPageHooks, assetFiles, hookPrerendered } from '../src/server/page-hook'
+import { pageEtag } from '../src/server/prerendered'
 
 const scratch = await mkdtemp(join(tmpdir(), 'kay-page-hook-'))
 const clientDir = join(scratch, '.kay/client/dist')
@@ -45,5 +47,33 @@ describe('page hooks', () => {
     ], '/about', '<body></body>', file)
 
     expect(html).toBe('<body><footer>/about two</footer></body>')
+  })
+
+  it('hooks several prerendered pages at once, at most 8, each written back with its own etag', async () => {
+    const paths = Array.from({ length: 20 }, (_, index) => `/page-${index}`)
+    const pages = Object.fromEntries(paths.map(path => [path, { pattern: path, file: `${path.slice(1)}.html`, status: 200, headers: {}, etag: 'stale', renderedAt: 0 }]))
+    let running = 0
+    let most = 0
+
+    await Promise.all(paths.map(async path => Bun.write(join(scratch, '.kay/client', PRERENDERED_DIR, `${path.slice(1)}.html`), `<p>${path}</p>`)))
+    await writeManifest(scratch, { entryImports: [], islands: {}, styles: {}, pages })
+    await hookPrerendered(scratch, [async ({ path, html }) => {
+      most = Math.max(most, ++running)
+      await Bun.sleep(5)
+      running--
+
+      return html.replace('</p>', ` hooked ${path}</p>`)
+    }], { clientDir, publicDir, base: '' })
+
+    const written = (await readManifest(scratch))!.pages!
+
+    expect(most).toBe(8)
+
+    for (const path of paths) {
+      const html = await Bun.file(join(scratch, '.kay/client', PRERENDERED_DIR, written[path]!.file)).text()
+
+      expect(html).toBe(`<p>${path} hooked ${path}</p>`)
+      expect(written[path]!.etag).toBe(pageEtag(html))
+    }
   })
 })
