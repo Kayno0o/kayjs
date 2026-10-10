@@ -1,7 +1,7 @@
 {
   "name": "@kaynooo/kayjs-ui",
   "type": "module",
-  "version": "0.4.31",
+  "version": "0.4.32",
   "description": "kay components: dialogs, tables, toasts, forms and the rest of what the user's sites share, as .kay sources the app compiles as its own",
   "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
   "license": "MIT",
