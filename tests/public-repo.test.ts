@@ -1,6 +1,6 @@
-import { $ } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
+import { $ } from 'bun'
 import { expect, it } from 'bun:test'
 
 // Spelled in parts so this file does not match itself.
