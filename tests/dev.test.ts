@@ -8,6 +8,7 @@ import { describe, expect, it } from 'bun:test'
 import { KayCompileError } from '../src/build/transform'
 import { dev, watchProject } from '../src/dev'
 import { bootFailure, hotSwap } from '../src/server/dev'
+import { editorCommand } from '../src/server/editor'
 
 async function until(condition: () => boolean, timeout = 5000) {
   for (const start = Date.now(); !condition(); await Bun.sleep(20)) {
@@ -450,5 +451,19 @@ describe('hot swap', () => {
       await stop()
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('the editor the inspector opens', () => {
+  it('passes the position the way each editor takes it, and runs a terminal editor only when KAY_EDITOR names it', () => {
+    const at = ['/p/src/routes/index.kay', 12, 3] as const
+    const none = { PATH: '' }
+
+    expect(editorCommand(...at, { ...none, EDITOR: 'code --wait' })).toEqual(['code', '--wait', '-g', '/p/src/routes/index.kay:12:3'])
+    expect(editorCommand(...at, { ...none, VISUAL: '/usr/bin/zed' })).toEqual(['/usr/bin/zed', '/p/src/routes/index.kay:12:3'])
+    expect(editorCommand(...at, { ...none, EDITOR: 'webstorm.sh' })).toEqual(['webstorm.sh', '--line', '12', '--column', '3', '/p/src/routes/index.kay'])
+    expect(editorCommand(...at, { ...none, EDITOR: 'nvim' })).toBeUndefined()
+    expect(editorCommand(...at, { ...none, EDITOR: 'nvim', KAY_EDITOR: 'kitty nvim' })).toEqual(['kitty', 'nvim', '/p/src/routes/index.kay'])
+    expect(editorCommand(...at, { ...none, EDITOR: 'nvim', KAY_EDITOR: 'cursor' })).toEqual(['cursor', '-g', '/p/src/routes/index.kay:12:3'])
   })
 })
