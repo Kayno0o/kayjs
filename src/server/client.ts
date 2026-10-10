@@ -16,6 +16,8 @@ export interface ClientManifest {
   styles: Record<string, string>
   // The pages `kay build` rendered, by URL path.
   pages?: Record<string, PrerenderedPage>
+  // The site they were rendered for, its origin and base: a server running for another renders them again.
+  site?: string | undefined
   // Whether the entry swaps pages in place, which ships it to pages posting forms to actions too.
   navigation?: boolean
   // In development, the source files each chunk of an island holds, by chunk URL and relative to the root: an edited island swaps in everywhere its code runs.

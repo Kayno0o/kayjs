@@ -677,6 +677,29 @@ describe('revalidation', () => {
     }
   })
 
+  it('renders the pages again on their first request when the server runs for another site than the build', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const canonical = async (app: Awaited<ReturnType<typeof pages>>) => (await (await app.handle(new Request('http://localhost/news'))).text()).match(/<link rel="canonical" href="([^"]+)">/)?.[1]
+
+    try {
+      await prerenderPages(root, { routes, site: 'https://example.com' }, (await readClient(root))!)
+
+      expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'https://example.com' }))).toBe('https://example.com/news')
+      expect(warned).not.toHaveBeenCalled()
+
+      // Built where the variable naming the host is unset, run where it is.
+      expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' }))).toBe('http://127.0.0.1:4173/news')
+      expect(warned).toHaveBeenCalledWith('[kay] kay build rendered its pages for https://example.com and this server runs for http://127.0.0.1:4173: each renders again on its first request')
+    }
+    finally {
+      warned.mockRestore()
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
   it('renders a page an action invalidated before the next request gets it, whatever its revalidate period', async () => {
     const root = process.cwd()
     const manifest = (await readManifest(root))!

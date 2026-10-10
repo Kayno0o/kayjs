@@ -58,7 +58,9 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
 
   await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (config.fonts?.length ?? 0) > 0, config: config.images?.card, name: config.seo?.name, quality: config.images?.quality, collect: true })
 
-  setSite(config.site === undefined ? undefined : siteOrigin(config.site) + basePath(config.base), config.trailingSlash)
+  const site = config.site === undefined ? undefined : siteOrigin(config.site) + basePath(config.base)
+
+  setSite(site, config.trailingSlash)
   const maxDensity = applyImageConfig(config.images)
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
@@ -159,7 +161,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   if (problems.length > 0 || apiProblems.length > 0)
     throw new ExportError(`kay: ${[count(problems.length, 'page'), count(apiProblems.length, 'API module')].filter(part => part !== '').join(' and ')} cannot be exported to static files, which no server answers for:\n${[...problems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)
 
-  await writeManifest(root, { ...manifest, pages })
+  await writeManifest(root, { ...manifest, pages, site })
   client.pages = new Map(Object.entries(pages))
 
   return Object.keys(pages).length

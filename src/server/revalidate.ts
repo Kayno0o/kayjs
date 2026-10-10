@@ -27,8 +27,14 @@ onPagesInvalidated((paths) => {
   markStale(path => paths.includes(path))
 })
 
-export function trackPrerendered(pages: Map<string, ServedPage>): void {
+// `stale` has every page wait for a fresh render on its first request, as when the build rendered them for another site.
+export function trackPrerendered(pages: Map<string, ServedPage>, stale = false): void {
   served.add(pages)
+
+  if (stale) {
+    for (const page of pages.values())
+      revalidationOf(page).invalidatedAt = ++invalidations
+  }
 }
 
 // Marks the prerendered page at `path`, or every one the function matches, as `/blog/` + anything, stale: the next request for it waits for a fresh render instead of getting it as it was.

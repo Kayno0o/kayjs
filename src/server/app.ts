@@ -168,7 +168,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const maxDensity = applyImageConfig(options.images)
 
   setTracer(options.tracer)
-  setSite(options.site === undefined ? undefined : siteOrigin(options.site) + base, options.trailingSlash)
+  const site = options.site === undefined ? undefined : siteOrigin(options.site) + base
+
+  setSite(site, options.trailingSlash)
 
   if (options.inlineStyles === true && !options.dev)
     client.inlineStyles = await readInlineStyles(client, base)
@@ -322,10 +324,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   serveCards(app, cards, imageRoute)
 
-  serveFeeds(app, await projectCollections(root, options.content), options.site === undefined ? undefined : siteOrigin(options.site) + base, options.dev)
+  serveFeeds(app, await projectCollections(root, options.content), site, options.dev)
 
-  if (options.site !== undefined)
-    serveSitemap(app, routes, siteOrigin(options.site) + base, publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
+  if (site !== undefined)
+    serveSitemap(app, routes, site, publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
 
   const favicon = faviconSource(root, options.favicon)
 
@@ -337,8 +339,14 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   await serveServiceWorker(app, new Set([...publicUrls, ...servedPaths(routes)]), { client, offline: options.dev ? undefined : options.offline, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined).map(([path]) => path) })
 
+  // Their canonical links, social URLs and anything built with `siteUrl()` name the site the build ran for.
+  const moved = client.pages.size > 0 && client.site !== site
+
+  if (moved)
+    console.warn(`[kay] kay build rendered its pages for ${client.site ?? 'no site'} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
+
   for (const pages of prerendered.values())
-    trackPrerendered(pages)
+    trackPrerendered(pages, moved)
 
   const matchers = await loadMatchers(routesDir, routes)
   const trailingSlash = options.trailingSlash ?? 'never'
