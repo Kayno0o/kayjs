@@ -4,7 +4,7 @@ import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
 import type { BearerToken, CreateTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
-import type { AuthSessionData, Core, OAuthApp, Profile, User } from './core'
+import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
 import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
@@ -13,6 +13,7 @@ import type { OAuthFailure } from './oauth/flow'
 import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
 import type { PasswordProblem } from './rules'
+import type { UserSession } from './sessions'
 import type { RequestState } from './state'
 import type { AuthStore, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
@@ -35,6 +36,7 @@ import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
+import { listSessions, liveSession, openSession } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
@@ -42,6 +44,8 @@ export type { AuthSessionData, OAuthApp, Profile, User } from './core'
 const READ_METHODS = new Set(['GET', 'HEAD'])
 const STATE = Symbol('kayjs-auth.state')
 const TRAILING_SLASH = /\/$/
+// kay's own session lifetime, 30 days.
+const DEFAULT_SESSION_MAX_AGE = 30 * 24 * 60 * 60
 
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
 export type AuthRequirement<Role extends string> = Requirement<User, Role>
@@ -84,6 +88,12 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   // The roles every new user starts with, by password or by provider, such as a site's `user`. An unverified account holding only these counts as given none: see `requireVerified`.
   defaultRoles?: NoInfer<Role>[] | undefined
+  // Seconds a session lives unseen: kay's session `maxAge`, 30 days by default as kay's is. A session past it leaves the list of where the user is signed in.
+  sessionMaxAge?: number | undefined
+  // The app's page listing where the user is signed in, linked from new sign-in mails: `/account/sessions`.
+  sessionsPage?: string | undefined
+  // Where an address is, shown beside each session, from a geolocation database of the app's: `ip => cityOf(ip)`.
+  locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
   limits?: Partial<Limits> | undefined
   // A CAPTCHA asked of registering, password sign-in, password resets and magic links: `{ verify: turnstile(secret) }`.
@@ -103,11 +113,12 @@ export class Auth<Scope extends string = string> {
   private source: 'session' | 'bearer' | null = null
   private tokenScopes: string[] | null = null
 
-  constructor(private readonly session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string) {
+  constructor(private readonly session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string, address: string) {
     this[STATE] = {
       core,
       session,
       client,
+      address,
       current: () => this.record(),
       via: () => this.source,
       complete: async (record, redirect) => completeSignIn(this[STATE], record, redirect, signedIn => this.establish(signedIn)),
@@ -119,6 +130,10 @@ export class Auth<Scope extends string = string> {
           return
 
         await this.session.set('auth', { ...signedIn, version: record.sessionVersion })
+
+        if (signedIn.session !== undefined)
+          await this.core.store.sessions.update(signedIn.session, { version: record.sessionVersion })
+
         this.resolving = Promise.resolve(record)
       },
     }
@@ -150,6 +165,11 @@ export class Auth<Scope extends string = string> {
 
   // Signs this session out. A session held in the cookie alone stays valid wherever it was copied until it expires; `signOutEverywhere` ends those too.
   async signOut(): Promise<void> {
+    const signedIn = await this.session.get('auth')
+
+    if (signedIn?.session !== undefined)
+      await this.core.store.sessions.delete(signedIn.user, signedIn.session)
+
     await this.session.unset('auth')
     await this.session.unset('authRegistered')
     await this.session.regenerate()
@@ -337,6 +357,28 @@ export class Auth<Scope extends string = string> {
     return scopeAllows(await this.scopes(), scope)
   }
 
+  // Where the signed-in user is signed in, this browser marked `current`; empty for a bearer token.
+  async sessions(): Promise<UserSession[]> {
+    return listSessions(this[STATE])
+  }
+
+  // Ends one of the signed-in user's sessions, effective on its next request; ending this one signs out. False when they have none with that id.
+  async endSession(id: string): Promise<boolean> {
+    const record = await this.record()
+    const signedIn = await this.session.get('auth')
+
+    if (!record || this.source !== 'session')
+      return false
+
+    if (signedIn?.session === id) {
+      await this.signOut()
+
+      return true
+    }
+
+    return this.core.store.sessions.delete(record.id, id)
+  }
+
   // The signed-in user's bearer tokens, without the tokens themselves.
   async tokens(): Promise<BearerToken[]> {
     return listTokens(this[STATE])
@@ -348,12 +390,33 @@ export class Auth<Scope extends string = string> {
 
   // Under a new session id, so one planted before is worth nothing.
   private async establish(record: UserRecord): Promise<void> {
+    const previous = await this.session.get('auth')
+
+    // Signing in again, as another user or the same, replaces the sign-in this browser held.
+    if (previous?.session !== undefined)
+      await this.core.store.sessions.delete(previous.user, previous.session)
+
     await this.session.unset('authChallenge')
     await this.session.regenerate()
-    await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now() })
+
+    const session = await openSession(this.core, record, this[STATE].address, this.request.headers.get('user-agent') ?? '')
+
+    await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now(), session })
     this.source = 'session'
     this.resolving = Promise.resolve(record)
     await noteSignIn(this.core, record, this[STATE].client, this.request.headers.get('user-agent') ?? '')
+  }
+
+  // Whether the sign-in's session is still on the user's list; one from before kayjs-auth kept them is put on it.
+  private async live(signedIn: SignedIn, record: UserRecord): Promise<boolean> {
+    if (signedIn.session !== undefined)
+      return liveSession(this.core, { ...signedIn, session: signedIn.session }, record, this[STATE].address)
+
+    const session = await openSession(this.core, record, this[STATE].address, this.request.headers.get('user-agent') ?? '')
+
+    await this.session.set('auth', { ...signedIn, session })
+
+    return true
   }
 
   private async record(): Promise<UserRecord | null> {
@@ -366,13 +429,13 @@ export class Auth<Scope extends string = string> {
     const signedIn = await this.session.get('auth')
     const record = signedIn && await this.core.store.users.get(signedIn.user)
 
-    if (record && record.sessionVersion === signedIn!.version) {
+    if (record && record.sessionVersion === signedIn!.version && await this.live(signedIn!, record)) {
       this.source = 'session'
 
       return record
     }
 
-    // Deleted, or signed out everywhere since.
+    // Deleted, signed out everywhere since, or its session ended.
     if (signedIn)
       await this.session.unset('auth')
 
@@ -402,7 +465,9 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       if (!session)
         throw new Error('kayjs-auth: no session reaches this route. Use the session plugin on the app itself, or leave it to auth.plugin, rather than in a plugin of the app\'s own before auth.plugin')
 
-      return { auth: new Auth<Scope>(session, core, ctx.request, rateKey(clientAddress(ctx.request, ctx.server, options.proxy))) }
+      const address = clientAddress(ctx.request, ctx.server, options.proxy)
+
+      return { auth: new Auth<Scope>(session, core, ctx.request, rateKey(address), address) }
     })
     // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
     .as('global')
@@ -516,6 +581,9 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     twoFactorPage: options.twoFactorPage ?? '/two-factor',
     site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
     limits: { ...DEFAULT_LIMITS, ...options.limits },
+    sessionMaxAge: options.sessionMaxAge ?? DEFAULT_SESSION_MAX_AGE,
+    sessionsPage: options.sessionsPage,
+    locate: options.locate,
     scopes: new Set(options.scopes),
     captcha: options.captcha,
     breached: options.breachedPasswords === true ? pwnedPassword : options.breachedPasswords || undefined,

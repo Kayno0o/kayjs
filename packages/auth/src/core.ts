@@ -28,6 +28,8 @@ export interface SignedIn {
   version: number
   // When they signed in or last re-proved who they are, in milliseconds since the epoch.
   at: number
+  // The sign-in's id in the store's sessions; missing from one signed in before kayjs-auth kept them, which gets one on its next request.
+  session?: string
 }
 
 // An OAuth app registered at a provider: `{ provider: discordProvider(), clientId, clientSecret }`.
@@ -64,6 +66,12 @@ export interface Core {
   // The site's name, as mails and authenticators show it.
   site: string
   limits: Limits
+  // Seconds a session lives unseen, kay's session `maxAge`.
+  sessionMaxAge: number
+  // The app's page listing the user's sessions, linked from new sign-in mails.
+  sessionsPage?: string | undefined
+  // Where an address is, such as a city, shown beside each session.
+  locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // The scopes a bearer token may be given.
   scopes: Set<string>
   captcha?: CaptchaOptions | undefined

@@ -139,12 +139,32 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.bearerTokens.findByDigest('d1')).toBeUndefined()
     })
 
+    test('sessions are got, listed by user oldest first, updated, and deleted by their owner only', async () => {
+      const session = (id: string, createdAt: string) => ({ id, userId: 'u1', version: 0, userAgent: 'Firefox', ip: '10.0.0.1', createdAt: new Date(createdAt), lastSeenAt: new Date(createdAt) })
+
+      await store.users.create(userRecord({ id: 'u1' }))
+      await store.sessions.create(session('s2', '2026-01-02T00:00:00Z'))
+      await store.sessions.create(session('s1', '2026-01-01T00:00:00Z'))
+
+      const at = new Date('2026-02-01T00:00:00Z')
+
+      await store.sessions.update('s1', { version: 3, ip: '10.0.0.2', lastSeenAt: at })
+
+      expect(await store.sessions.get('s1')).toEqual({ ...session('s1', '2026-01-01T00:00:00Z'), version: 3, ip: '10.0.0.2', lastSeenAt: at })
+      expect((await store.sessions.listByUser('u1')).map(found => found.id)).toEqual(['s1', 's2'])
+      expect(await store.sessions.delete('u2', 's1')).toBe(false)
+      expect(await store.sessions.delete('u1', 's1')).toBe(true)
+      expect(await store.sessions.get('s1')).toBeUndefined()
+      expect(await store.sessions.get('missing')).toBeUndefined()
+    })
+
     test('deleting a user takes everything kept for them', async () => {
       await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
       await store.identities.create(identity('discord', '1', 'u1'))
       await store.tokens.create({ digest: 'a', type: 'magic-link', userId: 'u1', email: 'x', redirect: null, expiresAt: new Date(Date.now() + 60_000) })
       await store.recoveryCodes.replace('u1', ['a'])
       await store.bearerTokens.create({ id: 't1', userId: 'u1', label: 'Phone', digest: 'd1', scopes: null, createdAt: new Date(), lastUsedAt: null, expiresAt: null })
+      await store.sessions.create({ id: 's1', userId: 'u1', version: 0, userAgent: '', ip: '', createdAt: new Date(), lastSeenAt: new Date() })
 
       await store.users.delete('u1')
 
@@ -153,6 +173,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.tokens.consume('a', 'magic-link')).toBeUndefined()
       expect(await store.recoveryCodes.count('u1')).toBe(0)
       expect(await store.bearerTokens.findByDigest('d1')).toBeUndefined()
+      expect(await store.sessions.get('s1')).toBeUndefined()
     })
 
     test('attempts count within their window, start over after it, and reset', async () => {

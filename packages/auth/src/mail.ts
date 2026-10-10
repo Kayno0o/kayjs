@@ -78,12 +78,18 @@ function lasting(data: MailData, link: string): string {
 
 const NOT_YOU = 'If this was not you, reset your password and check your account at once.'
 
+// With a `url`, a link to where the user reviews what happened, such as the list of where they are signed in.
 function noticeMail(data: MailData, subject: string, lead: string, ending = NOT_YOU): MailContent {
+  const review = 'See where your account is signed in, and end what you do not know:'
+
   return {
     subject: `${subject} on ${data.site}`,
-    text: `${lead}\n\n${ending}`,
+    text: [lead, data.url === undefined ? undefined : `${review} ${data.url}`, ending].filter(part => part !== undefined).join('\n\n'),
     html: `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
-  <p style="font-size:16px;line-height:1.5;margin:0 0 20px">${escape(lead)}</p>
+  <p style="font-size:16px;line-height:1.5;margin:0 0 20px">${escape(lead)}</p>${data.url === undefined
+    ? ''
+    : `
+  <p style="font-size:14px;line-height:1.5;margin:0 0 20px">${escape(review)} <a href="${escape(data.url)}" style="color:#1a1a1a">${escape(data.url)}</a></p>`}
   <p style="font-size:13px;line-height:1.5;color:#555555;margin:0">${escape(ending)}</p>
 </div>`,
   }

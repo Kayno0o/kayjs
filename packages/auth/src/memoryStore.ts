@@ -1,4 +1,4 @@
-import type { AuthStore, BearerTokenRecord, IdentityRecord, TokenRecord, UserRecord } from './store'
+import type { AuthStore, BearerTokenRecord, IdentityRecord, SessionRecord, TokenRecord, UserRecord } from './store'
 
 const SWEEP_EVERY = 1000
 
@@ -9,6 +9,7 @@ export function memoryStore(): AuthStore {
   const tokens = new Map<string, TokenRecord>()
   const recoveryCodes = new Map<string, Set<string>>()
   const bearerTokens = new Map<string, BearerTokenRecord>()
+  const sessions = new Map<string, SessionRecord>()
   const attempts = new Map<string, { count: number, resetAt: number }>()
   let hits = 0
   const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
@@ -77,6 +78,11 @@ export function memoryStore(): AuthStore {
           if (token.userId === id)
             bearerTokens.delete(key)
         }
+
+        for (const [key, session] of sessions) {
+          if (session.userId === id)
+            sessions.delete(key)
+        }
       },
       advanceTotpStep(id, step) {
         const user = users.get(id)
@@ -130,6 +136,25 @@ export function memoryStore(): AuthStore {
           if (token.userId === userId && (type === undefined || token.type === type))
             tokens.delete(key)
         }
+      },
+    },
+    sessions: {
+      create(session) {
+        sessions.set(session.id, { ...session })
+      },
+      get: id => clone(sessions.get(id)),
+      listByUser: userId => [...sessions.values()].filter(session => session.userId === userId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map(session => ({ ...session })),
+      update(id, patch) {
+        const session = sessions.get(id)
+
+        if (session)
+          sessions.set(id, { ...session, ...patch })
+      },
+      delete(userId, id) {
+        if (sessions.get(id)?.userId !== userId)
+          return false
+
+        return sessions.delete(id)
       },
     },
     bearerTokens: {

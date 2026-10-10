@@ -8,6 +8,8 @@ export interface RequestState {
   session: Session<AuthSessionData>
   // Who is asking, as rate limits count them.
   client: string
+  // The client's address as it is, for the list of where the user is signed in.
+  address: string
   current: () => Promise<UserRecord | null>
   // How the current user was read, once `current` has been.
   via: () => 'session' | 'bearer' | null

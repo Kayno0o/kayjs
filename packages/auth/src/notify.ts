@@ -18,8 +18,11 @@ export async function notify(core: Core, record: UserRecord, event: SecurityEven
   if (!mail || to === null)
     return
 
+  // A new sign-in links to where the user ends the sessions they do not know.
+  const url = event === 'new-sign-in' && core.sessionsPage !== undefined ? `${core.url}${core.sessionsPage}` : undefined
+
   try {
-    await mail.mailer.send({ to, kind: event, ...mail.templates[event]({ site: core.site, email: to, detail }) })
+    await mail.mailer.send({ to, kind: event, ...url === undefined ? {} : { url }, ...mail.templates[event]({ site: core.site, email: to, detail, url }) })
   }
   catch (error) {
     console.error(`kayjs-auth: mailing ${event} failed`, error)

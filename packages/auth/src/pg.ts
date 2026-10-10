@@ -1,5 +1,5 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
-import type { AuthStore, BearerTokenRecord, IdentityRecord, TokenRecord, TokenType, UserRecord } from './store'
+import type { AuthStore, BearerTokenRecord, IdentityRecord, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
 
 // Expired attempt windows are deleted once every so many hits.
@@ -61,6 +61,16 @@ export const AuthBearerTokens = defineTable('auth_bearer_token', t => ({
   expires_at: t.timestamptz().nullable(),
 })).withIndexes([{ columns: ['user_id'] }])
 
+export const AuthSessions = defineTable('auth_session', t => ({
+  id: t.text().primaryKey(),
+  user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
+  version: t.int4().notNull(),
+  user_agent: t.text().notNull(),
+  ip: t.text().notNull(),
+  created_at: t.timestamptz().notNull(),
+  last_seen_at: t.timestamptz().notNull(),
+})).withIndexes([{ columns: ['user_id'] }])
+
 export const AuthAttempts = defineTable('auth_attempt', t => ({
   key: t.text().primaryKey(),
   count: t.int4().notNull(),
@@ -68,7 +78,7 @@ export const AuthAttempts = defineTable('auth_attempt', t => ({
 }))
 
 // The tables to list in the app's `new Database({ tables })`, so `db.sync()` creates them.
-export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthAttempts] as const
+export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthAttempts] as const
 
 type UserRow = InferEntity<typeof AuthUsers>
 
@@ -79,6 +89,7 @@ export function pgStore(db: Database): AuthStore {
   const tokens = db.repo(AuthTokens)
   const recoveryCodes = db.repo(AuthRecoveryCodes)
   const bearerTokens = db.repo(AuthBearerTokens)
+  const sessions = db.repo(AuthSessions)
   const attempts = db.repo(AuthAttempts)
   let hits = 0
 
@@ -125,6 +136,17 @@ export function pgStore(db: Database): AuthStore {
       async deleteForUser(userId, type) {
         await tokens.write.deleteMany(type === undefined ? { user_id: userId } : { user_id: userId, type })
       },
+    },
+    sessions: {
+      async create(session) {
+        await sessions.write.insertOne({ id: session.id, user_id: session.userId, version: session.version, user_agent: session.userAgent, ip: session.ip, created_at: session.createdAt, last_seen_at: session.lastSeenAt })
+      },
+      get: async id => toSession(await sessions.read.findById(id)),
+      listByUser: async userId => (await sessions.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toSession(row)!),
+      async update(id, patch) {
+        await sessions.write.updateById(id, withoutUndefined({ version: patch.version, ip: patch.ip, last_seen_at: patch.lastSeenAt }))
+      },
+      delete: async (userId, id) => await sessions.write.deleteOne({ id, user_id: userId }) !== null,
     },
     bearerTokens: {
       async create(token) {
@@ -227,6 +249,10 @@ function toToken(row: InferEntity<typeof AuthTokens>): TokenRecord {
 
 function toBearerToken(row: InferEntity<typeof AuthBearerTokens> | null): BearerTokenRecord | undefined {
   return row ? { id: row.id, userId: row.user_id, label: row.label, digest: row.digest, scopes: row.scopes, createdAt: row.created_at, lastUsedAt: row.last_used_at, expiresAt: row.expires_at } : undefined
+}
+
+function toSession(row: InferEntity<typeof AuthSessions> | null): SessionRecord | undefined {
+  return row ? { id: row.id, userId: row.user_id, version: row.version, userAgent: row.user_agent, ip: row.ip, createdAt: row.created_at, lastSeenAt: row.last_seen_at } : undefined
 }
 
 // pg-orm refuses an `undefined` value, so a patch names only the fields it changes.
