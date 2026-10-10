@@ -141,6 +141,8 @@ Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged wit
 
 `/_kay/mail/samples` shows the app's mails without sending any: every `.kay` file under `src/mails`, each rendered as the mailer renders it, html at desktop or phone width and text, with the props its `<name>.preview.ts` beside it default-exports, or none without one; a mail that throws shows why. The page reloads when `kay dev` restarts the server for a changed file.
 
+A mail in the outbox and a sample can each be sent for real from its page, to an address typed in its form, over the SMTP the environment names: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASS`, and `SMTP_FROM` unless `mailer({ from })` gives the sender, read on the first send. It goes to that address alone, its `cc` and `bcc` dropped, and nothing else leaves the outbox. `SMTP_HOST` naming a local mailpit puts it there; a real relay puts it in a real inbox, to see what Gmail or Outlook make of it. Without them the page names the variables missing instead of the form, and a post from another site is refused.
+
 ```ts
 // src/mails/welcome.preview.ts
 import type Welcome from './welcome.kay'

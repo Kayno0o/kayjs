@@ -1,4 +1,5 @@
 import type { EnqueueOptions, KayExtension, QueueOptions } from 'kay/server'
+import type { Relay } from './preview'
 import type { Address, Delivery, Envelope, Mail, Message, Transport } from './types'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -112,7 +113,7 @@ function delivering(): 'outbox' | 'smtp' {
 }
 
 // SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT`, `SMTP_DKIM_*`, `SMTP_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
-function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, to: string | undefined, missing: () => string[] } {
+function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
   const env = defineEnv(s.Object({
     SMTP_HOST: optional ? s.Optional(s.String()) : s.String(),
     SMTP_PORT: s.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
@@ -158,7 +159,24 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
     get to() {
       return env.MAIL_TO
     },
+    get server() {
+      return `${env.SMTP_HOST}:${env.SMTP_PORT}`
+    },
     missing,
+  }
+}
+
+// The environment's SMTP, which the development pages send a mail over when asked: read on the first ask, so a server never asking reads none of it.
+function relay(options: MailerOptions): Relay {
+  let settings: ReturnType<typeof fromEnvironment> | undefined
+  const read = () => settings ??= fromEnvironment(options.from, options.fromName, true)
+
+  return {
+    missing: () => read().missing(),
+    server: () => read().server,
+    to: () => read().to,
+    // The typed address alone: a sample never reaches the addresses it was rendered for.
+    send: (mail, to) => read().transport.send({ ...mail, to: [to], cc: [], bcc: [] }),
   }
 }
 
@@ -247,7 +265,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const plugin = new Elysia().use(jobs)
 
   if (transport === outbox && process.env.NODE_ENV === 'development')
-    plugin.use(preview(render as (message: Message) => Promise<Mail>))
+    plugin.use(preview(render as (message: Message) => Promise<Mail>, relay(options)))
 
   const sending = Object.assign(plugin, {
     send: async <P extends object>(message: Message<P>) => {

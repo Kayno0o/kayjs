@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
 import process from 'node:process'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { mailer, mailExtension } from '../src/mailer'
 import { outbox } from '../src/outbox'
+import { startSmtp } from './helpers/smtp'
 
 const saved = process.env.NODE_ENV
 
@@ -209,5 +210,97 @@ describe('the mail samples page', () => {
     expect(await failed.text()).toContain('receipt.preview.ts default-exports beside it')
     expect((await get(mail, '/_kay/mail/samples?mail=../server.ts')).status).toBe(404)
     expect((await get(mail, '/_kay/mail/samples/html?mail=../server.ts')).status).toBe(404)
+  })
+})
+
+describe('sending a development mail for real', () => {
+  const server = startSmtp()
+  const root = process.cwd()
+
+  beforeAll(() => process.chdir(`${root}/tests/fixture`))
+  afterAll(() => {
+    process.chdir(root)
+    server.stop()
+  })
+  afterEach(() => {
+    delete process.env.SMTP_HOST
+    delete process.env.SMTP_PORT
+  })
+
+  function post(app: { handle: (request: Request) => Promise<Response> }, path: string, to: string, site = 'same-origin'): Promise<Response> {
+    return get(app, path, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': site }, body: new URLSearchParams({ to }) })
+  }
+
+  it('names what the environment lacks instead of offering the form', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+
+    await mail.send({ to: 'ada@example.com', subject: 'Unsent', text: 'Hello' })
+
+    const page = await (await get(mail, `/_kay/mail/${outbox.last()!.id}`)).text()
+
+    expect(page).toContain('Set SMTP_HOST to send this mail over SMTP')
+    expect(page).not.toContain('<form')
+  })
+
+  it('sends an outbox mail to the typed address alone, over the environment\'s SMTP', async () => {
+    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port) })
+    const mail = mailer({ from: 'dev@example.com' })
+
+    await mail.send({ to: 'ada@example.com', cc: 'cc@example.com', bcc: 'bcc@example.com', subject: 'For real', text: 'Hello' })
+
+    const { id } = outbox.last()!
+    const form = await (await get(mail, `/_kay/mail/${id}`)).text()
+
+    expect(form).toContain(`<form class="bar" method="post" action="/_kay/mail/${id}/send"><label>Over 127.0.0.1:${server.port} to <input type="email" name="to" required value=""></label>`)
+
+    const sent = await post(mail, `/_kay/mail/${id}/send`, 'me@example.com')
+
+    expect(sent.status).toBe(303)
+    expect(sent.headers.get('location')).toBe(`/_kay/mail/${id}?sent=me%40example.com`)
+    expect(server.received.at(-1)?.to).toEqual(['<me@example.com>'])
+    expect(server.received.at(-1)?.data).not.toContain('cc@example.com')
+    expect(await (await get(mail, sent.headers.get('location')!)).text()).toContain(`<p class="sent">Sent to me@example.com over 127.0.0.1:${server.port}.</p>`)
+  })
+
+  it('sends a sample, rendered with its preview props', async () => {
+    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port) })
+    const mail = mailer({ from: 'dev@example.com' })
+    const sent = await post(mail, '/_kay/mail/samples/send?mail=welcome.kay', 'me@example.com')
+
+    expect(sent.headers.get('location')).toBe('/_kay/mail/samples?mail=welcome.kay&sent=me%40example.com')
+    expect(server.received.at(-1)?.data).toContain('Welcome, Ada')
+    expect(outbox.mails).toEqual([])
+  })
+
+  it('refuses another site, an address that is not one, and says why a server refused it', async () => {
+    const closed = startSmtp()
+
+    closed.stop()
+    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port) })
+    const mail = mailer({ from: 'dev@example.com' })
+    const received = server.received.length
+
+    await mail.send({ to: 'ada@example.com', subject: 'Guarded', text: 'Hello' })
+
+    const { id } = outbox.last()!
+
+    expect((await post(mail, `/_kay/mail/${id}/send`, 'me@example.com', 'cross-site')).status).toBe(403)
+    expect((await post(mail, '/_kay/mail/samples/send?mail=welcome.kay', 'me@example.com', 'cross-site')).status).toBe(403)
+
+    const several = await post(mail, `/_kay/mail/${id}/send`, 'me@example.com, you@example.com')
+
+    expect(several.status).toBe(400)
+    expect(await several.text()).toContain('Not sent: type one address to send it to')
+    expect(server.received.length).toBe(received)
+
+    process.env.SMTP_PORT = String(closed.port)
+    const unreachable = mailer({ from: 'dev@example.com' })
+
+    await unreachable.send({ to: 'ada@example.com', subject: 'Unreachable', text: 'Hello' })
+
+    const failed = await post(unreachable, `/_kay/mail/${outbox.last()!.id}/send`, 'me@example.com')
+
+    expect(failed.status).toBe(502)
+    expect(await failed.text()).toContain('<p class="warning">Not sent: ')
   })
 })

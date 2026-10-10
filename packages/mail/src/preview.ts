@@ -1,5 +1,5 @@
 import type { SentMail } from './outbox'
-import type { Address, Attachment, Mail, Message } from './types'
+import type { Address, Attachment, Delivery, Mail, Message } from './types'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -20,6 +20,25 @@ const MAILS_DIR = 'src/mails'
 const KAY_FILE = new Bun.Glob('**/*.kay')
 const KAY_EXTENSION = /\.kay$/
 const SAMPLE_ADDRESS = 'sample@localhost'
+// One address, as the send form takes: a comma or a name would add a recipient.
+const ONE_ADDRESS = /^[^\s<>@,]+@[^\s<>@,]+$/
+
+// The environment's SMTP as the development pages send over it, read when first asked.
+export interface Relay {
+  // The variables it lacks to send, empty once it can.
+  missing: () => string[]
+  // Its host and port, as the pages name it.
+  server: () => string
+  // `MAIL_TO`, which the form offers.
+  to: () => string | undefined
+  send: (mail: Mail, to: string) => Promise<Delivery>
+}
+
+// How the last send from a page went: sent when `error` is absent.
+interface Outcome {
+  to: string
+  error?: string | undefined
+}
 
 // Reloads the list as each mail arrives.
 const LIVE = `new EventSource('${PREVIEW_PATH}/events').onmessage=()=>location.reload()`
@@ -50,6 +69,8 @@ iframe{width:100%;height:70vh;border:1px solid #e5e5e0;background:#fff}
 iframe.phone{width:${PHONE_WIDTH}px;max-width:100%}
 .bar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:0 0 16px}
 .warning{color:#8a2c0d;font-weight:600}
+.sent{color:#166534;font-weight:600}
+input{font:inherit;padding:5px 8px;min-width:16em}
 .confirm{padding:16px;margin:0 0 16px;background:#fff;border:1px solid #e5e5e0}
 button{font:inherit;padding:6px 12px;cursor:pointer}
 pre{white-space:pre-wrap;background:#fff;border:1px solid #e5e5e0;padding:12px;margin:0}
@@ -101,7 +122,56 @@ function rendered(mail: Mail, view: (phone: boolean) => string, frame: string, p
   return `${html}<h2>Text</h2><pre>${escape(mail.text)}</pre>`
 }
 
-function mailPage(mail: SentMail, phone: boolean): Response {
+const messageOf = (error: unknown): string => error instanceof Error ? error.message : String(error)
+
+// The form sending the mail for real over the environment's SMTP, with how the last send went, or what the environment lacks for it.
+function sendForm(relay: Relay, action: string, outcome: Outcome | undefined): string {
+  let missing: string[]
+
+  try {
+    missing = relay.missing()
+  }
+  catch (error) {
+    return `<h2>Send for real</h2><p class="warning">${escape(messageOf(error))}</p>`
+  }
+
+  if (missing.length > 0)
+    return `<h2>Send for real</h2><p>Set ${missing.join(' and ')} to send this mail over SMTP, a relay's or a local mailpit's.</p>`
+
+  const server = escape(relay.server())
+  const offered = outcome?.to ?? relay.to() ?? ''
+  const result = outcome === undefined ? '' : outcome.error === undefined ? `<p class="sent">Sent to ${escape(outcome.to)} over ${server}.</p>` : `<p class="warning">Not sent: ${escape(outcome.error)}</p>`
+
+  return `<h2>Send for real</h2>${result}<form class="bar" method="post" action="${action}"><label>Over ${server} to <input type="email" name="to" required value="${escape(ONE_ADDRESS.test(offered) ? offered : '')}"></label><button type="submit">Send</button></form>`
+}
+
+// Sends it over the relay, answering what went wrong, or nothing once the server took it.
+async function attempt(relay: Relay, mail: Mail, to: string): Promise<string | undefined> {
+  try {
+    const { rejected, response } = await relay.send(mail, to)
+
+    return rejected.length > 0 ? `the server refused ${rejected.join(', ')}${response ? `: ${response}` : ''}` : undefined
+  }
+  catch (error) {
+    return messageOf(error)
+  }
+}
+
+// The address a send form posted, when it is one.
+function postedAddress(body: unknown): string | undefined {
+  const to = typeof body === 'object' && body !== null && 'to' in body && typeof body.to === 'string' ? body.to.trim() : undefined
+
+  return to !== undefined && ONE_ADDRESS.test(to) ? to : undefined
+}
+
+// Only from the development pages themselves, so another site the developer visits cannot act through them.
+function crossSite(request: Request, refusal: string): Response | undefined {
+  const site = request.headers.get('sec-fetch-site')
+
+  return site !== null && site !== 'same-origin' ? new Response(`Refused: ${refusal}`, { status: 403 }) : undefined
+}
+
+function mailPage(mail: SentMail, phone: boolean, relay: Relay, outcome?: Outcome, status = 200): Response {
   const headers: [string, string][] = [
     ['From', shown(mail.from)],
     ['To', shown(mail.to)],
@@ -116,7 +186,7 @@ function mailPage(mail: SentMail, phone: boolean): Response {
   ]
   const self = `${PREVIEW_PATH}/${mail.id}`
 
-  return page(mail.subject, `<div class="bar"><a href="${PREVIEW_PATH}">Outbox</a><a href="${self}/eml">Download .eml</a></div><h1>${escape(mail.subject)}</h1><table><tbody>${headers.map(([name, value]) => `<tr><th>${name}</th><td>${value}</td></tr>`).join('')}</tbody></table>${rendered(mail, phone => phone ? `${self}?view=phone` : self, `${self}/html`, phone)}`)
+  return page(mail.subject, `<div class="bar"><a href="${PREVIEW_PATH}">Outbox</a><a href="${self}/eml">Download .eml</a></div><h1>${escape(mail.subject)}</h1><table><tbody>${headers.map(([name, value]) => `<tr><th>${name}</th><td>${value}</td></tr>`).join('')}</tbody></table>${sendForm(relay, `${self}/send`, outcome)}${rendered(mail, phone => phone ? `${self}?view=phone` : self, `${self}/html`, phone)}`, status)
 }
 
 // The app's mails, as paths from its mails folder.
@@ -148,7 +218,7 @@ function samplesPage(files: string[]): Response {
   return page('Mail samples', `${back}<h1>Mail samples</h1><p>Each mail under ${MAILS_DIR}, rendered with the props its <code>&lt;name&gt;.preview.ts</code> default-exports.</p><ul>${rows.join('')}</ul>`, 200, live)
 }
 
-async function samplePage(file: string, phone: boolean, render: (message: Message) => Promise<Mail>): Promise<Response> {
+async function samplePage(file: string, phone: boolean, render: (message: Message) => Promise<Mail>, relay: Relay, outcome?: Outcome, status = 200): Promise<Response> {
   const live = `<script>${RESTARTED}</script>`
   const self = `${SAMPLES_PATH}?mail=${encodeURIComponent(file)}`
   const back = `<div class="bar"><a href="${SAMPLES_PATH}">Mail samples</a></div>`
@@ -157,7 +227,7 @@ async function samplePage(file: string, phone: boolean, render: (message: Messag
     const { mail, sampled } = await sample(file, render)
     const props = sampled ? escape(previewOf(file)) : `none, as there is no ${escape(previewOf(file))}`
 
-    return page(file, `${back}<h1>${escape(file)}</h1><table><tbody><tr><th>Props</th><td>${props}</td></tr><tr><th>Size</th><td>${sizeOf(mail)}</td></tr></tbody></table>${rendered(mail, phone => phone ? `${self}&amp;view=phone` : self, `${SAMPLES_PATH}/html?mail=${encodeURIComponent(file)}`, phone)}`, 200, live)
+    return page(file, `${back}<h1>${escape(file)}</h1><table><tbody><tr><th>Props</th><td>${props}</td></tr><tr><th>Size</th><td>${sizeOf(mail)}</td></tr></tbody></table>${sendForm(relay, `${SAMPLES_PATH}/send?mail=${encodeURIComponent(file)}`, outcome)}${rendered(mail, phone => phone ? `${self}&amp;view=phone` : self, `${SAMPLES_PATH}/html?mail=${encodeURIComponent(file)}`, phone)}`, status, live)
   }
   catch (error) {
     return page(file, `${back}<h1>${escape(file)}</h1><p class="warning">It did not render: ${escape(error instanceof Error ? error.message : String(error))}</p><p>A mail taking props renders with those ${escape(previewOf(file))} default-exports beside it.</p>`, 500, live)
@@ -211,8 +281,10 @@ function mailHtml(html: string): Response {
   return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': MAIL_POLICY } })
 }
 
+const sentTo = (to: string | undefined): Outcome | undefined => to === undefined ? undefined : { to }
+
 // The development server's view of the outbox, every mail sent since it started, newest first, each with its headers, html and text, and of the app's mails rendered with sample props, through `render`.
-export function preview(render: (message: Message) => Promise<Mail>) {
+export function preview(render: (message: Message) => Promise<Mail>, relay: Relay) {
   return new Elysia({ name: 'kayjs-mail-preview' })
     .get(PREVIEW_PATH, ({ query }) => listPage('clear' in query))
     .get(SAMPLES_PATH, async ({ query }) => {
@@ -221,7 +293,25 @@ export function preview(render: (message: Message) => Promise<Mail>) {
       if (query.mail === undefined)
         return samplesPage(files)
 
-      return files.includes(query.mail) ? samplePage(query.mail, query.view === 'phone', render) : notSample()
+      return files.includes(query.mail) ? samplePage(query.mail, query.view === 'phone', render, relay, sentTo(query.sent)) : notSample()
+    })
+    .post(`${SAMPLES_PATH}/send`, async ({ query, request, body }) => {
+      const refused = crossSite(request, 'a sample is sent from its own page')
+
+      if (refused)
+        return refused
+
+      if (query.mail === undefined || !(await mailFiles()).includes(query.mail))
+        return notSample()
+
+      const to = postedAddress(body)
+
+      if (to === undefined)
+        return samplePage(query.mail, false, render, relay, { to: '', error: 'type one address to send it to' }, 400)
+
+      const error = await attempt(relay, (await sample(query.mail, render)).mail, to)
+
+      return error === undefined ? Response.redirect(`${SAMPLES_PATH}?mail=${encodeURIComponent(query.mail)}&sent=${encodeURIComponent(to)}`, 303) : samplePage(query.mail, false, render, relay, { to, error }, 502)
     })
     .get(`${SAMPLES_PATH}/html`, async ({ query }) => {
       if (query.mail === undefined || !(await mailFiles()).includes(query.mail))
@@ -232,12 +322,11 @@ export function preview(render: (message: Message) => Promise<Mail>) {
       return html === undefined ? notSample() : mailHtml(html)
     })
     .get(`${PREVIEW_PATH}/events`, events)
-  // Only from the outbox page itself, so another site the developer visits cannot empty it.
     .post(`${PREVIEW_PATH}/clear`, ({ request }) => {
-      const site = request.headers.get('sec-fetch-site')
+      const refused = crossSite(request, 'the outbox is cleared from its own page')
 
-      if (site !== null && site !== 'same-origin')
-        return new Response('Refused: the outbox is cleared from its own page', { status: 403 })
+      if (refused)
+        return refused
 
       outbox.clear()
 
@@ -247,7 +336,27 @@ export function preview(render: (message: Message) => Promise<Mail>) {
     .get(`${PREVIEW_PATH}/:id`, ({ params, query }) => {
       const mail = outbox.find(params.id)
 
-      return mail ? mailPage(mail, query.view === 'phone') : missing()
+      return mail ? mailPage(mail, query.view === 'phone', relay, sentTo(query.sent)) : missing()
+    })
+    .post(`${PREVIEW_PATH}/:id/send`, async ({ params, request, body }) => {
+      const refused = crossSite(request, 'a mail is sent from its own page')
+
+      if (refused)
+        return refused
+
+      const mail = outbox.find(params.id)
+
+      if (!mail)
+        return missing()
+
+      const to = postedAddress(body)
+
+      if (to === undefined)
+        return mailPage(mail, false, relay, { to: '', error: 'type one address to send it to' }, 400)
+
+      const error = await attempt(relay, mail, to)
+
+      return error === undefined ? Response.redirect(`${PREVIEW_PATH}/${mail.id}?sent=${encodeURIComponent(to)}`, 303) : mailPage(mail, false, relay, { to, error }, 502)
     })
     .get(`${PREVIEW_PATH}/:id/eml`, async ({ params }) => {
       const mail = outbox.find(params.id)
