@@ -1,5 +1,5 @@
 import type { KayExtension } from 'kay/server'
-import { brotliCompressSync } from 'node:zlib'
+import { brotliCompressSync, constants } from 'node:zlib'
 
 const SLOT = '<span data-page-weight></span>'
 const TAG = /<(img|script|link)\b[^>]*>/g
@@ -45,11 +45,26 @@ function linkedUrls(html: string): Set<string> {
   return urls
 }
 
+// Most pages link the same stylesheets and scripts: each is measured once per version of it rather than once per page, brotli at its strongest costing tens of milliseconds a file.
+const measured = new Map<string, Promise<number>>()
+
 // Text goes out brotli, as the static build precompresses it; an image or an icon goes out as it is.
-async function servedSize(path: string): Promise<number> {
+async function measure(path: string): Promise<number> {
   const bytes = await Bun.file(path).bytes()
 
   return COMPRESSED.test(path) ? brotliCompressSync(bytes).length : bytes.length
+}
+
+async function servedSize(path: string): Promise<number> {
+  const key = `${path}:${Bun.file(path).lastModified}`
+  let size = measured.get(key)
+
+  if (size === undefined) {
+    size = measure(path)
+    measured.set(key, size)
+  }
+
+  return size
 }
 
 const line = (bytes: number) => `<span data-page-weight>This page: ${(bytes / 1024).toFixed(1)} KB.</span>`
@@ -64,8 +79,8 @@ export const pageWeight: KayExtension = {
     const paths = await Promise.all([...linkedUrls(html)].map(async url => file(url)))
     const sizes = await Promise.all(paths.filter(path => path !== undefined).map(async path => servedSize(path)))
     const linked = sizes.reduce((sum, size) => sum + size, 0)
-    // Measured once more with the line in place, which it adds a few bytes to.
-    const estimate = html.replace(SLOT, () => line(brotliCompressSync(html).length + linked))
+    // A quick brotli only picks the digits; the page is measured at full strength once, with the line in place, which it adds a few bytes to.
+    const estimate = html.replace(SLOT, () => line(brotliCompressSync(html, { params: { [constants.BROTLI_PARAM_QUALITY]: 5 } }).length + linked))
 
     return html.replace(SLOT, () => line(brotliCompressSync(estimate).length + linked))
   },
