@@ -12,7 +12,6 @@
         "@iconify-json/tabler": "^1.2.41",
         "@kaynooo/eslint": "^6.0.1",
         "@types/bun": "^1.4.2",
-        "@typescript/native-preview": "^7.0.0-dev.20260707.2",
         "chartist": "^1.5.0",
         "elysia": "^1.4.30",
         "hls.js": "^1.7.0",
