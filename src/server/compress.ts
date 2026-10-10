@@ -54,14 +54,25 @@ export async function compressPaths(paths: string[]): Promise<void> {
     if (bytes.length < MIN_SIZE)
       return
 
-    const { constants } = nodeZlib()
-    const copies: [Encoding, Uint8Array][] = [
-      ['br', await compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })],
-      ['gzip', Bun.gzipSync(bytes, { level: 9 })],
-    ]
-
-    await Promise.all(copies.filter(([, copy]) => copy.length < bytes.length * 0.9).map(async ([encoding, copy]) => Bun.write(encodedPath(path, encoding), copy)))
+    await Promise.all(Object.entries(await strongestCopies(bytes)).map(async ([encoding, copy]) => Bun.write(encodedPath(path, encoding as Encoding), copy)))
   }))
+}
+
+// The copies `kay build` writes, for text rendered while serving but off any request's path, as a stale page rendered again.
+export async function compressTextStrongest(text: string): Promise<Partial<Record<Encoding, Uint8Array<ArrayBuffer>>>> {
+  const bytes = new TextEncoder().encode(text)
+
+  return bytes.length < MIN_SIZE ? {} : strongestCopies(bytes)
+}
+
+async function strongestCopies(bytes: Uint8Array<ArrayBuffer>): Promise<Partial<Record<Encoding, Uint8Array<ArrayBuffer>>>> {
+  const { constants } = nodeZlib()
+  const copies: [Encoding, Uint8Array<ArrayBuffer>][] = [
+    ['br', await compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })],
+    ['gzip', Bun.gzipSync(bytes, { level: 9 })],
+  ]
+
+  return Object.fromEntries(copies.filter(([, copy]) => copy.length < bytes.length * 0.9))
 }
 
 // A brotli and a gzip copy of text rendered while serving, at levels quick enough for a request path; none below the size worth it, nor one saving little.

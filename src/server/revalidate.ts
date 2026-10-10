@@ -1,6 +1,6 @@
 import type { ServedPage } from './render'
 import { broadcast, onPagesInvalidated } from '../runtime/cache'
-import { compressText } from './compress'
+import { compressText, compressTextStrongest } from './compress'
 import { pageEtag, storedHeaders } from './prerendered'
 
 interface Revalidation {
@@ -88,6 +88,17 @@ export async function revalidateStale(page: ServedPage, render: () => Promise<Re
     revalidation.running = rerender(page, render, revalidation, report)
 }
 
+async function strengthen(page: ServedPage, html: string): Promise<void> {
+  try {
+    const encoded = await compressTextStrongest(html)
+
+    // A render landing meanwhile keeps its own.
+    if (page.html === html)
+      page.encoded = encoded
+  }
+  catch {}
+}
+
 async function rerender(page: ServedPage, render: () => Promise<Response>, revalidation: Revalidation, report: (error: unknown) => void): Promise<void> {
   const started = invalidations
   const period = page.revalidate === undefined ? Infinity : page.revalidate * 1000
@@ -113,6 +124,8 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
     Object.assign(page, { html, encoded, status: response.status, headers: Object.entries(storedHeaders(response.headers)), etag: pageEtag(html), renderedAt: Date.now() })
     revalidation.renderedAfter = started
     revalidation.staleAt = Date.now() + period
+    // The request waiting goes out with the quick copies; the next get the build's, as small as a page `kay build` wrote.
+    void strengthen(page, html)
   }
   catch (error) {
     failed()

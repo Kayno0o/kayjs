@@ -15,6 +15,7 @@ import { action } from '../src/runtime'
 import { sqliteCache } from '../src/runtime/cache.server'
 import { inlineScriptHashes, invalidatePage, pages, shutdown, sqliteJobs, sqliteStore } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
@@ -353,7 +354,7 @@ describe('action protection', () => {
     }
   })
 
-  it('refuses a plain post whose stamp is missing, forged, another action\'s or too old, and lets a call from kay\'s script through without one', async () => {
+  it('refuses a plain post sent too soon, or as expired one whose stamp is missing, forged, another action\'s or too old, in the site\'s words when it has its own, and lets a call from kay\'s script through without one', async () => {
     const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })
     const { ask, quick } = await import(QUOTE) as { ask: Action<{ message: string }, number>, quick: Action<{ message: string }, number> }
     const start = Date.now()
@@ -374,14 +375,22 @@ describe('action protection', () => {
       expect(await refusal({ message: 'hi', kay_since: own })).toBeUndefined()
 
       for (const kay_since of [undefined, `${(start - 5000).toString(36)}.forged`, `${(start - 9000).toString(36)}.${own.slice(own.indexOf('.') + 1)}`, other])
-        expect(await refusal({ message: 'hi', kay_since })).toBe('Sent too fast; take a moment, then send it again')
+        expect(await refusal({ message: 'hi', kay_since })).toBe('This form has expired; send it again')
 
-      expect(await refusal({ message: 'hi', kay_since: stale })).toBe('This form was open too long; send it again')
-      expect((await site.submit(ask, { message: 'hello' }, { from: '/quote' })).html).toContain('<p class="error">422 Sent too fast; take a moment, then send it again</p>')
+      expect(await refusal({ message: 'hi', kay_since: stale })).toBe('This form has expired; send it again')
+      expect(await refusal({ message: 'hi', kay_since: signStamp(ask.url, start - 1000) })).toBe('Sent too fast; take a moment, then send it again')
+
+      const worded = { url: '/_kay/action/worded', protection: { minTime: '3s', messages: { minTime: (reason: string) => `${reason}!` } } } as never
+
+      expect((await refusalOf(worded, new Request('http://localhost/'), { kay_since: signStamp('/_kay/action/worded', start - 1000) }, true, null))?.message).toBe('early!')
+      expect((await refusalOf(worded, new Request('http://localhost/'), {}, true, null))?.message).toBe('expired!')
+      expect((await site.submit(ask, { message: 'hello' }, { from: '/quote' })).html).toContain('<p class="error">422 This form has expired; send it again</p>')
+      // A stamp given to it wins over the page's.
+      expect((await site.submit(ask, { message: 'hello', kay_since: 'forged' }, { from: page })).html).toContain('<p class="error">422 This form has expired; send it again</p>')
 
       // An island's form renders no stamp; one it sends is still checked.
       expect(await refusal({ message: 'hi' }, false)).toBeUndefined()
-      expect(await refusal({ message: 'hi', kay_since: 'forged' }, false)).toBe('Sent too fast; take a moment, then send it again')
+      expect(await refusal({ message: 'hi', kay_since: 'forged' }, false)).toBe('This form has expired; send it again')
       expect(await site.call(ask, { message: 'hello' })).toBe(5)
     }
     finally {
@@ -784,6 +793,13 @@ describe('revalidation', () => {
       // Built where the variable naming the host is unset, run where it is.
       expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' }))).toBe('http://127.0.0.1:4173/news')
       expect(warned).toHaveBeenCalledWith('[kay] kay build rendered its pages for https://example.com and this server runs for http://127.0.0.1:4173: each renders again on its first request')
+
+      // Once rendered again, it goes out as small as the build would have written it.
+      const moved = await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' })
+      const html = await (await moved.handle(new Request('http://localhost/news'))).text()
+
+      await Bun.sleep(100)
+      expect(await (await moved.handle(new Request('http://localhost/news', { headers: { 'accept-encoding': 'br' } }))).bytes()).toEqual((await compressTextStrongest(html)).br!)
     }
     finally {
       warned.mockRestore()
