@@ -6,6 +6,7 @@ import { existsSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { throughLinks } from '../build/links'
+import { loadConfig, mergeConfig } from '../config'
 import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { bundled, importModule } from './bundle'
@@ -234,6 +235,42 @@ async function mergedCatalogs(catalogs: string[]): Promise<Map<string, Message>>
   }
 
   return messages
+}
+
+// The locales each project root serves, which what renders outside a request reads: the running server's, else read off the project's config once.
+const projects = new Map<string, Promise<I18n>>()
+
+export function serveLocales(root: string, i18n: I18n): void {
+  projects.set(resolve(root), Promise.resolve(i18n))
+}
+
+// The state `renderToString` runs in outside a request, or for another locale than the request's, in the site's default locale unless given one; its page is the root.
+export async function renderState(locale: string | undefined): Promise<LocaleState> {
+  const i18n = await projectI18n()
+  const chosen = locale ?? i18n.settings.defaultLocale
+  const translations = i18n.translations.get(chosen)
+
+  if (!translations)
+    throw new Error(`kay: renderToString renders in ${chosen}, which is none of the site's locales: ${i18n.settings.locales.join(', ')}`)
+
+  return { ...translations, settings: i18n.settings, path: '/', ...i18n.implicit && { implicit: true } }
+}
+
+async function projectI18n(): Promise<I18n> {
+  const bundle = bundled()
+  const root = bundle?.root ?? resolve(process.env.KAY_ROOT ?? process.cwd())
+  let loading = projects.get(root)
+
+  if (!loading) {
+    loading = (async () => {
+      const config = bundle ? mergeConfig(bundle.config, {}) : await loadConfig(root)
+
+      return config.i18n ? loadI18n(root, config.i18n, config.extensions) : implicitI18n(root, config.lang, config.extensions)
+    })()
+    projects.set(root, loading)
+  }
+
+  return loading
 }
 
 // The state a request runs in for that locale, the page's path given without its prefix.

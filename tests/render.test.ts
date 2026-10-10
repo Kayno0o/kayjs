@@ -342,6 +342,32 @@ describe('renderToString', () => {
     })(), inner: Promise.resolve('nested') })).toBe('<p>start</p><p>one</p><p>nested</p><p>middle</p><p>two</p>')
   })
 
+  it('runs t() and the formatters outside a request in the site\'s default locale, or in the one given', async () => {
+    const project = join(scratch, 'localized')
+
+    await Promise.all([
+      Bun.write(join(project, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n'),
+      Bun.write(join(project, 'src/messages/en.ts'), 'export default { hello: \'Hello {name}\', only: \'English only\' }\n'),
+      Bun.write(join(project, 'src/messages/fr.ts'), 'export default { hello: \'Bonjour {name}\' }\n'),
+    ])
+    const view = await load<{ name: string }>('---\nimport { formatNumber, locale, t } from \'kay/i18n\'\n\nconst { name } = props<{ name: string }>()\n---\np(lang={locale()}) {t(\'hello\', { name })} {t(\'only\')} {formatNumber(1234.5)}')
+    const saved = process.env.KAY_ROOT
+
+    process.env.KAY_ROOT = project
+
+    try {
+      expect(await renderToString(view, { name: 'Ada' })).toBe('<p lang="en">Hello Ada English only 1,234.5</p>')
+      expect(await renderToString(view, { name: 'Ada' }, { locale: 'fr' })).toBe('<p lang="fr">Bonjour Ada English only 1\u202F234,5</p>')
+      await expect(renderToString(view, { name: 'Ada' }, { locale: 'de' })).rejects.toThrow('renderToString renders in de, which is none of the site\'s locales: en, fr')
+    }
+    finally {
+      if (saved === undefined)
+        delete process.env.KAY_ROOT
+      else
+        process.env.KAY_ROOT = saved
+    }
+  })
+
   it('takes no props argument for a component without required props', async () => {
     const view = await load('p Static')
 

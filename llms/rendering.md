@@ -82,4 +82,4 @@ const html = await renderToString(Receipt, { order })
 
 - Its `await` blocks are waited for and rendered in place, each `then` block or, once its value rejects, its `catch` block; a value rejecting with no `catch` block rejects the render, so nothing goes out with part of it missing.
 - Islands render their server markup, with no script to run them, and a `head` block sets nothing. The props argument is left out for a component taking no required prop.
-- Called while an action or a page runs, `t()` and `locale()` from `kay/i18n` read the request's locale; elsewhere, as in a job, they throw.
+- `t()`, `locale()` and the formatters from `kay/i18n` read the request's locale while an action or a page runs, and the site's default locale elsewhere, as in a job or a component test; `renderToString(Mail, props, { locale: 'fr' })` renders in the one given, as for a mail in its recipient's language, and refuses a locale the site lacks.

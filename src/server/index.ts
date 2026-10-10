@@ -39,6 +39,7 @@ export type { Route } from './routes'
 export type { Session, SessionData, SessionOptions, SessionStore } from './session'
 export { memoryStore, session, sqliteStore } from './session'
 export type { Prefetch } from './speculation'
+export type { RenderToStringOptions } from './string'
 export { renderToString } from './string'
 export { CspViolation } from './violations'
 

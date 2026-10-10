@@ -31,7 +31,7 @@ import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuard, loadGuards } from './guards'
-import { cookieLocale, hostLocale, implicitI18n, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, routedSettings, stateFor } from './i18n'
+import { cookieLocale, hostLocale, implicitI18n, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, routedSettings, serveLocales, stateFor } from './i18n'
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader, underKayDev } from './loader'
@@ -204,6 +204,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   // Without `i18n`, every request runs in the site's one language, its extensions' messages and the app's read.
   const locales = i18n ?? await implicitI18n(root, options.lang, options.extensions)
+
+  serveLocales(root, locales)
   const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
 
   const base = basePath(options.base)

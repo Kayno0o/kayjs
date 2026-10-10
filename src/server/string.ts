@@ -2,12 +2,24 @@ import type { JSX } from '../runtime/jsx'
 import { collectDeferred } from '../runtime/await.server'
 import { child, component } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
+import { localeState, runInLocale } from '../runtime/locale-state'
+import { renderState } from './i18n'
 
-type PropsArgument<P> = object extends P ? [props?: P] : [props: P]
+export interface RenderToStringOptions {
+  // The locale `t()` and the formatters read: the request's while one runs, else the site's default locale.
+  locale?: string | undefined
+}
+
+type RenderArguments<P> = object extends P ? [props?: P, options?: RenderToStringOptions] : [props: P, options?: RenderToStringOptions]
 
 // Renders a component to its markup outside a page, as a mail or a feed needs: `await` blocks are waited for and rendered in place, and islands render their server markup with no script to run them.
-export async function renderToString<P extends object>(view: (props: P) => JSX.Element, ...[props]: PropsArgument<P>): Promise<string> {
-  return settled(() => component(view, props ?? {} as P))
+export async function renderToString<P extends object>(view: (props: P) => JSX.Element, ...[props, options]: RenderArguments<P>): Promise<string> {
+  const render = async () => settled(() => component(view, props ?? {} as P))
+
+  if (localeState() !== undefined && options?.locale === undefined)
+    return render()
+
+  return runInLocale(await renderState(options?.locale), render)
 }
 
 async function settled(view: () => unknown): Promise<string> {
