@@ -5,9 +5,13 @@ import { llmsHref, loadReference } from './src/reference'
 
 export interface SearchSection {
   page: string
+  // The title alone, where `page` adds the part of the site it belongs to.
+  title: string
   href: string
   heading?: string | undefined
   text: string
+  // Written for agents: listed after every page written for people.
+  reference?: true
 }
 
 const ROOT = join(import.meta.dir, '..')
@@ -26,7 +30,7 @@ const SPACES = /\s+/g
 const plain = (html: string) => html.replace(BLOCK_TAGS, ' ').replace(TAGS, '').replace(ENTITY, (entity, code?: string) => code === undefined ? ENTITIES[entity]! : String.fromCodePoint(Number(code))).replace(SPACES, ' ').trim()
 
 // One entry for the text above a page's first heading, then one per heading down to h4, each linking the heading's own anchor.
-async function sections(page: string, href: string, markdown: string): Promise<SearchSection[]> {
+async function sections(page: Pick<SearchSection, 'page' | 'title' | 'reference'>, href: string, markdown: string): Promise<SearchSection[]> {
   const { html } = await renderMarkdown(markdown)
   const found: SearchSection[] = []
   let heading: string | undefined
@@ -34,13 +38,13 @@ async function sections(page: string, href: string, markdown: string): Promise<S
   let last = 0
 
   for (const match of html.matchAll(HEADING)) {
-    found.push({ page, href: href + anchor, heading, text: plain(html.slice(last, match.index)) })
+    found.push({ ...page, href: href + anchor, heading, text: plain(html.slice(last, match.index)) })
     heading = plain(match[3]!)
     anchor = `#${match[2]}`
     last = match.index + match[0].length
   }
 
-  found.push({ page, href: href + anchor, heading, text: plain(html.slice(last)) })
+  found.push({ ...page, href: href + anchor, heading, text: plain(html.slice(last)) })
 
   return found.filter(section => section.heading !== undefined || section.text !== '')
 }
@@ -53,9 +57,9 @@ const docs = await Promise.all([...new Bun.Glob('*/*.md').scanSync(DOCS)].map(as
 }))
 
 const index = [
-  ...(await Promise.all(docs.map(async page => sections(page.data.title, `/${page.slug}`, page.body)))).flat(),
-  ...(await Promise.all([...await loadReference(), ...await loadLibraries()].map(async topic => sections(`${topic.data.title} · full reference`, llmsHref(topic.slug), topic.body)))).flat(),
-  ...(await Promise.all((await loadComponents()).map(async component => sections(`${component.data.title} · kayjs-ui`, `/ui/${component.slug}`, [component.data.description, component.body].join('\n\n'))))).flat(),
+  ...(await Promise.all(docs.map(async page => sections({ page: page.data.title, title: page.data.title }, `/${page.slug}`, page.body)))).flat(),
+  ...(await Promise.all((await loadComponents()).map(async component => sections({ page: `${component.data.title} · kayjs-ui`, title: component.data.title }, `/ui/${component.slug}`, [component.data.description, component.body].join('\n\n'))))).flat(),
+  ...(await Promise.all([...await loadReference(), ...await loadLibraries()].map(async topic => sections({ page: `${topic.data.title} · full reference`, title: topic.data.title, reference: true }, llmsHref(topic.slug), topic.body)))).flat(),
 ]
 
 await Bun.write(join(import.meta.dir, 'public/search.json'), JSON.stringify(index))

@@ -26,7 +26,7 @@ let input: HTMLInputElement | undefined
 
 const words = memo(() => query().trim().toLowerCase().split(WORDS).filter(word => word !== ''))
 
-// Every word has to appear in the section: a heading match outranks the page title, which outranks the text.
+// Every word has to appear in the section. A page titled as searched comes first, then headings, then page titles holding the word, then the text; the full reference, written for agents, after every page for people.
 const matches = memo((): Match[] => {
   const all = sections() ?? []
   const terms = words()
@@ -39,11 +39,18 @@ const matches = memo((): Match[] => {
   for (const section of all) {
     const heading = section.heading?.toLowerCase() ?? ''
     const page = section.page.toLowerCase()
+    const title = section.title.toLowerCase()
     const text = section.text.toLowerCase()
-    let score = section.heading === undefined ? 1 : 0
+    const top = section.heading === undefined
+    let score = top ? 1 : 0
+
+    if (top && title === terms.join(' '))
+      score += 30
 
     for (const term of terms) {
-      if (heading.includes(term))
+      if (top && title.includes(term))
+        score += 12
+      else if (heading.includes(term))
         score += heading.startsWith(term) ? 14 : 10
       else if (page.includes(term))
         score += 6
@@ -59,7 +66,7 @@ const matches = memo((): Match[] => {
       found.push({ section, score, snippet: snippet(section.text, terms) })
   }
 
-  return found.sort((a, b) => b.score - a.score).slice(0, 40)
+  return found.sort((a, b) => Number(a.section.reference ?? false) - Number(b.section.reference ?? false) || b.score - a.score).slice(0, 40)
 })
 
 // About a line of text around the first word found, each word in it marked.

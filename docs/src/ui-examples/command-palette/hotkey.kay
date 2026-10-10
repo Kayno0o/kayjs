@@ -9,5 +9,5 @@ const entries: PaletteEntry[] = [
   { label: 'Dialog', group: 'Pages', href: '/ui/dialog' },
 ]
 ---
-p Press <kbd>Ctrl</kbd> + <kbd>J</kbd> (<kbd>Cmd</kbd> + <kbd>J</kbd> on a Mac). The palette is {open() ? 'open' : 'closed'}.
+p Press Ctrl+J, or Cmd+J on a Mac. The palette is {open() ? 'open' : 'closed'}.
 CommandPalette(hotkey="j" onOpenChange={open.set} entries={entries})
