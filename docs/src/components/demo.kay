@@ -1,9 +1,8 @@
 ---
-import type { DemoName } from '../demos'
-import { demos } from '../demos'
+import { demo } from '../demos'
 
-const { name } = props<{ name: DemoName }>()
-const { component: Example, html } = demos[name]
+const { name } = props<{ name: string }>()
+const { component: Example, html } = demo(name)
 ---
 .example
   .ui-stage

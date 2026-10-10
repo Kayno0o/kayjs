@@ -65,6 +65,22 @@ ul
     TodoItem(todo={todo} size="sm")
 ```
 
+## Many components at once
+
+`import.meta.glob` imports every file a pattern matches, as in Vite, keyed by its path as the pattern writes it:
+
+```kay
+---
+import type { Component } from 'kay'
+
+const cards = import.meta.glob<Component>('../cards/*.kay', { eager: true, import: 'default' })
+---
+for Card of Object.values(cards)
+  Card
+```
+
+Without `eager`, each value is a function importing the file when called. A pattern starts with `./`, `../` or `/` for the project's root, and one starting with `!` leaves its files out. Patterns and options are written in the call, as the build reads them, and `kay dev` picks up a file added or removed with nothing to rerun.
+
 ## Slots and blocks
 
 Children of a component go to its `slot`. A `@name` block directly under it becomes the prop `name`, which the component renders with `slot name`; the lines under a `slot` render when it gets nothing. `src/components/card.kay`:

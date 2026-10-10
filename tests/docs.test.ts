@@ -73,15 +73,6 @@ describe('the documentation site', () => {
     expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => void')
   })
 
-  it('keeps the demo registry in step with src/ui-examples', async () => {
-    const registry = join(root, 'docs/src/demos.ts')
-    const before = await Bun.file(registry).text()
-
-    await Bun.$`bun ${join(root, 'docs/demos.ts')}`.quiet()
-
-    expect(await Bun.file(registry).text()).toBe(before)
-  })
-
   it('links only to pages the site serves', async () => {
     const docsRoot = join(root, 'docs/src/content')
     const files = [...new Bun.Glob('{docs/*/*,ui/*}.md').scanSync(docsRoot)]

@@ -5,6 +5,7 @@ import { parseKay } from '../compiler/parser'
 import { ASSET_FILE, writeAsset } from './assets'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { scriptLoader, transpilerFor } from './files'
+import { globbedFiles } from './glob'
 import { libraryOf } from './libraries'
 
 const KAY_FILE = /\.kay$/
@@ -29,7 +30,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
   const inProject = (path: string) => path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)
   // A kay library's components and modules are followed as the app's own are.
   const followed = (path: string) => CSS_FILE.test(path) || ((inProject(path) || libraryOf(libraries, path) !== undefined) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
-  const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => transpilerFor(loader).scanImports(code).map(({ path }) => resolve(path, importer)).filter(path => path !== undefined)
+  const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => [...transpilerFor(loader).scanImports(code).map(({ path }) => resolve(path, importer)).filter(path => path !== undefined), ...globbedFiles(code, importer, root, loader)]
   const imports = async (code: string, importer: string, loader: Bun.JavaScriptLoader) => {
     const paths = scan(code, importer, loader)
 

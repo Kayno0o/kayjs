@@ -67,6 +67,26 @@ ul
 
 `List(items={todos} show={todo => todo.title})` types `todo` as one of `todos`, and `kay fmt` writes the line `--- <T ...>`. A page has no props, so it takes no type parameters.
 
+### Glob imports
+
+`import.meta.glob` imports every file a pattern matches, as Vite's does, in a component script, a server fence or a TypeScript module:
+
+```kay
+---
+import type { Component } from 'kay'
+
+const cards = import.meta.glob<Component>('../cards/*.kay', { eager: true, import: 'default' })
+---
+for Card of Object.values(cards)
+  Card
+```
+
+- It gives a record of the files by their path as the pattern writes it, `'../cards/one.kay'`, sorted. With `eager: true` each value is the file's module, imported along with the importer; without, a function importing it, `() => Promise<module>`, a chunk of its own in the browser. `import: 'default'` gives that export of each instead of the module, and `T` types what each gives, `unknown` by default.
+- A pattern starts with `./` or `../`, from the importer, or `/`, from the project's root, and its keys start the same way. A list of patterns adds up their files, one starting with `!` leaving its own out: `['./demos/*.kay', '!./demos/draft.kay']`. `node_modules` is only searched by a pattern naming it, and the importer never matches itself.
+- The build expands the call, so its patterns and options are written in it: a pattern built at run time, or another option, is a build error. The stylesheets of the components it imports reach the page as a static import's do.
+- `kay dev` restarts when a matching file is added or removed, so the record follows with nothing to rerun.
+- A server run from source outside `kay dev` registers kay's loader in `pages()`: the entry, and what it imports before calling it, has no `import.meta.glob` there, nor imports a `.kay` file. `kay dev` and `kay build --compile` have them everywhere.
+
 ## Component libraries
 
 A package can ship `.kay` components, which the app installing it compiles as its own: on the server, in islands, and in `kay build --compile` and `--static`.

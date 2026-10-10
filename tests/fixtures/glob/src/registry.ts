@@ -1,0 +1,5 @@
+export const modules = import.meta.glob<{ name: string }>('./demos/*.ts', { eager: true })
+export const titles = import.meta.glob<string>(['./demos/*.ts', '!./demos/draft.ts'], { eager: true, import: 'default' })
+export const names = import.meta.glob<string>('./demos/*.ts', { import: 'name' })
+export const lazy = import.meta.glob<{ default: string }>('./demos/a.ts')
+export const siblings = import.meta.glob('./*.ts')

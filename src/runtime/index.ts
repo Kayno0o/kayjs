@@ -286,6 +286,16 @@ export type EndpointContext<Params extends Record<string, unknown> = Record<stri
 // A string or a Blob it returns is served with the type its file's extension names; a Response goes out as it is.
 export type EndpointBody = string | Blob | Response
 
+declare global {
+  // `import.meta.glob`, which kay's build expands, typed as Vite types it: `T` is what each file gives, its module or with `import` one export.
+  interface ImportMeta {
+    glob: {
+      <T = unknown>(pattern: string | string[], options: { eager: true, import?: string }): Record<string, T>
+      <T = unknown>(pattern: string | string[], options?: { eager?: false, import?: string }): Record<string, () => Promise<T>>
+    }
+  }
+}
+
 // The default export of a `_guard.ts`: runs before every page and every action in its directory and below, and lets the request through unless it redirects or denies.
 export function guard(check: Guard): Guard {
   return check

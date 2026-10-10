@@ -991,6 +991,19 @@ describe('kay check, what the server refuses at boot', () => {
     }
   })
 
+  it('types import.meta.glob as Vite does, in a component and a module', async () => {
+    const root = await scratchProject({
+      'src/cards/one.kay': 'p One\n',
+      'src/routes/index.kay': '---\nimport type { Component } from \'kay\'\n\nconst cards = import.meta.glob<Component>(\'../cards/*.kay\', { eager: true, import: \'default\' })\n---\nfor Card of Object.values(cards)\n  Card\n',
+      'src/lazy.ts': 'export const cards = import.meta.glob<{ default: unknown }>(\'./cards/*.kay\')\nexport const first: Promise<{ default: unknown }> | undefined = cards[\'./cards/one.kay\']?.()\nexport const wrong: number = cards\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.file, d.code])).toEqual([[join(root, 'src/lazy.ts'), 'TS2322']])
+    }
+    finally { await rm(root, { recursive: true, force: true }) }
+  })
+
   it('types links to endpoint files and what their GET returns, and reports one a public file serves too', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'a(href="/llms.txt") llms\na(href="/feeds/first.json") feed\na(href="/feeds/first.xml") none\n',

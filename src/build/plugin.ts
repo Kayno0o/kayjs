@@ -1,10 +1,13 @@
 import type { BunPlugin } from 'bun'
 import type { Target } from './transform'
-import { dirname, resolve } from 'node:path'
+import { realpathSync } from 'node:fs'
+import { dirname, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
 import { RESIZABLE } from '../runtime/image'
 import { ASSET_FILE, writeAsset } from './assets'
+import { scriptLoader } from './files'
+import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { settingsReplacements } from './libraries'
 import { transformKayCached } from './transform'
@@ -58,18 +61,21 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
     name: 'kay',
     setup(build) {
       const target = options.target ?? (build.config?.target === 'browser' ? 'dom' : 'ssr')
+      const root = options.root ?? process.cwd()
+      // The project's TypeScript modules, read for their `import.meta.glob` calls, by their real path as Bun loads them.
+      const projectScript = new RegExp(`^${RegExp.escape(realpathSync(root) + sep)}(?!(?:.*/)?node_modules/).*\\.(?:m?ts|tsx)$`)
 
       const load = async (file: string) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
-        const contents = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect })
+        const contents = expandGlobs(await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect }), withoutTwin(file), root, 'ts')
 
         return { contents: options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents, loader: 'ts' as const }
       }
 
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))
 
-      const iconSets = installedIconSets(options.root ?? process.cwd())
+      const iconSets = installedIconSets(root)
 
       // Only a bundle has a config; the runtime loader takes the specifier as it is.
       if (build.config !== undefined) {
@@ -87,13 +93,22 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
       }
 
       // A library's settings module loads as the app's own, wherever the library imports it from.
-      for (const { paths, replacement } of settingsReplacements(options.root ?? process.cwd(), options.settings ?? {})) {
+      for (const { paths, replacement } of settingsReplacements(root, options.settings ?? {})) {
         for (const path of paths)
           build.onLoad({ filter: new RegExp(`^${RegExp.escape(path)}$`) }, () => ({ contents: `export * from ${JSON.stringify(replacement)}\nexport { default } from ${JSON.stringify(replacement)}\n`, loader: 'ts' }))
       }
 
       // `import logo from './logo.png'` gives the URL the server serves it at, on the server and in islands alike; an image also records its size for `image()`.
-      build.onLoad({ filter: ASSET_FILE }, async ({ path }) => ({ contents: await assetModule(path, await writeAsset(path, options.root ?? process.cwd())), loader: 'js' }))
+      build.onLoad({ filter: ASSET_FILE }, async ({ path }) => ({ contents: await assetModule(path, await writeAsset(path, root)), loader: 'js' }))
+
+      // Last, as it takes every module: the runtime loader hands a module without a call back as it is, where the bundler loads it itself.
+      build.onLoad({ filter: projectScript }, async ({ path }) => {
+        const source = await Bun.file(path).text()
+        const loader = scriptLoader(path)
+        const contents = expandGlobs(source, path, root, loader)
+
+        return contents === source && build.config !== undefined ? undefined : { contents, loader }
+      })
     },
   }
 }

@@ -1,0 +1,8 @@
+---
+import type { Component } from 'kay'
+
+const cards = import.meta.glob<Component>('../cards/*.kay', { eager: true, import: 'default' })
+---
+main
+  for Card of Object.values(cards)
+    Card
