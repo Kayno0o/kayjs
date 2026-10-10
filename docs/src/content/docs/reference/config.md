@@ -85,6 +85,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `health` | The route a load balancer polls, `/_kay/health` by default |
 | `log` | One line per request, `'json'`, a function, or `false` |
 | `bodyLimit` | The most bytes an action or API request may send, 1 MB by default |
+| `openapi` | An OpenAPI document of the API modules at `/api/openapi.json`, and a reference page. See [API routes](/guides/api-routes#openapi) |
 | `shutdownTimeout` | How long a stopping server lets open requests finish, 10 seconds by default |
 | `onError` | Receives every error a load, render, guard or action throws, for an error tracker |
 | `serverTiming`, `tracer` | A `Server-Timing` header, and OpenTelemetry spans |

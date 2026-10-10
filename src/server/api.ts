@@ -5,6 +5,7 @@ import type { ActionOptions } from './actions'
 import type { BodyLimit } from './body'
 import type { CorsOptions, CorsRule } from './cors'
 import type { LoadedGuard } from './guards'
+import type { MountedApi } from './openapi'
 import type { Span } from './trace'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
@@ -94,9 +95,10 @@ const TRAILING_SLASH = /\/$/
 const spans = new WeakMap<Request, Span>()
 
 // Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused, unless the module's `cors` lets that site in.
-// Gives back the body limit of each module by the path it is mounted at.
-export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<Map<string, BodyLimit>> {
+// Gives back the body limit of each module by the path it is mounted at, and the modules as mounted.
+export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, mounted: MountedApi[] }> {
   const limits = new Map<string, BodyLimit>()
+  const mounted: MountedApi[] = []
 
   for (const module of modules) {
     const instance = (await importModule<{ default?: unknown }>(module.file)).default
@@ -105,6 +107,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       throw new TypeError(`kay: ${module.file} must export an Elysia instance by default: export default new Elysia().get('/', () => ...)`)
 
     Object.defineProperty(instance, API_MOUNT, { value: module.mount, configurable: true })
+    mounted.push({ ...module, instance })
     const cors = (instance as { [CORS]?: CorsRule })[CORS]
 
     limits.set(module.mount, { bytes: (instance as { [BODY_LIMIT]?: number })[BODY_LIMIT], refuse: cors ? request => corsResponse(cors, request, tooLarge()) : tooLarge })
@@ -165,7 +168,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     })
   }
 
-  return limits
+  return { limits, mounted }
 }
 
 // JSON has no bigint, which JSON.stringify throws on: a plain object or array holding one is answered with each written as its digits, as a database's bigint ids usually are.

@@ -30,13 +30,14 @@ import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
-import { loadGuards } from './guards'
+import { loadGuard, loadGuards } from './guards'
 import { cookieLocale, hostLocale, implicitI18n, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, routedSettings, stateFor } from './i18n'
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader, underKayDev } from './loader'
 import { logRequests, pathOf } from './log'
 import { serveServiceWorker } from './offline'
+import { openApiDocument, serveOpenApi } from './openapi'
 import { assetFiles, hookedResponse } from './page-hook'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes, shapeParams } from './params'
 import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
@@ -341,7 +342,19 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const actionOptions = { dev: options.dev, onError: options.onError, i18n: locales, base }
   const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
 
-  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, await serveApi(app, apiModules, actionOptions))
+  const api = await serveApi(app, apiModules, actionOptions)
+  const openapi = options.openapi === true ? {} : options.openapi === false ? undefined : options.openapi
+
+  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, api.limits)
+
+  if (openapi && (openapi.dev !== true || options.dev)) {
+    // The guards every module runs, the API directory's own first: those of a directory holding every module when it has none.
+    const shared = apiModules.reduce<string[] | undefined>((common, module) => common === undefined ? module.guards : common.filter((file, index) => module.guards[index] === file), undefined) ?? []
+    const guards = await Promise.all(shared.map(async file => loadGuard({ file, special: {} })))
+
+    serveOpenApi(app, openApiDocument(api.mounted, { title: openapi.title ?? options.seo?.name ?? 'API', version: openapi.version ?? '1.0.0', base }), openapi, guards, actionOptions)
+  }
+
   serveErrorReports(app, options.onError)
 
   if (options.security !== undefined && options.security !== false && options.security.reports === true)

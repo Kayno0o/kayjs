@@ -4,6 +4,7 @@ import type { Duration } from './runtime/duration'
 import type { JsonLd } from './runtime/seo'
 import type { EnvSchema } from './server/env'
 import type { RequestLogger } from './server/log'
+import type { OpenApiConfig } from './server/openapi'
 import type { PageHook } from './server/page-hook'
 import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
@@ -41,6 +42,8 @@ export interface KayConfig {
   proxy?: ProxyConfig | undefined
   // The most bytes a request to an action or an API route may send, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
   bodyLimit?: number | undefined
+  // Serves an OpenAPI 3.1 document of the API modules' routes at `/api/openapi.json`, read from their schemas, behind the API directory's own `_guard.ts`; `{ reference: true }` adds a page listing them at `/api/reference`, `{ dev: true }` keeps both to `kay dev`.
+  openapi?: boolean | OpenApiConfig | undefined
   // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip: for a server with no proxy in front doing it. Off by default.
   compress?: boolean | undefined
   // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
