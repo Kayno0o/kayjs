@@ -1,3 +1,4 @@
+import type { AuthenticationResponseJSON } from '@simplewebauthn/server'
 import type { Core } from './core'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
@@ -6,6 +7,7 @@ import { qrCodeDataUri } from '@kaynooo/utils/tools'
 import { deriveKeys, digest } from './keys'
 import { spend } from './limits'
 import { notify } from './notify'
+import { provePasskey } from './passkeys'
 import { generateTotpSecret, otpauthUri, verifyTotp } from './totp'
 
 const CHALLENGE_MAX_AGE_MS = 10 * 60 * 1000
@@ -19,11 +21,13 @@ const RECOVERY_CODE_LENGTH = 15
 const NOT_CODE_CHARACTERS = /[^a-z0-9]/g
 const EVERY_FIVE = /.{5}(?=.)/g
 
-// What re-proves the user behind a live session: their password, or with none their second factor.
+// What re-proves the user behind a live session: their password, or with none their second factor, or one of their passkeys.
 export interface Proof {
   password?: string
   // An authenticator code, or a recovery code.
   code?: string
+  // A passkey's answer to `passkeyProofOptions`, which stands for the password and the second factor both.
+  passkey?: AuthenticationResponseJSON
 }
 
 // `proof` when the proof was wrong or missing; `stale` when the account has neither a password nor a second factor and was signed into too long ago, so the user signs in again first.
@@ -99,15 +103,20 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
 
   const twoFactor = record.totpEnabledAt !== null
 
-  if (record.passwordHash === null && !twoFactor)
+  if (proof.passkey === undefined && record.passwordHash === null && !twoFactor)
     return await provedLately(state) ? { ok: true, record } : { ok: false, error: 'stale' }
 
   if (await spend(state.core.store, `reprove:${record.id}`, state.core.limits.reprove))
     return { ok: false, error: 'limited' }
 
-  const proved = record.passwordHash !== null && !(options.secondFactor && twoFactor)
-    ? await comparePasswords(proof.password ?? '', record.passwordHash)
-    : await spendSecondFactor(state.core, record, proof.code ?? '')
+  let proved: unknown
+
+  if (proof.passkey !== undefined)
+    proved = await provePasskey(state, record, proof.passkey)
+  else if (record.passwordHash !== null && !(options.secondFactor && twoFactor))
+    proved = await comparePasswords(proof.password ?? '', record.passwordHash)
+  else
+    proved = await spendSecondFactor(state.core, record, proof.code ?? '')
 
   if (!proved)
     return { ok: false, error: 'proof' }

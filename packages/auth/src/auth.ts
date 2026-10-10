@@ -1,3 +1,4 @@
+import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
 import type { AnyElysia } from 'elysia'
 import type { Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
@@ -10,6 +11,7 @@ import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
 import type { SecurityEvent } from './mail'
 import type { OAuthFailure } from './oauth/flow'
+import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
 import type { PasswordProblem } from './rules'
@@ -34,6 +36,7 @@ import { noteSignIn } from './notify'
 import { createOAuthClient } from './oauth/client'
 import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow'
 import { createOAuthTokenRefresher } from './oauth/refresher'
+import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
 import { register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
 import { listSessions, liveSession, openSession } from './sessions'
@@ -98,6 +101,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`.
   limits?: Partial<Limits> | undefined
+  // Passkeys are made for `url`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from.
+  passkeys?: { rpId?: string, origins?: string[] } | undefined
   // A CAPTCHA asked of registering, password sign-in, password resets and magic links: `{ verify: turnstile(secret) }`.
   captcha?: CaptchaOptions | undefined
   // Refuses a new password Have I Been Pwned lists, with `true`, or that a check of the app's own finds.
@@ -121,6 +126,7 @@ export class Auth<Scope extends string = string> {
       session,
       client,
       address,
+      userAgent: request.headers.get('user-agent') ?? '',
       current: () => this.record(),
       via: () => this.source,
       complete: async (record, redirect) => completeSignIn(this[STATE], record, redirect, signedIn => this.establish(signedIn)),
@@ -381,6 +387,52 @@ export class Auth<Scope extends string = string> {
     return this.core.store.sessions.delete(record.id, id)
   }
 
+  // The options for `startRegistration` of `@simplewebauthn/browser`, to make a passkey for the signed-in user; `stale` past ten minutes since signing in or re-proving.
+  async passkeyRegistrationOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON>> {
+    return passkeyRegistrationOptions(this[STATE])
+  }
+
+  // Keeps the passkey `startRegistration` made, under `name` or the browser and system it was made on.
+  async registerPasskey(response: RegistrationResponseJSON, name?: string): Promise<RegisterPasskeyResult> {
+    return registerPasskey(this[STATE], response, name)
+  }
+
+  async passkeys(): Promise<Passkey[]> {
+    return listPasskeys(this[STATE])
+  }
+
+  async renamePasskey(id: string, name: string): Promise<boolean> {
+    return renamePasskey(this[STATE], id, name)
+  }
+
+  async removePasskey(id: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-found' | 'last-way-in' }> {
+    return removePasskey(this[STATE], id, proof)
+  }
+
+  // The options for `startAuthentication` of `@simplewebauthn/browser`, naming no account; with `useBrowserAutofill` the browser offers the passkeys in the sign-in field's autofill.
+  async passkeySignInOptions(): Promise<PublicKeyCredentialRequestOptionsJSON> {
+    return passkeySignInOptions(this[STATE])
+  }
+
+  // Signs in with the passkey that answered `passkeySignInOptions`, with no second factor after it.
+  async signInWithPasskey(response: AuthenticationResponseJSON, redirect?: string): Promise<PasskeySignInResult> {
+    return signInWithPasskey(this[STATE], response, redirect, record => this.establish(record))
+  }
+
+  // The options for answering a pending sign-in's second factor with a passkey; `none` when the user has none.
+  async twoFactorPasskeyOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
+    return twoFactorPasskeyOptions(this[STATE])
+  }
+
+  async verifyTwoFactorPasskey(response: AuthenticationResponseJSON): Promise<TwoFactorResult> {
+    return verifyTwoFactorPasskey(this[STATE], response, record => this.establish(record))
+  }
+
+  // The options for re-proving with a passkey, its answer then passed as `{ passkey }` wherever a proof is asked.
+  async passkeyProofOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
+    return passkeyProofOptions(this[STATE])
+  }
+
   // The signed-in user's bearer tokens, without the tokens themselves.
   async tokens(): Promise<BearerToken[]> {
     return listTokens(this[STATE])
@@ -401,12 +453,12 @@ export class Auth<Scope extends string = string> {
     await this.session.unset('authChallenge')
     await this.session.regenerate()
 
-    const session = await openSession(this.core, record, this[STATE].address, this.request.headers.get('user-agent') ?? '')
+    const session = await openSession(this.core, record, this[STATE].address, this[STATE].userAgent)
 
     await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now(), session })
     this.source = 'session'
     this.resolving = Promise.resolve(record)
-    await noteSignIn(this.core, record, this[STATE].client, this.request.headers.get('user-agent') ?? '')
+    await noteSignIn(this.core, record, this[STATE].client, this[STATE].userAgent)
   }
 
   // Whether the sign-in's session is still on the user's list; one from before kayjs-auth kept them is put on it.
@@ -414,7 +466,7 @@ export class Auth<Scope extends string = string> {
     if (signedIn.session !== undefined)
       return liveSession(this.core, { ...signedIn, session: signedIn.session }, record, this[STATE].address)
 
-    const session = await openSession(this.core, record, this[STATE].address, this.request.headers.get('user-agent') ?? '')
+    const session = await openSession(this.core, record, this[STATE].address, this[STATE].userAgent)
 
     await this.session.set('auth', { ...signedIn, session })
 
@@ -605,6 +657,9 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     sessionsPage: options.sessionsPage,
     locate: options.locate,
     scopes: new Set(options.scopes),
+    passkeys: url === undefined
+      ? undefined
+      : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin] },
     captcha: options.captcha,
     breached: options.breachedPasswords === true ? pwnedPassword : options.breachedPasswords || undefined,
     email: options.email && {

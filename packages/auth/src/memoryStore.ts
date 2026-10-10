@@ -1,4 +1,4 @@
-import type { AuthStore, BearerTokenRecord, IdentityRecord, SessionRecord, TokenRecord, UserRecord } from './store'
+import type { AuthStore, BearerTokenRecord, IdentityRecord, PasskeyRecord, SessionRecord, TokenRecord, UserRecord } from './store'
 
 const SWEEP_EVERY = 1000
 
@@ -10,6 +10,7 @@ export function memoryStore(): AuthStore {
   const recoveryCodes = new Map<string, Set<string>>()
   const bearerTokens = new Map<string, BearerTokenRecord>()
   const sessions = new Map<string, SessionRecord>()
+  const passkeys = new Map<string, PasskeyRecord>()
   const attempts = new Map<string, { count: number, resetAt: number }>()
   let hits = 0
   const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
@@ -82,6 +83,11 @@ export function memoryStore(): AuthStore {
         for (const [key, session] of sessions) {
           if (session.userId === id)
             sessions.delete(key)
+        }
+
+        for (const [key, passkey] of passkeys) {
+          if (passkey.userId === id)
+            passkeys.delete(key)
         }
       },
       advanceTotpStep(id, step) {
@@ -157,6 +163,28 @@ export function memoryStore(): AuthStore {
         return sessions.delete(id)
       },
     },
+    passkeys: {
+      create(passkey) {
+        if (passkeys.has(passkey.id))
+          throw new Error(`kayjs-auth: the passkey ${passkey.id} is taken`)
+
+        passkeys.set(passkey.id, copyPasskey(passkey)!)
+      },
+      get: id => copyPasskey(passkeys.get(id)),
+      listByUser: userId => [...passkeys.values()].filter(passkey => passkey.userId === userId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map(passkey => copyPasskey(passkey)!),
+      update(id, patch) {
+        const passkey = passkeys.get(id)
+
+        if (passkey)
+          passkeys.set(id, { ...passkey, ...patch })
+      },
+      delete(userId, id) {
+        if (passkeys.get(id)?.userId !== userId)
+          return false
+
+        return passkeys.delete(id)
+      },
+    },
     bearerTokens: {
       create(token) {
         bearerTokens.set(token.id, copyToken(token)!)
@@ -220,6 +248,10 @@ function copy(user: UserRecord | undefined): UserRecord | undefined {
 
 function copyToken(token: BearerTokenRecord | undefined): BearerTokenRecord | undefined {
   return token && { ...token, scopes: token.scopes && [...token.scopes] }
+}
+
+function copyPasskey(passkey: PasskeyRecord | undefined): PasskeyRecord | undefined {
+  return passkey && { ...passkey, transports: [...passkey.transports] }
 }
 
 function clone<T extends object>(value: T | undefined): T | undefined {

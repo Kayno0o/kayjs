@@ -155,7 +155,27 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.sessions.delete('u2', 's1')).toBe(false)
       expect(await store.sessions.delete('u1', 's1')).toBe(true)
       expect(await store.sessions.get('s1')).toBeUndefined()
+      expect(await store.passkeys.get('p1')).toBeUndefined()
       expect(await store.sessions.get('missing')).toBeUndefined()
+    })
+
+    test('passkeys are got, listed by user oldest first, updated, unique, and deleted by their owner only', async () => {
+      const passkey = (id: string, createdAt: string) => ({ id, userId: 'u1', name: 'Phone', publicKey: 'pk', counter: 0, transports: ['internal'], multiDevice: true, backedUp: false, createdAt: new Date(createdAt), lastUsedAt: null })
+
+      await store.users.create(userRecord({ id: 'u1' }))
+      await store.passkeys.create(passkey('p2', '2026-01-02T00:00:00Z'))
+      await store.passkeys.create(passkey('p1', '2026-01-01T00:00:00Z'))
+
+      const at = new Date('2026-02-01T00:00:00Z')
+
+      await store.passkeys.update('p1', { name: 'Laptop', counter: 4_000_000_000, backedUp: true, lastUsedAt: at })
+
+      expect(await store.passkeys.get('p1')).toEqual({ ...passkey('p1', '2026-01-01T00:00:00Z'), name: 'Laptop', counter: 4_000_000_000, backedUp: true, lastUsedAt: at })
+      expect((await store.passkeys.listByUser('u1')).map(found => found.id)).toEqual(['p1', 'p2'])
+      expect(async () => store.passkeys.create(passkey('p1', '2026-01-03T00:00:00Z'))).toThrow()
+      expect(await store.passkeys.delete('u2', 'p1')).toBe(false)
+      expect(await store.passkeys.delete('u1', 'p1')).toBe(true)
+      expect(await store.passkeys.get('p1')).toBeUndefined()
     })
 
     test('deleting a user takes everything kept for them', async () => {
@@ -165,6 +185,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       await store.recoveryCodes.replace('u1', ['a'])
       await store.bearerTokens.create({ id: 't1', userId: 'u1', label: 'Phone', digest: 'd1', scopes: null, createdAt: new Date(), lastUsedAt: null, expiresAt: null })
       await store.sessions.create({ id: 's1', userId: 'u1', version: 0, userAgent: '', ip: '', createdAt: new Date(), lastSeenAt: new Date() })
+      await store.passkeys.create({ id: 'p1', userId: 'u1', name: 'Phone', publicKey: 'pk', counter: 0, transports: [], multiDevice: false, backedUp: false, createdAt: new Date(), lastUsedAt: null })
 
       await store.users.delete('u1')
 

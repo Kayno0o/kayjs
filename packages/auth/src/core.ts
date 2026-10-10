@@ -7,6 +7,7 @@ import type { createOAuthClient } from './oauth/client'
 import type { OAuthFlow } from './oauth/flow'
 import type { createTokenRefresher, StoredCredential } from './oauth/refresher'
 import type { OAuthProvider, OAuthUser } from './oauth/types'
+import type { PasskeyChallenge, Relying } from './passkeys'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Challenge } from './twoFactor'
 import { Buffer } from 'node:buffer'
@@ -18,6 +19,7 @@ export interface AuthSessionData {
   authOAuth?: OAuthFlow
   authChallenge?: Challenge
   authEmailCode?: PendingCode
+  authPasskey?: PasskeyChallenge
   // The account this browser registered, or proved the password of while its address was unverified: it may have the link resent and verify it without signing in.
   authRegistered?: string
 }
@@ -75,6 +77,8 @@ export interface Core {
   locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // The scopes a bearer token may be given.
   scopes: Set<string>
+  // Who passkeys are made for, from `url`; none without it.
+  passkeys?: Relying | undefined
   captcha?: CaptchaOptions | undefined
   // Whether a new password is known from a breach.
   breached?: ((password: string) => boolean | Promise<boolean>) | undefined

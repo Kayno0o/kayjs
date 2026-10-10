@@ -60,6 +60,25 @@ export interface SessionRecord {
   lastSeenAt: Date
 }
 
+// A passkey: a WebAuthn credential the user signs in with, by its credential id.
+export interface PasskeyRecord {
+  // The credential id, base64url.
+  id: string
+  userId: string
+  name: string
+  // The COSE public key, base64url.
+  publicKey: string
+  // The authenticator's signature counter, 0 for one that does not count.
+  counter: number
+  // How the browser reaches the authenticator, such as 'internal' or 'usb'.
+  transports: string[]
+  // Whether it syncs between devices, as one in a password manager does.
+  multiDevice: boolean
+  backedUp: boolean
+  createdAt: Date
+  lastUsedAt: Date | null
+}
+
 // What an emailed link proves once used.
 export type LinkType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email'
 
@@ -91,7 +110,7 @@ export interface AuthStore {
     create: (user: UserRecord) => MaybePromise<UserRecord | void>
     // The user once changed, or undefined when there is none; throws when the change takes an email or a username another user has.
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
-    // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, bearer tokens and recovery codes.
+    // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens and recovery codes.
     delete: (id: string) => MaybePromise<void>
     // Records `step` as the last one a code was accepted for, only when it is later than the one recorded: false when it is not, even when two requests try it together.
     advanceTotpStep: (id: string, step: number) => MaybePromise<boolean>
@@ -118,6 +137,16 @@ export interface AuthStore {
     listByUser: (userId: string) => MaybePromise<SessionRecord[]>
     update: (id: string, patch: Partial<Pick<SessionRecord, 'version' | 'ip' | 'lastSeenAt'>>) => MaybePromise<void>
     // Deletes the user's session with that id; false when they have none.
+    delete: (userId: string, id: string) => MaybePromise<boolean>
+  }
+  passkeys: {
+    // Credential ids are unique, whoever holds them.
+    create: (passkey: PasskeyRecord) => MaybePromise<void>
+    get: (id: string) => MaybePromise<PasskeyRecord | undefined>
+    // Oldest first.
+    listByUser: (userId: string) => MaybePromise<PasskeyRecord[]>
+    update: (id: string, patch: Partial<Pick<PasskeyRecord, 'name' | 'counter' | 'backedUp' | 'lastUsedAt'>>) => MaybePromise<void>
+    // Deletes the user's passkey with that id; false when they have none.
     delete: (userId: string, id: string) => MaybePromise<boolean>
   }
   bearerTokens: {

@@ -1,5 +1,5 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
-import type { AuthStore, BearerTokenRecord, IdentityRecord, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
+import type { AuthStore, BearerTokenRecord, IdentityRecord, PasskeyRecord, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
 
 // Expired attempt windows are deleted once every so many hits.
@@ -71,6 +71,20 @@ export const AuthSessions = defineTable('auth_session', t => ({
   last_seen_at: t.timestamptz().notNull(),
 })).withIndexes([{ columns: ['user_id'] }])
 
+export const AuthPasskeys = defineTable('auth_passkey', t => ({
+  id: t.text().primaryKey(),
+  user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
+  name: t.text().notNull(),
+  public_key: t.text().notNull(),
+  // A uint32, past what int4 holds.
+  counter: t.int8().notNull(),
+  transports: t.array(t.text()).notNull(),
+  multi_device: t.bool().notNull(),
+  backed_up: t.bool().notNull(),
+  created_at: t.timestamptz().notNull(),
+  last_used_at: t.timestamptz().nullable(),
+})).withIndexes([{ columns: ['user_id'] }])
+
 export const AuthAttempts = defineTable('auth_attempt', t => ({
   key: t.text().primaryKey(),
   count: t.int4().notNull(),
@@ -78,7 +92,7 @@ export const AuthAttempts = defineTable('auth_attempt', t => ({
 }))
 
 // The tables to list in the app's `new Database({ tables })`, so `db.sync()` creates them.
-export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthAttempts] as const
+export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAttempts] as const
 
 type UserRow = InferEntity<typeof AuthUsers>
 
@@ -90,6 +104,7 @@ export function pgStore(db: Database): AuthStore {
   const recoveryCodes = db.repo(AuthRecoveryCodes)
   const bearerTokens = db.repo(AuthBearerTokens)
   const sessions = db.repo(AuthSessions)
+  const passkeys = db.repo(AuthPasskeys)
   const attempts = db.repo(AuthAttempts)
   let hits = 0
 
@@ -147,6 +162,17 @@ export function pgStore(db: Database): AuthStore {
         await sessions.write.updateById(id, withoutUndefined({ version: patch.version, ip: patch.ip, last_seen_at: patch.lastSeenAt }))
       },
       delete: async (userId, id) => await sessions.write.deleteOne({ id, user_id: userId }) !== null,
+    },
+    passkeys: {
+      async create(passkey) {
+        await passkeys.write.insertOne({ id: passkey.id, user_id: passkey.userId, name: passkey.name, public_key: passkey.publicKey, counter: BigInt(passkey.counter), transports: passkey.transports, multi_device: passkey.multiDevice, backed_up: passkey.backedUp, created_at: passkey.createdAt, last_used_at: passkey.lastUsedAt })
+      },
+      get: async id => toPasskey(await passkeys.read.findById(id)),
+      listByUser: async userId => (await passkeys.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toPasskey(row)!),
+      async update(id, patch) {
+        await passkeys.write.updateById(id, withoutUndefined({ name: patch.name, counter: patch.counter === undefined ? undefined : BigInt(patch.counter), backed_up: patch.backedUp, last_used_at: patch.lastUsedAt }))
+      },
+      delete: async (userId, id) => await passkeys.write.deleteOne({ id, user_id: userId }) !== null,
     },
     bearerTokens: {
       async create(token) {
@@ -253,6 +279,10 @@ function toBearerToken(row: InferEntity<typeof AuthBearerTokens> | null): Bearer
 
 function toSession(row: InferEntity<typeof AuthSessions> | null): SessionRecord | undefined {
   return row ? { id: row.id, userId: row.user_id, version: row.version, userAgent: row.user_agent, ip: row.ip, createdAt: row.created_at, lastSeenAt: row.last_seen_at } : undefined
+}
+
+function toPasskey(row: InferEntity<typeof AuthPasskeys> | null): PasskeyRecord | undefined {
+  return row ? { id: row.id, userId: row.user_id, name: row.name, publicKey: row.public_key, counter: Number(row.counter), transports: row.transports, multiDevice: row.multi_device, backedUp: row.backed_up, createdAt: row.created_at, lastUsedAt: row.last_used_at } : undefined
 }
 
 // pg-orm refuses an `undefined` value, so a patch names only the fields it changes.

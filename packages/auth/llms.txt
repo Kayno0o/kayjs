@@ -60,7 +60,7 @@ The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(
 - `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
 - `prefix`: where the OAuth routes live, `/auth` by default.
 - `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default.
-- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `sessionMaxAge`, `sessionsPage`, `locate`: see Sessions.
+- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `sessionMaxAge`, `sessionsPage`, `locate`: see Sessions. `passkeys`: see Passkeys.
 
 ## The signed-in user
 
@@ -232,11 +232,30 @@ if failure
 - From then on every way of signing in stops at the `twoFactorPage`. `twoFactorPending()` says whether a sign-in waits there (for ten minutes), and `verifyTwoFactor(code)` finishes it with an authenticator code or a recovery code, answering `{ ok: true, redirect }`, or `'invalid'`, `'expired'` or `'limited'`.
 - An authenticator code works once, even at two sign-ins at the same moment, and the step either side of now is accepted. A recovery code works once and mails a warning. Eight tries in 15 minutes stop the account's attempts.
 - `regenerateRecoveryCodes(proof)` voids the old set, `recoveryCodesLeft()` counts the unused ones, `disableTwoFactor(proof)` turns the factor off and voids the codes. TOTP secrets are stored encrypted, bound to their user.
+- A user with a passkey may answer the `twoFactorPage` with it instead of a code: see Passkeys.
+
+## Passkeys
+
+Passkeys are made for `url`'s host and checked against its origin: `passkeys: { rpId, origins }` widens them to a parent domain, or lists every origin the pages are served from. The browser side is `@simplewebauthn/browser`'s `startRegistration` and `startAuthentication`, in an island; each method below gives the options to pass it, kept as a challenge in the session that works once, for five minutes.
+
+```ts
+// In an island on the account page, `passkeyOptions` and `addPasskey` being the app's actions calling `auth.passkeyRegistrationOptions()` and `auth.registerPasskey(response, name)`
+const { options } = await actions.passkeyOptions()
+await actions.addPasskey({ response: await startRegistration({ optionsJSON: options }), name })
+```
+
+- `passkeyRegistrationOptions()` and `registerPasskey(response, name?)` add a passkey to the signed-in user, named as given or after the browser and system it was made on (`Safari on macOS`), and mail them. A passkey is a way in, so adding one needs a session that signed in or re-proved in the last ten minutes, `'stale'` past that, as linking a provider does. The passkey is kept on the authenticator, so it signs in without a name typed first.
+- `passkeys()` lists `{ id, name, multiDevice, backedUp, createdAt, lastUsedAt }`; `renamePasskey(id, name)`; `removePasskey(id, proof)` re-proves first, refuses the last passkey of an account with no other way in (`'last-way-in'`), and mails the user.
+- `passkeySignInOptions()` and `signInWithPasskey(response, redirect?)` sign in with a passkey alone: the options name no account, so the browser offers every passkey it holds for the site, and with `startAuthentication({ optionsJSON, useBrowserAutofill: true })` offers them in the autofill of a field with `autocomplete="username webauthn"`. The passkey must verify the user (a PIN, a fingerprint), so it is two factors in one and no second factor is asked after it. Errors: `'expired'` (no challenge, or one spent), `'invalid'`, `'limited'`.
+- `twoFactorPasskeyOptions()` and `verifyTwoFactorPasskey(response)` answer a sign-in waiting at the `twoFactorPage` with one of the user's passkeys, as `verifyTwoFactor` does with a code.
+- `passkeyProofOptions()` gives the options for a re-proof; the answer goes in as `{ passkey: response }` wherever a proof is asked, and stands for the password and the second factor both.
+- The authenticator's signature counter is checked: an answer that does not count past the last one, as a cloned key sends, is refused. Passkeys are stored as their public key only.
 
 ## Re-proof
 
-Changing what protects the account takes a `proof`: `changePassword`, `changeEmail`, `setUpTwoFactor`, `disableTwoFactor`, `regenerateRecoveryCodes`, `unlink`, `deleteAccount` and `createToken`.
+Changing what protects the account takes a `proof`: `changePassword`, `changeEmail`, `setUpTwoFactor`, `disableTwoFactor`, `regenerateRecoveryCodes`, `unlink`, `removePasskey`, `deleteAccount` and `createToken`.
 
+- `{ passkey }`, the answer to `passkeyProofOptions()`, from any user with a passkey.
 - `{ password }` when the user has a password; otherwise `{ code }`, an authenticator or recovery code, when they have a second factor. `disableTwoFactor` and `regenerateRecoveryCodes` take the `{ code }` even from a user with a password, so the password alone cannot undo what stands behind it.
 - A user with neither proves nothing but a sign-in under ten minutes old: past that, the method answers `'stale'` and the page asks them to sign in again first. A stolen session thus cannot set a password and an address and keep the account.
 - `auth.reprove(proof)` proves the user without changing anything, as before linking a provider. Any proof counts for ten minutes, as a sign-in does.
@@ -264,7 +283,7 @@ A change to what protects an account is mailed to its verified address, never an
 - `new-sign-in`: a device or network the account had not used before; the first sign-in has nothing to compare against. The mail links to `sessionsPage` when the app has one.
 - `password-changed`, `two-factor-enabled`, `two-factor-disabled`, `recovery-code-used`, `recovery-codes-regenerated`, `account-deleted`.
 - `email-changed`, mailed to the address left, `detail` the new one.
-- `provider-linked` and `provider-unlinked`, `detail` the provider; `token-created`, `detail` its label.
+- `provider-linked` and `provider-unlinked`, `detail` the provider; `passkey-added` and `passkey-removed`, `detail` its name; `token-created`, `detail` its label.
 
 ## Bots and breached passwords
 
@@ -295,8 +314,8 @@ Attempts are counted in the store, so every process shares them, per client addr
 ## Stores
 
 - `memoryStore()` keeps everything in the process: for tests, and for trying kayjs-auth before a database is wired.
-- `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps it in Postgres through pg-orm, once `authTables` are among the `Database`'s tables: `auth_user`, `auth_identity`, `auth_token`, `auth_recovery_code`, `auth_bearer_token`, `auth_session` and `auth_attempt`, the others deleted with their user.
-- Any object with the `AuthStore` methods is a store: `users`, `identities`, `tokens`, `recoveryCodes`, `bearerTokens`, `sessions` and `attempts`, each method sync or async. What must hold is written on each method: emails are looked up exactly, usernames without case; a mailed token, a recovery code and a TOTP step are spent once even by two requests together; deleting a user deletes what kayjs-auth keeps for them.
+- `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps it in Postgres through pg-orm, once `authTables` are among the `Database`'s tables: `auth_user`, `auth_identity`, `auth_token`, `auth_recovery_code`, `auth_bearer_token`, `auth_session`, `auth_passkey` and `auth_attempt`, the others deleted with their user.
+- Any object with the `AuthStore` methods is a store: `users`, `identities`, `tokens`, `recoveryCodes`, `bearerTokens`, `sessions`, `passkeys` and `attempts`, each method sync or async. What must hold is written on each method: emails are looked up exactly, usernames without case; a mailed token, a recovery code and a TOTP step are spent once even by two requests together; deleting a user deletes what kayjs-auth keeps for them.
 - A store over an app's own tables: `users.create(user)` answers the user as stored when the store picks its own id, such as a serial column's, `user` whole with only its `id` changed, and kayjs-auth goes on with it (ids are strings, so the store converts); answering nothing keeps the id kayjs-auth picked. TOTP secrets are stored sealed with the auth `secret`: a store whose rows hold plain base32 secrets from before seals each on read with `sealTotpSecret(secret, userId, plain)`, from `@kaynooo/kayjs-auth`, `secret` being the value `createAuth` takes, a list included. A plain base32 value matches `/^[A-Z2-7]+=*$/`, which a sealed one in practice never does, and what kayjs-auth writes afterwards is sealed already.
 
 ## Testing

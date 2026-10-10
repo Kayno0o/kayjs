@@ -1,7 +1,7 @@
 import type { LinkType } from './store'
 
 // A change to what protects an account, mailed to its verified address and given to `onEvent`.
-export type SecurityEvent = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'token-created' | 'account-deleted'
+export type SecurityEvent = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'account-deleted'
 
 // What a mail is about: a link to follow, or news of a change to the account.
 export type MailKind = LinkType | SecurityEvent
@@ -109,6 +109,8 @@ export const defaultTemplates: Templates = {
   'recovery-codes-regenerated': data => noticeMail(data, 'New recovery codes', `Your ${data.site} account has a new set of recovery codes, and the old ones no longer work.`),
   'provider-linked': data => noticeMail(data, 'Account linked', `A ${data.detail} account can now sign into your ${data.site} account.`),
   'provider-unlinked': data => noticeMail(data, 'Account unlinked', `Your ${data.detail} account no longer signs into your ${data.site} account.`),
+  'passkey-added': data => noticeMail(data, 'New passkey', `A passkey named ${data.detail} can now sign into your ${data.site} account.`),
+  'passkey-removed': data => noticeMail(data, 'Passkey removed', `The passkey named ${data.detail} no longer signs into your ${data.site} account.`),
   'token-created': data => noticeMail(data, 'New access token', `An access token named ${data.detail} was created for your ${data.site} account.`),
   'account-deleted': data => noticeMail(data, 'Account deleted', `Your ${data.site} account was deleted.`, 'If this was not you, contact the site at once.'),
 }
