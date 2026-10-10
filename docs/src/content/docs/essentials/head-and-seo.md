@@ -46,6 +46,14 @@ Without `site` in the config, kay reads it from `SITE_URL`, so one build serves 
 
 </Callout>
 
+Any other tag every page carries, such as an analytics script, goes in `head`, written as a `head` block compiles it. The content security policy lets an inline one through:
+
+```ts
+export default defineConfig({
+  head: [{ tag: 'script', props: { src: '/stats.js', defer: true } }],
+})
+```
+
 ## Social card
 
 `seo.image` is the default `og:image`. A page can set its own, cut to the 1200x630 card with `shareImage()` or drawn from its title with `shareCard()`, both from `kay/image`:

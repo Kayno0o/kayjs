@@ -35,6 +35,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | --- | --- |
 | `site` | The public origin, for canonical links, the sitemap and social URLs. `SITE_URL` when left out. See [Head and SEO](/essentials/head-and-seo) |
 | `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
+| `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
 | `favicon` | A square image of 512 px or more, served as the favicon and the manifest icons. `false` serves none |
 | `manifest` | The web manifest: `shortName`, `themeColor`, `display` |
 | `offline` | A service worker keeping the build's files and some pages for offline visitors |
@@ -51,7 +52,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `base` | Where the site is mounted when not at its host's root, `/docs` |
 | `trailingSlash` | `never` (the default), `always` or `ignore` |
 | `prefetch` | When links are fetched ahead: `moderate` (on hover) by default |
-| `extensions` | What libraries add: their pages under a prefix, which an app file at the same path replaces, their message catalogs, and page hooks. See [Routing](/essentials/routing#pages-from-a-library) |
+| `extensions` | What libraries add: their pages and API modules under a prefix, which an app file at the same path replaces, their message catalogs, config laid under the app's, and page hooks. See [Routing](/essentials/routing#pages-from-a-library) |
 | `navigation` | The in-place page swap, on by default. `false` loads every page fully. See [Islands](/essentials/islands) |
 
 ## Content and i18n

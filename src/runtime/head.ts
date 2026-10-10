@@ -277,7 +277,7 @@ function tagMarkup(tag: HeadTag): string {
   if (VOID_TAGS.has(tag.tag))
     return `<${tag.tag}${attributes}>`
 
-  const content = tag.tag === 'script' ? scriptText(tag) : tag.tag === 'style' ? text(tag).replace(STYLE_END, '<\\/$1') : escape(text(tag))
+  const content = tag.tag === 'script' ? scriptText(tag) : tag.tag === 'style' ? inlineText(tag) ?? '' : escape(text(tag))
 
   return `<${tag.tag}${attributes}>${content}</${tag.tag}>`
 }
@@ -291,6 +291,17 @@ function scriptText(tag: HeadTag): string {
   const json = typeof children === 'string' ? children : JSON.stringify(children ?? null)
 
   return json.replace(JSON_LT, '\\u003c')
+}
+
+// The text an inline script or style renders with, which the content security policy hashes; undefined for any other tag, a script with a source or a JSON one.
+export function inlineText(tag: HeadTag): string | undefined {
+  if (tag.props.children == null || (tag.tag !== 'script' && tag.tag !== 'style'))
+    return undefined
+
+  if (tag.tag === 'style')
+    return text(tag).replace(STYLE_END, '<\\/$1')
+
+  return tag.props.src == null && !JSON_TYPE.test(String(tag.props.type ?? '')) ? scriptText(tag) : undefined
 }
 
 function text(tag: HeadTag): string {

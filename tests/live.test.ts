@@ -42,7 +42,7 @@ describe('API modules', () => {
       { file: join(apiDir, 'chat.ts'), mount: '/api/chat', guards: [] },
       { file: join(apiDir, 'index.ts'), mount: '/api', guards: [] },
       { file: join(apiDir, 'party.ts'), mount: '/api/party', guards: [] },
-      { file: join(apiDir, 'private/index.ts'), mount: '/api/private', guards: [join(apiDir, 'private/_guard.ts')] },
+      { file: join(apiDir, 'private/index.ts'), mount: '/api/private', guards: [{ file: join(apiDir, 'private/_guard.ts'), path: 'private/_guard.ts' }] },
     ])
     expect(await (await site.fetch('/api')).json()).toEqual({ ok: true })
     expect((await site.fetch('/api/_helpers')).status).toBe(404)
@@ -192,7 +192,7 @@ describe('API modules', () => {
     const outdir = await mkdtemp(join(tmpdir(), 'kay-live-'))
 
     try {
-      const build = await Bun.build({ entrypoints: [join(fixture, 'src/components/chat.kay')], outdir, target: 'browser', plugins: [apiStubs(apiDir, await scanApi(apiDir)), kay()] })
+      const build = await Bun.build({ entrypoints: [join(fixture, 'src/components/chat.kay')], outdir, target: 'browser', plugins: [apiStubs([apiDir], await scanApi(apiDir)), kay()] })
       const code = await build.outputs[0]!.text()
 
       expect(build.success).toBe(true)

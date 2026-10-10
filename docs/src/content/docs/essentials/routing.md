@@ -127,6 +127,6 @@ export default defineConfig({ extensions: [authPages()] })
 
 Its pages serve under their prefix, `/auth/login`, inside your layouts and guards. To change one, put your own file at the same path, `src/routes/auth/login.kay`: it replaces that page alone, and the library's others stay.
 
-<ReadMore href="/llms/components#extensions">Writing an extension, its layouts and messages, and page hooks.</ReadMore>
+<ReadMore href="/llms/components#extensions">Writing an extension, its layouts, messages, API modules and config, and page hooks.</ReadMore>
 
 <ReadMore href="/llms/routing">Matchers, server islands, rewrites, base path and static export are in the full routing reference.</ReadMore>

@@ -18,7 +18,7 @@ import { IMAGE_ROUTE } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
 import { overHttps, registerActionRoutes } from './actions'
-import { scanApi, serveApi, sharedGuards } from './api'
+import { projectApi, serveApi, sharedGuards } from './api'
 import { basePath, rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { bundled } from './bundle'
@@ -217,12 +217,12 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (options.inlineStyles === true && !options.dev)
     client.inlineStyles = await readInlineStyles(client, base)
 
-  const { head, styles } = await configHead(root, options, client.dir, bundle !== undefined)
+  const { head, scripts, styles } = await configHead(root, options, client.dir, bundle !== undefined)
   const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head, base, maxDensity, offline: options.offline !== undefined && !options.dev }
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
-  const security = securityHeaders({ ...options, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) })
+  const security = securityHeaders({ ...options, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) })
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])
 
@@ -342,7 +342,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   const matchers = await loadMatchers(routesDir, routes)
   const actionOptions = { dev: options.dev, onError: options.onError, i18n: locales, base }
-  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
+  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? projectApi(root, options)])
 
   const api = await serveApi(app, apiModules, actionOptions)
   const openapi = openApiSettings(options.openapi)

@@ -28,7 +28,7 @@ import { isLint, isLintGroup, LEVELS, lintLevels, typeLint } from '../compiler/l
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
-import { scanApi } from '../server/api'
+import { projectApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
@@ -160,7 +160,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push(fromCompile(file, source, diagnostic))
   }
 
-  const [routes, found, apiModules] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
+  const [routes, found, apiModules] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(root, options, diagnostics)])
   const publicPaths = [...found, ...htmlFallbacks(found, servedPaths(routes))]
 
   // A param a matcher kay ships checks is named after it, `:integer`, so a link filling it with a literal is checked as the matcher would; any other is `:`.
@@ -351,7 +351,7 @@ function settingsCheck(root: string, settings: Record<string, string>, diagnosti
 
 // Each default export the server calls, a guard's, an API module's or a matcher's, assigned to the type it is called as, so a wrong one is a type error at its file rather than a refusal at boot.
 function exportsCheck(root: string, routesDir: string, routes: Route[], api: ApiModule[]): { code: string, lines: Map<number, { file: string, wanted: string }> } {
-  const guards = new Set([...routes.flatMap(route => route.guards.map(guard => guard.file)), ...api.flatMap(module => module.guards)])
+  const guards = new Set([...routes.flatMap(route => route.guards.map(guard => guard.file)), ...api.flatMap(module => module.guards.map(guard => guard.file))])
   const matchers = new Set(routes.flatMap(route => Object.values(route.matchers ?? {})).map(matcher => matcherSource(routesDir, matcher)).filter((source): source is string => source !== undefined && source !== 'kay'))
   const entries = [
     ...[...guards].map(file => ({ file, type: 'Guard', wanted: 'a guard by default: export default guard(ctx => ...)' })),
@@ -378,12 +378,12 @@ function exportsCheck(root: string, routesDir: string, routes: Route[], api: Api
 }
 
 // The API modules, or none with the reason the server would refuse them reported at the directory.
-async function apiModulesOf(apiDir: string, diagnostics: CheckDiagnostic[]): Promise<ApiModule[]> {
+async function apiModulesOf(root: string, options: CheckOptions, diagnostics: CheckDiagnostic[]): Promise<ApiModule[]> {
   try {
-    return await scanApi(apiDir)
+    return await projectApi(root, options)
   }
   catch (error) {
-    diagnostics.push({ file: apiDir, line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
+    diagnostics.push({ file: resolve(root, options.api ?? 'src/api'), line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
 
     return []
   }

@@ -2,6 +2,7 @@ import type { KayConfig, SeoConfig, TrailingSlash } from '../config'
 import type { HeadOptions, HeadTag, ImageSize } from '../runtime/head'
 import type { LocaleCopy } from './i18n'
 import { join, resolve } from 'node:path'
+import { inlineText } from '../runtime/head'
 import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { jsonLd } from '../runtime/seo'
@@ -18,10 +19,11 @@ const CARD_FILE = /^\/_kay\/images\/card-[\da-z]+\.jpg$/
 // The head options of one response, from its URL and status.
 export type SeoHead = (url: URL, status: number) => HeadOptions
 
-// Everything kay.config.ts gives every page's head: the fonts, the favicon, then `site` and `seo`, with the inline styles among them for the content security policy.
+// Everything kay.config.ts gives every page's head: the fonts, the favicon, its `head`, then `site` and `seo`, with the inline scripts and styles among them for the content security policy.
 // An executable reads the fonts `kay build` recorded, its project being elsewhere; anything else writes them from their files.
-export async function configHead(root: string, config: KayConfig, clientDir: string, bundled = false): Promise<{ head: SeoHead | undefined, styles: string[] }> {
+export async function configHead(root: string, config: KayConfig, clientDir: string, bundled = false): Promise<{ head: SeoHead | undefined, scripts: string[], styles: string[] }> {
   const extra: HeadTag[] = []
+  const scripts: string[] = []
   const styles: string[] = []
   const dir = join(clientDir, '..')
 
@@ -42,10 +44,19 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   if (config.manifest?.themeColor !== undefined)
     extra.push({ tag: 'meta', props: { name: 'theme-color', content: config.manifest.themeColor } })
 
+  for (const tag of config.head ?? []) {
+    const inline = inlineText(tag)
+
+    extra.push(tag)
+
+    if (inline !== undefined)
+      (tag.tag === 'script' ? scripts : styles).push(inline)
+  }
+
   const social = config.site !== undefined || config.seo !== undefined
   const sizeOf = social ? await cardImageSizes(resolve(root, config.publicDir ?? 'public')) : undefined
 
-  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf), styles }
+  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf), scripts, styles }
 }
 
 // The pixel size of a card image named by its path: an imported image's, a public file's, read once here, and a share card's 1200x630.

@@ -1,9 +1,12 @@
+import type { BunPlugin } from 'bun'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { parse } from 'devalue'
+import { t } from 'elysia'
+import { mergeConfig } from '../src/config'
 import { routeMounts, scanRoutes } from '../src/server/routes'
 
 const CLI = resolve('src/cli.ts')
@@ -155,6 +158,59 @@ process.exit(0)
   'lib/routes/login.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const signIn = action(t.Object({ name: t.String({ maxLength: 50 }) }), ({ name }) => ({ signedIn: name }))\n---\nform(action={signIn})\n  input(name="name")\n  button Sign in\n',
 }
 
+// An app with a library serving API modules under `/api/auth` and laying its config under the app's, which also has a head of its own.
+const SERVED_API: Record<string, string> = {
+  'package.json': JSON.stringify({ name: 'app', dependencies: { 'kay-lib': '*' } }),
+  'tsconfig.json': TSCONFIG,
+  'kay.config.ts': `import { defineConfig } from 'kay/server'
+import { authApi } from 'kay-lib'
+
+export default defineConfig({ seo: { name: 'App' }, head: [{ tag: 'meta', props: { name: 'app', content: 'mine' } }], openapi: true, extensions: [authApi()] })
+`,
+  'src/routes/index.kay': '---\nimport Who from \'../components/who.kay\'\n---\np.home home\nWho\n',
+  'src/components/who.kay': '---\nimport { resource } from \'kay\'\nimport session from \'kay-lib/api/session\'\n\nconst who = resource(session, \'/\')\n---\np.who {who.value()?.from}\n',
+  'src/api/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (request.headers.has(\'x-deny\'))\n    deny(403, \'denied\')\n})\n',
+  'src/api/auth/me.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'app\' }))\n',
+  'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', type: 'module', exports: { '.': './index.ts', './api/*': './api/*.ts' }, peerDependencies: { kay: '*' } }),
+  'node_modules/kay-lib/index.ts': `import type { KayExtension } from 'kay/server'
+
+export const authApi = (): KayExtension => ({
+  name: 'kay-lib',
+  api: { dir: \`\${import.meta.dir}/api\`, prefix: 'auth' },
+  config: {
+    seo: { name: 'Lib', description: 'from the library' },
+    head: [{ tag: 'script', props: { children: 'window.lib = 1' } }, { tag: 'style', props: { children: '.lib { color: teal }' } }],
+    redirects: { '/old': '/' },
+  },
+})
+`,
+  'node_modules/kay-lib/api/session.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'lib\' }))\n',
+  'node_modules/kay-lib/api/me.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'lib\' }))\n',
+  'node_modules/kay-lib/api/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(401, \'no admin\'))\n',
+  'node_modules/kay-lib/api/admin/stats.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ stats: 1 }))\n',
+}
+
+const SERVE_API = `import { pages } from 'kay/server'
+
+const app = await pages({ prebuilt: true })
+const get = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(\`http://localhost\${path}\`, { headers }))
+const home = await get('/')
+const old = await get('/old')
+const status = async (path: string, headers?: Record<string, string>) => (await get(path, headers)).status
+
+console.log(JSON.stringify({
+  session: await (await get('/api/auth/session')).json(),
+  me: await (await get('/api/auth/me')).json(),
+  denied: await status('/api/auth/session', { 'x-deny': '1' }),
+  admin: await status('/api/auth/admin/stats'),
+  openapi: await (await get('/api/openapi.json')).json(),
+  home: await home.text(),
+  csp: home.headers.get('content-security-policy'),
+  old: [old.status, old.headers.get('location')],
+}))
+process.exit(0)
+`
+
 const projects = new Map<string, string>()
 
 beforeAll(async () => {
@@ -162,7 +218,7 @@ beforeAll(async () => {
 
   await mkdir(base, { recursive: true })
 
-  for (const [name, files] of [['routes', { ...FILES, 'serve.ts': SERVE }], ['messages', { ...LOCALIZED, 'serve.ts': SERVE_LOCALIZED }], ['implicit', { ...IMPLICIT, 'serve.ts': SERVE_IMPLICIT }], ['borrowed', { ...BORROWED, 'serve.ts': SERVE_LOGIN }], ['outside', OUTSIDE]] as const) {
+  for (const [name, files] of [['routes', { ...FILES, 'serve.ts': SERVE }], ['messages', { ...LOCALIZED, 'serve.ts': SERVE_LOCALIZED }], ['implicit', { ...IMPLICIT, 'serve.ts': SERVE_IMPLICIT }], ['borrowed', { ...BORROWED, 'serve.ts': SERVE_LOGIN }], ['outside', OUTSIDE], ['api', { ...SERVED_API, 'serve.ts': SERVE_API }]] as const) {
     const dir = await mkdtemp(join(base, `extension-${name}-`))
 
     await Promise.all(Object.entries(files).filter(([, content]) => content !== undefined).map(async ([path, content]) => Bun.write(join(dir, path), content)))
@@ -254,6 +310,69 @@ describe('a library\'s routes', () => {
 
     expect(code).toBe(1)
     expect([...output.matchAll(/serves (\S+?)"/g)].map(match => match[1])).toEqual(['/auth/nope', '/auth/nope'])
+  })
+})
+
+// What `SERVE_API` reports, checked the same whichever way it ran.
+function expectApiServed({ code, stdout, stderr }: { code: number, stdout: string, stderr: string }) {
+  expect(stderr).not.toContain('error')
+  expect(code).toBe(0)
+  const served = JSON.parse(stdout) as { session: unknown, me: unknown, denied: number, admin: number, openapi: { paths: Record<string, { get: { 'x-kay-guards'?: string[] } }> }, home: string, csp: string, old: [number, string] }
+  const hash = (text: string) => `'sha256-${new Bun.CryptoHasher('sha256').update(text).digest('base64')}'`
+
+  expect(served.session).toEqual({ from: 'lib' })
+  expect(served.me).toEqual({ from: 'app' })
+  // The app's guard runs before the library's modules, and the library's own before those under it.
+  expect(served.denied).toBe(403)
+  expect(served.admin).toBe(401)
+  expect(served.openapi.paths['/api/auth/session']?.get['x-kay-guards']).toEqual(['_guard.ts'])
+  expect(served.openapi.paths['/api/auth/admin/stats']?.get['x-kay-guards']).toEqual(['_guard.ts', 'auth/admin/_guard.ts'])
+  // The app's `seo.name` wins, the library's `description` fills in, and both heads are carried.
+  expect(served.home).toContain('<title>App</title>')
+  expect(served.home).toContain('<meta name="description" content="from the library">')
+  expect(served.home).toContain('<script>window.lib = 1</script>')
+  expect(served.home).toContain('<style>.lib { color: teal }</style>')
+  expect(served.home).toContain('<meta name="app" content="mine">')
+  expect(served.csp).toContain(hash('window.lib = 1'))
+  expect(served.old).toEqual([308, '/'])
+}
+
+describe('a library\'s API modules and config', () => {
+  const root = () => projects.get('api')!
+
+  it('serve under its prefix behind the app\'s guards, an app module at the same path replacing one, its config under the app\'s', async () => {
+    expectApiServed(await run([process.execPath, 'serve.ts'], root()))
+  })
+
+  it('are carried by the executable, an island reading one getting its mount and none of its code', async () => {
+    const build = await run([process.execPath, CLI, 'build', '--no-check', '--compile', 'server', '--entry', 'serve.ts'], root())
+
+    expect(build.stderr).not.toContain('error')
+    expect(build.code).toBe(0)
+    const chunks = await Array.fromAsync(new Bun.Glob('.kay/**/who-*.js').scan({ cwd: root(), dot: true }))
+
+    expect(chunks.length).toBeGreaterThan(0)
+    const island = await Bun.file(join(root(), chunks[0]!)).text()
+
+    expect(island).toContain('/api/auth/session')
+    expect(island).not.toContain('Elysia')
+    const elsewhere = join(root(), '..', `${basename(root())}-elsewhere`)
+
+    await mkdir(elsewhere, { recursive: true })
+
+    try {
+      expectApiServed(await run([join(root(), 'server')], elsewhere))
+    }
+    finally {
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('type an island\'s calls in kay check', async () => {
+    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root())
+
+    expect(`${stdout}${stderr}`).not.toContain('error')
+    expect(code).toBe(0)
   })
 })
 
@@ -454,5 +573,34 @@ describe('a library\'s route tree', () => {
 
       expect(Object.fromEntries(routes.map(route => [route.pattern, route.file]))).toEqual({ '/': join(root, 'src/routes/index.kay'), '/about': join(root, 'one/about.kay'), '/contact': join(root, 'two/contact.kay') })
     })
+  })
+})
+
+describe('an extension\'s config', () => {
+  const plugin = (name: string): BunPlugin => ({ name, setup: () => undefined })
+
+  it('lies under the app\'s: objects merged key by key, arrays joined in the order listed, the app\'s value winning', () => {
+    const config = mergeConfig({
+      lang: 'fr',
+      plugins: [plugin('app')],
+      security: { csp: { 'img-src': ['https://app.example'] } },
+      extensions: [
+        { name: 'one', config: { lang: 'en', minify: false, plugins: [plugin('one')], security: { csp: { 'img-src': ['https://one.example'], 'font-src': ['https://fonts.example'] } } } },
+        { name: 'two', config: { minify: true, plugins: [plugin('two')] } },
+      ],
+    }, {})
+
+    expect(config.lang).toBe('fr')
+    expect(config.minify).toBe(true)
+    expect(config.plugins?.map(each => each.name)).toEqual(['one', 'two', 'app'])
+    expect(config.security).toEqual({ csp: { 'img-src': ['https://one.example', 'https://app.example'], 'font-src': ['https://fonts.example'] } })
+  })
+
+  it('keeps a schema whole, and follows the extensions options given in code name', () => {
+    const schema = t.Object({ MAP_KEY: t.String() })
+    const config = mergeConfig({ publicEnv: schema, extensions: [{ name: 'file', config: { lang: 'de' } }] }, { extensions: [{ name: 'code', config: { lang: 'it', publicEnv: t.Object({ OTHER: t.String() }) } }] })
+
+    expect(config.publicEnv).toBe(schema)
+    expect(config.lang).toBe('it')
   })
 })

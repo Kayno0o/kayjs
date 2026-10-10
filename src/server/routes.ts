@@ -268,6 +268,11 @@ export function routeMounts(root: string, extensions: KayExtension[] = []): Rout
   return extensions.flatMap(({ routes }) => routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix) }] : [])
 }
 
+// The API directories each extension in `extensions` mounts, reached as its routes are.
+export function apiMounts(root: string, extensions: KayExtension[] = []): RouteMount[] {
+  return extensions.flatMap(({ api }) => api ? [{ dir: throughLinks(root, resolve(root, api.dir)), prefix: mountPrefix(api.prefix) }] : [])
+}
+
 // `/auth` for `auth`, `/auth/` and `/auth`; `''` for the root.
 function mountPrefix(prefix = '/'): string {
   const trimmed = prefix.replace(EDGE_SLASHES, '')
@@ -276,7 +281,7 @@ function mountPrefix(prefix = '/'): string {
 }
 
 // The file a directory of the URL tree holds under `name`: the app's, else the first mounted library's.
-function fileAt(trees: RouteMount[], at: string, name: string): string | undefined {
+export function fileAt(trees: RouteMount[], at: string, name: string): string | undefined {
   for (const { dir, prefix } of trees) {
     if (at === prefix || at.startsWith(`${prefix}/`)) {
       const file = join(dir, at.slice(prefix.length), name)
@@ -298,7 +303,7 @@ function virtualDir(trees: RouteMount[], dir: string): string {
 }
 
 // From `at` up to the root of the URL tree, both included: `/a/b`, `/a`, `''`.
-function directoriesUp(at: string): string[] {
+export function directoriesUp(at: string): string[] {
   const dirs = [at]
   let current = at
 

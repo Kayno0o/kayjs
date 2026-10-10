@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { ActionOptions } from './actions'
+import type { ApiGuard } from './api'
 import type { LoadedGuard } from './guards'
-import { dirname, relative } from 'node:path'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
 import { API_PREFIX } from './api'
@@ -21,7 +21,7 @@ export interface MountedApi {
   file: string
   mount: string
   instance: Elysia
-  guards: string[]
+  guards: ApiGuard[]
 }
 
 type Schema = Record<string, unknown>
@@ -60,7 +60,6 @@ const TRAILING_SLASH = /(?<=.)\/$/
 const DATE = 'Date'
 const BYTES = 'Uint8Array'
 const BINARY = { type: 'string', format: 'binary' }
-const MODULE_FILE = /(?:\/index)?\.ts$/
 
 type Route = MountedApi['instance']['routes'][number]
 
@@ -108,7 +107,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
           ...parameters(path, hooks),
           ...hooks.body !== undefined && { requestBody: { required: true, content: content(hooks.body, holdsFile(hooks.body) ? 'multipart/form-data' : 'application/json') } },
           responses: responses(hooks.response),
-          ...module.guards.length > 0 && { 'x-kay-guards': module.guards.map(file => relative(apiDir(module), file)) },
+          ...module.guards.length > 0 && { 'x-kay-guards': module.guards.map(guard => guard.path) },
         }
         const methods = paths[path] ??= {}
 
@@ -125,13 +124,6 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   }
 
   return { openapi: '3.1.0', info: { title: options.title, version: options.version }, servers: [{ url: options.base || '/' }], paths }
-}
-
-// The API directory a module sits in, read back from its file and the path it is mounted at, so the document names guards by where they sit there, whatever machine built the server.
-function apiDir(module: MountedApi): string {
-  const path = module.file.replace(MODULE_FILE, '')
-
-  return path.slice(0, path.length - (module.mount.length - API_PREFIX.length)) || dirname(module.file)
 }
 
 function parameters(path: string, hooks: Record<string, unknown>): { parameters?: Schema[] } {

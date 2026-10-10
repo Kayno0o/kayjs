@@ -12,7 +12,7 @@ import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { runInLocale } from '../runtime/locale-state'
 import { setSite, standInReads } from '../runtime/site'
-import { scanApi } from './api'
+import { projectApi } from './api'
 import { basePath } from './base'
 import { setupCards } from './card'
 import { PRERENDERED_DIR, readInlineStyles, readManifest, writeManifest } from './client'
@@ -178,7 +178,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
     }
   }
 
-  const apiProblems = options.exportAll ? (await scanApi(resolve(root, config.api ?? 'src/api'))).map(module => `${relative(root, module.file)}: an API module answers requests, which only a server does`) : []
+  const apiProblems = options.exportAll ? (await projectApi(root, config)).map(module => `${relative(root, module.file)}: an API module answers requests, which only a server does`) : []
 
   if (problems.length > 0 || apiProblems.length > 0)
     throw new ExportError(`kay: ${[count(problems.length, 'page'), count(apiProblems.length, 'API module')].filter(part => part !== '').join(' and ')} cannot be exported to static files, which no server answers for:\n${[...problems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)

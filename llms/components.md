@@ -94,7 +94,13 @@ A library hands the app one value to list in `extensions` in `kay.config.ts`, ty
 import type { KayExtension } from 'kay/server'
 
 export function authPages({ prefix = '/auth' } = {}): KayExtension {
-  return { name: '@kaynooo/kayjs-auth', routes: { dir: `${import.meta.dir}/routes`, prefix }, messages: `${import.meta.dir}/messages` }
+  return {
+    name: '@kaynooo/kayjs-auth',
+    routes: { dir: `${import.meta.dir}/routes`, prefix },
+    api: { dir: `${import.meta.dir}/api`, prefix },
+    messages: `${import.meta.dir}/messages`,
+    config: { head: [{ tag: 'meta', props: { name: 'referrer', content: 'same-origin' } }] },
+  }
 }
 ```
 
@@ -113,6 +119,8 @@ export default defineConfig({ extensions: [authPages()] })
 - `kay check` lets links point at its pages; type errors inside its files are the library's own check's.
 - Param matchers a library route names come from the app's `src/params` or kay's built-ins.
 - Two extensions mounting a page at the same path: the first listed serves it.
+- `api` lays a directory of API modules over the app's `src/api` at `prefix` the same way: `api/session.ts` serves `/api/auth/session` unless the app has `src/api/auth/session.ts`, the app's `_guard.ts` files run before the library's, and the server, the executable, `testSite`, the OpenAPI document and an island importing one, typed in `kay check`, see them as the app's own. A static export refuses them as it refuses the app's.
+- `config` lies under the app's `kay.config.ts`, read by every command as if the app wrote it: objects merge key by key, arrays join with the extension's items first, and any other value the app sets wins, as does a later extension's over an earlier one's. A library needing Bun plugins for its files lists them in `config.plugins`, tags every page carries in `config.head`, a CSP source in `config.security.csp`.
 - `kay dev` watches the app's files, not `node_modules`: after editing a linked library's pages, restart it.
 - `messages` names a directory of catalogs, `<locale>.ts` each, laid under the app's `src/messages` key by key, with or without `i18n`: see [Locales](locales.md).
 - `transformPage` rewrites each prerendered page before it is written: see [Page hooks](routing.md#page-hooks).

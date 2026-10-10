@@ -1,6 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { LintLevels } from './compiler/lints'
 import type { Duration } from './runtime/duration'
+import type { HeadTag } from './runtime/head'
 import type { JsonLd } from './runtime/seo'
 import type { EnvSchema } from './server/env'
 import type { RequestLogger } from './server/log'
@@ -27,6 +28,8 @@ export interface KayConfig {
   // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, so one build serves each host it is deployed to.
   site?: string | undefined
   seo?: SeoConfig | undefined
+  // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
+  head?: HeadTag[] | undefined
   images?: ImagesConfig | undefined
   // A square image, relative to the root, 512 pixels wide or more for sharp icons, a smaller one enlarged with a warning: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. `{ image, svg }` adds an SVG of it, served as `/favicon.svg` and linked after the ICO. Defaults to kay's own mark; `false` serves none.
   favicon?: string | FaviconConfig | false | undefined
@@ -232,12 +235,16 @@ export interface I18nConfig {
   messages?: string | undefined
 }
 
-// What a library hands the app to list in `extensions`: pages it serves and the texts they show, as if they were the app's own.
+// What a library hands the app to list in `extensions`: pages it serves, the texts they show and the config it needs, as if they were the app's own.
 export interface KayExtension {
   name: string
+  // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`.
+  config?: Omit<KayConfig, 'extensions'> | undefined
   // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
-  // It and `messages` are absolute, as a library gives them from `import.meta.dir`, or relative to the project root.
+  // Its directories are absolute, as a library gives them from `import.meta.dir`, or relative to the project root.
   routes?: { dir: string, prefix?: string | undefined } | undefined
+  // A directory of API modules laid over the app's under `prefix`, the root by default, as `routes` is over its pages: `{ dir: 'api', prefix: 'auth' }` serves `api/session.ts` at `/api/auth/session`, unless the app has `src/api/auth/session.ts`.
+  api?: { dir: string, prefix?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.
   messages?: string | undefined
   // Called with each page `kay build` prerenders, once the files it links are written and before it is compressed, and again when the server renders it afresh: returns the HTML to write.
@@ -257,17 +264,61 @@ export function defineConfig<Config extends KayConfig>(config: Config): Config {
 }
 
 export async function loadConfig(root: string): Promise<KayConfig> {
+  return withSiteUrl(withExtensions(await importConfig(root)))
+}
+
+// The config as `kay.config.ts` writes it, its extensions' config not laid under it yet.
+async function importConfig(root: string): Promise<KayConfig> {
   const file = join(root, CONFIG_FILE)
 
   if (!existsSync(file))
-    return withSiteUrl({})
+    return {}
 
   const { default: config } = await import(file) as { default?: KayConfig }
 
   if (typeof config !== 'object' || config === null)
     throw new Error(`kay: ${CONFIG_FILE} must export its config by default: export default defineConfig({ ... })`)
 
-  return withSiteUrl(config)
+  return config
+}
+
+// The config with each extension's own laid under it, a later extension's over an earlier one's.
+function withExtensions<Config extends KayConfig>(config: Config): Config {
+  const layers = (config.extensions ?? []).flatMap(extension => extension.config === undefined ? [] : [extension.config])
+
+  if (layers.length === 0)
+    return config
+
+  return underlay(layers.reduce<KayConfig>((under, layer) => underlay(under, layer) as KayConfig, {}), config) as Config
+}
+
+// `over` merged onto `under`: plain objects key by key, arrays joined, anything else `over`'s unless it leaves it undefined.
+function underlay(under: unknown, over: unknown): unknown {
+  if (over === undefined)
+    return under
+
+  if (Array.isArray(under) && Array.isArray(over))
+    return [...under, ...over]
+
+  if (!isPlainObject(under) || !isPlainObject(over))
+    return over
+
+  const merged: Record<string, unknown> = { ...under }
+
+  for (const [key, value] of Object.entries(over))
+    merged[key] = underlay(under[key], value)
+
+  return merged
+}
+
+// A schema such as `publicEnv`'s carries symbol keys a merge would drop, so it stays whole like any value built by a class.
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Object.getOwnPropertySymbols(value).length > 0)
+    return false
+
+  const prototype: unknown = Object.getPrototypeOf(value)
+
+  return prototype === Object.prototype || prototype === null
 }
 
 function withSiteUrl<Config extends KayConfig>(config: Config): Config {
@@ -278,9 +329,10 @@ function withSiteUrl<Config extends KayConfig>(config: Config): Config {
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
 export async function withConfig<Options extends KayConfig>(root: string, options: Options): Promise<KayConfig & Options> {
-  return mergeConfig(await loadConfig(root), options)
+  return mergeConfig(await importConfig(root), options)
 }
 
+// `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.
 export function mergeConfig<Options extends KayConfig>(config: KayConfig, options: Options): KayConfig & Options {
-  return withSiteUrl({ ...config, ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) } as KayConfig & Options)
+  return withSiteUrl(withExtensions({ ...config, ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) } as KayConfig & Options))
 }

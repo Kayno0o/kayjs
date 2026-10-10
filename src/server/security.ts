@@ -12,7 +12,8 @@ export interface SecurityOptions {
   dev?: boolean | undefined
   base?: string | undefined
   offline?: KayConfig['offline'] | undefined
-  // The inline styles kay writes in every head, such as the fonts' rules.
+  // The inline scripts and styles kay writes in every head, such as the fonts' rules.
+  scripts?: string[] | undefined
   styles?: string[] | undefined
 }
 
@@ -56,7 +57,7 @@ export function securityHeaders(options: SecurityOptions): Record<string, string
   const headers: Record<string, string> = { ...HEADERS }
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
-  const hashes = inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base, offline: options.offline !== undefined && !options.dev })
+  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base, offline: options.offline !== undefined && !options.dev }), ...(options.scripts ?? []).map(sourceHash)]
   const styles = (options.styles ?? []).map(sourceHash)
   const reportTo = reports === true ? `${base}${CSP_REPORTS}` : reports
 

@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG } from '../content/server'
-import { scanApi } from '../server/api'
+import { projectApi } from '../server/api'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
@@ -67,8 +67,8 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   const extensionMessages = Object.fromEntries(locales.map(locale => [locale, extensionMessageFiles(root, config.extensions, locale).filter(file => existsSync(file))]))
   const messageFiles = [...Object.values(extensionMessages).flat(), ...locales.map(locale => messagesFile(root, config.i18n ?? {}, locale)).filter(file => existsSync(file))]
   // The API modules too, with their guards, which `pages()` mounts from the list rather than the directory.
-  const api = await scanApi(resolve(root, config.api ?? 'src/api'))
-  const modules = [...new Set([...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...api.flatMap(module => [module.file, ...module.guards])])]
+  const api = await projectApi(root, config)
+  const modules = [...new Set([...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...api.flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
   const configFile = join(root, CONFIG_FILE)
   const generated = join(root, '.kay', 'compile', 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
