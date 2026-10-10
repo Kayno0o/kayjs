@@ -186,6 +186,8 @@ describe('kay build --static', () => {
 
     expect(missing.status).toBe(404)
     expect(missing.text).toContain('<h1>Nothing here</h1>')
+    // Written by the export rather than prerendered, it goes through the page hooks all the same.
+    expect(missing.text).toMatch(/<!--linked from \/404\.html: [^>]*\.css[^>]*--><\/body>/)
   })
 
   it('turns a redirect into a page sending the browser on, and lists every one in _redirects', async () => {

@@ -6,6 +6,7 @@ import { cp, mkdir, readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
+import { pageHooks } from '../config'
 import { feedPaths, projectCollections } from '../content/server'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
@@ -18,6 +19,7 @@ import { PUBLIC_ENV_PATH } from '../server/env'
 import { faviconPaths } from '../server/favicon'
 import { localeSettings } from '../server/i18n'
 import { SERVICE_WORKER } from '../server/offline'
+import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles } from '../server/public'
 import { siteOrigin } from '../server/seo'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
@@ -95,8 +97,11 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
 
   const missing = await app.handle(new Request(`http://localhost${MISSING}`))
 
+  // Rendered here rather than prerendered, so it goes through the page hooks as it is written.
   if (missing.status === 404 && missing.headers.get('content-type')?.startsWith('text/html')) {
-    await Bun.write(join(out, '404.html'), await missing.text())
+    const files = assetFiles({ clientDir: client.dir, publicDir, base: basePath(config.base), aspects: config.images?.aspects })
+
+    await Bun.write(join(out, '404.html'), await applyPageHooks(pageHooks(config.extensions), '/404.html', await missing.text(), files))
     written.push(join(out, '404.html'))
   }
 

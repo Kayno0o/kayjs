@@ -132,7 +132,7 @@ export const pageWeight: KayExtension = {
 }
 ```
 
-- It runs in `kay build`, `--static` included, once the image variants, share cards and favicons the page links are written and before the pages are compressed, and again on each page the server renders afresh, by its `revalidate` period, `invalidatePage` or for another site, so a page never loses what it added. A site without one pays nothing; `kay dev` renders pages per request and calls none.
+- It runs in `kay build`, `--static` included, the `404.html` a static export writes too with `/404.html` as its `path`, once the image variants, share cards and favicons the page links are written and before the pages are compressed, and again on each page the server renders afresh, by its `revalidate` period, `invalidatePage` or for another site, so a page never loses what it added. A site without one pays nothing; `kay dev` renders pages per request and calls none.
 - It gets `path`, the path the page serves without the base, a locale's under its segment, and `html`, holding any server island or form stamp the server fills per request, which it leaves in place. Several extensions' hooks run in their order, each given the HTML the one before returned.
 - `file(url)` gives the absolute path of the file serving a root-relative URL the page links, under the base and as an attribute holds it, `&amp;` included: a stylesheet, script or font of the build, an image variant, a public file or a favicon. It gives `undefined` for any other, such as another site's or one only the server answers, as the public environment. An image route URL in a server build gives the WebP variant the build wrote, where a browser taking AVIF gets the AVIF one.
 
