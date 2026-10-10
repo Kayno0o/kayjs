@@ -12,6 +12,9 @@ import { localeCopies } from './i18n'
 import { publicFiles } from './public'
 import { slashedPath } from './routes'
 
+// The file a prerendered page's `shareCard()` links, where a page served per request links the card route.
+const CARD_FILE = /^\/_kay\/images\/card-[\da-z]+\.jpg$/
+
 // The head options of one response, from its URL and status.
 export type SeoHead = (url: URL, status: number) => HeadOptions
 
@@ -62,7 +65,7 @@ async function cardImageSizes(publicDir: string): Promise<(path: string) => Imag
   return (path) => {
     const { pathname, searchParams } = new URL(path, 'http://localhost')
 
-    if ((pathname === IMAGE_ROUTE && searchParams.has('card')) || pathname.startsWith(CARD_ROUTE) || (pathname.startsWith(VARIANTS) && pathname.endsWith('-card.jpg')))
+    if ((pathname === IMAGE_ROUTE && searchParams.has('card')) || pathname.startsWith(CARD_ROUTE) || CARD_FILE.test(pathname) || (pathname.startsWith(VARIANTS) && pathname.endsWith('-card.jpg')))
       return CARD
 
     return importedSize(path) ?? sizes.get(pathname)

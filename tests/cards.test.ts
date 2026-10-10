@@ -322,6 +322,7 @@ describe('share cards', () => {
         const link = (/<meta property="og:image" content="https:\/\/cards\.example(\/_kay\/images\/card-\w+\.jpg)">/).exec(html)?.[1]
 
         expect(link).toBeDefined()
+        expect(html).toContain('<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">')
         expect(await new Bun.Image(Bun.file(join(outdir, link!))).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
       }
     }
