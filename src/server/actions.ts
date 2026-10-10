@@ -4,6 +4,7 @@ import type { Server } from 'elysia/universal'
 import type { KayConfig } from '../config'
 import type { GuardContext, Locals } from '../runtime'
 import type { ActionContext, ServerAction } from '../runtime/action'
+import type { Locale } from '../runtime/i18n'
 import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
@@ -269,8 +270,9 @@ export function inLocale<T>(request: Request, options: ActionOptions, run: () =>
 }
 
 // What `ctx.locale` reads: the request's locale, or the site's single language.
-function contextLocale(): string {
-  return localeState()?.locale ?? ''
+function contextLocale(): Locale {
+  // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them
+  return (localeState()?.locale ?? '') as Locale
 }
 
 // The guards of the action's page, answering for it when one stops the request.
