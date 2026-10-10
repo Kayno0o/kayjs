@@ -11,10 +11,12 @@ const SECRET = 'a-fixture-secret-that-is-long-enough-for-kay'
 // Every mail the site sends, read by the test.
 export const mails: Mail[] = []
 
+export const store = memoryStore()
+
 export const auth = createAuth({
   sessions: session<AuthSessionData>({ secret: SECRET }),
   secret: SECRET,
-  store: memoryStore(),
+  store,
   url: 'http://localhost',
   site: 'Fixture',
   signInPage: '/login',
@@ -27,6 +29,7 @@ export const auth = createAuth({
     },
     links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' },
   },
+  organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' },
 })
 
 // The routes the app serves besides its pages are kayjs-auth's, so `kay check` checks links to them.

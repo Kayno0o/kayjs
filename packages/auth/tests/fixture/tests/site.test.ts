@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { totpCode, totpStep } from '../../../src/totp'
-import { auth, mails } from '../src/auth'
+import { auth, mails, store } from '../src/auth'
 
 // The fixture is served the way an app serves itself: kayjs-auth's plugin, then kay's pages.
 const ROOT = join(import.meta.dir, '..')
@@ -20,6 +20,7 @@ const { enable, setUp, signOut } = await import('../src/routes/account/index.kay
 const { verify } = await import('../src/routes/two-factor.kay')
 const { magic, password, register } = await import('../src/routes/login.kay')
 const { spend } = await import('../src/routes/magic.kay')
+const { rename } = await import('../src/routes/orgs/[org]/index.kay')
 
 afterEach(() => {
   globalThis.fetch = realFetch
@@ -85,6 +86,36 @@ describe('a kay site on kayjs-auth', () => {
 
     expect(account).toMatchObject({ url: '/account', status: 200 })
     expect(text(account.html, 'account')).toBe('magic@example.com')
+  })
+
+  test('an organization\'s guard reads its route\'s param, for its page and its actions alike', async () => {
+    const member = async (email: string, roles?: string[]) => {
+      const visitor = await browser()
+
+      await visitor.submit(register, { email, password: 'correct horse battery' }, { from: '/login' })
+
+      const { id } = (await store.users.findByEmail(email))!
+
+      if (roles)
+        await store.members!.add({ organizationId: 'o1', userId: id, roles, createdAt: new Date() })
+
+      return visitor
+    }
+
+    await store.organizations!.create({ id: 'o1', name: 'Acme', slug: 'acme', createdAt: new Date() })
+
+    const ada = await member('org-admin@example.com', ['admin'])
+    const grace = await member('org-member@example.com', ['member'])
+    const alan = await member('org-stranger@example.com')
+
+    expect(text((await ada.visit('/orgs/acme')).html, 'organization')).toBe('Acme')
+    expect((await grace.visit('/orgs/acme')).status).toBe(403)
+    expect((await alan.visit('/orgs/o1')).status).toBe(403)
+    expect(await (await browser()).visit('/orgs/acme')).toMatchObject({ url: '/login?redirect=%2Forgs%2Facme' })
+
+    expect(await ada.call(rename, { name: 'Acme Inc' }, { from: '/orgs/acme' })).toBe('Acme Inc')
+    await expect(grace.call(rename, { name: 'Taken' }, { from: '/orgs/acme' })).rejects.toThrow()
+    expect((await store.organizations!.get('o1'))!.name).toBe('Acme Inc')
   })
 
   test('the Discord link signs in through the provider and lands on the account', async () => {

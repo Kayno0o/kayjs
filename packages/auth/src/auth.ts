@@ -949,8 +949,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
           ctx.deny(401, 'Sign in to continue')
         }
 
-        // A guard sees params only once kay hands them over (kayjs #192); `memberOf` refuses without its own, never skipping the check.
-        if (guardOptions.require !== undefined && !(await authorize(user, guardOptions.require, reading ? 'read' : 'write', { params: 'params' in ctx ? ctx.params as Record<string, string> : undefined })))
+        // kay before 1.23 gives a guard no params, and `memberOf` then refuses rather than skip the check.
+        if (guardOptions.require !== undefined && !(await authorize(user, guardOptions.require, reading ? 'read' : 'write', { params: ctx.params })))
           ctx.deny(403)
 
         if (!scopeAllows(await authOf(ctx.locals).scopes(), guardOptions.scope))

@@ -107,10 +107,10 @@ export async function chooseRemember(state: RequestState, remember: boolean | un
 export async function applyLifetime(state: RequestState, remember: boolean | undefined): Promise<number | null> {
   const { core, session } = state
 
-  // kay before 1.22 has no lifetime of a session's own.
+  // kay before 1.23 has no lifetime of a session's own.
   if (!('lifetime' in session)) {
     if (remember !== undefined)
-      throw new Error('kayjs-auth: remember needs kay 1.22 or later, whose sessions take a lifetime of their own')
+      throw new Error('kayjs-auth: remember needs kay 1.23 or later, whose sessions take a lifetime of their own')
 
     return null
   }
