@@ -59,7 +59,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | --- | --- |
 | `content` | The module exporting the collections, `src/content.config.ts` by default. See [Content](/guides/content) |
 | `preview` | Lets an editor see drafts on the live site, with a `secret` |
-| `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`. See [Internationalization](/guides/i18n) |
+| `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale. See [Internationalization](/guides/i18n) |
 
 ## Assets and build
 

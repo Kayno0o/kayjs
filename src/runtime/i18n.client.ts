@@ -1,6 +1,6 @@
 import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue, RelativeTimeOptions, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, splitLocale, textDirection, translate } from './i18n'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 
 export type { Direction, Locale, LocaleSettings, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions } from './i18n'
 export { defineMessages } from './i18n'
@@ -61,11 +61,16 @@ export const localize = ((href: string, target?: string) => {
 }) as Localize
 
 export function alternate(target: Locale): string {
-  load()
-
+  const { locale: current } = translations()
   const path = withoutBase(location.pathname)
 
-  return withBase(settings ? localePath(settings, splitLocale(settings, path).path, target, location.host) : path)
+  if (!settings)
+    return withBase(path)
+
+  // The page's own path first, which its locale may translate.
+  const { locale, path: own } = splitLocale(settings, path)
+
+  return withBase(localePath(settings, untranslatedPath(settings, own, locale ?? current), target, location.host))
 }
 
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {

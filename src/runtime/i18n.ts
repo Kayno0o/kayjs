@@ -22,6 +22,8 @@ export interface LocaleSettings {
   prefixDefault: boolean
   // The host serving each locale, when locales go by domain rather than prefix.
   hosts?: Readonly<Record<string, string>> | undefined
+  // A page's path in the locales translating it, by the pattern kay serves the page under: `{ '/about': { fr: '/a-propos' } }`.
+  paths?: Readonly<Record<string, Readonly<Record<string, string>>>> | undefined
 }
 
 // What a translation reads: the messages of its locale by dotted key, then the default locale's for a key it lacks.
@@ -62,6 +64,9 @@ const directions = new Map<string, Direction>()
 // Scripts written right to left: Arabic, Hebrew, Thaana, Syriac, N'Ko, Adlam, Hanifi Rohingya, Mandaic and Samaritan.
 const RTL_SCRIPTS: ReadonlySet<string> = new Set(['Arab', 'Hebr', 'Thaa', 'Syrc', 'Nkoo', 'Adlm', 'Rohg', 'Mand', 'Samr'])
 // Each unit with its length in seconds, a relative time taking the largest one the span reaches.
+// Where a link's path ends and its query or fragment starts.
+const PATH_END = /[?#]/
+const OPTIONAL_MARK = /\?$/
 const RELATIVE_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [['year', 31_536_000], ['month', 2_592_000], ['week', 604_800], ['day', 86_400], ['hour', 3600], ['minute', 60], ['second', 1]]
 
 export type Direction = 'ltr' | 'rtl'
@@ -191,19 +196,126 @@ function cached<Value>(cache: Map<string, Value>, key: string, make: () => Value
   return value
 }
 
-// The path in that locale: under its prefix, bare for an unprefixed default, or on its own host when locales go by domain.
+// The path in that locale, translated where the locale names the page its own way: under its prefix, bare for an unprefixed default, or on its own host when locales go by domain.
 export function localePath(settings: LocaleSettings, path: string, locale: string, currentHost?: string): string {
+  const translated = translatedPath(settings, path, locale)
+
   if (settings.hosts) {
     const host = settings.hosts[locale]
 
     // Protocol-relative, so a link to another host keeps the scheme the page came over, plain http in development.
-    return host === undefined || host === currentHost ? path : `//${host}${path}`
+    return host === undefined || host === currentHost ? translated : `//${host}${translated}`
   }
 
   if (locale === settings.defaultLocale && !settings.prefixDefault)
-    return path
+    return translated
 
-  return `/${locale}${path === '/' ? '' : path}`
+  return `/${locale}${translated === '/' ? '' : translated}`
+}
+
+// A page's path as a locale writes it, `/a-propos` for `/about` in French, its params carried over; a path the locale does not translate stays as it is.
+export function translatedPath(settings: LocaleSettings, path: string, locale: string): string {
+  return repath(settings, path, locale, false)
+}
+
+// The page's path behind one a locale translates, `/about` for `/a-propos` in French.
+export function untranslatedPath(settings: LocaleSettings, path: string, locale: string): string {
+  return repath(settings, path, locale, true)
+}
+
+// The query and fragment go along; of several patterns taking the path, the one naming most of it outright wins, as the router picks `/blog/new` over `/blog/:slug`.
+function repath(settings: LocaleSettings, href: string, locale: string, back: boolean): string {
+  if (settings.paths === undefined)
+    return href
+
+  const end = href.search(PATH_END)
+  const path = end === -1 ? href : href.slice(0, end)
+  const slash = path.length > 1 && path.endsWith('/')
+  const segments = segmentsOf(slash ? path.slice(0, -1) : path)
+  let best: { target: string, params: Record<string, string>, named: number } | undefined
+
+  for (const [pattern, translations] of Object.entries(settings.paths)) {
+    const translated = translations[locale]
+
+    if (translated === undefined)
+      continue
+
+    const [from, target] = back ? [translated, pattern] : [pattern, translated]
+    const params: Record<string, string> = {}
+    const named = matchSegments(segmentsOf(from), segments, params)
+
+    if (named !== undefined && (best === undefined || named > best.named))
+      best = { target, params, named }
+  }
+
+  if (best === undefined)
+    return href
+
+  const { target, params } = best
+  const filled = segmentsOf(target).flatMap((segment) => {
+    const name = segment === '*' ? '*' : segment.startsWith(':') ? segment.slice(1).replace(OPTIONAL_MARK, '') : undefined
+    const value = name === undefined ? segment : params[name]
+
+    return value === undefined || value === '' ? [] : [value]
+  })
+
+  return `/${filled.join('/')}${slash && filled.length > 0 ? '/' : ''}${end === -1 ? '' : href.slice(end)}`
+}
+
+function segmentsOf(path: string): string[] {
+  return path === '/' || path === '' ? [] : path.split('/').slice(1)
+}
+
+// How many segments the pattern names outright when it takes the path, its params gathered; undefined when it does not take it.
+function matchSegments(pattern: string[], path: string[], params: Record<string, string>): number | undefined {
+  const [head, ...rest] = pattern
+
+  if (head === undefined)
+    return path.length === 0 ? 0 : undefined
+
+  if (head === '*') {
+    params['*'] = path.join('/')
+
+    return 0
+  }
+
+  if (head.startsWith(':') && head.endsWith('?')) {
+    const without = matchSegments(rest, path, params)
+
+    if (without !== undefined)
+      return without
+  }
+
+  const [segment, ...remaining] = path
+
+  if (segment === undefined)
+    return undefined
+
+  if (head.startsWith(':')) {
+    const named = matchSegments(rest, remaining, params)
+
+    if (named !== undefined)
+      params[head.slice(1).replace(OPTIONAL_MARK, '')] = segment
+
+    return named
+  }
+
+  if (pathSegment(head) !== pathSegment(segment))
+    return undefined
+
+  const named = matchSegments(rest, remaining, params)
+
+  return named === undefined ? undefined : named + 1
+}
+
+// A segment as a URL carries it, so `à-propos` written in the config and `%C3%A0-propos` sent by a browser are one.
+export function pathSegment(segment: string): string {
+  try {
+    return encodeURIComponent(decodeURIComponent(segment))
+  }
+  catch {
+    return segment
+  }
 }
 
 // The locale a path's first segment names, and the path without it; a path with no locale prefix is the default locale's when it goes unprefixed.

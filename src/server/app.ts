@@ -11,7 +11,7 @@ import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { projectCollections, serveFeeds } from '../content/server'
-import { localePath, splitLocale } from '../runtime/i18n'
+import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
@@ -29,7 +29,7 @@ import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuards } from './guards'
-import { cookieLocale, hostLocale, loadI18n, localeCookie, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
+import { cookieLocale, hostLocale, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader } from './loader'
@@ -118,10 +118,20 @@ function slashRedirect(url: URL, shape: RouterShape, trailingSlash: TrailingSlas
   return wanted === url.pathname ? undefined : new Response(null, { status: 308, headers: { location: `${wanted}${url.search}` } })
 }
 
-// Where a router path is served for each locale: under its prefix, bare for an unprefixed default, and bare with no locale for every path that redirects to the visitor's or takes its host's.
+// The pages a router path serves in one locale, or those a locale translates elsewhere, which it sends there.
+interface LocaleServed {
+  prefix: string
+  candidates: { route: ServedRoute, shape: RouterShape }[]
+  untranslated?: true
+}
+
+// Where a router path is served for each locale: under its prefix, bare for an unprefixed default or on its own host, and bare with no locale for every path that redirects to the visitor's.
 function localeVariants(settings: LocaleSettings | undefined): { prefix: string, locale: string | undefined }[] {
-  if (!settings || settings.hosts)
+  if (!settings)
     return [{ prefix: '', locale: undefined }]
+
+  if (settings.hosts)
+    return settings.locales.map(locale => ({ prefix: '', locale }))
 
   const prefixed = localePrefixes(settings).map(locale => ({ prefix: `/${locale}`, locale }))
 
@@ -392,16 +402,37 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     return served ?? servePrerendered(route, page, context, client, renderOptions)
   }
 
-  // Each path the router serves, with the pages serving it and the locale it is in: a page whose matcher refuses the URL passes it to the next, the one without a matcher last.
-  const byPath = new Map<string, { prefix: string, locale: string | undefined, candidates: { route: ServedRoute, shape: RouterShape }[] }>()
+  // Each path the router serves, with the pages serving it in each locale: a page whose matcher refuses the URL passes it to the next, the one without a matcher last.
+  // Locales going by domain share a path, each host answering in its own; a path a locale translates is its alone, its untranslated one sending there.
+  const byPath = new Map<string, Map<string | undefined, LocaleServed>>()
+  const serve = (path: string, locale: string | undefined, served: LocaleServed) => {
+    const locales = byPath.get(path) ?? new Map<string | undefined, LocaleServed>()
 
-  for (const { prefix, locale } of localeVariants(i18n?.settings)) {
+    byPath.set(path, locales)
+
+    return locales.get(locale) ?? (locales.set(locale, served), served)
+  }
+  const variants = localeVariants(i18n?.settings)
+
+  for (const { prefix, locale } of variants) {
     for (const route of routes) {
-      for (const shape of routerShapes(route, prefix)) {
-        const served = byPath.get(shape.path) ?? { prefix, locale, candidates: [] }
+      const pattern = i18n && locale !== undefined ? localePattern(i18n.settings, route.pattern, locale) : route.pattern
 
-        served.candidates.push({ route, shape })
-        byPath.set(shape.path, served)
+      for (const shape of routerShapes(route, prefix, pattern))
+        serve(shape.path, locale, { prefix, candidates: [] }).candidates.push({ route, shape })
+    }
+  }
+
+  for (const { prefix, locale } of variants) {
+    for (const route of routes) {
+      if (!i18n || locale === undefined || localePattern(i18n.settings, route.pattern, locale) === route.pattern)
+        continue
+
+      for (const shape of routerShapes(route, prefix)) {
+        const served = serve(shape.path, locale, { prefix, candidates: [], untranslated: true })
+
+        if (served.untranslated === true)
+          served.candidates.push({ route, shape })
       }
     }
   }
@@ -433,30 +464,42 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     return renderUnmatched(candidates.at(-1)!.route.special, context, client, renderOptions)
   }
 
-  for (const [path, { prefix, locale, candidates }] of byPath) {
+  for (const [path, locales] of byPath) {
     // Several matchers on one path are tried in the order of their files' paths.
-    candidates.sort((a, b) => Number(isPlain(a)) - Number(isPlain(b)) || a.route.file.localeCompare(b.route.file))
+    for (const { candidates } of locales.values())
+      candidates.sort((a, b) => Number(isPlain(a)) - Number(isPlain(b)) || a.route.file.localeCompare(b.route.file))
 
     app.get(path, async (context) => {
       const url = new URL(context.request.url)
-      const redirect = slashRedirect(url, candidates[0]!.shape, trailingSlash)
+      const settings = i18n?.settings
+      // On a host, the path is served in the host's locale, or not at all when only another locale's translation names it.
+      const locale = settings?.hosts ? hostLocale(settings, context.request) : locales.keys().next().value
+      const served = locales.get(locale)
+      const redirect = slashRedirect(url, (served ?? locales.values().next().value!).candidates[0]!.shape, trailingSlash)
 
       if (redirect)
         return redirect
 
-      if (!i18n)
-        return answer(candidates, context, url)
-
-      const { settings } = i18n
+      if (!i18n || !settings)
+        return answer(served!.candidates, context, url)
 
       // With every locale prefixed, a path without one goes to the visitor's.
-      if (!settings.hosts && locale === undefined)
+      if (locale === undefined)
         return localeRedirect(settings, context.request, url)
 
-      const served = locale ?? hostLocale(settings, context.request)
-      const response = await runInLocale(stateFor(i18n, served, url.pathname.slice(prefix.length) || '/', context.request), async () => answer(candidates, context, url))
+      const own = url.pathname.slice(served?.prefix.length ?? 0) || '/'
 
-      return settings.prefixDefault ? remembered(response, context.request, served) : response
+      if (served?.untranslated === true)
+        return new Response(null, { status: 308, headers: { location: `${localePath(settings, own, locale, url.host)}${url.search}` } })
+
+      const state = stateFor(i18n, locale, untranslatedPath(settings, own, locale), context.request)
+
+      if (!served)
+        return runInLocale(state, async () => renderUnmatched(locales.values().next().value!.candidates.at(-1)!.route.special, context, client, renderOptions))
+
+      const response = await runInLocale(state, async () => answer(served.candidates, context, url))
+
+      return settings.prefixDefault ? remembered(response, context.request, locale) : response
     })
   }
 
@@ -471,7 +514,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
       const url = new URL(context.request.url)
       const { settings } = i18n
       const { locale, path } = splitLocale(settings, url.pathname)
-      const response = await runInLocale(stateFor(i18n, locale ?? (settings.hosts ? hostLocale(settings, context.request) : preferredLocale(settings, context.request)), path, context.request), async () => renderUnmatched(fallback, context, client, renderOptions))
+      const answering = locale ?? (settings.hosts ? hostLocale(settings, context.request) : preferredLocale(settings, context.request))
+      const response = await runInLocale(stateFor(i18n, answering, untranslatedPath(settings, path, answering), context.request), async () => renderUnmatched(fallback, context, client, renderOptions))
 
       // A path with no locale of its own is answered in the visitor's, which a shared cache must tell apart.
       if (locale === undefined && !settings.hosts)

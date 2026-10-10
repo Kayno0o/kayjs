@@ -1,0 +1,8 @@
+--- server
+import { alternate } from 'kay/i18n'
+
+const slug = ctx.params.slug
+const french = alternate('fr')
+---
+h1.post {slug}
+a.fr(href={french}) FR

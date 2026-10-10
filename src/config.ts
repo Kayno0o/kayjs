@@ -214,6 +214,8 @@ export interface I18nConfig {
   prefixDefault?: boolean | undefined
   // Each locale's host, `{ fr: 'example.fr', en: 'example.com' }`, in place of prefixes; a host not listed serves the default locale.
   domains?: Record<string, string> | undefined
+  // A page's path in the locales naming it their own way, by the pattern the page is served under: `{ '/about': { fr: '/a-propos' }, '/blog/:slug': { fr: '/articles/:slug' } }`; its untranslated path in that locale redirects there.
+  paths?: Record<string, Record<string, string>> | undefined
   // The directory of the `<locale>.ts` message files, relative to the root: `src/messages` by default.
   messages?: string | undefined
 }

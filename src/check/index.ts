@@ -30,7 +30,7 @@ import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
 import { scanApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
-import { localePrefixes, localeSettings, messagesFile } from '../server/i18n'
+import { localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
@@ -154,15 +154,20 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const [routes, publicPaths, apiModules] = await Promise.all([scanRoutes(routesDir), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(resolve(root, options.api ?? 'src/api'), diagnostics)])
 
   // A param a matcher kay ships checks is named after it, `:integer`, so a link filling it with a literal is checked as the matcher would; any other is `:`.
-  const shapes = routes.flatMap(route => patternShapes(route.pattern).map(shape => shape.replace(PARAM_SEGMENT, (_, name: string) => {
+  const shapesOf = (route: Route, pattern: string) => patternShapes(pattern).map(shape => shape.replace(PARAM_SEGMENT, (_, name: string) => {
     const matcher = route.matchers?.[name]
 
     return matcher !== undefined && matcherSource(routesDir, matcher) === 'kay' ? `:${matcher}` : ':'
-  })))
+  }))
   const settings = options.i18n && i18nSettings(root, options.i18n, diagnostics)
-  // A page is reached in every locale, under its prefix where it has one; an unprefixed path still answers, sending the visitor on to theirs when every locale is prefixed.
+  // A page is reached in every locale at the path the locale gives it, under its prefix where it has one; an unprefixed path still answers, sending the visitor on to theirs when every locale is prefixed.
   const prefixes = settings ? localePrefixes(settings) : []
-  const localized = [...shapes, ...prefixes.flatMap(locale => shapes.map(shape => `/${locale}${shape === '/' ? '' : shape}`))]
+  const localized = settings
+    ? [...new Set([
+      ...settings.prefixDefault ? routes.flatMap(route => shapesOf(route, route.pattern)) : [],
+      ...settings.locales.flatMap(locale => routes.flatMap(route => shapesOf(route, localePattern(settings, route.pattern, locale)).map(shape => prefixes.includes(locale) ? `/${locale}${shape === '/' ? '' : shape}` : shape))),
+    ])]
+    : routes.flatMap(route => shapesOf(route, route.pattern))
 
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: relative(dirname(environmentPath), module.file).replace(TS_EXTENSION, '') }))
 

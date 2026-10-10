@@ -5,9 +5,10 @@ import type { Route } from './routes'
 import { existsSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { flattenMessages, localePath, splitLocale } from '../runtime/i18n'
+import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { bundled, importModule } from './bundle'
+import { patternShapes } from './routes'
 
 // Where a visitor's choice of locale is kept, read before their browser's languages.
 export const LOCALE_COOKIE = 'kay-locale'
@@ -16,6 +17,7 @@ const MESSAGES_DIR = 'src/messages'
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 const LOCALE_TAG = /^[a-z]{2,3}(?:-[a-z\d]{2,8})*$/i
 const QUALITY = /;\s*q=([\d.]+)/
+const PARAM_NAME = /^:[^/]+$/
 
 // The project's locales, read and checked once at boot.
 export interface I18n {
@@ -53,7 +55,37 @@ export function localeSettings(config: I18nConfig): LocaleSettings {
   if (homeless !== undefined)
     throw new Error(`kay: i18n gives domains, but none to ${homeless}, which no request could then reach`)
 
-  return { locales: config.locales, defaultLocale: config.defaultLocale, prefixDefault: config.prefixDefault === true, ...config.domains && { hosts: config.domains } }
+  return { locales: config.locales, defaultLocale: config.defaultLocale, prefixDefault: config.prefixDefault === true, ...config.domains && { hosts: config.domains }, ...config.paths && { paths: translatedPaths(config) } }
+}
+
+// Each translated path with the params of the page's own, its segments written as a URL carries them.
+function translatedPaths(config: I18nConfig): Record<string, Record<string, string>> {
+  return Object.fromEntries(Object.entries(config.paths ?? {}).map(([pattern, translations]) => {
+    if (!pattern.startsWith('/'))
+      throw new Error(`kay: i18n.paths names ${pattern}, which is no path: write the page's as kay serves it, /blog/:slug`)
+
+    const params = paramsOf(pattern)
+
+    return [pattern, Object.fromEntries(Object.entries(translations).map(([locale, path]) => {
+      if (!config.locales.includes(locale))
+        throw new Error(`kay: i18n.paths translates ${pattern} for ${locale}, which is not one of its locales: ${config.locales.join(', ')}`)
+
+      if (!path.startsWith('/'))
+        throw new Error(`kay: i18n.paths translates ${pattern} for ${locale} as ${path}, which does not start with /`)
+
+      if (paramsOf(path) !== params)
+        throw new Error(`kay: i18n.paths translates ${pattern} for ${locale} as ${path}, whose params are not the page's: each translation names the same :params, and a * as the last segment when the page has one`)
+
+      return [locale, path === '/' ? path : path.split('/').map(segment => segment === '*' || segment.startsWith(':') ? segment : pathSegment(segment)).join('/')]
+    }))]
+  }))
+}
+
+// A pattern's params in a form two patterns compare by, a catch-all only counting as its last segment.
+function paramsOf(pattern: string): string {
+  const segments = pattern.split('/')
+
+  return segments.flatMap((segment, index) => segment === '*' ? [index === segments.length - 1 ? '*' : '*inner'] : segment.startsWith(':') ? [segment] : []).sort().join(' ')
 }
 
 // The locales served under a prefix: every one but an unprefixed default, none when each has its domain.
@@ -61,13 +93,46 @@ export function localePrefixes(settings: LocaleSettings): string[] {
   return settings.hosts ? [] : settings.locales.filter(locale => locale !== settings.defaultLocale || settings.prefixDefault)
 }
 
-// A page whose first segment is a locale's prefix would be served twice at one path.
+// A page whose first segment is a locale's prefix would be served twice at one path; so would a translated path another page of that locale serves.
 export function refuseLocaleClashes(settings: LocaleSettings, routes: Pick<Route, 'file' | 'pattern'>[]): void {
   const prefixes = new Set(localePrefixes(settings))
   const clash = routes.find(route => prefixes.has(firstSegment(route.pattern)))
 
   if (clash)
     throw new Error(`kay: ${clash.file} serves ${clash.pattern}, under the prefix of the locale ${firstSegment(clash.pattern)}; kay serves every page there already`)
+
+  const patterns = new Set(routes.map(route => route.pattern))
+  const unknown = Object.keys(settings.paths ?? {}).find(pattern => !patterns.has(pattern))
+
+  if (unknown !== undefined)
+    throw new Error(`kay: i18n.paths translates ${unknown}, which no page serves; name a page by the pattern it is served under, /blog/:slug for src/routes/blog/[slug].kay`)
+
+  for (const locale of settings.locales) {
+    const served = new Map<string, { file: string, translated: boolean }>()
+    const unprefixed = !settings.hosts && !prefixes.has(locale)
+
+    for (const route of routes) {
+      const pattern = localePattern(settings, route.pattern, locale)
+      const translated = pattern !== route.pattern
+
+      if (translated && unprefixed && prefixes.has(firstSegment(pattern)))
+        throw new Error(`kay: i18n.paths translates ${route.pattern} for ${locale} as ${pattern}, under the prefix of the locale ${firstSegment(pattern)}`)
+
+      for (const shape of patternShapes(pattern).map(shape => shape.split('/').map(segment => PARAM_NAME.test(segment) ? ':' : segment).join('/'))) {
+        const other = served.get(shape)
+
+        if (other !== undefined && (translated || other.translated))
+          throw new Error(`kay: ${route.file} and ${other.file} are both served at ${pattern} in ${locale}, once i18n.paths translates them`)
+
+        served.set(shape, { file: route.file, translated })
+      }
+    }
+  }
+}
+
+// The pattern a page is served under in a locale, translated when i18n.paths names it.
+export function localePattern(settings: LocaleSettings, pattern: string, locale: string): string {
+  return settings.paths?.[pattern]?.[locale] ?? pattern
 }
 
 function firstSegment(path: string): string {
@@ -187,7 +252,7 @@ export function localeCopies(settings: LocaleSettings | undefined, path: string)
     return [{ locale: undefined, path, key: path }]
 
   return settings.locales.map((locale) => {
-    const served = settings.hosts ? path : localePath(settings, path, locale)
+    const served = settings.hosts ? translatedPath(settings, path, locale) : localePath(settings, path, locale)
 
     return { locale, path: served, key: prerenderKey(settings, locale, served), ...settings.hosts && { host: settings.hosts[locale] } }
   })

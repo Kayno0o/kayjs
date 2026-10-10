@@ -53,9 +53,9 @@ export async function loadMatchers(routesDir: string, routes: Route[]): Promise<
   return matchers
 }
 
-// Under a static prefix, such as a locale's `/en`, the positions count its segments too.
-export function routerShapes(route: Route, prefix = ''): RouterShape[] {
-  return patternShapes(route.pattern).map((shape) => {
+// Under a static prefix, such as a locale's `/en`, the positions count its segments too; a pattern a locale translates names the route's params where it puts them.
+export function routerShapes(route: Route, prefix = '', pattern = route.pattern): RouterShape[] {
+  return patternShapes(pattern).map((shape) => {
     const positions: [number, string][] = []
     const path = (prefix === '' ? shape : `${prefix}${shape === '/' ? '' : shape}`).split('/').map((segment, index) => {
       if (segment === '*') {

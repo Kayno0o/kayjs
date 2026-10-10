@@ -9,7 +9,7 @@ import { Elysia } from 'elysia'
 import { projectCollections } from '../content/server'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
-import { localePath } from '../runtime/i18n'
+import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { pages as servePages } from '../server'
 import { basePath } from '../server/base'
 import { PRERENDERED_DIR } from '../server/client'
@@ -105,15 +105,24 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
 
   written.push(...await writeRedirects(out, config.redirects ?? {}, base, origin))
 
+  const settings = config.i18n && localeSettings(config.i18n)
+
   // With every locale prefixed, a path without one has no file of its own: it goes to the default locale's.
-  if (config.i18n?.prefixDefault) {
-    const settings = localeSettings(config.i18n)
-    const prefix = `/${settings.defaultLocale}`
+  // A page a locale translates has none at its untranslated path either, which goes to the translated one.
+  if (settings && !settings.hosts) {
+    for (const [path] of pages) {
+      const { locale, path: own } = splitLocale(settings, path)
 
-    for (const [path] of pages.filter(([path]) => path === prefix || path.startsWith(`${prefix}/`))) {
-      const unprefixed = path.slice(prefix.length) || '/'
+      if (locale === undefined)
+        continue
 
-      written.push(...await writeRefresh(out, unprefixed, joinBase(base, localePath(settings, unprefixed, settings.defaultLocale)), origin))
+      const page = untranslatedPath(settings, own, locale)
+
+      if (page !== own)
+        written.push(...await writeRefresh(out, localePath({ ...settings, paths: undefined }, page, locale), joinBase(base, path), origin))
+
+      if (settings.prefixDefault && locale === settings.defaultLocale)
+        written.push(...await writeRefresh(out, page, joinBase(base, path), origin))
     }
   }
 

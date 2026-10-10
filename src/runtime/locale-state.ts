@@ -4,7 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 // The locale a request is served in, for everything that runs while it is: loads, templates, components, actions and guards.
 export interface LocaleState extends Translations {
   settings: LocaleSettings
-  // The page's path without its locale prefix, for `alternate`.
+  // The page's path without its locale prefix, untranslated, for `alternate`.
   path: string
   host?: string
 }

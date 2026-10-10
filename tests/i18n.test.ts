@@ -6,7 +6,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { check } from '../src/check'
-import { flattenMessages, textDirection, translate } from '../src/runtime/i18n'
+import { flattenMessages, localePath, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { acceptedLocale, localeSettings, requestLocale } from '../src/server/i18n'
@@ -171,6 +171,66 @@ describe('locales by domain', () => {
   })
 })
 
+describe('translated paths', () => {
+  const paths = { '/about': { fr: '/a-propos', en: '/about-us' }, '/blog/:slug': { en: '/articles/:slug' } }
+  const translated = { ...i18n, paths }
+
+  it('serve a page at its path in each locale, links and the locale switcher following', async () => {
+    const served = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: translated }))
+    const english = await get('/en/about-us', served)
+
+    expect(english.html).toContain('<h1>About</h1>')
+    expect(english.html).toContain('<a class="about" href="/en/about-us" aria-current="page">About</a>')
+    expect(english.html).toContain('<a class="fr" href="/a-propos">FR</a>')
+    expect((await get('/a-propos', served)).html).toContain('<h1>À propos</h1>')
+    expect((await get('/en/articles/hello', served)).html).toContain('<h1 class="post">hello</h1>')
+    expect((await get('/en/articles/hello', served)).html).toContain('<a class="fr" href="/blog/hello">FR</a>')
+    expect((await get('/blog/hello', served)).html).toContain('<h1 class="post">hello</h1>')
+  })
+
+  it('send a locale\'s untranslated path to its translation', async () => {
+    const served = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: translated }))
+
+    expect(await get('/en/about?x=1', served)).toMatchObject({ status: 308, location: '/en/about-us?x=1' })
+    expect(await get('/about', served)).toMatchObject({ status: 308, location: '/a-propos' })
+    expect(await get('/en/blog/hello', served)).toMatchObject({ status: 308, location: '/en/articles/hello' })
+    expect((await get('/en/a-propos', served)).status).toBe(404)
+  })
+
+  it('serve a host only its own locale\'s paths, and list them in the sitemap', async () => {
+    const domains = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.fr', i18n: { ...translated, domains: { fr: 'x.fr', en: 'x.com' } } }))
+    const english = await get('http://x.com/about-us', domains)
+
+    expect(english.html).toContain('<h1>About</h1>')
+    expect(english.html).toContain('<a class="fr" href="//x.fr/a-propos">FR</a>')
+    expect(await get('http://x.com/about', domains)).toMatchObject({ status: 308, location: '/about-us' })
+    expect((await get('http://x.fr/about-us', domains)).status).toBe(404)
+    expect((await get('http://x.fr/a-propos', domains)).html).toContain('<h1>À propos</h1>')
+    expect((await get('http://x.com/sitemap.xml', domains)).html).toContain('<url><loc>https://x.com/about-us</loc><xhtml:link rel="alternate" hreflang="fr" href="https://x.fr/a-propos"/><xhtml:link rel="alternate" hreflang="en" href="https://x.com/about-us"/>')
+  })
+
+  it('carry params, the query and a trailing slash, the most named pattern winning', () => {
+    const settings = localeSettings({ ...i18n, paths: { '/blog/:slug': { en: '/articles/:slug' }, '/blog/new': { en: '/write' }, '/docs/*': { en: '/guide/*' }, '/archive/:page?': { en: '/past/:page?' }, '/about': { fr: '/à-propos' } } })
+
+    expect(localePath(settings, '/blog/hello?ref=1#top', 'en')).toBe('/en/articles/hello?ref=1#top')
+    expect(localePath(settings, '/blog/new', 'en')).toBe('/en/write')
+    expect(localePath(settings, '/docs/a/b/', 'en')).toBe('/en/guide/a/b/')
+    expect(localePath(settings, '/archive', 'en')).toBe('/en/past')
+    expect(localePath(settings, '/archive/2', 'en')).toBe('/en/past/2')
+    expect(localePath(settings, '/about', 'fr')).toBe('/%C3%A0-propos')
+    expect(untranslatedPath(settings, '/%C3%A0-propos', 'fr')).toBe('/about')
+    expect(untranslatedPath(settings, '/articles/hello', 'en')).toBe('/blog/hello')
+    expect(untranslatedPath(settings, '/articles/hello', 'fr')).toBe('/articles/hello')
+  })
+
+  it('refuse a translation whose params are not the page\'s, or that another page of its locale takes', async () => {
+    expect(() => localeSettings({ ...i18n, paths: { '/blog/:slug': { en: '/articles/:id' } } })).toThrow('whose params are not the page\'s')
+    expect(() => localeSettings({ ...i18n, paths: { '/about': { de: '/uber' } } })).toThrow('de, which is not one of its locales')
+    await expect(pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, paths: { '/contact': { en: '/reach-us' } } } })).rejects.toThrow('translates /contact, which no page serves')
+    await expect(pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, paths: { '/about': { en: '/' } } } })).rejects.toThrow('are both served at / in en')
+  })
+})
+
 describe('locale detection', () => {
   it('matches Accept-Language by tag, then by language, by quality', () => {
     expect(acceptedLocale(['fr', 'en'], 'de-DE, en-GB;q=0.8, fr;q=0.9')).toBe('fr')
@@ -298,6 +358,26 @@ describe('kay check', () => {
     }
   })
 
+  it('checks a link against the path its locale gives the page, and reports a translation another page takes', async () => {
+    const paths = { '/about': { en: '/about-us' } }
+    const page = join(FIXTURE, 'src/routes/links.kay')
+
+    try {
+      await Bun.write(page, 'a(href="/en/about-us") About\na(href="/a-propos") À propos\na(href="/en/about") About\n')
+
+      const diagnostics = (await check(FIXTURE, { i18n: { ...i18n, messages: undefined, paths } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
+
+      expect(diagnostics.filter(diagnostic => diagnostic.file === page).map(diagnostic => diagnostic.line)).toEqual([2, 3])
+    }
+    finally {
+      await rm(page, { force: true })
+    }
+
+    const clash = await check(FIXTURE, { i18n: { ...i18n, messages: undefined, paths: { '/about': { en: '/' } } } })
+
+    expect(clash.map(({ message }) => message)).toContainEqual(expect.stringContaining('are both served at / in en'))
+  })
+
   it('reports a locale config no request could be served by, at the config', async () => {
     const diagnostics = await check(FIXTURE, { i18n: { locales: ['fr'], defaultLocale: 'en' } })
 
@@ -307,17 +387,18 @@ describe('kay check', () => {
 
 describe('in the browser', () => {
   it('reads the messages the page sent, those of a streamed part included', async () => {
-    GlobalRegistrator.register({ url: 'http://localhost/en/about' })
+    GlobalRegistrator.register({ url: 'http://localhost/en/about-us' })
 
     try {
       const { alternate, formatNumber, localize, t } = await import('../src/runtime/i18n.client')
-      const payload = { locale: 'en', settings: localeSettings(i18n), messages: { 'counter.label': 'Counter' } }
+      const payload = { locale: 'en', settings: localeSettings({ ...i18n, paths: { '/about': { fr: '/a-propos', en: '/about-us' } } }), messages: { 'counter.label': 'Counter' } }
 
       document.head.innerHTML = `<script type="application/json" data-kay-i18n>${JSON.stringify(payload)}</script>`
 
       expect(t('counter.label')).toBe('Counter')
-      expect(localize('/about')).toBe('/en/about')
-      expect(alternate('fr')).toBe('/about')
+      expect(localize('/about')).toBe('/en/about-us')
+      expect(localize('/')).toBe('/en')
+      expect(alternate('fr')).toBe('/a-propos')
       expect(formatNumber(1234)).toBe('1,234')
 
       document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"messages":{"items":{"one":"{count} item","other":"{count} items"}}}</script>'
