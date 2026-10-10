@@ -13,20 +13,23 @@ interface RowState {
 
 export function App(props: PageProps) {
   return (
-    <Layout>
+    <Layout page={props.page}>
       {props.page === 'products' ? <Products products={props.products} /> : <Table />}
     </Layout>
   )
 }
 
-function Layout(props: { children: JSX.Element }) {
+// Marks the link to the page shown, as kay does by itself.
+function Layout(props: { page: PageProps['page'], children: JSX.Element }) {
+  const current = (page: PageProps['page']) => props.page === page ? 'page' : undefined
+
   return (
     <>
       <header class="site">
-        <a class="brand" href="/">Bench shop</a>
+        <a class="brand" href="/" aria-current={current('products')}>Bench shop</a>
         <nav>
-          <a href="/">Products</a>
-          <a href="/table">Table</a>
+          <a href="/" aria-current={current('products')}>Products</a>
+          <a href="/table" aria-current={current('table')}>Table</a>
         </nav>
       </header>
       <main>{props.children}</main>
