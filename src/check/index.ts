@@ -32,6 +32,7 @@ import { scanApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
+import { OPENAPI_PATH, REFERENCE_PATH } from '../server/openapi'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { patternShapes, routeMounts, routeOf, scanRoutes, servedPaths } from '../server/routes'
@@ -114,7 +115,7 @@ const MISSING_PROPERTY = 'TS2339'
 const LEADING_NAME = /^[a-z_$][\w$]*/i
 const MEMBER_OF = /([a-z_$][\w$]*)\??\.$/i
 // What kay serves itself, whether or not the project turns it on.
-const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
+const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH, OPENAPI_PATH, REFERENCE_PATH]
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.
 const NOT_IN_URL = /[^\x21-\x7E]+/g
 // Stylesheets import for their effect, other assets for their URL. TypeScript matches a wildcard module case-sensitively, so both `.png` and `.PNG` are declared; a mixed case such as `.Png` is not.

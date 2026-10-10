@@ -76,6 +76,21 @@ export async function scanApi(apiDir: string): Promise<ApiModule[]> {
   return modules.sort((a, b) => a.file.localeCompare(b.file))
 }
 
+// The guards every module runs, the API directory's own first; with none of its own, those of a directory holding every module.
+export function sharedGuards(modules: ApiModule[]): string[] {
+  const [first, ...rest] = modules
+  const shared: string[] = []
+
+  for (const [index, file] of first?.guards.entries() ?? []) {
+    if (!rest.every(module => module.guards[index] === file))
+      break
+
+    shared.push(file)
+  }
+
+  return shared
+}
+
 function guardsOf(apiDir: string, dir: string): string[] {
   const guards: string[] = []
 

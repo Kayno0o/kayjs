@@ -1,12 +1,17 @@
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
 
+const CLI = resolve('src/cli.ts')
 const KEY = { 'x-key': 'open' }
+const projects: string[] = []
 const site = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', openapi: { title: 'Shop', version: '2.1.0', reference: true }, base: '/shop' })
 const hidden = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', openapi: { dev: true } })
 
 afterAll(async () => {
-  await Promise.all([site.close(), hidden.close()])
+  await Promise.all([site.close(), hidden.close(), ...projects.map(async dir => rm(dir, { recursive: true, force: true }))])
 })
 
 async function documented(): Promise<{ info: unknown, servers: unknown, paths: Record<string, Record<string, Record<string, unknown>>> }> {
@@ -23,7 +28,7 @@ describe('the OpenAPI document', () => {
 
     expect(document.info).toEqual({ title: 'Shop', version: '2.1.0' })
     expect(document.servers).toEqual([{ url: '/shop' }])
-    expect(Object.keys(document.paths).sort()).toEqual(['/api/items', '/api/items/photo', '/api/items/{id}', '/api/private'])
+    expect(Object.keys(document.paths).sort()).toEqual(['/api/files', '/api/files/any', '/api/files/bytes', '/api/files/raw/{wildcard}', '/api/files/size', '/api/files/{name}', '/api/items', '/api/items/photo', '/api/items/{id}', '/api/private'])
     expect(Object.keys(document.paths['/api/items/{id}']!)).toEqual(['get'])
   })
 
@@ -38,7 +43,7 @@ describe('the OpenAPI document', () => {
     ])
     expect(one.responses).toEqual({
       200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', required: ['id', 'name'], properties: { id: { type: 'number' }, name: { type: 'string' } } } } } },
-      404: { description: 'Error', content: { 'application/json': { schema: { const: 'Not found', type: 'string' } } } },
+      404: { description: 'Error', content: { 'text/plain': { schema: { const: 'Not found', type: 'string' } } } },
     })
   })
 
@@ -48,6 +53,49 @@ describe('the OpenAPI document', () => {
     expect(paths['/api/items']!.post!.requestBody).toEqual({ required: true, content: { 'application/json': { schema: { type: 'object', required: ['name', 'added'], properties: { name: { type: 'string' }, added: { anyOf: [{ format: 'date-time', type: 'string' }, { format: 'date', type: 'string' }, { type: 'number' }] } } } } } })
     expect(paths['/api/items']!.post!.tags).toEqual(['items'])
     expect(Object.keys((paths['/api/items/photo']!.post!.requestBody as { content: object }).content)).toEqual(['multipart/form-data'])
+  })
+
+  it('lists a route with an optional param with and without it, names a wildcard, and keeps a method\'s own route over .all()', async () => {
+    const { paths } = await documented()
+
+    expect(paths['/api/files']!.get).toBeDefined()
+    expect((paths['/api/files/{name}']!.get!.parameters as unknown[])[0]).toEqual({ name: 'name', in: 'path', required: true, schema: { type: 'string' } })
+    expect((paths['/api/files/raw/{wildcard}']!.get!.parameters as unknown[])[0]).toMatchObject({ name: 'wildcard', in: 'path', required: true })
+    expect(paths['/api/files/any']!.get!.summary).toBe('Specific')
+    expect(Object.keys(paths['/api/files/any']!)).toEqual(['get', 'post', 'put', 'patch', 'delete'])
+  })
+
+  it('gives raw bytes as binary and a bigint as an integer', async () => {
+    const { paths } = await documented()
+
+    expect(paths['/api/files/bytes']!.post!.requestBody).toEqual({ required: true, content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } } })
+    expect(paths['/api/files/size']!.get!.responses).toEqual({ 200: { description: 'OK', content: { 'application/json': { schema: { type: 'integer', minimum: 0 } } } } })
+  })
+
+  it('refuses to start when a module serves the path the document or its page is served at', async () => {
+    await expect(testSite({ routes: 'tests/fixtures/openapi-clash/src/routes', api: 'tests/fixtures/openapi-clash/src/api', openapi: { reference: true } })).rejects.toThrow('serves /api/reference, where `openapi` serves its reference page')
+  })
+
+  it('has kay check take a link to the document or its page', async () => {
+    const base = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(base, { recursive: true })
+
+    const dir = await mkdtemp(join(base, 'openapi-'))
+
+    projects.push(dir)
+    await Promise.all(Object.entries({
+      'package.json': JSON.stringify({ name: 'app' }),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ openapi: { reference: true } })\n',
+      'src/routes/index.kay': 'a(href="/api/reference") API\na(href="/api/openapi.json") Spec\n',
+    }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+
+    const child = Bun.spawn([process.execPath, CLI, 'check'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect(`${stdout}${stderr}`).not.toContain('/api/reference')
+    expect(code).toBe(0)
   })
 
   it('names the guards a route runs, by where they sit in the API directory', async () => {

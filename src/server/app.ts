@@ -18,7 +18,7 @@ import { IMAGE_ROUTE } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
 import { overHttps, registerActionRoutes } from './actions'
-import { scanApi, serveApi } from './api'
+import { scanApi, serveApi, sharedGuards } from './api'
 import { basePath, rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { bundled } from './bundle'
@@ -37,7 +37,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { registerLoader, underKayDev } from './loader'
 import { logRequests, pathOf } from './log'
 import { serveServiceWorker } from './offline'
-import { openApiDocument, serveOpenApi } from './openapi'
+import { openApiDocument, openApiSettings, refuseOpenApiClashes, serveOpenApi } from './openapi'
 import { assetFiles, hookedResponse } from './page-hook'
 import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes, shapeParams } from './params'
 import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
@@ -343,14 +343,14 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
 
   const api = await serveApi(app, apiModules, actionOptions)
-  const openapi = options.openapi === true ? {} : options.openapi === false ? undefined : options.openapi
+  const openapi = openApiSettings(options.openapi)
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, api.limits)
 
   if (openapi && (openapi.dev !== true || options.dev)) {
-    // The guards every module runs, the API directory's own first: those of a directory holding every module when it has none.
-    const shared = apiModules.reduce<string[] | undefined>((common, module) => common === undefined ? module.guards : common.filter((file, index) => module.guards[index] === file), undefined) ?? []
-    const guards = await Promise.all(shared.map(async file => loadGuard({ file, special: {} })))
+    const guards = await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} })))
+
+    refuseOpenApiClashes(api.mounted, openapi)
 
     serveOpenApi(app, openApiDocument(api.mounted, { title: openapi.title ?? options.seo?.name ?? 'API', version: openapi.version ?? '1.0.0', base }), openapi, guards, actionOptions)
   }

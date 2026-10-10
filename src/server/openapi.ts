@@ -37,16 +37,55 @@ interface Operation {
   'x-kay-guards'?: string[]
 }
 
+export function openApiSettings(value: boolean | OpenApiConfig | undefined): OpenApiConfig | undefined {
+  if (value === true)
+    return {}
+
+  return value === false ? undefined : value
+}
+
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
 export const REFERENCE_PATH = `${API_PREFIX}/reference`
 
 const METHODS = new Set(['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH', 'TRACE'])
+// What a route answering every method, `.all()`, is listed under.
+const ANY_METHOD = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 const STATUS = /^\d{3}$/
 const PATH_PARAM = /:(\w+)\??/g
+const OPTIONAL_SEGMENT = /\/:\w+\?/g
+const WILDCARD = /\*$/
+const BRACED_PARAM = /\{(\w+)\}/g
 const TRAILING_SLASH = /(?<=.)\/$/
-// What TypeBox and Elysia add to a schema for themselves, or JSON Schema has no type for.
-const NOT_JSON_TYPES = new Set(['Date', 'Uint8Array'])
+// What JSON Schema has no type for: a Date object beside its text is left out of a union, raw bytes are binary text.
+const DATE = 'Date'
+const BYTES = 'Uint8Array'
+const BINARY = { type: 'string', format: 'binary' }
 const MODULE_FILE = /(?:\/index)?\.ts$/
+
+type Route = MountedApi['instance']['routes'][number]
+
+// The paths a route answers, as the document writes them: one without each optional param and one with it, a wildcard named `wildcard`.
+function routePaths(module: MountedApi, route: Route): string[] {
+  const path = `${module.mount}${route.path === '/' ? '' : route.path}`.replace(TRAILING_SLASH, '')
+  const bare = path.replace(OPTIONAL_SEGMENT, '')
+  const variants = bare === path ? [path] : [bare || API_PREFIX, path]
+
+  return variants.map(variant => variant.replace(PATH_PARAM, '{$1}').replace(WILDCARD, '{wildcard}'))
+}
+
+// A module serving the path the document or the reference page is served at would hide it without a word, so the server refuses to start.
+export function refuseOpenApiClashes(modules: MountedApi[], config: OpenApiConfig): void {
+  const taken = new Set([OPENAPI_PATH, ...config.reference === true ? [REFERENCE_PATH] : []])
+
+  for (const module of modules) {
+    for (const route of module.instance.routes) {
+      const clash = routePaths(module, route).find(path => taken.has(path))
+
+      if (clash !== undefined)
+        throw new Error(`kay: ${module.file} serves ${clash}, where \`openapi\` serves ${clash === OPENAPI_PATH ? 'its document' : 'its reference page'}; move the route, or turn ${clash === OPENAPI_PATH ? '`openapi` off' : 'the reference page off'}`)
+    }
+  }
+}
 
 // An OpenAPI 3.1 document of every route the modules serve, read from the schemas their routes declare; a route behind a guard names it, as `x-kay-guards`.
 export function openApiDocument(modules: MountedApi[], options: { title: string, version: string, base: string }): Schema {
@@ -57,27 +96,31 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
       const method = route.method.toUpperCase()
       const hooks = route.hooks as Record<string, unknown> & { detail?: { summary?: string, description?: string, tags?: string[], deprecated?: boolean, hide?: boolean } }
 
-      if (!METHODS.has(method) && method !== 'ALL')
+      if ((!METHODS.has(method) && method !== 'ALL') || hooks.detail?.hide === true)
         continue
 
-      if (hooks.detail?.hide === true)
-        continue
+      for (const path of routePaths(module, route)) {
+        const operation: Operation = {
+          tags: hooks.detail?.tags ?? [module.mount.slice(API_PREFIX.length + 1) || 'api'],
+          ...hooks.detail?.summary !== undefined && { summary: hooks.detail.summary },
+          ...hooks.detail?.description !== undefined && { description: hooks.detail.description },
+          ...hooks.detail?.deprecated === true && { deprecated: true },
+          ...parameters(path, hooks),
+          ...hooks.body !== undefined && { requestBody: { required: true, content: content(hooks.body, holdsFile(hooks.body) ? 'multipart/form-data' : 'application/json') } },
+          responses: responses(hooks.response),
+          ...module.guards.length > 0 && { 'x-kay-guards': module.guards.map(file => relative(apiDir(module), file)) },
+        }
+        const methods = paths[path] ??= {}
 
-      const path = `${module.mount}${route.path === '/' ? '' : route.path}`.replace(TRAILING_SLASH, '')
-      const operation: Operation = {
-        tags: hooks.detail?.tags ?? [module.mount.slice(API_PREFIX.length + 1) || 'api'],
-        ...hooks.detail?.summary !== undefined && { summary: hooks.detail.summary },
-        ...hooks.detail?.description !== undefined && { description: hooks.detail.description },
-        ...hooks.detail?.deprecated === true && { deprecated: true },
-        ...parameters(path, hooks),
-        ...hooks.body !== undefined && { requestBody: { required: true, content: { [holdsFile(hooks.body) ? 'multipart/form-data' : 'application/json']: { schema: jsonSchema(hooks.body) } } } },
-        responses: responses(hooks.response),
-        ...module.guards.length > 0 && { 'x-kay-guards': module.guards.map(file => relative(apiDir(module), file)) },
+        // A route for one method answers it whatever order `.all()` was declared in.
+        if (method === 'ALL') {
+          for (const each of ANY_METHOD)
+            methods[each.toLowerCase()] ??= operation
+        }
+        else {
+          methods[method.toLowerCase()] = operation
+        }
       }
-      const methods = paths[path.replace(PATH_PARAM, '{$1}')] ??= {}
-
-      for (const each of method === 'ALL' ? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] : [method])
-        methods[each.toLowerCase()] = operation
     }
   }
 
@@ -95,14 +138,14 @@ function parameters(path: string, hooks: Record<string, unknown>): { parameters?
   const found: Schema[] = []
   const declared = (hooks.params as { properties?: Record<string, unknown> } | undefined)?.properties ?? {}
 
-  for (const [, name] of path.matchAll(PATH_PARAM))
-    found.push({ name, in: 'path', required: true, schema: jsonSchema(declared[name!] ?? { type: 'string' }) })
+  for (const [, name] of path.matchAll(BRACED_PARAM))
+    found.push({ name, in: 'path', required: true, schema: name === 'wildcard' ? schemaOf(declared['*'] ?? { type: 'string' }) : schemaOf(declared[name!] ?? { type: 'string' }) })
 
   for (const [where, schema] of [['query', hooks.query], ['header', hooks.headers]] as const) {
     const object = schema as { properties?: Record<string, unknown>, required?: string[] } | undefined
 
     for (const [name, property] of Object.entries(object?.properties ?? {}))
-      found.push({ name, in: where, required: object?.required?.includes(name) === true, schema: jsonSchema(property) })
+      found.push({ name, in: where, required: object?.required?.includes(name) === true, schema: schemaOf(property) })
   }
 
   return found.length > 0 ? { parameters: found } : {}
@@ -110,37 +153,68 @@ function parameters(path: string, hooks: Record<string, unknown>): { parameters?
 
 // One schema for every answer, or one per status.
 function responses(response: unknown): Record<string, Schema> {
-  if (response === undefined || response === null)
+  if (response === undefined || response === null || typeof response !== 'object')
     return { 200: { description: 'OK' } }
 
   const byStatus = Object.keys(response).length > 0 && Object.keys(response).every(key => STATUS.test(key)) ? response as Record<string, unknown> : { 200: response }
 
-  return Object.fromEntries(Object.entries(byStatus).map(([status, schema]) => [status, { description: status.startsWith('2') ? 'OK' : 'Error', content: { 'application/json': { schema: jsonSchema(schema) } } }]))
+  return Object.fromEntries(Object.entries(byStatus).map(([status, schema]) => [status, { description: status.startsWith('2') ? 'OK' : 'Error', content: content(schema, 'application/json') }]))
+}
+
+// A schema under the type it goes as: raw bytes as such, text as text, anything else as `fallback`.
+function content(schema: unknown, fallback: string): Record<string, { schema: unknown }> {
+  const plain = schemaOf(schema) as Schema
+  const type = plain.format === 'binary' ? 'application/octet-stream' : plain.type === 'string' && fallback === 'application/json' ? 'text/plain' : fallback
+
+  return { [type]: { schema: plain } }
 }
 
 function holdsFile(schema: unknown): boolean {
   if (typeof schema !== 'object' || schema === null)
     return false
 
-  return (schema as Schema).format === 'binary' || Object.values(schema).some(holdsFile)
+  return Object.values(schema).some(value => typeof value === 'object' && value !== null && ((value as Schema).format === 'binary' || holdsFile(value)))
 }
 
-// A plain JSON Schema: TypeBox's symbols and Elysia's own marks left out, and of a union the members JSON cannot carry, such as a Date object beside its text.
+// A route's schema as JSON Schema; one kay cannot read, a model's name or another library's validator, says nothing.
+function schemaOf(schema: unknown): unknown {
+  return typeof schema !== 'object' || schema === null || '~standard' in schema ? {} : jsonSchema(schema)
+}
+
+// A plain JSON Schema: TypeBox's symbols and Elysia's own marks left out, a bigint as a number.
 function jsonSchema(schema: unknown): unknown {
+  if (typeof schema === 'bigint')
+    return Number.isSafeInteger(Number(schema)) ? Number(schema) : schema.toString()
+
   if (Array.isArray(schema))
     return schema.map(jsonSchema)
 
   if (typeof schema !== 'object' || schema === null)
     return schema
 
+  const source = schema as Schema
+
+  if (source.type === BYTES)
+    return BINARY
+
   const plain: Schema = {}
 
-  for (const [key, value] of Object.entries(schema)) {
-    if (key === 'elysiaMeta' || (key === 'default' && (schema as Schema).format === 'binary'))
+  for (const [key, value] of Object.entries(source)) {
+    if (key === 'elysiaMeta' || (key === 'default' && (value === 'File' || value === 'Files')))
       continue
 
+    if (key === 'type' && value === 'bigint') {
+      plain.type = 'integer'
+
+      continue
+    }
+
     if (key === 'anyOf' && Array.isArray(value)) {
-      const kept = value.filter(member => !NOT_JSON_TYPES.has((member as Schema).type as string) && Object.keys(member as Schema).some(name => name !== 'default'))
+      // Elysia's `t.Uint8Array()` is a union of an example and the bytes.
+      if (value.some(member => (member as Schema).type === BYTES))
+        return BINARY
+
+      const kept = value.filter(member => (member as Schema).type !== DATE)
 
       if (kept.length === 1)
         Object.assign(plain, jsonSchema(kept[0]))
@@ -174,6 +248,13 @@ export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfi
   }
 }
 
+// A body or an answer: its type and schema.
+function schemaBlock(described: Schema): string {
+  const [type, { schema }] = Object.entries(described.content as Record<string, { schema: unknown }>)[0]!
+
+  return `<p>${escape(type)}</p><pre>${escape(JSON.stringify(schema, null, 2))}</pre>`
+}
+
 // Every route with what it takes and answers, as plain HTML that needs no script or style the site's policy would have to allow.
 function referencePage(document: Schema): string {
   const info = document.info as { title: string, version: string }
@@ -184,8 +265,8 @@ function referencePage(document: Schema): string {
       operation.description === undefined ? '' : `<p>${escape(operation.description)}</p>`,
       operation['x-kay-guards'] ? `<p>Guarded by ${operation['x-kay-guards'].map(file => `<code>${escape(file)}</code>`).join(', ')}</p>` : '',
       operation.parameters ? `<h3>Parameters</h3><ul>${operation.parameters.map(parameter => `<li><code>${escape(String(parameter.name))}</code> in ${String(parameter.in)}${parameter.required === true ? ', required' : ''}: <code>${escape(JSON.stringify(parameter.schema))}</code></li>`).join('')}</ul>` : '',
-      operation.requestBody ? `<h3>Body</h3><pre>${escape(JSON.stringify(Object.values((operation.requestBody as { content: Record<string, { schema: unknown }> }).content)[0]!.schema, null, 2))}</pre>` : '',
-      `<h3>Responses</h3><dl>${Object.entries(operation.responses).map(([status, response]) => `<dt>${status}</dt><dd>${response.content !== undefined ? `<pre>${escape(JSON.stringify((response.content as Record<string, { schema: unknown }>)['application/json']!.schema, null, 2))}</pre>` : escape(String(response.description))}</dd>`).join('')}</dl>`,
+      operation.requestBody ? `<h3>Body</h3>${schemaBlock(operation.requestBody)}` : '',
+      `<h3>Responses</h3><dl>${Object.entries(operation.responses).map(([status, response]) => `<dt>${status}</dt><dd>${response.content !== undefined ? schemaBlock(response) : escape(String(response.description))}</dd>`).join('')}</dl>`,
     ]
 
     return `<section>${parts.join('')}</section>`
