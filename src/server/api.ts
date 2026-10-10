@@ -14,7 +14,7 @@ import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { inLocale, isCrossSite, passGuards } from './actions'
 import { importModule } from './bundle'
-import { corsAdmits, corsHeaders, corsRule, preflight } from './cors'
+import { corsAdmits, corsResponse, corsRule, preflight, withCors } from './cors'
 import { loadGuard } from './guards'
 import { reportServerError } from './report'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
@@ -105,18 +105,17 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       throw new TypeError(`kay: ${module.file} must export an Elysia instance by default: export default new Elysia().get('/', () => ...)`)
 
     Object.defineProperty(instance, API_MOUNT, { value: module.mount, configurable: true })
-    limits.set(module.mount, { bytes: (instance as { [BODY_LIMIT]?: number })[BODY_LIMIT], refuse: tooLarge })
+    const cors = (instance as { [CORS]?: CorsRule })[CORS]
+
+    limits.set(module.mount, { bytes: (instance as { [BODY_LIMIT]?: number })[BODY_LIMIT], refuse: cors ? request => corsResponse(cors, request, tooLarge()) : tooLarge })
 
     const guards = await Promise.all(module.guards.map(async file => loadGuard({ file, special: {} })))
-    const cors = (instance as { [CORS]?: CorsRule })[CORS]
+    const methods = [...new Set(instance.routes.map(route => route.method.toUpperCase()).filter(method => method !== 'OPTIONS' && method !== 'WS'))]
 
     app.group(module.mount, (group) => {
       // Registered before the hooks, so a preflight, which carries no credentials, never meets the guards.
-      if (cors) {
-        const methods = [...new Set(instance.routes.map(route => route.method.toUpperCase()).filter(method => method !== 'OPTIONS' && method !== 'WS'))]
-
+      if (cors)
         group.options('/', ({ request }) => preflight(cors, methods, request)).options('/*', ({ request }) => preflight(cors, methods, request))
-      }
 
       return group
         // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
@@ -128,10 +127,16 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           if (span)
             spans.set(request, span)
         })
+        // A route of the module's own answering OPTIONS, `.all()` included, leaves a browser's preflight to kay.
+        .onBeforeHandle(({ request }) => cors && request.method === 'OPTIONS' && request.headers.has('access-control-request-method') ? preflight(cors, methods, request) : undefined)
         .onBeforeHandle(async context => inLocale(context.request, options, async () => admit(guards, context, options, cors)))
         .mapResponse(({ responseValue, set }) => withBigints(responseValue, set))
-        .onError(({ request, error }) => {
+        .onError(({ request, error, set }) => {
           const span = spans.get(request)
+
+          // Input refused before the guards ran gets the headers too, so the calling page can read why.
+          if (cors)
+            withCors(cors, request, set.headers)
 
           if (span)
             failed(span, error)
@@ -146,7 +151,11 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           answered(span, responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200)
           span.end()
         })
-        .onAfterHandle(({ request, responseValue }) => {
+        .onAfterHandle(({ request, responseValue, set }) => {
+          // A Vary the route set itself keeps Origin.
+          if (cors)
+            withCors(cors, request, responseValue instanceof Response ? responseValue.headers : set.headers)
+
           const reporter = responseValue instanceof Response ? streamReporters.get(responseValue) : undefined
 
           if (reporter)
@@ -198,7 +207,7 @@ function tooLarge(): Response {
 // They read the params of the module's route the request matched.
 async function admit(guards: LoadedGuard[], context: { request: Request, params?: Record<string, unknown>, set: { headers: Record<string, unknown> } }, options: ActionOptions, cors: CorsRule | undefined): Promise<Response | undefined> {
   if (cors)
-    Object.assign(context.set.headers, corsHeaders(cors, context.request))
+    withCors(cors, context.request, context.set.headers)
 
   const passed = guards.length > 0 ? await passGuards(guards, context, context.params ?? {}, options) : undefined
 

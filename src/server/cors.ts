@@ -25,6 +25,8 @@ export interface CorsRule {
 
 const WILDCARD = /^(https?):\/\/\*\.(.+)$/
 const SPECIAL = /[.*+?^${}()|[\]\\]/g
+// What a route answering every method, `.all()`, takes.
+const ANY_METHOD = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']
 
 export function corsRule(options: CorsOptions): CorsRule {
   if (options.origins === '*' && options.credentials)
@@ -37,7 +39,7 @@ export function corsRule(options: CorsOptions): CorsRule {
     const wildcard = WILDCARD.exec(origin.toLowerCase())
     const concrete = wildcard ? `${wildcard[1]}://x.${wildcard[2]}` : origin.toLowerCase()
 
-    if (!URL.canParse(concrete) || new URL(concrete).origin !== concrete)
+    if (!isOrigin(concrete))
       throw new Error(`kay: cors lists ${JSON.stringify(origin)}, which is no origin: a scheme and a host, with a port if any and no path, as https://app.example.com, or https://*.example.com for its subdomains`)
 
     if (wildcard)
@@ -49,6 +51,16 @@ export function corsRule(options: CorsOptions): CorsRule {
   return { any: options.origins === '*', exact, subdomains, credentials: options.credentials === true, expose: options.expose ?? [], headers: options.headers, maxAge: durationSeconds(options.maxAge ?? '1h', 'cors maxAge') }
 }
 
+// A scheme and a host, with a port if any: `https://app.example.com`, or `capacitor://localhost` for an app's web view.
+function isOrigin(text: string): boolean {
+  if (!URL.canParse(text))
+    return false
+
+  const url = new URL(text)
+
+  return url.host !== '' && `${url.protocol}//${url.host}` === text
+}
+
 function allows(rule: CorsRule, origin: string | null): origin is string {
   return origin !== null && (rule.any || rule.exact.has(origin) || rule.subdomains.some(pattern => pattern.test(origin)))
 }
@@ -58,10 +70,35 @@ export function corsAdmits(rule: CorsRule, request: Request): boolean {
   return allows(rule, request.headers.get('origin')) && (rule.credentials || !request.headers.has('cookie'))
 }
 
-// The headers a response of the module carries: an answer naming the caller's origin differs by it, so caches keep one per origin.
-export function corsHeaders(rule: CorsRule, request: Request): Record<string, string> {
+// Origin added to a Vary header, whatever else it names.
+function varyOrigin(vary: string | null | undefined): string {
+  if (vary === null || vary === undefined || vary === '')
+    return 'Origin'
+
+  return vary.split(',').some(name => ['origin', '*'].includes(name.trim().toLowerCase())) ? vary : `${vary}, Origin`
+}
+
+// Puts the headers a response of the module carries on the headers a route set, or on a response it built: an answer naming the caller's origin differs by it, so caches keep one per origin.
+export function withCors(rule: CorsRule, request: Request, headers: Record<string, unknown> | Headers): void {
+  const set = (name: string, value: string) => headers instanceof Headers ? headers.set(name, value) : headers[name] = value
+
+  for (const [name, value] of Object.entries(corsHeaders(rule, request)))
+    set(name, value)
+
+  if (!rule.any)
+    set('vary', varyOrigin(headers instanceof Headers ? headers.get('vary') : headers.vary as string | undefined))
+}
+
+// A response built before the route ran, such as a body over the limit, with the headers the module's answers carry.
+export function corsResponse(rule: CorsRule, request: Request, response: Response): Response {
+  withCors(rule, request, response.headers)
+
+  return response
+}
+
+function corsHeaders(rule: CorsRule, request: Request): Record<string, string> {
   const origin = request.headers.get('origin')
-  const headers: Record<string, string> = rule.any ? {} : { vary: 'Origin' }
+  const headers: Record<string, string> = {}
 
   if (!allows(rule, origin))
     return headers
@@ -79,12 +116,14 @@ export function corsHeaders(rule: CorsRule, request: Request): Record<string, st
 
 // The answer to a browser asking whether another site's page may send a request: the module's methods and the headers allowed, kept for `maxAge`; an origin the rule does not list gets no grant.
 export function preflight(rule: CorsRule, methods: readonly string[], request: Request): Response {
-  const headers = new Headers(corsHeaders(rule, request))
+  const headers = new Headers()
+
+  withCors(rule, request, headers)
 
   if (allows(rule, request.headers.get('origin'))) {
     const asked = request.headers.get('access-control-request-headers')
 
-    headers.set('access-control-allow-methods', methods.join(', '))
+    headers.set('access-control-allow-methods', [...new Set(methods.flatMap(method => method === 'ALL' ? ANY_METHOD : [method]))].join(', '))
     headers.set('access-control-max-age', String(rule.maxAge))
 
     if (rule.headers) {

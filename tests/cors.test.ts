@@ -15,6 +15,10 @@ afterAll(async () => {
   await Promise.all(projects.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
+function upgrade(path: string, headers: Record<string, string>): Request {
+  return new Request(`http://localhost${path}`, { headers: { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13', 'sec-fetch-site': 'cross-site', ...headers } })
+}
+
 async function asked(path: string, origin: string, method: string, headers: Record<string, string> = {}): Promise<Response> {
   return site.fetch(path, { method: 'OPTIONS', headers: { 'origin': origin, 'access-control-request-method': method, ...headers } })
 }
@@ -36,6 +40,7 @@ describe('an API module opening its routes to other sites', () => {
     expect(preflight.headers.get('vary')).toContain('Origin')
     expect(preflight.headers.get('vary')).toContain('Access-Control-Request-Headers')
     expect((await asked('/api/shared/items', 'https://eu.shop.partner.example', 'POST')).headers.get('access-control-allow-origin')).toBe('https://eu.shop.partner.example')
+    expect((await asked('/api/shared/items', 'capacitor://localhost', 'POST')).headers.get('access-control-allow-origin')).toBe('capacitor://localhost')
   })
 
   it('grants nothing to an origin it does not list, a lookalike of a listed subdomain included', async () => {
@@ -62,6 +67,31 @@ describe('an API module opening its routes to other sites', () => {
     expect((await posted('/api/shared/items', { origin: 'https://evil.example' })).status).toBe(403)
   })
 
+  it('lets the calling page read why its input was refused: a body the schema refuses, one that does not parse, one over the limit', async () => {
+    const refused = [
+      await posted('/api/shared/items', { origin: APP }, { name: 1 }),
+      await site.fetch('/api/shared/items', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': APP }, body: '{"name":' }),
+      await posted('/api/shared/items', { origin: APP }, { name: 'x'.repeat(512) }),
+    ]
+
+    expect(refused.map(response => response.status)).toEqual([422, 400, 413])
+
+    for (const response of refused) {
+      expect(response.headers.get('access-control-allow-origin')).toBe(APP)
+      expect(response.headers.get('vary')).toContain('Origin')
+    }
+  })
+
+  it('keeps Origin in a Vary the route sets itself', async () => {
+    expect((await site.fetch('/api/shared/greeting', { headers: { origin: APP } })).headers.get('vary')).toBe('Accept-Language, Origin')
+    expect((await site.fetch('/api/shared/built', { headers: { origin: APP } })).headers.get('vary')).toContain('Accept-Encoding, Origin')
+  })
+
+  it('opens its websockets to the origins it lists only', async () => {
+    expect((await site.handle(upgrade('/api/shared/live', { origin: APP }))).status).not.toBe(403)
+    expect((await site.handle(upgrade('/api/shared/live', { origin: 'https://evil.example' }))).status).toBe(403)
+  })
+
   it('varies by origin even for a request naming none, so a cache never hands a listed site an answer made for another', async () => {
     const plain = await site.fetch('/api/shared/items')
 
@@ -77,6 +107,7 @@ describe('an API module opening its routes to other sites', () => {
     expect(preflight.headers.get('access-control-allow-headers')).toBe('content-type')
     expect(preflight.headers.get('access-control-max-age')).toBe('600')
     expect(preflight.headers.get('vary')).toBeNull()
+    expect((await asked('/api/open/any', 'https://anyone.example', 'PUT')).headers.get('access-control-allow-methods')).toBe('GET, POST, HEAD, PUT, PATCH, DELETE')
 
     const sent = await posted('/api/open', { origin: 'https://anyone.example' })
 
