@@ -627,10 +627,10 @@ describe('in the browser', () => {
   it('renders a relative time first as the server did, then ticks at its unit\'s pace until its root goes', async () => {
     GlobalRegistrator.register({ url: 'http://localhost/en' })
     jest.useFakeTimers({ now: 1_010_000 })
+    const { flush, root } = await import('../src/runtime')
 
     try {
       const { relativeTime } = await import('../src/runtime/i18n.client')
-      const { flush, root } = await import('../src/runtime')
 
       document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"locale":"en","messages":{},"now":1000000}</script>'
 
@@ -660,6 +660,8 @@ describe('in the browser', () => {
       expect([texts, jest.getTimerCount()]).toEqual([['30 seconds ago', '40 seconds ago', '41 seconds ago', '1 minute ago', '1 minute ago', '2 minutes ago'], 0])
     }
     finally {
+      // A fake queueMicrotask holds the flush the last tick queued, which every later effect of the process would wait on.
+      flush()
       jest.useRealTimers()
       await GlobalRegistrator.unregister()
     }
