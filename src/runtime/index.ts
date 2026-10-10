@@ -281,6 +281,11 @@ export type GuardContext = Pick<PageContext<RouteParams>, 'request' | 'url' | 'l
 
 export type Guard = (ctx: GuardContext) => void | Promise<void>
 
+// What the `GET` of an endpoint file reads: `src/routes/feeds/[slug].json.ts` gets `{ slug }`, the extension left out.
+export type EndpointContext<Params extends Record<string, unknown> = Record<string, string>> = Pick<PageContext<Params>, 'request' | 'url' | 'params' | 'locals'>
+// A string or a Blob it returns is served with the type its file's extension names; a Response goes out as it is.
+export type EndpointBody = string | Blob | Response
+
 // The default export of a `_guard.ts`: runs before every page and every action in its directory and below, and lets the request through unless it redirects or denies.
 export function guard(check: Guard): Guard {
   return check

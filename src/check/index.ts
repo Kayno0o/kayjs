@@ -9,7 +9,7 @@ import type { Duration } from '../runtime/duration'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ApiModule } from '../server/api'
 import type { Redirects } from '../server/redirects'
-import type { Route } from '../server/routes'
+import type { Endpoint, Route, RouteMount } from '../server/routes'
 import type { ShadowFile } from './shadow'
 import { existsSync, statSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
@@ -37,7 +37,7 @@ import { HEALTH_PATH } from '../server/lifecycle'
 import { OPENAPI_PATH, REFERENCE_PATH } from '../server/openapi'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
-import { patternShapes, routeMounts, routeOf, scanRoutes, servedPaths } from '../server/routes'
+import { patternShapes, routeMounts, routeOf, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { bootProblems } from './boot'
 import { islandOnlyComponents } from './island-only'
@@ -167,7 +167,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push(fromCompile(file, source, diagnostic))
   }
 
-  const [routes, found, apiModules] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(root, options, diagnostics)])
+  const [routes, found, apiModules, endpoints] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(root, options, diagnostics), endpointsOf(routesDir, routeMounts(root, options.extensions))])
   const publicPaths = [...found, ...htmlFallbacks(found, servedPaths(routes))]
 
   // A param a matcher kay ships checks is named after it, `:integer`, so a link filling it with a literal is checked as the matcher would; any other is `:`.
@@ -200,10 +200,13 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const catalogs = [...extensionMessageFiles(root, options.extensions, textLocale), messagesFile(root, options.i18n ?? {}, textLocale)].filter(file => existsSync(file)).map(file => relative(dirname(environmentPath), file).replace(TS_EXTENSION, ''))
   const texts = options.i18n ? settings && { locales: options.i18n.locales, prefixes, messages: catalogs } : catalogs.length > 0 ? { locales: [textLocale], prefixes: [], messages: catalogs } : undefined
 
-  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, texts, config, app, content, servers))
+  // An endpoint with params is linked to as a template: `/feeds/${string}.json`.
+  const endpointPaths = endpoints.map(endpoint => endpoint.params.length === 0 ? JSON.stringify(endpoint.pattern) : `\`${endpoint.pattern.replace(PARAM_SEGMENT, () => `\${string}`)}${endpoint.suffix ?? ''}\``)
+
+  await writeIfChanged(environmentPath, environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, texts, config, app, content, servers, endpointPaths))
 
   // What kay serves itself counts as served, whether or not the project turns it on.
-  const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS]
+  const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS, ...endpoints.filter(endpoint => endpoint.params.length === 0).map(endpoint => endpoint.pattern)]
 
   for (const message of redirectProblems(options.redirects ?? {}, served))
     diagnostics.push({ file: join(root, CONFIG_FILE), line: 1, column: 1, message })
@@ -241,7 +244,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await writeIfChanged(packagesPath, packageTypes(root, libraries))
 
   const replaced = settingsCheck(root, options.settings ?? {}, diagnostics)
-  const exported = exportsCheck(root, routesDir, routes, apiModules)
+  const exported = exportsCheck(root, routesDir, routes, apiModules, endpoints)
 
   await writeIfChanged(settingsPath, replaced.code)
   await writeIfChanged(exportsPath, exported.code)
@@ -359,13 +362,15 @@ function settingsCheck(root: string, settings: Record<string, string>, diagnosti
 }
 
 // Each default export the server calls, a guard's, an API module's or a matcher's, assigned to the type it is called as, so a wrong one is a type error at its file rather than a refusal at boot.
-function exportsCheck(root: string, routesDir: string, routes: Route[], api: ApiModule[]): { code: string, lines: Map<number, { file: string, wanted: string }> } {
-  const guards = new Set([...routes.flatMap(route => route.guards.map(guard => guard.file)), ...api.flatMap(module => module.guards.map(guard => guard.file))])
+function exportsCheck(root: string, routesDir: string, routes: Route[], api: ApiModule[], endpoints: Endpoint[]): { code: string, lines: Map<number, { file: string, wanted: string }> } {
+  const guards = new Set([...routes, ...api, ...endpoints].flatMap(served => served.guards.map(guard => guard.file)))
   const matchers = new Set(routes.flatMap(route => Object.values(route.matchers ?? {})).map(matcher => matcherSource(routesDir, matcher)).filter((source): source is string => source !== undefined && source !== 'kay'))
-  const entries = [
+  const entries: { file: string, type: string, wanted: string, named?: string }[] = [
     ...[...guards].map(file => ({ file, type: 'Guard', wanted: 'a guard by default: export default guard(ctx => ...)' })),
     ...api.map(module => ({ file: module.file, type: 'AnyElysia', wanted: 'an Elysia instance by default: export default new Elysia().get(\'/\', () => ...)' })),
     ...[...matchers].map(file => ({ file, type: '(value: string) => unknown', wanted: 'a matcher by default: export default (value: string) => value or undefined' })),
+    // Its context is the app's to type, `EndpointContext<{ slug: string }>`; what it returns is checked.
+    ...endpoints.map(endpoint => ({ file: endpoint.file, type: '(ctx: never) => EndpointBody | Promise<EndpointBody>', wanted: 'a GET handler: export function GET(ctx: EndpointContext) { return \'text\' }', named: 'GET' })),
   ]
   const lines = new Map<number, { file: string, wanted: string }>()
 
@@ -373,8 +378,9 @@ function exportsCheck(root: string, routesDir: string, routes: Route[], api: Api
     return { code: '', lines }
 
   const shadowDir = join(root, SHADOW_DIR)
-  const header = [...guards.size > 0 ? ['import type { Guard } from \'kay\''] : [], ...api.length > 0 ? ['import type { AnyElysia } from \'elysia\''] : []]
-  const imports = entries.map(({ file }, index) => `import kayExport${index} from ${JSON.stringify(relative(shadowDir, file).replace(SCRIPT_EXTENSION, ''))}`)
+  const kayTypes = [...guards.size > 0 ? ['Guard'] : [], ...endpoints.length > 0 ? ['EndpointBody'] : []]
+  const header = [...kayTypes.length > 0 ? [`import type { ${kayTypes.join(', ')} } from 'kay'`] : [], ...api.length > 0 ? ['import type { AnyElysia } from \'elysia\''] : []]
+  const imports = entries.map((entry, index) => `import ${entry.named === undefined ? `kayExport${index}` : `{ ${entry.named} as kayExport${index} }`} from ${JSON.stringify(relative(shadowDir, entry.file).replace(SCRIPT_EXTENSION, ''))}`)
   const checks = entries.map(({ type }, index) => `export const kayCheck${index}: ${type} = kayExport${index}`)
 
   // Lines count from 1: the type imports, the imports, a blank line, then the checks.
@@ -384,6 +390,16 @@ function exportsCheck(root: string, routesDir: string, routes: Route[], api: Api
   }
 
   return { code: `${[...header, ...imports].join('\n')}\n\n${checks.join('\n')}\n`, lines }
+}
+
+// The endpoint files, or none while one is misnamed: the boot checks report it.
+async function endpointsOf(routesDir: string, mounts: RouteMount[]): Promise<Endpoint[]> {
+  try {
+    return await scanEndpoints(routesDir, mounts)
+  }
+  catch {
+    return []
+  }
 }
 
 // The API modules, or none with the reason the server would refuse them reported at the directory.
@@ -411,13 +427,13 @@ function i18nSettings(root: string, config: I18nConfig, diagnostics: CheckDiagno
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.
-function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false): string {
+function environment(patterns: string[], files: string[], api: { mount: string, module: string }[], i18n?: { locales: string[], prefixes: string[], messages: string[] }, config?: string, app?: string, content?: string, servers = false, endpoints: string[] = []): string {
   const routes = patterns.length > 0 ? patterns.map(routeTuple).join(' | ') : 'never'
   // The collections' feeds are served as files are, a localized one's under each locale's prefix too.
   const feed = content === undefined ? undefined : `FeedPathsOf<typeof import(${importSpecifier(content)})>`
   const prefixes = i18n?.prefixes.map(locale => JSON.stringify(`/${locale}`)).join(' | ')
   const feeds = feed === undefined ? [] : [feed, ...prefixes === undefined || prefixes === '' ? [] : [`\`\${${prefixes}}\${${feed}}\``]]
-  const paths = [...files.flatMap(spellings).map(file => JSON.stringify(file)), ...feeds].join(' | ') || 'never'
+  const paths = [...files.flatMap(spellings).map(file => JSON.stringify(file)), ...feeds, ...endpoints].join(' | ') || 'never'
   // The app's catalog laid over its extensions', key by key.
   const messages = i18n?.messages.length === 0 ? '{}' : i18n?.messages.map(file => `typeof import(${importSpecifier(file)}).default`).reduce((under, over) => `MergeMessages<${under}, ${over}>`)
   const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: ${messages}` : ''

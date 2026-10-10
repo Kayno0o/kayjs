@@ -9,7 +9,7 @@ import { projectApi } from '../server/api'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
-import { refuseClashes, routeMounts, routeTrees, scanRoutes, specialPagesOf } from '../server/routes'
+import { refuseClashes, routeMounts, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from '../server/routes'
 import { outputDir } from './assets'
 import { kay } from './plugin'
 import { runtimeConfig, withoutPlugins } from './runtime-config'
@@ -69,7 +69,8 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   const messageFiles = [...Object.values(extensionMessages).flat(), ...locales.map(locale => messagesFile(root, config.i18n ?? {}, locale)).filter(file => existsSync(file))]
   // The API modules too, with their guards, which `pages()` mounts from the list rather than the directory.
   const api = await projectApi(root, config)
-  const modules = [...new Set([...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...api.flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
+  const endpoints = await scanEndpoints(routesDir, mounts)
+  const modules = [...new Set([...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
   const configFile = join(root, CONFIG_FILE)
   const generated = join(root, '.kay', 'compile', 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
@@ -92,6 +93,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     `  routes: ${JSON.stringify(routes)},`,
     `  fallback: ${JSON.stringify(fallback)},`,
     `  api: ${JSON.stringify(api)},`,
+    `  endpoints: ${JSON.stringify(endpoints)},`,
     `  extensionMessages: ${JSON.stringify(extensionMessages)},`,
     `  modules: { ${modules.map((file, index) => `${JSON.stringify(file)}: module${index}`).join(', ')} },`,
     '  config,',

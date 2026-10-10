@@ -86,6 +86,35 @@ export default defineConfig({
 })
 ```
 
+## Endpoint files
+
+A `.ts` file in `src/routes/` whose name carries an extension before `.ts` serves that path with what its `GET` returns, such as an `llms.txt` or a JSON feed, without an API module:
+
+```ts
+// src/routes/feeds/[slug].json.ts
+import type { EndpointContext } from 'kay'
+import { feedOf } from '../../data'
+
+export const page = { prerender: [{ slug: 'news' }, { slug: 'releases' }] }
+
+export function GET({ params }: EndpointContext<{ slug: string }>) {
+  return Response.json(feedOf(params.slug))
+}
+```
+
+| File | URL |
+| --- | --- |
+| `llms.txt.ts` | `/llms.txt` |
+| `feeds/[slug].json.ts` | `/feeds/:slug.json`, read as `params.slug` |
+| `exports/[year]/report.csv.ts` | `/exports/:year/report.csv` |
+
+- `GET(ctx)` takes an `EndpointContext`: `request`, `url`, `params` and `locals`, as a page's `ctx` has them. It returns a string, a `Blob` or a `Response`, or a promise of one: a string is sent as the type its extension names, `text/plain` for `.txt`, in UTF-8, a Blob with its own type or else that one, and a Response as it is, its status and headers included. A handler that throws answers 500 and goes to `onError`.
+- The `_guard.ts` files above an endpoint run before it, as they do for a page: a redirect or a denial answers, and the cookies and headers they set go out with its answer.
+- A param is a plain `[name]` segment, the extension of the last one written after its brackets, `[slug].json`; a rest, an optional or a matcher param stops the server. Endpoints whose paths only differ by that extension share the path, `feeds/[slug].json.ts` beside `feeds/[name].xml.ts`, but a page cannot share one with an endpoint, `posts/[slug].kay` beside `posts/[slug].json.ts`, as the router reads both as `/posts/:slug`: move one, `posts/[slug]/feed.json.ts`.
+- An endpoint serving a page's path, another endpoint's or a public file's stops the server, which `kay check` reports. Locale prefixes and layouts leave endpoints alone, and the sitemap lists none.
+- A `.ts` file without an extension before `.ts`, `format.ts`, stays a helper, as do `.test.ts` and `.d.ts` files.
+- `kay check` checks links to endpoints, `a(href="/feeds/news.json")`, and that each exports a `GET` returning one of those; `kay build --compile` embeds them, and `kay build --static` writes each to its path: one without params as it is, one with params for each set of values `export const page = { prerender: [...] }` lists, as a page does.
+
 ## Prerendering
 
 A page whose `page` has `prerender: true` is rendered once by `kay build`, its loads included, and served from that file in production, revalidated by its ETag. Its guards still run on every request. It renders without a request, so reading `ctx.cookies`, `ctx.query` or `ctx.locals` in its server fence is reported by `kay check`, and in a layout fails the build, and `ctx.failed` and `ctx.succeeded` return `undefined`; `ctx.url` is `http://localhost` plus its path. A refused form post, and a request carrying the cookie a plain form post that went through leaves, as the browser coming back from one does, get it rendered for that request instead, with how the post went, as `Cache-Control: private, no-store` and no ETag; the next request gets the file again. Development renders it per request like any other.
@@ -221,8 +250,8 @@ export default defineConfig({
 
 `kay build --static` writes the site to `dist`, or `--outdir`, for any static host: Forgejo Pages, a CDN, plain nginx.
 
-- Every page is rendered: one without params as it is, one with params for the values its `prerender` lists. A page a guard covers, one exporting an action, one holding a [server island](#server-islands), one with params and no list, one exporting `prerender = false`, one that redirects or answers another status than 200, one linking an image only the image route makes, and one whose render fails cannot be served without a server, nor can a module under `src/api/`, and the build fails naming each of them.
-- Each page is written as `about.html` and `about/index.html`, so a host finds it at `/about` and `/about/` alike, `/` as `index.html`; the browser build goes under `_kay/`, the public files at the root, with the sitemap, `robots.txt`, feeds, favicons, `sw.js` (see [Offline](head.md#offline)) and `404.html` from `_404.kay`. Every compressible file has its `.br` and `.gz` copy beside it, for a server sending them as they are (nginx's `gzip_static`), and asset names carry their hash, so `_kay/` can be cached forever.
+- Every page is rendered: one without params as it is, one with params for the values its `prerender` lists. A page a guard covers, one exporting an action, one holding a [server island](#server-islands), one with params and no list, one exporting `prerender = false`, one that redirects or answers another status than 200, one linking an image only the image route makes, and one whose render fails cannot be served without a server, nor can a module under `src/api/`, an [endpoint file](#endpoint-files) a guard covers or one with params and no `prerender` list, and the build fails naming each of them.
+- Each page is written as `about.html` and `about/index.html`, so a host finds it at `/about` and `/about/` alike, `/` as `index.html`; the browser build goes under `_kay/`, the public files at the root, with each endpoint file written to its path, `llms.txt`, the sitemap, `robots.txt`, feeds, favicons, `sw.js` (see [Offline](head.md#offline)) and `404.html` from `_404.kay`. Every compressible file has its `.br` and `.gz` copy beside it, for a server sending them as they are (nginx's `gzip_static`), and asset names carry their hash, so `_kay/` can be cached forever.
 - Imported images link the variants the build writes, `/_kay/images/hero-640.webp`, `hero-640-16x9.webp` cut and `hero-card.jpg` for the share card, since no image route answers; an image from `images.dirs` is not exported, and one from `images.remote` is downloaded by the build, its variants written as `/_kay/images/remote-<hash of its URL>-640.webp`, the build failing if the host does not answer.
 - A redirect without params becomes a page sending the browser on with `<meta http-equiv="refresh">`; every redirect also goes to `_redirects`, read by hosts such as Netlify and Cloudflare Pages. With `i18n.prefixDefault`, each unprefixed path sends the browser to the default locale's copy. Locales by domain need a server.
 - The directory is cleared first, only when the last export wrote it: kay refuses one holding other files, and the project itself.

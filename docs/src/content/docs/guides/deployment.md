@@ -34,7 +34,7 @@ For a host with no server, `--static` writes the whole site to `dist`:
 kay build --static --outdir dist
 ```
 
-Every page is rendered, with `about.html` and `about/index.html` for `/about`, plus the sitemap, feeds and a `404.html`. The build fails naming each page that needs a server: one behind a guard, one exporting an action, one with params and no `prerender` list, and any module under `src/api/`. With no server to take them, the errors a browser meets are logged to its console only, not reported to `onError`.
+Every page is rendered, with `about.html` and `about/index.html` for `/about`, plus each [endpoint file](/essentials/routing#endpoint-files) such as `llms.txt`, the sitemap, feeds and a `404.html`. The build fails naming each page or endpoint that needs a server: one behind a guard, one exporting an action, one with params and no `prerender` list, and any module under `src/api/`. With no server to take them, the errors a browser meets are logged to its console only, not reported to `onError`.
 
 ## Docker
 

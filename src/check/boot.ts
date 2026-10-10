@@ -12,7 +12,7 @@ import { localeSettings, refuseLocaleClashes } from '../server/i18n'
 import { shutdownSeconds } from '../server/lifecycle'
 import { publicFiles, refusePublicClashes } from '../server/public'
 import { readRedirects, refuseRedirectClashes } from '../server/redirects'
-import { refuseClashes, routeMounts, scanRoutes } from '../server/routes'
+import { refuseClashes, refuseEndpointClashes, routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 
 // What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree.
@@ -46,6 +46,13 @@ export async function bootProblems(root: string, options: CheckOptions): Promise
   refused(config, () => refuseRedirectClashes(readRedirects(options.redirects ?? {}), routes))
   refused(routesDir, () => refuseClashes(routesDir, routes))
   refused(publicDir, () => refusePublicClashes(files, routes))
+
+  try {
+    refuseEndpointClashes(await scanEndpoints(routesDir, routeMounts(root, options.extensions)), routes, files.map(file => file.url))
+  }
+  catch (error) {
+    diagnostics.push({ file: routesDir, line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
+  }
 
   let settings: LocaleSettings | undefined
 

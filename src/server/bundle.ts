@@ -1,6 +1,6 @@
 import type { KayConfig } from '../config'
 import type { ApiModule } from './api'
-import type { Route, SpecialPages } from './routes'
+import type { Endpoint, Route, SpecialPages } from './routes'
 
 // What `kay build --compile` bakes into an executable: the routes as the build scanned them, every module they name, and where the embedded client build and public files sit.
 export interface Bundle {
@@ -11,6 +11,8 @@ export interface Bundle {
   fallback: SpecialPages
   // The modules under the API directory, mounted under `/api`.
   api?: ApiModule[]
+  // The endpoint files under the routes directory, `llms.txt.ts` and the like.
+  endpoints?: Endpoint[]
   modules: Record<string, unknown>
   // The message catalogs the extensions gave each locale, found where the build ran: an extension names its own under the executable's.
   extensionMessages?: Record<string, string[]>

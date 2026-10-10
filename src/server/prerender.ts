@@ -17,6 +17,7 @@ import { projectApi } from './api'
 import { basePath } from './base'
 import { setupCards } from './card'
 import { PRERENDERED_DIR, readInlineStyles, readManifest, writeManifest } from './client'
+import { exportedEndpoints } from './endpoints'
 import { implicitI18n, loadI18n, localeCopies, routedSettings, stateFor } from './i18n'
 import { applyImageConfig } from './image'
 import { registerLoader } from './loader'
@@ -24,12 +25,13 @@ import { pageSetting } from './page-settings'
 import { loadMatchers, matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pathOf, storedHeaders } from './prerendered'
 import { renderPage } from './render'
-import { refuseClashes, routeMounts, scanRoutes } from './routes'
+import { refuseClashes, routeMounts, scanEndpoints, scanRoutes } from './routes'
 import { configHead, siteOrigin } from './seo'
 import { serverIslandModes } from './server-islands'
 import { STAMP_HOLE } from './stamp'
 
 const KAY_PREFIX = /^kay: /
+const PARTS = new Intl.ListFormat('en-GB')
 const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
 
 // The image route in an attribute, `src`, `srcset` or a style's `url()`: a page whose text only names it, as documentation does, links nothing.
@@ -181,10 +183,11 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
     }
   }
 
-  const apiProblems = options.exportAll ? (await projectApi(root, config)).map(module => `${relative(root, module.file)}: an API module answers requests, which only a server does`) : []
+  const apiProblems = options.exportAll ? (await projectApi(root, config)).map(module => `${relative(root, module.file)}: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file`) : []
+  const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, routeMounts(root, config.extensions)))).problems : []
 
-  if (problems.length > 0 || apiProblems.length > 0)
-    throw new ExportError(`kay: ${[count(problems.length, 'page'), count(apiProblems.length, 'API module')].filter(part => part !== '').join(' and ')} cannot be exported to static files, which no server answers for:\n${[...problems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)
+  if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
+    throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)
 
   await writeManifest(root, { ...manifest, pages, site })
   client.pages = new Map(Object.entries(pages))

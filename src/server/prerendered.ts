@@ -27,7 +27,7 @@ export function pageEtag(html: string): string {
 }
 
 // The paths a page export such as `prerender` lists: `true` for a route without params; a list of params, a function returning one, a content collection, or a `paginate()` list, for a route with some.
-export async function listedParams(route: Route, file: string, name: string, value: unknown, settings?: LocaleSettings): Promise<ListedParams[]> {
+export async function listedParams(route: Pick<Route, 'params' | 'optional' | 'catchAll'>, file: string, name: string, value: unknown, settings?: LocaleSettings): Promise<ListedParams[]> {
   if (isPaginated(value)) {
     const param = route.params[0]
 
@@ -89,7 +89,7 @@ export async function listedParams(route: Route, file: string, name: string, val
 }
 
 // A segment, or for a catch-all a slash-separated run of them, that names a file inside the prerendered pages; an optional param may be left out.
-function isPathPart(route: Route, param: string, value: unknown): boolean {
+function isPathPart(route: Pick<Route, 'optional' | 'catchAll'>, param: string, value: unknown): boolean {
   if (value === undefined && route.optional?.includes(param))
     return true
 
@@ -107,7 +107,7 @@ export function listedIn(params: ListedParams, locale: string | undefined, setti
 }
 
 // The URL path the params fill in, each segment encoded as the server looks pages up; a catch-all keeps its slashes, an optional param left out leaves its segment out.
-export function pathOf(route: Route, params: Record<string, string>): string {
+export function pathOf(route: Pick<Route, 'pattern' | 'catchAll'>, params: Record<string, string>): string {
   const path = route.pattern.split('/').flatMap((segment) => {
     if (segment === '*')
       return [params[route.catchAll!]!.split('/').map(encodeURIComponent).join('/')]

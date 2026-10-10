@@ -15,12 +15,14 @@ import { pages as servePages } from '../server'
 import { basePath } from '../server/base'
 import { PRERENDERED_DIR } from '../server/client'
 import { compressPaths } from '../server/compress'
+import { exportedEndpoints } from '../server/endpoints'
 import { PUBLIC_ENV_PATH } from '../server/env'
 import { faviconPaths } from '../server/favicon'
 import { localeSettings } from '../server/i18n'
 import { SERVICE_WORKER } from '../server/offline'
 import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles } from '../server/public'
+import { routeMounts, scanEndpoints } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { outputDir } from './assets'
@@ -84,7 +86,7 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
   // The extensions' server plugins are left out, since nothing a static site serves runs them and one may open a database.
   const extensions = config.extensions?.map(({ server: _, ...extension }) => extension)
   const app = new Elysia().use(await servePages({ ...config, extensions, root, prebuilt: true, log: false, health: false, security: false, compress: false }))
-  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...faviconPaths(config.favicon), ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => feedPaths(collection, config.i18n && localeSettings(config.i18n)).map(({ path }) => path))]
+  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...faviconPaths(config.favicon), ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => feedPaths(collection, config.i18n && localeSettings(config.i18n)).map(({ path }) => path)), ...(await exportedEndpoints(root, await scanEndpoints(resolve(root, config.routes ?? 'src/routes'), routeMounts(root, config.extensions)))).paths]
 
   for (const path of fetched) {
     const response = await app.handle(new Request(`http://localhost${path}`))

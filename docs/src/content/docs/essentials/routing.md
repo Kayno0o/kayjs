@@ -76,6 +76,26 @@ The keys are `prerender` and `revalidate` (see [Prerendering](#prerendering)), `
 
 A page reads its data in a `--- server` fence, with the request in `ctx`. See [Data loading](/essentials/data-loading).
 
+## Endpoint files
+
+A `.ts` file whose name keeps an extension before `.ts` serves that path with what its `GET` returns, for an `llms.txt`, a JSON feed or a CSV export, with no API module:
+
+```ts
+// src/routes/feeds/[slug].json.ts
+import type { EndpointContext } from 'kay'
+import { feedOf } from '../../data'
+
+export const page = { prerender: [{ slug: 'news' }] }
+
+export function GET({ params }: EndpointContext<{ slug: string }>) {
+  return Response.json(feedOf(params.slug))
+}
+```
+
+`GET` gets the `request`, `url`, `params` and `locals`, and returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, `text/plain` for `llms.txt`. The guards above it run first, as they do for a page, and `kay build --static` writes it to a file, for each set of params its `prerender` lists.
+
+A page and an endpoint cannot share a param path, `posts/[slug].kay` beside `posts/[slug].json.ts`: put the endpoint one level down, `posts/[slug]/feed.json.ts`. A `.ts` file with no extension before `.ts` stays a helper.
+
 ## Not found and errors
 
 `_404.kay` renders for `ctx.notFound()` and for every URL no page serves. `_error.kay` renders when a page throws, reading `ctx.error`:

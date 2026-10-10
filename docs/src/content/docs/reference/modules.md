@@ -34,7 +34,7 @@ import { collection } from 'kay/content'
 | `uid` | A unique id that matches between server and browser |
 | `previewing` | Whether the visitor is in preview mode |
 
-Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext` and `Locals`.
+Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `EndpointContext`, `EndpointBody` and `Locals`.
 
 ## kay/server
 

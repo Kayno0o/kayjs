@@ -14,10 +14,7 @@ export interface SearchSection {
   reference?: true
 }
 
-const ROOT = join(import.meta.dir, '..')
 const DOCS = join(import.meta.dir, 'src/content/docs')
-const RAW = 'https://git.kaynooo.fr/kaynooo/kayjs/raw/branch/main/'
-const DOC_LINK = /\]\((llms\/[\w-]+\.md)/g
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n/
 const HEADING = /<h([1-4]) id="([^"]+)">([\s\S]*?)<\/h\1>/g
 // Block tags part words, inline ones such as code sit inside a sentence.
@@ -63,5 +60,3 @@ const index = [
 ]
 
 await Bun.write(join(import.meta.dir, 'public/search.json'), JSON.stringify(index))
-// llms.txt for agents, its links made absolute on the forge since the site serves the docs it lists as pages.
-await Bun.write(join(import.meta.dir, 'public/llms.txt'), (await Bun.file(join(ROOT, 'llms.txt')).text()).replace(DOC_LINK, (_link, path: string) => `](${RAW}${path}`))

@@ -1,7 +1,7 @@
 import type { KayExtension } from '../config'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
-import { findKayFiles } from '../build/files'
+import { findKayFiles, findProjectFiles } from '../build/files'
 import { throughLinks } from '../build/links'
 
 export interface Route {
@@ -19,6 +19,16 @@ export interface Route {
   layouts: string[]
   special: SpecialPages
   // `_guard.ts` files covering the page and its actions, outermost first.
+  guards: GuardFile[]
+}
+
+// A file under the routes directory answering GET with what its `GET` returns: `llms.txt.ts` serves `/llms.txt`.
+export interface Endpoint {
+  // The router path: `/llms.txt`, or `/feeds/:slug` for `feeds/[slug].json.ts`, whose last param ends in its `suffix`, `.json`.
+  pattern: string
+  file: string
+  params: string[]
+  suffix?: string | undefined
   guards: GuardFile[]
 }
 
@@ -63,6 +73,12 @@ const ERROR = '_error.kay'
 const GUARD = '_guard.ts'
 // What Elysia reads as a parameter, a wildcard or breaks the code it generates on, in a static segment.
 const ROUTER_SYNTAX = /[:*']/
+// `llms.txt.ts` or `[slug].json.ts`: an extension of its own before `.ts`, which a module of helpers beside the pages has not; nor is a test or a declaration file an endpoint.
+const ENDPOINT_FILE = /\.[a-z\d]+\.ts$/i
+const NOT_ENDPOINT = /\.(?:test|spec|d)\.ts$/
+const SUFFIXED_PARAM = /^(\[\[?[^[\]]+\]\]?)(\.[\w.-]+)$/
+const TS_EXTENSION = /\.ts$/
+const BRACKETS = /[[\]]/
 const PARAM_NAME = /:[^/]+/g
 const TRAILING_SLASH = /\/$/
 const EDGE_SLASHES = /^\/+|\/+$/g
@@ -160,6 +176,82 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
   }
 
   return routes
+}
+
+// The app's endpoint files, then each mounted library's that the app has none of at the same path.
+export async function scanEndpoints(routesDir: string, mounts: RouteMount[] = []): Promise<Endpoint[]> {
+  const trees = routeTrees(routesDir, mounts)
+  const endpoints: Endpoint[] = []
+  const read: LayoutsRead = new Map()
+  const served = new Set<string>()
+
+  for (const tree of trees) {
+    const own: Endpoint[] = []
+
+    for (const file of existsSync(tree.dir) ? await findProjectFiles(tree.dir, ENDPOINT_FILE) : []) {
+      const endpoint = endpointOf(tree.dir, file, tree.prefix)
+
+      if (endpoint && !served.has(endpointKey(endpoint)))
+        own.push({ ...endpoint, guards: guardsOf(trees, virtualDir(trees, dirname(file)), read) })
+    }
+
+    for (const endpoint of own)
+      served.add(endpointKey(endpoint))
+
+    endpoints.push(...own)
+  }
+
+  return endpoints
+}
+
+// Named as a page is, `[name]` taking a segment, with its extension kept in the path; the last param may carry the extension, `[slug].json`.
+function endpointOf(routesDir: string, file: string, prefix: string): Omit<Endpoint, 'guards'> | undefined {
+  if (basename(file).startsWith('_') || NOT_ENDPOINT.test(file))
+    return undefined
+
+  const name = file.replace(TS_EXTENSION, '')
+  const suffixed = SUFFIXED_PARAM.exec(basename(name))
+  const route = routeOf(routesDir, suffixed ? join(dirname(name), suffixed[1]!) : name, prefix)
+
+  if (!route)
+    return undefined
+
+  if (route.catchAll !== undefined || route.optional || route.matchers)
+    throw new Error(`kay: ${file} answers one path per set of params, so each of its params is a plain [name] segment, with no ..., [[ ]] or matcher`)
+
+  if (route.pattern.split('/').some(segment => !segment.startsWith(':') && (BRACKETS.test(segment) || ROUTER_SYNTAX.test(segment))))
+    throw new Error(`kay: ${file} has a [, ], :, * or ' in its name outside a [name] param, which the router cannot serve; rename it`)
+
+  return { pattern: route.pattern, file, params: route.params, ...suffixed && { suffix: suffixed[2] } }
+}
+
+// What two endpoints compare by: their router path, params unnamed, and the extension of the last.
+export function endpointKey(endpoint: Pick<Endpoint, 'pattern' | 'suffix'>): string {
+  return `${routerKey(endpoint.pattern)}${endpoint.suffix ?? ''}`
+}
+
+// Two endpoints serving the same paths, or one taking a path a page or a public file serves, stop the server, as two pages do.
+export function refuseEndpointClashes(endpoints: Endpoint[], routes: Route[], publicUrls: Iterable<string>): void {
+  const pages = new Map(routes.flatMap(route => patternShapes(route.pattern).map(shape => [routerKey(shape), route.file] as const)))
+  const files = new Set(publicUrls)
+  const seen = new Map<string, string>()
+
+  for (const endpoint of endpoints) {
+    const key = endpointKey(endpoint)
+    const page = pages.get(routerKey(endpoint.pattern))
+    const path = `${endpoint.pattern}${endpoint.suffix ?? ''}`
+
+    if (seen.has(key))
+      throw new Error(`kay: ${seen.get(key)} and ${endpoint.file} both serve ${path}`)
+
+    if (page !== undefined)
+      throw new Error(`kay: ${page} and ${endpoint.file} both serve ${endpoint.pattern}${endpoint.suffix === undefined ? '' : `, which ${endpoint.file} takes for its paths ending in ${endpoint.suffix}`}; move one`)
+
+    if (files.has(path))
+      throw new Error(`kay: ${endpoint.file} and the public file ${path} both serve ${path}; drop one`)
+
+    seen.set(key, endpoint.file)
+  }
 }
 
 // Two pages serving the same path stop the server, unless all but one check a param with a matcher, which a refused URL falls through; so does a name the router misreads.

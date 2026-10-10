@@ -199,6 +199,11 @@ describe('kay build --static', () => {
     expect(missing.text).toMatch(/<!--linked from \/404\.html: [^>]*\.css[^>]*--><\/body>/)
   })
 
+  it('writes each endpoint file to its path, once per param its prerender lists', async () => {
+    expect((await get('/llms.txt')).text).toBe('# Static site\n')
+    expect((await get('/data/first.json')).text).toBe('{"slug":"first"}')
+  })
+
   it('turns a redirect into a page sending the browser on, and lists every one in _redirects', async () => {
     expect((await get('/old')).text).toContain('<meta http-equiv="refresh" content="0; url=/repo/about">')
     expect(await Bun.file(join(out, '_redirects')).text()).toBe('/repo/old /repo/about 301\n/repo/blog/:slug /repo/posts/:slug 301\n')
@@ -216,12 +221,14 @@ describe('kay build --static', () => {
       await Bun.write(join(tags, '[tag].kay'), 'h1 Tag\n')
       await Bun.write(join(tags, 'gone.kay'), '--- server\nctx.redirect(\'/about\')\n---\np x\n')
       await Bun.write(join(api, 'ping.ts'), 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'pong\')\n')
+      await Bun.write(join(tags, '[tag].json.ts'), 'export function GET() {\n  return \'{}\'\n}\n')
 
       const { code, errors } = await exportSite(elsewhere)
 
       expect(code).toBe(1)
-      expect(errors).toContain('kay: 3 pages and 1 API module cannot be exported to static files, which no server answers for:')
-      expect(errors).toContain('src/api/ping.ts: an API module answers requests, which only a server does')
+      expect(errors).toContain('kay: 3 pages, 1 endpoint and 1 API module cannot be exported to static files, which no server answers for:')
+      expect(errors).toContain('src/api/ping.ts: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file')
+      expect(errors).toContain('src/routes/tags/[tag].json.ts: it takes tag, so `prerender` lists the values to export')
       expect(errors).toContain('src/routes/tags/gone.kay: /tags/gone redirects to /about, which no static host does')
       expect(errors).toContain('src/routes/members/index.kay: a guard covers it, and only a server can run one per request')
       expect(errors).toContain('src/routes/tags/[tag].kay: it takes tag, so `prerender` lists the values to export')

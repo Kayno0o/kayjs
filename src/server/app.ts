@@ -26,6 +26,7 @@ import { serveCards, setupCards } from './card'
 import { PRERENDERED_DIR, readInlineStyles } from './client'
 import { compressResponse, encodedCopies, encodedPath, filesUnder, fixedTexts, preferredEncoding } from './compress'
 import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, devA11y, devAxe, devEvents, devInspector, devPatch, hotSwap, openInEditor } from './dev'
+import { serveEndpoints } from './endpoints'
 import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
@@ -49,7 +50,7 @@ import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './rende
 import { reportServerError } from './report'
 import { revalidateStale, trackPrerendered } from './revalidate'
 import { rewriteRequests } from './rewrite'
-import { decodePath, refuseClashes, routeMounts, routeTrees, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
+import { decodePath, refuseClashes, refuseEndpointClashes, routeMounts, routeTrees, scanEndpoints, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
 import { headerCopies, ownHeaders, securityHeaders, setSecurityHeaders } from './security'
 import { configHead, siteOrigin } from './seo'
 import { serveServerIslands } from './server-islands'
@@ -356,6 +357,13 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? projectApi(root, options)])
 
   const api = await serveApi(app, apiModules, actionOptions)
+  const endpoints = bundle?.endpoints ?? await scanEndpoints(routesDir, mounts)
+
+  refuseEndpointClashes(endpoints, routes, publicUrls)
+  await serveEndpoints(app, endpoints, actionOptions)
+
+  // What a public file or an endpoint serves, which kay's own files, the sitemap or a favicon, give way to.
+  const taken = new Set([...publicUrls, ...endpoints.filter(endpoint => endpoint.params.length === 0).map(endpoint => endpoint.pattern)])
   const openapi = openApiSettings(options.openapi)
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, api.limits)
@@ -400,17 +408,17 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   serveFeeds(app, collections, site, options.dev, i18n)
 
   if (site !== undefined)
-    serveSitemap(app, routes, site, publicUrls, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
+    serveSitemap(app, routes, site, taken, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
 
   const favicon = faviconSource(root, options.favicon)
 
   if (favicon !== undefined)
-    serveFavicons(app, new Set([...publicUrls, ...servedPaths(routes)]), { source: favicon, builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
+    serveFavicons(app, new Set([...taken, ...servedPaths(routes)]), { source: favicon, builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, new Set([...publicUrls, ...servedPaths(routes)]), { client, offline: options.dev ? undefined : options.offline, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
+  await serveServiceWorker(app, new Set([...taken, ...servedPaths(routes)]), { client, offline: options.dev ? undefined : options.offline, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
 
   // Their canonical links, social URLs and anything built with `siteUrl()` name the site the build ran for.
   const moved = client.pages.size > 0 && client.site !== site

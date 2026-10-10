@@ -991,6 +991,29 @@ describe('kay check, what the server refuses at boot', () => {
     }
   })
 
+  it('types links to endpoint files and what their GET returns, and reports one a public file serves too', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'a(href="/llms.txt") llms\na(href="/feeds/first.json") feed\na(href="/feeds/first.xml") none\n',
+      'src/routes/llms.txt.ts': 'export function GET() {\n  return \'# Site\'\n}\n',
+      'src/routes/feeds/[slug].json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET({ params }: EndpointContext<{ slug: string }>) {\n  return Response.json(params)\n}\n',
+      'src/routes/count.txt.ts': 'export const GET = () => 42\n',
+      'public/llms.txt': 'Ada\n',
+    })
+
+    try {
+      const diagnostics = await check(root)
+
+      expect(diagnostics.filter(d => d.code === 'TS2345').map(d => d.message)).toEqual([expect.stringContaining('No page, public file or app route serves /feeds/first.xml')])
+      expect(await refusals(root)).toEqual([
+        ['src/routes/count.txt.ts', expect.stringMatching(/^It must export a GET handler/)],
+        ['src/routes', 'kay: src/routes/llms.txt.ts and the public file /llms.txt both serve /llms.txt; drop one'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a feed without the site\'s URL its links need', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p hi\n',
