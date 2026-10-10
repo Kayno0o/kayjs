@@ -63,7 +63,8 @@
     "@kaynooo/kayjs-ui": "^0.4.28",
     "@kaynooo/utils": "^2.27.0",
     "@simplewebauthn/server": "^14.0.3",
-    "jose": "^6.2.12"
+    "jose": "^6.2.12",
+    "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
     "@kaynooo/eslint": "^6.0.1",

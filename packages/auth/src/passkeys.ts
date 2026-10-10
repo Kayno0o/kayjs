@@ -4,7 +4,6 @@ import type { RequestState } from './state'
 import type { PasskeyRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult } from './twoFactor'
 import { Buffer } from 'node:buffer'
-import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from '@simplewebauthn/server'
 import { banned } from './core'
 import { readDevice } from './device'
 import { report } from './events'
@@ -12,6 +11,7 @@ import { spend } from './limits'
 import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
 import { provedLately, reprove } from './twoFactor'
+import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
 
 const CHALLENGE_MAX_AGE_MS = 5 * 60 * 1000
 const NAME_MAX_LENGTH = 64
