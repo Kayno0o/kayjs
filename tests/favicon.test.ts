@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { pages } from '../src/server'
 import { faviconFiles, writeFavicons } from '../src/server/favicon'
 
@@ -102,14 +102,25 @@ describe('favicon', () => {
     expect(await (await off.handle(new Request('http://localhost/about'))).text()).toContain('<meta name="theme-color" content="#1e1e2e">')
   })
 
-  it('refuses a source that is not square or smaller than the largest icon, and writes the files for a build', async () => {
+  it('refuses a source that is not square, enlarges one smaller than the largest icon with a warning, and writes the files for a build', async () => {
     const wide = join(scratch, 'wide.png')
     const small = join(scratch, 'small.png')
 
     await Bun.write(wide, await new Bun.Image(SOURCE).resize(512, 256).png().bytes())
     await Bun.write(small, await new Bun.Image(SOURCE).resize(256, 256).png().bytes())
-    await expect(faviconFiles(wide)).rejects.toThrow('is 512x256; it has to be square, 512x512 or more')
-    await expect(faviconFiles(small)).rejects.toThrow('is 256x256; it has to be square, 512x512 or more')
+    await expect(faviconFiles(wide)).rejects.toThrow('is 512x256; it has to be square')
+
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const files = await faviconFiles(small)
+
+      expect(await widthOf(files.get('/icon-512.png')!)).toBe(512)
+      expect(warned).toHaveBeenCalledWith(`[kay] the favicon ${small} is 256x256, enlarged to the icons up to 512x512, which look blurred; a source of 512x512 or more keeps them sharp`)
+    }
+    finally {
+      warned.mockRestore()
+    }
 
     await writeFavicons(SOURCE, join(scratch, 'built'))
 

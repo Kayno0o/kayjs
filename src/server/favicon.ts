@@ -43,8 +43,12 @@ export interface FaviconOptions {
 export async function faviconFiles(source: string): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
   const { width, height } = await new Bun.Image(source).metadata()
 
-  if (width !== height || width < LARGEST)
-    throw new Error(`kay: the favicon ${source} is ${width}x${height}; it has to be square, ${LARGEST}x${LARGEST} or more`)
+  if (width !== height)
+    throw new Error(`kay: the favicon ${source} is ${width}x${height}; it has to be square`)
+
+  // Enlarged to the sizes it lacks, so the manifest keeps the 192 and 512 icons a browser asks for before it offers to install the site.
+  if (width < LARGEST)
+    console.warn(`[kay] the favicon ${source} is ${width}x${height}, enlarged to the icons up to ${LARGEST}x${LARGEST}, which look blurred; a source of ${LARGEST}x${LARGEST} or more keeps them sharp`)
 
   const files = new Map<string, Uint8Array<ArrayBuffer>>()
   const png = async (size: number) => new Uint8Array(await new Bun.Image(source).resize(size, size).png().bytes())
