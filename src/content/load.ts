@@ -3,6 +3,7 @@ import type { ContentProblem } from './validate'
 import { mkdir, rename } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
+import { outputDir } from '../build/assets'
 import { bundled } from '../server/bundle'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { ContentError } from './validate'
@@ -63,7 +64,7 @@ export function manifestFile(base: string, dir: string): string {
 
 async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
   const bundle = bundled()
-  const base = bundle?.clientDir ?? (process.env.NODE_ENV === 'production' ? join(rootOf(), '.kay', 'client') : undefined)
+  const base = bundle?.clientDir ?? (process.env.NODE_ENV === 'production' ? outputDir(rootOf()) : undefined)
 
   if (base === undefined)
     return undefined

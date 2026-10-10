@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
+import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
 import { dev, watchProject } from '../src/dev'
 import { bootFailure, hotSwap } from '../src/server/dev'
@@ -423,6 +424,41 @@ describe('kay dev', () => {
       await until(() => existsSync(seen))
       expect(JSON.parse(readFileSync(seen, 'utf8'))).toEqual([join(root, 'src/routes/index.kay')])
       expect(await (await open('src/routes/index.kay:2:3')).json()).toEqual({ opened: false, failed: true })
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps serving the stylesheets its pages link while a build of the same project runs beside it', async () => {
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'dev-output-'))
+    const lines: string[] = []
+
+    await Bun.write(join(root, '.env'), 'PORT=0\n')
+    await Bun.write(join(root, 'src/app.css'), 'p { color: red }\n')
+    await Bun.write(join(root, 'src/post.css'), 'h1 { color: blue }\n')
+    await Bun.write(join(root, 'src/routes/_layout.kay'), '---\nimport \'../app.css\'\n---\nmain\n  slot\n')
+    await Bun.write(join(root, 'src/routes/posts/[slug].kay'), '--- server\nconst slug = ctx.params.slug\n---\n---\nimport \'../../post.css\'\n---\nh1 {slug}\n')
+    const stop = await dev(root, { log: line => lines.push(line) })
+
+    try {
+      await until(() => lines.length === 1, 20_000)
+
+      const url = lines[0]!.split(' ')[2]!
+      const page = await (await fetch(`${url}/posts/hello`)).text()
+      const stylesheets = [...page.matchAll(/href="(\/_kay\/[^"]+\.css)"/g)].map(([, href]) => href!)
+
+      expect(stylesheets.some(href => href.startsWith('/_kay/[slug]-'))).toBe(true)
+
+      // As `kay build` or a test run does, from a process `kay dev` did not start.
+      await buildClient(root)
+
+      for (const href of stylesheets)
+        expect((await fetch(url + href)).status).toBe(200)
     }
     finally {
       await stop()

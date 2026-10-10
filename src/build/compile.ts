@@ -10,6 +10,7 @@ import { AVIF_WORKER_SOURCE } from '../server/avif'
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
 import { refuseClashes, routeMounts, routeTrees, scanRoutes, specialPagesOf } from '../server/routes'
+import { outputDir } from './assets'
 import { kay } from './plugin'
 import { runtimeConfig, withoutPlugins } from './runtime-config'
 import { withoutStyles } from './styles'
@@ -44,7 +45,7 @@ function withoutCompiler(): BunPlugin {
 export async function compileServer(root: string, config: KayConfig, options: CompileOptions): Promise<string> {
   const routesDir = resolve(root, config.routes ?? 'src/routes')
   const publicDir = resolve(root, config.publicDir ?? 'public')
-  const clientBase = join(root, '.kay', 'client')
+  const clientBase = outputDir(root)
   const entry = resolve(root, options.entry ?? 'src/server.ts')
   const outfile = resolve(root, options.outfile)
 

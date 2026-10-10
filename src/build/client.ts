@@ -16,7 +16,7 @@ import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env'
 import { apiMounts, routeMounts } from '../server/routes'
-import { ASSET_PREFIX, clientDir } from './assets'
+import { ASSET_PREFIX, clientDir, outputDir } from './assets'
 import { findKayFiles, writeIfChanged } from './files'
 import { findKayLibraries, reachableLibraryFiles, sourceWords } from './libraries'
 import { throughLinks } from './links'
@@ -122,7 +122,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics)
 
-  const base = join(root, '.kay', 'client')
+  const base = outputDir(root)
   const dir = clientDir(root)
   const routesDir = resolve(root, options.routes ?? 'src/routes')
 

@@ -65,7 +65,14 @@ const streamReporters = new WeakMap<Response, { report: (error: unknown) => void
 
 // The app's API modules and its extensions', as `pages()` serves them.
 export async function projectApi(root: string, config: Pick<KayConfig, 'api' | 'extensions'>): Promise<ApiModule[]> {
-  return scanApi(resolve(root, config.api ?? 'src/api'), apiMounts(root, config.extensions))
+  const [app, ...mounts] = apiTrees(root, config)
+
+  return scanApi(app!.dir, mounts)
+}
+
+// The app's API directory at the root of the API tree, then each extension's under its prefix.
+export function apiTrees(root: string, config: Pick<KayConfig, 'api' | 'extensions'>): RouteMount[] {
+  return [{ dir: resolve(root, config.api ?? 'src/api'), prefix: '' }, ...apiMounts(root, config.extensions)]
 }
 
 // Every module under `apiDir`, mounted at `/api` plus its path there, then each mounted library's under its prefix that no module before it is served at.
@@ -88,8 +95,7 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = []): Promis
       if (ROUTER_SYNTAX.test(name))
         throw new Error(`kay: ${join(dir, path)} has a :, * or ' in its path, which the router cannot mount; rename it`)
 
-      const route = `${prefix}/${name.replace(TS_FILE, '').replace(INDEX, '')}`.replace(TRAILING_SLASH, '')
-      const mount = `${API_PREFIX}${route}`
+      const mount = mountOf(prefix, name)
       const at = `${prefix}/${dirname(name)}`.replace(CURRENT_DIR, '')
 
       // The app's module, or an earlier library's, at the same path replaces a library's.
@@ -116,6 +122,11 @@ export function sharedGuards(modules: ApiModule[]): string[] {
   }
 
   return shared
+}
+
+// Where a module at `name` in a tree mounted at `prefix` is served: `/api/auth/session` for `session.ts` under `/auth`.
+function mountOf(prefix: string, name: string): string {
+  return `${API_PREFIX}${`${prefix}/${name.replace(TS_FILE, '').replace(INDEX, '')}`.replace(TRAILING_SLASH, '')}`
 }
 
 // The guards of a directory of the API tree and above, `''` for its root, outermost first: the app's at each level, else a library's.
@@ -365,21 +376,20 @@ function encodeEvent(value: unknown): string {
   }
 }
 
-// In the browser build an island imports a module under one of `apiDirs` for its routes' types only: it gets where they are served, and none of the server code.
-export function apiStubs(apiDirs: string[], modules: ApiModule[]): BunPlugin {
-  const mounts = new Map(modules.map(module => [module.file, module.mount]))
-
+// In the browser build an island imports a module of one of the API `trees` for its routes' types only: it gets where they are served, and none of the server code.
+// A library module the app replaced gives the app's mount, which is the same path, so a library island importing it still builds.
+export function apiStubs(trees: RouteMount[]): BunPlugin {
   return {
     name: 'kay-api',
     setup(build) {
-      build.onLoad({ filter: new RegExp(`^(?:${apiDirs.map(dir => (dir + sep).replace(REGEX_SYNTAX, '\\$&')).join('|')}).*\\.ts$`) }, ({ path }) => {
-        const mount = mounts.get(path)
-        const apiDir = apiDirs.find(dir => path.startsWith(dir + sep))!
+      build.onLoad({ filter: new RegExp(`^(?:${trees.map(({ dir }) => (dir + sep).replace(REGEX_SYNTAX, '\\$&')).join('|')}).*\\.ts$`) }, ({ path }) => {
+        const { dir, prefix } = trees.find(tree => path.startsWith(tree.dir + sep))!
+        const name = relative(dir, path).split(sep).join('/')
 
-        if (mount === undefined)
-          throw new Error(`kay: an island imports ${relative(apiDir, path)}, which is no module under ${basename(apiDir)}: only a module's default export reaches the browser, as where its routes are served`)
+        if (NOT_A_MODULE.test(name))
+          throw new Error(`kay: an island imports ${name}, which is no module under ${basename(dir)}: only a module's default export reaches the browser, as where its routes are served`)
 
-        return { contents: `export default { [Symbol.for('kay.api')]: ${JSON.stringify(mount)} }`, loader: 'js' }
+        return { contents: `export default { [Symbol.for('kay.api')]: ${JSON.stringify(mountOf(prefix, name))} }`, loader: 'js' }
       })
     },
   }

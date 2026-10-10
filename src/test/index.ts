@@ -9,6 +9,7 @@ import type { PageReading } from './page'
 import { join } from 'node:path'
 import { beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
+import { outputDir } from '../build/assets'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
 import { encodeCall, minTimeOf, readActionResponse, STAMP_FIELD } from '../runtime/action'
@@ -40,7 +41,7 @@ export interface TestOptions extends PagesOptions {
   use?: AnyElysia[] | undefined
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
   locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
-  // Builds the islands for the browser, as `kay dev` does into `.kay/client`, for `open()` to load pages in a headless Chrome.
+  // Builds the islands for the browser, into `.kay/client` as `kay build` does, for `open()` to load pages in a headless Chrome.
   browser?: boolean | BrowserOptions | undefined
 }
 
@@ -141,7 +142,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const config = { ...loaded, site: loaded.site ?? ORIGIN }
   const client: ClientBuild = options.browser !== undefined && options.browser !== false
     ? await buildClient(root, { plugins: config.plugins, routes: config.routes, extensions: config.extensions, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
-    : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(root, '.kay', 'client', 'dist') }
+    : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(outputDir(root), 'dist') }
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const pages = await servePages(root, config, async () => client)
   const locals = options.locals

@@ -1,5 +1,5 @@
 import { join, normalize, resolve, sep } from 'node:path'
-import { ASSET_PREFIX } from '../build/assets'
+import { ASSET_PREFIX, outputDir } from '../build/assets'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { FAVICON_DIR, FAVICON_PATHS } from './favicon'
@@ -80,7 +80,7 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
   const file = assetFiles(dirs)
 
   for (const [path, page] of Object.entries(manifest.pages)) {
-    const name = join(root, '.kay', 'client', PRERENDERED_DIR, page.file)
+    const name = join(outputDir(root), PRERENDERED_DIR, page.file)
     const html = await applyPageHooks(hooks, path, await Bun.file(name).text(), file)
 
     await Bun.write(name, html)

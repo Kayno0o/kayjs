@@ -23,6 +23,7 @@ import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles } from '../server/public'
 import { siteOrigin } from '../server/seo'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
+import { outputDir } from './assets'
 
 // Left in the directory a static export writes, so a later export knows it may clear it, and never clears one it did not write.
 const MARKER = '.kay-static'
@@ -52,7 +53,7 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
   refuseStaticConfig(config)
   await clear(root, out)
 
-  const pagesDir = join(root, '.kay', 'client', PRERENDERED_DIR)
+  const pagesDir = join(outputDir(root), PRERENDERED_DIR)
   const pages = [...client.pages]
   // What is written here rather than copied from the build, compressed once it is all in.
   const written: string[] = []

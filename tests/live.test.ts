@@ -192,7 +192,7 @@ describe('API modules', () => {
     const outdir = await mkdtemp(join(tmpdir(), 'kay-live-'))
 
     try {
-      const build = await Bun.build({ entrypoints: [join(fixture, 'src/components/chat.kay')], outdir, target: 'browser', plugins: [apiStubs([apiDir], await scanApi(apiDir)), kay()] })
+      const build = await Bun.build({ entrypoints: [join(fixture, 'src/components/chat.kay')], outdir, target: 'browser', plugins: [apiStubs([{ dir: apiDir, prefix: '' }]), kay()] })
       const code = await build.outputs[0]!.text()
 
       expect(build.success).toBe(true)

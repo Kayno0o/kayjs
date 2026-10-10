@@ -163,15 +163,17 @@ const SERVED_API: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'app', dependencies: { 'kay-lib': '*' } }),
   'tsconfig.json': TSCONFIG,
   'kay.config.ts': `import { defineConfig } from 'kay/server'
-import { authApi } from 'kay-lib'
+import { authApi, statsApi } from 'kay-lib'
 
-export default defineConfig({ seo: { name: 'App' }, head: [{ tag: 'meta', props: { name: 'app', content: 'mine' } }], openapi: true, extensions: [authApi()] })
+export default defineConfig({ seo: { name: 'App' }, head: [{ tag: 'meta', props: { name: 'app', content: 'mine' } }], openapi: true, extensions: [authApi(), statsApi()] })
 `,
   'src/routes/index.kay': '---\nimport Who from \'../components/who.kay\'\n---\np.home home\nWho\n',
-  'src/components/who.kay': '---\nimport { resource } from \'kay\'\nimport session from \'kay-lib/api/session\'\n\nconst who = resource(session, \'/\')\n---\np.who {who.value()?.from}\n',
+  // It reads a module the app replaced and one of a second library directory too.
+  'src/components/who.kay': '---\nimport { resource } from \'kay\'\nimport me from \'kay-lib/api/me\'\nimport session from \'kay-lib/api/session\'\nimport count from \'kay-lib/stats-api/count\'\n\nconst who = resource(session, \'/\')\nconst mine = resource(me, \'/\')\nconst total = resource(count, \'/\')\n---\np.who {who.value()?.from} {mine.value()?.from} {total.value()?.count}\n',
+  'src/api/auth/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n',
   'src/api/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (request.headers.has(\'x-deny\'))\n    deny(403, \'denied\')\n})\n',
   'src/api/auth/me.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'app\' }))\n',
-  'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', type: 'module', exports: { '.': './index.ts', './api/*': './api/*.ts' }, peerDependencies: { kay: '*' } }),
+  'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', type: 'module', exports: { '.': './index.ts', './api/*': './api/*.ts', './stats-api/*': './stats-api/*.ts' }, peerDependencies: { kay: '*' } }),
   'node_modules/kay-lib/index.ts': `import type { KayExtension } from 'kay/server'
 
 export const authApi = (): KayExtension => ({
@@ -183,10 +185,15 @@ export const authApi = (): KayExtension => ({
     redirects: { '/old': '/' },
   },
 })
+
+export const statsApi = (): KayExtension => ({ name: 'kay-lib-stats', api: { dir: \`\${import.meta.dir}/stats-api\`, prefix: 'stats' } })
 `,
   'node_modules/kay-lib/api/session.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'lib\' }))\n',
   'node_modules/kay-lib/api/me.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'lib\' }))\n',
   'node_modules/kay-lib/api/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(401, \'no admin\'))\n',
+  'node_modules/kay-lib/api/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(401, \'no staff\'))\n',
+  'node_modules/kay-lib/api/staff/list.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => [\'ada\'])\n',
+  'node_modules/kay-lib/stats-api/count.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ count: 1 }))\n',
   'node_modules/kay-lib/api/admin/stats.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ stats: 1 }))\n',
 }
 
@@ -203,6 +210,8 @@ console.log(JSON.stringify({
   me: await (await get('/api/auth/me')).json(),
   denied: await status('/api/auth/session', { 'x-deny': '1' }),
   admin: await status('/api/auth/admin/stats'),
+  staff: await status('/api/auth/staff/list'),
+  count: await (await get('/api/stats/count')).json(),
   openapi: await (await get('/api/openapi.json')).json(),
   home: await home.text(),
   csp: home.headers.get('content-security-policy'),
@@ -317,7 +326,7 @@ describe('a library\'s routes', () => {
 function expectApiServed({ code, stdout, stderr }: { code: number, stdout: string, stderr: string }) {
   expect(stderr).not.toContain('error')
   expect(code).toBe(0)
-  const served = JSON.parse(stdout) as { session: unknown, me: unknown, denied: number, admin: number, openapi: { paths: Record<string, { get: { 'x-kay-guards'?: string[] } }> }, home: string, csp: string, old: [number, string] }
+  const served = JSON.parse(stdout) as { session: unknown, me: unknown, denied: number, admin: number, staff: number, count: unknown, openapi: { paths: Record<string, { get: { 'x-kay-guards'?: string[] } }> }, home: string, csp: string, old: [number, string] }
   const hash = (text: string) => `'sha256-${new Bun.CryptoHasher('sha256').update(text).digest('base64')}'`
 
   expect(served.session).toEqual({ from: 'lib' })
@@ -325,6 +334,9 @@ function expectApiServed({ code, stdout, stderr }: { code: number, stdout: strin
   // The app's guard runs before the library's modules, and the library's own before those under it.
   expect(served.denied).toBe(403)
   expect(served.admin).toBe(401)
+  // The app's guard at the same level replaces the library's.
+  expect(served.staff).toBe(200)
+  expect(served.count).toEqual({ count: 1 })
   expect(served.openapi.paths['/api/auth/session']?.get['x-kay-guards']).toEqual(['_guard.ts'])
   expect(served.openapi.paths['/api/auth/admin/stats']?.get['x-kay-guards']).toEqual(['_guard.ts', 'auth/admin/_guard.ts'])
   // The app's `seo.name` wins, the library's `description` fills in, and both heads are carried.
@@ -355,6 +367,8 @@ describe('a library\'s API modules and config', () => {
     const island = await Bun.file(join(root(), chunks[0]!)).text()
 
     expect(island).toContain('/api/auth/session')
+    expect(island).toContain('/api/auth/me')
+    expect(island).toContain('/api/stats/count')
     expect(island).not.toContain('Elysia')
     const elsewhere = join(root(), '..', `${basename(root())}-elsewhere`)
 

@@ -4,6 +4,7 @@ import type { ClientBuild, PrerenderedPage } from './client'
 import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
+import { outputDir } from '../build/assets'
 import { elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
@@ -54,7 +55,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   if (!manifest)
     throw new Error('kay: no client build to add prerendered pages to; run buildClient first')
 
-  const dir = join(root, '.kay', 'client', PRERENDERED_DIR)
+  const dir = join(outputDir(root), PRERENDERED_DIR)
   const { head } = await configHead(root, config, client.dir)
 
   if (config.inlineStyles === true)

@@ -1,7 +1,7 @@
 import type { SizeReport } from '../build/report'
 import type { ServerIslandMode } from '../runtime/html'
 import { join, resolve } from 'node:path'
-import { ASSET_PREFIX, clientDir } from '../build/assets'
+import { ASSET_PREFIX, clientDir, outputDir } from '../build/assets'
 import { NOWHERE } from '../runtime/base'
 import { unrebaseCss } from './base'
 
@@ -69,18 +69,18 @@ export const MANIFEST = 'manifest.json'
 export const PRERENDERED_DIR = 'pages'
 
 export async function writeManifest(root: string, manifest: ClientManifest): Promise<void> {
-  await Bun.write(join(root, '.kay', 'client', MANIFEST), JSON.stringify(manifest))
+  await Bun.write(join(outputDir(root), MANIFEST), JSON.stringify(manifest))
 }
 
 // `base` is where `kay build` wrote the client build, `.kay/client` unless an executable embeds it elsewhere.
-export async function readManifest(root: string, base = join(root, '.kay', 'client')): Promise<ClientManifest | undefined> {
+export async function readManifest(root: string, base = outputDir(root)): Promise<ClientManifest | undefined> {
   const file = Bun.file(join(base, MANIFEST))
 
   return await file.exists() ? await file.json() as ClientManifest : undefined
 }
 
 // What `kay build` left, or undefined when it never ran.
-export async function readClient(root: string, base = join(root, '.kay', 'client')): Promise<ClientBuild | undefined> {
+export async function readClient(root: string, base = outputDir(root)): Promise<ClientBuild | undefined> {
   const manifest = await readManifest(root, base)
 
   return manifest && fromManifest(root, manifest, join(base, 'dist'))

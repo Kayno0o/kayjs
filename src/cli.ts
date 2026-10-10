@@ -14,6 +14,7 @@ import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
+import { outputDir } from './build/assets'
 import { buildClient } from './build/client'
 import { compileServer } from './build/compile'
 import { formatSizeReport } from './build/report'
@@ -277,7 +278,7 @@ async function build(args: string[]): Promise<number> {
 
   const config = await loadConfig(root)
 
-  const output = join(root, '.kay', 'client')
+  const output = outputDir(root)
   const previous = `${output}-previous`
   const checking = !skipCheck
 
@@ -399,7 +400,7 @@ async function bundleClient(root: string, config: KayConfig, exported: boolean, 
 // The rest of what the server serves from `.kay/client`, which runs the app's content config and pages, so only once the check passed: content manifests, prerendered pages, the variants of images only they import, and favicons, compressed.
 async function finishOutput(root: string, config: KayConfig, exported: boolean, client: ClientBuild, checking: boolean): Promise<{ prerendered: number, entries: number, failing: number }> {
   // Before prerendering, whose pages read the collections from what it writes.
-  const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
+  const entries = await writeContentManifests(root, outputDir(root), config.content)
 
   // A static host has no image route, so pages link the variant files the build writes.
   if (exported)
@@ -423,7 +424,7 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
     await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR))
 
   await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: resolve(root, config.publicDir ?? 'public'), base: basePath(config.base), aspects: config.images?.aspects })
-  await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
+  await Promise.all([compressFiles(client.dir), compressFiles(join(outputDir(root), PRERENDERED_DIR))])
 
   return { prerendered, entries, failing }
 }
