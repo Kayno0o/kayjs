@@ -17,7 +17,7 @@
 
 ## Docs
 
-To build a site, read [Build a site](llms/site.md) first: one page walking through config, layout, content pages, islands and a form. Each topic is a file of its own: read the one a task touches before writing code for it, for what the walkthrough leaves out.
+To build a site, read [Build a site](llms/site.md) first: one page walking through config, layout, content pages, islands and a form, enough to write them. The topic files below are references for what it leaves out: open one when a task needs something the walkthrough does not show, and search it for that rather than reading it whole.
 
 - [Build a site](llms/site.md): one walkthrough of a small site: config and page titles, the layout and its nav, a Markdown collection and its pages, the 404 page, islands and shared state, a form checked on the server and in the browser
 - [Components](llms/components.md): the fences of a `.kay` file, props, signals, memos, effects, generic components, and shipping components in a package
