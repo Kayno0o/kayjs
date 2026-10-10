@@ -51,7 +51,8 @@ async function cardImageSizes(publicDir: string): Promise<(path: string) => Imag
 
   await Promise.all((await publicFiles(publicDir)).filter(file => RESIZABLE.test(file.path)).map(async ({ path, url }) => {
     try {
-      const { width, height } = await new Bun.Image(path).metadata()
+      // Through Bun.file, which reaches the files an executable embeds, where Bun.Image given a path does not.
+      const { width, height } = await new Bun.Image(Bun.file(path)).metadata()
 
       sizes.set(url, { width, height })
     }
