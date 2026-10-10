@@ -130,4 +130,18 @@ describe('ConfirmDelete', () => {
 
     expect(root.querySelectorAll<HTMLDialogElement>('dialog')[3]?.open).toBe(true)
   })
+
+  test('takes a plain text link as its trigger, and its dialog a title and confirm labels of its own', async () => {
+    const root = await dialogs()
+    const trigger = root.querySelector('.rotate')!
+
+    expect([trigger.tagName, trigger.className, trigger.textContent]).toEqual(['BUTTON', 'kui-confirm-delete-link rotate', 'Rotate link'])
+
+    click(trigger)
+    await settle()
+
+    const dialog = root.querySelectorAll<HTMLDialogElement>('dialog')[4]!
+
+    expect([dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, dialog.querySelector('.kui-btn-danger')?.textContent]).toEqual([true, 'Rotate link', 'Rotate'])
+  })
 })

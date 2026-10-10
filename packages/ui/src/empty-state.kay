@@ -1,9 +1,11 @@
 ---
 import type { JSX } from 'kay'
 
-const { title, description, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
+const { title, description, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
   title: string
   description?: string | undefined
+  // Below the description: a button or a link leading out of the empty list, such as the one that adds the first item.
+  actions?: JSX.Element
   class?: string | undefined
 }>()
 ---
@@ -11,3 +13,6 @@ const { title, description, class: className, ...rest } = props<Omit<JSX.Intrins
   p.kui-empty-state-title {title}
   if description
     p.kui-empty-state-description {description}
+  if actions
+    .kui-empty-state-actions
+      | {actions}

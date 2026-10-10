@@ -5,7 +5,7 @@ import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
 import { attempt } from './toast'
 
-const { message, onConfirm, failure, refused, trigger = 'icon', label = 'Delete', size, variant, class: className } = props<{
+const { message, onConfirm, failure, refused, trigger = 'icon', label = 'Delete', title = 'Confirm Deletion', confirmLabel = 'Delete', pendingLabel = 'Deleting…', size, variant, class: className } = props<{
   message: string
   // Deletes. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
   onConfirm: () => void | Promise<void>
@@ -13,10 +13,15 @@ const { message, onConfirm, failure, refused, trigger = 'icon', label = 'Delete'
   failure: string
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: toasted in place of `failure`, which stays for an answer of undefined or another error.
   refused?: ((data: Data) => string | undefined) | undefined
-  // An icon by default; `button` is a labelled danger button, for a dialog footer.
-  trigger?: 'icon' | 'button' | undefined
+  // An icon by default; `button` is a labelled danger button, for a dialog footer, and `link` a plain underlined text button, for a confirm inside running text.
+  trigger?: 'icon' | 'button' | 'link' | undefined
   // What the trigger says, for a delete the reader knows by another name: "Empty trash", "Revoke link".
   label?: string | undefined
+  // The dialog's title, for a confirm that is not a deletion: "Rotate link".
+  title?: string | undefined
+  // The confirm button's text, and the one it shows while `onConfirm` is pending.
+  confirmLabel?: string | undefined
+  pendingLabel?: string | undefined
   // The icon trigger's size and look; the button trigger is always a danger button.
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
@@ -40,10 +45,12 @@ async function confirm() {
 ---
 if trigger === 'button'
   Button(label={label} variant="danger" class={className} onClick={() => open.set(true)})
+else if trigger === 'link'
+  button.kui-confirm-delete-link(type="button" class={className} onClick={() => open.set(true)}) {label}
 else
   IconButton(icon="delete" label={label} size={size} variant={variant} class={className} onClick={() => open.set(true)})
-Dialog(open={open()} title="Confirm Deletion" dirty={pending()} onClose={() => open.set(false)})
+Dialog(open={open()} title={title} dirty={pending()} onClose={() => open.set(false)})
   @footer
     Button(label="Cancel" disabled={pending()} onClick={() => open.set(false)})
-    Button(label={pending() ? 'Deleting…' : 'Delete'} variant="danger" busy={pending()} disabled={pending()} onClick={confirm})
+    Button(label={pending() ? pendingLabel : confirmLabel} variant="danger" busy={pending()} disabled={pending()} onClick={confirm})
   p.kui-confirm-delete-message {message}

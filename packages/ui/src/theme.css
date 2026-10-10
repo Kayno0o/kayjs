@@ -378,6 +378,10 @@
     @apply px-4 py-6 text-center text-sm text-kui-subtext0;
   }
 
+  .kui-confirm-delete-link {
+    @apply cursor-pointer text-xs text-kui-subtext0 underline transition-colors hover:text-kui-text;
+  }
+
   .kui-confirm-delete-message {
     @apply text-kui-muted;
   }
@@ -433,6 +437,10 @@
 
   .kui-empty-state-description {
     @apply text-xs text-kui-overlay1;
+  }
+
+  .kui-empty-state-actions {
+    @apply flex flex-wrap items-center justify-center gap-2;
   }
 
   .kui-file-drop {
@@ -1299,6 +1307,10 @@
   /* The code keeps its own light ground and dark modules, which scanners need, whatever the theme. */
   .kui-qr-code {
     @apply block h-auto max-w-full;
+  }
+
+  .kui-qr-code > svg {
+    @apply block h-auto w-full;
   }
 
   .kui-tab-nav {

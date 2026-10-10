@@ -14,6 +14,9 @@ main
     p Edge to edge
   Badge#badge Draft
   EmptyState#empty(title="No moons" description="Add one to start")
+  EmptyState#empty-action(title="No rockets")
+    @actions
+      a.go(href="/paging") Build one
   form#form
     Select(name="planet" value="earth" emptyOption="Any" options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]})
   article#carousel

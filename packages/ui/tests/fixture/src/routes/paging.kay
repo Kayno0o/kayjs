@@ -21,3 +21,9 @@ main
     QrCode(value="https://kaynooo.fr/t" label="Tier lists")
   article#qr-styled
     QrCode(value="https://kaynooo.fr" label="Styled" options={{ foreground: '#7aa2f7' }})
+  article#qr-inline
+    QrCode(value="https://kaynooo.fr" label="Inline" size={120} inline options={{ foreground: 'currentColor', eyeColor: 'var(--color-accent)' }})
+  article#qr-decor
+    QrCode(value="https://kaynooo.fr")
+  article#qr-decor-inline
+    QrCode(value="https://kaynooo.fr" inline)

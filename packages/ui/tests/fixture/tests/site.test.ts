@@ -130,6 +130,11 @@ describe('content', () => {
     expect(await page('empty')).toBe('<div id="empty" class="kui-empty-state"><p class="kui-empty-state-title">No moons</p><p class="kui-empty-state-description">Add one to start</p></div>')
   })
 
+  test('EmptyState holds an @actions block below its description, and none without one', async () => {
+    expect(await page('empty-action')).toContain('<p class="kui-empty-state-title">No rockets</p><div class="kui-empty-state-actions"><a class="go" href="/paging">Build one</a></div>')
+    expect(await page('empty')).not.toContain('kui-empty-state-actions')
+  })
+
   test('Select marks its value\'s option selected, after the empty one', async () => {
     const form = await page('form')
 
@@ -341,4 +346,16 @@ test('QrCode draws its value as an SVG image named for screen readers, drawn as 
   expect(await svg('qr')).not.toBe(await svg('qr-other'))
   expect(await svg('qr-styled')).toContain('#7aa2f7')
   expect(await element('/paging', 'qr-other')).not.toContain('width=')
+})
+
+test('QrCode with inline draws the SVG in the page, so CSS colours resolve, and hides an unlabeled code from assistive technology', async () => {
+  const inline = await element('/paging', 'qr-inline')
+
+  expect(inline).not.toContain('<img')
+  expect(inline).toContain('<div role="img" aria-label="Inline" style="width: 120px; height: 120px" class="kui-qr-code"><svg')
+  expect(inline).toContain('currentColor')
+  expect(inline).toContain('var(--color-accent)')
+  expect(await element('/paging', 'qr-decor')).toContain('alt aria-hidden="true"')
+  expect(await element('/paging', 'qr-decor-inline')).toContain('aria-hidden="true"')
+  expect(await element('/paging', 'qr-decor-inline')).not.toContain('role=')
 })

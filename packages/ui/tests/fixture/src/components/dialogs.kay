@@ -22,4 +22,5 @@ Dialog#dialog(open={open()} title="Rename" dirty={dirty} onClose={() => { open.s
 ConfirmDelete(message="Delete this?" failure="Could not delete" onConfirm={onDelete})
 ConfirmDelete(message="Archive this?" failure="Could not archive" onConfirm={archive} label="Archive" refused={(data: { error?: string }) => data.error})
 ConfirmDelete(message="Revoke this link?" failure="Could not revoke" onConfirm={onDelete} trigger="button" label="Revoke link" class="revoke")
+ConfirmDelete(message="Rotating breaks every link." failure="Could not rotate" onConfirm={onDelete} trigger="link" label="Rotate link" title="Rotate link" confirmLabel="Rotate" pendingLabel="Rotating…" class="rotate")
 Toaster

@@ -134,7 +134,8 @@ Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
   - While the promise `onConfirm` returns is pending, the dialog's buttons are disabled.
   - Once it resolves, the dialog closes. If it throws, the dialog stays open and `failure` is toasted, or a refusal of the whole call such as a limit, as `attempt` does.
   - `refused` reads a refusal of the action's handler, as `attempt` does, and its message is toasted in place of `failure`: `ConfirmDelete(... failure="Could not delete" refused={(data: { error: string }) => data.error})`.
-  - `trigger="button"` makes the trigger a labelled danger button rather than an icon. `label` renames the trigger, for "Revoke link" or "Empty trash", and `class` goes on it. `size` and `variant` style the icon trigger only.
+  - `trigger="button"` makes the trigger a labelled danger button rather than an icon, and `trigger="link"` a plain underlined text button, for a confirm inside running text. `label` renames the trigger, for "Revoke link" or "Empty trash", and `class` goes on it. `size` and `variant` style the icon trigger only.
+  - `title` (`Confirm Deletion`), `confirmLabel` (`Delete`) and `pendingLabel` (`Deleting…`) replace the dialog's words, for a confirm that is not a deletion: `ConfirmDelete(message="Rotating breaks every link already shared." failure="Could not rotate" onConfirm={rotate} trigger="link" label="Rotate link" title="Rotate link" confirmLabel="Rotate" pendingLabel="Rotating…")`.
 
 ### Table
 
@@ -195,8 +196,9 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
   - It shows the first and last pages and `siblings` on each side of the current one, 1 by default, an ellipsis for those left out, or the page itself when only one would be. The current page is marked `aria-current="page"`; Previous and Next are links with `rel="prev"` and `rel="next"`, and plain text at the ends. With one page or none it draws nothing.
   - `label` (`Pagination`), `previousLabel` and `nextLabel` replace its words.
 - `Pagination(of={list})`: the same links for a page kay's `paginate()` from `kay/content` gave, `const list = await blog.page(ctx.params.page) ?? ctx.notFound()` in a `blog/[[page=integer]].kay` route, each page at its own path, `/blog`, `/blog/2`, rather than through the query. `of` takes any `{ page, pages, href(n) }`.
-- `QrCode(value={shareUrl} label="Scan to open the list" size={160})`: the value as a QR code, an SVG image drawn where the page renders, on the server for a static page. `label` is its `alt`. Without `size` it takes the width CSS gives it.
-  - It keeps dark modules on a light ground with a quiet zone, which every scanner reads, whatever the theme. `options` takes what `qrCodeSvg` from @kaynooo/utils does, `ecc`, `moduleShape`, `eyeColor`, `foreground`, `background`, `margin` and the rest, its colours written out since the image cannot read the page's CSS.
+- `QrCode(value={shareUrl} label="Scan to open the list" size={160})`: the value as a QR code, an SVG image drawn where the page renders, on the server for a static page. `label` is its `alt`, and may be left out for a decorative code, which is then hidden from assistive technology. Without `size` it takes the width CSS gives it.
+  - `inline` draws the SVG in the page instead of an image, so the colours in `options` may be CSS ones and follow the page: `QrCode(value={url} inline options={{ foreground: 'currentColor', eyeColor: 'var(--color-accent)', background: null }})`. A `label` then makes it `role="img"`; `size` sets the box's width and height.
+  - It keeps dark modules on a light ground with a quiet zone, which every scanner reads, whatever the theme. `options` takes what `qrCodeSvg` from @kaynooo/utils does, `ecc`, `moduleShape`, `eyeColor`, `foreground`, `background`, `margin` and the rest, its colours written out since the image cannot read the page's CSS, unless it is `inline`.
 
 ### TextInput, Select
 
@@ -212,7 +214,7 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
 
 - `Card(title="Traffic")`: a `section.kui-card` that frames its children in `.kui-card-body`. `head` sits at the far end of the title's line, for a count or a link. `bare` drops the body's inset, for content that runs to the edge, such as a table.
 - `Badge(label="Draft" tone="warning" icon="info")`: `tone` is `neutral`, `accent`, `success`, `warning`, `danger` or `info`. Children render after `label`.
-- `EmptyState(title="No posts yet" description="Write the first one.")`: what a list shows when it holds nothing.
+- `EmptyState(title="No posts yet" description="Write the first one.")`: what a list shows when it holds nothing. An `@actions` block sits below the description, for the button that adds the first item: `EmptyState(title="No posts yet")` then `@actions` holding `Button(href="/new" label="New post")`.
 
 ### Popover, TooltipHost
 
