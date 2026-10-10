@@ -14,13 +14,14 @@ const ON_PATH = ['code', 'cursor', 'zed', 'codium', 'subl', 'webstorm', 'idea']
 // The command opening `file` at the position in an editor with a window of its own: `KAY_EDITOR`, then `VISUAL` or `EDITOR` when they name one, then the first found on the PATH.
 // A terminal editor, as `vim`, would take over the terminal `kay dev` prints in, so only `KAY_EDITOR` runs one, with the file as its last argument.
 export function editorCommand(file: string, line: number, column: number, env: Record<string, string | undefined> = process.env): string[] | undefined {
-  const own = env.KAY_EDITOR?.trim()
+  const own = env.KAY_EDITOR?.trim() ?? ''
 
-  if (own)
+  if (own !== '')
     return positioned(own.split(WHITESPACE), file, line, column) ?? [...own.split(WHITESPACE), file]
 
   for (const variable of [env.VISUAL, env.EDITOR]) {
-    const command = variable?.trim() ? positioned(variable.trim().split(WHITESPACE), file, line, column) : undefined
+    const named = variable?.trim() ?? ''
+    const command = named === '' ? undefined : positioned(named.split(WHITESPACE), file, line, column)
 
     if (command)
       return command
