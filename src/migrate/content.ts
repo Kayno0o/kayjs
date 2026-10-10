@@ -2,11 +2,11 @@ import type * as t from '@babel/types'
 import type { MigratedFile, Note } from './astro'
 import { parse } from '@babel/parser'
 
-// An Astro content config, `defineCollection` with a zod schema, as kay's: `collection(folder, { schema })` with the schema in `t`.
+// An Astro content config, `defineCollection` with a zod schema, as kay's: `collection(folder, { schema })` with the schema in `s`.
 
-// zod's types and the `t` builder each becomes, for those that take their arguments the same way.
+// zod's types and the `s` builder each becomes, for those that take their arguments the same way.
 const SAME: Record<string, string> = { string: 'String', number: 'Number', boolean: 'Boolean', date: 'Date', array: 'Array', object: 'Object', literal: 'Literal', any: 'Any', unknown: 'Unknown', null: 'Null' }
-// zod's string checks and the `t.String` option each becomes.
+// zod's string checks and the `s.String` option each becomes.
 const STRING_CHECKS: Record<string, string> = { min: 'minLength', max: 'maxLength', email: 'format', url: 'format', regex: 'pattern' }
 const NUMBER_CHECKS: Record<string, string> = { min: 'minimum', max: 'maximum', gte: 'minimum', lte: 'maximum' }
 
@@ -37,7 +37,7 @@ class SchemaTranslator {
 
     // The schema helper Astro passes, `schema: ({ image }) => z.object(...)`.
     if (current.type === 'CallExpression' && current.callee.type === 'Identifier' && current.callee.name === 'image')
-      return chain.length === 0 ? 't.String()' : this.modifiers('t.String()', chain, node)
+      return chain.length === 0 ? 's.String()' : this.modifiers('s.String()', chain, node)
 
     const base = chain.shift()
 
@@ -71,22 +71,22 @@ class SchemaTranslator {
     if (kind === 'object' && args[0]?.type === 'ObjectExpression') {
       const fields = args[0].properties.map(property => property.type === 'ObjectProperty' ? `${this.text(property.key)}: ${this.schema(property.value)}` : this.untranslated(property, 'a spread in an object schema'))
 
-      built = `t.Object({ ${fields.join(', ')} })`
+      built = `s.Object({ ${fields.join(', ')} })`
     }
     else if (kind === 'array' && args[0]) {
-      built = `t.Array(${this.schema(args[0])}${options.length > 0 ? `, { ${options.join(', ')} }` : ''})`
+      built = `s.Array(${this.schema(args[0])}${options.length > 0 ? `, { ${options.join(', ')} }` : ''})`
     }
     else if (kind === 'enum' && args[0]?.type === 'ArrayExpression') {
-      built = `t.Union([${args[0].elements.map(element => element ? `t.Literal(${this.text(element)})` : '').join(', ')}])`
+      built = `s.Union([${args[0].elements.map(element => element ? `s.Literal(${this.text(element)})` : '').join(', ')}])`
     }
     else if (kind === 'union' && args[0]?.type === 'ArrayExpression') {
-      built = `t.Union([${args[0].elements.map(element => element ? this.schema(element) : '').join(', ')}])`
+      built = `s.Union([${args[0].elements.map(element => element ? this.schema(element) : '').join(', ')}])`
     }
     else if (kind === 'coerce' || !(kind in SAME)) {
       return this.untranslated(node, `z.${kind} has no \`t\` counterpart kay migrate knows`)
     }
     else {
-      const builder = integer ? 't.Integer' : `t.${SAME[kind]}`
+      const builder = integer ? 's.Integer' : `s.${SAME[kind]}`
 
       built = `${builder}(${[...args.map(arg => this.text(arg)), ...options.length > 0 ? [`{ ${options.join(', ')} }`] : []].join(', ')})`
     }
@@ -101,11 +101,11 @@ class SchemaTranslator {
       const name = call.callee.type === 'MemberExpression' && call.callee.property.type === 'Identifier' ? call.callee.property.name : ''
 
       if (name === 'optional' || name === 'nullish')
-        result = `t.Optional(${result})`
+        result = `s.Optional(${result})`
       else if (name === 'nullable')
-        result = `t.Nullable(${result})`
+        result = `s.Nullable(${result})`
       else if (name === 'default' && call.arguments[0])
-        result = result.endsWith(')') && !result.startsWith('t.Optional(') ? `${result.slice(0, -1)}${result.endsWith('()') ? '' : ', '}{ default: ${this.text(call.arguments[0])} })` : this.untranslated(node, '`.default` on a schema already given options')
+        result = result.endsWith(')') && !result.startsWith('s.Optional(') ? `${result.slice(0, -1)}${result.endsWith('()') ? '' : ', '}{ default: ${this.text(call.arguments[0])} })` : this.untranslated(node, '`.default` on a schema already given options')
       else
         return this.untranslated(node, `.${name}() has no \`t\` counterpart kay migrate knows`)
     }
@@ -180,7 +180,7 @@ export function migrateContentConfig(source: string): MigratedFile {
   }
 
   const code = [
-    `import { t } from 'kay'\nimport { collection } from 'kay/content'`,
+    `import { s } from 'kay'\nimport { collection } from 'kay/content'`,
     ...kept,
     ...collections,
   ].join('\n\n')
@@ -217,7 +217,7 @@ function collectionsOf(object: t.ObjectExpression, declared: Map<string, t.CallE
     if (folder === undefined)
       notes.push({ line: call.loc!.start.line, message: `the collection ${name} uses a loader other than \`glob({ base })\`: kay reads a folder of files, so give it the folder` })
 
-    result.push(`export const ${name} = collection('${folder ?? `content/${name}`}', {\n  schema: ${schema ? translator.schema(schema) : 't.Object({})'},\n})`)
+    result.push(`export const ${name} = collection('${folder ?? `content/${name}`}', {\n  schema: ${schema ? translator.schema(schema) : 's.Object({})'},\n})`)
   }
 
   return result

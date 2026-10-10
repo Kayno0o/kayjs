@@ -7,15 +7,15 @@ description: Read Markdown and data files against a schema, and render a page pe
 A collection is a folder of Markdown, JSON or YAML files, each checked against a schema. Declare them in `src/content.config.ts`, each folder relative to that file, so `content/posts` is `src/content/posts`:
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: t.Object({
-    title: t.String(),
-    date: t.Date(),
-    tags: t.Array(t.String(), { default: [] }),
-    draft: t.Optional(t.Boolean()),
+  schema: s.Object({
+    title: s.String(),
+    date: s.Date(),
+    tags: s.Array(s.String(), { default: [] }),
+    draft: s.Optional(s.Boolean()),
   }),
   draft: post => post.data.draft === true,
   sort: (a, b) => b.data.date.getTime() - a.data.date.getTime(),
@@ -144,7 +144,7 @@ export const news = collection({
   })),
   ttl: '15m',
 }, {
-  schema: t.Object({ title: t.String() }),
+  schema: s.Object({ title: s.String() }),
 })
 ```
 

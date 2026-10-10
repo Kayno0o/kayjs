@@ -113,12 +113,12 @@ a(href="/") Back to the list
 A server fence exports actions: a schema and a handler. The form posts to it without any JavaScript, and `kay check` verifies each field name against the schema. Add to the server fence of `src/routes/index.kay`:
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { addBook, listBooks } from '../books'
 
-export const add = action(t.Object({
-  title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
-  author: t.String({ minLength: 1, maxLength: 100, error: 'Write the author' }),
+export const add = action(s.Object({
+  title: s.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+  author: s.String({ minLength: 1, maxLength: 100, error: 'Write the author' }),
 }), async ({ title, author }, ctx) => {
   if ((await listBooks()).some(book => book.title === title))
     return ctx.fail(409, { message: 'Already on the list' })

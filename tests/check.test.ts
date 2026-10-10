@@ -164,6 +164,25 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('reports the schema builder a script imports as t, which --fix renames', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p Home\n',
+      'src/schemas.ts': 'import { t } from \'kay\'\n\nexport const page = t.Integer({ minimum: 1 })\n',
+    })
+
+    try {
+      const diagnostics = await check(root)
+
+      expect(diagnostics.map(d => [d.file.slice(root.length + 1), d.line, d.code, d.severity])).toEqual([['src/schemas.ts', 1, 'deprecated-schema-name', 'warning']])
+      expect(await applySafeFixes(root, diagnostics)).toBe(1)
+      expect(await Bun.file(join(root, 'src/schemas.ts')).text()).toBe('import { s } from \'kay\'\n\nexport const page = s.Integer({ minimum: 1 })\n')
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves a kay project nested inside, holding its own kay.config.ts, to its own check', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p Home\n',
@@ -197,7 +216,7 @@ describe('kay check, edge cases', () => {
   })
 
   it('types what the fences use of kay unimported', async () => {
-    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { t } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
+    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[8, 'TS2322']])

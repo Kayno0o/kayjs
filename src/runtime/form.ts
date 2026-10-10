@@ -18,7 +18,7 @@ const BOOLEAN_TEXT = new Map([['true', true], ['on', true], ['false', false]])
 const DECIMAL = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i
 // What a form posts for a line break, a lone carriage return included.
 const CRLF = /\r\n?/g
-// The string formats Elysia gives the numeric text `t.Integer()` and `t.Numeric()` also take.
+// The string formats Elysia gives the numeric text `s.Integer()` and `s.Numeric()` also take.
 const NUMERIC_FORMATS = new Set<unknown>(['integer', 'numeric'])
 // A field name holding one of these anywhere is a secret: `newPassword`, `accessToken`.
 const SECRET_PART = /password|passwd|passphrase|passcode|secret|token|apikey|cvc|cvv|pass(?![a-z])/i
@@ -94,7 +94,7 @@ function fromText(field: FieldSchema | undefined, value: unknown): unknown {
   return value.includes('\r') ? value.replaceAll(CRLF, '\n') : value
 }
 
-// `t.Number()`, or `t.Integer()` and `t.Numeric()`, which Elysia writes as a number or a numeric string; `t.Date()` takes a number too, but not only.
+// `s.Number()`, or `s.Integer()` and `s.Numeric()`, which Elysia writes as a number or a numeric string; `s.Date()` takes a number too, but not only.
 function isNumeric(field: FieldSchema): boolean {
   return field.type === 'number' || field.type === 'integer' || (field.anyOf?.every(member => isNumeric(member) || NUMERIC_FORMATS.has(member.format)) ?? false)
 }

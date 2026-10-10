@@ -8,11 +8,11 @@ An action is a schema and a handler exported from a page's server fence. It beco
 
 ```kay
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { addTodo } from '../data'
 
-const newTodo = t.Object({
-  title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+const newTodo = s.Object({
+  title: s.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
 })
 
 export const add = action(newTodo, async ({ title }) => {
@@ -26,7 +26,7 @@ form(action={add})
 
 `form(action={add})` posts without JavaScript, and `kay check` verifies every field `name` against the schema. With kay's script the form posts without a reload.
 
-Text reaches the schema trimmed, so `minLength` counts what was typed, and an optional field left blank counts as left out. A field named like a password keeps its spaces, as does `t.String({ trim: false })`.
+Text reaches the schema trimmed, so `minLength` counts what was typed, and an optional field left blank counts as left out. A field named like a password keeps its spaces, as does `s.String({ trim: false })`.
 
 ## Showing errors
 
@@ -80,11 +80,10 @@ An action reads the params of the page it was posted from in `ctx.params`, as th
 
 ```kay
 --- server
-import { t } from 'elysia'
 import { action } from 'kay'
 import { projects } from '../../../db'
 
-export const remove = action(t.Object({ id: t.String() }), async ({ id }, ctx) => {
+export const remove = action(s.Object({ id: s.String() }), async ({ id }, ctx) => {
   await projects.remove({ org: String(ctx.params.org), id })
 })
 ---
@@ -118,7 +117,7 @@ Once a call goes through, the page's loads run again, so the list it shows is up
 
 ## File uploads
 
-Use `t.File()` in the schema and `input(type="file" name="avatar")` in the form, and the handler receives a `File`. A post carries 1 MB at most, so raise `bodyLimit` in the third argument of `action`.
+Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form, and the handler receives a `File`. A post carries 1 MB at most, so raise `bodyLimit` in the third argument of `action`.
 
 ## Rate limit, honeypot and minimum time
 

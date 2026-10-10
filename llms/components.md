@@ -21,7 +21,7 @@ button(onClick={() => count.set(count + 1)}) Clicked {count} times
 
 ## Component script
 
-Props are declared once, at the top level, with the `props<T>()` macro. It needs no import, and neither do `signal`, `memo`, `effect` and `onMount` in a script, nor `action` in a server fence: the compiler imports them from `kay` when the file uses them without declaring or importing a name of its own. The rest of `kay`, such as `persisted`, `context` or `navigate`, is imported.
+Props are declared once, at the top level, with the `props<T>()` macro. It needs no import, and neither do `signal`, `memo`, `effect` and `onMount` in a script, nor `action` in a server fence: the compiler imports them from `kay` when the file uses them without declaring or importing a name of its own, and the translation `t` of `kay/i18n` in a template or any fence alike. The rest of `kay`, such as `persisted`, `context` or `navigate`, is imported.
 
 ```kay
 ---

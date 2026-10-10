@@ -476,14 +476,14 @@ function authFiles({ tw }: Setup): Record<string, string> {
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
     '.env.example': 'SESSION_SECRET=at-least-32-characters-kept-out-of-the-repository\nPOSTGRES_PASSWORD=letters-and-digits-only-as-it-goes-into-a-url\n',
-    'src/env.ts': `import { t } from 'kay'
+    'src/env.ts': `import { s } from 'kay'
 import { defineEnv } from 'kay/server'
 
 // Read once as the server boots; \`kay new\` wrote a secret and the development database to .env, and production sets its own.
-export const env = defineEnv(t.Object({
-  SESSION_SECRET: t.String({ minLength: 32 }),
-  DATABASE_URL: t.String(),
-  PORT: t.Integer({ default: 3000 }),
+export const env = defineEnv(s.Object({
+  SESSION_SECRET: s.String({ minLength: 32 }),
+  DATABASE_URL: s.String(),
+  PORT: s.Integer({ default: 3000 }),
 }))
 `,
     'src/db/member.ts': `import type { InferEntity } from '@kaynooo/pg-orm'
@@ -568,12 +568,12 @@ export const app = new Elysia().use(sessions).use(await pages()).listen(env.PORT
 console.log(\`Listening on http://localhost:\${app.server?.port}\`)
 `,
     'src/routes/login.kay': `--- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { db } from '../db'
 import { Member } from '../db/member'
 
 // Anyone may sign in under any name, which makes them a member the first time: swap in real credentials, such as @kaynooo/kayjs-auth's.
-export const signIn = action(t.Object({ name: t.String({ pattern: '\\\\S', maxLength: 40, error: 'Write a name' }) }), async ({ name }, ctx) => {
+export const signIn = action(s.Object({ name: s.String({ pattern: '\\\\S', maxLength: 40, error: 'Write a name' }) }), async ({ name }, ctx) => {
   await db.repo(Member).write.findOrCreate({ name: name.trim() }, ['name'])
   await ctx.locals.session.regenerate()
   await ctx.locals.session.set('name', name.trim())
@@ -600,11 +600,11 @@ export default guard(async ({ locals, redirect }) => {
 })
 `,
     'src/routes/account/index.kay': `--- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { db } from '../../db'
 import { Member } from '../../db/member'
 
-export const signOut = action(t.Object({}), async (_input, ctx) => {
+export const signOut = action(s.Object({}), async (_input, ctx) => {
   await ctx.locals.session.destroy()
   ctx.redirect('/')
 })
@@ -684,14 +684,14 @@ it('knows a member from the seed, and since when', async () => {
 // An API module and a live island over its websocket.
 function wsFiles({ tw }: Setup): Record<string, string> {
   return {
-    'src/api/online.ts': `import { t } from 'kay'
+    'src/api/online.ts': `import { s } from 'kay'
 import { api } from 'kay/server'
 
 let online = 0
 
 // Served at /api/online: every open connection hears how many there are.
 export default api().ws('/', {
-  response: t.Object({ online: t.Number() }),
+  response: s.Object({ online: s.Number() }),
   open(ws) {
     online++
     ws.subscribe('online')

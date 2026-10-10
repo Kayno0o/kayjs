@@ -82,7 +82,7 @@ export interface KayConfig {
   plugins?: BunPlugin[] | undefined
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
   settings?: Record<string, string> | undefined
-  // Variables an island may read, as `publicEnv` from `kay`: `t.Object({ MAP_KEY: t.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser.
+  // Variables an island may read, as `publicEnv` from `kay`: `s.Object({ MAP_KEY: s.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser.
   publicEnv?: EnvSchema | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined

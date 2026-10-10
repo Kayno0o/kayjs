@@ -11,7 +11,7 @@ import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
-import { analyzeScript, analyzeServer, unboundedFields } from './script'
+import { analyzeScript, analyzeServer, deprecatedSchemaNames, unboundedFields } from './script'
 import { ISLAND_TWIN } from './twin'
 
 export type { Diagnostic } from './ast'
@@ -62,6 +62,8 @@ export interface CompileResult {
 const WORD = /[a-z0-9]+/gi
 const LEADING_DIGIT = /^\d/
 const KAY_EXTENSION = /\.kay$/
+// A read of a member of `t`, which a schema builder named so gets: `t.Object(...)`.
+const MEMBER_OF_T = /(?<![\w$.])t\s*\.(?!\.)/
 const ERROR_PAGE = '_error.kay'
 // Rendered by the server around or instead of a page, never inside an island.
 const ROUTE_FILES = new Set(['_layout.kay', '_404.kay', ERROR_PAGE])
@@ -109,7 +111,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, bindings, name, values, file.templateStart)
   }
 
-  const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.rewrites })
+  const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.rewrites, translates: found.translates })
   const diagnostics = [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...analysis.diagnostics, ...found.diagnostics]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.
@@ -124,7 +126,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (options.check)
-    diagnostics.push(...unboundedFields(source, file.server), ...broken ? [] : [...unreadNames(source, file.template, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
+    diagnostics.push(...unboundedFields(source, file.server), ...[file.script, file.server].flatMap(fence => fence ? fenceSchemaNames(source, fence) : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
@@ -146,6 +148,11 @@ export function compileKay(source: string, filename: string, options: CompileOpt
 }
 
 // Props and server data nothing reads: a prop beside a `...rest` is left out of it on purpose, and a name starting with `_` is unused on purpose, as TypeScript takes it.
+// A fence's `t` from 'kay' is renamed in it alone, so a `t.` read anywhere else in the file keeps the name.
+function fenceSchemaNames(source: string, fence: Span): Diagnostic[] {
+  return deprecatedSchemaNames(source.slice(fence.start, fence.end), fence.start, !MEMBER_OF_T.test(`${source.slice(0, fence.start)} ${source.slice(fence.end)}`))
+}
+
 function unreadNames(source: string, template: Node[], script: ScriptAnalysis, server: ServerAnalysis | undefined, found: FoundRewrites): Diagnostic[] {
   const unread: Diagnostic[] = []
   const unused = (span: Span) => found.unread.has(span.start) && !source.startsWith('_', span.start)

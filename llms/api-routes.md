@@ -3,15 +3,15 @@
 Each `.ts` module under `src/api/`, the `api` option of `kay.config.ts` naming another directory, exports an Elysia instance by default, which `pages()` mounts at `/api` plus its path there, with nothing to register: `src/api/chat.ts` serves its routes under `/api/chat`, `src/api/index.ts` under `/api`. Files and directories starting with `_`, and `.test.ts` files, are left out.
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { api, eventStream } from 'kay/server'
 import { complete, listRooms } from '../data'
 
 export default api()
   .get('/rooms', () => listRooms())
   .ws('/:room', {
-    body: t.Object({ text: t.String() }),
-    response: t.Object({ from: t.String(), text: t.String() }),
+    body: s.Object({ text: s.String() }),
+    response: s.Object({ from: s.String(), text: s.String() }),
     message(ws, { text }) {
       ws.send({ from: ws.data.user?.name ?? 'guest', text })
     },
@@ -19,7 +19,7 @@ export default api()
   .post(
     '/answer',
     ({ body }) => eventStream(complete(body.prompt)),
-    { body: t.Object({ prompt: t.String() }) },
+    { body: s.Object({ prompt: s.String() }) },
   )
 ```
 
@@ -31,7 +31,7 @@ export default api()
 - `api({ cors: { origins: ['https://app.example.com', 'https://*.example.org'] } })` lets the pages of those origins call the module's routes from the browser, `https://*.example.org` standing for any of its subdomains, and `origins: '*'` for any site. A preflight `OPTIONS` is answered before the guards run, with the module's methods, the headers asked for, or `headers: [...]` alone, and `Access-Control-Max-Age`, `maxAge`, an hour by default; an origin not listed gets no grant. Its requests, websocket upgrades included, go through the guards and are not refused, their answers naming the origin, with `expose: [...]` the response headers the page may read. `credentials: true` takes the user's cookies as well; without it a request from another site carrying cookies is refused, and with `origins: '*'` it is a type error `kay check` reports. Its answers carry the grant, a body its schema refuses, one that does not parse, or one over its `bodyLimit` included, so the calling page reads why, and those of a module listing origins carry `Vary: Origin`, added to any Vary the route sets. An origin is a scheme and a host, a port if any, `capacitor://localhost` for an app's web view included. A module without `cors` answers no preflight and keeps refusing.
 - `eventStream(source)` answers with server-sent events, one per value an async iterable, a generator or an array gives, crossing as island props do, Dates, Maps and Sets included. The source is read once the browser reads the response and stopped when it goes away; a source that throws ends the stream as failed, the error logged and handed to `onError`. A comment line every 5 seconds keeps a quiet stream open past Bun's `idleTimeout` and a proxy's.
 - `kay check` checks links and redirects against the modules' GET routes, `/api/chat/rooms` here; `kay build --compile` embeds the modules, and `kay build --static` refuses them.
-- `openapi: true` in kay.config.ts serves an OpenAPI 3.1 document of every module's routes at `/api/openapi.json`, read from the schemas they declare: path params in braces, `params`, `query` and `headers` as parameters, `body` as JSON, or multipart when it holds a `t.File()`, and `response`, one schema or one per status. A route's `detail` gives its `summary`, `description`, `tags`, the module's path by default, and `deprecated`, and `detail: { hide: true }` leaves it out; websockets are left out. A route behind guards lists them in `x-kay-guards`, by where they sit in the API directory, `private/_guard.ts`. The document is served behind the guards every module runs, the API directory's own `_guard.ts`, so a private API keeps its spec private. `{ title, version }` set its `info`, the site's `seo.name` and `1.0.0` by default; `{ reference: true }` adds `/api/reference`, a plain HTML page listing each route with what it takes and answers, behind the same guards; `{ dev: true }` keeps both to `kay dev`. The executable serves them as the server does. Without a `_guard.ts` of the API directory itself, the document is public, guarded modules included. Schemas are read as TypeBox writes them: a model's name or another library's validator documents nothing. An optional param lists the path with and without it, and a wildcard is `{wildcard}`. A module serving `/api/openapi.json`, or `/api/reference` with the page on, stops the server.
+- `openapi: true` in kay.config.ts serves an OpenAPI 3.1 document of every module's routes at `/api/openapi.json`, read from the schemas they declare: path params in braces, `params`, `query` and `headers` as parameters, `body` as JSON, or multipart when it holds an `s.File()`, and `response`, one schema or one per status. A route's `detail` gives its `summary`, `description`, `tags`, the module's path by default, and `deprecated`, and `detail: { hide: true }` leaves it out; websockets are left out. A route behind guards lists them in `x-kay-guards`, by where they sit in the API directory, `private/_guard.ts`. The document is served behind the guards every module runs, the API directory's own `_guard.ts`, so a private API keeps its spec private. `{ title, version }` set its `info`, the site's `seo.name` and `1.0.0` by default; `{ reference: true }` adds `/api/reference`, a plain HTML page listing each route with what it takes and answers, behind the same guards; `{ dev: true }` keeps both to `kay dev`. The executable serves them as the server does. Without a `_guard.ts` of the API directory itself, the document is public, guarded modules included. Schemas are read as TypeBox writes them: a model's name or another library's validator documents nothing. An optional param lists the path with and without it, and a wildcard is `{wildcard}`. A module serving `/api/openapi.json`, or `/api/reference` with the page on, stops the server.
 
 An island imports a module for its routes:
 
@@ -59,8 +59,7 @@ button(onClick={() => messages.send({ text })}) Send
 Rooms group a module's websocket connections, such as a game's players or a document's editors:
 
 ```ts
-import { t } from 'elysia'
-import { dispatch } from 'kay'
+import { dispatch, s } from 'kay'
 import { api, rooms } from 'kay/server'
 
 type Sent =
@@ -75,9 +74,9 @@ const sendBoard = games.coalesce(room => ({
 
 export default api()
   .ws('/:room', {
-    body: t.Union([
-      t.Object({ type: t.Literal('say'), text: t.String() }),
-      t.Object({ type: t.Literal('play'), cell: t.Integer() }),
+    body: s.Union([
+      s.Object({ type: s.Literal('say'), text: s.String() }),
+      s.Object({ type: s.Literal('play'), cell: s.Integer() }),
     ]),
     open(ws) {
       games.join(ws, ws.data.params.room, ws.data.user.name)

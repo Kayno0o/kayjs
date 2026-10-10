@@ -45,11 +45,11 @@ A page exports a `query` schema to read the search params typed. A value the sch
 
 ```kay
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 
-export const query = t.Object({
-  q: t.String({ default: '' }),
-  page: t.Optional(t.Integer()),
+export const query = s.Object({
+  q: s.String({ default: '' }),
+  page: s.Optional(s.Integer()),
 })
 
 const { q, page = 1 } = ctx.query
@@ -114,12 +114,12 @@ Caching a load with `cached()` is covered in [Caching and streaming](/guides/cac
 
 ```ts
 // src/env.ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { defineEnv } from 'kay/server'
 
-export const env = defineEnv(t.Object({
-  DATABASE_URL: t.String(),
-  PORT: t.Integer({ default: 3000 }),
+export const env = defineEnv(s.Object({
+  DATABASE_URL: s.String(),
+  PORT: s.Integer({ default: 3000 }),
 }))
 ```
 

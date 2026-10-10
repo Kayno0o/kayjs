@@ -1,12 +1,12 @@
-import { t } from 'kay'
+import { s } from 'kay'
 import { rooms } from 'kay/server'
 
 export const BOARD = 'board'
 
 // What every open board page hears: a notice as it is posted, and who is reading.
-export const boardMessage = t.Union([
-  t.Object({ type: t.Literal('posted'), notice: t.Object({ id: t.Number(), title: t.String(), author: t.String() }) }),
-  t.Object({ type: t.Literal('present'), names: t.Array(t.String()), guests: t.Number() }),
+export const boardMessage = s.Union([
+  s.Object({ type: s.Literal('posted'), notice: s.Object({ id: s.Number(), title: s.String(), author: s.String() }) }),
+  s.Object({ type: s.Literal('present'), names: s.Array(s.String()), guests: s.Number() }),
 ])
 
 export type BoardMessage = typeof boardMessage.static

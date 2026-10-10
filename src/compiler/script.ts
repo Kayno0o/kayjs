@@ -618,7 +618,56 @@ export function unboundedFields(source: string, server: Span | undefined): Diagn
   return diagnostics
 }
 
-// Every `t.String(...)` call in a schema, with the name of the field it types, the nearest property holding it.
+const KAY_SCHEMA_T = /\{[^}]*\bt\b[^}]*\}\s*from\s*['"]kay['"]/
+
+// `t` imported from 'kay', the schema builder's name before `s`, in `code` starting at `offset` of its file.
+// The fix renames it throughout `code`, or imports `s as t` where `s` is taken or `t` is read where the fix cannot reach, such as a template (`renamable` false).
+export function deprecatedSchemaNames(code: string, offset: number, renamable = true): Diagnostic[] {
+  if (!KAY_SCHEMA_T.test(code))
+    return []
+
+  let ast: ParseResult<t.File>
+
+  try {
+    ast = parse(code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+  }
+  catch {
+    return []
+  }
+
+  const diagnostics: Diagnostic[] = []
+  const span = (node: t.Node) => ({ start: offset + node.start!, end: offset + node.end! })
+
+  loadTraverse()(ast, {
+    ImportSpecifier(path: NodePath<t.ImportSpecifier>) {
+      const { imported, local } = path.node
+      const declaration = path.parent as t.ImportDeclaration
+
+      if (declaration.source.value !== 'kay' || imported.type !== 'Identifier' || imported.name !== 't')
+        return
+
+      const references = local.name === 't' ? path.scope.getBinding('t')?.referencePaths ?? [] : []
+      const rename = renamable && local.name === 't' && !path.scope.hasBinding('s') && references.every(reference => !reference.scope.hasBinding('s'))
+      const edits = local.name !== 't'
+        ? [{ ...span(imported), text: 's' }]
+        : rename ? [path.node, ...references.map(reference => reference.node)].map(node => ({ ...span(node), text: 's' })) : [{ ...span(path.node), text: 's as t' }]
+
+      diagnostics.push({
+        ...span(imported),
+        code: 'deprecated-schema-name',
+        message: '`t` from \'kay\' is `s` now',
+        note: '`t` is left to translations, which every template reads without an import',
+        help: 'import `s` and build schemas with `s.Object(...)`',
+        fixes: [{ title: rename ? 'Rename it `s`' : 'Import `s`', edits, safe: true }],
+        checkOnly: true,
+      })
+    },
+  })
+
+  return diagnostics
+}
+
+// Every `s.String(...)` call in a schema, with the name of the field it types, the nearest property holding it.
 function schemaStrings(node: t.Node | null | undefined, field: string | undefined, found: (call: t.CallExpression, field: string | undefined) => void): void {
   if (!node || typeof node.type !== 'string')
     return

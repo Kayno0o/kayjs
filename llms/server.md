@@ -37,11 +37,11 @@ The server entry exports the app using it before the pages, `export const app = 
 
 ```kay
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 
-const credentials = t.Object({
-  email: t.String({ maxLength: 254 }),
-  password: t.String(),
+const credentials = s.Object({
+  email: s.String({ maxLength: 254 }),
+  password: s.String(),
 })
 
 export const signIn = action(credentials, async (input, ctx) => {
@@ -71,28 +71,28 @@ const userId = await ctx.locals.session.get('userId')
 `defineEnv` from `kay/server` reads `process.env` once against a schema, as the server boots, and gives it back typed:
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { defineEnv } from 'kay/server'
 
-export const env = defineEnv(t.Object({
-  DATABASE_URL: t.String(),
-  PORT: t.Integer({ default: 3000 }),
-  DEBUG: t.Optional(t.Boolean()),
+export const env = defineEnv(s.Object({
+  DATABASE_URL: s.String(),
+  PORT: s.Integer({ default: 3000 }),
+  DEBUG: s.Optional(s.Boolean()),
 }))
 ```
 
-A number or boolean is read from its text as a form field is, a variable left out takes its `default`, and any missing or refused stops the boot with an error naming each one. An empty variable, `SMTP_PORT=` or `SMTP_PORT=""` in a `.env` file, counts as left out: it takes the default, satisfies `t.Optional` and fails a required one, rather than an empty string reaching the schema. So an empty string is not a value a variable can carry: a setting that means something when blank is `t.Optional`, read as `undefined`. A value of spaces is kept as it is, since only quoting makes one. `kay build` runs without the server's environment: there a missing or refused variable leaves the module declaring it alone, and reading it throws naming it, which fails only a prerendered page that reads it. The object holds the declared names only. Server code imports it: a `.ts` module, a server fence, the server entry; an island never sees the server's environment.
+A number or boolean is read from its text as a form field is, a variable left out takes its `default`, and any missing or refused stops the boot with an error naming each one. An empty variable, `SMTP_PORT=` or `SMTP_PORT=""` in a `.env` file, counts as left out: it takes the default, satisfies `s.Optional` and fails a required one, rather than an empty string reaching the schema. So an empty string is not a value a variable can carry: a setting that means something when blank is `s.Optional`, read as `undefined`. A value of spaces is kept as it is, since only quoting makes one. `kay build` runs without the server's environment: there a missing or refused variable leaves the module declaring it alone, and reading it throws naming it, which fails only a prerendered page that reads it. The object holds the declared names only. Server code imports it: a `.ts` module, a server fence, the server entry; an island never sees the server's environment.
 
 `publicEnv` in kay.config.ts declares the variables an island may read, such as a map key or an analytics id, which a component reads as `publicEnv` from `kay`, typed from the declaration:
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  publicEnv: t.Object({
-    MAP_KEY: t.String(),
-    ANALYTICS_ID: t.Optional(t.String()),
+  publicEnv: s.Object({
+    MAP_KEY: s.String(),
+    ANALYTICS_ID: s.Optional(s.String()),
   }),
 })
 ```

@@ -13,6 +13,8 @@ import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 
 export interface GenerateOptions {
   name: string
+  // The component reads `t` unimported: the translation function from `kay/i18n`, imported here.
+  translates?: boolean | undefined
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
   island?: string | undefined
   // The island renders in the browser only: `--- client`, or a package it imports cannot load on the server.
@@ -130,6 +132,9 @@ class Generator {
 
     if (implicit.length > 0)
       b.add(`import { ${[...new Set(implicit)].join(', ')} } from 'kay'\n`)
+
+    if (this.options.translates === true && !imported.has('t'))
+      b.add('import { t } from \'kay/i18n\'\n')
 
     for (const span of script.hoisted)
       this.emitHoisted(span, script.specifiers, script.imports, [])

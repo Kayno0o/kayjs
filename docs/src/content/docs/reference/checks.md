@@ -55,6 +55,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `missing-captions` | warn | a11y | A `video` with no captions |
 | `redundant-alt` | warn | a11y | Alt text that says it is an image |
 | `constant-signal` | warn | islands | A signal that is only ever read |
+| `deprecated-schema-name` | warn | code | The schema builder imported as `t`, now `s` |
 | `uncaught-await` | warn | code | An `await` block with no `catch` |
 | `missing-site` | warn | seo | `seo` with no `site` |
 | `missing-description` | warn | seo | No `seo.description` |

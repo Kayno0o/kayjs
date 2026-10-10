@@ -1,10 +1,10 @@
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 
-export const query = t.Object({ token: t.Optional(t.String()) })
+export const query = s.Object({ token: s.Optional(s.String()) })
 
 // The link only opens this page; the button spends it, so a mail scanner opening the link signs no one in.
-export const spend = action(t.Object({ token: t.String() }), async ({ token }, ctx) => {
+export const spend = action(s.Object({ token: s.String() }), async ({ token }, ctx) => {
   const result = await ctx.locals.auth.signInWithMagicLink(token)
 
   if (!result.ok)

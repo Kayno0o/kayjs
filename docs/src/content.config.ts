@@ -1,4 +1,4 @@
-import { t } from 'kay'
+import { s } from 'kay'
 import { collection } from 'kay/content'
 import Callout from './components/callout.kay'
 import Demo from './components/demo.kay'
@@ -13,7 +13,7 @@ const sectionIndex = (slug: string) => SECTIONS.findIndex(section => slug.starts
 
 // Written for people: one folder per section, read in the sidebar's order.
 export const docs = collection('content/docs', {
-  schema: t.Object({ title: t.String(), order: t.Number(), description: t.String() }),
+  schema: s.Object({ title: s.String(), order: s.Number(), description: s.String() }),
   components: { Callout, ReadMore },
   sort: (a, b) => sectionIndex(a.slug) - sectionIndex(b.slug) || byOrder(a, b),
   highlight,
@@ -21,16 +21,16 @@ export const docs = collection('content/docs', {
 
 // Written for agents, every option and edge case: llms.txt and the docs it lists, then each library's llms.txt as published.
 export const reference = collection({ name: 'reference', load: async () => [...await loadReference(), ...await loadLibraries()] }, {
-  schema: t.Object({ title: t.String(), order: t.Number(), version: t.Optional(t.String()) }),
+  schema: s.Object({ title: s.String(), order: s.Number(), version: s.Optional(s.String()) }),
   sort: byOrder,
   highlight,
 })
 
-const prop = t.Object({ name: t.String(), type: t.String(), optional: t.Boolean(), default: t.Optional(t.String()), comment: t.Optional(t.String()) })
+const prop = s.Object({ name: s.String(), type: s.String(), optional: s.Boolean(), default: s.Optional(s.String()), comment: s.Optional(s.String()) })
 
 // One page per kayjs-ui component: its usage from src/content/ui, its props read from its source.
 export const components = collection({ name: 'components', load: loadComponents }, {
-  schema: t.Object({ title: t.String(), order: t.Number(), description: t.String(), props: t.Array(prop) }),
+  schema: s.Object({ title: s.String(), order: s.Number(), description: s.String(), props: s.Array(prop) }),
   components: { Callout, Demo, ReadMore },
   sort: byOrder,
   highlight,

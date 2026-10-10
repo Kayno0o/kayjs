@@ -1,10 +1,10 @@
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 
-export const query = t.Object({ token: t.Optional(t.String()) })
+export const query = s.Object({ token: s.Optional(s.String()) })
 
 // Confirms the address without signing in: in another browser than the one that joined, the password proves who confirms.
-export const confirm = action(t.Object({ token: t.String(), password: t.Optional(t.String({ maxLength: 128 })) }), async ({ token, password }, ctx) => {
+export const confirm = action(s.Object({ token: s.String(), password: s.Optional(s.String({ maxLength: 128 })) }), async ({ token, password }, ctx) => {
   const result = await ctx.locals.auth.verifyEmail(token, password)
 
   if (!result.ok)

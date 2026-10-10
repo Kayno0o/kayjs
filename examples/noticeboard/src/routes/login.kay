@@ -1,11 +1,11 @@
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { FAILURE_WORDS } from '../words'
 
-export const signIn = action(t.Object({
-  identifier: t.String({ maxLength: 254 }),
-  password: t.String({ maxLength: 128 }),
-  redirect: t.Optional(t.String({ maxLength: 2000 })),
+export const signIn = action(s.Object({
+  identifier: s.String({ maxLength: 254 }),
+  password: s.String({ maxLength: 128 }),
+  redirect: s.Optional(s.String({ maxLength: 2000 })),
 }), async (input, ctx) => {
   const result = await ctx.locals.auth.signInWithPassword(input)
 
@@ -16,9 +16,9 @@ export const signIn = action(t.Object({
 })
 
 // Answers alike whether or not an account has the address, so the form tells no one which addresses are members.
-export const mailLink = action(t.Object({
-  email: t.String({ maxLength: 254 }),
-  redirect: t.Optional(t.String({ maxLength: 2000 })),
+export const mailLink = action(s.Object({
+  email: s.String({ maxLength: 254 }),
+  redirect: s.Optional(s.String({ maxLength: 2000 })),
 }), async ({ email, redirect }, ctx) => {
   const result = await ctx.locals.auth.requestMagicLink(email, redirect)
 

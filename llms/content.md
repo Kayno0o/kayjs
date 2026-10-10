@@ -3,16 +3,16 @@
 A collection is a folder of Markdown files, or of JSON and YAML data files, read against a schema. The project declares its collections in `src/content.config.ts`, or the module `content` names in kay.config.ts, each folder relative to that module:
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { collection } from 'kay/content'
 import Callout from './components/callout.kay'
 
 export const posts = collection('content/posts', {
-  schema: t.Object({
-    title: t.String(),
-    date: t.Date(),
-    tags: t.Array(t.String(), { default: [] }),
-    draft: t.Optional(t.Boolean()),
+  schema: s.Object({
+    title: s.String(),
+    date: s.Date(),
+    tags: s.Array(s.String(), { default: [] }),
+    draft: s.Optional(s.Boolean()),
   }),
   components: { Callout },
   draft: post => post.data.draft === true,
@@ -29,7 +29,7 @@ export const posts = collection('content/posts', {
 })
 
 export const authors = collection('content/authors', {
-  schema: t.Object({ name: t.String() }),
+  schema: s.Object({ name: s.String() }),
 })
 ```
 
@@ -54,7 +54,7 @@ article
 
 - `all()` gives every entry in the collection's `sort` order, by slug without one; filter and sort it like any array. `get(slug)` gives one entry or `undefined`. An entry `draft` returns true for shows in `kay dev` and to a visitor in preview mode only: everywhere else it is left out of `all()`, `get()`, prerendering, the sitemap and the feed. Two files giving one slug, `guides.md` and `guides/index.md`, fail the collection.
 - An entry has `slug`, its path in the folder without the extension (`guides/intro`; an `index` file takes its folder's), `data`, `headings` (`{ depth, id, text }` in order, for a table of contents), `Content`, the component rendering its body, and `file`. A data file's `headings` is empty and its `Content` renders nothing.
-- A Markdown file starts with YAML frontmatter between `---` lines. Every entry's data is read against the schema: defaults filled in, a `t.Date()` decoded from its text. An entry it refuses, or one that does not parse, fails `kay check` at the field's line, and fails `kay build` and the first load.
+- A Markdown file starts with YAML frontmatter between `---` lines. Every entry's data is read against the schema: defaults filled in, an `s.Date()` decoded from its text. An entry it refuses, or one that does not parse, fails `kay check` at the field's line, and fails `kay build` and the first load.
 - Headings get ids, deduplicated, and link to themselves. Bare URLs become links.
 - `highlight: (code, language) => html` highlights code blocks as entries compile, at build time: it returns the whole `<pre>`, such as Shiki's `codeToHtml`, which the site depends on itself. Without one, a block renders as `<pre><code class="language-ts">`.
 - A Markdown entry uses the components its collection's `components` names, written with a capital as in a template: `<Callout type="warn">` on its own line, Markdown inside after a blank line, then `</Callout>` on its own line; `<Badge text="new" />` inline. Attributes are text (`type="warn"`), JSON in braces (`count={3}`, `items={["a", "b"]}`), or bare for `true`, and may spread over several lines. An interactive component renders as an island and hydrates as in any page. A page rendering an entry's `Content` links the stylesheets those components import, for every collection its `--- server` fence imports. A tag in a code span, a fenced code block or an indented one stays text. A component the collection does not name, or a tag left open, fails `kay check` and the build.
@@ -72,7 +72,7 @@ article
 A collection whose entries live in a headless CMS, an API or a database takes a loader instead of a folder, and is read, typed and used as a folder's is:
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { collection } from 'kay/content'
 import { listPosts } from './cms'
 
@@ -86,7 +86,7 @@ export const news = collection({
     })),
   ttl: '15m',
 }, {
-  schema: t.Object({ title: t.String(), published: t.Boolean() }),
+  schema: s.Object({ title: s.String(), published: s.Boolean() }),
   draft: post => !post.data.published,
 })
 ```

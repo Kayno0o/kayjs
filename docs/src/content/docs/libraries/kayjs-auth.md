@@ -65,11 +65,11 @@ Methods that can fail answer `{ ok: true, ... }` or `{ ok: false, error }`, with
 
 ```kay
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 
-export const signIn = action(t.Object({
-  identifier: t.String({ maxLength: 254 }),
-  password: t.String({ maxLength: 128 }),
+export const signIn = action(s.Object({
+  identifier: s.String({ maxLength: 254 }),
+  password: s.String({ maxLength: 128 }),
 }), async (input, ctx) => {
   const result = await ctx.locals.auth.signInWithPassword(input)
 

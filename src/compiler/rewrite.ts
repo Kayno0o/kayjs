@@ -53,6 +53,8 @@ export interface FoundRewrites {
   serverReads: Set<string>
   // Where the signals nothing writes are declared, and the value they start with: every use of one reads it.
   constantSignals: ConstantSignal[]
+  // True when the component reads a `t` nothing declares or imports: the translation function, which the compiler imports.
+  translates?: boolean
 }
 
 // Reads the analysis-pass TSX with real scope resolution, so shadowed names are left alone, and returns the rewrites to apply in the final pass.
@@ -76,6 +78,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
 
   const propsByLocal = new Map<number, { binding: PropsBinding, index: number }>()
   let shadowsName = false
+  let translates = false
 
   for (const [index, binding] of bindings.entries())
     propsByLocal.set(binding.local.start, { binding, index })
@@ -145,6 +148,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
   traverse(ast, {
     Program: (path) => {
       // The export of the function counts as a reference to it, and a tag of that name is the component rendering itself; neither is a read of a global.
+      translates = Object.hasOwn(path.scope.globals, 't')
       shadowsName = path.scope.getBinding(componentName)?.referencePaths.some(reference => reference.isIdentifier() && !inIslandExport(reference) && tagPosition(reference) === undefined) ?? false
     },
     ArrowFunctionExpression: (path) => {
@@ -215,7 +219,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     },
   })
 
-  return { rewrites, diagnostics, shadowsName, unread, serverReads, constantSignals: [...constantSignals.values()] }
+  return { rewrites, diagnostics, shadowsName, unread, serverReads, constantSignals: [...constantSignals.values()], translates }
 }
 
 // Where a node of the generated code was written, when all of it was.

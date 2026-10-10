@@ -7,11 +7,11 @@ import { highlight } from '../../highlight'
 export const prerender = true
 
 const SAMPLE = `--- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { addTodo, listTodos } from '../todos'
 
 export const add = action(
-  t.Object({ title: t.String({ minLength: 1 }) }),
+  s.Object({ title: s.String({ minLength: 1 }) }),
   ({ title }) => addTodo(title),
 )
 
@@ -26,11 +26,11 @@ form(action={add})
   button Add`
 
 const AUTH = `--- server
-import { t } from 'kay'
+import { s } from 'kay'
 
-const Credentials = t.Object({
-  identifier: t.String({ maxLength: 254 }),
-  password: t.String({ maxLength: 128 }),
+const Credentials = s.Object({
+  identifier: s.String({ maxLength: 254 }),
+  password: s.String({ maxLength: 128 }),
 })
 
 export const signIn = action(Credentials, async (input, ctx) => {

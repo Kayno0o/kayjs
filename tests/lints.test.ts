@@ -113,6 +113,19 @@ describe('kay explain', () => {
   })
 })
 
+describe('deprecated-schema-name', () => {
+  it('renames the schema builder imported as t in its fence, or imports s as t where the rename cannot reach', () => {
+    const renamed = '--- server\nimport { action, t } from \'kay\'\n\ntype Query = typeof t\nexport const add = action(t.Object({ title: t.String({ maxLength: 9 }) }), async () => undefined)\n---\np x'
+    const taken = '--- server\nimport { t } from \'kay\'\n\nconst s = 1\nexport const query = t.Object({})\n---\np x'
+    const aliased = '--- server\nimport { t as schema } from \'kay\'\n\nexport const query = schema.Object({})\n---\np x'
+
+    expect(lints(renamed)).toEqual([{ code: 'deprecated-schema-name', severity: 'warning', at: 't' }])
+    expect(fixed(renamed)).toEqual([renamed.replaceAll('t }', 's }').replaceAll('typeof t', 'typeof s').replaceAll('t.', 's.')])
+    expect(fixed(taken)).toEqual([taken.replace('{ t }', '{ s as t }')])
+    expect(fixed(aliased)).toEqual([aliased.replace('t as schema', 's as schema')])
+  })
+})
+
 describe('positional-key', () => {
   it('reports rows keyed by their index while each has an `id`, dropping the key, and the index once nothing else reads it', () => {
     const source = `${ROWS}for todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`

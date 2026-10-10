@@ -1,8 +1,8 @@
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { EMAIL_WORDS, FAILURE_WORDS } from '../../words'
 
-export const resend = action(t.Object({}), async (_input, ctx) => {
+export const resend = action(s.Object({}), async (_input, ctx) => {
   const result = await ctx.locals.auth.sendVerification()
 
   if (!result.ok)
@@ -12,7 +12,7 @@ export const resend = action(t.Object({}), async (_input, ctx) => {
 })
 
 // Mails a link to the new address; the account moves once that link is followed.
-export const changeEmail = action(t.Object({ email: t.String({ maxLength: 254 }), password: t.String({ maxLength: 128 }) }), async ({ email, password }, ctx) => {
+export const changeEmail = action(s.Object({ email: s.String({ maxLength: 254 }), password: s.String({ maxLength: 128 }) }), async ({ email, password }, ctx) => {
   const result = await ctx.locals.auth.changeEmail({ password }, email)
 
   if (!result.ok)
@@ -21,7 +21,7 @@ export const changeEmail = action(t.Object({ email: t.String({ maxLength: 254 })
   return { sent: true }
 })
 
-export const signOut = action(t.Object({}), async (_input, ctx) => {
+export const signOut = action(s.Object({}), async (_input, ctx) => {
   await ctx.locals.auth.signOut()
 
   return ctx.redirect('/')

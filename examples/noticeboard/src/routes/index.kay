@@ -1,14 +1,14 @@
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { BOARD, board } from '../board'
 import { db } from '../db'
 import { Notice } from '../db/notice'
 import { announcements } from '../jobs'
 import { latestNotices } from '../notices'
 
-export const post = action(t.Object({
-  title: t.String({ pattern: '\\S', maxLength: 120, error: 'Write a title' }),
-  body: t.String({ pattern: '\\S', maxLength: 4000, error: 'Write the notice' }),
+export const post = action(s.Object({
+  title: s.String({ pattern: '\\S', maxLength: 120, error: 'Write a title' }),
+  body: s.String({ pattern: '\\S', maxLength: 4000, error: 'Write the notice' }),
 }), async ({ title, body }, ctx) => {
   const user = await ctx.locals.auth.user()
 

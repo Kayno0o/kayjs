@@ -4,7 +4,7 @@ import { t } from 'elysia'
 import { PUBLIC_ENV } from '../runtime/env'
 import { readFields } from './query'
 
-// A `t.Object` of the variables, each read on its own.
+// A `s.Object` of the variables, each read on its own.
 export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
 
 // On the global object, so a copy of kay the app loads beside the CLI's sees it too.
@@ -27,7 +27,7 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
   for (const name of Object.keys(schema.properties)) {
     const value = source[name]
 
-    // An empty variable is how a `.env` file says it is not set, so the default or `t.Optional` applies rather than `''` failing the schema; nothing tells `KEY=` from `KEY=""` by the time it is read.
+    // An empty variable is how a `.env` file says it is not set, so the default or `s.Optional` applies rather than `''` failing the schema; nothing tells `KEY=` from `KEY=""` by the time it is read.
     if (value !== undefined && value !== '')
       input[name] = value
   }

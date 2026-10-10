@@ -1,4 +1,4 @@
-import type { Action, Failure, ServerAction, t } from '../src/runtime'
+import type { Action, Failure, s, ServerAction } from '../src/runtime'
 import type { TestSite } from '../src/test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -17,7 +17,7 @@ import { resetTodos } from './fixtures/site/src/data'
 const routes = 'tests/fixtures/site/src/routes'
 
 // The schema of the admin page's actions, which take a name.
-type Named = ReturnType<typeof t.Object<{ name: ReturnType<typeof t.String> }>>
+type Named = ReturnType<typeof s.Object<{ name: ReturnType<typeof s.String> }>>
 // A 1x1 PNG, which Elysia's `t.File({ type: 'image/png' })` recognises from its bytes.
 const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
 const site = await testSite({ routes, publicDir: 'tests/fixtures/site/public', locals: request => ({ user: request.headers.get('x-user') ?? undefined }) })

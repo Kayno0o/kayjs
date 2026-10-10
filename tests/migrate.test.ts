@@ -233,15 +233,15 @@ const blog = defineCollection({
 export const collections = { blog, authors: defineCollection({ schema: z.object({ name: z.string() }) }) }
 `)
 
-    expect(code).toBe(`import { t } from 'kay'
+    expect(code).toBe(`import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const blog = collection('data/blog', {
-  schema: t.Object({ title: t.String({ maxLength: 80 }), date: t.Date(), tags: t.Array(t.String(), { default: [] }), draft: t.Optional(t.Boolean()), kind: t.Union([t.Literal('note'), t.Literal('post')]), cover: t.String(), views: t.Integer({ minimum: 0 }), slug: /* kay migrate: .transform() has no \`t\` counterpart kay migrate knows */ z.string().transform(value => value.toLowerCase()) }),
+  schema: s.Object({ title: s.String({ maxLength: 80 }), date: s.Date(), tags: s.Array(s.String(), { default: [] }), draft: s.Optional(s.Boolean()), kind: s.Union([s.Literal('note'), s.Literal('post')]), cover: s.String(), views: s.Integer({ minimum: 0 }), slug: /* kay migrate: .transform() has no \`t\` counterpart kay migrate knows */ z.string().transform(value => value.toLowerCase()) }),
 })
 
 export const authors = collection('content/authors', {
-  schema: t.Object({ name: t.String() }),
+  schema: s.Object({ name: s.String() }),
 })
 `)
     expect(notes.map(note => note.line)).toEqual([14])

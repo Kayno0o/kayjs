@@ -144,7 +144,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           if (code === 'VALIDATION')
             return refused(value, error, request, server, back)
 
-          // Elysia checks a top-level `t.File({ type })` against the file's bytes once the schema passed.
+          // Elysia checks a top-level `s.File({ type })` against the file's bytes once the schema passed.
           if (code === 'INVALID_FILE_TYPE') {
             const field = error.property.replace(BODY_PREFIX, '')
 
@@ -254,7 +254,7 @@ function fieldError(action: ServerAction<TSchema, unknown>, field: string): stri
   return typeof error === 'string' ? error : undefined
 }
 
-// A file input left empty still posts a nameless, empty file; dropping it lets `t.Optional(t.File())` see no file at all.
+// A file input left empty still posts a nameless, empty file; dropping it lets `s.Optional(s.File())` see no file at all.
 function withoutEmptyFiles(body: unknown): unknown {
   if (typeof body !== 'object' || body === null)
     return body

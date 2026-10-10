@@ -18,7 +18,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { ASSET_EXTENSIONS } from '../build/assets'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
-import { findKayFiles, writeIfChanged } from '../build/files'
+import { findKayFiles, findProjectFiles, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacements, throughNodeModules } from '../build/libraries'
 import { cacheEntry } from '../build/transform'
@@ -26,6 +26,7 @@ import { componentName, rendersAsIsland, SourceMap } from '../compiler'
 import { formatReport } from '../compiler/frame'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels, typeLint } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { deprecatedSchemaNames } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
 import { projectApi } from '../server/api'
@@ -103,6 +104,9 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
 export const UNUSED_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205])
 // What `noUnusedParameters` alone reports: a parameter, a destructured one or a type parameter, under the codes locals share.
 const UNUSED_PARAMETER_CODES = new Set([6133, 6198, 6205])
+// The project's own scripts, which `kay check` reads for what only it reports in them; a declaration file holds no code.
+const SCRIPT_MODULE = /\.(?:[cm]?ts|tsx)$/
+const DECLARATION_FILE = /\.d\.[cm]?ts$/
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\): (?:error|warning) (TS\d+): (.*)$/
 // An error about the whole run, such as a tsconfig that does not exist.
 const TSC_GLOBAL_LINE = /^error (TS\d+): (.*)$/
@@ -606,13 +610,30 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
       diagnostics.push(remapped)
   }
 
-  diagnostics.push(...content.problems, ...messages, ...boot)
+  diagnostics.push(...content.problems, ...messages, ...boot, ...await moduleSchemaNames(root, options.lints))
 
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && reported.length === 0 && errors.trim() === '')
     diagnostics.push({ file: config, line: 1, column: 1, message: `tsgo exited with code ${code} and no diagnostics` })
 
   return diagnostics
+}
+
+// The schema builder the project's own scripts import as `t`: the `deprecated-schema-name` lint, which the compiler finds in fences only.
+async function moduleSchemaNames(root: string, levels: LintLevels | undefined): Promise<CheckDiagnostic[]> {
+  const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
+  const found = await Promise.all(files.map(async (file) => {
+    const source = await Bun.file(file).text()
+    const levelAt = lintLevels(source, levels)
+
+    return deprecatedSchemaNames(source, 0).flatMap((diagnostic) => {
+      const level = levelAt('deprecated-schema-name', diagnostic.start)
+
+      return level === 'allow' ? [] : [fromCompile(file, source, { ...diagnostic, severity: level === 'warn' ? 'warning' : 'error' })]
+    })
+  }))
+
+  return found.flat()
 }
 
 // Each locale's messages against the default locale's, read in a process of its own so an edited file is read afresh.

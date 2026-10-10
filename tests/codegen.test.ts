@@ -65,6 +65,18 @@ describe('component shell', () => {
   })
 })
 
+describe('translations', () => {
+  it('imports t from kay/i18n for a component reading it unimported, and leaves a t it declares or imports alone', () => {
+    const translation = 'import { t } from \'kay/i18n\''
+
+    expect(tsx('p {t(\'hello\')}')).toContain(translation)
+    expect(tsx('---\nconst label = t(\'hello\')\n---\np {label}')).toContain(translation)
+    expect(tsx('for t of [1]\n  p {t}')).not.toContain('kay/i18n')
+    expect(tsx('---\nimport { t } from \'./words\'\n---\np {t(\'x\')}')).not.toContain('kay/i18n')
+    expect(tsx('---\nconst t = (key: string) => key\n---\np {t(\'x\')}')).not.toContain('kay/i18n')
+  })
+})
+
 describe('props', () => {
   it('types the component from props<T>() and reads destructured names off the props object', () => {
     const code = tsx('---\nconst { title, count } = props<{ title: string, count: number }>()\nconst label = () => `${title}: ${count}`\n---\np {label()} {title}')
@@ -241,7 +253,7 @@ describe('islands', () => {
   })
 
   it('imports what the fences use of kay unimported, which makes the component an island', () => {
-    const source = '--- server\nexport const add = action(t.Object({}), async () => 1)\n---\n---\nconst count = signal(0)\nconst double = memo(() => count() * 2)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()}\n'
+    const source = '--- server\nexport const add = action(s.Object({}), async () => 1)\n---\n---\nconst count = signal(0)\nconst double = memo(() => count() * 2)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()}\n'
 
     expect(tsx(source)).toStartWith('import { signal, memo, action } from \'kay\'\n')
     expect(compileKay(source, 'test.kay').island).toBe('test.kay')

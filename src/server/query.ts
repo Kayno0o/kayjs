@@ -48,7 +48,7 @@ export function readFields(schema: TSchema, input: Record<string, unknown>, form
   if (!check)
     checks.set(schema, check = TypeCompiler.Compile(schema))
 
-  // Decoding turns what a schema reads from text, such as a `t.Date()`, into the value its type says.
+  // Decoding turns what a schema reads from text, such as an `s.Date()`, into the value its type says.
   if (check.Check(value))
     return { value: check.Decode<Record<string, unknown>>(value) }
 

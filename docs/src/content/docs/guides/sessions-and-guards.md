@@ -46,11 +46,11 @@ Without a store the data travels in the cookie, sealed but limited to about 3.5 
 
 ```kay
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 
-const credentials = t.Object({
-  email: t.String({ maxLength: 254 }),
-  password: t.String(),
+const credentials = s.Object({
+  email: s.String({ maxLength: 254 }),
+  password: s.String(),
 })
 
 export const signIn = action(credentials, async (input, ctx) => {
@@ -64,7 +64,7 @@ export const signIn = action(credentials, async (input, ctx) => {
   ctx.redirect('/')
 })
 
-export const signOut = action(t.Object({}), async (_input, ctx) => {
+export const signOut = action(s.Object({}), async (_input, ctx) => {
   await ctx.locals.session.destroy()
   ctx.redirect('/login')
 })
@@ -98,11 +98,11 @@ A guard reads the params of the page asked for in `ctx.params`, as `src/routes/o
 `defineEnv` reads `process.env` once against a schema at boot and stops the server with an error naming each missing variable. For variables an island may read, such as a map key, declare `publicEnv` in `kay.config.ts` and import it from `kay`:
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  publicEnv: t.Object({ MAP_KEY: t.String() }),
+  publicEnv: s.Object({ MAP_KEY: s.String() }),
 })
 ```
 

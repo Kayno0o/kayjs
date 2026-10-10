@@ -13,10 +13,11 @@ const MENTIONED = /\b(?:process|Bun)\b/
 const KAY_FILE = /\.kay$/
 // The one read the client build replaces with a literal, so it reaches no chunk.
 const DEFINED = 'NODE_ENV'
-// Part of the message of the browser's stand-in for kay's `t`, which survives minifying: a chunk holding it builds a schema where Elysia is not.
+// Part of the message of the browser's stand-in for kay's `s`, which survives minifying: a chunk holding it builds a schema where Elysia is not.
 const BROWSER_T = 'builds a schema on the server, and kay'
 const KAY_IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"]kay['"]/g
-const T_SPECIFIER = /^t(?:\s+as\s+\w+)?$/
+// `s`, or the `t` it was called before.
+const SCHEMA_SPECIFIER = /^[st](?:\s+as\s+\w+)?$/
 // Bun's refusal of a builtin in a browser build, which names the module importing it and not the island that reached it.
 const BUILTIN_REFUSAL = /^Browser build cannot import (?:Node\.js|Bun) builtin/
 const PACKAGE_PATH = /node_modules\/((?:@[^/]+\/)?[^/]+)/
@@ -265,11 +266,11 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
       problems.push(`\`${name}\` in ${basename(file)}, read by ${modules.length > 0 ? modules.join(', ') : 'a module of it kay could not pin down'}`)
   }))
 
-  // The browser's `t` sits with the runtime, and the modules taking it in any chunk.
+  // The browser's `s` sits with the runtime, and the modules taking it in any chunk.
   if (buildsSchemas) {
     for (const meta of Object.values(outputs)) {
       for (const [module, source] of await modulesOf(meta)) {
-        if (importsKayT(KAY_FILE.test(module) ? scriptFence(source) : source))
+        if (importsKaySchema(KAY_FILE.test(module) ? scriptFence(source) : source))
           schemaBuilders.add(module)
       }
     }
@@ -284,16 +285,16 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
     refusals.push(`a browser has no \`process\` or \`Bun\`, and these chunks a page loads read one, so every island in them dies as the chunk evaluates: ${problems.sort().join('; ')}. Keep the module reading it out of what an island imports, directly or through the page's script fence, and pass what it holds as a prop; ask \`typeof\` first where the module runs on both sides.`)
 
   if (schemaBuilders.size > 0)
-    refusals.push(`kay's \`t\` builds schemas on the server only, and an island imports ${[...schemaBuilders].sort().join(', ')}, which take${schemaBuilders.size === 1 ? 's' : ''} it from 'kay': its first \`t.Object(...)\` would throw as the island loads, and Elysia's own \`t\` reads \`Bun\`. Keep the schemas in a module only the server imports, and what an island needs of them, a length or a list of choices, in another.`)
+    refusals.push(`kay's \`s\` builds schemas on the server only, and an island imports ${[...schemaBuilders].sort().join(', ')}, which take${schemaBuilders.size === 1 ? 's' : ''} it from 'kay': its first \`s.Object(...)\` would throw as the island loads, and Elysia's own \`t\` reads \`Bun\`. Keep the schemas in a module only the server imports, and what an island needs of them, a length or a list of choices, in another.`)
 
   if (refusals.length > 0)
     throw new Error(`kay: ${refusals.join(' And ')}`)
 }
 
-// Whether a module imports `t` itself from 'kay', not as a type.
-function importsKayT(source: string): boolean {
+// Whether a module imports `s` (or `t`) itself from 'kay', not as a type.
+function importsKaySchema(source: string): boolean {
   for (const [, specifiers] of source.matchAll(KAY_IMPORT)) {
-    if (specifiers!.split(',').some(specifier => T_SPECIFIER.test(specifier.trim())))
+    if (specifiers!.split(',').some(specifier => SCHEMA_SPECIFIER.test(specifier.trim())))
       return true
   }
 

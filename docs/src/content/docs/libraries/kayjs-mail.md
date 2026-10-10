@@ -62,13 +62,13 @@ Tailwind classes do nothing in a mail. Style with `style` attributes.
 
 ```kay
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { mail } from '../mail'
 import Welcome from '../mails/welcome.kay'
 
-const newUser = t.Object({
-  name: t.String({ maxLength: 100 }),
-  email: t.String({ format: 'email', maxLength: 254 }),
+const newUser = s.Object({
+  name: s.String({ maxLength: 100 }),
+  email: s.String({ format: 'email', maxLength: 254 }),
 })
 
 export const signUp = action(newUser, async ({ name, email }) => {

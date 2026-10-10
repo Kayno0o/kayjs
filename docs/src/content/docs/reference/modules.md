@@ -6,12 +6,12 @@ description: What each public kay entry point exports.
 Import from the entry point that matches where the code runs. `kay` works in pages, components and islands, `kay/server` only on the server.
 
 ```ts
-import { action, signal, t } from 'kay'
+import { action, s, signal } from 'kay'
 import { defineConfig, pages, session } from 'kay/server'
 import { collection } from 'kay/content'
 ```
 
-`signal`, `memo`, `effect`, `onMount`, `props` and a server fence's `action` need no import inside a `.kay` file.
+`signal`, `memo`, `effect`, `onMount`, `props`, a server fence's `action` and the translation `t` from `kay/i18n` need no import inside a `.kay` file.
 
 ## kay
 
@@ -19,7 +19,7 @@ import { collection } from 'kay/content'
 | --- | --- |
 | `signal`, `memo`, `effect`, `batch`, `untrack`, `onMount`, `onCleanup` | Reactivity |
 | `persisted`, `linked`, `selection`, `context` | Signal helpers: stored, derived from a source, one selected key, shared down a tree |
-| `t` | The schema builder for actions, config and content (`t.Object`, `t.String`, ...) |
+| `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...) |
 | `action` | A form post or island call checked by a schema. See [Forms and actions](/essentials/forms-and-actions) |
 | `guard` | A route guard. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defer` | Makes a promise an `await` block can stream |
@@ -70,7 +70,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext` and `Loc
 
 <Callout type="note">
 
-`kay/i18n` has its own `t` for messages, not the schema builder `t` of `kay`.
+`kay/i18n` has its own `t` for messages, which `.kay` files read with no import; the schema builder is `kay`'s `s`, its old name `t` deprecated.
 
 </Callout>
 

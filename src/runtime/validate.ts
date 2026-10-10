@@ -32,7 +32,7 @@ const FORMATS: Record<string, RegExp> = {
   email: /^[\w!#$%&'*+/=?^`{|}~-]+(?:\.[\w!#$%&'*+/=?^`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i,
   uuid: /^(?:urn:uuid:)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i,
 }
-// The numeric text `t.Integer()` and `t.Numeric()` take, already read as a number.
+// The numeric text `s.Integer()` and `s.Numeric()` take, already read as a number.
 const NUMERIC_TEXT = new Set(['integer', 'numeric'])
 
 // Checks a form against the schema of the action it posts to, as the server would, reporting each refused field with the message the server would give; true when it may post.

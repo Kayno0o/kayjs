@@ -358,6 +358,28 @@ describe('renderToString', () => {
     })(), inner: Promise.resolve('nested') })).toBe('<p>start</p><p>one</p><p>nested</p><p>middle</p><p>two</p>')
   })
 
+  it('imports t for a template and a script reading it unimported, in a project with no i18n settings', async () => {
+    const project = join(scratch, 'unimported')
+
+    await Bun.write(join(project, 'src/messages/en.ts'), 'export default { hello: \'Hello {name}\', bye: \'Bye\' }\n')
+    const view = await load<{ name: string }>('---\nconst { name } = props<{ name: string }>()\nconst bye = t(\'bye\')\n---\np {t(\'hello\', { name })} {bye}')
+    const shadowed = await load('for t of [\'x\']\n  p {t}')
+    const saved = process.env.KAY_ROOT
+
+    process.env.KAY_ROOT = project
+
+    try {
+      expect(await renderToString(view, { name: 'Ada' })).toBe('<p>Hello Ada Bye</p>')
+      expect(await renderToString(shadowed, {})).toBe('<p>x</p>')
+    }
+    finally {
+      if (saved === undefined)
+        delete process.env.KAY_ROOT
+      else
+        process.env.KAY_ROOT = saved
+    }
+  })
+
   it('runs t() and the formatters outside a request in the site\'s default locale, or in the one given', async () => {
     const project = join(scratch, 'localized')
 

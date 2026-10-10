@@ -1,11 +1,11 @@
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { EMAIL_WORDS, FAILURE_WORDS, PASSWORD_WORDS, USERNAME_WORDS } from '../words'
 
-export const join = action(t.Object({
-  username: t.String({ pattern: '\\S', maxLength: 32, error: 'Write a name' }),
-  email: t.String({ maxLength: 254 }),
-  password: t.String({ maxLength: 128 }),
+export const join = action(s.Object({
+  username: s.String({ pattern: '\\S', maxLength: 32, error: 'Write a name' }),
+  email: s.String({ maxLength: 254 }),
+  password: s.String({ maxLength: 128 }),
 }), async (input, ctx) => {
   const result = await ctx.locals.auth.register(input)
 

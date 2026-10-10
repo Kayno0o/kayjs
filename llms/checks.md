@@ -56,6 +56,7 @@ What the markup alone cannot tell, such as text too faint on its background, con
 | `missing-captions` | warn | a11y | A `video` that is not `muted` with no captions `track`. |
 | `redundant-alt` | warn | a11y | Alt text that is a filename or says it is an image. |
 | `constant-signal` | warn | islands | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |
+| `deprecated-schema-name` | warn | code | `t` imported from `kay` for the schema builder, now `s`; `--fix` renames it, in `.kay` fences and the project's own modules alike. |
 | `uncaught-await` | warn | code | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
 | `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts or `SITE_URL`: no canonical links, `og:url`, sitemap or robots.txt. |
 | `missing-description` | warn | seo | A public site with no `seo.description`. |

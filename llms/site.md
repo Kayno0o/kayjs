@@ -50,14 +50,14 @@ A link to the page being rendered gets `aria-current="page"` by itself, as the A
 Collections are declared in `src/content.config.ts`, each folder relative to that module, so `content/posts` is `src/content/posts`:
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: t.Object({
-    title: t.String(),
-    date: t.Date(),
-    tags: t.Array(t.String(), { default: [] }),
+  schema: s.Object({
+    title: s.String(),
+    date: s.Date(),
+    tags: s.Array(s.String(), { default: [] }),
   }),
 })
 ```
@@ -154,13 +154,13 @@ The handler checks them, `src/routes/guestbook.kay`; `kay check` asks each strin
 
 ```kay
 --- server
-import { t } from 'kay'
+import { s } from 'kay'
 import { checkComment } from '../comment'
 import CommentForm from '../components/comment-form.kay'
 
-const newComment = t.Object({
-  name: t.String({ maxLength: 100 }),
-  text: t.String({ maxLength: 2000 }),
+const newComment = s.Object({
+  name: s.String({ maxLength: 100 }),
+  text: s.String({ maxLength: 2000 }),
 })
 
 export const comment = action(newComment, (input, ctx) => {

@@ -163,7 +163,7 @@ export interface PageContext<Params extends Record<string, unknown> = Record<str
   // The locale the page is served in, as `i18n` in kay.config.ts gives it; the site's `lang` without.
   locale: Locale
   params: Params
-  // The search params, read against the page's `export const query = t.Object(...)`; a query it refuses answers 400. Their raw text is `url.searchParams`.
+  // The search params, read against the page's `export const query = s.Object(...)`; a query it refuses answers 400. Their raw text is `url.searchParams`.
   query: Query
   // Read on demand; what a page sets or deletes goes out as Set-Cookie headers, redirects included.
   cookies: CookieMap
@@ -233,7 +233,7 @@ export type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
-export { t } from '#schema'
+export { s, t } from '#schema'
 export type { Action, ActionContext, ActionProtection, ActionRateLimit, CallOptions, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, HoneypotOptions, MinTimeOptions, MinTimeRefusal, ProtectionMessages, RateLimit, RateStore, RateWindow, ServerAction, Success, SuccessOf } from './action'
 export { action, ActionError, ActionRedirect } from './action'
 export { localPath, withBase } from './base'

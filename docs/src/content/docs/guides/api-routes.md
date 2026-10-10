@@ -7,7 +7,7 @@ description: Add Elysia routes under src/api and call them typed from an island,
 Each `.ts` module in `src/api/` exports an Elysia instance by default, and kay mounts it at `/api` plus its path, with nothing to register. `src/api/notes.ts` serves `/api/notes`:
 
 ```ts
-import { t } from 'kay'
+import { s } from 'kay'
 import { api } from 'kay/server'
 import { addNote, listNotes } from '../data'
 
@@ -15,12 +15,12 @@ export default api()
   .get(
     '/',
     ({ query }) => listNotes(query.prefix ?? ''),
-    { query: t.Object({ prefix: t.Optional(t.String()) }) },
+    { query: s.Object({ prefix: s.Optional(s.String()) }) },
   )
   .post(
     '/',
     ({ body }) => addNote(body.text),
-    { body: t.Object({ text: t.String() }) },
+    { body: s.Object({ text: s.String() }) },
   )
 ```
 
@@ -78,7 +78,7 @@ import { api, eventStream } from 'kay/server'
 export default api().post(
   '/answer',
   ({ body }) => eventStream(complete(body.prompt)),
-  { body: t.Object({ prompt: t.String() }) },
+  { body: s.Object({ prompt: s.String() }) },
 )
 ```
 
@@ -101,8 +101,8 @@ A `.ws()` route is opened with `socket()`. `send` takes the route's `body`, `las
 
 ```ts
 export default api().ws('/:room', {
-  body: t.Object({ text: t.String() }),
-  response: t.Object({ from: t.String(), text: t.String() }),
+  body: s.Object({ text: s.String() }),
+  response: s.Object({ from: s.String(), text: s.String() }),
   message(ws, { text }) {
     ws.send({ from: ws.data.user?.name ?? 'guest', text })
   },
