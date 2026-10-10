@@ -34,7 +34,12 @@ A request other than GET that another site's page sends is refused with 403, and
 // src/api/catalog.ts
 import { api } from 'kay/server'
 
-export default api({ cors: { origins: ['https://shop.example.com', 'https://*.partner.example'], credentials: true } })
+export default api({
+  cors: {
+    origins: ['https://shop.example.com', 'https://*.partner.example'],
+    credentials: true,
+  },
+})
   .get('/items', () => [{ id: 1, name: 'Pen' }])
 ```
 
