@@ -31,15 +31,22 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'bench/apps/*/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
 
-      # A tag on a version commit alone, over a parent the Tests workflow passed, skips the checks below, which that run already made on the same tree. Anything else, or a status that cannot be read, runs them all.
+      # The checks below are skipped once the Tests workflow, which makes them all, passed this tree: on the tagged commit itself when code commits were pushed with it, as the runner takes one job at a time and ran Tests first, or on its parent when the tagged commit only changes the version. Anything else, or a status that cannot be read, runs them all.
       - name: Find whether this tree was already tested
         id: tested
         run: |
+          verdict() {
+            curl -sf -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$1/status" | jq -r '[.statuses[]? | select(.context | startswith("Tests /")) | .status // .state] | first // empty' || true
+          }
           tested=false
-          if git diff --quiet HEAD^ HEAD -- . ":!package.json" && [ "$(git show HEAD^:package.json | jq -S "del(.version)")" = "$(jq -S "del(.version)" package.json)" ]; then
-            state=$(curl -sf -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$(git rev-parse HEAD^)/status" | jq -r .state || true)
-            echo "The parent commit's status: ${state:-unreadable}"
-            [ "$state" = success ] && tested=true
+          own=$(verdict "$(git rev-parse HEAD)")
+          echo "The Tests workflow on this commit: ${own:-none}"
+          if [ "$own" = success ]; then
+            tested=true
+          elif git diff --quiet HEAD^ HEAD -- . ":!package.json" && [ "$(git show HEAD^:package.json | jq -S "del(.version)")" = "$(jq -S "del(.version)" package.json)" ]; then
+            parent=$(verdict "$(git rev-parse HEAD^)")
+            echo "The Tests workflow on its parent: ${parent:-none}"
+            [ "$parent" = success ] && tested=true
           fi
           echo "tested=$tested" >> "$GITHUB_OUTPUT"
         env:
