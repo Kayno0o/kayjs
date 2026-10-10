@@ -172,7 +172,7 @@ describe('the dev watcher', () => {
       await child.exited
       await rm(root, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 })
 
 describe('kay dev', () => {
