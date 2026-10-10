@@ -35,7 +35,7 @@ main
 footer © Journal
 ```
 
-A link to the page being rendered gets `aria-current="page"` by itself, as the About link does on `/about`; a section's link lit on the pages below it, `/posts/first` here, is the template's to write. See [Pages and routing](routing.md).
+A link to the page being rendered gets `aria-current="page"` by itself, as the About link does on `/about`; a section's link lit on the pages below it, `/posts/first` here, is the template's to write, and a link writing `aria-current={undefined}` is never marked, such as a logo linking to `/`. See [Pages and routing](routing.md).
 
 ## Content and its pages
 
@@ -131,7 +131,7 @@ export function checkComment({ name, text }: Comment): CommentErrors {
 }
 ```
 
-The handler checks them, `src/routes/guestbook.kay`:
+The handler checks them, `src/routes/guestbook.kay`; `kay check` asks each string field of the schema for a `maxLength` (`unbounded-string`):
 
 ```kay
 --- server
