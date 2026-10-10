@@ -31,11 +31,32 @@ kay new my-app --template app --without docker
 | Option | Effect |
 | --- | --- |
 | `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with sessions and members in Postgres |
-| `--with <features>` | Adds comma-separated features to the preset, such as `tailwind,tests` |
+| `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
 | `-y` | Takes the `server` preset without asking |
 
 In a terminal with none of these options, `kay new` asks for a preset, then for each feature.
+
+### Features
+
+| Feature | Adds | In the presets |
+| --- | --- | --- |
+| `server` | An Elysia server, run in production as one executable; without it, a static site built to `dist` | server, app |
+| `starter` | A header, a skip link, a 404 page, and a home page greeting from the server with a counter island | server, site, app |
+| `tailwind` | Tailwind over the Catppuccin Mocha palette; without it, the markup carries no classes | server, site, app |
+| `accents` | An accent picker in the header, kept in a cookie; needs `starter` and `tailwind` | server, site, app |
+| `eslint` | ESLint through `@kaynooo/eslint`, `.kay` fences included | server, site, app |
+| `tests` | `bun test` through `kay/test`, with a first test | server, site, app |
+| `ci` | A Forgejo workflow checking, linting and testing the server, or publishing the static site to Pages | server, site, app |
+| `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site | server, site, app |
+| `auth` | Sessions, a sign-in, members in Postgres through pg-orm and a guarded `/account`; needs `server` | app |
+| `ws` | An API module over a websocket, with an island counting the visitors online; needs `server` | app |
+
+`blank` has none of them. Asked in the terminal, checking a feature checks what it needs, and unchecking one unchecks what needs it. With options, a feature missing what it needs is refused with the flag to add:
+
+```
+kay: accents needs tailwind: add --with tailwind, or drop it with --without accents
+```
 
 ## kay dev
 
