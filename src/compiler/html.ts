@@ -1,4 +1,4 @@
-import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ErrorNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ErrorNode, ForNode, IfBranch, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
 import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, marksServerIsland, serverIslandOf } from './ast'
@@ -189,7 +189,19 @@ export class HtmlTemplate {
 
         break
       case 'if':
-        b.wrap(item.node, () => this.if(item.node, 0))
+        b.wrap(item.node, () => {
+          const { subject } = item.node
+
+          // A `match` reads its subject once, which each branch compares with its values.
+          if (subject) {
+            b.add('((KaySubject) => ')
+            this.if(item.node, 0)
+            b.add(')(').addSource(subject).add(')')
+          }
+          else {
+            this.if(item.node, 0)
+          }
+        })
 
         break
       case 'for':
@@ -254,7 +266,9 @@ export class HtmlTemplate {
         return
       }
 
-      b.add('((').addSource(branch.test).add(') ? ')
+      b.add('((')
+      this.test(branch)
+      b.add(') ? ')
       this.markup(branch.children)
       b.add(' : ')
 
@@ -265,6 +279,19 @@ export class HtmlTemplate {
 
       b.add(')')
     })
+  }
+
+  private test(branch: IfBranch): void {
+    const { b } = this
+
+    if (!branch.values) {
+      b.addSource(branch.test!)
+
+      return
+    }
+
+    for (const [index, value] of branch.values.entries())
+      b.add(index === 0 ? 'KaySubject === (' : ' || KaySubject === (').addSource(value).add(')')
   }
 
   private for(node: ForNode): void {

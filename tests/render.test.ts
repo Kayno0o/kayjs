@@ -188,6 +188,17 @@ describe('named slots', () => {
   })
 })
 
+describe('match blocks', () => {
+  it('render the first when holding the subject, else the else, or nothing without one', async () => {
+    const template = '---\nconst { status } = props<{ status: string }>()\n---\nmatch status\n  when \'draft\'\n    p Draft\n  when \'published\', \'scheduled\'\n    p Live\n'
+
+    expect(await renderKay(`${template}  else\n    p Unknown`, { status: 'scheduled' })).toBe('<p>Live</p>')
+    expect(await renderKay(`${template}  else\n    p Unknown`, { status: 'gone' })).toBe('<p>Unknown</p>')
+    expect(await renderKay(template, { status: 'gone' })).toBe('')
+    expect(await renderKay(`div\n  match 1\n    when 1\n      match 2\n        when 1\n          p a\n        when 2\n          p b`)).toBe('<div><p>b</p></div>')
+  })
+})
+
 describe('template consts', () => {
   it('name a value once per render of their block, for the lines after them and their children', async () => {
     await Bun.write(join(scratch, 'box.kay'), '---\nimport type { JSX } from \'kay\'\n\nconst { children } = props<{ children: JSX.Element }>()\n---\ndiv.box\n  slot\n')

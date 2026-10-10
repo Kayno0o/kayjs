@@ -154,7 +154,7 @@ function multiLineSpans(nodes: Node[]): Span[] {
       return node.parts.flatMap(part => part.kind === 'chunk' ? [] : part.kind === 'expression' ? [part] : multiLineSpans([part]))
 
     if (node.kind === 'if')
-      return node.branches.flatMap(branch => [...(branch.test ? [branch.test] : []), ...multiLineSpans(branch.children)])
+      return [...(node.subject ? [node.subject] : []), ...node.branches.flatMap(branch => [...(branch.test ? [branch.test] : []), ...multiLineSpans(branch.children)])]
 
     if (node.kind === 'for')
       return [node.each, ...node.key ? [{ start: node.key.start - 1, end: node.key.end + 1 }] : [], ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]

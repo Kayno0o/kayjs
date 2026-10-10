@@ -124,6 +124,10 @@ describe('formatKay', () => {
     expect(format('form\n    error.text-sm title\n    error\n')).toBe('form\n  error.text-sm title\n  error\n')
   })
 
+  it('indents a match, its when lines and their blocks like any block, a subject running over several lines moving along with it', () => {
+    expect(format('div\n    match pick({\n      a: 1,\n    })\n        when 1,   2\n            p a\n        else\n            p b\n')).toBe('div\n  match pick({\n    a: 1,\n  })\n    when 1,   2\n      p a\n    else\n      p b\n')
+  })
+
   it('indents a try and its catch block like any block', () => {
     expect(format('try\n    p {\n      a\n    }\ncatch error\n      p b\n')).toBe('try\n  p {\n    a\n  }\ncatch error\n  p b\n')
   })

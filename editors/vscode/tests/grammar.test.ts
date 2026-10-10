@@ -136,6 +136,8 @@ describe('kay grammar', () => {
       '| plain {x}',
       'slot row(item)',
       '{x}',
+      'match tab',
+      '  when \'a\', b',
     ].join('\n'))
 
     expect(lines[0]).toEqual([
@@ -161,6 +163,8 @@ describe('kay grammar', () => {
     expect(lines[8]).toEqual(['|: punctuation.definition.text.kay', 'plain: source.kay', '{: punctuation.section.embedded.begin.kay', 'x: variable.other.ts', '}: punctuation.section.embedded.end.kay'])
     expect(lines[9]).toEqual(['slot: entity.name.tag.kay', 'row: entity.other.attribute-name.slot.kay', '(: punctuation.definition.parameters.begin.kay', 'item: variable.other.ts', '): punctuation.definition.parameters.end.kay'])
     expect(lines[10]).toEqual(['{: punctuation.section.embedded.begin.kay', 'x: variable.other.ts', '}: punctuation.section.embedded.end.kay'])
+    expect(lines[11]).toEqual(['match: keyword.control.conditional.kay', 'tab: variable.other.ts'])
+    expect(lines[12]?.[0]).toBe('when: keyword.control.conditional.kay')
   })
 
   it('reads a const line, its pattern and value as TypeScript, and leaves a var element alone', () => {

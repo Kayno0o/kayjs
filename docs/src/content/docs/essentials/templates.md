@@ -75,6 +75,20 @@ ul
     li No posts yet
 ```
 
+`match` picks among the values of one expression, rendering the block of the first `when` listing it, else the `else` block:
+
+```kay
+match post.status
+  when 'draft'
+    p Draft
+  when 'published', 'scheduled'
+    p Live
+  else
+    p Archived
+```
+
+The expression is read once, and `kay check` narrows it in each block as a TypeScript `switch` does: on a union of objects, `match shape.kind` types `shape` per `when`, and a `when` value the type cannot hold is an error.
+
 `if value as name` binds the truthy value for the children. A `for` matches its rows by `item.id`, else by the item itself. When your items have neither, name a key: `for post of posts key={post.slug}`.
 
 A `const` line names a value for the lines after it and their children, so a row computes it once however often it reads it:

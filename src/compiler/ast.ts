@@ -77,13 +77,17 @@ export interface TextNode extends Span {
 }
 
 export interface IfBranch extends Span {
+  // A `when` line's whole value list, which `values` splits; none on an `else`.
   test?: Span | undefined
   alias?: Span | undefined
+  values?: Span[] | undefined
   children: Node[]
 }
 
+// A `match` is an `if` whose branches compare its subject to each of their values.
 export interface IfNode extends Span {
   kind: 'if'
+  subject?: Span | undefined
   branches: IfBranch[]
 }
 

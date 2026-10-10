@@ -166,16 +166,28 @@ export class DomTemplate {
   private if(node: IfNode, at: string): void {
     const { b } = this
 
+    // A `match` reads its subject once, which each branch compares with its values.
+    if (node.subject)
+      b.add(`{ const KaySubject = ${domAlias('memo')}(() => (`).addSource(node.subject).add(')); ')
+
     b.add(`KayBranches(${at}, [`)
 
     for (const branch of node.branches) {
       b.wrap(branch, () => {
         b.add('[')
 
-        if (branch.test)
+        if (branch.values) {
+          b.add('() => ')
+
+          for (const [index, value] of branch.values.entries())
+            b.add(index === 0 ? 'KaySubject() === (' : ' || KaySubject() === (').addSource(value).add(')')
+        }
+        else if (branch.test) {
           b.add('() => (').addSource(branch.test).add(')')
-        else
+        }
+        else {
           b.add('null')
+        }
 
         b.add(', (')
 
@@ -188,7 +200,7 @@ export class DomTemplate {
       })
     }
 
-    b.add(']);')
+    b.add(node.subject ? ']); }' : ']);')
   }
 
   private for(node: ForNode, at: string): void {

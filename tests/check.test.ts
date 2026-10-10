@@ -391,6 +391,25 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('narrows a match\'s subject and its object per when, reporting a value its type cannot hold, in an island as in a static component', async () => {
+    const template = 'ul\n  for shape of shapes key={shape.kind}\n    match shape.kind\n      when \'circle\'\n        li {shape.r}\n      when \'square\', \'rect\'\n        li {shape.side}\n      else\n        li {JSON.stringify(shape)}\n'
+    const script = '---\ntype Shape = { kind: \'circle\', r: number } | { kind: \'square\', side: number }\nconst { shapes } = props<{ shapes: Shape[] }>()\n'
+    const root = await scratchProject({
+      'src/static.kay': `${script}---\n${template}`,
+      'src/island.kay': `${script.replace('---\n', '---\nimport { signal } from \'kay\'\n\n')}const open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) x\n${template}`,
+    })
+
+    try {
+      expect((await check(root)).map(diagnostic => [basename(diagnostic.file), diagnostic.line, firstLine(diagnostic.message)])).toEqual([
+        ['island.kay', 14, 'Type \'"rect"\' is not comparable to type \'"circle" | "square"\'.'],
+        ['static.kay', 10, 'Type \'"rect"\' is not comparable to type \'"circle" | "square"\'.'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('takes raw on a head title only', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'head\n  title(raw) Whole\n  meta(raw name="x" content="y")\np Home\n' })
 

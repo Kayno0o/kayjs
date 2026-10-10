@@ -731,6 +731,28 @@ describe('template consts', () => {
   })
 })
 
+describe('match blocks', () => {
+  it('render the first when holding the subject, else the else, and follow the subject reading it once', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst tab = signal(\'gone\')\nlet reads = 0\nconst read = () => (reads++, tab())\n---\nbutton#next(onClick={() => tab.set(tab() === \'gone\' ? \'draft\' : \'live\')}) next\nmatch read()\n  when \'draft\'\n    p.draft Draft\n  when \'live\', \'scheduled\'\n    p.live Live\n  else\n    p.other Unknown {reads}\n',
+    })
+
+    try {
+      expect(root.querySelector('p.other')!.textContent).toBe('Unknown 1')
+      root.querySelector<HTMLButtonElement>('#next')!.click()
+      await settle()
+      expect(root.querySelector('p')!.className).toBe('draft')
+      root.querySelector<HTMLButtonElement>('#next')!.click()
+      await settle()
+      expect(root.querySelectorAll('p')).toHaveLength(1)
+      expect(root.querySelector('p')!.className).toBe('live')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('bind:value on a number input', () => {
   it('keeps the signal\'s last number while the input is empty', async () => {
     const dir = await mkdtemp(join(import.meta.dir, '.dom-'))

@@ -40,6 +40,9 @@
       "include": "#else"
     },
     {
+      "include": "#match"
+    },
+    {
       "include": "#await"
     },
     {
@@ -282,6 +285,22 @@
       "captures": {
         "1": {
           "name": "keyword.control.conditional.kay"
+        }
+      }
+    },
+    "match": {
+      "match": "^[ \\t]*(match|when)[ \\t]+(.*?)[ \\t]*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.conditional.kay"
+        },
+        "2": {
+          "name": "meta.embedded.expression.kay",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
         }
       }
     },

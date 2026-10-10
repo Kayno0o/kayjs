@@ -15,7 +15,8 @@ const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 // `slot actions`: where a component renders its `actions` block prop.
 const NAMED_SLOT = /slot[ \t]+([A-Z_$][\w$]*)/diy
 const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
-const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch|try)(?=[ \t]|\r?\n|$)/y
+const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch|try|match|when)(?=[ \t]|\r?\n|$)/y
+const MATCH_LINE = /(when|else)(?=[ \t]|\r?\n|$)/y
 const CONST_HEAD = /const(?=[ \t]|\r?\n|$)/y
 // `let x = 1`: a declaration kay has no counterpart for, told from a `var` element by the `=`.
 const REASSIGNABLE = /(let|var)[ \t]+[A-Z_$][\w$]*[ \t]*=(?!=)/iy
@@ -26,13 +27,12 @@ const ERROR_HEAD = /error(?=[. \t]|\r?\n|$)/y
 const FIELD_NAME = /[\w$-]+|"[^"\n]*"|'[^'\n]*'/y
 const ERROR_HELP = '`error title` shows the message of the field posted as `title`, a bare `error` the form\'s own'
 // Pug lines kay has no counterpart for, which would otherwise read as an element named after the keyword.
-const PUG_KEYWORD = /(each|while|unless|case|when|include|extends|block|mixin|doctype)(?=[ \t]|\r?\n|$)/y
+const PUG_KEYWORD = /(each|while|unless|case|include|extends|block|mixin|doctype)(?=[ \t]|\r?\n|$)/y
 const PUG_HINTS: Record<string, string> = {
   each: 'kay loops with `for item of list`',
   while: 'kay loops with `for item of list`',
   unless: 'kay writes `unless x` as `if !x`',
-  case: 'kay writes `case` as `if`, `else if` and `else`',
-  when: 'kay writes `case` as `if`, `else if` and `else`',
+  case: 'kay picks among values with `match value` and its `when` lines',
   include: 'kay reuses markup through a component: import a `.kay` file and use its tag',
   extends: 'a `_layout.kay` wraps the pages of its directory at its `slot`',
   block: 'a `_layout.kay` renders its page at `slot`, and a component takes markup as an `@name` block',
@@ -308,6 +308,20 @@ class TemplateParser {
       return
     }
 
+    if (keyword === 'match') {
+      siblings.push(this.parseMatch(indent))
+
+      return
+    }
+
+    if (keyword === 'when') {
+      this.error(start, start + 4, '`when` sits in a `match` block', { help: '`match status`, then one `when \'draft\'` line per case below it' })
+      this.pos = this.lineEnd(start)
+      this.skipChildren(indent)
+
+      return
+    }
+
     if (keyword === 'then' || keyword === 'catch') {
       this.attachAwaitBranch(indent, siblings.at(-1), keyword)
 
@@ -443,10 +457,130 @@ class TemplateParser {
     return { start, end: this.lastContentEnd(), test, alias, children }
   }
 
+  // Only `when` lines and a last `else` sit in a `match`, each holding the markup of its case.
+  private parseMatch(indent: number): IfNode {
+    const start = this.pos
+
+    this.pos = start + 'match'.length
+    this.skipSpaces()
+    const subject = this.scanToLineEnd()
+    const node: IfNode = { kind: 'if', start, end: subject.end, subject, branches: [] }
+    let blockIndent = -1
+
+    if (subject.start === subject.end)
+      this.error(start, subject.end, 'Expected the value to match', { help: '`match post.status`' })
+
+    while (true) {
+      this.skipBlankLines()
+
+      if (this.pos >= this.src.length)
+        break
+
+      const lineIndent = this.measureIndent()
+
+      if (lineIndent <= indent)
+        break
+
+      if (blockIndent === -1)
+        blockIndent = lineIndent
+      else if (lineIndent !== blockIndent)
+        this.error(this.pos, this.pos + lineIndent, 'Inconsistent indentation', { label: `expected ${blockIndent} spaces, found ${lineIndent}`, note: 'the first line of a block sets its indentation' })
+
+      this.pos += lineIndent
+      const lineStart = this.pos
+
+      if (this.src.startsWith('//', lineStart)) {
+        this.pos = this.lineEnd(lineStart)
+        this.skipChildren(lineIndent)
+
+        continue
+      }
+
+      MATCH_LINE.lastIndex = lineStart
+      const keyword = MATCH_LINE.exec(this.src)?.[1]
+
+      const afterElse = node.branches.length > 0 && node.branches.at(-1)!.test === undefined
+
+      if (keyword === undefined || afterElse) {
+        this.error(lineStart, this.lineEnd(lineStart), keyword === undefined ? 'A `match` holds `when` lines and a last `else`' : '`else` comes last in a `match`')
+        this.pos = this.lineEnd(lineStart)
+        this.skipChildren(lineIndent)
+
+        continue
+      }
+
+      this.pos = lineStart + keyword.length
+
+      if (keyword === 'else') {
+        this.expectLineEnd('`else` takes no value in a `match`')
+        node.branches.push({ start: lineStart, end: lineStart + 4, children: this.parseBlock(lineIndent) })
+      }
+      else {
+        this.skipSpaces()
+        const { test, values } = this.scanValues()
+
+        node.branches.push({ start: lineStart, end: test.end, test, values, children: this.parseBlock(lineIndent) })
+      }
+
+      node.branches.at(-1)!.end = this.lastContentEnd()
+      node.end = this.lastContentEnd()
+    }
+
+    if (!node.branches.some(branch => branch.test))
+      this.error(start, subject.end, '`match` has no `when` line', { help: 'one `when \'draft\'` line per case below it, then an optional `else`' })
+
+    return node
+  }
+
+  // A `when` line's values, split at its top-level commas.
+  private scanValues(): { test: Span, values: Span[] } {
+    const test = this.scanToLineEnd()
+    const values: Span[] = []
+    let from = test.start
+    let i = test.start
+
+    while (i <= test.end) {
+      const char = this.src[i]
+
+      if (i === test.end || char === ',') {
+        let start = from
+        let end = i
+
+        while (start < end && WHITESPACE.test(this.src[start]!))
+          start++
+
+        while (end > start && WHITESPACE.test(this.src[end - 1]!))
+          end--
+
+        if (start === end)
+          this.error(from, Math.max(i, from + 1), 'Expected a value', { help: '`when \'draft\'`, or `when \'published\', \'scheduled\'`' })
+        else
+          values.push({ start, end })
+
+        from = ++i
+
+        continue
+      }
+
+      if (char === '"' || char === '\'')
+        i = this.skipString(i, char)
+      else if (char === '`')
+        i = this.skipTemplate(i)
+      else if (char === '{' || char === '(' || char === '[')
+        i = this.scanBalanced(i)
+      else if (char === '/' && this.skipRegex(test.start, i) !== -1)
+        i = this.skipRegex(test.start, i)
+      else
+        i++
+    }
+
+    return { test, values }
+  }
+
   private attachElse(indent: number, previous: Node | undefined, hasTest: boolean) {
     const start = this.pos
 
-    if (previous?.kind === 'if' && previous.branches.at(-1)?.test) {
+    if (previous?.kind === 'if' && !previous.subject && previous.branches.at(-1)?.test) {
       if (hasTest) {
         const testStart = this.src.indexOf('if', start + 4)
         const branch = this.parseBranch(testStart + 2, indent)

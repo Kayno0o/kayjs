@@ -709,7 +709,12 @@ class Generator {
         case 'if':
           this.b.wrap(node, () => {
             this.b.add('{')
-            this.emitIf(node, 0)
+
+            if (node.subject)
+              this.emitMatch(node, node.subject)
+            else
+              this.emitIf(node, 0)
+
             this.b.add('}')
           })
 
@@ -783,6 +788,26 @@ class Generator {
 
       b.add(')}')
     })
+  }
+
+  // A `switch`, so `kay check` narrows the subject in each branch and reports a value its type cannot hold.
+  private emitMatch(node: IfNode, subject: Span) {
+    const { b } = this
+
+    b.add('(() => { switch (').addSource(subject).add(') { ')
+
+    for (const branch of node.branches) {
+      b.wrap(branch, () => {
+        for (const value of branch.values ?? [])
+          b.add('case ').addSource(value).add(': ')
+
+        b.add(branch.values ? 'return (' : 'default: return (')
+        this.emitRoot(branch.children)
+        b.add('); ')
+      })
+    }
+
+    b.add(node.branches.some(branch => !branch.values) ? '} })()' : '} return null })()')
   }
 
   private emitIf(node: IfNode, index: number) {

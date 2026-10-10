@@ -309,6 +309,28 @@ describe('control flow', () => {
     expect((file.template[0] as ForNode).key).toBeUndefined()
   })
 
+  it('reads a match, its when lines split at their top-level commas and a last else', () => {
+    const file = parse('match post.status\n  // the cases\n  when \'draft\'\n    p Draft\n  when \'a, b\', pick(1, 2), [3]\n    p Live\n  else\n    p Unknown')
+    const node = file.template[0] as IfNode
+
+    expect(file.diagnostics).toEqual([])
+    expect(text(file, node.subject)).toBe('post.status')
+    expect(node.branches.map(branch => branch.values?.map(value => text(file, value)))).toEqual([['\'draft\''], ['\'a, b\'', 'pick(1, 2)', '[3]'], undefined])
+    expect(node.branches.map(branch => branch.children.length)).toEqual([1, 1, 1])
+  })
+
+  it('rejects a match without a subject or a when, other lines in it, an else before a when, and a when outside one', () => {
+    const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
+
+    expect(at('match\n  when 1\n    p')).toEqual([['match', 'Expected the value to match']])
+    expect(at('match x\n  p a')).toEqual([['p a', 'A `match` holds `when` lines and a last `else`'], ['match x', '`match` has no `when` line']])
+    expect(at('match x\n  when 1\n  else\n  when 2')).toEqual([['when 2', '`else` comes last in a `match`']])
+    expect(at('match x\n  when 1,\n    p')).toEqual([['\n', 'Expected a value']])
+    expect(at('when 1\n  p a')).toEqual([['when', '`when` sits in a `match` block']])
+    expect(at('match x\n  when 1\nelse\n  p b')[0]?.[1]).toContain('must directly follow')
+    expect(parse('case x\n  when 1').diagnostics[0]?.help).toBe('kay picks among values with `match value` and its `when` lines')
+  })
+
   it('rejects a stray else', () => {
     expect(parse('p a\nelse\n  p b').diagnostics[0]?.message).toContain('must directly follow')
   })

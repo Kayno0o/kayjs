@@ -161,6 +161,11 @@ describe('control flow', () => {
     expect(jsx('if a\n  p a\nelse if b\n  p b\nelse\n  p c')).toBe('<>{(a) ? <p>a</p> : (b) ? <p>b</p> : <p>c</p>}</>')
   })
 
+  it('writes a match as a switch, so kay check narrows its subject per branch', () => {
+    expect(jsx('match s.kind\n  when \'a\', \'b\'\n    p ab\n  else\n    p other')).toBe('<>{(() => { switch (s.kind) { case \'a\': case \'b\': return (<p>ab</p>); default: return (<p>other</p>); } })()}</>')
+    expect(jsx('match s\n  when 1\n    p one')).toBe('<>{(() => { switch (s) { case 1: return (<p>one</p>); } return null })()}</>')
+  })
+
   it('narrows an aliased if through Show', () => {
     expect(jsx('if user() as u\n  p {u.name}\nelse\n  p anon')).toBe('<>{<KayShow when={user()} fallback={<p>anon</p>}>{(u) => <p>{u.name}</p>}</KayShow>}</>')
   })
