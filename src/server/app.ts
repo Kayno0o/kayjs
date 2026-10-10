@@ -203,7 +203,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   // Without `i18n`, every request runs in the site's one language, its extensions' messages and the app's read.
   const locales = i18n ?? await implicitI18n(root, options.lang, options.extensions)
-  const inImplicitLocale = async (request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, new URL(request.url).pathname, request), run)
+  const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
 
   const base = basePath(options.base)
   const maxDensity = applyImageConfig(options.images)
@@ -522,7 +522,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
         return redirect
 
       if (!i18n || !settings)
-        return inImplicitLocale(context.request, async () => answer(served!.candidates, context, url))
+        return inImplicitLocale(url, context.request, async () => answer(served!.candidates, context, url))
 
       // With every locale prefixed, a path without one goes to the visitor's.
       if (locale === undefined)
@@ -549,10 +549,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   // Every route above wins over this one, so it only answers what no page serves, in the locale its prefix or its host names.
   if (fallback.notFound ?? fallback.error) {
     app.get('/*', async (context) => {
-      if (!i18n)
-        return inImplicitLocale(context.request, async () => renderUnmatched(fallback, context, client, renderOptions))
-
       const url = new URL(context.request.url)
+
+      if (!i18n)
+        return inImplicitLocale(url, context.request, async () => renderUnmatched(fallback, context, client, renderOptions))
+
       const { settings } = i18n
       const { locale, path } = splitLocale(settings, url.pathname)
       const answering = locale ?? (settings.hosts ? hostLocale(settings, context.request) : preferredLocale(settings, context.request))

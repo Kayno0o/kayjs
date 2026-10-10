@@ -21,7 +21,7 @@ declare const RESULT: unique symbol
 declare const HONEYPOT: unique symbol
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 // A module outside the root, as a linked library is, has `..` segments in its path, which a URL would resolve away.
-const DOT_SEGMENT = /(?<=^|\/)\.\.?(?=\/|$)/g
+const PARENT_SEGMENT = /(?<=^|\/)\.\.(?=\/|$)/g
 
 // Where the server writes the post a page with islands was rendered in answer to.
 export const OUTCOME_SCRIPT = 'data-kay-outcome'
@@ -235,7 +235,7 @@ export function isFailure(value: unknown): value is Failure<unknown> {
 }
 
 export function actionUrl(moduleId: string, name: string): string {
-  return `/_kay/action/${moduleId.replace(UNSAFE_URL_CHARACTERS, '_').replace(DOT_SEGMENT, '~')}/${name}`
+  return `/_kay/action/${moduleId.replace(UNSAFE_URL_CHARACTERS, '_').replace(PARENT_SEGMENT, '~')}/${name}`
 }
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.

@@ -71,8 +71,8 @@ export interface ActionOptions {
   // Shows a failed action's message instead of a generic one.
   dev?: boolean | undefined
   onError?: KayConfig['onError'] | undefined
-  // An action runs in the locale of the page it was sent from.
-  i18n?: I18n | undefined
+  // An action runs in the locale of the page it was sent from, or the site's one language without `i18n`.
+  i18n: I18n
   // Where the site is mounted, which the page a refused form post came from is served under.
   base?: string | undefined
 }
@@ -84,7 +84,7 @@ export type RouteMatch = (route: ServedRoute, path: string) => Record<string, un
 type Back = (request: Request, headers: Headers, flash: Flash, server: Server | null) => Promise<Response>
 
 // Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path.
-export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions = {}): Promise<Map<string, BodyLimit>> {
+export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions): Promise<Map<string, BodyLimit>> {
   const back: Back = async (request, headers, flash, server) => renderBack(app, options.base ?? '', request, headers, flash, server)
   const served = new Map<string, { file: string, action: ServerAction<TSchema, unknown> }>()
   const limits = new Map<string, BodyLimit>()
@@ -305,9 +305,6 @@ export function overHttps(request: Request): boolean {
 }
 
 export function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
-  if (!options.i18n)
-    return run()
-
   const locale = requestLocale(options.i18n.settings, request, postedFrom(request) ?? null)
 
   return runInLocale(stateFor(options.i18n, locale, new URL(request.url).pathname, request), run)

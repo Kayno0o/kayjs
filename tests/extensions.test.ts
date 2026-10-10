@@ -100,8 +100,23 @@ const IMPLICIT: Record<string, string> = {
   'node_modules/kay-lib/messages/fr.ts': LOCALIZED['node_modules/kay-lib/messages/fr.ts']!,
   'node_modules/kay-lib/routes/login.kay': '--- server\nimport { locale, localize, t } from \'kay/i18n\'\n\nexport const prerender = true\n\nconst title = t(\'auth.title\')\nconst hint = t(\'auth.hint\')\nconst register = localize(\'/auth/register\')\nconst lang = locale()\n---\n---\nimport Hint from \'../hint.kay\'\n---\nh1 {title}\np {hint}\na(href={register}) {lang}\nHint\n',
   'node_modules/kay-lib/hint.kay': '---\nimport { signal } from \'kay\'\nimport { t } from \'kay/i18n\'\n\nconst open = signal(false)\n---\nbutton(type="button" onClick={() => open.set(!open())}) {t(\'auth.hint\')}\n',
-  'node_modules/kay-lib/routes/register.kay': 'p register\n',
+  'node_modules/kay-lib/routes/register.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\nimport { t as text } from \'kay/i18n\'\n\nexport const register = action(t.Object({}), (_, ctx) => ({ locale: ctx.locale, hint: text(\'auth.hint\') }))\n---\nform(action={register})\n  button Register\n',
+  'src/routes/_404.kay': '---\nimport { t } from \'kay/i18n\'\n---\np.missing {t(\'auth.title\')}\n',
 }
+
+// The implicit app's login page, its 404 page and what its register action answers.
+const SERVE_IMPLICIT = `import { parse, stringify } from 'devalue'
+import { pages } from 'kay/server'
+
+const app = await pages({ prebuilt: true })
+const visit = async (path: string) => (await app.handle(new Request(\`http://localhost\${path}\`))).text()
+const register = await visit('/auth/register')
+const action = (/<form[^>]*action="([^"]+)"/).exec(register)?.[1] ?? ''
+const posted = await app.handle(new Request(\`http://localhost\${action}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({}) }))
+
+console.log(JSON.stringify({ login: await visit('/auth/login'), missing: await visit('/nope'), registered: parse(await posted.text()) }))
+process.exit(0)
+`
 
 // The library's catalogs standing in for an app in two locales that writes none of its own.
 const BORROWED: Record<string, string> = {
@@ -147,7 +162,7 @@ beforeAll(async () => {
 
   await mkdir(base, { recursive: true })
 
-  for (const [name, files] of [['routes', { ...FILES, 'serve.ts': SERVE }], ['messages', { ...LOCALIZED, 'serve.ts': SERVE_LOCALIZED }], ['implicit', { ...IMPLICIT, 'serve.ts': SERVE_LOGIN }], ['borrowed', { ...BORROWED, 'serve.ts': SERVE_LOGIN }], ['outside', OUTSIDE]] as const) {
+  for (const [name, files] of [['routes', { ...FILES, 'serve.ts': SERVE }], ['messages', { ...LOCALIZED, 'serve.ts': SERVE_LOCALIZED }], ['implicit', { ...IMPLICIT, 'serve.ts': SERVE_IMPLICIT }], ['borrowed', { ...BORROWED, 'serve.ts': SERVE_LOGIN }], ['outside', OUTSIDE]] as const) {
     const dir = await mkdtemp(join(base, `extension-${name}-`))
 
     await Promise.all(Object.entries(files).filter(([, content]) => content !== undefined).map(async ([path, content]) => Bun.write(join(dir, path), content)))
@@ -305,14 +320,17 @@ describe('a library\'s messages', () => {
 describe('a library\'s messages in an app without i18n', () => {
   const root = () => projects.get('implicit')!
 
-  it('translate its pages in the site\'s language, the app\'s catalog over its own, links kept as written and no alternates', async () => {
+  it('translate its pages, its actions and the 404 page in the site\'s language, the app\'s catalog over its own, links kept as written and no alternates', async () => {
     const { code, stdout, stderr } = await run([process.execPath, 'serve.ts'], root())
 
     expect(stderr).not.toContain('error')
     expect(code).toBe(0)
-    const { login } = JSON.parse(stdout) as { login: string }
+    const { login, missing, registered } = JSON.parse(stdout) as { login: string, missing: string, registered: unknown }
 
     expect(login).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p><a href="/auth/register">fr</a>')
+    // The 404 page and the actions read the same messages, in the same language.
+    expect(missing).toContain('<p class="missing">Se connecter</p>')
+    expect(registered).toEqual({ locale: 'fr', hint: 'Utilisez votre e-mail' })
     expect(login).toContain('<html lang="fr">')
     expect(login).toContain('<link rel="canonical" href="https://example.com/auth/login">')
     expect(login).not.toContain('hreflang')
@@ -339,11 +357,21 @@ describe('a library\'s messages in an app without i18n', () => {
       await rm(elsewhere, { recursive: true, force: true })
     }
 
-    const exported = await run([process.execPath, CLI, 'build', '--no-check', '--static', '--outdir', 'dist'], root())
+    // A static export takes no action, so the app replaces the page posting one.
+    const override = join(root(), 'src/routes/auth/register.kay')
 
-    expect(exported.stderr).not.toContain('error')
-    expect(exported.code).toBe(0)
-    expect(await Bun.file(join(root(), 'dist/auth/login.html')).text()).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
+    await Bun.write(override, 'p.register static\n')
+
+    try {
+      const exported = await run([process.execPath, CLI, 'build', '--no-check', '--static', '--outdir', 'dist'], root())
+
+      expect(exported.stderr).not.toContain('error')
+      expect(exported.code).toBe(0)
+      expect(await Bun.file(join(root(), 'dist/auth/login.html')).text()).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
+    }
+    finally {
+      await rm(override)
+    }
   }, 60_000)
 
   it('give t() their keys in kay check', async () => {

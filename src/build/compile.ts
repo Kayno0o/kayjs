@@ -61,7 +61,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
 
   const fallback = specialPagesOf(routeTrees(routesDir, mounts), '')
   const contentConfig = resolve(root, config.content ?? CONTENT_CONFIG)
-  // The content config too, which the server reads the collections and their feeds from, the project's own param matchers and its messages, its extensions' included, those of the site's one language without `i18n`.
+  // The content config too, which the server reads the collections and their feeds from, the project's own param matchers and every locale's messages, its extensions' included.
   const matcherFiles = [...new Set(routes.flatMap(route => Object.values(route.matchers ?? {})))].map(name => matcherFile(routesDir, name)).filter(file => existsSync(file))
   const locales = config.i18n?.locales ?? [config.lang ?? DEFAULT_LANG]
   const extensionMessages = Object.fromEntries(locales.map(locale => [locale, extensionMessageFiles(root, config.extensions, locale).filter(file => existsSync(file))]))
