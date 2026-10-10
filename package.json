@@ -1,7 +1,7 @@
 {
   "name": "@kaynooo/kayjs",
   "type": "module",
-  "version": "1.19.1",
+  "version": "1.20.0",
   "description": "Pug-like, fully typed web framework on Bun, Elysia and pg-orm, with its own island runtime",
   "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
   "license": "MIT",
