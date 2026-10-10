@@ -9,7 +9,7 @@ import { isInteractive } from '../compiler/codegen'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
 import { readCacheEntry, writeCacheEntry } from './cache'
-import { throughLinks } from './libraries'
+import { throughLinks } from './links'
 import { importsBrowserOnly, mayImportPackage } from './probe'
 import { registerSourceMap } from './sourcemap'
 

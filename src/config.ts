@@ -227,6 +227,7 @@ export interface I18nConfig {
 export interface KayExtension {
   name: string
   // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
+  // It and `messages` are absolute, as a library gives them from `import.meta.dir`, or relative to the project root.
   routes?: { dir: string, prefix?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.
   messages?: string | undefined

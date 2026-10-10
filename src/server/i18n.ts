@@ -5,7 +5,7 @@ import type { Route } from './routes'
 import { existsSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { throughLinks } from '../build/libraries'
+import { throughLinks } from '../build/links'
 import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { bundled, importModule } from './bundle'
@@ -32,7 +32,7 @@ export function messagesFile(root: string, config: I18nConfig, locale: string): 
 
 // The catalogs the extensions give a locale, in the order they are listed, the app's own laid over them.
 export function extensionMessageFiles(root: string, extensions: KayExtension[] | undefined, locale: string): string[] {
-  return (extensions ?? []).flatMap(extension => extension.messages === undefined ? [] : [join(throughLinks(root, resolve(extension.messages)), `${locale}.ts`)])
+  return (extensions ?? []).flatMap(extension => extension.messages === undefined ? [] : [join(throughLinks(root, resolve(root, extension.messages)), `${locale}.ts`)])
 }
 
 // The settings the config gives, refused when they cannot serve a page: a default outside the locales, a tag no browser sends, a domain for no locale.

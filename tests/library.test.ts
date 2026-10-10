@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { throughLinks } from '../src/build/libraries'
+import { throughLinks } from '../src/build/links'
 
 const CLI = resolve('src/cli.ts')
 

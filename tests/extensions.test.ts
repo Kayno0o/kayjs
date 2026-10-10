@@ -1,8 +1,10 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { parse } from 'devalue'
+import { routeMounts, scanRoutes } from '../src/server/routes'
 
 const CLI = resolve('src/cli.ts')
 
@@ -229,5 +231,53 @@ describe('a library\'s messages', () => {
     expect(output).not.toContain('"auth.hint"')
     expect(output).toContain('lacks auth.extra, which node_modules/kay-lib/messages/en.ts has')
     expect([...output.matchAll(/^ *--> (\S+)$/gm)].map(match => match[1])).toEqual(['src/routes/index.kay:5:17', 'src/messages/fr.ts:1:1'])
+  })
+})
+
+describe('a library\'s route tree', () => {
+  // Writes empty files under a scratch directory and hands it to `test`, removing it after.
+  async function withTree(files: string[], test: (dir: string) => Promise<void>) {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-mounts-'))
+
+    try {
+      await Promise.all(files.map(async file => Bun.write(join(dir, file), '')))
+      await test(dir)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('resolves layouts, guards and special pages per URL directory across both trees, the app\'s file winning at a level both have one', async () => {
+    const app = ['_guard.ts', '_layout.kay', '_404.kay', 'auth/_layout.kay', 'auth/register.kay']
+    const library = ['_layout.kay', '_guard.ts', '_error.kay', 'login.kay', 'register.kay', 'admin/_layout.kay', 'admin/index.kay']
+
+    await withTree([...app.map(file => `src/routes/${file}`), ...library.map(file => `lib/routes/${file}`)], async (root) => {
+      const ours = (file: string) => join(root, 'src/routes', file)
+      const theirs = (file: string) => join(root, 'lib/routes', file)
+      const routes = await scanRoutes(ours(''), routeMounts(root, [{ name: 'lib', routes: { dir: 'lib/routes', prefix: 'auth/' } }]))
+      const at = (pattern: string) => routes.filter(route => route.pattern === pattern)
+
+      expect(routes.map(route => route.pattern).sort()).toEqual(['/auth/admin', '/auth/login', '/auth/register'])
+      expect(at('/auth/register').map(route => route.file)).toEqual([ours('auth/register.kay')])
+
+      const [login] = at('/auth/login')
+
+      expect(login!.layouts).toEqual([ours('_layout.kay'), ours('auth/_layout.kay')])
+      expect(login!.special).toEqual({ notFound: { file: ours('_404.kay'), layouts: [ours('_layout.kay')] }, error: { file: theirs('_error.kay'), layouts: [ours('_layout.kay'), ours('auth/_layout.kay')] } })
+      expect(login!.guards).toEqual([
+        { file: ours('_guard.ts'), special: { notFound: { file: ours('_404.kay'), layouts: [] }, error: undefined } },
+        { file: theirs('_guard.ts'), special: { notFound: { file: ours('_404.kay'), layouts: [ours('_layout.kay')] }, error: undefined } },
+      ])
+      expect(at('/auth/admin')[0]!.layouts).toEqual([ours('_layout.kay'), ours('auth/_layout.kay'), theirs('admin/_layout.kay')])
+    })
+  })
+
+  it('mounts at the root by default, the first extension listed serving a path two of them have', async () => {
+    await withTree(['src/routes/index.kay', 'one/about.kay', 'two/about.kay', 'two/contact.kay'], async (root) => {
+      const routes = await scanRoutes(join(root, 'src/routes'), routeMounts(root, [{ name: 'one', routes: { dir: 'one' } }, { name: 'two', routes: { dir: 'two', prefix: '/' } }]))
+
+      expect(Object.fromEntries(routes.map(route => [route.pattern, route.file]))).toEqual({ '/': join(root, 'src/routes/index.kay'), '/about': join(root, 'one/about.kay'), '/contact': join(root, 'two/contact.kay') })
+    })
   })
 })

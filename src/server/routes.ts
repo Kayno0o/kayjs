@@ -2,7 +2,7 @@ import type { KayExtension } from '../config'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles } from '../build/files'
-import { throughLinks } from '../build/libraries'
+import { throughLinks } from '../build/links'
 
 export interface Route {
   // Path pattern: `/todos/:id`, `/docs/*`, an optional param as `/blog/:page?`.
@@ -141,10 +141,12 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
 
     for (const file of existsSync(tree.dir) ? await findKayFiles(tree.dir) : []) {
       const route = routeOf(tree.dir, file, tree.prefix)
-      const at = virtualDir(trees, dirname(file))
 
-      if (route && !served.has(routerKey(route.pattern)))
+      if (route && !served.has(routerKey(route.pattern))) {
+        const at = virtualDir(trees, dirname(file))
+
         own.push({ ...route, layouts: layoutsOf(trees, at, file, read), special: specialPagesOf(trees, at, read), guards: guardsOf(trees, at, read) })
+      }
     }
 
     for (const route of own)
@@ -213,7 +215,7 @@ function layoutsOf(trees: RouteMount[], at: string, file: string, read: LayoutsR
   if (exportsNoLayouts(file, read))
     return []
 
-  const layouts = directoriesUp(at).flatMap(dir => found(trees, dir, LAYOUT) ?? []).reverse()
+  const layouts = directoriesUp(at).flatMap(dir => fileAt(trees, dir, LAYOUT) ?? []).reverse()
   // The innermost layout that leaves its parents out starts the chain.
   const reset = layouts.findLastIndex(layout => exportsNoLayouts(layout, read))
 
@@ -230,11 +232,11 @@ function exportsNoLayouts(file: string, read: LayoutsRead): boolean {
 }
 
 function guardsOf(trees: RouteMount[], at: string, read: LayoutsRead): GuardFile[] {
-  return directoriesUp(at).flatMap(dir => found(trees, dir, GUARD) ?? []).reverse().map((file) => {
+  return directoriesUp(at).flatMap(dir => fileAt(trees, dir, GUARD) ?? []).reverse().map((file) => {
     const dir = virtualDir(trees, dirname(file))
 
     // A guard on the routes directory covers every layout, so its special pages render bare.
-    return { file, special: dir === '' ? withoutLayouts(specialPagesOf(trees, dir, read)) : specialPagesOf(trees, dirname(dir), read) }
+    return { file, special: dir === '' ? withoutLayouts(specialPagesOf(trees, dir, read)) : specialPagesOf(trees, parentOf(dir), read) }
   })
 }
 
@@ -248,7 +250,7 @@ function withoutLayouts(special: SpecialPages): SpecialPages {
 // The special pages for a directory of the URL tree, `''` for the root, `/account` below it.
 export function specialPagesOf(trees: RouteMount[], at: string, read: LayoutsRead = new Map()): SpecialPages {
   const nearest = (name: string): SpecialPage | undefined => {
-    const file = directoriesUp(at).map(dir => found(trees, dir, name)).find(path => path !== undefined)
+    const file = directoriesUp(at).map(dir => fileAt(trees, dir, name)).find(path => path !== undefined)
 
     return file !== undefined ? { file, layouts: layoutsOf(trees, virtualDir(trees, dirname(file)), file, read) } : undefined
   }
@@ -263,7 +265,7 @@ export function routeTrees(routesDir: string, mounts: RouteMount[] = []): RouteM
 
 // The routes each extension in `extensions` mounts, its directory as the project reaches it under `node_modules`, where a linked library's real path would name its actions after a path outside the project.
 export function routeMounts(root: string, extensions: KayExtension[] = []): RouteMount[] {
-  return extensions.flatMap(({ routes }) => routes ? [{ dir: throughLinks(root, resolve(routes.dir)), prefix: mountPrefix(routes.prefix) }] : [])
+  return extensions.flatMap(({ routes }) => routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix) }] : [])
 }
 
 // `/auth` for `auth`, `/auth/` and `/auth`; `''` for the root.
@@ -274,7 +276,7 @@ function mountPrefix(prefix = '/'): string {
 }
 
 // The file a directory of the URL tree holds under `name`: the app's, else the first mounted library's.
-function found(trees: RouteMount[], at: string, name: string): string | undefined {
+function fileAt(trees: RouteMount[], at: string, name: string): string | undefined {
   for (const { dir, prefix } of trees) {
     if (at === prefix || at.startsWith(`${prefix}/`)) {
       const file = join(dir, at.slice(prefix.length), name)
@@ -301,11 +303,16 @@ function directoriesUp(at: string): string[] {
   let current = at
 
   while (current !== '') {
-    current = current.slice(0, current.lastIndexOf('/'))
+    current = parentOf(current)
     dirs.push(current)
   }
 
   return dirs
+}
+
+// The directory of the URL tree holding `at`: `/a` for `/a/b`, `''` for `/a`.
+function parentOf(at: string): string {
+  return at.slice(0, at.lastIndexOf('/'))
 }
 
 // A percent-encoded URL path, or undefined when the encoding is malformed (`/100%`).
