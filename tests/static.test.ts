@@ -146,13 +146,14 @@ describe('kay build --static', () => {
     expect((await get('/about')).text).toContain('<!--linked from /about: ')
   })
 
-  it('ships none of the persisted signal code to an island calling signal() alone', async () => {
+  it('ships none of the persisted signal or query param code to an island calling signal() alone', async () => {
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
     const code = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))
 
     // The counter's own chunk is among them, so its imports are too.
     expect(code.some(text => text.includes('<button>Count'))).toBe(true)
     expect(code.filter(text => text.includes('cannot name a cookie'))).toEqual([])
+    expect(code.filter(text => text.includes('data-kay-query'))).toEqual([])
   })
 
   it('ships no code reporting browser errors, which no server would take', async () => {

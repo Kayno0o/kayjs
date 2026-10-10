@@ -2,9 +2,10 @@ import type { FieldSchema } from '../src/runtime/form'
 import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { formInput, nativeConstraints } from '../src/runtime/form'
+import { readParam } from '../src/runtime/query-param'
 import { defineEnv } from '../src/server'
 import { buildingWithoutEnv, publicEnvModule, servePublicEnv } from '../src/server/env'
-import { readQuery } from '../src/server/query'
+import { queryRules, queryScript, readQuery } from '../src/server/query'
 import { Denied } from '../src/server/signals'
 
 const schema = t.Object({
@@ -158,5 +159,39 @@ describe('readQuery', () => {
 
   it('denies a query its schema refuses with 400', () => {
     expect(() => query('?n=x', t.Object({ n: t.Integer() }))).toThrow(Denied)
+  })
+})
+
+describe('readParam', () => {
+  const rules = queryRules(t.Object({
+    page: t.Integer({ minimum: 1, default: 1 }),
+    tags: t.Array(t.String(), { default: [] }),
+    view: t.UnionEnum(['grid', 'list'], { default: 'grid' }),
+    exact: t.Boolean(),
+    near: t.Optional(t.Numeric()),
+    sort: t.Union([t.Literal('new'), t.Literal('old')], { default: 'new' }),
+  }))
+  const param = (name: string, search: string) => readParam(rules, name, new URLSearchParams(search))
+
+  it('reads a param as the page\'s schema does, through rules that hold no TypeBox', () => {
+    expect(JSON.parse(JSON.stringify(rules))).toEqual(rules!)
+    expect([param('page', 'page=3'), param('tags', 'tags=a&tags=b'), param('view', 'view=list'), param('exact', 'exact=on'), param('near', 'near=2.5'), param('sort', 'sort=old')]).toEqual([3, ['a', 'b'], 'list', true, 2.5, 'old'])
+  })
+
+  it('reads a param left out as its default, an unticked checkbox as false', () => {
+    expect([param('page', ''), param('tags', ''), param('view', ''), param('exact', ''), param('near', '')]).toEqual([1, [], 'grid', false, undefined])
+  })
+
+  it('reads a param the schema refuses as its default rather than throwing', () => {
+    expect([param('page', 'page=x'), param('page', 'page=0'), param('page', 'page=1.5'), param('view', 'view=table'), param('near', 'near=far'), param('sort', 'sort=top'), param('tags', 'tags=a&tags=')]).toEqual([1, 1, 1, 'grid', undefined, 'new', ['a', '']])
+  })
+
+  it('reads a param no rule names, or every param of a page without a schema, as its text', () => {
+    expect([param('q', 'q=kay'), readParam(undefined, 'page', new URLSearchParams('page=3'))]).toEqual(['kay', '3'])
+  })
+
+  it('writes the rules into a script no text in them closes', () => {
+    expect(queryScript(queryRules(t.Object({ q: t.String({ default: '</script>' }) })))).toBe('<script type="application/json" data-kay-query>{"q":{"type":"string","default":"\\u003c/script>","required":true}}</script>')
+    expect(queryScript(queryRules(undefined))).toBe('')
   })
 })

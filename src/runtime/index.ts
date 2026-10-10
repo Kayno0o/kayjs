@@ -7,6 +7,7 @@ import type { Locale } from './i18n'
 import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
 import { keepValue } from './persist'
+import { keepParam } from './query-param'
 import { createSignal, memo, onCleanup, provideContext, readContext, tracking, untrack } from './reactive'
 
 // Writes a value, or what a function makes of the current one.
@@ -43,6 +44,18 @@ export function persisted<T>(name: string, value: PlainValue<T>, options?: Persi
 export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T>): Signal<T> {
   const [own, write] = createSignal<T>(value, options)
   const kept = keepValue(name, options?.storage ?? 'cookie', own, write, value as T)
+
+  return withSetter(kept.read, (next) => {
+    write(next)
+    kept.save(untrack(own))
+  })
+}
+
+// A signal holding the page's query param `name`, read as the page's `query` schema reads it, so `queryParam<number>('page')` holds a number; the schema's default when the param is left out or refused, which writing leaves out of the URL.
+// Without a schema naming the param, its text, as `persisted(name, '', { storage: 'query' })` keeps it.
+export function queryParam<T = string | undefined>(name: string): Signal<T> {
+  const [own, write] = createSignal<T>(undefined as T)
+  const kept = keepParam(name, own, write)
 
   return withSetter(kept.read, (next) => {
     write(next)

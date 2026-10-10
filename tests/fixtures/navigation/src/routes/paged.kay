@@ -1,0 +1,16 @@
+--- server
+import { s } from 'kay'
+import Pager from '../components/pager.kay'
+
+export const page = {
+  query: s.Object({
+    page: s.Integer({ minimum: 1, default: 1 }),
+    tags: s.Array(s.String(), { default: [] }),
+    view: s.UnionEnum(['grid', 'list'], { default: 'grid' }),
+  }),
+}
+---
+head
+  title Paged
+h1 Paged
+Pager

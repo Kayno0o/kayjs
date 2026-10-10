@@ -560,6 +560,30 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(warnings).toEqual([])
   })
 
+  it('keeps a query param typed by the page\'s schema, the server rendering it and its default leaving the URL plain', async () => {
+    const warnings: string[] = []
+
+    page.on('console', (message) => {
+      if (message.type() === 'warning' || pageError(message))
+        warnings.push(message.text())
+    })
+
+    const html = await (await page.request.get(`${origin}/paged?page=3&tags=a`)).text()
+
+    expect(html).toContain('<script type="application/json" data-kay-query>')
+    expect(html).toContain('Page <!--[-->3<!--]--> <!--[-->number<!--]--> <!--[-->a<!--]--> <!--[-->grid<!--]-->')
+
+    await page.goto(`${origin}/paged?page=3&tags=a`)
+    await page.click('button.next')
+    await page.locator('p.paged', { hasText: 'Page 4 number a grid' }).waitFor()
+    await page.click('button.tag')
+    await page.click('button.list')
+    await until(async () => page.evaluate(() => location.search === '?page=4&tags=a&tags=b&view=list'))
+    await page.click('button.first')
+    await until(async () => page.evaluate(() => location.search === '?tags=a&tags=b&view=list'))
+    expect(warnings).toEqual([])
+  })
+
   it('focuses the field a post was refused for, described by its message', async () => {
     await page.goto(`${origin}/second`)
     await page.fill('input[name="title"]', 'ab')

@@ -11,7 +11,7 @@ import { defaultName } from './codegen'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 // What `kay` exports that is read by calling it, which the template reads by name.
-const ACCESSORS = new Set(['signal', 'memo', 'persisted', 'linked'])
+const ACCESSORS = new Set(['signal', 'memo', 'persisted', 'linked', 'queryParam'])
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
 const require = createRequire(import.meta.url)
@@ -353,7 +353,7 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     const start = map.toSource(identifier.start!)
 
     if (!known.has(binding) && start !== undefined)
-      diagnostics.push({ start, end: start + identifier.name.length, message: `\`${identifier.name}\` is not a signal kay can tell, so it cannot be assigned`, note: 'kay writes a name through `.set` when it sees the signal made: by `signal`, `persisted` or `linked` in this script, as a module\'s `export const`, or as a prop typed `Signal<T>`', help: `write \`${identifier.name}.set(...)\` if it holds a signal` })
+      diagnostics.push({ start, end: start + identifier.name.length, message: `\`${identifier.name}\` is not a signal kay can tell, so it cannot be assigned`, note: 'kay writes a name through `.set` when it sees the signal made: by `signal`, `persisted`, `linked` or `queryParam` in this script, as a module\'s `export const`, or as a prop typed `Signal<T>`', help: `write \`${identifier.name}.set(...)\` if it holds a signal` })
   }
 
   return { rewrites, diagnostics, shadowsName, unread, serverReads, constantSignals: [...constantSignals.values()], translates }

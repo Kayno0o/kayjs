@@ -1,5 +1,6 @@
 import type { TSchema } from 'elysia'
 import type { TypeCheck } from 'elysia/type-system'
+import type { ParamRule, QueryRules } from '../runtime/query-param'
 import { mapValueError } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { formInput } from '../runtime/form'
@@ -11,8 +12,23 @@ interface ObjectSchema {
   properties?: Record<string, { default?: unknown, error?: unknown }>
 }
 
+// The JSON schema keywords a param's rule is read from.
+interface ParamSchema {
+  type?: unknown
+  format?: unknown
+  anyOf?: ParamSchema[]
+  items?: ParamSchema
+  enum?: unknown[]
+  const?: unknown
+  minimum?: unknown
+  maximum?: unknown
+  default?: unknown
+}
+
 const KIND = Symbol.for('TypeBox.Kind')
 const checks = new WeakMap<TSchema, TypeCheck<TSchema>>()
+const rulesCache = new WeakMap<TSchema, QueryRules>()
+const PLAIN_TYPES = new Set<unknown>(['string', 'number', 'integer', 'boolean', 'array'])
 // The top-level field of a validation path such as `/page`.
 const FIELD = /^\/([^/]*)/
 
@@ -63,6 +79,63 @@ export function readFields(schema: TSchema, input: Record<string, unknown>, form
   }
 
   return { refused }
+}
+
+// The rules of a page's `query` schema, which its islands' `queryParam` reads its params by: a param the rules cannot tell the type of reads as its text.
+export function queryRules(schema: unknown): QueryRules | undefined {
+  if (!isSchema(schema))
+    return undefined
+
+  let rules = rulesCache.get(schema)
+
+  if (!rules) {
+    const { properties = {}, required = [] } = schema as { properties?: Record<string, ParamSchema>, required?: string[] }
+
+    rules = Object.fromEntries(Object.entries(properties).map(([name, field]) => [name, required.includes(name) ? { ...paramRule(field), required: true } : paramRule(field)]))
+    rulesCache.set(schema, rules)
+  }
+
+  return rules
+}
+
+export function queryScript(rules: QueryRules | undefined): string {
+  return rules ? `<script type="application/json" data-kay-query>${JSON.stringify(rules).replaceAll('<', '\\u003c')}</script>` : ''
+}
+
+// `s.Integer()` and `s.Numeric()` are a numeric string or a number, a union of literals one of its values.
+function paramRule(field: ParamSchema): ParamRule {
+  const members = field.anyOf ?? []
+  const consts = members.every(member => member.const !== undefined) ? members.map(member => member.const) : undefined
+  const numeric = members.find(member => member.type === 'integer' || member.type === 'number')
+  let type = PLAIN_TYPES.has(field.type) ? field.type as ParamRule['type'] : undefined
+
+  if (consts && consts.length > 0)
+    type = consts.every(value => typeof value === 'number') ? 'number' : consts.every(value => typeof value === 'boolean') ? 'boolean' : 'string'
+  else if (numeric)
+    type = members.some(member => member.type === 'integer' || member.format === 'integer') ? 'integer' : 'number'
+
+  const minimum = field.minimum ?? numeric?.minimum
+  const maximum = field.maximum ?? numeric?.maximum
+  const rule: ParamRule = { type }
+
+  if (type === 'array' && field.items)
+    rule.items = paramRule(field.items)
+
+  if (consts && consts.length > 0)
+    rule.enum = consts
+  else if (Array.isArray(field.enum))
+    rule.enum = field.enum
+
+  if (typeof minimum === 'number')
+    rule.minimum = minimum
+
+  if (typeof maximum === 'number')
+    rule.maximum = maximum
+
+  if (field.default !== undefined)
+    rule.default = field.default
+
+  return rule
 }
 
 // Gathered in a Map, so a parameter named `constructor` or `__proto__` is a parameter like any other.
