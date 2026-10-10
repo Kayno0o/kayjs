@@ -137,8 +137,6 @@ export async function createProject(target: string, options: NewOptions = {}): P
   const files: Record<string, string> = {
     ...templateFiles(features),
     'AGENTS.md': agentsFile(scripts),
-    // Claude Code reads AGENTS.md itself only from v2.1.277, and not in every kind of session.
-    'CLAUDE.md': '@AGENTS.md\n',
     'package.json': `${JSON.stringify({
       name,
       type: 'module',
