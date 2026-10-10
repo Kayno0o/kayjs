@@ -20,6 +20,8 @@ export interface Outbox extends Transport {
   links: (mail: Mail) => string[]
   // The newest mail to this address once there is one, as `to` finds them, failing after `timeout`, 5 seconds by default.
   waitFor: (address: string, options?: { timeout?: Duration | undefined }) => Promise<SentMail>
+  // Calls `listener` with each mail sent from now on, until the function it returns is called.
+  watch: (listener: (mail: SentMail) => void) => () => void
 }
 
 // Enough for a day of development without the process growing for ever.
@@ -45,19 +47,25 @@ function sentTo(mail: Mail, wanted: string): boolean {
 
 function createOutbox(): Outbox {
   const mails: SentMail[] = []
-  const waiting = new Set<(mail: SentMail) => void>()
+  const watchers = new Set<(mail: SentMail) => void>()
+  const watch = (listener: (mail: SentMail) => void) => {
+    watchers.add(listener)
+
+    return () => {
+      watchers.delete(listener)
+    }
+  }
 
   return {
     mails,
     send: async (mail): Promise<Delivery> => {
       const id = crypto.randomUUID()
-
       const sent = { ...mail, id, sentAt: new Date() }
 
       mails.push(sent)
 
-      for (const notify of waiting)
-        notify(sent)
+      for (const watcher of watchers)
+        watcher(sent)
 
       if (mails.length > KEPT)
         mails.splice(0, mails.length - KEPT)
@@ -84,22 +92,21 @@ function createOutbox(): Outbox {
         return found
 
       const { promise, resolve, reject } = Promise.withResolvers<SentMail>()
-      const notify = (mail: SentMail) => {
+      const unwatch = watch((mail) => {
         if (sentTo(mail, wanted))
           resolve(mail)
-      }
+      })
       const timer = setTimeout(() => reject(new Error(`kayjs-mail: no mail to ${address} reached the outbox within ${wait} ms`)), wait)
-
-      waiting.add(notify)
 
       try {
         return await promise
       }
       finally {
         clearTimeout(timer)
-        waiting.delete(notify)
+        unwatch()
       }
     },
+    watch,
   }
 }
 

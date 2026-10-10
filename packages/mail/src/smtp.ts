@@ -45,6 +45,22 @@ export function checkKey(key: string, what: string): void {
   }
 }
 
+// The message as nodemailer composes it, for the SMTP transport and the outbox page's .eml alike.
+export function nodemailerMessage(mail: Mail) {
+  return {
+    from: mail.from,
+    to: mail.to,
+    cc: mail.cc,
+    bcc: mail.bcc,
+    replyTo: mail.replyTo,
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    headers: mail.headers,
+    attachments: mail.attachments.map(({ filename, content, contentType, cid }) => ({ filename, content: typeof content === 'string' ? content : Buffer.from(content), contentType, cid })),
+  }
+}
+
 function positiveInteger(name: string, value: number | undefined): void {
   if (value !== undefined && (!Number.isInteger(value) || value < 1))
     throw new Error(`kayjs-mail: smtp()'s ${name} is ${value}; it takes a whole number of at least 1`)
@@ -77,18 +93,7 @@ export function smtp(settings: SmtpSettings): Transport {
       sending++
 
       try {
-        const info = await current.sendMail({
-          from: mail.from,
-          to: mail.to,
-          cc: mail.cc,
-          bcc: mail.bcc,
-          replyTo: mail.replyTo,
-          subject: mail.subject,
-          text: mail.text,
-          html: mail.html,
-          headers: mail.headers,
-          attachments: mail.attachments.map(({ filename, content, contentType, cid }) => ({ filename, content: typeof content === 'string' ? content : Buffer.from(content), contentType, cid })),
-        })
+        const info = await current.sendMail(nodemailerMessage(mail))
 
         return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected, response: info.response }
       }

@@ -131,7 +131,7 @@ it('welcomes a new account', async () => {
 
 ## Development
 
-Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged with its subject and kept in the outbox, and `/_kay/mail` lists them, newest first, each with its headers, its html in a sandboxed frame and its text. The outbox lives in the server's process: a restart empties it.
+Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged with its subject and kept in the outbox, and `/_kay/mail` lists them, newest first, each with its headers, its size, its html in a sandboxed frame and its text. The list reloads as mails arrive and can be cleared, a mail's html shows at desktop or phone width (`?view=phone`), its size warns past the 102 KB of html Gmail clips at, and it downloads as the `.eml` SMTP would send. The outbox lives in the server's process: a restart empties it.
 
 ## Other transports
 

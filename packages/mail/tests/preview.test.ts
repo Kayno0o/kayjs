@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
@@ -19,8 +20,8 @@ afterAll(() => {
 
 beforeEach(() => outbox.clear())
 
-async function get(app: { handle: (request: Request) => Promise<Response> }, path: string): Promise<Response> {
-  return app.handle(new Request(`http://localhost${path}`))
+async function get(app: { handle: (request: Request) => Promise<Response> }, path: string, init?: RequestInit): Promise<Response> {
+  return app.handle(new Request(`http://localhost${path}`, init))
 }
 
 describe('the development outbox page', () => {
@@ -80,6 +81,71 @@ describe('the development outbox page', () => {
     expect(response.headers.get('content-type')).toStartWith('application/json')
     expect(ada).toMatchObject({ subject: 'First', text: 'Hi', headers: { 'X-Kind': 'welcome' }, attachments: [{ filename: 'a.bin', content: 'AQID', encoding: 'base64' }] })
     expect(ada!.html).toContain('<p>Hi</p>')
+  })
+
+  it('shows a mail at phone width from the URL, and its size, warning past the html Gmail clips', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+
+    await mail.send({ to: 'ada@example.com', subject: 'Small', html: '<p>Hi</p>' })
+
+    const small = outbox.last()!
+    const desktop = await (await get(mail, `/_kay/mail/${small.id}`)).text()
+    const phone = await (await get(mail, `/_kay/mail/${small.id}?view=phone`)).text()
+
+    expect(desktop).toContain(`<a href="/_kay/mail/${small.id}" aria-current="page">Desktop</a>`)
+    expect(desktop).not.toContain('class="phone"')
+    expect(phone).toContain('<iframe class="phone"')
+    expect(phone).toContain(`<a href="/_kay/mail/${small.id}?view=phone" aria-current="page">Phone</a>`)
+    expect(desktop).toMatch(/<th>Size<\/th><td>[\d.]+ KB, html [\d.]+ KB<\/td>/)
+
+    await mail.send({ to: 'ada@example.com', subject: 'Big', html: `<p>${'x'.repeat(110 * 1024)}</p>` })
+    expect(await (await get(mail, `/_kay/mail/${outbox.last()!.id}`)).text()).toContain('Gmail clips it')
+  })
+
+  it('reloads the list as mails arrive, through a script its policy allows by hash and a stream of their ids', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+    const list = await get(mail, '/_kay/mail')
+    const script = (/<script>([^<]*)<\/script>/).exec(await list.text())![1]!
+
+    expect(list.headers.get('content-security-policy')).toContain(`script-src 'sha256-${createHash('sha256').update(script).digest('base64')}'`)
+
+    const events = await get(mail, '/_kay/mail/events')
+    const reader = events.body!.getReader()
+
+    expect(events.headers.get('content-type')).toBe('text/event-stream')
+    await mail.send({ to: 'ada@example.com', subject: 'Live', text: 'Hi' })
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe(`data: ${outbox.last()!.id}\n\n`)
+    await reader.cancel()
+  })
+
+  it('clears the outbox once confirmed, from its own page only', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+
+    await mail.send({ to: 'ada@example.com', subject: 'One', text: 'Hi' })
+    expect(await (await get(mail, '/_kay/mail?clear')).text()).toContain('<button type="submit">Clear 1 mail</button>')
+    expect((await get(mail, '/_kay/mail/clear', { method: 'POST', headers: { 'sec-fetch-site': 'cross-site' } })).status).toBe(403)
+    expect(outbox.mails).toHaveLength(1)
+
+    const cleared = await get(mail, '/_kay/mail/clear', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' } })
+
+    expect(cleared.status).toBe(303)
+    expect(cleared.headers.get('location')).toBe('/_kay/mail')
+    expect(outbox.mails).toEqual([])
+  })
+
+  it('downloads a mail as the .eml SMTP would send', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+
+    await mail.send({ to: 'ada@example.com', subject: 'Raw', html: '<p>Hi</p>' })
+
+    const raw = await get(mail, `/_kay/mail/${outbox.last()!.id}/eml`)
+    const message = await raw.text()
+
+    expect(raw.headers.get('content-type')).toBe('message/rfc822')
+    expect(raw.headers.get('content-disposition')).toBe(`attachment; filename="mail-${outbox.last()!.id}.eml"`)
+    expect(message).toContain('Subject: Raw')
+    expect(message).toContain('To: ada@example.com')
+    expect(message).toContain('multipart/alternative')
   })
 
   it('answers 404 for a mail no longer kept', async () => {
