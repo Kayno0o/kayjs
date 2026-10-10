@@ -1,6 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { sendValue } from '../src/runtime/send'
 import { mount, settle } from '../src/test'
 
 beforeAll(() => {
@@ -30,6 +31,27 @@ describe('mount', () => {
 
     expect(disposed).toBe(true)
     expect(root.isConnected).toBe(false)
+  })
+
+  it('runs every mount on modules of its own, as a page load does, a persisted signal reading storage as it is then', async () => {
+    try {
+      localStorage.setItem('favorites', sendValue(['first']))
+
+      const first = await mount('tests/fixtures/mount/favorites.kay')
+
+      expect(first.root.textContent).toBe('first')
+      first.unmount()
+
+      localStorage.setItem('favorites', sendValue(['second']))
+
+      const second = await mount('tests/fixtures/mount/favorites.kay')
+
+      expect(second.root.textContent).toBe('second')
+      second.unmount()
+    }
+    finally {
+      localStorage.clear()
+    }
   })
 
   it('reports a component that does not compile, and builds it again once fixed', async () => {

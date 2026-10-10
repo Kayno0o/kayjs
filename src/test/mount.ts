@@ -15,8 +15,8 @@ interface MountModule {
   mount: (element: HTMLElement, props: Record<string, unknown>) => () => void
 }
 
-// One bundle per component and version of its file, for the test process.
-const bundles = new Map<string, Promise<MountModule>>()
+// One bundle per component and version of its file, for the test process, evaluated again on every mount.
+const bundles = new Map<string, Promise<string>>()
 
 // Lets queued effects and timers due now land, as after a click, before the DOM is read.
 export async function settle(): Promise<void> {
@@ -37,10 +37,10 @@ export async function mount(file: string, props: Record<string, unknown> = {}): 
   if (!bundled)
     bundles.set(key, bundled = bundle(root, path))
 
-  let module: MountModule
+  let code: string
 
   try {
-    module = await bundled
+    code = await bundled
   }
   catch (error) {
     // A failed bundle is tried again on the next mount, the file fixed or not.
@@ -49,6 +49,7 @@ export async function mount(file: string, props: Record<string, unknown> = {}): 
     throw error
   }
 
+  const module = await evaluate(root, code)
   const element = document.createElement('div')
 
   document.body.append(element)
@@ -69,21 +70,17 @@ export async function mount(file: string, props: Record<string, unknown> = {}): 
 }
 
 // Bundled from under the project's `.kay`, where `kay/dom` resolves to the kay it installed, with its libraries' settings applied.
-async function bundle(root: string, file: string): Promise<MountModule> {
-  const dir = join(root, '.kay', 'test')
-
-  await mkdir(dir, { recursive: true })
-
-  const work = await mkdtemp(join(dir, 'mount-'))
+async function bundle(root: string, file: string): Promise<string> {
+  const work = await mkdtemp(join(await testDir(root), 'mount-'))
 
   try {
     await Bun.write(join(work, 'entry.ts'), entry(file))
 
     const { settings } = await loadConfig(root)
-    let output: string
+    let output: Bun.BuildArtifact
 
     try {
-      output = (await Bun.build({ entrypoints: [join(work, 'entry.ts')], outdir: join(work, 'out'), target: 'browser', plugins: [kay({ root, settings })] })).outputs[0]!.path
+      output = (await Bun.build({ entrypoints: [join(work, 'entry.ts')], outdir: join(work, 'out'), target: 'browser', plugins: [kay({ root, settings })] })).outputs[0]!
     }
     catch (error) {
       // Bun throws on a failed build, its messages in `errors`.
@@ -92,11 +89,33 @@ async function bundle(root: string, file: string): Promise<MountModule> {
       throw new AggregateError(errors, `kay: bundling ${file} for the browser failed: ${errors.map(String).join('\n')}`)
     }
 
-    return await import(output) as MountModule
+    return await output.text()
   }
   finally {
     await rm(work, { recursive: true, force: true })
   }
+}
+
+// The bundle's modules run afresh, as on a page load, so what one mount left in them, such as a persisted signal read from storage, does not reach the next.
+async function evaluate(root: string, code: string): Promise<MountModule> {
+  const file = join(await testDir(root), `mount-${crypto.randomUUID()}.js`)
+
+  await Bun.write(file, code)
+
+  try {
+    return await import(file) as MountModule
+  }
+  finally {
+    await rm(file, { force: true })
+  }
+}
+
+async function testDir(root: string): Promise<string> {
+  const dir = join(root, '.kay', 'test')
+
+  await mkdir(dir, { recursive: true })
+
+  return dir
 }
 
 // Changes when the file is rewritten, so a test editing a component between mounts gets its new build.

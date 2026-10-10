@@ -1,0 +1,4 @@
+---
+import { favorites } from './favorites'
+---
+p.favorites {favorites().join(', ')}

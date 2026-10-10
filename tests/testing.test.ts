@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { readActionResponse } from '../src/runtime/action'
 import { session } from '../src/server/session'
@@ -85,6 +86,21 @@ describe('kay/test', () => {
     const unset = await testSite({ routes: 'tests/fixtures/production/src/routes', security: false })
 
     expect((await unset.visit('/origin')).html).toContain('<p class="origin">http://localhost</p>')
+  })
+
+  it('goes on working once a test registered a DOM, as one of `mount` leaves it for every later file', async () => {
+    GlobalRegistrator.register()
+
+    try {
+      const echo = await testSite({ routes: 'tests/fixtures/bare/src/routes', use: [new Elysia().get('/echo', ({ headers }) => headers['x-user'] ?? 'nobody')] })
+
+      expect(await (await echo.fetch('/echo', { headers: { 'x-user': 'ada' } })).text()).toBe('ada')
+      expect((await site.submit(add, { title: 'Sent under a DOM' })).html).toContain('Sent under a DOM</a></li>')
+      expect(await site.call(add, { title: 'Called under a DOM' })).toBeNumber()
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+    }
   })
 
   it('stops at a redirect to another site', async () => {

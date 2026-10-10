@@ -19,6 +19,7 @@ import { drainQueues } from '../server/queue'
 import { SITEMAP } from '../server/sitemap'
 import { servedThrough } from '../server/visit'
 import { browse } from './browser'
+import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket } from './natives'
 import { readPage, sitemapUrls } from './page'
 import { testRoot } from './root'
 
@@ -98,7 +99,7 @@ export type TestStream<Client> = Client & {
 
 const ORIGIN = 'http://localhost'
 // The DOM typings of WebSocket hide the options Bun takes, the upgrade's headers among them.
-const BunWebSocket = WebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
+const BunWebSocket = NativeWebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
 const MAX_REDIRECTS = 10
 
 // The project's pages and actions without a server, and without a browser build unless `browser` is set: pages then render their islands' markup and no scripts.
@@ -134,9 +135,9 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   }
 
   const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
-    const headers = cookieHeader(new Headers(init.headers))
+    const headers = cookieHeader(new NativeHeaders(init.headers))
 
-    const response = await handle(new Request(new URL(path, ORIGIN), { ...init, headers, redirect: 'manual' }))
+    const response = await handle(new NativeRequest(new NativeURL(path, ORIGIN), { ...init, headers, redirect: 'manual' }))
 
     for (const header of response.headers.getSetCookie()) {
       const cookie = Bun.Cookie.parse(header)
@@ -203,7 +204,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     fetch: async (path, init = {}) => send(path, init),
     socket: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
-      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: Object.fromEntries(cookieHeader(new Headers(options?.headers))) }))
+      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: Object.fromEntries(cookieHeader(new NativeHeaders(options?.headers))) }))
       const tested = Object.assign(client, inbox(client))
 
       client.start()
@@ -262,7 +263,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       const target = page?.find('form').map(form => form.attributes.action).find(url => url !== undefined && new URL(url, ORIGIN).pathname.endsWith(action.url))
       const url = target === undefined ? undefined : new URL(target, ORIGIN)
       const posted = url === undefined ? action.url : url.pathname + url.search
-      const form = new FormData()
+      const form = new NativeFormData()
 
       // The stamp `minTime` reads goes with the post, as the browser sends the form it was rendered in.
       const stamp = url === undefined ? undefined : page?.find(`form[action^="${url.pathname}"] input[name="${STAMP_FIELD}"]`)[0]?.attributes.value
