@@ -51,6 +51,8 @@ export type Mailer = Elysia & {
 const DOCTYPE = /^\s*<!doctype/i
 const HTML_ROOT = /^\s*<html[\s>]/i
 const LINE_BREAK = /[\r\n]/
+const STYLE_ELEMENT = /<style\b[^>]*>[\s\S]*?<\/style>/gi
+const DARK_RULES = /prefers-color-scheme:\s*dark/
 // `Name <address>` or a bare address, as `SMTP_FROM` holds one.
 const SENDER = '^(?:[^<>]*<[^\\s<>@]+@[^\\s<>@]+>|[^\\s<>@]+@[^\\s<>@]+)$'
 // One address or more, apart by commas, as `MAIL_TO` holds them: a name in it holds no comma.
@@ -70,7 +72,7 @@ function domainOf(address: Address): string | undefined {
   return at === -1 ? undefined : plain.slice(at + 1)
 }
 
-// A whole document around a component's markup, which renders the body alone: clients read the charset and the viewport from it.
+// A whole document around a component's markup, which renders the body alone: clients read the charset and the viewport from it, and Gmail reads styles only from the head, where the markup's go.
 function asDocument(html: string, subject: string, lang: string): string {
   if (DOCTYPE.test(html))
     return html
@@ -78,7 +80,11 @@ function asDocument(html: string, subject: string, lang: string): string {
   if (HTML_ROOT.test(html))
     return `<!doctype html>${html}`
 
-  return `<!doctype html><html lang="${escape(lang)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting" content="true"><title>${escape(subject)}</title>${OUTLOOK_SETTINGS}</head><body style="margin:0;padding:0">${html}</body></html>`
+  const styles = html.match(STYLE_ELEMENT) ?? []
+  // Light alone unless the styles carry dark colours, so a client never inverts some colours and leaves others.
+  const schemes = styles.some(style => DARK_RULES.test(style)) ? 'light dark' : 'light'
+
+  return `<!doctype html><html lang="${escape(lang)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting" content="true"><meta name="color-scheme" content="${schemes}"><meta name="supported-color-schemes" content="${schemes}"><title>${escape(subject)}</title>${OUTLOOK_SETTINGS}${styles.join('')}</head><body style="margin:0;padding:0">${html.replace(STYLE_ELEMENT, '')}</body></html>`
 }
 
 // RFC 8058's one-click unsubscribe, which Gmail and Yahoo require of bulk senders.

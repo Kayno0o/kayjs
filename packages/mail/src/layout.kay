@@ -1,6 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import { CARD_PADDING_X } from './card'
+import { darkStyle } from './dark'
 import { ghostTable } from './mso'
 import settings from './settings'
 
@@ -9,21 +10,22 @@ const [open, close] = ghostTable(settings.width)
 // Invisible characters filling the inbox preview past the preheader, which clients would otherwise fill with the mail's first lines.
 const filler = '\u034F\u200C\u00A0'.repeat(100)
 ---
-table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor={settings.background} style={`background:${settings.background}`})
+{darkStyle(settings)}
+table(class="km-bg" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor={settings.background} style={`background:${settings.background}`})
   tr
-    td(align="center" style={`padding:24px 12px;font-family:${settings.font};color:${settings.text}`})
+    td(class="km-text" align="center" style={`padding:24px 12px;font-family:${settings.font};color:${settings.text}`})
       if preheader
         div(style="display:none;mso-hide:all;max-height:0;max-width:0;overflow:hidden;opacity:0" aria-hidden="true") {preheader}{filler}
       {open}
       table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style={`max-width:${settings.width}px;margin:0 auto`})
         tr
-          td(align="left" bgcolor={settings.surface} style={`background:${settings.surface};border:1px solid ${settings.border};border-radius:${settings.radius};padding:32px ${CARD_PADDING_X}px;font-family:${settings.font};color:${settings.text}`})
+          td(class="km-surface km-text" align="left" bgcolor={settings.surface} style={`background:${settings.surface};border:1px solid ${settings.border};border-radius:${settings.radius};padding:32px ${CARD_PADDING_X}px;font-family:${settings.font};color:${settings.text}`})
             slot
       {close}
       if footer
         {open}
         table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style={`max-width:${settings.width}px;margin:0 auto`})
           tr
-            td(align="center" style={`padding-top:16px;font-family:${settings.font};font-size:12px;line-height:1.5;color:${settings.muted}`})
+            td(class="km-muted" align="center" style={`padding-top:16px;font-family:${settings.font};font-size:12px;line-height:1.5;color:${settings.muted}`})
               | {footer}
         {close}

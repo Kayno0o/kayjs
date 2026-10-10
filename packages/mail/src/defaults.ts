@@ -1,8 +1,5 @@
-// What an app may replace through `settings` in its kay.config.ts, spreading these defaults to change a few. Mail clients drop stylesheets, so every value lands in a `style` attribute.
-export interface Settings {
-  font: string
-  // A `Code`'s.
-  mono: string
+// The colours a mail is drawn in.
+export interface Palette {
   text: string
   muted: string
   // Around the card, filling the client's window.
@@ -14,9 +11,18 @@ export interface Settings {
   accent: string
   // A button's text.
   onAccent: string
+}
+
+// What an app may replace through `settings` in its kay.config.ts, spreading these defaults to change a few. Mail clients drop stylesheets, so every value lands in a `style` attribute.
+export interface Settings extends Palette {
+  font: string
+  // A `Code`'s.
+  mono: string
   radius: string
   // The card's widest, in pixels.
   width: number
+  // The colours of a client's dark mode, each left out derived from its light one: lightness turned over, and the accent lightened until it reads on the card. Derived from hex colours only.
+  dark?: Partial<Palette> | undefined
 }
 
 const defaults: Settings = {

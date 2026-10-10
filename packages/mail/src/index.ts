@@ -1,4 +1,5 @@
-export type { Settings } from './defaults'
+export { darkPalette } from './dark'
+export type { Palette, Settings } from './defaults'
 export { default as defaults } from './defaults'
 export type { Mailer, MailerOptions } from './mailer'
 export { mailer, mailExtension, MailNotConfigured } from './mailer'

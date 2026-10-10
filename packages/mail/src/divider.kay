@@ -3,4 +3,4 @@ import settings from './settings'
 ---
 table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0")
   tr
-    td(height="1" style={`border-top:1px solid ${settings.border};font-size:0;line-height:0`}) {' '}
+    td(class="km-border" height="1" style={`border-top:1px solid ${settings.border};font-size:0;line-height:0`}) {' '}

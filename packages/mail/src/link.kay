@@ -3,5 +3,5 @@ import settings from './settings'
 
 const { href } = props<{ href: string }>()
 ---
-a(href={href} style={`color:${settings.accent};text-decoration:underline`})
+a(class="km-link" href={href} style={`color:${settings.accent};text-decoration:underline`})
   slot

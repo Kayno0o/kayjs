@@ -1,6 +1,6 @@
 import type { Mail, Transport } from '@kaynooo/kayjs-mail'
 import process from 'node:process'
-import { mailer, MailNotConfigured, outbox } from '@kaynooo/kayjs-mail'
+import { darkPalette, defaults, mailer, MailNotConfigured, outbox } from '@kaynooo/kayjs-mail'
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { mail } from '../src/mail'
 import Hello from '../src/mails/hello.kay'
@@ -32,6 +32,31 @@ describe('rendering', () => {
     expect(html).toContain('bgcolor="#ffffff"')
     expect(html).toContain('mso-hide:all')
     expect(html).toContain('<!--[if mso]><i style="mso-font-width:125%;mso-text-raise:150%" hidden>&emsp;</i><span style="mso-text-raise:75%"><![endif]-->Confirm my address<!--[if mso]></span>')
+  })
+
+  it('declares dark mode and carries its colours in the head, derived from the light ones, the accent lightened to read on the dark card', async () => {
+    const { html, text } = await mail.render({ to: 'ada@example.com', subject: 'Welcome', view: Welcome, props: { name: 'Ada', url: URL } })
+    const [head, body] = html!.split('</head>') as [string, string]
+
+    expect(head).toContain('<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">')
+    expect(head).toContain('@media (prefers-color-scheme:dark){.km-bg{background-color:#21211c!important}.km-surface{background-color:#141414!important;border-color:#303028!important}')
+    expect(head).toContain('.km-button{background-color:#477bff!important;color:#141414!important}')
+    expect(head).toContain('[data-ogsc] .km-text,[data-ogsb] .km-text{color:#d5d5d5!important}')
+    expect(body).not.toContain('<style')
+    expect(body).toContain('class="km-button"')
+    expect(text).not.toContain('color-scheme')
+  })
+
+  it('declares a mail without dark colours light only, so no client inverts part of it', async () => {
+    const { html } = await mail.render({ to: 'ada@example.com', subject: 'Plain', html: '<p>Hi</p>' })
+
+    expect(html).toContain('<meta name="color-scheme" content="light">')
+    expect(html).not.toContain('<style')
+  })
+
+  it('takes the dark colours an app gives, deriving only the others', () => {
+    expect(darkPalette(defaults)).toEqual({ text: '#d5d5d5', muted: '#a3a3a3', background: '#21211c', surface: '#141414', border: '#303028', accent: '#d5d5d5', onAccent: '#141414' })
+    expect(darkPalette({ ...defaults, accent: 'rebeccapurple', dark: { surface: '#202020' } })).toMatchObject({ surface: '#202020', accent: 'rebeccapurple', onAccent: '#ffffff' })
   })
 
   it('follows the preheader with invisible filler, so the inbox preview stops there, and leaves it out of the text', async () => {
@@ -68,9 +93,9 @@ describe('rendering', () => {
     expect(html).toContain('font-family:ui-monospace')
     expect(html).toContain('letter-spacing:6px')
     expect(html).toContain('border-top:1px solid #e5e5e0')
-    expect(html).toContain('<h2 style="font-size:18px')
+    expect(html).toContain('<h2 class="km-text" style="font-size:18px')
     expect(html).toContain('<!--[if true]><td width="251" valign="top"><![endif]--><div style="display:inline-block;width:100%;max-width:251px;vertical-align:top">')
-    expect(html).toContain('<a href="https://fixture.test/help" style="color:#0047ff;text-decoration:underline">the help</a>')
+    expect(html).toContain('<a class="km-link" href="https://fixture.test/help" style="color:#0047ff;text-decoration:underline">the help</a>')
     expect(text).toBe('Fixture\n\nYour code\n\n482 913\n\nDetails\n\nLeft\n\nRight\n\nRead the help (https://fixture.test/help).')
   })
 
