@@ -4,6 +4,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, nanoid } from '@kaynooo/utils'
 import { qrCodeDataUri } from '@kaynooo/utils/tools'
+import { banned } from './core'
 import { report } from './events'
 import { deriveKeys, digest } from './keys'
 import { spend } from './limits'
@@ -31,8 +32,8 @@ export interface Proof {
   passkey?: AuthenticationResponseJSON
 }
 
-// `proof` when the proof was wrong or missing; `stale` when the account has neither a password nor a second factor and was signed into too long ago, so the user signs in again first.
-export type ProofFailure = 'signed-out' | 'proof' | 'stale' | 'limited'
+// `proof` when the proof was wrong or missing; `stale` when the account has neither a password nor a second factor and was signed into too long ago, so the user signs in again first; `impersonating` when an admin acts as the user, who proves nothing for them.
+export type ProofFailure = 'signed-out' | 'proof' | 'stale' | 'limited' | 'impersonating'
 
 export interface TwoFactorSetup {
   // Base32, for typing into an authenticator by hand.
@@ -55,16 +56,19 @@ export interface Challenge {
 export type TwoFactorResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' }
 
 // Signs `record` in, or when it has a second factor parks the sign-in until the code, and answers where the browser goes next.
-export async function completeSignIn(state: RequestState, record: UserRecord, redirect: string, method: string, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<string> {
+export async function completeSignIn(state: RequestState, record: UserRecord, redirect: string, method: string, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<{ ok: true, redirect: string } | { ok: false, error: 'banned' }> {
+  if (banned(record))
+    return { ok: false, error: 'banned' }
+
   if (record.totpEnabledAt === null) {
     await signIn(record, method)
 
-    return redirect
+    return { ok: true, redirect }
   }
 
   await state.session.set('authChallenge', { user: record.id, version: record.sessionVersion, redirect, method, expires: Date.now() + CHALLENGE_MAX_AGE_MS })
 
-  return state.core.twoFactorPage
+  return { ok: true, redirect: state.core.twoFactorPage }
 }
 
 // Whether this session holds a sign-in waiting for its second factor.
@@ -106,6 +110,9 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
 
   if (!record)
     return { ok: false, error: 'signed-out' }
+
+  if ((await state.session.get('auth'))?.impersonator)
+    return { ok: false, error: 'impersonating' }
 
   const twoFactor = record.totpEnabledAt !== null
 

@@ -3,6 +3,7 @@ import type { AnyElysia } from 'elysia'
 import type { Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
+import type { AdminFailure, BanResult, ManagedUser, RoleResult } from './admin'
 import type { BearerToken, CreateTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
@@ -23,10 +24,11 @@ import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { clientAddress, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
+import { actingAdmin, adminAuditLog, banUser, changeRole, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { bearerUser, createToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { captchaRequired } from './captcha'
-import { publicUser } from './core'
+import { banned, publicUser } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithEmailCode, signInWithMagicLink, verifyEmail, verifyEmailCode } from './email'
 import { auditEntries, report } from './events'
 import { createGate, scopeAllows } from './gate'
@@ -95,6 +97,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   scopes?: readonly Scope[] | undefined
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
   roles?: Record<Role, NoInfer<Role>[]> | undefined
+  // Who may list, ban and impersonate users and grant them roles, such as `'admin'`; nobody without it.
+  admin?: AuthRequirement<NoInfer<Role>> | undefined
   // The roles every new user starts with, by password or by provider, such as a site's `user`. An unverified account holding only these counts as given none: see `requireVerified`.
   defaultRoles?: NoInfer<Role>[] | undefined
   // Seconds a session lives unseen: kay's session `maxAge`, 30 days by default as kay's is. A session past it leaves the list of where the user is signed in.
@@ -118,9 +122,9 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
-export class Auth<Scope extends string = string> {
+export class Auth<Scope extends string = string, Role extends string = string> {
   readonly [STATE]: RequestState
-  private resolving?: Promise<UserRecord | null>
+  private resolving?: Promise<UserRecord | null> | undefined
   private source: 'session' | 'bearer' | null = null
   private tokenScopes: string[] | null = null
 
@@ -172,6 +176,9 @@ export class Auth<Scope extends string = string> {
     if (!record)
       throw new Error(`kayjs-auth: no user ${user.id} to sign in`)
 
+    if (banned(record))
+      throw new Error(`kayjs-auth: user ${user.id} is banned`)
+
     await this.establish(record, 'app')
   }
 
@@ -180,18 +187,28 @@ export class Auth<Scope extends string = string> {
     const signedIn = await this.session.get('auth')
     const record = signedIn && await this.core.store.users.get(signedIn.user)
 
-    if (record)
+    if (signedIn?.impersonator) {
+      const actor = await this.core.store.users.get(signedIn.impersonator.user)
+
+      if (record && actor)
+        await report(this[STATE], record, 'impersonation-ended', undefined, actor)
+    }
+    else if (record) {
       await report(this[STATE], record, 'signed-out')
+    }
 
     await this.leave()
   }
 
-  // Signs this session out without a word to `onEvent`.
+  // Signs this session out without a word to `onEvent`, the admin behind an impersonation too.
   private async leave(): Promise<void> {
     const signedIn = await this.session.get('auth')
 
     if (signedIn?.session !== undefined)
       await this.core.store.sessions.delete(signedIn.user, signedIn.session)
+
+    if (signedIn?.impersonator?.session !== undefined)
+      await this.core.store.sessions.delete(signedIn.impersonator.user, signedIn.impersonator.session)
 
     await this.session.unset('auth')
     await this.session.unset('authRegistered')
@@ -457,6 +474,109 @@ export class Auth<Scope extends string = string> {
     return record ? auditEntries(this.core, { ...options, userId: record.id }) : []
   }
 
+  // The users, newest first, a page of `limit` (50 by default) from `offset`; `search` matches part of an email or a username, or a whole id. For an admin only, as every method below.
+  async listUsers(query: { search?: string, offset?: number, limit?: number } = {}): Promise<{ ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' }> {
+    return listUsers(this[STATE], query)
+  }
+
+  async getUser(userId: string): Promise<{ ok: true, user: ManagedUser } | { ok: false, error: AdminFailure }> {
+    return getUser(this[STATE], userId)
+  }
+
+  // Gives a user a role the app declares, effective on their next request.
+  async grantRole(userId: string, role: Role): Promise<RoleResult> {
+    return changeRole(this[STATE], userId, role, true)
+  }
+
+  async revokeRole(userId: string, role: Role): Promise<RoleResult> {
+    return changeRole(this[STATE], userId, role, false)
+  }
+
+  // Bars a user from signing in, for good or `until` then, and signs them out everywhere; another admin is refused.
+  async banUser(userId: string, options: { reason?: string, until?: Date } = {}): Promise<BanResult> {
+    return banUser(this[STATE], userId, options)
+  }
+
+  async unbanUser(userId: string): Promise<{ ok: true, user: ManagedUser } | { ok: false, error: AdminFailure }> {
+    return unbanUser(this[STATE], userId)
+  }
+
+  // Everyone's audit log, or `userId`'s, newest first.
+  async adminAuditLog(query: { userId?: string, before?: Date, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
+    return adminAuditLog(this[STATE], query)
+  }
+
+  // Signs this browser in as `userId`, the admin's own sign-in kept for `stopImpersonating`. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
+  async impersonate(userId: string): Promise<{ ok: true } | { ok: false, error: AdminFailure | 'self' | 'admin' | 'banned' }> {
+    const actor = await actingAdmin(this[STATE])
+    const own = await this.session.get('auth')
+
+    if (!actor || this.source !== 'session' || !own)
+      return { ok: false, error: 'forbidden' }
+
+    const record = await this.core.store.users.get(userId)
+
+    if (!record)
+      return { ok: false, error: 'not-found' }
+
+    if (record.id === actor.id)
+      return { ok: false, error: 'self' }
+
+    if (await isAdmin(this[STATE], record))
+      return { ok: false, error: 'admin' }
+
+    if (banned(record))
+      return { ok: false, error: 'banned' }
+
+    await this.session.unset('authChallenge')
+    await this.session.regenerate()
+
+    const session = await openSession(this.core, record, this[STATE].address, this[STATE].userAgent)
+
+    // Signed in at 0, so nothing asking for a recent sign-in passes.
+    await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: 0, session, impersonator: own })
+    this.resolving = Promise.resolve(record)
+    await report(this[STATE], record, 'impersonation-started', undefined, actor)
+
+    return { ok: true }
+  }
+
+  // Signs the admin back in as themselves; signed out when their own sign-in ended meanwhile. False when not impersonating.
+  async stopImpersonating(): Promise<boolean> {
+    const signedIn = await this.session.get('auth')
+
+    if (!signedIn?.impersonator)
+      return false
+
+    const { impersonator } = signedIn
+    const record = await this.core.store.users.get(signedIn.user)
+    const actor = await this.core.store.users.get(impersonator.user)
+
+    if (record && actor)
+      await report(this[STATE], record, 'impersonation-ended', undefined, actor)
+
+    if (signedIn.session !== undefined)
+      await this.core.store.sessions.delete(signedIn.user, signedIn.session)
+
+    await this.session.regenerate()
+    await this.session.set('auth', impersonator)
+    this.source = null
+    this.resolving = undefined
+
+    if (!(await this.record()))
+      await this.leave()
+
+    return true
+  }
+
+  // The admin acting as the signed-in user, to show while they do; null otherwise.
+  async impersonator(): Promise<User | null> {
+    const signedIn = await this.session.get('auth')
+    const actor = signedIn?.impersonator && await this.core.store.users.get(signedIn.impersonator.user)
+
+    return actor ? publicUser(actor) : null
+  }
+
   // The signed-in user's bearer tokens, without the tokens themselves.
   async tokens(): Promise<BearerToken[]> {
     return listTokens(this[STATE])
@@ -508,22 +628,34 @@ export class Auth<Scope extends string = string> {
     const signedIn = await this.session.get('auth')
     const record = signedIn && await this.core.store.users.get(signedIn.user)
 
-    if (record && record.sessionVersion === signedIn!.version && await this.live(signedIn!, record)) {
+    if (record && record.sessionVersion === signedIn!.version && !banned(record) && await this.genuine(signedIn!) && await this.live(signedIn!, record)) {
       this.source = 'session'
 
       return record
     }
 
-    // Deleted, signed out everywhere since, or its session ended.
+    // Deleted, signed out everywhere since, banned, or its session ended.
     if (signedIn)
       await this.session.unset('auth')
 
     const owner = await bearerUser(this.core, this.request)
 
-    this.source = owner ? 'bearer' : null
-    this.tokenScopes = owner?.scopes ?? null
+    const live = owner && !banned(owner.record) ? owner : null
 
-    return owner?.record ?? null
+    this.source = live ? 'bearer' : null
+    this.tokenScopes = live?.scopes ?? null
+
+    return live?.record ?? null
+  }
+
+  // Whether the admin behind an impersonation still is one, signed in as themselves; true when there is none.
+  private async genuine(signedIn: SignedIn): Promise<boolean> {
+    if (!signedIn.impersonator)
+      return true
+
+    const actor = await this.core.store.users.get(signedIn.impersonator.user)
+
+    return actor !== undefined && actor.sessionVersion === signedIn.impersonator.version && !banned(actor) && await isAdmin(this[STATE], actor)
   }
 }
 
@@ -546,7 +678,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       const address = clientAddress(ctx.request, ctx.server, options.proxy)
 
-      return { auth: new Auth<Scope>(session, core, ctx.request, rateKey(address), address) }
+      return { auth: new Auth<Scope, Role>(session, core, ctx.request, rateKey(address), address) }
     })
     // The session's derive reaches this instance only; lifting both globally lets them reach every route the app declares after it, however deep the plugin is used.
     .as('global')
@@ -606,6 +738,10 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   const authorize = options.authorize ?? (async (user, requirement, _level, ctx) => user !== null && evaluate(user, requirement, ctx))
   const signedIn: Predicate<User> = user => user !== null
+  const admin = options.admin
+
+  if (admin !== undefined)
+    core.admin = async user => authorize(user, admin, 'write', {})
 
   return {
     // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
@@ -697,6 +833,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     refreshers: new Map(),
     allow: options.allow,
     defaultRoles: [...(options.defaultRoles ?? [])],
+    roles: options.roles && new Set(Object.keys(options.roles)),
     onSignUp: options.onSignUp,
     onProviderProfile: options.onProviderProfile,
     onDelete: options.onDelete,

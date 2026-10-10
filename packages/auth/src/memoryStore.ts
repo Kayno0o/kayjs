@@ -91,6 +91,14 @@ export function memoryStore(): AuthStore {
             passkeys.delete(key)
         }
       },
+      list({ search, offset, limit }) {
+        const wanted = search?.toLowerCase()
+        const found = [...users.values()]
+          .filter(user => wanted === undefined || user.id === search || user.email?.includes(wanted) || user.username?.toLowerCase().includes(wanted))
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+
+        return { users: found.slice(offset, offset + limit).map(user => copy(user)!), total: found.length }
+      },
       advanceTotpStep(id, step) {
         const user = users.get(id)
 

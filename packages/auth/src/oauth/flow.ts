@@ -14,7 +14,7 @@ import { safeRedirect } from './redirect'
 const FLOW_MAX_AGE_MS = 10 * 60 * 1000
 
 // Why an OAuth sign-in failed, sent to the sign-in page as `?error=`.
-export type OAuthFailure = 'oauth' | 'cancelled' | 'refused' | 'taken' | 'unavailable' | 'signed-out' | 'stale'
+export type OAuthFailure = 'oauth' | 'cancelled' | 'refused' | 'taken' | 'unavailable' | 'signed-out' | 'stale' | 'banned'
 
 // What a sign-in in progress keeps in the session between leaving for the provider and coming back.
 export interface OAuthFlow {
@@ -143,7 +143,9 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
 
   await heardProfile(core, record, profile)
 
-  return { redirect: await state.complete(record, flow.redirect, `oauth:${provider}`) }
+  const done = await state.complete(record, flow.redirect, `oauth:${provider}`)
+
+  return done.ok ? { redirect: done.redirect } : { error: done.error }
 }
 
 // What else the provider came back with, such as Apple's `user` naming the user on their first sign-in.

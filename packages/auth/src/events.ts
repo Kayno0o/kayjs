@@ -2,14 +2,15 @@ import type { Core, User } from './core'
 import type { SecurityEvent } from './mail'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
+import { clamp } from '@kaynooo/utils'
 import { publicUser } from './core'
 
 // The audit log is pruned of what outlived its age at most this often.
 const PRUNE_EVERY_MS = 60 * 60 * 1000
 const AUDIT_PAGE_MAX = 200
 
-// What happens to an account without changing what protects it, handed to `onEvent` but never mailed.
-export type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed'
+// What happens to an account without changing what protects it, handed to `onEvent` but never mailed; the admin's doing for the last six, the admin in the context's `actor`.
+export type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended'
 
 export type AuthEvent = SecurityEvent | ActivityEvent
 
@@ -61,7 +62,7 @@ export async function auditEntries(core: Core, query: { userId?: string | undefi
   if (!core.audit)
     return []
 
-  const limit = Math.min(Math.max(Math.trunc(query.limit ?? 50), 1), AUDIT_PAGE_MAX)
+  const limit = clamp(Math.trunc(query.limit ?? 50), 1, AUDIT_PAGE_MAX)
 
   return (await audit(core).list({ ...query.userId === undefined ? {} : { userId: query.userId }, ...query.before === undefined ? {} : { before: query.before }, limit })).map(entry => ({ ...entry, event: entry.event as AuthEvent }))
 }

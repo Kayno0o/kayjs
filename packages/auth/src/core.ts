@@ -32,6 +32,8 @@ export interface SignedIn {
   at: number
   // The sign-in's id in the store's sessions; missing from one signed in before kayjs-auth kept them, which gets one on its next request.
   session?: string
+  // The admin's own sign-in while they act as this user, put back when they stop.
+  impersonator?: Omit<SignedIn, 'impersonator'>
 }
 
 // An OAuth app registered at a provider: `{ provider: discordProvider(), clientId, clientSecret }`.
@@ -87,6 +89,10 @@ export interface Core {
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
   defaultRoles: string[]
+  // The roles the app declares; any role goes without them.
+  roles?: Set<string> | undefined
+  // Whether a user meets the `admin` option; nobody does without it.
+  admin?: ((user: User) => Promise<boolean>) | undefined
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   onProviderProfile?: ((user: User, profile: Profile) => void | Promise<void>) | undefined
   onDelete?: ((user: User) => void | Promise<void>) | undefined
@@ -126,9 +132,17 @@ export function newUserRecord(fields: Partial<UserRecord>): UserRecord {
     roles: [],
     sessionVersion: 0,
     lastSignIn: null,
+    bannedAt: null,
+    bannedUntil: null,
+    banReason: null,
     createdAt: new Date(),
     ...fields,
   }
+}
+
+// Whether an admin bars `record` from signing in at this moment.
+export function banned(record: UserRecord, now = Date.now()): boolean {
+  return record.bannedAt !== null && (record.bannedUntil === null || record.bannedUntil.getTime() > now)
 }
 
 export function sameText(a: string, b: string): boolean {

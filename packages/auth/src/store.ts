@@ -17,6 +17,10 @@ export interface UserRecord {
   sessionVersion: number
   // A keyed digest of where the last sign-in came from.
   lastSignIn: string | null
+  // Set while an admin bars the user from signing in, until `bannedUntil` or for good when null.
+  bannedAt: Date | null
+  bannedUntil: Date | null
+  banReason: string | null
   createdAt: Date
 }
 
@@ -124,6 +128,8 @@ export interface AuthStore {
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
     // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens and recovery codes.
     delete: (id: string) => MaybePromise<void>
+    // Newest first; `search` matches part of the email or the username, whatever its case, or the whole id.
+    list: (query: { search?: string, offset: number, limit: number }) => MaybePromise<{ users: UserRecord[], total: number }>
     // Records `step` as the last one a code was accepted for, only when it is later than the one recorded: false when it is not, even when two requests try it together.
     advanceTotpStep: (id: string, step: number) => MaybePromise<boolean>
   }

@@ -7,6 +7,7 @@ import type { Proof, ProofFailure } from './twoFactor'
 import { comparePasswords, hashPassword, nanoid } from '@kaynooo/utils'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
+import { banned } from './core'
 import { digest, randomToken } from './keys'
 import { spend } from './limits'
 import { notify } from './notify'
@@ -63,12 +64,12 @@ export interface PendingCode {
   expires: number
 }
 
-export type CodeResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' }
+export type CodeResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' | 'banned' }
 
 // Sent whether or not an account has that address, so the answer tells nothing of which ones exist.
 export type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'captcha' | 'unavailable' }
 
-export type LinkResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' }
+export type LinkResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'banned' }
 
 export type VerifyEmailResult = LinkResult | { ok: false, error: 'confirm' }
 
@@ -145,6 +146,10 @@ export async function resetPassword(state: RequestState, token: string, password
   if (!spent.ok)
     return spent
 
+  // Before the password changes: a banned user keeps the account as the admin left it.
+  if (banned(spent.record))
+    return { ok: false, error: 'banned' }
+
   const { store } = state.core
   const record = await store.users.update(spent.record.id, {
     ...await claim(state.core, spent.record),
@@ -159,7 +164,7 @@ export async function resetPassword(state: RequestState, token: string, password
   await revokeBearerTokens(state.core, record.id)
   await notify(state, record, 'password-changed')
 
-  return { ok: true, redirect: await state.complete(record, '/', 'reset-password') }
+  return state.complete(record, '/', 'reset-password')
 }
 
 export async function requestMagicLink(state: RequestState, email: string, redirect?: string, captcha?: string): Promise<MailRequestResult> {
@@ -176,7 +181,7 @@ export async function signInWithMagicLink(state: RequestState, token: string): P
     ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
     : spent.record
 
-  return { ok: true, redirect: await state.complete(record, spent.token.redirect ?? '/', 'magic-link') }
+  return state.complete(record, spent.token.redirect ?? '/', 'magic-link')
 }
 
 // Mails the new address a link confirming it; the account keeps the old one until then.
@@ -244,7 +249,7 @@ export async function signInWithEmailCode(state: RequestState, code: string): Pr
     ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
     : spent.record
 
-  return { ok: true, redirect: await state.complete(record, spent.token.redirect ?? '/', 'email-code') }
+  return state.complete(record, spent.token.redirect ?? '/', 'email-code')
 }
 
 // Verifies the address with the code its verification mail carried, in the session that asked for it, which registered the account or is signed in as it.

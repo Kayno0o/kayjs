@@ -1,0 +1,158 @@
+import type { User } from './core'
+import type { AuditEntry } from './events'
+import type { RequestState } from './state'
+import type { UserRecord } from './store'
+import { clamp } from '@kaynooo/utils'
+import { banned, publicUser } from './core'
+import { revokeBearerTokens } from './email'
+import { auditEntries, report } from './events'
+
+const USER_PAGE_MAX = 200
+const BAN_REASON_MAX_LENGTH = 500
+
+// A user as an admin sees them.
+export interface ManagedUser extends User {
+  createdAt: Date
+  // Set while the user is barred from signing in, `until` null for good.
+  ban: { at: Date, until: Date | null, reason: string | null } | null
+}
+
+// `forbidden` when the user asking does not meet the `admin` option, or acts as someone else.
+export type AdminFailure = 'forbidden' | 'not-found'
+
+export type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminFailure | 'unknown-role' }
+
+export type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminFailure | 'self' | 'admin' | 'until' }
+
+export function managedUser(record: UserRecord): ManagedUser {
+  return {
+    ...publicUser(record),
+    createdAt: record.createdAt,
+    ban: banned(record) ? { at: record.bannedAt!, until: record.bannedUntil, reason: record.banReason } : null,
+  }
+}
+
+// The user asking, when they meet the `admin` option as themselves.
+export async function actingAdmin(state: RequestState): Promise<UserRecord | null> {
+  const record = await state.current()
+
+  if (!record || (await state.session.get('auth'))?.impersonator)
+    return null
+
+  return await isAdmin(state, record) ? record : null
+}
+
+export async function isAdmin(state: RequestState, record: UserRecord): Promise<boolean> {
+  return await state.core.admin?.(publicUser(record)) ?? false
+}
+
+// Newest first, a page of `limit` (50 by default) from `offset`.
+export async function listUsers(state: RequestState, query: { search?: string | undefined, offset?: number | undefined, limit?: number | undefined }): Promise<{ ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' }> {
+  if (!(await actingAdmin(state)))
+    return { ok: false, error: 'forbidden' }
+
+  const search = query.search?.trim()
+  const found = await state.core.store.users.list({
+    ...search ? { search } : {},
+    offset: Math.max(Math.trunc(query.offset ?? 0), 0),
+    limit: clamp(Math.trunc(query.limit ?? 50), 1, USER_PAGE_MAX),
+  })
+
+  return { ok: true, users: found.users.map(managedUser), total: found.total }
+}
+
+export async function getUser(state: RequestState, userId: string): Promise<{ ok: true, user: ManagedUser } | { ok: false, error: AdminFailure }> {
+  if (!(await actingAdmin(state)))
+    return { ok: false, error: 'forbidden' }
+
+  const record = await state.core.store.users.get(userId)
+
+  return record ? { ok: true, user: managedUser(record) } : { ok: false, error: 'not-found' }
+}
+
+// Takes effect on the user's next request, roles being read with the user each time.
+export async function changeRole(state: RequestState, userId: string, role: string, granted: boolean): Promise<RoleResult> {
+  const actor = await actingAdmin(state)
+
+  if (!actor)
+    return { ok: false, error: 'forbidden' }
+
+  if (state.core.roles && !state.core.roles.has(role))
+    return { ok: false, error: 'unknown-role' }
+
+  const record = await state.core.store.users.get(userId)
+
+  if (!record)
+    return { ok: false, error: 'not-found' }
+
+  if (record.roles.includes(role) === granted)
+    return { ok: true, user: managedUser(record) }
+
+  const roles = granted ? [...record.roles, role] : record.roles.filter(held => held !== role)
+  const updated = await state.core.store.users.update(record.id, { roles }) ?? { ...record, roles }
+
+  await report(state, updated, granted ? 'role-granted' : 'role-revoked', role, actor)
+
+  return { ok: true, user: managedUser(updated) }
+}
+
+// Bars the user from signing in, for good or `until` then, and signs them out everywhere, devices included. Another admin is refused: revoke their role first.
+export async function banUser(state: RequestState, userId: string, options: { reason?: string | undefined, until?: Date | undefined }): Promise<BanResult> {
+  const actor = await actingAdmin(state)
+
+  if (!actor)
+    return { ok: false, error: 'forbidden' }
+
+  if (options.until !== undefined && !(options.until.getTime() > Date.now()))
+    return { ok: false, error: 'until' }
+
+  const record = await state.core.store.users.get(userId)
+
+  if (!record)
+    return { ok: false, error: 'not-found' }
+
+  if (record.id === actor.id)
+    return { ok: false, error: 'self' }
+
+  if (await isAdmin(state, record))
+    return { ok: false, error: 'admin' }
+
+  const reason = options.reason?.trim().slice(0, BAN_REASON_MAX_LENGTH) || null
+  const patch = { bannedAt: new Date(), bannedUntil: options.until ?? null, banReason: reason, sessionVersion: record.sessionVersion + 1 }
+  const updated = await state.core.store.users.update(record.id, patch) ?? { ...record, ...patch }
+
+  await revokeBearerTokens(state.core, record.id)
+  await report(state, updated, 'banned', reason ?? undefined, actor)
+
+  return { ok: true, user: managedUser(updated) }
+}
+
+export async function unbanUser(state: RequestState, userId: string): Promise<{ ok: true, user: ManagedUser } | { ok: false, error: AdminFailure }> {
+  const actor = await actingAdmin(state)
+
+  if (!actor)
+    return { ok: false, error: 'forbidden' }
+
+  const record = await state.core.store.users.get(userId)
+
+  if (!record)
+    return { ok: false, error: 'not-found' }
+
+  if (record.bannedAt === null)
+    return { ok: true, user: managedUser(record) }
+
+  const patch = { bannedAt: null, bannedUntil: null, banReason: null }
+  const updated = await state.core.store.users.update(record.id, patch) ?? { ...record, ...patch }
+
+  await report(state, updated, 'unbanned', undefined, actor)
+
+  return { ok: true, user: managedUser(updated) }
+}
+
+// Everyone's audit log, or one user's, newest first.
+export async function adminAuditLog(state: RequestState, query: { userId?: string | undefined, before?: Date | undefined, limit?: number | undefined }): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
+  if (!(await actingAdmin(state)))
+    return { ok: false, error: 'forbidden' }
+
+  return { ok: true, entries: await auditEntries(state.core, query) }
+}

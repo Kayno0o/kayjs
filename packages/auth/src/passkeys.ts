@@ -5,6 +5,7 @@ import type { PasskeyRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult } from './twoFactor'
 import { Buffer } from 'node:buffer'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from '@simplewebauthn/server'
+import { banned } from './core'
 import { readDevice } from './device'
 import { report } from './events'
 import { spend } from './limits'
@@ -49,7 +50,7 @@ export type PasskeyOptionsResult<Options> = { ok: true, options: Options } | { o
 
 export type RegisterPasskeyResult = { ok: true, passkey: Passkey } | { ok: false, error: 'signed-out' | 'expired' | 'invalid' }
 
-export type PasskeySignInResult = { ok: true, redirect: string } | { ok: false, error: 'expired' | 'invalid' | 'limited' }
+export type PasskeySignInResult = { ok: true, redirect: string } | { ok: false, error: 'expired' | 'invalid' | 'limited' | 'banned' }
 
 // The options for the browser's `navigator.credentials.create`, through `startRegistration` of `@simplewebauthn/browser`. A new passkey is a way in, so it needs a session that signed in or re-proved lately.
 export async function passkeyRegistrationOptions(state: RequestState): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON>> {
@@ -206,6 +207,9 @@ export async function signInWithPasskey(state: RequestState, response: Authentic
 
     return { ok: false, error: 'invalid' }
   }
+
+  if (banned(record))
+    return { ok: false, error: 'banned' }
 
   await signIn(record, 'passkey')
 

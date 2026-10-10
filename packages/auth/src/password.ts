@@ -43,7 +43,7 @@ export interface PasswordSignInInput {
 
 // `invalid` whether no account matches or the password is wrong, so the answer tells nothing of which accounts exist.
 // `unverified` once the password is right, when the app wants the address verified first.
-export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'captcha' | 'unverified' }
+export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned' }
 
 let decoy: Promise<string> | undefined
 
@@ -153,7 +153,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   if (passwordNeedsRehash(record!.passwordHash!))
     await store.users.update(record!.id, { passwordHash: await hashPassword(input.password) })
 
-  return { ok: true, redirect: await state.complete(record!, safeRedirect(input.redirect), 'password') }
+  return state.complete(record!, safeRedirect(input.redirect), 'password')
 }
 
 // Spends as long on an account without a password as on a wrong one, so the time taken tells nothing either.

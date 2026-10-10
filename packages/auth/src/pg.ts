@@ -19,8 +19,11 @@ export const AuthUsers = defineTable('auth_user', t => ({
   roles: t.array(t.text()).notNull().default([]),
   session_version: t.int4().notNull().default(0),
   last_sign_in: t.text().nullable(),
+  banned_at: t.timestamptz().nullable(),
+  banned_until: t.timestamptz().nullable(),
+  ban_reason: t.text().nullable(),
   created_at: t.timestamptz().notNull(),
-}))
+})).withIndexes([{ columns: ['created_at'] }])
 
 const userId = () => AuthUsers
 
@@ -134,6 +137,14 @@ export function pgStore(db: Database): AuthStore {
       },
       async delete(id) {
         await users.write.deleteById(id)
+      },
+      async list({ search, offset, limit }) {
+        const [rows, total] = await Promise.all([
+          users.read.findMany(q => q.andWhere(search !== undefined && (e => e.or(e.eq('id', search), e.iContains('email', search), e.iContains('username', search)))).orderBy('created_at', 'desc').orderBy('id', 'desc').offset(offset).limit(limit)),
+          users.read.count(search !== undefined && (e => e.or(e.eq('id', search), e.iContains('email', search), e.iContains('username', search)))),
+        ])
+
+        return { users: rows.map(row => toUser(row)!), total }
       },
       // updateMany on the key, as updateOne's LIMIT 1 subquery is not rechecked against a concurrent step: two codes for one step would both pass.
       advanceTotpStep: async (id, step) => (await users.write.updateMany({ totp_last_step: step }, e => e.and(e.eq('id', id), e.lt('totp_last_step', step)), { pk: true })).length > 0,
@@ -264,6 +275,9 @@ function toUser(row: UserRow | null): UserRecord | undefined {
       roles: row.roles,
       sessionVersion: row.session_version,
       lastSignIn: row.last_sign_in,
+      bannedAt: row.banned_at,
+      bannedUntil: row.banned_until,
+      banReason: row.ban_reason,
       createdAt: row.created_at,
     }
     : undefined
@@ -283,6 +297,9 @@ function fromUser(user: Partial<UserRecord>) {
     roles: user.roles,
     session_version: user.sessionVersion,
     last_sign_in: user.lastSignIn,
+    banned_at: user.bannedAt,
+    banned_until: user.bannedUntil,
+    ban_reason: user.banReason,
     created_at: user.createdAt,
   })
 }

@@ -50,6 +50,21 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.users.update('missing', { sessionVersion: 1 })).toBeUndefined()
     })
 
+    test('users list newest first, a page at a time, searched by part of an email or a username whatever its case, or by id', async () => {
+      await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', username: 'Ada', createdAt: new Date('2026-01-01T00:00:00Z') }))
+      await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com', createdAt: new Date('2026-01-02T00:00:00Z') }))
+      await store.users.create(userRecord({ id: 'u3', username: 'Adalbert', createdAt: new Date('2026-01-03T00:00:00Z'), bannedAt: new Date('2026-02-01T00:00:00Z'), banReason: 'spam' }))
+
+      const ids = (found: { users: { id: string }[] }) => found.users.map(user => user.id)
+
+      expect(ids(await store.users.list({ offset: 0, limit: 10 }))).toEqual(['u3', 'u2', 'u1'])
+      expect(await store.users.list({ offset: 1, limit: 1 })).toMatchObject({ users: [{ id: 'u2' }], total: 3 })
+      expect(await store.users.list({ search: 'ADA', offset: 0, limit: 10 })).toMatchObject({ users: [{ id: 'u3', bannedAt: new Date('2026-02-01T00:00:00Z'), banReason: 'spam' }, { id: 'u1' }], total: 2 })
+      expect(ids(await store.users.list({ search: 'bob@', offset: 0, limit: 10 }))).toEqual(['u2'])
+      expect(ids(await store.users.list({ search: 'u1', offset: 0, limit: 10 }))).toEqual(['u1'])
+      expect(await store.users.list({ search: '%', offset: 0, limit: 10 })).toEqual({ users: [], total: 0 })
+    })
+
     test('a TOTP step advances only forward', async () => {
       await store.users.create(userRecord({ id: 'u1', totpLastStep: 10 }))
 
