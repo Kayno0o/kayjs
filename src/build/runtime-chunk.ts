@@ -167,10 +167,16 @@ export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[
       importedNames(await output.text(), used, specifier => eager.has(specifier))
   }
 
+  return { dir: dirname(entry), anchor: anchorModule(used), lazy }
+}
+
+// Held where nothing can tree-shake it away, so every entry point reaches each of them through this module; behind a function, as a module importing this one may not have run yet.
+// In a set order: Bun hands the lazy chunks over in any order, and a list in another one would rename the runtime's chunk and every chunk importing it, a page open in development then reloading rather than swapping an island in.
+export function anchorModule(used: Map<string, Set<string>>): string {
   const imports: string[] = []
   const kept: string[] = []
 
-  for (const [specifier, names] of used) {
+  for (const [specifier, names] of [...used].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
     const from = JSON.stringify(specifier)
 
     if (names.has(ALL)) {
@@ -181,15 +187,14 @@ export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[
       imports.push(`import ${from}`)
     }
     else {
-      const aliases = [...names].map((name, index) => `${name} as k${kept.length + index}`)
+      const aliases = [...names].sort().map((name, index) => `${name} as k${kept.length + index}`)
 
       imports.push(`import { ${aliases.join(', ')} } from ${from}`)
       kept.push(...aliases.map(alias => alias.split(ALIAS)[1]!))
     }
   }
 
-  // Held where nothing can tree-shake it away, so every entry point reaches each of them through this module; behind a function, as a module importing this one may not have run yet.
-  return { dir: dirname(entry), anchor: `${imports.join('\n')}\n;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.runtime')] = () => [${kept.join(', ')}]\n`, lazy }
+  return `${imports.join('\n')}\n;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.runtime')] = () => [${kept.join(', ')}]\n`
 }
 
 // Serves the module every entry point imports, `boot` in it when given, and has each lazy runtime module import it too.

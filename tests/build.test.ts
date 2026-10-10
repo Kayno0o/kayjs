@@ -10,6 +10,7 @@ import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, writeAsset } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { formatSizeReport } from '../src/build/report'
+import { anchorModule } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
@@ -659,5 +660,15 @@ describe('the size report', () => {
 
   it('reports no JavaScript for a site with no island', () => {
     expect(formatSizeReport({ islands: [] })).toBe('no JavaScript: no page has an island')
+  })
+})
+
+describe('the runtime chunk', () => {
+  it('anchors the same module whatever order Bun reports the runtime\'s imports in, so its chunk keeps its name across development builds', () => {
+    const one = new Map([['kay/client', new Set(['hydrateIslands', 'enableHotSwap'])], ['kay', new Set(['signal', 'refresh'])], ['kay/navigate', new Set(['*'])]])
+    const other = new Map([['kay/navigate', new Set(['*'])], ['kay', new Set(['refresh', 'signal'])], ['kay/client', new Set(['enableHotSwap', 'hydrateIslands'])]])
+
+    expect(anchorModule(other)).toBe(anchorModule(one))
+    expect(anchorModule(one)).toContain('import { refresh as k0, signal as k1 } from "kay"')
   })
 })
