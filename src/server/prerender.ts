@@ -94,7 +94,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
     if (options.exportAll && (listed === undefined || listed === false))
       throw new Error(listed === false ? 'kay: it exports prerender = false' : `kay: it takes ${route.params.join(', ')}, so \`prerender\` lists the values to export: export const prerender = [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }]`)
 
-    for (const params of await listedParams(route, file, 'prerender', listed)) {
+    for (const params of await listedParams(route, file, 'prerender', listed, i18n?.settings)) {
       const path = pathOf(route, params)
       const matched = matchedParams(route, params, matchers)
 

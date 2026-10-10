@@ -20,6 +20,8 @@ import { ContentError, decodeEntries } from './validate'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { highlightCode, renderMarkdown } from './markdown'
+export type { Page, Paginated } from './paginate'
+export { isPaginated, paginate } from './paginate'
 
 export const COLLECTION = Symbol.for('kay.collection')
 // Never set: it only carries a feed's path in the collection's type, for `kay check` to count it as served.

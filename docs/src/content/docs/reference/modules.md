@@ -57,7 +57,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext` and `Loc
 
 | Entry | Exports |
 | --- | --- |
-| `kay/content` | `collection`, `renderMarkdown`, `highlightCode`. See [Content](/guides/content) |
+| `kay/content` | `collection`, `paginate`, `renderMarkdown`, `highlightCode`. See [Content](/guides/content) |
 | `kay/seo` | `siteUrl`, `siteOrigin`, `jsonLd`, `breadcrumbList`. See [Head and SEO](/essentials/head-and-seo) |
 | `kay/i18n` | `t`, `locale`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `formatList`, `direction`, `defineMessages`. See [Internationalization](/guides/i18n) |
 | `kay/params` | The route matchers `integer`, `uuid` and `slug` |

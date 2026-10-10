@@ -61,6 +61,29 @@ article
 
 A slug with a slash, like `guides/intro`, needs a catch-all page, `[...slug].kay`.
 
+## Pages of a list
+
+`paginate` splits a collection, an array, or a function returning one into pages, for a page whose one param is optional:
+
+```kay
+--- server
+// src/routes/blog/[[page=integer]].kay
+import { paginate } from 'kay/content'
+import { posts } from '../../content.config'
+
+const blog = paginate(posts, 10)
+
+export const prerender = blog
+
+const list = await blog.page(ctx.params.page) ?? ctx.notFound()
+---
+for post of list.items key={post.slug}
+  a(href={`/blog/${post.slug}`}) {post.data.title}
+Pagination(of={list})
+```
+
+`list` holds `items`, `page`, `pages`, the `prev` and `next` links, undefined at the ends, and `href(n)` for any page. The first page is `/blog`, the others `/blog/2`, `/blog/3`; `/blog/1`, a page past the last and anything but a number give `undefined`, a 404. Exported as `prerender` or `sitemap`, it lists every page, `kay build --static` included. Links follow the request's locale, the site's `base` and `trailingSlash`. A localized collection counts each locale's entries, so a locale with more of them has more pages, each listed in that locale alone. [Pagination](/ui/pagination) from kayjs-ui draws the links.
+
 ## Components in Markdown
 
 List the components a collection may use, and write them in the Markdown with a capital, as in a template:

@@ -94,7 +94,7 @@ const post = await findPost(ctx.params.slug) ?? ctx.notFound()
 h1 {post.title}
 ```
 
-Each value is a string with no empty, `.` or `..` segment, a catch-all's included with its slashes. `export const prerender = false` prerenders nothing.
+Each value is a string with no empty, `.` or `..` segment, a catch-all's included with its slashes. `export const prerender = false` prerenders nothing. A list `paginate()` from `kay/content` split lists each of its pages, for a page whose one param is optional, `blog/[[page=integer]].kay` (see content).
 
 `export const revalidate = '1h'` beside `prerender` keeps a prerendered page fresh: once it is older than that, seconds or a string such as `'1h'`, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does; every request after that render lands gets the new page, with a new ETag and compressed copies. One render runs at a time per path. A render that fails or answers 5xx is logged and leaves the page as it was, the next attempt coming a minute later at most. The new page lives in memory, so a restart serves the built file again until it goes stale; an executable built a while ago revalidates on its first request.
 

@@ -74,7 +74,7 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
       return []
 
     if (module.sitemap !== undefined)
-      return listedParams(route, file, 'sitemap', module.sitemap)
+      return listedParams(route, file, 'sitemap', module.sitemap, settings)
 
     if (route.guards.length > 0)
       return []
@@ -82,7 +82,7 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
     if (route.params.length === 0)
       return [{}]
 
-    return module.prerender === undefined ? [] : listedParams(route, file, 'prerender', module.prerender)
+    return module.prerender === undefined ? [] : listedParams(route, file, 'prerender', module.prerender, settings)
   }))
 
   const absolute = (copy: LocaleCopy) => escape(`${copy.host === undefined ? origin : `https://${copy.host}`}${slashedPath(copy.path, trailingSlash)}`)
