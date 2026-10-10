@@ -90,7 +90,7 @@ process.exit(0)
 const IMPLICIT: Record<string, string> = {
   'package.json': LOCALIZED['package.json']!,
   'tsconfig.json': TSCONFIG,
-  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { authPages } from \'kay-lib\'\n\nexport default defineConfig({ lang: \'fr\', site: \'https://example.com\', extensions: [authPages()] })\n',
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { authPages } from \'kay-lib\'\n\nexport default defineConfig({ lang: \'fr\', site: \'https://example.com\', lints: { seo: \'allow\' }, extensions: [authPages()] })\n',
   'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ auth: { title: \'Se connecter\' } })\n',
   // A component no page renders, so the static export leaves its unknown key to kay check.
   'src/wrong.kay': '---\nimport { t } from \'kay/i18n\'\n---\np {t(\'auth.nope\')}\n',

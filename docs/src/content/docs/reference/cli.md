@@ -17,7 +17,7 @@ bun run dev
 | `kay dev [dir]` | Run the server, restarting on change, with errors shown in the browser |
 | `kay build [dir]` | Check the project and bundle the browser code for production |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
-| `kay explain [lint]` | List the lints, or explain one |
+| `kay explain [lint\|group]` | List the lints, or a group's, or explain one |
 | `kay fmt [paths]` | Format `.kay` files |
 | `kay migrate astro [dir]` | Translate an Astro project into `.kay` files |
 | `kay lsp --stdio` | The language server behind the editor extension |
@@ -130,6 +130,7 @@ kay check --deny-warnings --fix
 | --- | --- |
 | `--deny-warnings` | Fails on warnings too, not only on errors |
 | `--fix` | Applies the fixes that change nothing else, then reports what is left |
+| `--only <group>` | Reports one group's lints alone, such as `seo`, as an audit |
 | `-p <tsconfig>` | Names another tsconfig, relative to the directory |
 | `--entry <file>` | The server entry whose `app` types `ctx.locals`, `src/server.ts` by default |
 

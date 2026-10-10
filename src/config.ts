@@ -77,7 +77,7 @@ export interface KayConfig {
   settings?: Record<string, string> | undefined
   // Variables an island may read, as `publicEnv` from `kay`: `t.Object({ MAP_KEY: t.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser.
   publicEnv?: EnvSchema | undefined
-  // The level of each lint `kay check`, `kay dev` and the editor report, over its default: `{ 'positional-key': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
+  // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
   // Lets an editor see drafts on the live site: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
   preview?: PreviewConfig | undefined

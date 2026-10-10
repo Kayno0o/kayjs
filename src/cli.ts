@@ -1,6 +1,9 @@
 #!/usr/bin/env bun
 import type { ParseArgsOptionsConfig } from 'node:util'
+import type { CheckDiagnostic } from './check'
+import type { RenderedPage } from './check/seo'
 import type { Paint } from './compiler/frame'
+import type { LintGroup } from './compiler/lints'
 import type { KayConfig } from './config'
 import type { Feature, Preset } from './new'
 import type { ClientBuild } from './server/client'
@@ -17,8 +20,9 @@ import { formatSizeReport } from './build/report'
 import { exportStatic, refuseStaticConfig } from './build/static'
 import { KayCompileError } from './build/transform'
 import { applySafeFixes, check, formatCheckDiagnostic } from './check'
+import { pageSeoLints } from './check/seo'
 import { formatDiagnostic } from './compiler'
-import { explainLint, isLint, lintList } from './compiler/lints'
+import { explainLint, isLint, isLintGroup, LINT_GROUPS, lintList, LINTS } from './compiler/lints'
 import { loadConfig, pageHooks } from './config'
 import { writeContentManifests } from './content/server'
 import { ContentError } from './content/validate'
@@ -44,7 +48,7 @@ const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const stderrColors = createColors({ stream: process.stderr })
 const toStderr: Paint = (styles, text) => styles.reduce((paint, style) => paint[style], stderrColors)(text)
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]\n       kay explain [lint]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>]\n       kay explain [lint|group]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -123,7 +127,7 @@ async function main(args: string[]): Promise<number> {
   return runCheck(rest)
 }
 
-// Lists the lints, or explains the one named.
+// Lists the lints, or a group's, or explains the lint named.
 function explain(args: string[]): number {
   const parsed = parseCommand(args, {}, 1)
 
@@ -138,8 +142,14 @@ function explain(args: string[]): number {
     return 0
   }
 
+  if (isLintGroup(name)) {
+    console.log(lintList(name))
+
+    return 0
+  }
+
   if (!isLint(name)) {
-    console.error(`kay explain: \`${name}\` is no lint; \`kay explain\` lists them`)
+    console.error(`kay explain: \`${name}\` is no lint or group; \`kay explain\` lists them`)
 
     return 1
   }
@@ -150,12 +160,20 @@ function explain(args: string[]): number {
 }
 
 async function runCheck(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' } }, 1)
+  const parsed = parseCommand(args, { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'only': { type: 'string' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
 
   const { project, entry } = parsed.values
+  const only = typeof parsed.values.only === 'string' ? parsed.values.only : undefined
+
+  if (only !== undefined && !isLintGroup(only)) {
+    console.error(`kay check: --only takes a group of lints, ${Object.keys(LINT_GROUPS).map(group => `\`${group}\``).join(', ')}, not \`${only}\``)
+
+    return 1
+  }
+
   const tsconfig = typeof project === 'string' ? project : 'tsconfig.json'
   const root = projectRoot('check', parsed.positionals[0])
 
@@ -166,7 +184,7 @@ async function runCheck(args: string[]): Promise<number> {
   buildingWithoutEnv()
 
   const started = performance.now()
-  const { failing, found } = await checkProject(root, await loadConfig(root), tsconfig, typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: parsed.values['deny-warnings'] === true, fix: parsed.values.fix === true })
+  const { failing, found } = await checkProject(root, await loadConfig(root), tsconfig, typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: parsed.values['deny-warnings'] === true, fix: parsed.values.fix === true, only })
 
   if (found === 0)
     done('checked', 'with no problems', started)
@@ -175,10 +193,10 @@ async function runCheck(args: string[]): Promise<number> {
 }
 
 // Prints what `kay check` finds in the project, as it finds it, and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
-// With `fix`, applies the safe fixes first, then checks again and prints what is left.
-async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string, { denyWarnings = false, fix = false } = {}): Promise<{ failing: number, found: number }> {
-  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions } = config
-  const options = { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions }
+// With `fix`, applies the safe fixes first, then checks again and prints what is left; with `only`, prints that group's lints alone.
+async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string, { denyWarnings = false, fix = false, only }: { denyWarnings?: boolean, fix?: boolean, only?: LintGroup | undefined } = {}): Promise<{ failing: number, found: number }> {
+  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon } = config
+  const options = { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon }
   let diagnostics = await check(root, options)
   const fixed = fix ? await applySafeFixes(root, diagnostics) : 0
 
@@ -187,6 +205,14 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
     diagnostics = await check(root, options)
   }
 
+  if (only !== undefined)
+    diagnostics = diagnostics.filter(diagnostic => isLint(diagnostic.code) && LINTS[diagnostic.code].group === only)
+
+  return printProblems(diagnostics, denyWarnings)
+}
+
+// Prints problems as rustc does, then how many there are, and answers how many of those fail: the errors, and the warnings too with `denyWarnings`.
+async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings = false): Promise<{ failing: number, found: number }> {
   const sources = new Map<string, string | undefined>()
 
   for (const diagnostic of diagnostics) {
@@ -283,7 +309,14 @@ async function build(args: string[]): Promise<number> {
 
     client = bundled.value
 
-    const { prerendered, entries } = await finishOutput(root, config, exported, client)
+    const { prerendered, entries, failing } = await finishOutput(root, config, exported, client, checking)
+
+    if (failing > 0) {
+      await putBack(output, previous)
+      console.error('kay build: nothing built, as the prerendered pages break the lints above; --no-check builds anyway')
+
+      return 1
+    }
 
     done('built', `${count(Object.keys(client.islands).length, 'island')}, ${count(client.styles.size, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''}`, started)
 
@@ -364,7 +397,7 @@ async function bundleClient(root: string, config: KayConfig, exported: boolean, 
 }
 
 // The rest of what the server serves from `.kay/client`, which runs the app's content config and pages, so only once the check passed: content manifests, prerendered pages, the variants of images only they import, and favicons, compressed.
-async function finishOutput(root: string, config: KayConfig, exported: boolean, client: ClientBuild): Promise<{ prerendered: number, entries: number }> {
+async function finishOutput(root: string, config: KayConfig, exported: boolean, client: ClientBuild, checking: boolean): Promise<{ prerendered: number, entries: number, failing: number }> {
   // Before prerendering, whose pages read the collections from what it writes.
   const entries = await writeContentManifests(root, join(root, '.kay', 'client'), config.content)
 
@@ -372,7 +405,10 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   if (exported)
     linkVariantFiles()
 
-  const prerendered = await prerenderPages(root, config, client, { exportAll: exported })
+  const rendered: RenderedPage[] = []
+  const prerendered = await prerenderPages(root, config, client, { exportAll: exported, rendered })
+  // The heads are the check's to read, so `--no-check` skips them with it.
+  const { failing } = checking ? await printProblems(pageSeoLints(config, rendered, exported)) : { failing: 0 }
 
   // Remote originals are kept between builds, revalidated as the image route does.
   const remote = remoteImages(join(root, '.kay', 'cache', 'remote'), remotePatterns(config.images?.remote))
@@ -389,7 +425,7 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: resolve(root, config.publicDir ?? 'public'), base: basePath(config.base), aspects: config.images?.aspects })
   await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay', 'client', PRERENDERED_DIR))])
 
-  return { prerendered, entries }
+  return { prerendered, entries, failing }
 }
 
 // The directory a command works on, or nothing once it said that the path is none.

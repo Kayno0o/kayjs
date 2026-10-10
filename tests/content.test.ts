@@ -111,7 +111,7 @@ describe('kay check', () => {
     const posts = join(FIXTURE, 'src/content/posts')
     const page = join(FIXTURE, 'src/routes/typo.kay')
 
-    expect(await check(FIXTURE, { site: SITE })).toEqual([])
+    expect(await check(FIXTURE, { site: SITE, lints: { seo: 'allow' } })).toEqual([])
 
     try {
       await Bun.write(join(posts, 'broken.md'), '---\ntitle: Broken\ndate: someday\n---\n\n<Missing />\n\n<Counter start="2" />\n\n<Callout kind="warn">\nText\n</Callout>\n')

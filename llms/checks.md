@@ -23,36 +23,55 @@
 `kay check`, `kay build` and `kay dev`'s problems panel print a problem as rustc does, and the editor shows the same message, note and help: `error[missing-alt]: An \`img\` needs \`alt\``, then ` --> src/routes/index.kay:4:3`, the lines at fault with the span underlined and the other places involved labelled, then `= note:` saying why when the message does not, and `= help:` saying what to write instead. A name in brackets is a lint's, and the project sets its level: `deny` reports it as an error, `warn` as a warning, and `allow` not at all. `kay check` prints warnings beside the errors and counts them apart, failing on them only with `--deny-warnings`, which the `check` script `kay new` writes passes; `kay build` and `kay dev` never fail on one. Lints are found while type checking, so a page with one still runs.
 
 - `lints` in `kay.config.ts` sets levels over the defaults: `defineConfig({ lints: { 'positional-key': 'deny', 'unread-name': 'warn' } })`.
+- Each lint is in a group, `code`, `a11y`, `forms`, `islands` or `seo`, and `lints` takes a group's level for every lint in it, a lint's own level winning: `lints: { a11y: 'warn', 'missing-alt': 'deny' }`.
+- `kay check --only seo` prints one group's lints alone, leaving out the other lints and every problem that is no lint, type errors included: an audit, not a check.
 - `// kay-allow constant-signal` allows a lint on the line it ends, or, alone on its line, on the line after it, in a fence or in the template; it takes several names separated by commas, and one that is no lint is reported.
-- `kay explain` lists the lints; `kay explain positional-key` prints one with an example it reports and the same written right.
+- `kay explain` lists the lints with their group; `kay explain seo` lists a group's; `kay explain positional-key` prints one with an example it reports and the same written right.
 
-| Lint | Default | Reports |
-| --- | --- | --- |
-| `unread-name` | deny | A prop, server value, import or declaration nothing reads (see [What `kay check` verifies](#what-kay-check-verifies)). |
-| `missing-alt` | deny | An `img` or `input(type="image")` with no `alt`. |
-| `missing-title` | deny | An `iframe` with no `title`. |
-| `unreachable-click` | deny | An `onClick` on an element no keyboard reaches and no `role` names. |
-| `empty-control` | deny | A `button`, or an `a` with an `href`, with nothing for a screen reader to announce: no text, no value, no `aria-label`, an icon alone. |
-| `unknown-aria` | deny | An `aria-*` attribute ARIA does not define, such as `aria-labeledby`. The quick fix writes the closest one. |
-| `unknown-role` | deny | A `role` ARIA does not define, or an abstract one such as `widget`. |
-| `missing-state` | deny | A `role` with no state it needs, such as a `switch` with no `aria-checked`. |
-| `hidden-focusable` | deny | An element the keyboard reaches on or inside `aria-hidden="true"`. |
-| `positive-tabindex` | deny | A `tabindex` above 0. |
-| `link-as-button` | deny | An `a` with `onClick` and no `href`, `href="#"` or a `javascript:` one. |
-| `nested-control` | deny | A link, button or field inside a link or a button. |
-| `duplicate-id` | deny | An id two elements of a template share, or one written out inside a `for`. |
-| `invalid-autocomplete` | deny | An `autocomplete` value HTML does not define. |
-| `unbounded-string` | deny | A string field of an action's schema with no `maxLength`. |
-| `positional-key` | warn | `for todo, i of todos key={i}` whose rows read `todo.id`: keyed by position, a row added before others hands their markup and state to the wrong rows. The quick fix drops the key, so they are matched by `todo.id`. |
-| `identity-key` | warn | A `for` in an island over objects with no `id` and no `key`, matched by the objects themselves: a list rebuilt with new objects builds every row anew. Found by the type check, so by `kay check` and the editor. |
-| `missing-label` | warn | An `input`, `select` or `textarea` with no `label`, `aria-label`, `aria-labelledby`, `title` or `placeholder`. |
-| `skipped-heading` | warn | A heading skipping a level after the one before it, an `h3` after an `h1`. |
-| `autofocus` | warn | `autofocus` outside a `dialog`, on an element without `tabindex="-1"`. |
-| `dangling-label` | warn | A `label(for="...")` pointing at an id nothing in the template has. |
-| `missing-captions` | warn | A `video` that is not `muted` with no captions `track`. |
-| `redundant-alt` | warn | Alt text that is a filename or says it is an image. |
-| `constant-signal` | warn | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |
-| `uncaught-await` | warn | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
+| Lint | Default | Group | Reports |
+| --- | --- | --- | --- |
+| `unread-name` | deny | code | A prop, server value, import or declaration nothing reads (see [What `kay check` verifies](#what-kay-check-verifies)). |
+| `missing-alt` | deny | a11y | An `img` or `input(type="image")` with no `alt`. |
+| `missing-title` | deny | a11y | An `iframe` with no `title`. |
+| `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches and no `role` names. |
+| `empty-control` | deny | a11y | A `button`, or an `a` with an `href`, with nothing for a screen reader to announce: no text, no value, no `aria-label`, an icon alone. |
+| `unknown-aria` | deny | a11y | An `aria-*` attribute ARIA does not define, such as `aria-labeledby`. The quick fix writes the closest one. |
+| `unknown-role` | deny | a11y | A `role` ARIA does not define, or an abstract one such as `widget`. |
+| `missing-state` | deny | a11y | A `role` with no state it needs, such as a `switch` with no `aria-checked`. |
+| `hidden-focusable` | deny | a11y | An element the keyboard reaches on or inside `aria-hidden="true"`. |
+| `positive-tabindex` | deny | a11y | A `tabindex` above 0. |
+| `link-as-button` | deny | a11y | An `a` with `onClick` and no `href`, `href="#"` or a `javascript:` one. |
+| `nested-control` | deny | a11y | A link, button or field inside a link or a button. |
+| `duplicate-id` | deny | a11y | An id two elements of a template share, or one written out inside a `for`. |
+| `invalid-autocomplete` | deny | forms | An `autocomplete` value HTML does not define. |
+| `unbounded-string` | deny | forms | A string field of an action's schema with no `maxLength`. |
+| `positional-key` | warn | islands | `for todo, i of todos key={i}` whose rows read `todo.id`: keyed by position, a row added before others hands their markup and state to the wrong rows. The quick fix drops the key, so they are matched by `todo.id`. |
+| `identity-key` | warn | islands | A `for` in an island over objects with no `id` and no `key`, matched by the objects themselves: a list rebuilt with new objects builds every row anew. Found by the type check, so by `kay check` and the editor. |
+| `missing-label` | warn | a11y | An `input`, `select` or `textarea` with no `label`, `aria-label`, `aria-labelledby`, `title` or `placeholder`. |
+| `skipped-heading` | warn | a11y | A heading skipping a level after the one before it, an `h3` after an `h1`. |
+| `autofocus` | warn | a11y | `autofocus` outside a `dialog`, on an element without `tabindex="-1"`. |
+| `dangling-label` | warn | a11y | A `label(for="...")` pointing at an id nothing in the template has. |
+| `missing-captions` | warn | a11y | A `video` that is not `muted` with no captions `track`. |
+| `redundant-alt` | warn | a11y | Alt text that is a filename or says it is an image. |
+| `constant-signal` | warn | islands | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |
+| `uncaught-await` | warn | code | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
+| `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts or `SITE_URL`: no canonical links, `og:url`, sitemap or robots.txt. |
+| `missing-description` | warn | seo | A public site with no `seo.description`. |
+| `missing-share-image` | warn | seo | A public site with no `seo.image`, and no `.kay` file of the project setting an `og:image`. |
+| `default-favicon` | warn | seo | A public site with no `favicon`, showing kay's mark. |
+| `untitled-page` | warn | seo | A prerendered page with no `title`. |
+| `undescribed-page` | warn | seo | A prerendered page with no description, its own or `seo.description`. |
+| `duplicate-title` | warn | seo | A prerendered page with the title of another of the same locale. |
+| `long-description` | warn | seo | A prerendered page whose description runs over 160 characters, which search results cut. |
+| `unsized-share-image` | warn | seo | A prerendered page whose `og:image` has no `og:image:width`, kay reading no size off it. |
+| `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `export const noindex = true` does both. |
+
+## SEO lints
+
+The `seo` group reads what search engines and social networks see of a public site: one with `site` or `seo` set, or exported with `kay build --static`. On any other site they are allowed unless `lints` sets them or `seo`. No `// kay-allow` comment reaches them, as no template reports them.
+
+- `kay check` reads kay.config.ts: `missing-site`, `missing-description`, `missing-share-image`, `default-favicon`. They point at kay.config.ts.
+- `kay build` reads the head of every page it prerenders once the check passed: `untitled-page`, `undescribed-page`, `duplicate-title`, `long-description`, `unsized-share-image`, `noindex-in-sitemap`. They point at the page's module and name the path; a page rendered per request is not read. One at `deny` fails the build and leaves the last one in place, as a failing check does; `--no-check` reads none.
 
 ## Linting
 

@@ -307,7 +307,7 @@ describe('localized content', () => {
     const broken = join(site, 'src/content/news/en/broken.md')
 
     try {
-      expect(await check(site, { site: SITE, i18n: { ...i18n, messages: undefined } })).toEqual([])
+      expect(await check(site, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined } })).toEqual([])
       await Bun.write(broken, '---\ntitle: Broken\ndate: someday\n---\n')
 
       const diagnostics = (await check(site, { site: SITE, i18n: { ...i18n, messages: undefined } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(site)), line, message }))
@@ -421,9 +421,9 @@ describe('prerendering', () => {
 
 describe('kay check', () => {
   it('types t() from the default locale\'s messages and reports a locale that strays from them', async () => {
-    expect(await check(FIXTURE, { site: SITE, i18n: { ...i18n, messages: undefined } })).toEqual([])
+    expect(await check(FIXTURE, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined } })).toEqual([])
     // Unprefixed links stay valid with every locale prefixed: the server sends them on to the visitor's.
-    expect(await check(FIXTURE, { site: SITE, i18n: { ...i18n, messages: undefined, prefixDefault: true } })).toEqual([])
+    expect(await check(FIXTURE, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined, prefixDefault: true } })).toEqual([])
 
     const english = join(FIXTURE, 'src/messages/en.ts')
     const page = join(FIXTURE, 'src/routes/typo.kay')
@@ -433,7 +433,7 @@ describe('kay check', () => {
       await Bun.write(english, source.replace('  greeting: \'Hello {name}\',\n', '').replace('Saved on {date}', 'Saved on {day}').replace('counter: { label: \'Counter\', more: \'More\' }', 'counter: { label: \'Counter\', more: \'More\', less: \'Less\' }'))
       await Bun.write(page, '--- server\nimport { t } from \'kay/i18n\'\n\nconst a = t(\'nav.hom\')\nconst b = t(\'greeting\')\nconst c = t(\'greeting\', { nom: \'Ada\' })\nconst d = t(\'items\', { count: \'2\' })\n---\np {a} {b} {c} {d}\n')
 
-      const diagnostics = (await check(FIXTURE, { site: SITE, i18n: { ...i18n, messages: undefined } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
+      const diagnostics = (await check(FIXTURE, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
 
       expect(diagnostics).toContainEqual({ file: english, line: 1, message: 'lacks greeting, which src/messages/fr.ts has' })
       expect(diagnostics).toContainEqual({ file: english, line: 7, message: 'gives saved without {date}, which src/messages/fr.ts has' })
@@ -454,7 +454,7 @@ describe('kay check', () => {
     try {
       await Bun.write(page, 'a(href="/en/about-us") About\na(href="/a-propos") À propos\na(href="/en/about") About\n')
 
-      const diagnostics = (await check(FIXTURE, { site: SITE, i18n: { ...i18n, messages: undefined, paths } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
+      const diagnostics = (await check(FIXTURE, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined, paths } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
 
       expect(diagnostics.filter(diagnostic => diagnostic.file === page).map(diagnostic => diagnostic.line)).toEqual([2, 3])
     }
@@ -462,13 +462,13 @@ describe('kay check', () => {
       await rm(page, { force: true })
     }
 
-    const clash = await check(FIXTURE, { site: SITE, i18n: { ...i18n, messages: undefined, paths: { '/about': { en: '/' } } } })
+    const clash = await check(FIXTURE, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined, paths: { '/about': { en: '/' } } } })
 
     expect(clash.map(({ message }) => message)).toContainEqual(expect.stringContaining('are both served at / in en'))
   })
 
   it('reports a locale config no request could be served by, at the config', async () => {
-    const diagnostics = await check(FIXTURE, { site: SITE, i18n: { locales: ['fr'], defaultLocale: 'en' } })
+    const diagnostics = await check(FIXTURE, { site: SITE, lints: { seo: 'allow' }, i18n: { locales: ['fr'], defaultLocale: 'en' } })
 
     expect(diagnostics.map(({ file, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), message }))).toContainEqual({ file: `${FIXTURE}/kay.config.ts`, message: 'kay: i18n\'s defaultLocale en is not one of its locales: fr' })
   })

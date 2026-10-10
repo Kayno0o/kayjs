@@ -1,3 +1,4 @@
+import type { RenderedPage } from '../check/seo'
 import type { KayConfig } from '../config'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Route } from './routes'
@@ -40,6 +41,8 @@ export class ExportError extends Error {
 export interface PrerenderOptions {
   // Every page, for `kay build --static`: one without params prerenders unless it opts out, and a page that cannot is reported rather than left to a server.
   exportAll?: boolean
+  // Receives every page rendered, for `kay build` to lint their heads.
+  rendered?: RenderedPage[] | undefined
 }
 
 // Renders every page whose server fence exports `prerender = true` into `.kay/client/pages`, listing them in the manifest the server boots from.
@@ -143,6 +146,10 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         paths.set(name, copy.key)
         await mkdir(join(dir, name, '..'), { recursive: true })
         await Bun.write(join(dir, name), html)
+
+        if (response.status === 200)
+          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex: module.noindex === true, sitemap: module.sitemap !== undefined })
+
         pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {} }
       }
     }

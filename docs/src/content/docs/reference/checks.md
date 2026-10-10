@@ -23,45 +23,58 @@ The name in brackets is a lint. `kay build` runs the same check and `kay dev` sh
 - Island props can be serialized, and no component reads a browser global while it renders.
 - Accessibility basics: `alt`, labels, headings, keyboard access.
 - Config the server would refuse at boot, such as two pages serving one path.
+- On a public site, what search engines and social networks read: a `site`, a description, a share image, a favicon. `kay build` also reads the head of every page it prerenders.
 
 ## Errors and warnings
 
 Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. Warnings fail the check only with `--deny-warnings`, which the `check` script of a new project passes. `kay build` and `kay dev` never fail on one.
 
-| Lint | Default | Reports |
-| --- | --- | --- |
-| `unread-name` | deny | A prop, import or declaration nothing reads |
-| `missing-alt` | deny | An `img` with no `alt` |
-| `missing-title` | deny | An `iframe` with no `title` |
-| `unreachable-click` | deny | An `onClick` on an element no keyboard reaches |
-| `empty-control` | deny | A button or link with nothing to announce |
-| `unknown-aria` | deny | An `aria-*` attribute ARIA does not define |
-| `unknown-role` | deny | A `role` ARIA does not define |
-| `missing-state` | deny | A `role="switch"` with no `aria-checked` |
-| `hidden-focusable` | deny | A focusable element under `aria-hidden` |
-| `positive-tabindex` | deny | A `tabindex` above 0 |
-| `link-as-button` | deny | An `a` with `onClick` and no `href` |
-| `nested-control` | deny | A button inside a link |
-| `duplicate-id` | deny | An id two elements share |
-| `invalid-autocomplete` | deny | An `autocomplete` value HTML does not define |
-| `unbounded-string` | deny | A string field of an action with no `maxLength` |
-| `positional-key` | warn | A `for` keyed by position whose rows read `item.id` |
-| `identity-key` | warn | An island `for` over objects with no `id` or `key` |
-| `missing-label` | warn | A form field with no label |
-| `skipped-heading` | warn | An `h3` right after an `h1` |
-| `autofocus` | warn | `autofocus` outside a `dialog` |
-| `dangling-label` | warn | A `label(for)` pointing at no id |
-| `missing-captions` | warn | A `video` with no captions |
-| `redundant-alt` | warn | Alt text that says it is an image |
-| `constant-signal` | warn | A signal that is only ever read |
-| `uncaught-await` | warn | An `await` block with no `catch` |
+| Lint | Default | Group | Reports |
+| --- | --- | --- | --- |
+| `unread-name` | deny | code | A prop, import or declaration nothing reads |
+| `missing-alt` | deny | a11y | An `img` with no `alt` |
+| `missing-title` | deny | a11y | An `iframe` with no `title` |
+| `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches |
+| `empty-control` | deny | a11y | A button or link with nothing to announce |
+| `unknown-aria` | deny | a11y | An `aria-*` attribute ARIA does not define |
+| `unknown-role` | deny | a11y | A `role` ARIA does not define |
+| `missing-state` | deny | a11y | A `role="switch"` with no `aria-checked` |
+| `hidden-focusable` | deny | a11y | A focusable element under `aria-hidden` |
+| `positive-tabindex` | deny | a11y | A `tabindex` above 0 |
+| `link-as-button` | deny | a11y | An `a` with `onClick` and no `href` |
+| `nested-control` | deny | a11y | A button inside a link |
+| `duplicate-id` | deny | a11y | An id two elements share |
+| `invalid-autocomplete` | deny | forms | An `autocomplete` value HTML does not define |
+| `unbounded-string` | deny | forms | A string field of an action with no `maxLength` |
+| `positional-key` | warn | islands | A `for` keyed by position whose rows read `item.id` |
+| `identity-key` | warn | islands | An island `for` over objects with no `id` or `key` |
+| `missing-label` | warn | a11y | A form field with no label |
+| `skipped-heading` | warn | a11y | An `h3` right after an `h1` |
+| `autofocus` | warn | a11y | `autofocus` outside a `dialog` |
+| `dangling-label` | warn | a11y | A `label(for)` pointing at no id |
+| `missing-captions` | warn | a11y | A `video` with no captions |
+| `redundant-alt` | warn | a11y | Alt text that says it is an image |
+| `constant-signal` | warn | islands | A signal that is only ever read |
+| `uncaught-await` | warn | code | An `await` block with no `catch` |
+| `missing-site` | warn | seo | `seo` with no `site` |
+| `missing-description` | warn | seo | No `seo.description` |
+| `missing-share-image` | warn | seo | No share image on any page |
+| `default-favicon` | warn | seo | kay's mark as the favicon |
+| `untitled-page` | warn | seo | A page with no title |
+| `undescribed-page` | warn | seo | A page with no description |
+| `duplicate-title` | warn | seo | Two pages with one title |
+| `long-description` | warn | seo | A description over 160 characters |
+| `unsized-share-image` | warn | seo | A share image of unknown size |
+| `noindex-in-sitemap` | warn | seo | A `noindex` page the sitemap lists |
 
 ## Fixing
 
 ```sh
 kay check --fix        # applies the safe fixes, such as removing unread props
 kay explain            # lists the lints
+kay explain seo        # lists a group's
 kay explain missing-alt
+kay check --only seo   # one group's lints alone, as an audit
 ```
 
 `kay explain <lint>` prints an example it reports and the same written right.
@@ -75,6 +88,16 @@ export default defineConfig({
   lints: { 'positional-key': 'deny', 'unread-name': 'warn' },
 })
 ```
+
+A group sets every lint in it, and a lint's own level wins:
+
+```ts
+export default defineConfig({
+  lints: { 'seo': 'deny', 'default-favicon': 'allow' },
+})
+```
+
+The `seo` lints warn on a site with `site` or `seo` set, or exported with `--static`, and stay quiet on any other unless `lints` turns them on. The ones about pages are found by `kay build`, in the pages it prerenders.
 
 For one place, with a comment on the line, or alone on the line before:
 

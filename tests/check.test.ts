@@ -860,7 +860,7 @@ describe('kay check, what the server refuses at boot', () => {
     })
 
     try {
-      const unserved = (await check(root, { site: 'https://example.com' })).filter(d => d.code !== undefined).map(d => [d.line, d.message])
+      const unserved = (await check(root, { site: 'https://example.com', lints: { seo: 'allow' } })).filter(d => d.code !== undefined).map(d => [d.line, d.message])
 
       expect(unserved).toEqual([[5, expect.stringContaining('No page, public file or app route serves /other.xml')]])
     }
@@ -1100,9 +1100,62 @@ describe('kay check, unused code', () => {
 
     try {
       expect((await check(root, { lints: { 'missing-alts': 'warn', 'missing-alt': 'warning' } as unknown as CheckOptions['lints'] })).map(d => [basename(d.file), d.message, d.help])).toEqual([
-        ['kay.config.ts', '`lints` names `missing-alts`, which is no lint', '`kay explain` lists them'],
+        ['kay.config.ts', '`lints` names `missing-alts`, which is no lint or group', '`kay explain` lists them'],
         ['kay.config.ts', 'The lint `missing-alt` is set to `warning`, which is no level', 'set it to `allow`, `warn` or `deny`'],
       ])
+      expect((await check(root, { lints: { a11y: 'loud' } as unknown as CheckOptions['lints'] })).map(d => d.message)).toEqual(['The group `a11y` is set to `loud`, which is no level'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports what a public site leaves out of kay.config.ts, and nothing on a site that is not public', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': 'p a\n' })
+    const seoLints = async (options: CheckOptions) => (await check(root, options)).map(d => [basename(d.file), d.code, d.severity])
+
+    try {
+      expect(await seoLints({})).toEqual([])
+      expect(await seoLints({ seo: { name: 'Example' } })).toEqual([
+        ['kay.config.ts', 'missing-site', 'warning'],
+        ['kay.config.ts', 'missing-description', 'warning'],
+        ['kay.config.ts', 'missing-share-image', 'warning'],
+        ['kay.config.ts', 'default-favicon', 'warning'],
+      ])
+      expect(await seoLints({ site: 'https://example.com', seo: { description: 'What it is', image: '/og.png' }, favicon: false })).toEqual([])
+      // A group's level reaches its lints, a lint's own wins, and a site that is not public gets the ones `lints` sets.
+      expect(await seoLints({ site: 'https://example.com', favicon: false, lints: { 'seo': 'deny', 'missing-share-image': 'allow' } })).toEqual([['kay.config.ts', 'missing-description', 'error']])
+      expect(await seoLints({ lints: { 'missing-description': 'warn' } })).toEqual([['kay.config.ts', 'missing-description', 'warning']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('takes a page or layout setting an og:image for the site\'s share image', async () => {
+    const root = await scratchProject({ 'src/routes/_layout.kay': 'head\n  meta(property="og:image" content="/card.png")\nslot\n' })
+
+    try {
+      expect((await check(root, { site: 'https://example.com', favicon: false, seo: { description: 'What it is' } })).map(d => d.code)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('prints one group\'s lints alone with --only, failing on them alone', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default { seo: { name: \'Example\' }, favicon: false }\n',
+      'src/routes/index.kay': 'img(src="/a.png")\n',
+    })
+
+    try {
+      const seo = await runCheck(root, '--only', 'seo')
+
+      expect(seo.output.match(/^\w+\[[\w-]+\]/gm)).toEqual(['warning[missing-site]', 'warning[missing-description]', 'warning[missing-share-image]'])
+      expect(seo.code).toBe(0)
+      expect((await runCheck(root, '--only', 'a11y')).output.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[missing-alt]'])
+      expect(await runCheck(root, '--only', 'nope')).toEqual({ code: 1, output: 'kay check: --only takes a group of lints, `code`, `a11y`, `forms`, `islands`, `seo`, not `nope`\n', report: '' })
     }
     finally {
       await rm(root, { recursive: true, force: true })

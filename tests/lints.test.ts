@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
-import { explainLint, lintList, LINTS } from '../src/compiler/lints'
+import { explainLint, LINT_GROUPS, lintList, LINTS } from '../src/compiler/lints'
 
 function lints(source: string, options: CompileOptions = {}) {
   return compileKay(source, 'list.kay', { check: true, ...options }).diagnostics.map(d => ({ code: d.code, severity: d.severity, at: source.slice(d.start, d.end) }))
@@ -30,6 +30,12 @@ describe('lint levels', () => {
     expect(lints(source, { lints: { 'missing-alt': 'allow', 'positional-key': 'allow' } })).toEqual([])
   })
 
+  it('takes a group\'s level for each of its lints, a lint\'s own level winning over it', () => {
+    const source = `${ROWS}img(src="/a.png")\niframe(src="/map")\nfor todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`
+
+    expect(lints(source, { lints: { 'a11y': 'warn', 'missing-title': 'allow', 'islands': 'allow' } })).toEqual([{ code: 'missing-alt', severity: 'warning', at: 'img' }])
+  })
+
   it('allows a lint on the line after a `// kay-allow` comment standing alone, or on the line it ends', () => {
     const source = '---\nimport { signal } from \'kay\'\n\n// kay-allow constant-signal\nconst a = signal(1)\nconst b = signal(2) // kay-allow constant-signal, missing-alt\nconst c = signal(3)\n---\n// kay-allow missing-alt\nimg(src="/a.png")\nimg(src="/b.png")\np {a()} {b()} {c()}\n'
 
@@ -51,8 +57,8 @@ describe('lint levels', () => {
   })
 
   it('documents every lint with an example it reports, and the same example written right', () => {
-    // One the types find is proved by `kay check`'s own tests.
-    for (const [code, lint] of Object.entries(LINTS).filter(([, lint]) => !('typed' in lint))) {
+    // One the types find, or one found in kay.config.ts or the rendered pages, is proved by `kay check`'s and `kay build`'s own tests.
+    for (const [code, lint] of Object.entries(LINTS).filter(([, lint]) => !('typed' in lint) && !('site' in lint))) {
       expect(lints(lint.wrong).map(d => d.code)).toContain(code)
       expect(lints(lint.right).map(d => d.code)).not.toContain(code)
     }
@@ -74,24 +80,36 @@ describe('kay explain', () => {
     return { code: await child.exited, stdout: await new Response(child.stdout).text(), stderr: await new Response(child.stderr).text() }
   }
 
-  it('lists every lint with its default level and the first sentence of what it reports', () => {
-    expect(lintList().split('\n').map(line => line.split(/\s{2,}/).slice(0, 2))).toEqual(Object.entries(LINTS).map(([name, lint]) => [name, lint.level]))
-    expect(lintList()).toMatch(/^unread-name +deny {2}A prop or server value nothing reads\.$/m)
+  it('lists every lint with its group, its default level and the first sentence of what it reports', () => {
+    expect(lintList().split('\n').map(line => line.split(/\s{2,}/).slice(0, 3))).toEqual(Object.entries(LINTS).map(([name, lint]) => [name, lint.group, lint.level]))
+    expect(lintList()).toMatch(/^unread-name +code +deny {2}A prop or server value nothing reads\.$/m)
+  })
+
+  it('lists a group\'s lints under what the group covers', () => {
+    const [heading, blank, ...rows] = lintList('islands').split('\n')
+
+    expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'identity-key', 'constant-signal'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code', () => {
     expect(explainLint('constant-signal')).toBe([
-      'constant-signal: warn by default',
+      'constant-signal: warn by default, in islands',
       LINTS['constant-signal'].summary,
       'Reported:\n\n    ---\n    import { signal } from \'kay\'\n\n    const title = signal(\'Todos\')\n    ---\n    h1 {title()}',
       'Written right:\n\n    ---\n    const title = \'Todos\'\n    ---\n    h1 {title}',
-      'Its level is set in kay.config.ts, as `lints: { \'constant-signal\': \'deny\' }`, to `allow`, `warn` or `deny`; a `// kay-allow constant-signal` comment allows it on the line it ends, or alone on its line, on the line after it.',
+      'Its level is set in kay.config.ts, as `lints: { \'constant-signal\': \'deny\' }`, to `allow`, `warn` or `deny`, or with its group\'s, `lints: { islands: \'deny\' }`; a `// kay-allow constant-signal` comment allows it on the line it ends, or alone on its line, on the line after it.',
     ].join('\n\n'))
   })
 
-  it('prints them from the command line, refusing a name that is no lint', async () => {
+  it('leaves the `// kay-allow` comment out of a lint no template reports', () => {
+    expect(explainLint('missing-site')).toEndWith('or with its group\'s, `lints: { seo: \'deny\' }`.')
+  })
+
+  it('prints them from the command line, refusing a name that is no lint or group', async () => {
     expect(await explain('missing-alt')).toEqual({ code: 0, stdout: `${explainLint('missing-alt')}\n`, stderr: '' })
-    expect(await explain('missing-alts')).toEqual({ code: 1, stdout: '', stderr: 'kay explain: `missing-alts` is no lint; `kay explain` lists them\n' })
+    expect(await explain('seo')).toEqual({ code: 0, stdout: `${lintList('seo')}\n`, stderr: '' })
+    expect(await explain('missing-alts')).toEqual({ code: 1, stdout: '', stderr: 'kay explain: `missing-alts` is no lint or group; `kay explain` lists them\n' })
   })
 })
 

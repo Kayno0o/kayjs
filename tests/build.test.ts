@@ -417,6 +417,38 @@ describe('kay build checks the project first', () => {
     return { report, code }
   }
 
+  it('lints the heads of the pages it prerenders on a public site, failing on a lint the config denies', async () => {
+    const config = (lints: string) => `export default { site: 'https://example.com', favicon: false, seo: { image: '/og.png' }, lints: ${lints} }\n`
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': config('{ \'missing-description\': \'allow\', \'unsized-share-image\': \'allow\' }'),
+      'src/routes/index.kay': '--- server\nexport const prerender = true\n---\nhead\n  title Home\n  meta(name="robots" content="noindex")\np Home\n',
+      'src/routes/about.kay': '--- server\nexport const prerender = true\n---\nhead\n  title Home\n  meta(name="description" content="Who we are")\np About\n',
+    })
+
+    try {
+      const warned = await build(root)
+
+      expect(warned.report.match(/^\w+\[[\w-]+\]: .*/gm)).toEqual([
+        'warning[duplicate-title]: `/` has the title of `/about`, "Home"',
+        'warning[undescribed-page]: `/` has no description',
+        'warning[noindex-in-sitemap]: `/` is in the sitemap, though its head says `noindex`',
+      ])
+      expect(warned.code).toBe(0)
+      expect((await build(root, '--no-check')).report).not.toContain('warning[')
+
+      await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'allow\', \'duplicate-title\': \'deny\' }'))
+      const refused = await build(root)
+
+      expect(refused.report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[duplicate-title]'])
+      expect(refused.report).toContain('kay build: nothing built, as the prerendered pages break the lints above; --no-check builds anyway')
+      expect(refused.code).toBe(1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('builds nothing from a project kay check refuses, and builds it with --no-check', async () => {
     const root = await scratchProject({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': 'a(href="/nowhere") Lost\n' })
 

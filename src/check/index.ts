@@ -2,7 +2,7 @@ import type { KayLibrary, SettingsReplacement } from '../build/libraries'
 import type { Diagnostic, Fix } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
 import type { LintLevel, LintLevels, TypeLint } from '../compiler/lints'
-import type { I18nConfig, KayExtension } from '../config'
+import type { FaviconConfig, I18nConfig, KayExtension, SeoConfig } from '../config'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { Duration } from '../runtime/duration'
@@ -24,7 +24,7 @@ import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacement
 import { cacheEntry } from '../build/transform'
 import { componentName, rendersAsIsland, SourceMap } from '../compiler'
 import { formatReport } from '../compiler/frame'
-import { isLint, LEVELS, lintLevels, typeLint } from '../compiler/lints'
+import { isLint, isLintGroup, LEVELS, lintLevels, typeLint } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
@@ -38,6 +38,7 @@ import { patternShapes, routeMounts, routeOf, scanRoutes, servedPaths } from '..
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { bootProblems } from './boot'
 import { islandOnlyComponents } from './island-only'
+import { configSeoLints } from './seo'
 import { compileShadow, matcherSource, serializeShadowSettings, SHADOW_DIR, SHADOW_SETTINGS, shadowPath } from './shadow'
 
 const KAY_FILE = /\.kay$/
@@ -78,6 +79,9 @@ export interface CheckOptions {
   lang?: string | undefined
   // The level of each lint, over its default.
   lints?: LintLevels | undefined
+  // What a public site's head starts from, which the `seo` lints read.
+  seo?: SeoConfig | undefined
+  favicon?: string | FaviconConfig | false | undefined
 }
 
 export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity' | 'fixes'> {
@@ -507,7 +511,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const { files, diagnostics, unreached, libraries, settings, exports } = await writeShadowTypes(root, options)
 
-  diagnostics.push(...lintConfigProblems(root, options.lints))
+  diagnostics.push(...lintConfigProblems(root, options.lints), ...configSeoLints(options, join(root, CONFIG_FILE), [...files.values()].map(file => file.source)))
   const settingsFile = join(resolve(root), SHADOW_DIR, SETTINGS_CHECK)
   const exportsFile = join(resolve(root), SHADOW_DIR, EXPORTS_CHECK)
   const contentFile = join(resolve(root), SHADOW_DIR, CONTENT_CHECK)
@@ -826,10 +830,10 @@ function lintConfigProblems(root: string, lints: Record<string, string> = {}): C
   const at = { file: join(root, CONFIG_FILE), line: 1, column: 1 }
 
   return Object.entries(lints).flatMap(([name, level]) => {
-    if (!isLint(name))
-      return [{ ...at, message: `\`lints\` names \`${name}\`, which is no lint`, help: '`kay explain` lists them' }]
+    if (!isLint(name) && !isLintGroup(name))
+      return [{ ...at, message: `\`lints\` names \`${name}\`, which is no lint or group`, help: '`kay explain` lists them' }]
 
-    return LEVELS.has(level) ? [] : [{ ...at, message: `The lint \`${name}\` is set to \`${level}\`, which is no level`, help: 'set it to `allow`, `warn` or `deny`' }]
+    return LEVELS.has(level) ? [] : [{ ...at, message: `The ${isLint(name) ? 'lint' : 'group'} \`${name}\` is set to \`${level}\`, which is no level`, help: 'set it to `allow`, `warn` or `deny`' }]
   })
 }
 
