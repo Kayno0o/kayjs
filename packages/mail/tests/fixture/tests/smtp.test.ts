@@ -45,6 +45,39 @@ describe('smtp', () => {
     expect(server.received).toHaveLength(before)
   })
 
+  it('reuses one connection for mails sent one after another, and closes it once they stop', async () => {
+    const own = startSmtp()
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: own.port }) })
+
+    try {
+      for (const subject of ['One', 'Two', 'Three'])
+        await mail.send({ to: 'ada@example.com', subject, text: 'Hi' })
+
+      expect(own.received).toHaveLength(3)
+      expect(own.connections).toEqual({ opened: 1, closed: 0 })
+
+      await Bun.sleep(1200)
+      expect(own.connections).toEqual({ opened: 1, closed: 1 })
+    }
+    finally {
+      own.stop()
+    }
+  })
+
+  it('holds sends to the rate limit', async () => {
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, maxConnections: 1, rateLimit: 1 }) })
+    const started = performance.now()
+
+    await Promise.all([1, 2].map(async n => mail.send({ to: 'ada@example.com', subject: `Limited ${n}`, text: 'Hi' })))
+
+    expect(performance.now() - started).toBeGreaterThan(900)
+  })
+
+  it('refuses a connection count or a rate limit that is no whole number of at least 1', () => {
+    expect(() => smtp({ host: '127.0.0.1', maxConnections: 0 })).toThrow('maxConnections is 0')
+    expect(() => smtp({ host: '127.0.0.1', rateLimit: 0.5 })).toThrow('rateLimit is 0.5')
+  })
+
   it('refuses a timeout that is no positive duration where the transport is made', () => {
     expect(() => smtp({ host: '127.0.0.1', timeout: 'soon' as '10s' })).toThrow('takes a positive duration')
     expect(() => smtp({ host: '127.0.0.1', timeout: 0 })).toThrow('takes a positive duration')

@@ -12,15 +12,17 @@ interface Session {
   reading: boolean
 }
 
-// An SMTP server answering just enough of the protocol for a client to hand it one message per transaction, kept in `received`, and the names clients greeted it with in `greetings`.
-export function startSmtp(port = 0): { received: Received[], greetings: string[], port: number, stop: () => void } {
+// An SMTP server answering just enough of the protocol for a client to hand it one message per transaction, kept in `received`, the names clients greeted it with in `greetings`, and how many connections opened and closed.
+export function startSmtp(port = 0): { received: Received[], greetings: string[], connections: { opened: number, closed: number }, port: number, stop: () => void } {
   const received: Received[] = []
   const greetings: string[] = []
+  const connections = { opened: 0, closed: 0 }
   const listener: TCPSocketListener<Session> = Bun.listen<Session>({
     hostname: '127.0.0.1',
     port,
     socket: {
       open: (socket) => {
+        connections.opened++
         socket.data = { buffer: '', reading: false }
         socket.write('220 stub ESMTP\r\n')
       },
@@ -34,10 +36,13 @@ export function startSmtp(port = 0): { received: Received[], greetings: string[]
           answer(socket, line, received, greetings)
         }
       },
+      close: () => {
+        connections.closed++
+      },
     },
   })
 
-  return { received, greetings, port: listener.port, stop: () => listener.stop(true) }
+  return { received, greetings, connections, port: listener.port, stop: () => listener.stop(true) }
 }
 
 function answer(socket: Socket<Session>, line: string, received: Received[], greetings: string[]): void {

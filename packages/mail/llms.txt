@@ -44,9 +44,10 @@ In production the mailer reads, as the server boots, through kay's `defineEnv`:
 | `SMTP_HOST` | required |
 | `SMTP_PORT` | `465` by default: TLS from the start; another port upgrades with STARTTLS |
 | `SMTP_USER`, `SMTP_PASS` | both or neither, for a server needing no login; with a password and a port other than 465, a server not offering STARTTLS is refused |
+| `SMTP_RATE_LIMIT` | optional: the most mails a second, for a provider capping the rate |
 | `SMTP_FROM` | required unless `mailer({ from })` gives the sender: `Name <address>` or a bare address |
 
-A missing or refused variable stops the boot, naming each one. `kay build` runs without them and leaves them to the server. The client greets the server with the sender's domain, not the container's hostname, and gives up on a server silent for 10 seconds. Development and tests need none of them.
+A missing or refused variable stops the boot, naming each one. `kay build` runs without them and leaves them to the server. The client greets the server with the sender's domain, not the container's hostname, and gives up on a server silent for 10 seconds. It keeps up to 5 connections open while mails keep coming, so a burst reuses them, and closes them a second after the last mail, so a script ends. Development and tests need none of them.
 
 `mailer({ optional: true })` boots without `SMTP_HOST` and `SMTP_FROM` instead, for a site whose mail can wait to be set up: `mail.configured` reads `false`, and `send` and `enqueue` throw `MailNotConfigured`, whose `missing` names the variables, before rendering or queueing anything, so a contact form can catch it and tell the visitor to write or call instead. An app throws it too for a setting of its own, `new MailNotConfigured(['CONTACT_TO'])`.
 
@@ -129,7 +130,7 @@ Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged wit
 
 ## Other transports
 
-`transport` takes any `{ send(mail) }` resolving with a `Delivery`, such as a provider's HTTP API. `smtp({ host, port, user, pass, name, timeout })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.
+`transport` takes any `{ send(mail) }` resolving with a `Delivery`, such as a provider's HTTP API. `smtp({ host, port, user, pass, name, timeout, maxConnections, rateLimit })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send.
 
 ## kayjs-auth
 

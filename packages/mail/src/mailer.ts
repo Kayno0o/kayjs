@@ -84,13 +84,14 @@ function delivering(): 'outbox' | 'smtp' {
   return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? 'outbox' : 'smtp'
 }
 
-// SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
+// SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT` and `SMTP_FROM`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
 function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, missing: () => string[] } {
   const env = defineEnv(t.Object({
     SMTP_HOST: optional ? t.Optional(t.String()) : t.String(),
     SMTP_PORT: t.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
     SMTP_USER: t.Optional(t.String()),
     SMTP_PASS: t.Optional(t.String()),
+    SMTP_RATE_LIMIT: t.Optional(t.Integer({ minimum: 1 })),
     SMTP_FROM: optional || from !== undefined ? t.Optional(t.String({ pattern: SENDER })) : t.String({ pattern: SENDER }),
   }))
 
@@ -106,7 +107,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   return {
     transport: {
       send: async (mail) => {
-        transport ??= smtp({ host: env.SMTP_HOST!, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS, name: domainOf(sender()) })
+        transport ??= smtp({ host: env.SMTP_HOST!, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()) })
 
         return transport.send(mail)
       },
