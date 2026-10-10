@@ -1,6 +1,6 @@
 import type { Browser, Page } from 'playwright-core'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -57,12 +57,17 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
     process.env.KAY_HOT_PORT = String(probe.port)
     probe.stop(true)
+    // An editor named as VS Code's, which takes the position as `-g file:line:column`, noting what it was asked to open in a hidden file.
+    await Bun.write(join(root, 'bin/code'), `#!${process.execPath}\nawait Bun.write(${JSON.stringify(join(root, '.opened'))}, JSON.stringify(process.argv.slice(2)))\n`)
+    await chmod(join(root, 'bin/code'), 0o755)
+    process.env.KAY_EDITOR = join(root, 'bin/code')
     stop = await dev(root)
     browser = await chromium.launch({ headless: true, executablePath })
     page = await browser.newPage()
   }, 60_000)
 
   afterAll(async () => {
+    delete process.env.KAY_EDITOR
     await browser?.close()
     await stop?.()
     await rm(root, { recursive: true, force: true })
@@ -142,5 +147,17 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
     await page.click('button.extra')
     await page.locator('button.extra', { hasText: 'Extra on' }).waitFor()
+  }, 60_000)
+
+  it('opens the line an element came from on Alt+click, and lists the islands with the values of their signals', async () => {
+    await page.click('h1', { modifiers: ['Alt'] })
+    await until(() => existsSync(join(root, '.opened')))
+    expect(JSON.parse(await Bun.file(join(root, '.opened')).text())).toEqual(['-g', `${join(root, 'src/routes/index.kay')}:7:1`])
+
+    await page.click('button[aria-controls="kay-islands"]')
+    await page.locator('#kay-islands', { hasText: 'src/components/extra.kay#1 true' }).waitFor()
+    await page.click('button.extra')
+    await page.locator('#kay-islands', { hasText: 'src/components/extra.kay#1 false' }).waitFor()
+    expect(await page.textContent('#kay-islands')).toContain('src/components/counter.kay#1 0#2 ""')
   }, 60_000)
 })

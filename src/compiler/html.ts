@@ -37,6 +37,8 @@ export interface HtmlOptions {
   accessorLoops?: boolean | undefined
   // What a refused form's fields are described by.
   errors?: ErrorMessages | undefined
+  // Development: the source position each element carries for `kay dev`'s inspector.
+  located?: ((element: ElementNode) => string | undefined) | undefined
 }
 
 // Static text written as markup: `& b` and `&amp;` both stay as written, the way JSX text reaches the server markup.
@@ -537,6 +539,11 @@ export class HtmlTemplate {
       if (described)
         markup.dynamic(() => b.add(`${htmlAlias('attribute')}("aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), ""${describedValue(described)})`))
     }
+
+    const located = this.options.located?.(element)
+
+    if (located !== undefined)
+      markup.text(` data-kay-src="${escapeStaticAttribute(located)}"`)
 
     markup.text('>')
 

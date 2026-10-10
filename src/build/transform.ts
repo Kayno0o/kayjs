@@ -25,6 +25,8 @@ export interface TransformOptions {
   cacheDir?: string | undefined
   // Renders in the browser only: an island importing a package that cannot load on the server.
   clientOnly?: boolean | undefined
+  // Development: every element carries its source position, for `kay dev`'s inspector.
+  inspect?: boolean | undefined
 }
 
 interface Compiled {
@@ -74,7 +76,7 @@ export async function transformKayCached(source: string, filename: string, given
     return transformKay(source, filename, options)
 
   const hydratable = options.hydratable ?? false
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   if (cached !== undefined) {
@@ -126,7 +128,7 @@ function compile(source: string, filename: string, options: TransformOptions): C
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))

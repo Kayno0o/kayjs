@@ -43,6 +43,8 @@ export interface CompileOptions {
   clientOnly?: boolean | undefined
   // Type-checking a static component only islands render: its children render inline with it, so the props it passes them are not serialized.
   insideIsland?: boolean | undefined
+  // Development: every element carries `data-kay-src`, its file and position, for `kay dev`'s inspector.
+  inspect?: boolean | undefined
 }
 
 export interface CompileResult {
@@ -93,7 +95,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const promote = island === undefined && !routeFile && mayPromote(file, script) ? islandId(filename, options.root) : undefined
-  const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, insideIsland: options.insideIsland, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
+  const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
   const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
   let analysis = generate(file, script, server, { ...generateOptions, name })
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.

@@ -22,6 +22,8 @@ export interface KayPluginOptions {
   settings?: Record<string, string> | undefined
   // A module every component imports, which ties the runtime it uses to the chunk the page loads first: see runtime-chunk.ts.
   anchor?: string | undefined
+  // Development: every element carries its source position, for `kay dev`'s inspector.
+  inspect?: boolean | undefined
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
@@ -60,7 +62,7 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
       const load = async (file: string) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
-        const contents = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir })
+        const contents = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect })
 
         return { contents: options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents, loader: 'ts' as const }
       }

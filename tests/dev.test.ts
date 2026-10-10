@@ -370,6 +370,54 @@ describe('kay dev', () => {
     }
   })
 
+  it('marks its pages for the inspector, serves it, and opens the file it names in KAY_EDITOR', async () => {
+    // Inside the repository, where the browser build resolves `kay`.
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'inspect-'))
+    const seen = join(root, '.seen')
+    const lines: string[] = []
+
+    await Bun.write(join(root, 'record.ts'), `await Bun.write(${JSON.stringify(seen)}, JSON.stringify(process.argv.slice(2)))\n`)
+    await Bun.write(join(root, '.env'), 'PORT=0\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'main\n  h1 Home\n')
+    // Over any the shell set, which would win over a `.env` value.
+    const editor = process.env.KAY_EDITOR
+
+    process.env.KAY_EDITOR = `${process.execPath} ${join(root, 'record.ts')}`
+    const stop = await dev(root, { log: line => lines.push(line) })
+
+    if (editor === undefined)
+      delete process.env.KAY_EDITOR
+    else
+      process.env.KAY_EDITOR = editor
+
+    try {
+      await until(() => lines.length === 1, 20_000)
+
+      const url = lines[0]!.split(' ')[2]!
+      const page = await (await fetch(url)).text()
+
+      expect(page).toContain('<h1 data-kay-src="src/routes/index.kay:2:3">Home</h1>')
+      expect(page).toContain('<script type="module" src="/_kay/dev/inspector.js"></script>')
+      expect(await (await fetch(`${url}/_kay/dev/inspector.js`)).text()).toContain('startInspector()')
+
+      const open = async (source: string, headers: Record<string, string> = { 'x-kay-dev': '1' }) => fetch(`${url}/_kay/dev/open`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ source }) })
+
+      expect((await open('src/routes/index.kay:2:3', {})).status).toBe(403)
+      expect((await open('../outside.kay:1:1')).status).toBe(404)
+      expect((await open('record.ts:1:1')).status).toBe(404)
+      expect(await (await open('src/routes/index.kay:2:3')).json()).toEqual({ opened: true })
+      await until(() => existsSync(seen))
+      expect(JSON.parse(readFileSync(seen, 'utf8'))).toEqual([join(root, 'src/routes/index.kay')])
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('serves the compile errors of a project that failed to boot, and the reload stream', async () => {
     const source = 'p ok\nelse\n  p no\n'
     const error = new KayCompileError([{ file: join(process.cwd(), 'src/broken.kay'), source, start: 5, end: 9, message: '`else` must directly follow an `if`' }])

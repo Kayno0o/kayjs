@@ -39,7 +39,8 @@ export class DomTemplate {
   private formTarget: Span | undefined
 
   // `errors`: what a refused form's fields are described by.
-  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly errors?: ErrorMessages) {}
+  // `located`, in development: the source position each element carries for `kay dev`'s inspector.
+  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined) {}
 
   // A block: one element, or a fragment of its items, or `null` when empty.
   block(nodes: Node[]): void {
@@ -441,6 +442,11 @@ export class DomTemplate {
       if (described)
         own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)}${describedValue(described)}));`))
     }
+
+    const located = this.located?.(element)
+
+    if (located !== undefined)
+      html += ` data-kay-src="${escapeStaticAttribute(located)}"`
 
     html += '>'
 

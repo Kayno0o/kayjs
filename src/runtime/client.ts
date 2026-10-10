@@ -216,7 +216,7 @@ function noted<T>(element: HTMLElement, run: () => T): T {
   return rendering ? rendering(element, run) : run()
 }
 
-// Development: `kay dev`'s page script calls `$kayHot` with the islands an edit changed, which swap in, keeping their signals, rather than the page reloading.
+// Development: `kay dev`'s page script calls `$kayHot` with the islands an edit changed, which swap in, keeping their signals, rather than the page reloading; its inspector reads their values through `$kaySignals`.
 export function enableHotSwap(registry: IslandRegistry): void {
   rendering = (element, run, values) => {
     const recorded = recordSignals(run, values)
@@ -226,6 +226,7 @@ export function enableHotSwap(registry: IslandRegistry): void {
     return recorded.result
   }
   ;(globalThis as { $kayHot?: (swap: HotSwap) => Promise<boolean> }).$kayHot = async swap => hotSwap(registry, swap)
+  ;(globalThis as { $kaySignals?: (element: HTMLElement) => unknown[] | undefined }).$kaySignals = element => signalsOf.get(element)?.()
 }
 
 // Resolves false when the page must reload instead: a new chunk holding code the page already runs, as a changed shared module, would run beside its old copy.

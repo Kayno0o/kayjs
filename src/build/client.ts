@@ -42,6 +42,8 @@ export interface ClientOptions {
   navigation?: boolean | undefined
   // Development: an edited island swaps into the open pages rather than reloading them.
   hot?: boolean | undefined
+  // Development under `kay dev`: every element carries its source position, for its inspector.
+  inspect?: boolean | undefined
   // The config declares `publicEnv`: the entry imports its values from the server before any island hydrates.
   publicEnv?: boolean | undefined
   // The level of each lint the problems panel shows in development.
@@ -180,7 +182,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
   const define = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = async (anchor?: string) => [withoutStyles(), apiStubs(apiDir, await scanApi(apiDir)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings, anchor }), ...options.plugins ?? []]
+  const plugins = async (anchor?: string) => [withoutStyles(), apiStubs(apiDir, await scanApi(apiDir)), kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings, anchor, inspect: options.inspect }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 

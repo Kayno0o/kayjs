@@ -2,14 +2,23 @@ import type { KayCompileError } from '../build/transform'
 import type { HotSwap } from '../runtime/client'
 import type { ClientBuild } from './client'
 import { readFileSync, statSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { basename, isAbsolute, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
+import { isCrossSite } from './actions'
+import { editorCommand } from './editor'
+import { underKayDev } from './loader'
 import { compileErrorPage } from './overlay'
 
 export const DEV_EVENTS = '/_kay/dev/events'
 export const DEV_PATCH = '/_kay/dev/patch.js'
+export const DEV_INSPECTOR = '/_kay/dev/inspector.js'
+export const DEV_OPEN = '/_kay/dev/open'
 const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
+const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
+// What the inspector sends, which a page of another site cannot without a preflight nothing answers.
+const OPEN_HEADER = 'x-kay-dev'
+const POSITION = /^(.+\.kay):(\d+):(\d+)$/
 const BACKSLASH = /\\/g
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 
@@ -76,6 +85,56 @@ export function devPatch(): Response {
   patchModule ??= new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(PATCH_SOURCE, 'utf8'))
 
   return new Response(patchModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
+}
+
+let inspectorModule: string | undefined
+
+export function devInspector(): Response {
+  inspectorModule ??= `${new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(INSPECTOR_SOURCE, 'utf8'))}\nstartInspector()\n`
+
+  return new Response(inspectorModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
+}
+
+// Loads the inspector on the pages of a server `kay dev` started, the one whose elements carry their source position.
+export function inspectorScript(): string {
+  return underKayDev() ? `<script type="module" src="${DEV_INSPECTOR}"></script>` : ''
+}
+
+// Opens the `.kay` file at the position the inspector names, in the editor `editorCommand` finds; with none, the terminal prints the position.
+export async function openInEditor(root: string, request: Request): Promise<Response> {
+  if (request.headers.get(OPEN_HEADER) === null || isCrossSite(request))
+    return new Response(null, { status: 403 })
+
+  let source: unknown
+
+  try {
+    source = (await request.json() as { source?: unknown }).source
+  }
+  catch {
+    return new Response(null, { status: 400 })
+  }
+
+  const [, file, line, column] = typeof source === 'string' ? POSITION.exec(source) ?? [] : []
+  const path = file === undefined ? undefined : resolve(root, file)
+  const inside = path !== undefined && !relative(root, path).startsWith('..') && !isAbsolute(relative(root, path))
+
+  if (!inside || statSync(path, { throwIfNoEntry: false })?.isFile() !== true)
+    return new Response(null, { status: 404 })
+
+  const command = editorCommand(path, Number(line), Number(column))
+
+  try {
+    if (command !== undefined) {
+      Bun.spawn(command, { cwd: root, stdio: ['ignore', 'ignore', 'ignore'] }).unref()
+
+      return Response.json({ opened: true })
+    }
+  }
+  catch {}
+
+  console.log(`kay dev: ${file}:${line}:${column}, set KAY_EDITOR to open it from the page`)
+
+  return Response.json({ opened: false })
 }
 
 // The stream stays open until the process exits; `retry` makes the browser poll quickly for the next one.

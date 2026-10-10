@@ -7,6 +7,7 @@ import { actionOf, awaitBlocks, errorMessages, isChildrenSlot, isHead, serverIsl
 import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression, mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
+import { sourceLocator } from './inspect'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 
 export interface GenerateOptions {
@@ -17,6 +18,8 @@ export interface GenerateOptions {
   client?: boolean | undefined
   // Path relative to the project root, naming the module's actions.
   moduleId: string
+  // Development: every element carries its source position, for `kay dev`'s inspector.
+  inspect?: boolean | undefined
   // Type-checking output: adds assertions on links, form fields and island props through globals `kay check` declares.
   check?: boolean | undefined
   // Type-checking a static component only islands render: the props it passes its children are not serialized, so they are not asserted.
@@ -271,10 +274,11 @@ class Generator {
     b.add('\nreturn ')
 
     const errors = html || dom ? errorMessages(template, this.src) : undefined
-    const domTemplate = dom ? new DomTemplate(b, this.src, errors) : undefined
+    const located = this.options.inspect === true ? sourceLocator(this.src, this.options.moduleId) : undefined
+    const domTemplate = dom ? new DomTemplate(b, this.src, errors, located) : undefined
 
     if (html)
-      new HtmlTemplate(b, this.src, { hydratable: this.options.hydratable, accessorLoops: !staticLoops, errors }).value(this.withoutSlots(template))
+      new HtmlTemplate(b, this.src, { hydratable: this.options.hydratable, accessorLoops: !staticLoops, errors, located }).value(this.withoutSlots(template))
     else if (domTemplate)
       domTemplate.block(this.withoutSlots(template))
     else
