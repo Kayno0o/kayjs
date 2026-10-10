@@ -201,6 +201,27 @@ describe('kay build', () => {
     }
   })
 
+  it('puts the stylesheets of a collection\'s components in the pages rendering its entries, and only there', async () => {
+    const project = join(import.meta.dir, 'fixtures/collection-styles')
+
+    try {
+      const client = await buildClient(project)
+      const markers = async (route: string) => {
+        const css = await Bun.file(join(client.dir, client.styles.get(join(project, 'src/routes', route))!.slice('/_kay/'.length))).text()
+
+        return [...css.matchAll(/\.([a-z]+)-marker/g)].map(match => match[1])
+      }
+
+      // Neither the component the content config only passes along, nor the stylesheet its server module imports.
+      expect(await markers('posts/[slug].kay')).toEqual(['page', 'chart'])
+      expect(await markers('notes/[slug].kay')).toEqual(['page', 'tabs'])
+      expect(await markers('index.kay')).toEqual(['page'])
+    }
+    finally {
+      await rm(join(project, '.kay'), { recursive: true, force: true })
+    }
+  })
+
   it('writes the files pages import, through a server fence\'s modules too, for a production server that never writes', async () => {
     const site = join(import.meta.dir, 'fixtures/site')
 

@@ -1,0 +1,9 @@
+--- server
+import { notes, posts } from '../content.config'
+
+const entries = [...await posts.all(), ...await notes.all()]
+---
+---
+import '../page.css'
+---
+p {entries.length} entries

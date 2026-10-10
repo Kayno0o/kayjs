@@ -3,6 +3,7 @@ import type { KayLibrary } from './libraries'
 import { dirname, join, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { ASSET_FILE, writeAsset } from './assets'
+import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { scriptLoader, transpilerFor } from './files'
 import { libraryOf } from './libraries'
 
@@ -12,7 +13,7 @@ const CSS_FILE = /\.css$/
 const ABSOLUTE_URL = /^\//
 
 // For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses, and the assets they import are written for the server to serve.
-// A page's server code is left out but for its assets, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
+// A page's server code is left out but for its assets and the components of the collections whose entries it renders, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
 export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlugin {
   const project = root + sep
   // Tailwind reads the class names of every module the bundle parses, so importing the ones kay collected from the `.class` shorthand hands them over with no `@source` line.
@@ -54,18 +55,39 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
     }))
   }
 
+  // A collection's components render inside the Markdown of its entries, so a page rendering one's `Content` renders those of every collection its server code imports.
+  const collections = new Map<string, Promise<Map<string, string[]>>>()
+  const readCollections = async (module: string) => collectionComponents(await Bun.file(module).text())
+  const contentImports = async (code: string, importer: string) => {
+    const files = await Promise.all([...importedNames(code)].map(async ([specifier, names]) => {
+      const module = resolve(specifier, importer)
+
+      if (module === undefined || !SCRIPT_FILE.test(module) || !(inProject(module) || libraryOf(libraries, module) !== undefined))
+        return []
+
+      const exported = collections.get(module) ?? readCollections(module)
+
+      collections.set(module, exported)
+
+      return [...await exported].flatMap(([name, components]) => names.has(name) || names.has('*') ? components.flatMap(component => resolve(component, module) ?? []) : [])
+    }))
+
+    return [...new Set(files.flat())].filter(followed).map(path => `import ${JSON.stringify(path)}\n`).join('')
+  }
+
   return {
     name: 'kay-styles',
     setup(build) {
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => {
         const source = await Bun.file(path).text()
-        const { script, server } = parseKay(source)
-        const [contents] = await Promise.all([
+        const { script, server, template } = parseKay(source)
+        const [contents, content] = await Promise.all([
           script ? imports(source.slice(script.start, script.end), path, 'ts') : '',
+          server && rendersContent(template) ? contentImports(source.slice(server.start, server.end), path) : '',
           server ? serverAssets(source.slice(server.start, server.end), path, 'ts') : undefined,
         ])
 
-        return { contents: classes + contents, loader: 'js' }
+        return { contents: classes + contents + content, loader: 'js' }
       })
       build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => ({ contents: await imports(await Bun.file(path).text(), path, scriptLoader(path)), loader: 'js' }))
       // `url(/logo.png)` points at a public file the server serves as is.

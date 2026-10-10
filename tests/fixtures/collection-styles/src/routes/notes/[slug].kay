@@ -1,0 +1,11 @@
+--- server
+import { notes } from '../../content.config'
+
+const [entry] = await notes.all()
+const { Content } = entry!
+---
+---
+import '../../page.css'
+---
+article
+  Content

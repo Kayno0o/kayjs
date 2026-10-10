@@ -1,0 +1,11 @@
+--- server
+import { posts } from '../../content.config'
+
+const [entry] = await posts.all()
+const { Content } = entry!
+---
+---
+import '../../page.css'
+---
+article
+  Content
