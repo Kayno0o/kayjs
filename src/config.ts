@@ -10,6 +10,7 @@ import type { Prefetch } from './server/speculation'
 import type { Tracer } from './server/trace'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import process from 'node:process'
 
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
 export interface KayConfig {
@@ -21,7 +22,7 @@ export interface KayConfig {
   publicDir?: string | undefined
   minify?: boolean | undefined
   lang?: string | undefined
-  // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it.
+  // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, so one build serves each host it is deployed to.
   site?: string | undefined
   seo?: SeoConfig | undefined
   images?: ImagesConfig | undefined
@@ -226,14 +227,20 @@ export async function loadConfig(root: string): Promise<KayConfig> {
   const file = join(root, CONFIG_FILE)
 
   if (!existsSync(file))
-    return {}
+    return withSiteUrl({})
 
   const { default: config } = await import(file) as { default?: KayConfig }
 
   if (typeof config !== 'object' || config === null)
     throw new Error(`kay: ${CONFIG_FILE} must export its config by default: export default defineConfig({ ... })`)
 
-  return config
+  return withSiteUrl(config)
+}
+
+function withSiteUrl<Config extends KayConfig>(config: Config): Config {
+  const { SITE_URL } = process.env
+
+  return config.site !== undefined || SITE_URL === undefined || SITE_URL === '' ? config : { ...config, site: SITE_URL }
 }
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
@@ -242,5 +249,5 @@ export async function withConfig<Options extends KayConfig>(root: string, option
 }
 
 export function mergeConfig<Options extends KayConfig>(config: KayConfig, options: Options): KayConfig & Options {
-  return { ...config, ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) } as KayConfig & Options
+  return withSiteUrl({ ...config, ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) } as KayConfig & Options)
 }

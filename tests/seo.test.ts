@@ -1,5 +1,6 @@
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { jsonLd } from '../src/runtime/seo'
+import { siteOrigin as currentSiteOrigin, jsonLd, siteUrl } from '../src/runtime/seo'
 import { pages } from '../src/server'
 import { siteOrigin } from '../src/server/seo'
 
@@ -138,6 +139,32 @@ describe('seo head', () => {
     expect(() => siteOrigin('https://example.com/blog')).toThrow('kay: site is the origin')
     expect(() => siteOrigin('ftp://example.com')).toThrow('kay: site is the origin')
     expect(() => siteOrigin('example.com')).toThrow('kay: site is the origin')
+  })
+
+  it('reads the site from SITE_URL when the project leaves it out, its origin alone from siteOrigin()', async () => {
+    const before = process.env.SITE_URL
+
+    process.env.SITE_URL = 'https://preview.example.com'
+
+    try {
+      const preview = await pages({ routes: ROUTES, prebuilt: false, base: '/kay' })
+      const html = await (await preview.handle(new Request('http://localhost/about'))).text()
+
+      expect(html).toContain('<link rel="canonical" href="https://preview.example.com/kay/about">')
+      expect(siteUrl('/contact')).toBe('https://preview.example.com/kay/contact')
+      expect(currentSiteOrigin()).toBe('https://preview.example.com')
+
+      // What the config sets wins.
+      await pages({ routes: ROUTES, prebuilt: false, site: 'https://example.com' })
+
+      expect(currentSiteOrigin()).toBe('https://example.com')
+    }
+    finally {
+      if (before === undefined)
+        delete process.env.SITE_URL
+      else
+        process.env.SITE_URL = before
+    }
   })
 })
 

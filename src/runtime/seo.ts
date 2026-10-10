@@ -27,10 +27,27 @@ export function siteUrl(path = '/'): string {
   const site = configuredSite()
 
   if (site === undefined)
-    throw new Error('kay: siteUrl() reads site in kay.config.ts, the origin the site is public at, which it does not set')
+    throw unsetSite('siteUrl()')
 
   // As the canonical links are, under `trailingSlash: 'always'`.
   return site.origin + (site.slashed && !path.endsWith('/') && !path.includes('?') && !path.includes('#') ? `${path}/` : path)
+}
+
+// The site's origin alone, `https://example.com`, without `base`: from `site` in kay.config.ts on the server, the page's own in the browser.
+export function siteOrigin(): string {
+  if (typeof document !== 'undefined')
+    return window.location.origin
+
+  const site = configuredSite()
+
+  if (site === undefined)
+    throw unsetSite('siteOrigin()')
+
+  return new URL(site.origin).origin
+}
+
+function unsetSite(reader: string): Error {
+  return new Error(`kay: ${reader} reads site in kay.config.ts, the origin the site is public at, which it does not set, nor SITE_URL`)
 }
 
 export interface Crumb {
