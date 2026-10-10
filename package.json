@@ -14,8 +14,7 @@
     "url": "https://git.kaynooo.fr/kaynooo/kayjs/issues"
   },
   "publishConfig": {
-    "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/",
-    "access": "restricted"
+    "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
   },
   "imports": {
     "#schema": {
