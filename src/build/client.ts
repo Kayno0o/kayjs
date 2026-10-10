@@ -53,6 +53,8 @@ export interface ClientOptions {
   publicEnv?: boolean | undefined
   // The level of each lint the problems panel shows in development.
   lints?: LintLevels | undefined
+  // `kay build --static`: no server takes the errors the browser meets, so none are sent.
+  exported?: boolean | undefined
   // Measures what the browser loads for islands, `modules` breaking each chunk down by the modules it holds.
   report?: 'sizes' | 'modules' | undefined
 }
@@ -188,7 +190,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   ].join('\n'))
 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
-  const define = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production') }
+  const define: Record<string, string> = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' } }
   const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = async (anchor?: string) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings, anchor, inspect: options.inspect }), ...options.plugins ?? []]
 

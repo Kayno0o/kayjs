@@ -155,6 +155,14 @@ describe('kay build --static', () => {
     expect(code.filter(text => text.includes('cannot name a cookie'))).toEqual([])
   })
 
+  it('ships no code reporting browser errors, which no server would take', async () => {
+    const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
+    const code = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))
+
+    expect(code.some(text => text.includes('<button>Count'))).toBe(true)
+    expect(code.filter(text => text.includes('/_kay/error'))).toEqual([])
+  })
+
   it('keeps the JS a page loads up front within its budget', async () => {
     const pending = [...(await get('/')).text.matchAll(SCRIPT_URL)].map(match => match[1]!)
     const loaded = new Map<string, number>()

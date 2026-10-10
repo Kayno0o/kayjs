@@ -383,7 +383,7 @@ async function bundleClient(root: string, config: KayConfig, exported: boolean, 
   if (exported)
     refuseStaticConfig(config)
 
-  const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, extensions: config.extensions, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined, report: analyze ? 'modules' : 'sizes' })
+  const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, extensions: config.extensions, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined, exported, report: analyze ? 'modules' : 'sizes' })
 
   // A static host cannot pick a format by `Accept`, so an export links WebP alone.
   const avif = exported ? undefined : avifQuality(config.images)

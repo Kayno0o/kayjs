@@ -27,6 +27,9 @@ const disposers = new WeakMap<HTMLElement, () => void>()
 const ISLAND = 'slot[data-component]'
 // Where the browser sends the errors it meets, for the server's `onError`.
 const ERROR_URL = '/_kay/error'
+
+// Defined by `kay build --static`, whose host has no server to take the reports. Tested where it is read, not through a constant, so the bundler drops the code sending them.
+declare const KAY_STATIC_EXPORT: true | undefined
 const MAX_REPORTS = 10
 const reported = new Set<string>()
 // Set in development: renders an island noting its signals, for an edited version of it to take their values back.
@@ -45,10 +48,12 @@ export interface HotSwap {
 
 setErrorReporter((error, island) => {
   console.error(error)
-  sendError(error, island)
+
+  if (typeof KAY_STATIC_EXPORT === 'undefined')
+    sendError(error, island)
 })
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof KAY_STATIC_EXPORT === 'undefined') {
   // An error with no error object is another origin's script, whose details the browser hides: nothing to report.
   window.addEventListener('error', (event) => {
     if (event.error !== undefined && event.error !== null)
