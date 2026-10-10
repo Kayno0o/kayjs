@@ -32,6 +32,17 @@ describe('mount', () => {
     expect(root.isConnected).toBe(false)
   })
 
+  it('focuses the first invalid field a write just revealed, its render flushed first', async () => {
+    const focused: boolean[] = []
+    const { root, unmount } = await mount('tests/fixtures/mount/refused.kay', { onFocused: (took: boolean) => focused.push(took) })
+
+    root.querySelector<HTMLButtonElement>('.save')!.click()
+
+    expect(focused).toEqual([true])
+    expect(document.activeElement).toBe(root.querySelector('.login'))
+    unmount()
+  })
+
   it('runs every mount on modules of its own, as a page load does, a persisted signal reading storage as it is then, which a test writes and reads as it keeps it', async () => {
     try {
       writePersisted('favorites', ['first'])

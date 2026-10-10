@@ -1,6 +1,7 @@
 import type { Swap } from './navigate'
 import type { FetchedPage } from './swap'
 import { withoutBase } from './base'
+import { focusInvalid } from './focus'
 import { busyForms, checkedForms, leave, navigation, pageKey, restoreScroll, saveScroll, submitNatively, swappable, takeFormChecks, writeHistory } from './navigate'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
 import { decodeValue } from './wire'
@@ -525,13 +526,8 @@ function showRefusal(form: HTMLFormElement | undefined, control: number): boolea
   if (!form)
     return false
 
-  for (const field of form.querySelectorAll<HTMLElement>('[aria-invalid="true"]')) {
-    // Scrolled into view, unlike the other focus moves, as it may sit outside the kept scroll position.
-    field.focus()
-
-    if (document.activeElement === field)
-      return true
-  }
+  if (focusInvalid(form))
+    return true
 
   const message = form.getAttribute('aria-describedby')?.split(ID_LIST).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean).join(' ')
 

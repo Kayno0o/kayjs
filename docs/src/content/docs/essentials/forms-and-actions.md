@@ -113,7 +113,7 @@ form(action={add} onSubmit={submit})
   button(disabled={add.pending()}) Add
 ```
 
-When the handler refused the call with `ctx.fail(status, data)`, `add.refused(error)` in a `catch` tells that refusal apart from any other error and types `error.data` as the handler passed it, with no cast.
+When the handler refused the call with `ctx.fail(status, data)`, `add.refused(error)` in a `catch` tells that refusal apart from any other error and types `error.data` as the handler passed it, with no cast. `focusInvalid()` from `kay` then moves focus to the first field marked `aria-invalid`, once the island rendered what the refusal changed.
 
 Once a call goes through, the page's loads run again, so the list it shows is up to date. `add({ title }, { refresh: false })` leaves the page as it is.
 

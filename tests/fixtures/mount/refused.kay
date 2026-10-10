@@ -1,0 +1,18 @@
+---
+import { focusInvalid } from 'kay'
+
+const { onFocused } = props<{ onFocused: (focused: boolean) => void }>()
+const tab = signal('site')
+const refused = signal(false)
+
+function save() {
+  tab = 'access'
+  refused = true
+  onFocused(focusInvalid())
+}
+---
+button.save(onClick={save}) Save
+if tab === 'site'
+  input.name
+else
+  input.login(aria-invalid={refused ? 'true' : undefined})

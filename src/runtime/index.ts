@@ -274,6 +274,7 @@ export type { ApiRoutesOf, AwaitProps, CheckedHref, CheckedHtml, Deferred, Exten
 export type { Duration } from './duration'
 export type { PublicEnv, PublicEnvOf } from './env'
 export { publicEnv } from './env'
+export { focusInvalid } from './focus'
 export type { Component, EventHandler, JSX } from './jsx'
 export type { LeaveGuardOptions } from './leave'
 export { guardLeave } from './leave'
