@@ -155,6 +155,14 @@ describe('kay grammar', () => {
     expect(lines[10]).toEqual(['{: punctuation.section.embedded.begin.kay', 'x: variable.other.ts', '}: punctuation.section.embedded.end.kay'])
   })
 
+  it('reads a const line, its pattern and value as TypeScript, and leaves a var element alone', () => {
+    const lines = tokenize(['for p of ps', '  const price = p.cents', '  const { a } = p', 'var x'].join('\n'))
+
+    expect(lines[1]).toEqual(['const: storage.type.kay', 'price: variable.other.ts', '=: keyword.operator.assignment.kay', 'p: variable.other.ts', '.: meta.embedded.expression.kay', 'cents: variable.other.ts'])
+    expect(lines[2]).toEqual(['const: storage.type.kay', '{: meta.block.ts', 'a: variable.other.ts', '}: meta.block.ts', '=: keyword.operator.assignment.kay', 'p: variable.other.ts'])
+    expect(lines[3]![0]).toBe('var: entity.name.tag.kay')
+  })
+
   it('reads a try block with its catch branch', () => {
     const lines = tokenize(['try', '  p Fine', 'catch error'].join('\n'))
 

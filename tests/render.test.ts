@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { mapStack } from '../src/build/sourcemap'
 import { transformKay } from '../src/build/transform'
+import { collectHead } from '../src/runtime/head'
 import { child } from '../src/runtime/html'
 import { renderToString } from '../src/server/string'
 
@@ -184,6 +185,33 @@ describe('named slots', () => {
 
   it('read a line made of an expression as text', async () => {
     expect(await renderKay('---\nconst { name } = props<{ name: string }>()\n---\np\n  {name} <b>\n  | !', { name: 'kay' })).toBe('<p>kay &lt;b>\n!</p>')
+  })
+})
+
+describe('template consts', () => {
+  it('name a value once per render of their block, for the lines after them and their children', async () => {
+    await Bun.write(join(scratch, 'box.kay'), '---\nimport type { JSX } from \'kay\'\n\nconst { children } = props<{ children: JSX.Element }>()\n---\ndiv.box\n  slot\n')
+
+    const source = '---\nimport Box from \'./box.kay\'\n\nconst { products } = props<{ products: { name: string, cents: number, stock: number }[] }>()\n---\nconst count = products.length\np {count} products\nfor product of products\n  const price = (product.cents / 100).toFixed(2)\n  const { name, stock: left = 0 } = product\n  li(title={price}) {name}: {price}\n    if left < 3 as low\n      const label = \'only \' + low\n      b {label}\nBox\n  const total = products.reduce((sum, product) => sum + product.cents, 0)\n  | {total}\ntry\n  const twice = count * 2\n  i {twice}'
+
+    expect(await renderKay(source, { products: [{ name: 'Tea', cents: 250, stock: 1 }, { name: 'Mug', cents: 900, stock: 8 }] })).toBe('<p>2 products</p><li title="2.50">Tea: 2.50<b>only true</b></li><li title="9.00">Mug: 9.00</li><div class="box">1150</div><i>4</i>')
+  })
+
+  it('reach the head block when written before it', async () => {
+    const file = join(scratch, 'titled.kay')
+
+    await Bun.write(file, 'const name = \'Ada\'\nhead\n  title {name}\np {name}\n')
+
+    const { default: Titled } = await import(file) as { default: () => unknown }
+    const { head, result } = collectHead(() => child(Titled()))
+
+    expect([head.html, result]).toEqual(['<title>Ada</title>', '<p>Ada</p>'])
+  })
+
+  it('compute their value once, however often the lines after them read it', async () => {
+    const source = '---\nlet calls = 0\nconst next = () => ++calls\n---\nconst n = next()\np {n} {n} {n}\np {calls}'
+
+    expect(await renderKay(source)).toBe('<p>1 1 1</p><p>1</p>')
   })
 })
 

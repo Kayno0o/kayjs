@@ -41,6 +41,8 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
         return { try: outline(file, node.children), rejected: node.rejected && { alias: text(file, node.rejected.alias), children: outline(file, node.rejected.children) } }
       case 'slot':
         return { slot: text(file, node.name), ...(node.params && { params: text(file, node.params) }), children: outline(file, node.children) }
+      case 'const':
+        return { const: text(file, node.pattern), value: text(file, node.value) }
     }
 
     return node
@@ -173,6 +175,38 @@ describe('elements', () => {
     expect(at('doctype html\np')).toEqual([['doctype', '`doctype` is pug syntax kay does not hav']])
     expect(at('div\n  include a.pug')).toEqual([['include', '`include` is pug syntax kay does not hav']])
     expect(at('blockquote each one\np while\n')).toEqual([])
+  })
+})
+
+describe('const', () => {
+  it('declares a name or a destructuring pattern among its siblings, its value running to the end of the line or of its brackets', () => {
+    const file = parse('for p of ps\n  const price = p.cents / 100\n  const { name, tags: [first] = [] } = p\n  const total = sum({\n    a: 1,\n  })\n  li {price}')
+
+    expect(file.diagnostics).toEqual([])
+    expect(outline(file)).toEqual([{ for: 'p', index: undefined, of: 'ps', key: undefined, fallback: undefined, children: [
+      { const: 'price', value: 'p.cents / 100' },
+      { const: '{ name, tags: [first] = [] }', value: 'p' },
+      { const: 'total', value: 'sum({\n    a: 1,\n  })' },
+      { tag: 'li', children: [['{price}']] },
+    ] }])
+  })
+
+  it('rejects let, a malformed const, children under one, and pug\'s code lines, pointing at const', () => {
+    const at = (source: string) => parse(source).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
+
+    expect(at('let n = 1')).toEqual([['let', 'A template declares names with `const`, not `let`']])
+    expect(at('const = 1')).toEqual([['const = 1', 'Malformed `const`']])
+    expect(at('const n =')).toEqual([['const n =', 'A `const` needs a value']])
+    expect(at('const n = 1\n  p x')).toEqual([['p x', 'A `const` line has no children: the lines after it at its indentation read its name']])
+    expect(at('- const n = 1')).toEqual([['-', '`- code` is pug syntax kay does not have']])
+    expect(parse('- const n = 1').diagnostics[0]?.help).toBe('a template names a value with `const name = value`; other code goes in the script')
+  })
+
+  it('leaves a var element alone', () => {
+    const file = parse('var x\nvar {x}')
+
+    expect(file.diagnostics).toEqual([])
+    expect(outline(file)).toEqual([{ tag: 'var', children: [['x']] }, { tag: 'var', children: [['{x}']] }])
   })
 })
 

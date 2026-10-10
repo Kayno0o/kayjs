@@ -1,14 +1,14 @@
-import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import { URL_ATTRIBUTES } from '../runtime/base'
 import { actionOf, describedByOf, formFieldOf, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
-import { childItems, slotValue, soleDynamic } from './items'
+import { childItems, constDeclaration, slotValue, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const TRANSITION_PART = 'transition:'
 // A static URL an island sets itself rather than in its template, so the browser puts it under `base` as the server does: a root-relative one, or a `srcset` holding one.
@@ -41,6 +41,8 @@ export class DomTemplate {
   private counter = 0
   // The action the form being emitted posts to, whose refusal marks its fields invalid.
   private formTarget: Span | undefined
+  // How many blocks of template `const`s the binding being emitted sits in: a node first reached there is declared with `var`, so the bindings after the block reach it too.
+  private constBlocks = 0
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
@@ -69,9 +71,15 @@ export class DomTemplate {
     const parent = `KayP${this.counter++}`
 
     b.add(`KayFragment((${parent}) => { `)
+    let blocks = 0
 
     for (const item of childItems(nodes)) {
-      if (item.kind === 'text') {
+      if (item.kind === 'const') {
+        b.add('{ ')
+        this.constDeclaration(item.node)
+        blocks++
+      }
+      else if (item.kind === 'text') {
         b.add(`KayText(${parent}, ${JSON.stringify(decodeEntities(item.text))}); `)
       }
       else if (item.kind === 'element') {
@@ -86,7 +94,7 @@ export class DomTemplate {
       }
     }
 
-    b.add('})')
+    b.add(`${'} '.repeat(blocks)}})`)
   }
 
   // A dynamic part rendered into an element's content, or between two markers.
@@ -139,6 +147,10 @@ export class DomTemplate {
 
         break
     }
+  }
+
+  private constDeclaration(node: ConstNode): void {
+    this.b.wrap(node, () => constDeclaration(this.b, node, this.src, domAlias('memo')))
   }
 
   private if(node: IfNode, at: string): void {
@@ -295,7 +307,7 @@ export class DomTemplate {
         access = `${variable(node.parent!)}.firstChild`
 
       node.variable = `${prefix}${next++}`
-      b.add(`const ${node.variable} = ${access}; `)
+      b.add(`${this.constBlocks > 0 ? 'var' : 'const'} ${node.variable} = ${access}; `)
 
       return node.variable
     }
@@ -483,9 +495,18 @@ export class DomTemplate {
       const items = childItems(children)
       const raw = RAW_ELEMENTS.has(name)
       const sole = soleDynamic(items)
+      let blocks = 0
 
       for (const item of items) {
-        if (item.kind === 'text') {
+        if (item.kind === 'const') {
+          blocks++
+          bindings.push(() => {
+            b.add('{ ')
+            this.constBlocks++
+            this.constDeclaration(item.node)
+          })
+        }
+        else if (item.kind === 'text') {
           this.child(node, 'text')
           html += raw ? item.text : escapeText(item.text)
         }
@@ -502,6 +523,13 @@ export class DomTemplate {
           html += START_MARKER + END_MARKER
           bindings.push(variable => this.inForm(target, () => this.dynamic(item, 'null', variable(start), variable(end))))
         }
+      }
+
+      if (blocks > 0) {
+        bindings.push(() => {
+          b.add('}'.repeat(blocks))
+          this.constBlocks -= blocks
+        })
       }
     }
     else if (content !== undefined) {

@@ -341,6 +341,8 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
 
           break
         }
+        case 'const':
+          break
       }
     }
   }

@@ -677,6 +677,28 @@ describe('named slots', () => {
   })
 })
 
+describe('template consts', () => {
+  it('follow what they read as memos, in an element\'s content as in a block, two elements of one template declaring the same name', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nconst double = n * 2\nbutton#up(onClick={() => n.set(c => c + 1)}) {double}\ndiv\n  p\n    const label = \'p\' + n\n    b {label}\n    i(title={label}) {double}\n  span\n    const label = \'s\' + double\n    | {label}\nif n > 1\n  const { big } = { big: n * 10 }\n  em {big}\n',
+    })
+
+    try {
+      const read = () => [root.querySelector('#up')!.textContent, root.querySelector('b')!.textContent, root.querySelector('i')!.getAttribute('title'), root.querySelector('span')!.textContent, root.querySelector('em')?.textContent]
+      const bold = root.querySelector('b')
+
+      expect(read()).toEqual(['2', 'p1', 'p1', 's2', undefined])
+      root.querySelector<HTMLButtonElement>('#up')!.click()
+      await settle()
+      expect(read()).toEqual(['4', 'p2', 'p2', 's4', '20'])
+      expect(root.querySelector('b')).toBe(bold)
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('bind:value on a number input', () => {
   it('keeps the signal\'s last number while the input is empty', async () => {
     const dir = await mkdtemp(join(import.meta.dir, '.dom-'))

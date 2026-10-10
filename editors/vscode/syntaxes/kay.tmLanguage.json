@@ -25,6 +25,9 @@
       "include": "#expression-line"
     },
     {
+      "include": "#const"
+    },
+    {
       "include": "#for"
     },
     {
@@ -166,6 +169,33 @@
           "include": "#text"
         }
       ]
+    },
+    "const": {
+      "match": "^[ \\t]*(const)[ \\t]+(\\{.*\\}|\\[.*\\]|[A-Za-z_$][\\w$]*)[ \\t]*(=)(?!=)[ \\t]*(.*)$",
+      "captures": {
+        "1": {
+          "name": "storage.type.kay"
+        },
+        "2": {
+          "name": "meta.embedded.expression.kay",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        },
+        "3": {
+          "name": "keyword.operator.assignment.kay"
+        },
+        "4": {
+          "name": "meta.embedded.expression.kay",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        }
+      }
     },
     "for": {
       "match": "^[ \\t]*(for)[ \\t]+([A-Za-z_$][\\w$]*)(?:[ \\t]*(,)[ \\t]*([A-Za-z_$][\\w$]*))?[ \\t]+(of)[ \\t]+(.*?)[ \\t]+(key)(=)(\\{.*\\})[ \\t]*$",

@@ -1,0 +1,15 @@
+---
+import { signal } from 'kay'
+
+const products = signal([{ id: 1, name: 'Tea', cents: 250, stock: 1 }, { id: 2, name: 'Mug', cents: 900, stock: 8 }])
+const rate = signal(1)
+---
+section.priced
+  for product of products
+    const price = (product.cents * rate / 100).toFixed(2)
+    const { name, stock } = product
+    li.product(class={{ low: stock < 3 }} title={price})
+      | {name}: {price}
+      if stock < 3
+        span.badge {stock} left
+  button.rate(onClick={() => rate.set(2)}) Double

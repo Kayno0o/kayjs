@@ -77,6 +77,19 @@ ul
 
 `if value as name` binds the truthy value for the children. A `for` matches its rows by `item.id`, else by the item itself. When your items have neither, name a key: `for post of posts key={post.slug}`.
 
+A `const` line names a value for the lines after it and their children, so a row computes it once however often it reads it:
+
+```kay
+for product of products
+  const price = (product.cents / 100).toFixed(2)
+  const { name, stock } = product
+  li(title={price}) {name}: {price}
+    if stock < 3
+      span.badge Only {stock} left
+```
+
+In an island it follows what it reads, as a `memo` does, and redraws only what reads it. A name the template already sees, `let` and reassigning it are errors.
+
 ## Events and bindings
 
 Handlers are camelCase attributes. A component with one becomes an [island](/essentials/islands).

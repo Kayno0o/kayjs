@@ -245,4 +245,29 @@ describe('islands', () => {
     expect([...document.querySelectorAll('slot li.badge')].map(item => item.textContent)).toEqual(['a', 'b', 'c'])
     expect(issues).toEqual([])
   })
+
+  it('renders a row\'s template consts on the server, then hydrates them as memos that follow what they read without drawing the row again', async () => {
+    const issues: string[] = []
+    const warn = spyOn(console, 'warn').mockImplementation((...args) => void issues.push(args.join(' ')))
+    const error = spyOn(console, 'error').mockImplementation((...args) => void issues.push(args.join(' ')))
+    const { default: Fixture } = await import(join(fixtures, 'pricedpage.kay')) as { default: () => unknown }
+    const html = child(Fixture())
+    const rows = () => [...document.querySelectorAll('li.product')].map(row => [row.className, row.getAttribute('title'), row.textContent])
+
+    document.body.innerHTML = html
+    expect(rows()).toEqual([['product low', '2.50', 'Tea: 2.501 left'], ['product', '9.00', 'Mug: 9.00']])
+
+    const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+
+    await hydrateAgain()
+    const first = document.querySelector('li.product')
+
+    document.querySelector('button.rate')!.dispatchEvent(new Event('click', { bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    warn.mockRestore()
+    error.mockRestore()
+    expect(document.querySelector('li.product')).toBe(first)
+    expect(rows()).toEqual([['product low', '5.00', 'Tea: 5.001 left'], ['product', '18.00', 'Mug: 18.00']])
+    expect(issues).toEqual([])
+  })
 })

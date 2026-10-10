@@ -53,6 +53,10 @@ describe('formatKay', () => {
     ].join('\n'))
   })
 
+  it('re-indents a const line with its block, a value running over several lines moving along with it', () => {
+    expect(format('for p of ps\n    const total = sum({\n        a: 1,\n    })\n    li {total}\n')).toBe('for p of ps\n  const total = sum({\n      a: 1,\n  })\n  li {total}\n')
+  })
+
   it('keeps the type parameters of a generic component on its fence line', () => {
     expect(formatKay('---<T extends { id: number }>  \nconst { items } = props<{ items: T[] }>()\n---\np {items.length}\n').code).toBe('--- <T extends { id: number }>\nconst { items } = props<{ items: T[] }>()\n---\np {items.length}\n')
   })

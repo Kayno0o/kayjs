@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode, TryNode } from './ast'
 
 // `--- server`, `--- client`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
@@ -14,6 +14,11 @@ const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 const NAMED_SLOT = /slot[ \t]+([A-Z_$][\w$]*)/diy
 const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
 const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch|try)(?=[ \t]|\r?\n|$)/y
+const CONST_HEAD = /const(?=[ \t]|\r?\n|$)/y
+// `let x = 1`: a declaration kay has no counterpart for, told from a `var` element by the `=`.
+const REASSIGNABLE = /(let|var)[ \t]+[A-Z_$][\w$]*[ \t]*=(?!=)/iy
+const CONST_NAME = /[A-Z_$][\w$]*/iy
+const CONST_HELP = '`const name = value`, or `const { a, b } = value` to destructure it'
 // Pug lines kay has no counterpart for, which would otherwise read as an element named after the keyword.
 const PUG_KEYWORD = /(each|while|unless|case|when|include|extends|block|mixin|doctype)(?=[ \t]|\r?\n|$)/y
 const PUG_HINTS: Record<string, string> = {
@@ -227,6 +232,36 @@ class TemplateParser {
 
     if (this.src[start] === '@') {
       siblings.push(this.parseSlot(indent))
+
+      return
+    }
+
+    CONST_HEAD.lastIndex = start
+
+    if (CONST_HEAD.test(this.src)) {
+      const node = this.parseConst(indent)
+
+      if (node)
+        siblings.push(node)
+
+      return
+    }
+
+    REASSIGNABLE.lastIndex = start
+    const reassignable = REASSIGNABLE.exec(this.src)?.[1]
+
+    if (reassignable !== undefined) {
+      this.error(start, start + reassignable.length, `A template declares names with \`const\`, not \`${reassignable}\``, { note: 'what the template renders follows the values it reads, so nothing in it is reassigned', help: 'write `const`, or keep a value that changes in a signal of the script' })
+      this.pos = this.lineEnd(start)
+      this.skipChildren(indent)
+
+      return
+    }
+
+    if (this.src[start] === '-' && (this.src[start + 1] === ' ' || this.atLineEnd(start + 1))) {
+      this.error(start, start + 1, '`- code` is pug syntax kay does not have', { help: 'a template names a value with `const name = value`; other code goes in the script' })
+      this.pos = this.lineEnd(start)
+      this.skipChildren(indent)
 
       return
     }
@@ -543,6 +578,56 @@ class TemplateParser {
     const children = this.parseBlock(indent)
 
     return { kind: 'for', start, end: this.lastContentEnd(), item, index, each, key, children }
+  }
+
+  private parseConst(indent: number): ConstNode | undefined {
+    const start = this.pos
+    const lineEnd = this.lineEnd(start)
+
+    this.pos += 'const'.length
+    this.skipSpaces()
+
+    const patternStart = this.pos
+    let pattern: Span | undefined
+
+    if (this.src[this.pos] === '{' || this.src[this.pos] === '[') {
+      this.pos = this.scanBalanced(this.pos)
+      pattern = { start: patternStart, end: this.pos }
+    }
+    else {
+      CONST_NAME.lastIndex = this.pos
+      const name = CONST_NAME.exec(this.src)
+
+      if (name) {
+        this.pos += name[0].length
+        pattern = { start: patternStart, end: this.pos }
+      }
+    }
+
+    this.skipSpaces()
+
+    if (!pattern || this.src[this.pos] !== '=' || this.src[this.pos + 1] === '=') {
+      this.error(start, lineEnd, 'Malformed `const`', { help: CONST_HELP })
+      this.pos = lineEnd
+      this.skipChildren(indent)
+
+      return undefined
+    }
+
+    this.pos++
+    this.skipSpaces()
+    const value = this.scanToLineEnd()
+
+    if (value.start === value.end) {
+      this.error(start, lineEnd, 'A `const` needs a value', { help: CONST_HELP })
+      this.skipChildren(indent)
+
+      return undefined
+    }
+
+    this.rejectChildren(indent, 'A `const` line has no children: the lines after it at its indentation read its name')
+
+    return { kind: 'const', start, end: value.end, pattern, value }
   }
 
   // Parses `tag.class#id(attrs)` plus whatever follows on the line, stopping at `terminator` (a newline, or `]` inside `#[...]`).

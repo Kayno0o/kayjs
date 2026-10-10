@@ -1,0 +1,5 @@
+---
+import Priced from './priced.kay'
+---
+main
+  Priced

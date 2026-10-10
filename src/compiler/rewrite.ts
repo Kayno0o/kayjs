@@ -61,7 +61,8 @@ export interface FoundRewrites {
 // `bindings` are the names read off `__props`: destructured props first, so their indexes match the generated defaults, then server data.
 // `values`: code only read by the type checker, where a row or an alias is its value rather than an accessor to it, so TypeScript narrows it; its reads stay as written, its assignments are still reported.
 // `templateStart`: where the template begins in the source, past which a signal's name reads its value.
-export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, bindings: PropsBinding[], componentName: string, values: boolean, templateStart: number): FoundRewrites {
+// `constSites`: where the template's `const` lines declare their names, which then hide no other name.
+export function findRewrites(code: string, map: SourceMap, accessorSites: Set<number>, constSites: Set<number>, bindings: PropsBinding[], componentName: string, values: boolean, templateStart: number): FoundRewrites {
   const rewrites: Rewrites = new Map()
   const diagnostics: Diagnostic[] = []
   const unread = new Set<number>()
@@ -145,6 +146,31 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     return !((parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression') && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && parent.property.name === 'set')
   }
 
+  // A template `const`: each name it declares is new to the template, never reassigned, and, as `accessor`, read through the memo it is.
+  const templateConst = (path: NodePath<t.VariableDeclarator>, accessor: boolean) => {
+    for (const [name, identifier] of Object.entries(path.getBindingIdentifiers())) {
+      const source = map.toSource(identifier.start!)
+      const binding = path.scope.getBinding(name)
+      const hidden = path.scope.parent?.getBinding(name)
+
+      if (source === undefined || !binding)
+        continue
+
+      if (hidden) {
+        const declared = map.isExact(hidden.identifier.start!) ? map.toSource(hidden.identifier.start!) : undefined
+
+        diagnostics.push({ start: source, end: source + name.length, message: `\`${name}\` is already declared`, note: 'a template `const` would hide it from the lines after it', help: 'give the `const` a name of its own', related: declared === undefined ? undefined : [{ start: declared, end: declared + name.length, label: 'declared here' }] })
+      }
+
+      const readOnly = { message: `\`${name}\` is a template \`const\`, which cannot be reassigned`, help: 'keep a value that changes in a signal of the script' }
+
+      if (!accessor || values)
+        visitBinding(path.scope, name, reference => accessor && tagPosition(reference) === 'opening' ? {} : undefined, readOnly)
+      else
+        visitBinding(path.scope, name, reference => withShorthand(reference, name, { after: '()' }), readOnly)
+    }
+  }
+
   traverse(ast, {
     Program: (path) => {
       // The export of the function counts as a reference to it, and a tag of that name is the component rendering itself; neither is a read of a global.
@@ -169,6 +195,13 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
     },
     VariableDeclarator: (path) => {
       const { id, init } = path.node
+
+      if (constSites.has(id.start!)) {
+        templateConst(path, accessorSites.has(id.start!))
+
+        return
+      }
+
       const start = id.type === 'Identifier' && map.isExact(id.start!) ? map.toSource(id.start!) : undefined
       const made = id.type === 'Identifier' && init?.type === 'CallExpression' ? importedFromKay(path.scope, init.callee) : undefined
 

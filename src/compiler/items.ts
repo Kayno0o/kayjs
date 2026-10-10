@@ -1,5 +1,7 @@
-import type { AwaitNode, ElementNode, ForNode, IfNode, Node, TextExpression, TryNode } from './ast'
+import type * as t from '@babel/types'
+import type { AwaitNode, ConstNode, ElementNode, ForNode, IfNode, Node, TextExpression, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
+import { parseExpression } from '@babel/parser'
 import { isHead, isSlot } from './ast'
 
 // The children of an element or a block as the markup holds them: runs of static text, plain elements, and dynamic parts.
@@ -14,11 +16,12 @@ export type Item
     | { kind: 'for', node: ForNode }
     | { kind: 'await', node: AwaitNode }
     | { kind: 'try', node: TryNode }
+    | { kind: 'const', node: ConstNode }
 
-export type DynamicItem = Exclude<Item, { kind: 'text' | 'element' }>
+export type DynamicItem = Exclude<Item, { kind: 'text' | 'element' | 'const' }>
 
 export function isDynamic(item: Item): item is DynamicItem {
-  return item.kind !== 'text' && item.kind !== 'element'
+  return item.kind !== 'text' && item.kind !== 'element' && item.kind !== 'const'
 }
 
 // Consecutive text lines join with a line break; a `head` block and `@slot` blocks render elsewhere, so they hold no place here.
@@ -74,6 +77,10 @@ export function childItems(nodes: Node[]): Item[] {
         items.push({ kind: node.kind, node } as Item)
 
         break
+      case 'const':
+        items.push({ kind: 'const', node })
+
+        continue
       case 'slot':
         continue
     }
@@ -82,6 +89,63 @@ export function childItems(nodes: Node[]): Item[] {
   }
 
   return items
+}
+
+// A template `const` as a statement. `memo`, the helper's name in code that runs again as what it reads changes, makes each name a memo, read by calling it.
+export function constDeclaration(b: CodeBuilder, node: ConstNode, src: string, memo: string | undefined): void {
+  const names = memo === undefined ? [] : patternNames(src.slice(node.pattern.start, node.pattern.end))
+
+  if (memo === undefined) {
+    b.add('const ').addSource(node.pattern).add(' = (').addSource(node.value).add('); ')
+  }
+  else if (names.length === 1 && src.slice(node.pattern.start, node.pattern.end) === names[0]) {
+    b.add('const ').addSource(node.pattern).add(` = ${memo}(() => (`).addSource(node.value).add(')); ')
+  }
+  else {
+    // A destructured value is one memo, each name reading its part.
+    const shared = `KayC${node.start}`
+
+    b.add(`const ${shared} = ${memo}(() => { const `).addSource(node.pattern).add(' = (').addSource(node.value).add(`); return [${names.join(', ')}] })`)
+
+    for (const [index, name] of names.entries())
+      b.add(`, ${name} = () => ${shared}()[${index}]`)
+
+    b.add('; ')
+  }
+}
+
+// The names a destructuring pattern declares, in order.
+function patternNames(pattern: string): string[] {
+  const names: string[] = []
+  const visit = (node: t.Node | null) => {
+    if (node?.type === 'Identifier') {
+      names.push(node.name)
+    }
+    else if (node?.type === 'ObjectPattern') {
+      for (const property of node.properties)
+        visit(property.type === 'RestElement' ? property.argument : property.value)
+    }
+    else if (node?.type === 'ArrayPattern') {
+      for (const element of node.elements)
+        visit(element)
+    }
+    else if (node?.type === 'AssignmentPattern') {
+      visit(node.left)
+    }
+    else if (node?.type === 'RestElement') {
+      visit(node.argument)
+    }
+  }
+
+  try {
+    const fn = parseExpression(`(${pattern}) => 0`, { plugins: ['typescript'] })
+
+    if (fn.type === 'ArrowFunctionExpression')
+      visit(fn.params[0]!)
+  }
+  catch {}
+
+  return names
 }
 
 // What a `slot` renders: the component's children, or the block prop it names, called with its arguments when it has some.
@@ -100,5 +164,7 @@ export function slotValue(b: CodeBuilder, slot: ElementNode): void {
 
 // A lone dynamic part of an element owns all of its content, so it needs no markers around it.
 export function soleDynamic(items: Item[]): boolean {
-  return items.length === 1 && isDynamic(items[0]!)
+  const rendered = items.filter(item => item.kind !== 'const')
+
+  return rendered.length === 1 && isDynamic(rendered[0]!)
 }

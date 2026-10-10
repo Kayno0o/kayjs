@@ -1,12 +1,12 @@
 import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
-import type { DynamicItem } from './items'
+import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
 import { actionOf, describedByOf, formFieldOf, marksServerIsland, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
-import { childItems, slotValue, soleDynamic } from './items'
+import { childItems, constDeclaration, slotValue, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'localHref', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -121,9 +121,28 @@ export class HtmlTemplate {
 
   private children(nodes: Node[], markup: Markup, raw: boolean, inElement: boolean): void {
     const items = childItems(nodes)
-    const markers = this.options.hydratable === true && !(inElement && soleDynamic(items))
 
-    for (const item of items) {
+    this.items(items, markup, raw, this.options.hydratable === true && !(inElement && soleDynamic(items)))
+  }
+
+  private items(items: Item[], markup: Markup, raw: boolean, markers: boolean): void {
+    for (const [index, item] of items.entries()) {
+      if (item.kind === 'const') {
+        // The items after it render inside a function declaring it, so its name reaches them alone.
+        markup.dynamic(() => {
+          const rest = new Markup(this.b)
+
+          this.b.add('(() => { ')
+          this.b.wrap(item.node, () => constDeclaration(this.b, item.node, this.src, this.options.accessorLoops === true ? htmlAlias('memo') : undefined))
+          this.b.add('return (')
+          this.items(items.slice(index + 1), rest, raw, markers)
+          rest.end()
+          this.b.add(') })()')
+        })
+
+        return
+      }
+
       if (item.kind === 'text') {
         markup.text(raw ? item.text : escapeText(item.text))
       }

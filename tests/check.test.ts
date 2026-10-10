@@ -164,6 +164,28 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('types a template const, reporting at its line a type error and a name nothing reads', async () => {
+    const root = await scratchProject({ 'src/list.kay': '---\nconst { products } = props<{ products: { name: string, cents: number }[] }>()\n---\nfor product of products\n  const price = product.cents.toUpperCase()\n  const { name, cents: _cents } = product\n  const unused = 1\n  li {price} {name}\n' })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[5, 'TS2339'], [7, 'unread-name']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a template const hiding a name, and one reassigned', async () => {
+    const root = await scratchProject({ 'src/list.kay': '---\nconst { products } = props<{ products: { name: string }[] }>()\n---\nfor product of products\n  const { name } = product\n  const products = []\n  button(onClick={() => { name = \'x\' }}) {products.length}\n' })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message])).toEqual([[6, '`products` is already declared'], [7, '`name` is a template `const`, which cannot be reassigned']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the schema builder a script imports as t, which --fix renames', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p Home\n',

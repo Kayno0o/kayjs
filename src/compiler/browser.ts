@@ -295,7 +295,7 @@ function buildProgram(file: KayFile, serverNames: string[], expressions: { span:
   return { code, segments }
 }
 
-// The names `for`, `if ... as`, `then`, `catch` and `@slot(...)` bind for the template below them.
+// The names `for`, `if ... as`, `then`, `catch`, `@slot(...)` and `const` bind for the template below them.
 function templateNames(file: KayFile): string[] {
   const names: string[] = []
   const words = (span: Span | undefined) => span ? Array.from(file.source.slice(span.start, span.end).matchAll(WORD), match => match[0]) : []
@@ -314,6 +314,9 @@ function templateNames(file: KayFile): string[] {
     }
     else if (node.kind === 'slot') {
       names.push(...words(node.params))
+    }
+    else if (node.kind === 'const') {
+      names.push(...words(node.pattern))
     }
   })
 
@@ -352,7 +355,7 @@ function templateExpressions(file: KayFile): { span: Span, deferred: boolean }[]
     else if (node.kind === 'for') {
       found.push({ span: node.each, deferred: false }, ...node.key ? [{ span: node.key, deferred: false }] : [])
     }
-    else if (node.kind === 'await') {
+    else if (node.kind === 'await' || node.kind === 'const') {
       found.push({ span: node.value, deferred: false })
     }
   })

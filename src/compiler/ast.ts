@@ -127,7 +127,15 @@ export interface TryNode extends Span {
   rejected?: AwaitBranch
 }
 
-export type Node = ElementNode | TextNode | IfNode | ForNode | AwaitNode | TryNode | SlotNode
+// `const price = product.cents / 100`: a name for the value, seen by the lines after it at its indentation and by their children.
+export interface ConstNode extends Span {
+  kind: 'const'
+  // A name, or an object or array pattern destructuring the value.
+  pattern: Span
+  value: Span
+}
+
+export type Node = ElementNode | TextNode | IfNode | ForNode | AwaitNode | TryNode | SlotNode | ConstNode
 
 // An attribute written with a name, which a spread is not.
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
@@ -214,6 +222,10 @@ export function* elementsIn(nodes: readonly Node[]): Generator<ElementNode> {
         break
       case 'slot':
         yield* elementsIn(node.children)
+
+        break
+      case 'const':
+        break
     }
   }
 }
@@ -343,6 +355,8 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
           break
         case 'text':
           break
+        case 'const':
+          break
       }
     }
   }
@@ -456,6 +470,8 @@ export function drawIcons(nodes: Node[], icons: ReadonlySet<string>): void {
         drawIcons(tryBlocks(node).flat(), icons)
 
         break
+      case 'const':
+        break
     }
   }
 }
@@ -486,7 +502,7 @@ export function visitNodes(nodes: Node[], each: (node: Node) => void): void {
         visitNodes(block, each)
       }
     }
-    else {
+    else if (node.kind !== 'const') {
       visitNodes([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], each)
     }
   }

@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TextNode, TryNode } from './ast'
 import type { LintName } from './lints'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
@@ -8,7 +8,7 @@ import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression, mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
-import { slotValue } from './items'
+import { constDeclaration, slotValue } from './items'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 
 export interface GenerateOptions {
@@ -54,6 +54,8 @@ export interface Generated {
   builder: CodeBuilder
   // Generated offsets of parameters whose references must be called: loop items, loop indexes, narrowed `if` aliases.
   accessorSites: Set<number>
+  // Generated offsets of the names a template `const` declares, its pattern's start.
+  constSites: Set<number>
   diagnostics: Diagnostic[]
 }
 
@@ -111,6 +113,7 @@ export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAn
 class Generator {
   private readonly b: CodeBuilder
   private readonly accessorSites = new Set<number>()
+  private readonly constSites = new Set<number>()
   private readonly diagnostics: Diagnostic[] = []
   private readonly src: string
   // The action expression of the form being emitted, so its fields' names are checked against the action's input.
@@ -223,7 +226,7 @@ class Generator {
     if (!runnable && this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
       declared.push([DYNAMIC_TAG, 'Dynamic'])
 
-    const { head, template } = this.splitHead(this.file.template)
+    const { head, hoisted, template } = this.splitHead(this.file.template)
 
     if (head && !this.options.check && !runnable)
       declared.push(['KayUseHead', 'head'])
@@ -276,6 +279,9 @@ class Generator {
     b.add(') {\n')
     this.emitBody()
 
+    for (const node of hoisted)
+      this.emitHoistedConst(node, html || dom)
+
     // An island sets no head, and a static component rendering inside one leaves it to the server.
     if (head && !dom)
       this.emitHead(head)
@@ -306,7 +312,7 @@ class Generator {
     if (this.options.island !== undefined)
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''}${islandMessages(this.src, this.options.client)})${this.genericIslandType()}\n`)
 
-    return { builder: b, accessorSites: this.accessorSites, diagnostics: this.diagnostics }
+    return { builder: b, accessorSites: this.accessorSites, constSites: this.constSites, diagnostics: this.diagnostics }
   }
 
   // Whether the page declares its query; a layout's or special page's declaration is reported.
@@ -516,12 +522,40 @@ class Generator {
     }
   }
 
-  // The template's top-level `head` block, which renders into the document head rather than in place.
-  private splitHead(nodes: Node[]): { head?: ElementNode | undefined, template: Node[] } {
+  // A top-level `const` before the `head` block, declared ahead of it so the head reads it too.
+  private emitHoistedConst(node: ConstNode, final: boolean) {
+    const { b } = this
+    const memo = this.staticLoops ? undefined : 'KayMemo'
+
+    if (final) {
+      b.wrap(node, () => constDeclaration(b, node, this.src, memo))
+      b.add('\n')
+
+      return
+    }
+
+    b.wrap(node, () => {
+      b.add('const ')
+      this.constSites.add(b.code.length)
+
+      if (memo !== undefined)
+        this.accessorSites.add(b.code.length)
+
+      b.addSource(node.pattern).add(' = (').addSource(node.value).add(');\n')
+    })
+  }
+
+  // The template's top-level `head` block, which renders into the document head rather than in place, and the `const` lines before it, declared ahead of it.
+  private splitHead(nodes: Node[]): { head?: ElementNode | undefined, hoisted: ConstNode[], template: Node[] } {
     let head: ElementNode | undefined
     const template: Node[] = []
+    const headAt = nodes.findIndex(isHead)
+    const hoisted = nodes.slice(0, Math.max(headAt, 0)).filter(node => node.kind === 'const')
 
     for (const node of nodes) {
+      if (node.kind === 'const' && hoisted.includes(node))
+        continue
+
       if (!isHead(node)) {
         template.push(node)
 
@@ -538,7 +572,7 @@ class Generator {
       head ??= node
     }
 
-    return { head, template }
+    return { head, hoisted, template }
   }
 
   // Registered before the template renders, so a page's title and meta tags win over its layouts': they render first and register first.
@@ -654,8 +688,12 @@ class Generator {
   private emitChildren(nodes: Node[]) {
     let previous: Node | undefined
 
-    for (const node of nodes) {
+    for (const [index, node] of nodes.entries()) {
       switch (node.kind) {
+        case 'const':
+          this.emitConst(node, nodes.slice(index + 1))
+
+          return
         case 'element':
           this.emitElement(node)
 
@@ -696,6 +734,26 @@ class Generator {
 
       previous = node
     }
+  }
+
+  // The siblings after a `const` render inside a function declaring it, so its name reaches them and their children alone.
+  private emitConst(node: ConstNode, rest: Node[]) {
+    const { b } = this
+
+    b.add('{(() => { ')
+    b.wrap(node, () => {
+      b.add('const ')
+      this.constSites.add(b.code.length)
+
+      // Code that runs reads it as a memo, as it does a row, unless the markup renders once.
+      if (!this.staticLoops)
+        this.accessorSites.add(b.code.length)
+
+      b.addSource(node.pattern).add(' = (').addSource(node.value).add(');')
+    })
+    b.add(' return ')
+    this.emitRoot(rest)
+    b.add(' })()}')
   }
 
   private emitIf(node: IfNode, index: number) {
@@ -1472,6 +1530,8 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
         return tryBlocks(node).some(visit)
       case 'slot':
         return visit(node.children)
+      case 'const':
+        return false
     }
 
     return false
@@ -1500,6 +1560,8 @@ export function mayPromote(file: KayFile, script: ScriptAnalysis): boolean {
         return tryBlocks(node).some(visit)
       case 'slot':
         return visit(node.children)
+      case 'const':
+        return false
     }
 
     return false
@@ -1532,6 +1594,8 @@ function formHelpers(file: KayFile): KayHelper[] {
         return tryBlocks(node).some(hasActionForm)
       case 'slot':
         return hasActionForm(node.children)
+      case 'const':
+        return false
     }
 
     return false
@@ -1578,6 +1642,8 @@ function awaitedNames(nodes: Node[], source: string, found = new Set<string>()):
           awaitedNames(block, source, found)
 
         break
+      case 'const':
+        break
     }
   }
 
@@ -1614,6 +1680,8 @@ function usesSlot(nodes: Node[], found: (node: Node) => boolean): boolean {
         return awaitBlocks(node).some(uses)
       case 'try':
         return tryBlocks(node).some(uses)
+      case 'const':
+        return false
     }
 
     return false
@@ -1636,6 +1704,8 @@ function usesAwait(nodes: Node[]): boolean {
         return usesAwait(node.children) || usesAwait(node.fallback ?? [])
       case 'try':
         return tryBlocks(node).some(usesAwait)
+      case 'const':
+        return false
     }
 
     return false
@@ -1658,6 +1728,8 @@ function usesTry(nodes: Node[]): boolean {
         return usesTry(node.children) || usesTry(node.fallback ?? [])
       case 'await':
         return awaitBlocks(node).some(usesTry)
+      case 'const':
+        return false
     }
 
     return false
@@ -1699,7 +1771,7 @@ function usedHelpers(nodes: Node[], script: ScriptAnalysis, source: string): Hel
         for (const block of tryBlocks(node))
           visit(block)
       }
-      else {
+      else if (node.kind === 'text') {
         visit(node.parts.filter(part => part.kind === 'element'))
       }
     }

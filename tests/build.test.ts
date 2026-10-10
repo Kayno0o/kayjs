@@ -266,8 +266,8 @@ describe('kay build', () => {
       const entry = await Bun.file(entryFile).text()
 
       expect(code).toBe(0)
-      expect(report).toStartWith('built 9 islands, 0 stylesheets and 0 prerendered pages in ')
-      expect(Object.keys(manifest.islands).sort()).toEqual(['counter.kay', 'greeting.kay', 'joined.kay', 'picker.kay', 'plain.kay', 'rich.kay', 'slow.kay', 'tally.kay', 'typed.kay'])
+      expect(report).toStartWith('built 10 islands, 0 stylesheets and 0 prerendered pages in ')
+      expect(Object.keys(manifest.islands).sort()).toEqual(['counter.kay', 'greeting.kay', 'joined.kay', 'picker.kay', 'plain.kay', 'priced.kay', 'rich.kay', 'slow.kay', 'tally.kay', 'typed.kay'])
       // Minified: no line of the bundle is indented.
       expect(entry).not.toContain('\n  ')
       expect(Bun.gunzipSync(await Bun.file(`${entryFile}.gz`).bytes())).toEqual(await Bun.file(entryFile).bytes())

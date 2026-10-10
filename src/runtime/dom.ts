@@ -10,7 +10,7 @@ import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
 
 export { componentClass } from './classes'
-export { renderEffect as effect, untrack } from './reactive'
+export { renderEffect as effect, memo, untrack } from './reactive'
 export { transition } from './transition'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.

@@ -21,6 +21,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `head` | At the top level: its `title`, `meta`, `link`, `style`, `script` and `base` children go in the document head. |
 | `await value` / `then name` / `catch error` | Renders the indented block under `await` until `value` settles; see [Streaming](rendering.md#streaming). |
 | `try` / `catch error` | Renders the `catch` block instead when the `try` block throws; see [Error fallbacks](islands.md#error-fallbacks). |
+| `const name = value` | Names a value for the lines after it at its indentation and their children, computed once per render of its block; in an island it follows what it reads as a memo does, redrawing only what reads it. `const { a, b } = value` destructures. A name the template already sees, `let` and reassignment are errors. |
 
 ```kay
 ---
@@ -45,6 +46,23 @@ section.todo-list
       li.empty Nothing matches
   if selected as todo
     p Selected #[strong {todo.title}]
+```
+
+A value a row reads several times is named once in it:
+
+```kay
+---
+import type { Product } from './product'
+
+const { products } = props<{ products: Product[] }>()
+---
+for product of products
+  const price = (product.cents / 100).toFixed(2)
+  const low = product.stock < product.threshold
+  li.product(class={{ low }})
+    span.price(title={price}) {price}
+    if low
+      span.badge {product.stock}
 ```
 
 ## Elements
