@@ -19,7 +19,7 @@ export const auth = createAuth({
   store,
   url: 'http://localhost',
   site: 'Fixture',
-  signInPage: '/login',
+  pages: true,
   oauth: { discord: { provider: discordProvider(), clientId: 'discord-id', clientSecret: 'discord-secret' } },
   email: {
     mailer: {
@@ -27,7 +27,6 @@ export const auth = createAuth({
         mails.push(mail)
       },
     },
-    links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' },
   },
   organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' },
 })

@@ -1,3 +1,3 @@
 import { auth } from '../../../auth'
 
-export default auth.guard({ redirect: '/login', require: auth.memberOf('admin') })
+export default auth.guard({ require: auth.memberOf('admin') })

@@ -1,4 +1,5 @@
 --- server
+// The app's own page at one of kayjs-auth's paths replaces that page alone.
 import { t } from 'elysia'
 import { action } from 'kay'
 
