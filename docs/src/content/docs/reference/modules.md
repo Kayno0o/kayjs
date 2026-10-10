@@ -46,7 +46,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext` and `Loc
 | `session`, `memoryStore`, `sqliteStore` | Cookie sessions and their stores. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defineEnv` | Reads `process.env` once against a schema, typed |
 | `rateLimit`, `memoryRates`, `sqliteRates`, `clientAddress` | Rate limiting |
-| `schedule`, `background` | Cron jobs and background work in the server's process |
+| `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |
 | `queue`, `memoryJobs`, `sqliteJobs` | Durable jobs with retries |
 | `rooms`, `memoryRooms`, `sqliteRooms` | Websocket rooms |
 | `invalidatePage` | Rebuilds a prerendered page |

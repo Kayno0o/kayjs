@@ -29,6 +29,7 @@ import { background, pages, schedule } from 'kay/server'
 new Elysia()
   .use(schedule('@hourly', async () => purgeExpiredCarts()))
   .use(schedule('30 2 * * MON', sendWeeklyReport, { tz: 'Europe/Paris' }))
+  .use(schedule('30s', collectMetrics))
   .use(background(async (signal) => {
     while (!signal.aborted)
       await handleNextEmail(signal)
@@ -38,6 +39,7 @@ new Elysia()
 ```
 
 - `schedule` takes five cron fields, `minute hour day-of-month month day-of-week`, or a nickname such as `@daily`, read in the system's time zone unless `tz` names one. A literal one with another number of fields, an unknown nickname or a day its month never has, `0 0 30 2 *`, is a type error; a computed one it cannot read, or that never comes, fails the boot. Runs never overlap: the next is planned once the last settles. A run that throws is logged and the next one comes as planned.
+- `schedule('30s', job)`, or `schedule(30, job)` in seconds, runs every so long in place of a cron, at the multiples of that length since the epoch, `'1h'` on the hour and `'1d'` at UTC midnight, so it takes no `tz`; a run outlasting its length skips the runs it overlaps. A length that is not positive is a type error, or fails the boot when computed. `lock`, `store`, the overlap and the shutdown work as for a cron.
 - `background` starts `work` with the server, for a queue consumer or anything else that runs the whole time. On stop its signal aborts and the server waits for it to return. Work that throws is logged and not started again.
 - Stopping on a signal waits for a scheduled run in progress, and for every `onStop` hook the app registers, async ones included, in turn. `shutdown(app)` from `kay/server` stops a server the same way, as a test does; Elysia's own `app.stop()` does not wait for the hooks.
 - With several server processes, each runs its own schedules. `schedule(cron, job, { lock: 'weekly-report' })` runs each time once across every process sharing the job store (below), the first to reach it taking it; `store` names another store than the default one.

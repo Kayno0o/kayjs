@@ -4,7 +4,8 @@ export type Duration = number | `${number}${DurationUnit}`
 type DurationUnit = keyof typeof UNIT_SECONDS
 
 const UNIT_SECONDS = { s: 1, m: 60, h: 3600, d: 86_400, w: 604_800 }
-const DURATION_TEXT = /^(\d+(?:\.\d+)?)([smhdw])$/
+
+export const DURATION_TEXT = /^(\d+(?:\.\d+)?)([smhdw])$/
 
 // The seconds a positive duration stands for; `what` names the option in the error anything else throws.
 export function durationSeconds(value: unknown, what: string): number {

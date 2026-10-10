@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { afterAll, describe, expect, it, jest, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { background, memoryJobs, queue, schedule, shutdown, sqliteJobs } from '../src/server'
 import { drainQueues } from '../src/server/queue'
@@ -149,6 +149,91 @@ describe('schedule', () => {
     finally {
       cron.restore()
     }
+  })
+})
+
+describe('schedule every so long', () => {
+  // A run settles over a few microtasks, which fake timers never wait for.
+  const settle = async () => {
+    for (let tick = 0; tick < 20; tick++)
+      await Promise.resolve()
+  }
+
+  it('runs on the epoch\'s multiples of its length, planning the next once the last settles, until the server stops', async () => {
+    jest.useFakeTimers({ now: 45_000 })
+
+    const runs: number[] = []
+    let finish: (() => void) | undefined
+    const app = new Elysia().use(schedule('30s', async () => {
+      runs.push(Date.now())
+      await new Promise<void>((resolve) => {
+        finish = resolve
+      })
+    }))
+
+    try {
+      jest.advanceTimersByTime(60_000)
+      expect(runs).toEqual([])
+
+      app.listen(0)
+      jest.advanceTimersByTime(14_999)
+      expect(runs).toEqual([])
+      jest.advanceTimersByTime(1)
+      await settle()
+      // The run takes 40 s, past the 150 s one, so the 180 s one is the next.
+      jest.advanceTimersByTime(40_000)
+      finish?.()
+      await settle()
+      expect(runs).toEqual([120_000])
+      jest.advanceTimersByTime(19_999)
+      expect(runs).toEqual([120_000])
+      jest.advanceTimersByTime(1)
+      await settle()
+      expect(runs).toEqual([120_000, 180_000])
+      finish?.()
+      await shutdown(app)
+      jest.advanceTimersByTime(300_000)
+      expect([runs.length, jest.getTimerCount()]).toEqual([2, 0])
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('runs a locked schedule once across processes sharing its store, each time it comes', async () => {
+    jest.useFakeTimers({ now: 0 })
+
+    const store = memoryJobs()
+    const runs: string[] = []
+    const first = new Elysia().use(schedule(2, () => runs.push('first'), { lock: 'sync', store })).listen(0)
+    const second = new Elysia().use(schedule(2, () => runs.push('second'), { lock: 'sync', store })).listen(0)
+
+    try {
+      for (let tick = 0; tick < 3; tick++) {
+        jest.advanceTimersByTime(2000)
+        await settle()
+      }
+
+      expect(runs).toHaveLength(3)
+    }
+    finally {
+      jest.useRealTimers()
+      await shutdown(first)
+      await shutdown(second)
+    }
+  })
+
+  it('refuses a length that is not positive, or a time zone, at boot, and types a literal one', () => {
+    const typed = (_build: () => unknown) => true
+    const computed = (every: number) => every
+
+    expect(() => schedule(computed(0), () => undefined)).toThrow('the schedule 0 is 0; it takes a positive duration')
+    expect(() => schedule('30s', () => undefined, { tz: 'UTC' } as object)).toThrow('the schedule 30s takes no tz')
+    expect(typed(() => [schedule(30, () => undefined), schedule('1.5h', () => undefined), schedule('1d', () => undefined, { lock: 'daily' })])).toBe(true)
+    // @ts-expect-error -- not positive
+    expect(typed(() => schedule('0s', () => undefined))).toBe(true)
+    // @ts-expect-error -- a time zone means nothing to a schedule running from the epoch
+    expect(typed(() => schedule('30s', () => undefined, { tz: 'UTC' }))).toBe(true)
   })
 })
 
