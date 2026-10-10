@@ -10,6 +10,7 @@ import { welcome } from './email'
 import { report } from './events'
 import { randomToken } from './keys'
 import { spend } from './limits'
+import { validLocale } from './locale'
 import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, usernameProblem } from './rules'
 
@@ -19,6 +20,8 @@ export interface RegisterInput {
   username?: string
   // The CAPTCHA widget's token, when the app asks for one.
   captcha?: string | undefined
+  // The language the user reads, for their mails; the browser's by default.
+  locale?: string | undefined
 }
 
 // Why a field was refused, by field, as codes a form turns into messages in its own words and language.
@@ -81,7 +84,8 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   if (errors.email || errors.password || errors.username)
     return { ok: false, errors: withoutUndefined(errors) }
 
-  let record = newUserRecord({ email, username, passwordHash: await hashPassword(input.password), roles: [...state.core.defaultRoles] })
+  const locale = input.locale !== undefined && validLocale(input.locale) ? input.locale : state.languages[0] ?? null
+  let record = newUserRecord({ email, username, passwordHash: await hashPassword(input.password), roles: [...state.core.defaultRoles], locale })
 
   try {
     record = (await store.users.create(record)) ?? record

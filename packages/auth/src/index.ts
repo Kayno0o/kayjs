@@ -12,7 +12,7 @@ export type { ActivityEvent, AuditEntry, AuthEvent, EventContext } from './event
 export * from './gate'
 export { DEFAULT_LIMITS } from './limits'
 export type { Limit, Limits } from './limits'
-export { defaultTemplates } from './mail'
+export { defaultTemplates, frenchTemplates } from './mail'
 export type { Mail, MailContent, MailData, Mailer, MailKind, SecurityEvent, Templates } from './mail'
 export * from './memoryStore'
 export * from './oauth'

@@ -2,6 +2,7 @@ import type { SecurityEvent } from './mail'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { report } from './events'
+import { writing } from './mail'
 
 // Tells the user and the app of a change to what protects the account; mail goes to a verified address only, so a typo never warns a stranger.
 // A failure is logged, not thrown: the change is made by then, and a mail outage must not turn every sign-in into an error.
@@ -19,7 +20,9 @@ export async function notify(state: RequestState, record: UserRecord, event: Sec
   const url = event === 'new-sign-in' && core.sessionsPage !== undefined ? `${core.url}${core.sessionsPage}` : undefined
 
   try {
-    await mail.mailer.send({ to, kind: event, ...url === undefined ? {} : { url }, ...mail.templates[event]({ site: core.site, email: to, detail, url }) })
+    const { locale, templates } = writing(mail, [record.locale, ...state.languages])
+
+    await mail.mailer.send({ to, kind: event, locale, ...url === undefined ? {} : { url }, ...templates[event]({ site: core.site, email: to, detail, url, locale }) })
   }
   catch (error) {
     console.error(`kayjs-auth: mailing ${event} failed`, error)

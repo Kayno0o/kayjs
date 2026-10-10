@@ -10,6 +10,7 @@ import { admit } from './captcha'
 import { banned } from './core'
 import { digest, randomToken } from './keys'
 import { spend } from './limits'
+import { writing } from './mail'
 import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail } from './rules'
@@ -46,14 +47,19 @@ export interface EmailOptions {
   mailer: Mailer
   // The app's page each link opens, the token in `?token=`. Each shows a button, or the new password's form, posting the token to an action, so a mail scanner opening the link spends nothing.
   links: Record<LinkType, string>
+  // Over kayjs-auth's own templates in every language.
   templates?: Partial<Templates> | undefined
+  // The languages mails are written in, the first for a user whose language is none of them: `['en', 'fr']`. English only by default; kayjs-auth writes English and French, `translations` any other.
+  locales?: string[] | undefined
+  // Templates by language, over `templates`: `{ de: germanTemplates }`.
+  translations?: Record<string, Partial<Templates>> | undefined
   // Refuses password sign-in until the address is verified, and signs no one in on registering.
   requireVerified?: boolean | undefined
   // Whether magic links and verification mails carry a code, for both kinds at once or for each: `'both'`, `{ 'magic-link': 'code' }`. A link only by default.
   codes?: CodeMode | Partial<Record<CodedLink, CodeMode>> | undefined
 }
 
-export type EmailCore = Required<Omit<EmailOptions, 'templates' | 'requireVerified' | 'codes'>> & { requireVerified: boolean, templates: Templates, codes: Record<CodedLink, CodeMode> }
+export type EmailCore = Required<Omit<EmailOptions, 'templates' | 'requireVerified' | 'codes' | 'locales' | 'translations'>> & { requireVerified: boolean, locales: string[], templates: Record<string, Templates>, codes: Record<CodedLink, CodeMode> }
 
 // A code waiting in the session that asked for it, which alone can spend it.
 export interface PendingCode {
@@ -235,7 +241,7 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
 // On registering: the verification mail, when the app sends mail.
 export async function welcome(state: RequestState, record: UserRecord): Promise<void> {
   if (state.core.email && record.email)
-    await issue(state.core, record, 'verify-email', record.email, null, await bindCode(state, 'verify-email', record.email))
+    await issue(state, record, 'verify-email', record.email, null, await bindCode(state, 'verify-email', record.email))
 }
 
 // Signs in with the code a magic link mail carried, in the session that asked for it.
@@ -349,15 +355,15 @@ async function mailByAddress(state: RequestState, email: string, type: 'reset-pa
   const record = emailProblem(address) ? undefined : await core.store.users.findByEmail(address)
 
   if (record)
-    void issueQuietly(core, record, type, address, redirect, nonce)
+    void issueQuietly(state, record, type, address, redirect, nonce)
 
   return { ok: true }
 }
 
 // Off the response's path, where no one is left to answer a failure to: logged.
-async function issueQuietly(core: Core, record: UserRecord, type: LinkType, email: string, redirect: string | null, nonce: string | undefined): Promise<void> {
+async function issueQuietly(state: RequestState, record: UserRecord, type: LinkType, email: string, redirect: string | null, nonce: string | undefined): Promise<void> {
   try {
-    await issue(core, record, type, email, redirect, nonce)
+    await issue(state, record, type, email, redirect, nonce)
   }
   catch (error) {
     console.error(`kayjs-auth: mailing a ${type} link failed`, error)
@@ -374,13 +380,15 @@ async function mailFor(state: RequestState, record: UserRecord, type: LinkType, 
   if (await spend(core.store, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.store, `${limit}:${record.id}`, core.limits[`${limit}Account`]))
     return { ok: false, error: 'limited' }
 
-  await issue(core, record, type, email, redirect, await bindCode(state, type, email))
+  await issue(state, record, type, email, redirect, await bindCode(state, type, email))
 
   return { ok: true }
 }
 
 // One live link and code per kind and user: a new one replaces the last. A code goes only with the nonce of the session that asked for it.
-async function issue(core: Core, record: UserRecord, type: LinkType, email: string, redirect: string | null, nonce: string | undefined): Promise<void> {
+// Written in the user's language, else the browser's.
+async function issue(state: RequestState, record: UserRecord, type: LinkType, email: string, redirect: string | null, nonce: string | undefined): Promise<void> {
+  const { core } = state
   const mail = core.email!
   const mode = type in CODE_OF ? mail.codes[type as CodedLink] : 'link'
   const content: { url?: string, code?: string } = {}
@@ -403,7 +411,9 @@ async function issue(core: Core, record: UserRecord, type: LinkType, email: stri
     await core.store.tokens.create({ digest: codeDigest(core, nonce, code), type: codeType, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + TOKEN_LIFETIME_MS[codeType]) })
   }
 
-  await mail.mailer.send({ to: email, kind: type, ...content, ...mail.templates[type]({ site: core.site, email, ...content }) })
+  const { locale, templates } = writing(mail, [record.locale, ...state.languages])
+
+  await mail.mailer.send({ to: email, kind: type, locale, ...content, ...templates[type]({ site: core.site, email, locale, ...content }) })
 }
 
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.

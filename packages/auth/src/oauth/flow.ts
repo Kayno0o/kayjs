@@ -135,7 +135,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     record = await adoptEmail(core, record, profile)
   }
   else {
-    record = await signUp(core, profile)
+    record = await signUp(core, profile, state.languages[0] ?? null)
     // An identity left by a deleted user is replaced.
     await saveIdentity(core, undefined, record.id, profile, tokens, identity !== undefined)
     await core.onSignUp?.(publicUser(record), profile)
@@ -227,13 +227,13 @@ async function saveIdentity(core: Core, identity: IdentityRecord | undefined, us
 }
 
 // A new user from a provider account: its verified email and its name are taken only when no other user has them, so no account is ever merged into another by email.
-async function signUp(core: Core, profile: Profile): Promise<UserRecord> {
+async function signUp(core: Core, profile: Profile, locale: string | null): Promise<UserRecord> {
   const email = profile.email ? normalizeEmail(profile.email) : undefined
   const name = normalizeUsername(profile.username)
   const freeEmail = email !== undefined && !(await core.store.users.findByEmail(email)) ? email : null
   // A name these rules refuse is left out too: the user picks one later.
   const freeName = !usernameProblem(name) && !(await core.store.users.findByUsername(name)) ? name : null
-  const record = newUserRecord({ email: freeEmail, emailVerifiedAt: freeEmail === null ? null : new Date(), username: freeName, roles: [...core.defaultRoles] })
+  const record = newUserRecord({ email: freeEmail, emailVerifiedAt: freeEmail === null ? null : new Date(), username: freeName, roles: [...core.defaultRoles], locale })
 
   return (await core.store.users.create(record)) ?? record
 }

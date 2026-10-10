@@ -34,7 +34,8 @@ import { auditEntries, report } from './events'
 import { createGate, scopeAllows } from './gate'
 import { deriveKeys } from './keys'
 import { DEFAULT_LIMITS } from './limits'
-import { defaultTemplates } from './mail'
+import { acceptedLocales, validLocale } from './locale'
+import { localeTemplates } from './mail'
 import { noteSignIn } from './notify'
 import { createOAuthClient } from './oauth/client'
 import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow'
@@ -135,6 +136,7 @@ export class Auth<Scope extends string = string, Role extends string = string> {
       client,
       address,
       userAgent: request.headers.get('user-agent') ?? '',
+      languages: acceptedLocales(request.headers.get('accept-language') ?? ''),
       current: () => this.record(),
       via: () => this.source,
       complete: async (record, redirect, method) => completeSignIn(this[STATE], record, redirect, method, (signedIn, how) => this.establish(signedIn, how)),
@@ -305,6 +307,18 @@ export class Auth<Scope extends string = string, Role extends string = string> {
   // A fresh access token for the signed-in user's account at `provider`, refreshed when about to expire; null without one, or once the provider refuses a refresh.
   async providerToken(provider: string): Promise<string | null> {
     return providerToken(this[STATE], provider)
+  }
+
+  // Sets the language the signed-in user's mails are written in, a BCP 47 tag such as `fr`; false when signed out or not a tag.
+  async setLocale(locale: string): Promise<boolean> {
+    const record = await this.record()
+
+    if (!record || !validLocale(locale))
+      return false
+
+    this.resolving = Promise.resolve(await this.core.store.users.update(record.id, { locale }) ?? { ...record, locale })
+
+    return true
   }
 
   // The providers the signed-in user has linked.
@@ -798,6 +812,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   const oauth: Core['oauth'] = new Map()
   const oauthApps = Object.entries(options.oauth ?? {})
   const url = options.url?.replace(TRAILING_SLASH, '')
+  const locales = options.email?.locales?.length ? [...options.email.locales] : ['en']
 
   if ((oauthApps.length > 0 || options.email) && url === undefined)
     throw new Error('kayjs-auth: OAuth sign-in and mailed links need `url`, the site\'s public origin, to build their URLs')
@@ -826,7 +841,8 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     email: options.email && {
       ...options.email,
       requireVerified: options.email.requireVerified ?? false,
-      templates: { ...defaultTemplates, ...options.email.templates },
+      locales,
+      templates: localeTemplates(locales, options.email.templates, options.email.translations),
       codes: typeof options.email.codes === 'string' ? { 'magic-link': options.email.codes, 'verify-email': options.email.codes } : { 'magic-link': 'link', 'verify-email': 'link', ...options.email.codes },
     },
     oauth,

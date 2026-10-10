@@ -58,6 +58,7 @@ export interface User {
   roles: string[]
   hasPassword: boolean
   twoFactor: boolean
+  locale: string | null
 }
 
 // What every request's `Auth` shares.
@@ -116,6 +117,7 @@ export function publicUser(record: UserRecord): User {
     roles: [...record.roles],
     hasPassword: record.passwordHash !== null,
     twoFactor: record.totpEnabledAt !== null,
+    locale: record.locale,
   }
 }
 
@@ -132,6 +134,7 @@ export function newUserRecord(fields: Partial<UserRecord>): UserRecord {
     roles: [],
     sessionVersion: 0,
     lastSignIn: null,
+    locale: null,
     bannedAt: null,
     bannedUntil: null,
     banReason: null,

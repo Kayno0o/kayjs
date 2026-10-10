@@ -32,7 +32,7 @@ describe('createAuth', () => {
 
     await ada.fetch('/sign-in/u1', POST)
 
-    expect(await ada.json('/me')).toEqual({ id: 'u1', email: 'ada@example.com', emailVerified: false, username: null, roles: ['editor'], hasPassword: true, twoFactor: false })
+    expect(await ada.json('/me')).toEqual({ id: 'u1', email: 'ada@example.com', emailVerified: false, username: null, roles: ['editor'], hasPassword: true, twoFactor: false, locale: null })
   })
 
   test('reaches the app\'s routes from inside a plugin of the app\'s own, however deep', async () => {

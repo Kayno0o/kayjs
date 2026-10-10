@@ -11,6 +11,8 @@ export interface RequestState {
   // The client's address as it is, for the list of where the user is signed in.
   address: string
   userAgent: string
+  // The languages the browser asks for, most wanted first.
+  languages: string[]
   current: () => Promise<UserRecord | null>
   // How the current user was read, once `current` has been.
   via: () => 'session' | 'bearer' | null

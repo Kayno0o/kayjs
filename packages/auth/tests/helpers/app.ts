@@ -19,6 +19,7 @@ export function userRecord(fields: Partial<UserRecord> & Pick<UserRecord, 'id'>)
     roles: [],
     sessionVersion: 0,
     lastSignIn: null,
+    locale: null,
     bannedAt: null,
     bannedUntil: null,
     banReason: null,

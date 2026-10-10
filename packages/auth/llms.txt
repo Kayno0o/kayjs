@@ -74,7 +74,7 @@ else
   a(href="/login") Sign in
 ```
 
-- `user()` answers `{ id, email, emailVerified, username, roles, hasPassword, twoFactor }`, or `null`. Secrets never leave the store: no hash, no TOTP secret, no token.
+- `user()` answers `{ id, email, emailVerified, username, roles, hasPassword, twoFactor, locale }`, or `null`. Secrets never leave the store: no hash, no TOTP secret, no token.
 - It reads the session first, then the request's `Authorization: Bearer` token. `via()` says which: `'session'`, `'bearer'` or `null`.
 - `signOut()` signs this session out under a new session id, keeping the rest of the app's session data, and takes it off the user's sessions, so a copy of the cookie is worth nothing either. `signOutEverywhere()` ends every session of the user, copied cookies included, and every bearer token they hold; `signOutEverywhere({ keepThisOne: true })` keeps this session, the tokens still ending.
 - `signIn({ id })` signs a user in directly, without their second factor, for a way of signing in the app proves itself. kayjs-auth's own flows all go through the second factor.
@@ -172,7 +172,7 @@ if failure?.data?.error === 'invalid'
   p.error Wrong email or password
 ```
 
-- `register({ email, password, username? })` answers `{ ok: true, user, signedIn }`, or `errors` by field (`email`: `'invalid'` or `'taken'`; `password`: `'too-short'` or `'too-long'`; `username`: `'length'`, `'characters'`, `'mixed-scripts'` or `'taken'`), or `error: 'limited'` or `'captcha'`. `'mixed-scripts'` (and `'invalid'` for an address before its `@`) catches a name mixing Latin, Cyrillic and Greek letters only: a name written wholly in Cyrillic that looks Latin passes, so show names next to something they cannot fake, such as an avatar. It signs the user in unless the app requires verified addresses, and mails a verification link when the app sends mail.
+- `register({ email, password, username?, locale? })` answers `{ ok: true, user, signedIn }`, or `errors` by field (`email`: `'invalid'` or `'taken'`; `password`: `'too-short'` or `'too-long'`; `username`: `'length'`, `'characters'`, `'mixed-scripts'` or `'taken'`), or `error: 'limited'` or `'captcha'`. `'mixed-scripts'` (and `'invalid'` for an address before its `@`) catches a name mixing Latin, Cyrillic and Greek letters only: a name written wholly in Cyrillic that looks Latin passes, so show names next to something they cannot fake, such as an avatar. It signs the user in unless the app requires verified addresses, and mails a verification link when the app sends mail.
 - `signInWithPassword({ identifier, password, redirect? })` takes an email, or a username when it holds no `@`. A wrong password and an unknown account answer alike, `'invalid'`, in the same time. `'unverified'` comes once the password is right, when `email.requireVerified` is set: the page then offers `sendVerification()`, which this browser may call from then on. `'limited'` past the attempts allowed: six tries at one account in 15 minutes hold it until the window ends, the right password included, a lockout anyone who knows the address can cause. The tries count against the account, its email and every spelling of its name alike, and each is counted before its password is checked, so parallel guesses do not slip past; a right password clears the count.
 - Passwords are hashed with argon2id; a hash made weaker, or by bcrypt in an older app, is rehashed on the next sign-in.
 - The rules are browser-safe, so an island refuses before posting: `passwordProblem`, `emailProblem`, `usernameProblem`, `normalizeEmail` and `normalizeUsername` from `@kaynooo/kayjs-auth/rules`. Passwords are 10 to 128 characters, usernames 2 to 32. Emails and usernames are stored NFKC-folded, emails lowercased, usernames compared without case, and a name or an email's local part mixing Latin with Cyrillic or Greek is refused.
@@ -188,7 +188,8 @@ email: {
 }
 ```
 
-- `mailer.send(mail)` gets `{ to, kind, subject, text, html, url?, code? }`, filled from `defaultTemplates` or `templates`, keyed by `kind`, and is awaited, its result ignored. An app with its own templating reads `kind` and `url`.
+- `mailer.send(mail)` gets `{ to, kind, locale, subject, text, html, url?, code? }`, filled from the templates keyed by `kind`, and is awaited, its result ignored. An app with its own templating reads `kind`, `locale` and `url`.
+- Mails are written in the user's language: `locale` on the user, a BCP 47 tag kept from the browser's `Accept-Language` on signing up, from `register({ locale })`, or set with `setLocale(tag)`; the browser's when the user has none. `email.locales` lists the languages the site writes, `['en']` by default, the first for anyone else: a tag picks its own, else one of its language (`fr-CA` gets `fr`). kayjs-auth writes English (`defaultTemplates`) and French (`frenchTemplates`); `templates` goes over them in every language, and `translations: { de: {...} }` over both for its own.
 - A mailer of `@kaynooo/kayjs-mail` fits as it is, `mail` being its `mailer()`: `{ send: mail.enqueue }` renders each mail at once and leaves it to its queue, which retries a mail server that is away, `{ send: mail.send }` sends it before the call answers. In development and tests the mails go to its outbox, listed at `/_kay/mail`.
 - `links` names the app's page for each kind; the link is `url` + that path + `?token=`. The page shows a button posting the token to an action, so opening the link spends nothing:
 

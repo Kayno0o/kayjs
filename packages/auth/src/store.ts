@@ -17,6 +17,8 @@ export interface UserRecord {
   sessionVersion: number
   // A keyed digest of where the last sign-in came from.
   lastSignIn: string | null
+  // The language the user reads, a BCP 47 tag such as `fr` or `pt-BR`, for their mails.
+  locale: string | null
   // Set while an admin bars the user from signing in, until `bannedUntil` or for good when null.
   bannedAt: Date | null
   bannedUntil: Date | null
