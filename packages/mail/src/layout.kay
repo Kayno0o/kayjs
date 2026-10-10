@@ -5,12 +5,14 @@ import settings from './settings'
 
 const { preheader, footer } = props<{ preheader?: string | undefined, footer?: JSX.Element }>()
 const [open, close] = ghostTable(settings.width)
+// Invisible characters filling the inbox preview past the preheader, which clients would otherwise fill with the mail's first lines.
+const filler = '\u034F\u200C\u00A0'.repeat(100)
 ---
 table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor={settings.background} style={`background:${settings.background}`})
   tr
     td(align="center" style={`padding:24px 12px;font-family:${settings.font};color:${settings.text}`})
       if preheader
-        div(style="display:none;mso-hide:all;max-height:0;max-width:0;overflow:hidden;opacity:0" aria-hidden="true") {preheader}
+        div(style="display:none;mso-hide:all;max-height:0;max-width:0;overflow:hidden;opacity:0" aria-hidden="true") {preheader}{filler}
       {open}
       table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style={`max-width:${settings.width}px;margin:0 auto`})
         tr

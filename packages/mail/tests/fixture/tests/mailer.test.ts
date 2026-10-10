@@ -32,6 +32,13 @@ describe('rendering', () => {
     expect(html).toContain('<!--[if mso]><i style="mso-font-width:125%;mso-text-raise:150%" hidden>&emsp;</i><span style="mso-text-raise:75%"><![endif]-->Confirm my address<!--[if mso]></span>')
   })
 
+  it('follows the preheader with invisible filler, so the inbox preview stops there, and leaves it out of the text', async () => {
+    const { html, text } = await mail.render({ to: 'ada@example.com', subject: 'Welcome', view: Welcome, props: { name: 'Ada', url: URL } })
+
+    expect(html).toContain(`Your account is ready${'\u034F\u200C\u00A0'.repeat(100)}</div>`)
+    expect(text).not.toContain('\u034F')
+  })
+
   it('takes no props for a mail without required ones, and the text it is given over the one written from the html', async () => {
     const rendered = await mail.render({ to: 'ada@example.com', subject: 'Plain', view: Plain, text: 'Given text' })
 
