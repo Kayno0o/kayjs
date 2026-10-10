@@ -110,7 +110,7 @@ head
           @icon
             Language
           | A prefix per locale, typed messages with plurals, dates, numbers, relative times and lists, and right-to-left pages.
-        ModuleCard(title="Accessibility" use="kay check" href="/reference/checks")
+        ModuleCard(title="Accessibility" use="kay check" href="/reference/checks#errors-and-warnings")
           @icon
             Accessible
           | Missing alt text, misspelt ARIA, unknown roles, nested controls and duplicate ids, reported at the .kay line.
@@ -118,7 +118,7 @@ head
           @icon
             Seo
           | Titles a page overrides, canonical and Open Graph tags, share cards, a sitemap, robots.txt and JSON-LD.
-        ModuleCard(title="Images" use="kay/image" href="/essentials/styling-and-assets")
+        ModuleCard(title="Images" use="kay/image" href="/essentials/styling-and-assets#imported-images")
           @icon
             Photo
           | Imported images get WebP and AVIF variants in a srcset, their width and height, and crops to a shape.
@@ -134,7 +134,7 @@ head
           @icon
             Api
           | Elysia modules in src/api, mounted at their path, with server-sent events and websockets.
-        ModuleCard(title="Icons" use="~icons" href="/essentials/styling-and-assets")
+        ModuleCard(title="Icons" use="~icons" href="/essentials/styling-and-assets#icons")
           @icon
             Icons
           | Any Iconify set, imported one icon at a time as a tag that sizes to the text and takes its colour.

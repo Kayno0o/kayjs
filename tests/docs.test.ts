@@ -15,6 +15,8 @@ const SITE_LINK = /(?:\]\(|href=")(\/[\w/-]*?)\/?(?:#[\w-]*)?[)"]/g
 // Code blocks and spans, whose links are examples rather than links of the site.
 const CODE = /```[\s\S]*?```|`[^`\n]*`/g
 const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
+const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
+const SECTION_LINK = /href[=:] ?["'](\/[\w/-]+)#([\w-]+)["']/g
 
 describe('llms.txt', () => {
   it('stays an index an agent reads whole, listing every doc of llms/ once', () => {
@@ -100,6 +102,24 @@ describe('the documentation site', () => {
       }
     }
 
+    expect(broken).toEqual([])
+  })
+
+  it('links each card of the home page to its own page or section, each anchor a heading of that page', async () => {
+    const home = await Bun.file(join(root, 'docs/src/routes/(docs)/index.kay')).text()
+    const cards = [...home.matchAll(CARD_LINK)].map(match => match[1]!)
+    const broken: string[] = []
+
+    for (const [link, path, anchor] of home.matchAll(SECTION_LINK)) {
+      const source = Bun.file(join(root, 'docs/src/content/docs', `${path}.md`))
+      const ids = await source.exists() ? (await renderMarkdown(await source.text())).headings.map(heading => heading.id) : []
+
+      if (!ids.includes(anchor!))
+        broken.push(link)
+    }
+
+    expect(cards.length).toBeGreaterThan(5)
+    expect(new Set(cards).size).toBe(cards.length)
     expect(broken).toEqual([])
   })
 
