@@ -38,7 +38,7 @@
   },
   "scripts": {
     "prepare": "bun scripts/link-fixture.ts",
-    "check": "tsgo --noEmit",
+    "check": "$npm_execpath check",
     "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
     "prepack": "bun run build:types",
     "postpack": "rm -rf types",
