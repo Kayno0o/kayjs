@@ -2,6 +2,7 @@ import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue
 import { withBase, withoutBase } from './base'
 import { fragment, insert, markers } from './dom'
 import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { createSignal, effect, memo, onCleanup, onMount } from './reactive'
 
 export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions, RichText } from './i18n'
 export { defineMessages } from './i18n'
@@ -11,6 +12,8 @@ interface Payload {
   locale?: string
   settings?: LocaleSettings
   messages: Record<string, Message>
+  // When the server rendered the page, for `relativeTime`.
+  now?: number
 }
 
 const PAYLOAD = 'script[data-kay-i18n]'
@@ -18,6 +21,7 @@ const read = new WeakSet<Element>()
 const messages = new Map<string, Message>()
 let settings: LocaleSettings | undefined
 let pageLocale = ''
+let renderedAt: number | undefined
 
 // Reads the scripts not read yet, so messages a streamed part brought are found too.
 function load(): void {
@@ -31,6 +35,7 @@ function load(): void {
 
     settings ??= payload.settings
     pageLocale ||= payload.locale ?? ''
+    renderedAt ??= payload.now
 
     for (const [key, message] of Object.entries(payload.messages))
       messages.set(key, message)
@@ -106,6 +111,28 @@ export function formatRelativeTime(value: Date | number, options?: RelativeTimeO
 export function formatRelativeTime(value: number, unit: Intl.RelativeTimeFormatUnit, options?: Intl.RelativeTimeFormatOptions): string
 export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: Intl.RelativeTimeFormatOptions): string {
   return formatRelativeTimeIn(translations().locale, value, unitOrOptions, options)
+}
+
+// A date relative to now, formatted as `formatRelativeTime` does, that goes on ticking while the island lives: every second under a minute away, every minute under an hour, every hour past that.
+// It renders first as relative to the page's render time, as the server did, so hydrating changes nothing.
+export function relativeTime(value: () => Date | number, options?: Intl.RelativeTimeFormatOptions): () => string {
+  load()
+
+  const [now, setNow] = createSignal(renderedAt ?? Date.now())
+  const pace = memo(() => tickPace(Math.abs(Number(value()) - now()) / 1000))
+
+  onMount(() => setNow(Date.now()))
+  effect(() => {
+    const timer = setInterval(() => setNow(Date.now()), pace())
+
+    onCleanup(() => clearInterval(timer))
+  })
+
+  return memo(() => formatRelativeTime(value(), { ...options, now: now() }))
+}
+
+function tickPace(seconds: number): number {
+  return seconds < 60 ? 1000 : seconds < 3600 ? 60_000 : 3_600_000
 }
 
 export function formatList(items: Iterable<string>, options?: Intl.ListFormatOptions): string {

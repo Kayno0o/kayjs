@@ -9,6 +9,9 @@ export interface LocaleState extends Translations {
   host?: string
   // A site without `i18n`, its one language's messages read and its URLs carrying no locale.
   implicit?: true
+  // The moment `relativeTime` reads the page as rendered at, taken on its first call and written into the page once, so the islands' first render in the browser reads the same.
+  now?: number
+  nowWritten?: true
 }
 
 const store = new AsyncLocalStorage<LocaleState>()

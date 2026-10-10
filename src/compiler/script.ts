@@ -10,9 +10,10 @@ import { SENDABLE_CLASSES } from './expression'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
-const REACTIVE_MODULES = new Set(['kay'])
 // What `kay` exports that a static component may use and stay static.
 const STATIC_EXPORTS = new Set(['uid', 'sanitizeHtml', 'trustHtml', 'defer'])
+// What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
+const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
@@ -669,10 +670,12 @@ function undeclared(ast: ParseResult<t.File>, code: string, names: string[]): st
 }
 
 function importsReactiveValue(statement: t.Statement): boolean {
-  if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || !REACTIVE_MODULES.has(statement.source.value))
+  if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
     return false
 
-  return statement.specifiers.some(specifier => specifier.type !== 'ImportSpecifier' || (specifier.importKind !== 'type' && !STATIC_EXPORTS.has(importedName(specifier))))
+  const from = statement.source.value
+
+  return statement.specifiers.some(specifier => specifier.type !== 'ImportSpecifier' ? from === 'kay' : specifier.importKind !== 'type' && (from === 'kay' ? !STATIC_EXPORTS.has(importedName(specifier)) : from === 'kay/i18n' && REACTIVE_I18N.has(importedName(specifier))))
 }
 
 // The name an import specifier takes from its module, written as an identifier or, as `import { 'a b' as c }`, a string.

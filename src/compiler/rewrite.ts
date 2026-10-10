@@ -310,7 +310,8 @@ export function findRewrites(code: string, map: SourceMap, accessorSites: Set<nu
       }
 
       const start = id.type === 'Identifier' && map.isExact(id.start!) ? map.toSource(id.start!) : undefined
-      const made = id.type === 'Identifier' && init?.type === 'CallExpression' ? importedFromKay(path.scope, init.callee) : undefined
+      // `relativeTime` from `kay/i18n` makes a memo too.
+      const made = id.type === 'Identifier' && init?.type === 'CallExpression' ? importedFromKay(path.scope, init.callee) ?? (importedFromKay(path.scope, init.callee, 'kay/i18n') === 'relativeTime' ? 'memo' : undefined) : undefined
 
       const binding = id.type === 'Identifier' ? path.scope.getBinding(id.name) : undefined
 
@@ -382,12 +383,12 @@ function sourceSpan(map: SourceMap, node: t.Node | undefined): Span | undefined 
   return start === undefined ? undefined : { start, end: start + node!.end! - node!.start! }
 }
 
-// The name `kay` exports that `callee` imports, such as `signal`.
-export function importedFromKay(scope: Scope, callee: t.Node): string | undefined {
+// The name `kay`, or the kay module given, exports that `callee` imports, such as `signal`.
+export function importedFromKay(scope: Scope, callee: t.Node, module = 'kay'): string | undefined {
   const specifier = callee.type === 'Identifier' ? scope.getBinding(callee.name)?.path : undefined
   const declaration = specifier?.parent
 
-  if (!specifier?.isImportSpecifier() || declaration?.type !== 'ImportDeclaration' || declaration.source.value !== 'kay')
+  if (!specifier?.isImportSpecifier() || declaration?.type !== 'ImportDeclaration' || declaration.source.value !== module)
     return undefined
 
   const imported = specifier.node.imported

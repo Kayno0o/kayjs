@@ -374,16 +374,21 @@ export function prerenderKey(settings: LocaleSettings | undefined, locale: strin
 export function messagesScript(keys: Set<string>, first: boolean): string {
   const state = localeState()
 
+  const now = state?.now !== undefined && !state.nowWritten ? state.now : undefined
+
   // Without `i18n`, the browser builds links as they are written: a page sends its locale only for the messages its islands read.
-  if (!state || (keys.size === 0 && (!first || state.implicit)))
+  if (!state || (keys.size === 0 && (!first || state.implicit) && now === undefined))
     return ''
+
+  if (now !== undefined)
+    state.nowWritten = true
 
   const messages = Object.fromEntries([...keys].flatMap((key) => {
     const message = state.messages.get(key) ?? state.fallback?.get(key)
 
     return message === undefined ? [] : [[key, message]]
   }))
-  const payload = first ? { locale: state.locale, ...!state.implicit && { settings: state.settings }, messages } : { messages }
+  const payload = { ...first && { locale: state.locale, ...!state.implicit && { settings: state.settings } }, messages, ...now !== undefined && { now } }
 
   return `<script type="application/json" data-kay-i18n>${JSON.stringify(payload).replaceAll('<', '\\u003c')}</script>`
 }

@@ -4,17 +4,20 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, jest } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { chromium } from 'playwright-core'
 import { check } from '../src/check'
+import { compileKay } from '../src/compiler'
 import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
 import { flattenMessages, localePath, localizedLink, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
+import { relativeTime } from '../src/runtime/i18n.server'
+import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
-import { acceptedLocale, localeSettings, requestLocale } from '../src/server/i18n'
+import { acceptedLocale, localeSettings, messagesScript, requestLocale } from '../src/server/i18n'
 import { prerenderPages } from '../src/server/prerender'
 import { browserPath, testSite } from '../src/test'
 
@@ -554,6 +557,39 @@ describe('kay check', () => {
   })
 })
 
+describe('relativeTime', () => {
+  it('reads the page as rendered at one moment on the server, which the page sends its islands once', () => {
+    const state = { locale: 'en', messages: new Map(), settings: localeSettings(i18n), path: '/', implicit: true as const }
+
+    jest.useFakeTimers({ now: 1_000_000 })
+
+    try {
+      const scripts = runInLocale(state, () => {
+        const ago = relativeTime(() => 940_000)
+
+        jest.advanceTimersByTime(5000)
+
+        const later = relativeTime(() => 970_000, { style: 'short' })
+
+        return [ago(), later(), messagesScript(new Set(), true), messagesScript(new Set(), false)]
+      })
+
+      expect(scripts).toEqual(['1 minute ago', '30 sec. ago', '<script type="application/json" data-kay-i18n>{"locale":"en","messages":{},"now":1000000}</script>', ''])
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('makes a component an island, read by name in its template as a memo', () => {
+    const compiled = compileKay('---\nimport { relativeTime } from \'kay/i18n\'\n\nconst { date } = props<{ date: number }>()\nconst ago = relativeTime(() => date)\n---\ntime {ago}\n', join(process.cwd(), 'ago.kay'), { output: 'html', hydratable: true })
+
+    expect(compiled.tsx).toContain('KayIsland(')
+    expect(compiled.tsx).toContain('KayChild((ago()))')
+    expect(compileKay('---\nimport { formatDate } from \'kay/i18n\'\n---\ntime {formatDate(0)}\n', join(process.cwd(), 'date.kay'), { output: 'html', hydratable: true }).tsx).not.toContain('KayIsland(')
+  })
+})
+
 describe('in the browser', () => {
   it('reads the messages the page sent, those of a streamed part included', async () => {
     GlobalRegistrator.register({ url: 'http://localhost/en/about-us' })
@@ -584,6 +620,47 @@ describe('in the browser', () => {
       expect(container.innerHTML).toBe('<!--[-->Read <strong>our story</strong>, &lt;Ada&gt;, or &lt;Ada&gt;.<!--]-->')
     }
     finally {
+      await GlobalRegistrator.unregister()
+    }
+  })
+
+  it('renders a relative time first as the server did, then ticks at its unit\'s pace until its root goes', async () => {
+    GlobalRegistrator.register({ url: 'http://localhost/en' })
+    jest.useFakeTimers({ now: 1_010_000 })
+
+    try {
+      const { relativeTime } = await import('../src/runtime/i18n.client')
+      const { flush, root } = await import('../src/runtime')
+
+      document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"locale":"en","messages":{},"now":1000000}</script>'
+
+      const texts: string[] = []
+      const dispose = root((dispose) => {
+        const ago = relativeTime(() => 970_000)
+
+        texts.push(ago())
+        flush()
+        texts.push(ago())
+        jest.advanceTimersByTime(1000)
+        texts.push(ago())
+        // A minute away, it ticks each minute.
+        jest.advanceTimersByTime(20_000)
+        flush()
+        texts.push(ago())
+        jest.advanceTimersByTime(59_000)
+        texts.push(ago())
+        jest.advanceTimersByTime(1000)
+        texts.push(ago())
+
+        return dispose
+      })
+
+      dispose()
+      jest.advanceTimersByTime(3_600_000)
+      expect([texts, jest.getTimerCount()]).toEqual([['30 seconds ago', '40 seconds ago', '41 seconds ago', '1 minute ago', '1 minute ago', '2 minutes ago'], 0])
+    }
+    finally {
+      jest.useRealTimers()
       await GlobalRegistrator.unregister()
     }
   })
