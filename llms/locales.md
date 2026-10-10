@@ -34,7 +34,7 @@ A library listed in `extensions` can bring catalogs of its own, `<locale>.ts` ea
 
 Without `i18n`, a site is in its one language, its `lang` (`en` without one): `t()` reads its libraries' catalogs for it, with the app's `src/messages/<lang>.ts` laid over them when it has one, and `kay check` types the keys of both. `locale()` is that language, `localize()` gives a path back as written, and no page gets `hreflang` links, so a library's pages read their texts in any app.
 
-`kay/i18n` works anywhere a request is served from: loads, templates, components, islands, actions and guards, and in `renderToString` outside one, in the site's default locale or the one its `locale` option names (see rendering).
+`t`, `locale`, `direction`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime` and `formatList` come from `kay/i18n`, which works anywhere a request is served from: loads, templates, components, islands, actions and guards, and in `renderToString` outside one, in the site's default locale or the one its `locale` option names (see rendering).
 
 - `t('greeting', { name })`, which a template, a fence or an island reads with no import unless the file names its own `t`, gives a message in the request's locale, its key and placeholders typed from the default locale's file. A number fills a placeholder formatted for the locale, `1 234` in French, and a date with `dateStyle: 'medium'`. An object of plural forms is picked by `count` through `Intl.PluralRules`, `zero` taking 0 whenever it is given. A key no locale has renders as itself.
 - `T` renders a message holding markup, such as a link mid-sentence: see [Messages holding markup](#messages-holding-markup).

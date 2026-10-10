@@ -17,7 +17,7 @@ const posts = await cached('posts', '5m', listPosts)
 - Past `ttl`, the next call still gets the stale value and refreshes it in the background, so no request waits on a refresh.
 - A first load that throws throws to its callers and keeps nothing. A refresh that throws is logged and keeps the stale value, trying again a minute later at most.
 - For a visitor in preview mode (see [Preview mode](content.md#preview-mode)), every call runs `load` and keeps nothing, so they see what it gives now.
-- `invalidate(key)`, or `invalidate(key => key.startsWith('post:'))`, drops keys so the next call loads afresh: call it from the action that changed what they hold. A load already running for a dropped key never lands in the cache.
+- `invalidate(key)` from `kay/cache`, or `invalidate(key => key.startsWith('post:'))`, drops keys so the next call loads afresh: call it from the action that changed what they hold. A load already running for a dropped key never lands in the cache.
 - The value is the same object for every caller, so it is never mutated. At most 10,000 keys are kept, the least recently written going first.
 - The cache lives in the process: each server process keeps its own, and `kay dev` empties it on every change.
 

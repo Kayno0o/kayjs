@@ -20,7 +20,7 @@ Pages live in `src/routes/`:
 
 A page URL ending in a slash redirects with 308 to the one without, query kept: `/about/` to `/about`. `trailingSlash` in kay.config.ts changes that: `'always'` redirects `/about` to `/about/` instead, `'ignore'` serves both.
 
-A matcher checks a param, `[name=matcher]` or `[[name=matcher]]`: it returns the value `ctx.params` hands the page, typed as it returns it, or `undefined` to refuse the URL. kay ships `integer` (a safe whole number, as a number), `uuid` (lowercased) and `slug` (lowercase words joined by dashes), in `kay/params`; a project adds its own as `src/params/<name>.ts`, beside `src/routes/`, its default export the matcher, and one of that name wins over kay's. A matcher nobody provides stops the server.
+A matcher checks a param, `[name=matcher]` or `[[name=matcher]]`: it returns the value `ctx.params` hands the page, typed as it returns it, or `undefined` to refuse the URL. kay ships `integer`, `uuid` and `slug` in `kay/params`: a safe whole number, as a number, a UUID, lowercased, and lowercase words joined by dashes; a project adds its own as `src/params/<name>.ts`, beside `src/routes/`, its default export the matcher, and one of that name wins over kay's. A matcher nobody provides stops the server.
 
 ```ts
 // src/params/even.ts

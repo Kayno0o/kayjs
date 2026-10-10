@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { compileKay, formatDiagnostic } from '../src/compiler'
 import { LINTS } from '../src/compiler/lints'
+import { SCRIPT_GLOBALS, SERVER_GLOBALS } from '../src/compiler/script'
 import { formatKay } from '../src/format'
 
 const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
@@ -11,8 +12,11 @@ const root = join(import.meta.dir, '..')
 const spec = (await Promise.all(['llms.txt', ...(await readdir(join(root, 'llms'))).map(name => `llms/${name}`)].map(async file => Bun.file(join(root, file)).text()))).join('\n')
 const examples = [...spec.matchAll(KAY_BLOCK)].map(match => match[1]!)
 const IMPORT = /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+'(kay(?:\/[^']*)?)'/g
-// A name the prose places, as "`shutdown(app)` from `kay/server`".
-const MENTION = /`(\w+)(?:\([^`]*\))?` from `(kay(?:\/[\w/-]+)?)`/g
+const NAMED = /`(\w+)(?:<[^`>]*>)?(?:\([^`]*\))?`/g
+// Names the prose places, as "`shutdown(app)` from `kay/server`" or "`onCleanup`, `untrack` and `flush` come from `kay` too".
+const MENTION = /((?:`\w+(?:<[^`>]*>)?(?:\([^`]*\))?`(?:, | and | or ))*`\w+(?:<[^`>]*>)?(?:\([^`]*\))?`),? (?:(?:imported |comes? )?from|in) `(kay(?:\/[\w/-]+)?)`/g
+// The entry points an app imports from, without what compiled files import (llms/project.md).
+const PUBLIC_ENTRIES = ['kay', 'kay/cache', 'kay/content', 'kay/i18n', 'kay/icons', 'kay/image', 'kay/params', 'kay/seo', 'kay/server', 'kay/test']
 const LEADING_TYPE = /^type\s+/
 const ALIAS = /\s+as\s+(?:\S.*)?$/
 
@@ -26,8 +30,10 @@ function documentedImports(): Map<string, Set<string>> {
       add(module!, name)
   }
 
-  for (const [, name, module] of spec.matchAll(MENTION))
-    add(module!, name!)
+  for (const [, names, module] of spec.matchAll(MENTION)) {
+    for (const [, name] of names!.matchAll(NAMED))
+      add(module!, name!)
+  }
 
   return found
 }
@@ -61,8 +67,9 @@ describe('llms.txt and its docs', () => {
 
     expect(imports.get('kay/server')?.has('shutdown')).toBe(true)
     await mkdir(dir, { recursive: true })
-    await Bun.write(join(dir, 'imports.ts'), [...imports].map(([module, names]) => `export type { ${[...names].join(', ')} } from '${module}'\n`).join(''))
-    await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ extends: '../../../tsconfig.json', include: ['imports.ts'] }))
+    // A file per entry point, as two may export one name, `t` say.
+    await Promise.all([...imports].map(async ([module, names], index) => Bun.write(join(dir, `imports-${index}.ts`), `export type { ${[...names].join(', ')} } from '${module}'\n`)))
+    await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ extends: '../../../tsconfig.json', include: ['imports-*.ts'] }))
 
     try {
       const checked = Bun.spawn([join(import.meta.dir, '../node_modules/.bin/tsgo'), '--noEmit', '-p', join(dir, 'tsconfig.json')], { stdout: 'pipe', stderr: 'pipe' })
@@ -75,6 +82,15 @@ describe('llms.txt and its docs', () => {
       await rm(dir, { recursive: true, force: true })
     }
   }, 60_000)
+
+  it('says where each export it names is imported from', async () => {
+    const placed = new Set([...documentedImports().values()].flatMap(names => [...names]))
+    const named = new Set([...spec.matchAll(NAMED)].map(match => match[1]!))
+    const exported = new Set((await Promise.all(PUBLIC_ENTRIES.map(async entry => Object.keys(await import(entry))))).flat())
+    const implicit = new Set([...SCRIPT_GLOBALS, ...SERVER_GLOBALS, 't'])
+
+    expect([...exported].filter(name => named.has(name) && !placed.has(name) && !implicit.has(name)).sort()).toEqual([])
+  })
 
   it('keeps what generated code and kay\'s own build import off the public entries', async () => {
     const runtime = await import('kay')
