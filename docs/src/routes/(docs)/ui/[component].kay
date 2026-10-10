@@ -1,4 +1,5 @@
 --- server
+import { shareCard } from 'kay/image'
 import { components, reference } from '../../../content.config'
 import { FORGE_ROOT, neighbours } from '../../../pages'
 
@@ -24,6 +25,8 @@ import '../../../ui.css'
 head
   title {title} · kayjs-ui
   meta(name="description" content={description})
+  meta(property="og:image" content={shareCard({ title })})
+  meta(property="og:image:alt" content={title})
 .page
   header.page-head
     p.eyebrow kayjs-ui · {version}

@@ -9,5 +9,13 @@ const moved = readdirSync(join(import.meta.dir, '../llms')).map(file => file.rep
 export default defineConfig({
   log: false,
   plugins: [tailwind],
+  site: 'https://kayjs.kaynooo.fr',
+  seo: {
+    name: 'kay',
+    description: 'A Bun web framework: one .kay file per component, pages rendered to plain HTML on the server, interactive islands in the browser.',
+  },
+  // Only the share cards draw with it: no stylesheet names Inter, so pages never fetch it.
+  fonts: [{ fontsource: '@fontsource/inter', weights: [700] }],
+  images: { card: { background: '#17202e', color: '#eef2f7' } },
   redirects: Object.fromEntries(moved.map(topic => [`/reference/${topic}`, `/llms/${topic}`])),
 })

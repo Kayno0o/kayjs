@@ -1,4 +1,5 @@
 --- server
+import { shareCard } from 'kay/image'
 import { reference } from '../../../content.config'
 import { FORGE, FORGE_ROOT, neighbours } from '../../../pages'
 import { llmsHref } from '../../../reference'
@@ -20,6 +21,8 @@ import Toc from '../../../components/toc.kay'
 ---
 head
   title {topic.data.title} · Full reference · kay
+  meta(property="og:image" content={shareCard({ title: topic.data.title })})
+  meta(property="og:image:alt" content={topic.data.title})
 .page
   header.page-head
     p.eyebrow

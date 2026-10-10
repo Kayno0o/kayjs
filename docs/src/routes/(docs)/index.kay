@@ -1,5 +1,6 @@
 --- server
 import { highlightCode } from 'kay/content'
+import { shareCard } from 'kay/image'
 import { components } from '../../content.config'
 import { highlight } from '../../highlight'
 
@@ -88,6 +89,8 @@ import '../../ui.css'
 ---
 head
   title(raw) kay, a Bun web framework
+  meta(property="og:image" content={shareCard({ title: 'kay, a Bun web framework' })})
+  meta(property="og:image:alt" content="kay, a Bun web framework")
 .page.home
   header.page-head.hero
     h1 kay

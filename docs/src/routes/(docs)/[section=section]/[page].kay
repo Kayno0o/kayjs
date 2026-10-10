@@ -1,4 +1,5 @@
 --- server
+import { shareCard } from 'kay/image'
 import { docs } from '../../../content.config'
 import { FORGE, neighbours } from '../../../pages'
 import { sectionOf } from '../../../sections'
@@ -24,6 +25,8 @@ import Toc from '../../../components/toc.kay'
 head
   title {title} · kay
   meta(name="description" content={description})
+  meta(property="og:image" content={shareCard({ title })})
+  meta(property="og:image:alt" content={title})
 .page
   header.page-head
     p.eyebrow {sectionOf(entry.slug)?.title}
