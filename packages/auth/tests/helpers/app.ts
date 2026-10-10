@@ -20,6 +20,7 @@ export function userRecord(fields: Partial<UserRecord> & Pick<UserRecord, 'id'>)
     sessionVersion: 0,
     lastSignIn: null,
     locale: null,
+    guest: false,
     bannedAt: null,
     bannedUntil: null,
     banReason: null,

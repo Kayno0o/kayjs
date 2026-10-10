@@ -50,7 +50,7 @@ export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false,
 
 let decoy: Promise<string> | undefined
 
-// A new user with a password, signed in on this session.
+// A new user with a password, signed in on this session; a guest signed in becomes it, keeping their id.
 export async function register(state: RequestState, input: RegisterInput): Promise<RegisterResult> {
   const { store } = state.core
   const refused = await admit(state, 'register', input.captcha)
@@ -84,11 +84,14 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   if (errors.email || errors.password || errors.username)
     return { ok: false, errors: withoutUndefined(errors) }
 
-  const locale = input.locale !== undefined && validLocale(input.locale) ? input.locale : state.languages[0] ?? null
-  let record = newUserRecord({ email, username, passwordHash: await hashPassword(input.password), roles: [...state.core.defaultRoles], locale })
+  const current = await state.current()
+  const guest = current?.guest && state.via() === 'session' ? current : undefined
+  const locale = input.locale !== undefined && validLocale(input.locale) ? input.locale : guest?.locale ?? state.languages[0] ?? null
+  const fields = { email, username, passwordHash: await hashPassword(input.password), locale, guest: false }
+  let record = guest ? { ...guest, ...fields } : newUserRecord({ ...fields, roles: [...state.core.defaultRoles] })
 
   try {
-    record = (await store.users.create(record)) ?? record
+    record = guest ? await store.users.update(guest.id, fields) ?? record : (await store.users.create(record)) ?? record
   }
   // Another request took the email or the name in between; any other failure is the store's.
   catch (error) {
@@ -103,12 +106,16 @@ export async function register(state: RequestState, input: RegisterInput): Promi
 
   const user = publicUser(record)
 
-  await state.core.onSignUp?.(user, undefined)
+  // A guest's records exist already.
+  if (!guest)
+    await state.core.onSignUp?.(user, undefined)
+
   // This browser may verify the address without signing in, as with `requireVerified` it cannot.
   await state.session.set('authRegistered', record.id)
   await welcome(state, record)
 
-  if (requireVerified)
+  // A guest stays signed in: the account was theirs already.
+  if (requireVerified && !guest)
     return { ok: true, user, signedIn: false }
 
   await state.complete(record, '/', 'register')

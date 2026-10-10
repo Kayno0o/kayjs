@@ -19,6 +19,8 @@ export interface UserRecord {
   lastSignIn: string | null
   // The language the user reads, a BCP 47 tag such as `fr` or `pt-BR`, for their mails.
   locale: string | null
+  // Made by `signInAsGuest`, with no way back in once its session ends, until registering or an OAuth sign-in makes it a real account.
+  guest: boolean
   // Set while an admin bars the user from signing in, until `bannedUntil` or for good when null.
   bannedAt: Date | null
   bannedUntil: Date | null

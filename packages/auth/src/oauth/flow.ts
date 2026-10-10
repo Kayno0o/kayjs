@@ -135,10 +135,16 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     record = await adoptEmail(core, record, profile)
   }
   else {
-    record = await signUp(core, profile, state.languages[0] ?? null)
+    const current = await state.current()
+    // A guest becomes the provider account's user, keeping what the app holds for them.
+    const guest = current?.guest && state.via() === 'session' ? current : undefined
+
+    record = await signUp(core, profile, state.languages[0] ?? null, guest)
     // An identity left by a deleted user is replaced.
     await saveIdentity(core, undefined, record.id, profile, tokens, identity !== undefined)
-    await core.onSignUp?.(publicUser(record), profile)
+
+    if (!guest)
+      await core.onSignUp?.(publicUser(record), profile)
   }
 
   await heardProfile(core, record, profile)
@@ -226,13 +232,20 @@ async function saveIdentity(core: Core, identity: IdentityRecord | undefined, us
   await core.store.identities.create({ provider: profile.provider, providerId: profile.providerId, userId, ...sealed, createdAt: new Date() })
 }
 
-// A new user from a provider account: its verified email and its name are taken only when no other user has them, so no account is ever merged into another by email.
-async function signUp(core: Core, profile: Profile, locale: string | null): Promise<UserRecord> {
+// A new user from a provider account, or `guest` made one: its verified email and its name are taken only when no other user has them, so no account is ever merged into another by email.
+async function signUp(core: Core, profile: Profile, locale: string | null, guest?: UserRecord): Promise<UserRecord> {
   const email = profile.email ? normalizeEmail(profile.email) : undefined
   const name = normalizeUsername(profile.username)
   const freeEmail = email !== undefined && !(await core.store.users.findByEmail(email)) ? email : null
   // A name these rules refuse is left out too: the user picks one later.
   const freeName = !usernameProblem(name) && !(await core.store.users.findByUsername(name)) ? name : null
+
+  if (guest) {
+    const patch = { email: freeEmail, emailVerifiedAt: freeEmail === null ? null : new Date(), username: guest.username ?? freeName, guest: false }
+
+    return await core.store.users.update(guest.id, patch) ?? { ...guest, ...patch }
+  }
+
   const record = newUserRecord({ email: freeEmail, emailVerifiedAt: freeEmail === null ? null : new Date(), username: freeName, roles: [...core.defaultRoles], locale })
 
   return (await core.store.users.create(record)) ?? record

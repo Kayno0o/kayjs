@@ -478,3 +478,27 @@ describe('provider tokens', () => {
     logged.mockRestore()
   })
 })
+
+describe('a guest signing in with a provider', () => {
+  test('a new provider account makes the guest a real user, keeping their id; one known already signs in as its user', async () => {
+    const { browser, store, signUps } = setup()
+    const guest = browser()
+
+    providers({ 1: { id: '1', username: 'ada', email: 'ada@example.com' }, 2: { id: '2', username: 'bob' } })
+
+    const { user } = await guest.call('signInAsGuest')
+
+    await signInWith(guest, 'discord', '1')
+
+    expect(await guest.json('/me')).toMatchObject({ id: user.id, guest: false, email: 'ada@example.com', emailVerified: true, username: 'ada' })
+    expect((await store.identities.find('discord', '1'))!.userId).toBe(user.id)
+    expect(signUps).toHaveLength(1)
+
+    const other = browser()
+
+    await other.call('signInAsGuest')
+    await signInWith(other, 'discord', '1')
+
+    expect(await other.json('/me')).toMatchObject({ id: user.id })
+  })
+})

@@ -27,8 +27,8 @@ import { changePassword, changeUsername, deleteAccount, unlink } from './account
 import { actingAdmin, adminAuditLog, banUser, changeRole, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { bearerUser, createToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
-import { captchaRequired } from './captcha'
-import { banned, publicUser } from './core'
+import { admit, captchaRequired } from './captcha'
+import { banned, newUserRecord, publicUser } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, revokeBearerTokens, sendVerification, signInWithEmailCode, signInWithMagicLink, verifyEmail, verifyEmailCode } from './email'
 import { auditEntries, report } from './events'
 import { createGate, scopeAllows } from './gate'
@@ -237,6 +237,27 @@ export class Auth<Scope extends string = string, Role extends string = string> {
       await this[STATE].renew(updated)
     else
       await this.leave()
+  }
+
+  // Signs this browser in as a new guest, a user with no email and no password whom registering or an OAuth sign-in later makes a real account, keeping their id; the guest signed in already answers as is. Counted and CAPTCHA-checked as registering is.
+  async signInAsGuest(options: { captcha?: string | undefined } = {}): Promise<{ ok: true, user: User } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' }> {
+    const current = await this.record()
+
+    if (current)
+      return current.guest ? { ok: true, user: publicUser(current) } : { ok: false, error: 'signed-in' }
+
+    const refused = await admit(this[STATE], 'register', options.captcha)
+
+    if (refused)
+      return { ok: false, error: refused }
+
+    const fresh = newUserRecord({ guest: true, roles: [...this.core.defaultRoles], locale: this[STATE].languages[0] ?? null })
+    const record = (await this.core.store.users.create(fresh)) ?? fresh
+
+    await this.core.onSignUp?.(publicUser(record), undefined)
+    await this.establish(record, 'guest')
+
+    return { ok: true, user: publicUser(record) }
   }
 
   // A new user with an email and a password, signed in on this session; field errors come back as codes.
