@@ -62,7 +62,7 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 
 ## kay dev
 
-`kay dev` runs `src/server.ts` with `NODE_ENV=development`. Open pages refresh by themselves, an edited island is swapped in place, and a project that fails to compile shows its errors in the browser.
+`kay dev` runs `src/server.ts` with `NODE_ENV=development`. Open pages refresh by themselves, an edited island is swapped in place, and a project that fails to compile shows its errors in the browser. What the entry imports before it calls `pages()`, such as a mailer rendering `.kay` mails, imports `.kay` files and icons as pages do.
 
 | Option | Effect |
 | --- | --- |

@@ -203,6 +203,51 @@ describe('kay dev', () => {
     expect(children.at(-1)!.killed).toBe(true)
   })
 
+  it('loads the .kay modules and globs the entry imports before it calls pages()', async () => {
+    const base = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(base, { recursive: true })
+    const root = await mkdtemp(join(base, 'kay-dev-'))
+    const seen = join(root, 'seen.txt')
+
+    await Bun.write(join(root, 'src/mails/welcome.kay'), 'p Welcome\n')
+    await Bun.write(join(root, 'src/mailer.ts'), 'import Welcome from \'./mails/welcome.kay\'\n\nexport const mails = { Welcome, ...import.meta.glob(\'./mails/*.kay\', { eager: true, import: \'default\' }) }\n')
+    await Bun.write(join(root, 'src/server.ts'), `import { mails } from './mailer'\n\nawait Bun.write(${JSON.stringify(seen)}, Object.entries(mails).map(([name, mail]) => \`\${name}: \${typeof mail}\`).join(', '))\nsetInterval(() => undefined, 1000)\n`)
+    const stop = await dev(root)
+
+    try {
+      await until(() => existsSync(seen), 15_000)
+      expect(readFileSync(seen, 'utf8')).toBe('Welcome: function, ./mails/welcome.kay: function')
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('starts the loader over when pages() names another project than kay dev guessed', async () => {
+    const base = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(base, { recursive: true })
+    const root = await mkdtemp(join(base, 'kay-dev-'))
+    const app = join(root, 'app')
+    const loader = join(import.meta.dir, '../src/server/loader.ts')
+
+    await Bun.write(join(app, 'src/hello.kay'), 'p Hello\n')
+    await Bun.write(join(root, 'script.ts'), `import { registerEarlyLoader, registerLoader } from ${JSON.stringify(loader)}\n\nawait registerEarlyLoader(${JSON.stringify(root)})\nawait registerLoader(${JSON.stringify(app)})\nconsole.log(typeof (await import(${JSON.stringify(join(app, 'src/hello.kay'))})).default)\n`)
+
+    try {
+      const run = Bun.spawnSync([process.execPath, join(root, 'script.ts')], { cwd: root })
+
+      expect([run.stdout.toString(), run.stderr.toString()]).toEqual(['function\n', ''])
+      // Compiled by the loader registered for the app, not by the one guessed.
+      expect([existsSync(join(app, '.kay/cache')), existsSync(join(root, '.kay/cache'))]).toEqual([true, false])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('runs from the command line on the project a directory names, or with the entry --entry names', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const seen = join(root, 'seen.txt')

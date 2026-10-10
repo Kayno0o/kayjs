@@ -1,6 +1,7 @@
 import type { Server } from 'bun'
 import process from 'node:process'
 import { loadTraverse } from '../compiler/rewrite'
+import { registerEarlyLoader } from '../server/loader'
 import '../server'
 
 // Preloaded into the server process `kay dev` starts ahead of the next restart: kay and its compiler load while nothing waits on them.
@@ -60,3 +61,9 @@ if (startedAt !== undefined && changed !== undefined) {
 }
 
 reader.releaseLock()
+
+// Once `KAY_DEV_CODE` is set, which turns the inspector on. A project that cannot load its config fails in `pages()`, which serves the error.
+try {
+  await registerEarlyLoader(process.cwd())
+}
+catch {}
