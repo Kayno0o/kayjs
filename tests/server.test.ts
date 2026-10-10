@@ -584,6 +584,7 @@ describe('route params in guards and actions', () => {
     await Bun.write(join(dir, 'routes/orgs/[org]/index.kay'), ACTION('rename', 'p Org'))
     await Bun.write(join(dir, 'routes/orgs/[org]/[team=integer].kay'), 'p Team\n')
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
+    await Bun.write(join(dir, 'routes/shelves/[shelf].kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const stock = action(t.Object({}), () => \'stocked\')\nexport const count = action(t.Object({}), (_, ctx) => ctx.params)\n---\np Shelf\n')
     await Bun.write(join(dir, 'routes/orgs/[org]/report.kay'), '--- server\nexport const prerender = [{ org: \'acme\' }, { org: \'other\' }]\n---\nh1 Report\n')
     await Bun.write(join(dir, 'api/orgs/_guard.ts'), GUARD)
     await Bun.write(join(dir, 'api/orgs/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/:org\', ({ params }) => params.org)\n')
@@ -683,6 +684,13 @@ describe('route params in guards and actions', () => {
       headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'https://elsewhere.example/orgs/acme' },
       body: stringify({}),
     }))).status).toBe(400)
+  })
+
+  it('runs an action no guard covers from any page, refusing it once it reads the params of a post from no page of its route', async () => {
+    expect(await post('shelves/_shelf_.kay', 'stock', '/')).toEqual({ status: 200, guarded: null, body: 'stocked' })
+    expect(await post('shelves/_shelf_.kay', 'stock')).toEqual({ status: 200, guarded: null, body: 'stocked' })
+    expect(await post('shelves/_shelf_.kay', 'count', '/shelves/a')).toEqual({ status: 200, guarded: null, body: { shelf: 'a' } })
+    expect(await post('shelves/_shelf_.kay', 'count', '/')).toEqual({ status: 400, guarded: null, body: 'Action posted from no page of its route' })
   })
 
   it('gives an API route\'s guards its params', async () => {

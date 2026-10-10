@@ -89,7 +89,7 @@ export default guard(({ locals, redirect, deny }) => {
 
 <Callout type="warning">
 
-A guard reads the params of the page asked for in `ctx.params`, as `src/routes/orgs/[org]/_guard.ts` reads `params.org`. An action under it gets the params of the page it was posted from, in its guards and in its own `ctx.params` alike, and is refused when posted from no page of its route, so the guard is never skipped. The guard checked the visitor against those params, not against the action's input, so the action scopes what it touches by `ctx.params`. Checks on one record still belong in the load and in the action.
+A guard reads the params of the page asked for in `ctx.params`, as `src/routes/orgs/[org]/_guard.ts` reads `params.org`. An action under it gets the params of the page it was posted from, in its guards and in its own `ctx.params` alike, and is refused when posted from no page of its route, before the guard runs, so the guard is never skipped. The guard checked the visitor against those params, not against the action's input, so the action scopes what it touches by `ctx.params`. Checks on one record still belong in the load and in the action.
 
 </Callout>
 

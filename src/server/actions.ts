@@ -109,7 +109,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url } }, async (span) => {
-        const response = await inLocale(context.request, options, async () => runAction(value, context, options, back))
+        const response = await inLocale(context.request, options, async () => runAction(value, context, options, back, () => readPage(context.request, page, match, options)))
 
         if (span)
           answered(span, response.status)
@@ -119,7 +119,10 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
         body: value.schema,
         transform: async (context) => {
           refuseCrossSite(context.request)
-          readPage(context.request, page, match, options)
+
+          // Guards may check the params, so a post from no page of the file never reaches them; without guards, only an action reading `ctx.params` needs its page.
+          if (guards.length > 0)
+            readPage(context.request, page, match, options)
 
           const call = isCall(context.request)
           // A call may send a form's fields, read as a plain form post's are.
@@ -212,7 +215,7 @@ function actionFiles(routes: ServedRoute[]): Map<string, ActionPage & { guards: 
   return files
 }
 
-// The params of the page the post came from, kept for its guards and its action; a post reading params whose page is not one of the file's, or names none, is refused before anything runs, so no guard checking them is ever skipped.
+// The params of the page the post came from, kept for its guards and its action; a post reading params whose page is not one of the file's, or names none, is refused, before anything runs when guards cover the file, so no guard checking them is ever skipped.
 function readPage(request: Request, page: ActionPage, match: RouteMatch, { base = '' }: ActionOptions): void {
   // Nothing to read, so the project's matchers never run on a page that has nothing to do with the action.
   if (page.params.length === 0)
@@ -395,7 +398,7 @@ function backTo(request: Request): string {
 }
 
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
-async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back): Promise<Response> {
+async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back, readParams: () => void): Promise<Response> {
   const { request } = context
   const state = guarded.get(request) ?? { jar: cookieJar(request), headers: new Headers() }
   const { jar, headers } = state
@@ -403,7 +406,13 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
   const ctx: ActionContext = {
     request,
     locale: contextLocale(),
-    params: pageParams.get(request) ?? {},
+    // Read on first use, so an action that never reads them runs from any page.
+    get params() {
+      if (!pageParams.has(request))
+        readParams()
+
+      return pageParams.get(request) ?? {}
+    },
     get cookies() {
       return jar.cookies
     },
@@ -437,6 +446,10 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     if (error instanceof Redirect || error instanceof Denied)
       return stopped(error, request, state, options)
+
+    // The handler read `ctx.params` of a post from no page of its route.
+    if (error instanceof Refusal)
+      return error.response
 
     // A mistake, or a service the handler relies on gone down: logged as any server error, and told the visitor beside the form they keep, as a refusal is.
     reportServerError(error, request, options.onError)

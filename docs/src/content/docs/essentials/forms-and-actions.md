@@ -90,7 +90,7 @@ export const remove = action(t.Object({ id: t.String() }), async ({ id }, ctx) =
 ---
 ```
 
-A post from no page of the action's route is refused with 400 before any guard or the handler runs. The guards checked the visitor against `ctx.params`, not against the input, which the visitor chooses, so the handler scopes what it touches by them.
+A post from no page of the action's route is refused with 400, before any guard runs when guards cover the page, else once the handler reads `ctx.params`: an action that never reads them can be called from any page. The guards checked the visitor against `ctx.params`, not against the input, which the visitor chooses, so the handler scopes what it touches by them.
 
 ## Calling an action from an island
 
