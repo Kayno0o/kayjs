@@ -1,9 +1,10 @@
 ---
+import type { Action } from 'kay'
 import Section from './section.kay'
 import Stamped from './stamped.kay'
 
-const { stamp } = props<{ stamp: string }>()
+const { stamp, to } = props<{ stamp: string, to?: Action<{ stamp: string }, unknown> }>()
 ---
 Section(title="Contact")
   p Write to us
-  Stamped(server="defer" noscript="Show the form" stamp={stamp})
+  Stamped(server="defer" noscript="Show the form" stamp={stamp} to={to})

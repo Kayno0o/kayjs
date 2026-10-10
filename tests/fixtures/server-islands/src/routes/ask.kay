@@ -1,0 +1,15 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { stamp } from '../renders'
+
+// Its form is in a deferred island, whose fetch signs the `minTime` stamp: the page itself holds none.
+export const ask = action(t.Object({ stamp: t.String() }), async () => 'asked', { minTime: '3s' })
+
+const current = stamp()
+---
+---
+import Contact from '../components/contact.kay'
+---
+h1 Ask
+Contact(stamp={current} to={ask})

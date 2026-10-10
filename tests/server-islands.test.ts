@@ -109,6 +109,14 @@ describe('server islands', () => {
       expect(deferred.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
       expect(deferred.headers.get('etag')).toBeTruthy()
       expect(await deferred.text()).toBe(await Bun.file(join(root, '.kay/client/pages/deferred.html')).text())
+
+      // One whose deferred island holds the form of a `minTime` action too: the island's fetch signs the stamp.
+      const asking = await visit('/ask')
+
+      expect(written['/ask']!.stamps).toBeUndefined()
+      expect(asking.headers.get('etag')).toBeTruthy()
+      expect(await asking.text()).toBe(await Bun.file(join(root, '.kay/client/pages/ask.html')).text())
+      expect(await (await visit('/ask?kay_island=0', { [ISLAND_HEADER]: '1' })).text()).toMatch(/<input type="hidden" name="kay_since" value="[\da-z]+\.[\w-]+">/)
     }
     finally {
       await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
