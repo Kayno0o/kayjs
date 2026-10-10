@@ -74,6 +74,24 @@ export const signUp = action(schema, async (input, ctx) => {
 })
 ```
 
+## Route params
+
+An action reads the params of the page it was posted from in `ctx.params`, as the guards above it read them. In `src/routes/orgs/[org]/projects.kay`:
+
+```kay
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { projects } from '../../../db'
+
+export const remove = action(t.Object({ id: t.String() }), async ({ id }, ctx) => {
+  await projects.remove({ org: String(ctx.params.org), id })
+})
+---
+```
+
+A post from no page of the action's route is refused with 400 before any guard or the handler runs. The guards checked the visitor against `ctx.params`, not against the input, which the visitor chooses, so the handler scopes what it touches by them.
+
 ## Calling an action from an island
 
 An island imports the action from the page and calls it from a submit handler, which stops kay's own post. A refused call throws an `ActionError`, and `add.error('title')` shows the message reactively.

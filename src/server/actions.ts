@@ -2,7 +2,7 @@ import type { CookieMap } from 'bun'
 import type { Elysia, TSchema, ValidationError } from 'elysia'
 import type { Server } from 'elysia/universal'
 import type { KayConfig } from '../config'
-import type { GuardContext, Locals } from '../runtime'
+import type { GuardContext, Locals, RouteParams } from '../runtime'
 import type { ActionContext, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
 import type { BodyLimit } from './body'
@@ -16,7 +16,7 @@ import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { configuredSite } from '../runtime/site'
-import { FAILURE_HEADER, NAVIGATE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
+import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { sizeText } from './body'
 import { importModule } from './bundle'
@@ -42,6 +42,8 @@ class Refusal {
 
 // What the guards set on the response, carried to the handler they let through.
 const guarded = new WeakMap<Request, GuardedRequest>()
+// The params of the page each post came from, read by its guards and its action alike.
+const pageParams = new WeakMap<Request, RouteParams>()
 const TEXT = 'text/plain; charset=utf-8'
 // What a visitor reads when the handler throws and its action words nothing of its own.
 const SERVER_ERROR = 'Something went wrong on our side; try again later'
@@ -51,7 +53,7 @@ const SAME_SITE_FETCH = new Set(['same-origin', 'none'])
 const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
 
 // What describes the post's body, or would have the page come back compressed or as a call.
-const POST_HEADERS = ['content-type', 'content-length', 'transfer-encoding', 'accept-encoding', 'x-kay-action', 'origin']
+const POST_HEADERS = ['content-type', 'content-length', 'transfer-encoding', 'accept-encoding', 'x-kay-action', PAGE_HEADER, 'origin']
 const HTML = /^text\/html\b/
 const HEAD_START = /<head\b[^>]*>/i
 // The `action` of a form posting to an action, the site's `base` before it if any.
@@ -74,16 +76,19 @@ export interface ActionOptions {
   base?: string | undefined
 }
 
+// The params `path` gives the route, under any locale's pattern; undefined when the route does not serve it.
+export type RouteMatch = (route: ServedRoute, path: string) => Record<string, unknown> | undefined
+
 // Renders the page a refused plain form post came from, with how it failed, through the app the post reached.
 type Back = (request: Request, headers: Headers, flash: Flash, server: Server | null) => Promise<Response>
 
 // Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path.
-export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], options: ActionOptions = {}): Promise<Map<string, BodyLimit>> {
+export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions = {}): Promise<Map<string, BodyLimit>> {
   const back: Back = async (request, headers, flash, server) => renderBack(app, options.base ?? '', request, headers, flash, server)
   const served = new Map<string, { file: string, action: ServerAction<TSchema, unknown> }>()
   const limits = new Map<string, BodyLimit>()
 
-  for (const [file, guards] of actionFiles(routes)) {
+  for (const [file, { guards, ...page }] of actionFiles(routes)) {
     const module = await importModule<Record<string, unknown>>(file)
 
     for (const value of Object.values(module)) {
@@ -113,6 +118,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
         body: value.schema,
         transform: async (context) => {
           refuseCrossSite(context.request)
+          readPage(context.request, page, match, options)
 
           const call = isCall(context.request)
           // A call may send a form's fields, read as a plain form post's are.
@@ -129,7 +135,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], o
           context.body = asForm ? formInput(value.schema, withoutEmptyFiles(context.body)) : callInput(context.body)
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
-        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, context, options)) }),
+        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, context, pageParams.get(context.request) ?? {}, options)) }),
         error: async ({ code, error, request, body, server, set }) => {
           if (code === 'VALIDATION')
             return refused(value, error, request, server, back)
@@ -176,18 +182,57 @@ export function actionClash(first: string, second: string, url: string): Error {
   return new Error(`kay: ${first} and ${second} both export an action served at ${url}; rename one of the files`)
 }
 
+// What an action file is posted from: a page of `routes`, read for the `params` they all name.
+interface ActionPage {
+  routes: ServedRoute[]
+  params: string[]
+}
+
 // Every page and layout once, with the guards of its own directory and above: a layout's actions are not behind the guards of the pages below it.
-function actionFiles(routes: ServedRoute[]): Map<string, LoadedGuard[]> {
-  const files = new Map<string, LoadedGuard[]>()
+// A page's actions read its params, a layout's those of every page it wraps.
+function actionFiles(routes: ServedRoute[]): Map<string, ActionPage & { guards: LoadedGuard[] }> {
+  const files = new Map<string, ActionPage & { guards: LoadedGuard[] }>()
 
   for (const route of routes) {
     for (const file of [...route.layouts, route.file]) {
-      if (!files.has(file))
-        files.set(file, route.guards.filter(guard => file.startsWith(dirname(guard.file) + sep)))
+      const known = files.get(file)
+
+      if (known) {
+        known.routes.push(route)
+        known.params = known.params.filter(name => route.params.includes(name))
+
+        continue
+      }
+
+      files.set(file, { guards: route.guards.filter(guard => file.startsWith(dirname(guard.file) + sep)), routes: [route], params: route.params })
     }
   }
 
   return files
+}
+
+// The params of the page the post came from, kept for its guards and its action; a post reading params whose page is not one of the file's, or names none, is refused before anything runs, so no guard checking them is ever skipped.
+function readPage(request: Request, page: ActionPage, match: RouteMatch, { base = '' }: ActionOptions): void {
+  const from = postedFrom(request)
+  const path = from === undefined ? undefined : withoutBase(new URL(from).pathname, base)
+
+  for (const route of path === undefined ? [] : page.routes) {
+    const params = match(route, path!)
+
+    if (params) {
+      pageParams.set(request, Object.fromEntries(Object.entries(params).filter(([name]) => page.params.includes(name))))
+
+      return
+    }
+  }
+
+  if (page.params.length > 0)
+    throw new Refusal(new Response('Action posted from no page of its route', { status: 400, headers: { 'content-type': TEXT } }))
+}
+
+// A path as the router reads it, from where a request under `base` names it.
+function withoutBase(path: string, base: string): string {
+  return base !== '' && (path === base || path.startsWith(`${base}/`)) ? path.slice(base.length) || '/' : path
 }
 
 // A call's input comes encoded, multipart when it carries files; input that does not decode is answered 400.
@@ -276,8 +321,8 @@ function contextLocale(): Locale {
 }
 
 // The guards of the action's page, answering for it when one stops the request.
-async function admit(guards: LoadedGuard[], context: { request: Request }, options: ActionOptions): Promise<Response | undefined> {
-  const passed = await passGuards(guards, context, options)
+async function admit(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions): Promise<Response | undefined> {
+  const passed = await passGuards(guards, context, params, options)
 
   if (passed instanceof Response)
     return passed
@@ -288,13 +333,14 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, optio
 }
 
 // Runs the guards of an action or an API route: the response when one stops the request, else the cookies and headers they set.
-export async function passGuards(guards: LoadedGuard[], context: { request: Request }, options: ActionOptions): Promise<Response | GuardedRequest> {
+export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions): Promise<Response | GuardedRequest> {
   const { request } = context
   const state: GuardedRequest = { jar: cookieJar(request), headers: new Headers() }
   const ctx: GuardContext = {
     request,
     url: new URL(request.url),
     locale: contextLocale(),
+    params,
     get cookies() {
       return state.jar.cookies
     },
@@ -332,14 +378,18 @@ function isFormCall(request: Request): boolean {
   return request.headers.get('x-kay-action') === FORM_CALL
 }
 
-// The page a form post came from on this site: the one its form names when a refused post rendered it, else its `Referer`.
+// The page a post came from on this site: the one its form names when a refused post rendered it, else the one kay's script names, else its `Referer`.
 function postedFrom(request: Request): string | undefined {
-  const named = new URL(request.url).searchParams.get(BACK_PARAMETER)
-  const back = named !== null && URL.canParse(named, request.url) ? new URL(named, request.url).href : null
+  const page = (named: string | null) => named !== null && URL.canParse(named, request.url) ? new URL(named, request.url).href : null
+  const back = page(new URL(request.url).searchParams.get(BACK_PARAMETER))
+  const sent = page(request.headers.get(PAGE_HEADER))
   const referer = request.headers.get('referer')
 
   if (sameHost(request, back))
     return back
+
+  if (sameHost(request, sent))
+    return sent
 
   return sameHost(request, referer) ? referer : undefined
 }
@@ -357,6 +407,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
   const ctx: ActionContext = {
     request,
     locale: contextLocale(),
+    params: pageParams.get(request) ?? {},
     get cookies() {
       return jar.cookies
     },
@@ -497,7 +548,7 @@ async function failed(request: Request, headers: Headers, cookies: CookieMap, fl
 // It answers the post itself, with the failure's status: a reload posts again, as after any form a server answers in place, and without the page swap a `base` keeps relative links pointing where they did on the page.
 async function renderBack(app: Elysia, base: string, request: Request, headers: Headers, flash: Flash, server: Server | null): Promise<Response> {
   const from = new URL(backTo(request), request.url)
-  const path = base !== '' && (from.pathname === base || from.pathname.startsWith(`${base}/`)) ? from.pathname.slice(base.length) || '/' : from.pathname
+  const path = withoutBase(from.pathname, base)
   const sent = visitHeaders(request)
   const forget = handOver(sent, flash)
   let page: Response

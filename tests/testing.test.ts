@@ -171,6 +171,13 @@ describe('kay/test', () => {
     await expect(site.call(demote, { name: 'ada' }, { headers: { 'x-user': 'ada' } })).rejects.toMatchObject({ status: 422, data: { error: 'ada stays an admin' } })
   })
 
+  it('calls an action reading its params from the page it names', async () => {
+    const { which } = await import(join(import.meta.dir, 'fixtures/site/src/routes/todos/[id].kay')) as { which: Action<Record<string, never>, Record<string, unknown>> }
+
+    expect(await site.call(which, {}, { from: '/todos/7' })).toEqual({ id: '7' })
+    await expect(site.call(which, {})).rejects.toMatchObject({ name: 'ActionError', status: 400 })
+  })
+
   it('uploads files from a form and from a call, nested ones included', async () => {
     const { upload } = await import(join(import.meta.dir, 'fixtures/site/src/routes/upload.kay')) as { upload: Action<{ note: string, file: File, attachment?: File, extra?: { copies: number, files: File[] } }, string> }
     const image = (name: string) => new File([PNG], name, { type: 'image/png' })

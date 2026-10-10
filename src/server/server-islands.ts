@@ -97,7 +97,7 @@ export async function serveServerIslands(route: ServedRoute, page: ServedPage, p
 
   // A page with no island to render now still has its stamps signed.
   if (page.islands === undefined || (asked === null && !page.islands.includes('inline')))
-    return page.stamps ? servePrerendered(route, page, context, client, options, async () => splice(page, false, [], context.request)) : undefined
+    return page.stamps ? servePrerendered(route, page, params, context, client, options, async () => splice(page, false, [], context.request)) : undefined
 
   if (fetched && page.islands?.[Number(asked)] !== 'defer')
     return new Response(null, { status: 404 })

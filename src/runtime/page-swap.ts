@@ -2,7 +2,7 @@ import type { Swap } from './navigate'
 import type { FetchedPage } from './swap'
 import { withoutBase } from './base'
 import { busyForms, leave, navigation, pageKey, restoreScroll, saveScroll, submitNatively, swappable, writeHistory } from './navigate'
-import { FAILURE_HEADER, NAVIGATE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
+import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
 import { decodeValue } from './wire'
 
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link or post a form.
@@ -723,6 +723,7 @@ async function upload(url: URL, body: FormData | URLSearchParams, form: HTMLForm
 
     request.open('POST', url)
     request.setRequestHeader(NAVIGATE_HEADER, '1')
+    request.setRequestHeader(PAGE_HEADER, location.pathname + location.search)
     request.upload.addEventListener('progress', (event) => {
       if (!event.lengthComputable)
         return

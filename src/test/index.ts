@@ -15,6 +15,7 @@ import { encodeCall, minTimeOf, readActionResponse, STAMP_FIELD } from '../runti
 import { durationSeconds } from '../runtime/duration'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
+import { PAGE_HEADER } from '../runtime/swap'
 import { servePages } from '../server/app'
 import { basePath } from '../server/base'
 import { shutdown } from '../server/lifecycle'
@@ -67,8 +68,8 @@ export interface TestSite {
   // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser. A `Visit` as `from` posts where its form does, with the stamp `minTime` reads, from the URL the browser shows it at, the action's own for a page a refused post answered.
   // A post to an action with `minTime` goes through as if its form had been open long enough; `openedFor` sends one as if open that long instead, `0` as if just opened.
   submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit, openedFor?: Duration | 0 }) => Promise<Visit>
-  // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects.
-  call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit) => Promise<Success<ResultOf<Target>>>
+  // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects. `from` names the page it is made on, whose params the action reads.
+  call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<Success<ResultOf<Target>>>
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
   fetch: (path: string, init?: Omit<RequestInit, 'headers'> & VisitInit) => Promise<Response>
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
@@ -336,7 +337,12 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     call: async (action, input, init = {}) => {
       const { headers, body } = encodeCall(input)
 
-      return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...headers, origin: ORIGIN, ...init.headers }, body }))
+      const sent: Record<string, string> = { ...headers, origin: ORIGIN }
+
+      if (init.from !== undefined)
+        sent[PAGE_HEADER] = init.from
+
+      return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...sent, ...init.headers }, body }))
     },
   }
 }

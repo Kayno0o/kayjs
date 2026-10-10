@@ -349,6 +349,26 @@ describe('optimistic changes', () => {
     }
   })
 
+  it('name the page they are called from, which the action reads its params off', async () => {
+    const rename = actionStub('/_kay/action/test/rename') as unknown as Action<object, null>
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => new Response(null)) as unknown as typeof fetch)
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'location')
+
+    try {
+      Object.defineProperty(globalThis, 'location', { value: { pathname: '/orgs/acme', search: '?tab=1' }, configurable: true })
+      await rename({})
+      expect(new Headers(fetched.mock.calls[0]![1]!.headers).get('x-kay-page')).toBe('/orgs/acme?tab=1')
+    }
+    finally {
+      fetched.mockRestore()
+
+      if (had)
+        Object.defineProperty(globalThis, 'location', had)
+      else
+        Reflect.deleteProperty(globalThis, 'location')
+    }
+  })
+
   it('roll back when the action call fails, and stand once it went through', async () => {
     const move = actionStub('/_kay/action/test/move') as unknown as Action<{ to: number }, number>
     const at = signal(0)

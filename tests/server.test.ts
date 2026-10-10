@@ -4,11 +4,11 @@ import type { Span, SpanOptions, Tracer } from '../src/server/trace'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { brotliDecompressSync } from 'node:zlib'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
@@ -557,6 +557,128 @@ describe('guards', () => {
 
     expect(response.status).toBe(403)
     expect(response.headers.get('set-cookie')).toBeNull()
+  })
+})
+
+describe('route params in guards and actions', () => {
+  const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ params, headers, deny }) => {\n  headers.set(\'x-guarded\', JSON.stringify(params))\n\n  if (params.org !== \'acme\')\n    deny(403, `Not in ${String(params.org)}`)\n})\n'
+  const ACTION = (name: string, body: string) => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\nexport const ${name} = action(t.Object({}), (_, ctx) => ctx.params)\n---\n${body}\n`
+  const root = process.cwd()
+  let dir = ''
+  let served: Awaited<ReturnType<typeof pages>>
+
+  const post = async (file: string, name: string, from?: string, headers: Record<string, string> = {}) => {
+    const response = await served.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/${file}/${name}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...from === undefined ? {} : { referer: `http://localhost${from}` }, ...headers },
+      body: stringify({}),
+    }))
+
+    return { status: response.status, guarded: response.headers.get('x-guarded'), body: response.ok ? parse(await response.text()) as unknown : await response.text() }
+  }
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(root, '.kay/routes-'))
+    await Bun.write(join(dir, 'routes/orgs/[org]/_guard.ts'), GUARD)
+    await Bun.write(join(dir, 'routes/orgs/[org]/_layout.kay'), ACTION('leave', 'slot'))
+    await Bun.write(join(dir, 'routes/orgs/[org]/index.kay'), ACTION('rename', 'p Org'))
+    await Bun.write(join(dir, 'routes/orgs/[org]/[team=integer].kay'), 'p Team\n')
+    await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
+    await Bun.write(join(dir, 'routes/orgs/[org]/report.kay'), '--- server\nexport const prerender = [{ org: \'acme\' }, { org: \'other\' }]\n---\nh1 Report\n')
+    await Bun.write(join(dir, 'api/orgs/_guard.ts'), GUARD)
+    await Bun.write(join(dir, 'api/orgs/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/:org\', ({ params }) => params.org)\n')
+    served = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: true })
+    dir = join(dir, 'routes')
+  })
+
+  afterAll(async () => rm(dirname(dir), { recursive: true, force: true }))
+
+  it('gives a page\'s guards its params, as its matchers read them', async () => {
+    const team = await served.handle(new NativeRequest('http://localhost/orgs/acme/7'))
+    const other = await served.handle(new NativeRequest('http://localhost/orgs/other'))
+
+    expect(team.status).toBe(200)
+    expect(team.headers.get('x-guarded')).toBe('{"org":"acme","team":7}')
+    expect(other.status).toBe(403)
+    expect(other.headers.get('x-guarded')).toBe('{"org":"other"}')
+  })
+
+  it('gives a prerendered page\'s guards its params', async () => {
+    const manifest = (await readManifest(root))!
+
+    try {
+      await prerenderPages(root, { routes: dir }, (await readClient(root))!)
+      const file = await Bun.file(join(root, '.kay/client/pages/orgs/acme/report.html')).text()
+      const prerendered = await pages({ routes: dir, prebuilt: true })
+      const acme = await prerendered.handle(new NativeRequest('http://localhost/orgs/acme/report'))
+      const other = await prerendered.handle(new NativeRequest('http://localhost/orgs/other/report'))
+
+      expect(await acme.text()).toBe(file)
+      expect(acme.headers.get('x-guarded')).toBe('{"org":"acme"}')
+      expect(other.status).toBe(403)
+      expect(other.headers.get('x-guarded')).toBe('{"org":"other"}')
+    }
+    finally {
+      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('gives an action and its guards the params of the page it was posted from', async () => {
+    expect(await post('orgs/_org_/index.kay', 'rename', '/orgs/acme')).toEqual({ status: 200, guarded: '{"org":"acme"}', body: { org: 'acme' } })
+    expect(await post('orgs/_org_/index.kay', 'rename', '/orgs/other?tab=1')).toEqual({ status: 403, guarded: '{"org":"other"}', body: 'Not in other' })
+    // kay's script names the page itself, which a `referrer-policy` cutting the path does not reach.
+    expect(await post('orgs/_org_/index.kay', 'rename', '/', { 'x-kay-page': '/orgs/acme' })).toEqual({ status: 200, guarded: '{"org":"acme"}', body: { org: 'acme' } })
+  })
+
+  it('reads a plain form post\'s page from its Referer, or from the URL a refused one\'s form names', async () => {
+    const response = await served.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/orgs/_org_/index.kay/rename?kay_back=${encodeURIComponent('/orgs/acme')}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/orgs/other' },
+      body: '',
+    }))
+
+    expect(response.status).toBe(303)
+    expect(response.headers.get('x-guarded')).toBe('{"org":"acme"}')
+    expect(response.headers.get('location')).toBe('http://localhost/orgs/acme')
+
+    // Without one, its `Referer` names it.
+    const plain = await served.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/orgs/_org_/index.kay/rename`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/orgs/acme' },
+      body: '',
+    }))
+
+    expect(plain.status).toBe(303)
+    expect(plain.headers.get('x-guarded')).toBe('{"org":"acme"}')
+  })
+
+  it('gives a layout\'s action the params every page it wraps names', async () => {
+    expect(await post('orgs/_org_/_layout.kay', 'leave', '/orgs/acme/7')).toEqual({ status: 200, guarded: '{"org":"acme"}', body: { org: 'acme' } })
+    expect(await post('orgs/_org_/_layout.kay', 'leave', '/orgs/acme')).toEqual({ status: 200, guarded: '{"org":"acme"}', body: { org: 'acme' } })
+  })
+
+  it('refuses an action reading params posted from no page of its route, before its guards run', async () => {
+    for (const from of [undefined, '/', '/orgs/acme/x', '/orgs/acme/7']) {
+      expect(await post('orgs/_org_/index.kay', 'rename', from)).toEqual({ status: 400, guarded: null, body: 'Action posted from no page of its route' })
+    }
+
+    // A page on another host names no page of this site.
+    expect((await served.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/orgs/_org_/index.kay/rename`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'https://elsewhere.example/orgs/acme' },
+      body: stringify({}),
+    }))).status).toBe(400)
+  })
+
+  it('gives an API route\'s guards its params', async () => {
+    const allowed = await served.handle(new NativeRequest('http://localhost/api/orgs/acme'))
+    const denied = await served.handle(new NativeRequest('http://localhost/api/orgs/other'))
+
+    expect(allowed.status).toBe(200)
+    expect(await allowed.text()).toBe('acme')
+    expect(denied.status).toBe(403)
+    expect(denied.headers.get('x-guarded')).toBe('{"org":"other"}')
   })
 })
 

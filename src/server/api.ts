@@ -181,8 +181,9 @@ function tooLarge(): Response {
 }
 
 // Guards first, so a request without credentials gets their answer whatever its origin; what they set on the response goes out with the route's.
-async function admit(guards: LoadedGuard[], context: { request: Request, set: { headers: Record<string, unknown> } }, options: ActionOptions): Promise<Response | undefined> {
-  const passed = guards.length > 0 ? await passGuards(guards, context, options) : undefined
+// They read the params of the module's route the request matched.
+async function admit(guards: LoadedGuard[], context: { request: Request, params?: Record<string, unknown>, set: { headers: Record<string, unknown> } }, options: ActionOptions): Promise<Response | undefined> {
+  const passed = guards.length > 0 ? await passGuards(guards, context, context.params ?? {}, options) : undefined
 
   if (passed instanceof Response)
     return passed

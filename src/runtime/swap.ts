@@ -6,6 +6,8 @@ export const REDIRECT_HEADER = 'x-kay-redirect'
 export const NAVIGATE_HEADER = 'x-kay-navigate'
 // Marks a failure: a called action's body as the encoded `{ errors, data }`, which a denial or an error answered as text is not, or the page a refused form post renders in answer.
 export const FAILURE_HEADER = 'x-kay-failure'
+// Names the page an action is called, or a form posted, from, which its params, its locale and where a form post goes back to are read off: a `Referer` the app's `referrer-policy` may cut.
+export const PAGE_HEADER = 'x-kay-page'
 
 export interface FetchedPage {
   url: string

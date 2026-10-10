@@ -1,5 +1,10 @@
 --- server
+import { t } from 'elysia'
+import { action } from 'kay'
 import { findTodo } from '../../data'
+
+// Answers with the params of the page it was called from.
+export const which = action(t.Object({}), (_, ctx) => ctx.params)
 
 const id = Number(ctx.params.id)
 if (Number.isNaN(id)) {

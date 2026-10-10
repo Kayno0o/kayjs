@@ -1,6 +1,6 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
-import type { ErrorStatus, Locals, Redirect } from './checks'
+import type { ErrorStatus, Locals, Redirect, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import { withBase } from './base'
@@ -8,7 +8,7 @@ import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
 import { createSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
-import { FAILURE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
+import { FAILURE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
 import { decodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
@@ -110,6 +110,9 @@ export interface ActionContext {
   request: Request
   // The locale of the page the action was sent from, as `i18n` in kay.config.ts serves it; empty without.
   locale: Locale
+  // The params of the page the action was posted from, matched against the action's own route as its guards read them: scope what it touches by them, since the input is the visitor's to choose.
+  // A layout's action gets those every page it wraps names.
+  params: RouteParams
   cookies: CookieMap
   locals: Locals
   // Response status and headers, for a fetch call or the redirect after a plain form post.
@@ -474,7 +477,14 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 }
 
 async function post<Output>(url: string, input: unknown): Promise<Output> {
-  const response = await fetch(withBase(url), { method: 'POST', ...encodeCall(input) })
+  const { headers, body } = encodeCall(input)
+  const sent: Record<string, string> = { ...headers }
+
+  // A test or a script calling it has no page.
+  if (typeof location !== 'undefined')
+    sent[PAGE_HEADER] = location.pathname + location.search
+
+  const response = await fetch(withBase(url), { method: 'POST', headers: sent, body })
 
   prefetched.clear()
 

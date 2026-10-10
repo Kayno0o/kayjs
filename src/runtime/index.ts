@@ -1,7 +1,7 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { Action, FailureOf, SuccessOf } from './action'
-import type { Deferred, Locals, Redirect } from './checks'
+import type { Deferred, Locals, Redirect, RouteParams } from './checks'
 import type { Locale } from './i18n'
 import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
@@ -205,8 +205,9 @@ export interface ErrorPageContext<Params extends Record<string, unknown> = Recor
   error: PageError
 }
 
-// What a `_guard.ts` decides from: who is asking, never a page's params, which an action has none of. For an action, `url` is the action's.
-export type GuardContext = Pick<PageContext, 'request' | 'url' | 'locale' | 'cookies' | 'locals' | 'headers' | 'redirect' | 'deny'>
+// What a `_guard.ts` decides from: who is asking, and the params of the page asked for, each matcher's value in place of its text.
+// For an action, `url` is the action's and `params` those of the page it was posted from; for an API route, its own.
+export type GuardContext = Pick<PageContext<RouteParams>, 'request' | 'url' | 'locale' | 'params' | 'cookies' | 'locals' | 'headers' | 'redirect' | 'deny'>
 
 export type Guard = (ctx: GuardContext) => void | Promise<void>
 
@@ -234,7 +235,7 @@ export { t } from '#schema'
 export type { Action, ActionContext, ActionProtection, ActionRateLimit, CallOptions, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, HoneypotOptions, MinTimeOptions, MinTimeRefusal, ProtectionMessages, RateLimit, RateStore, RateWindow, ServerAction, Success, SuccessOf } from './action'
 export { action, ActionError, ActionRedirect } from './action'
 export { localPath, withBase } from './base'
-export type { ApiRoutesOf, AwaitProps, CheckedHref, CheckedHtml, Deferred, FunctionProp, HydrateWhen, IdentityKeyed, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, SafeHtml, TemplateHelpers } from './checks'
+export type { ApiRoutesOf, AwaitProps, CheckedHref, CheckedHtml, Deferred, FunctionProp, HydrateWhen, IdentityKeyed, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, RouteParams, SafeHtml, TemplateHelpers } from './checks'
 export type { Duration } from './duration'
 export type { PublicEnv, PublicEnvOf } from './env'
 export { publicEnv } from './env'

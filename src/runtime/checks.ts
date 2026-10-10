@@ -34,6 +34,9 @@ export type Locals = Register extends { locals: infer Values extends object } ? 
 export type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'>> = App['~Singleton']['decorator'] & App['~Singleton']['derive'] & App['~Singleton']['resolve']
   & App['~Ephemeral']['derive'] & App['~Ephemeral']['resolve'] & App['~Volatile']['derive'] & App['~Volatile']['resolve']
 
+// What a guard or an action reads in `ctx.params`: untyped, since a guard covers every route below its directory, a matcher may give anything and an optional param nothing.
+export type RouteParams = Readonly<Record<string, unknown>>
+
 // Routes as segment tuples: `[]` is `/`, `':'` a parameter, `':integer'` one a matcher kay ships checks, `'*'` a catch-all.
 type RoutePatterns = Register extends { routes: infer Routes extends readonly string[] } ? Routes : never
 type Split<Path extends string> = Path extends `${infer Head}/${infer Rest}` ? [Head, ...Split<Rest>] : [Path]

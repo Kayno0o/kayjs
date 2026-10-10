@@ -1,8 +1,9 @@
 import type { KayConfig, TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
+import type { RouteMatch } from './actions'
 import type { ClientBuild } from './client'
 import type { ServedRoute } from './guards'
-import type { RouterShape } from './params'
+import type { Matcher, RouterShape } from './params'
 import type { RequestContext, ServedPage } from './render'
 import { tmpdir } from 'node:os'
 import { join, normalize, relative, resolve, sep } from 'node:path'
@@ -37,7 +38,7 @@ import { registerLoader, underKayDev } from './loader'
 import { logRequests, pathOf } from './log'
 import { serveServiceWorker } from './offline'
 import { assetFiles, hookedResponse } from './page-hook'
-import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes } from './params'
+import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes, shapeParams } from './params'
 import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
 import { trustProxy } from './protection'
 import { servePublic } from './public'
@@ -138,6 +139,27 @@ function localeVariants(settings: LocaleSettings | undefined): { prefix: string,
   const prefixed = localePrefixes(settings).map(locale => ({ prefix: `/${locale}`, locale }))
 
   return [{ prefix: '', locale: settings.prefixDefault ? undefined : settings.defaultLocale }, ...prefixed]
+}
+
+// Reads a path as the router would for one route, under every locale's pattern, to give an action the params of the page it was posted from.
+function routeMatch(routes: ServedRoute[], settings: LocaleSettings | undefined, matchers: Map<string, Matcher>): RouteMatch {
+  const variants = localeVariants(settings)
+  const shapes = new Map(routes.map(route => [route, variants.flatMap(({ prefix, locale }) => {
+    const patterns = new Set([route.pattern, settings && locale !== undefined ? localePattern(settings, route.pattern, locale) : route.pattern])
+
+    return [...patterns].flatMap(pattern => routerShapes(route, prefix, pattern))
+  })]))
+
+  return (route, path) => {
+    for (const shape of shapes.get(route) ?? []) {
+      const params = shapeParams(shape, route, path, matchers)
+
+      if (params)
+        return params
+    }
+
+    return undefined
+  }
 }
 
 // A temporary redirect, since another visitor goes elsewhere, which no shared cache may keep.
@@ -311,8 +333,9 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     return new Response(encoded, { headers: { ...headers, 'content-encoding': encoding, 'content-type': file.type } })
   })
 
+  const matchers = await loadMatchers(routesDir, routes)
   const actionOptions = { dev: options.dev, onError: options.onError, i18n, base }
-  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
+  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? scanApi(resolve(root, options.api ?? 'src/api'))])
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, await serveApi(app, apiModules, actionOptions))
   serveErrorReports(app, options.onError)
@@ -373,7 +396,6 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   for (const pages of prerendered.values())
     trackPrerendered(pages, page => moved || page.readsSite === true)
 
-  const matchers = await loadMatchers(routesDir, routes)
   const trailingSlash = options.trailingSlash ?? 'never'
   const redirects = readRedirects(options.redirects ?? {})
 
@@ -414,7 +436,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
     const served = page.islands !== undefined || page.stamps === true ? await serveServerIslands(route, page, params, context, url, client, renderOptions) : undefined
 
-    return served ?? servePrerendered(route, page, context, client, renderOptions)
+    return served ?? servePrerendered(route, page, params, context, client, renderOptions)
   }
 
   // Each path the router serves, with the pages serving it in each locale: a page whose matcher refuses the URL passes it to the next, the one without a matcher last.

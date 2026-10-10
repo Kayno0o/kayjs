@@ -205,8 +205,12 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
   })
 
   it('posts a form without a reload, pending meanwhile, and shows what the action answered', async () => {
+    const posted = page.waitForRequest(request => request.method() === 'POST')
+
     await page.fill('input[name="title"]', 'abcd')
     await page.click('form button')
+    // Naming its page, as a `Referer` the app's `referrer-policy` cuts would not.
+    expect((await posted).headers()['x-kay-page']).toBe(new URL(page.url()).pathname)
     await page.locator('form[aria-busy="true"]').waitFor()
     await page.locator('p.done', { hasText: 'Added abcd' }).waitFor()
 

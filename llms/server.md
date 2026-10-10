@@ -117,8 +117,8 @@ export default guard(({ locals, redirect, deny }) => {
 })
 ```
 
-- Its `ctx` has `request`, `url`, `cookies`, `locals`, `headers`, `redirect` and `deny`; cookies and headers it sets reach the response either way.
-- It decides from who is asking, never from the page's params: actions have none, and their `url` is the action's own. Checks on one record belong in the load and the action.
+- Its `ctx` has `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect` and `deny`; cookies and headers it sets reach the response either way.
+- `ctx.params` holds the params of the page asked for, each matcher's value in place of its text: `src/routes/orgs/[org]/_guard.ts` reads `params.org`. They are typed `Readonly<Record<string, unknown>>`, since a guard covers every route below it. For an action they are those of the page it was posted from, which the action reads in its own `ctx.params` (see actions), and `url` is the action's; for a module under `src/api/`, those of the route the request matched. Checks on one record still belong in the load and the action.
 - An action's guards run once its input is valid, when the app's `resolve` values are there: input the schema refuses gets its field errors back without reaching a guard or the handler. A refused form post gets the redirect, or the denial as plain text.
 - A denied page renders the nearest `_error.kay` outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
 - A layout's `ctx.redirect` is no guard: actions never run layout loads. Neither is an Elysia `onBeforeHandle` testing the page's path: actions are served under `/_kay/action/`.

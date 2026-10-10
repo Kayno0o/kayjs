@@ -117,3 +117,36 @@ export function matchedParams(route: Route, params: Record<string, string>, matc
 
   return matched
 }
+
+// The params `path` gives the route through `shape`, read as the router and `positionalParams` read a request's: undefined when the shape does not serve the path or a matcher refuses it.
+export function shapeParams(shape: RouterShape, route: Route, path: string, matchers: Map<string, Matcher>): Record<string, unknown> | undefined {
+  const pattern = shape.path.split('/')
+  const segments = withoutSlash(path).split('/')
+  const raw: Record<string, string | null> = {}
+
+  for (const [index, segment] of pattern.entries()) {
+    if (segment === '*') {
+      raw['*'] = segments.slice(index).join('/')
+
+      break
+    }
+
+    const value = segments[index]
+
+    // The router gives no param an empty segment.
+    if (value === undefined || (segment.startsWith(':') && value === ''))
+      return undefined
+
+    if (segment.startsWith(':'))
+      raw[segment.slice(1)] = decodePath(value) ?? null
+    else if (segment !== value && segment !== decodePath(value))
+      return undefined
+  }
+
+  if (raw['*'] === undefined && segments.length !== pattern.length)
+    return undefined
+
+  const text = positionalParams(shape, route, raw)
+
+  return text === 'malformed' ? undefined : matchedParams(route, text, matchers)
+}

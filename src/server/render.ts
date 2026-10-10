@@ -196,9 +196,9 @@ function serverTiming(files: string[], modules: PageModule[], timings: number[],
 
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
 // `spliced` gives the page with what changes per request filled in, as its stamps, gzipped when the browser takes it.
-export async function servePrerendered(route: ServedRoute, page: ServedPage, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>, gzip: boolean }>): Promise<Response> {
+export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>, gzip: boolean }>): Promise<Response> {
   // Rendered under the mount point already, so its paths are not put under it twice.
-  const rendering = { ...createRendering(context, {}, options), base: '' }
+  const rendering = { ...createRendering(context, params, options), base: '' }
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
 
   if (refusal)
