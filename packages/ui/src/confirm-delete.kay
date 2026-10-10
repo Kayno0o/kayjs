@@ -30,11 +30,7 @@ const pending = signal(false)
 async function confirm() {
   pending.set(true)
 
-  const deleted = await attempt(async () => {
-    await onConfirm()
-
-    return true
-  }, failure, refused)
+  const deleted = await attempt(async () => onConfirm(), failure, refused)
 
   pending.set(false)
 

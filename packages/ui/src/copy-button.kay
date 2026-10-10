@@ -24,11 +24,7 @@ async function press() {
   if (!text)
     return
 
-  const done = await attempt(async () => {
-    await copy(text, html === undefined ? {} : { html })
-
-    return true
-  }, failure)
+  const done = await attempt(async () => copy(text, html === undefined ? {} : { html }), failure)
 
   if (!done)
     return

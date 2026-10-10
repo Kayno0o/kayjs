@@ -103,14 +103,18 @@ toast.success('Saved')
 toast.error('Could not save')
 toast.info('Copied')
 
-// Resolves to what the call returned, or to undefined once it threw and `failure` was toasted, or a refusal of the whole call such as a limit.
+// Resolves to what the call returned (`true` for a call returning nothing), or to undefined once it threw and `failure` was toasted, or a refusal of the whole call such as a limit.
 const post = await attempt(() => publish({ id }), 'Could not publish')
+
+// `success` is toasted once the call goes through.
+if (await attempt(() => archive({ id }), { failure: 'Could not archive', success: 'Archived' }))
+  selected.set([])
 
 // A refusal of the action's handler, `ctx.fail(409, { error: 'Already published' })`, toasted as it says.
 await attempt(() => publish({ id }), 'Could not publish', (data: { error: string }) => data.error)
 ```
 
-`attempt(run, failure, refused?)` toasts, for a call that throws, the message `refused` reads from the data the action's handler passed to `ctx.fail`; else a refusal of the whole call, such as a limit; else `failure`. An empty or undefined answer from `refused` falls through to the next. Type `refused`'s parameter as the handler's data: `(data: { error: string }) => data.error`.
+`attempt(run, failure, refused?)`, or `attempt(run, { failure, success?, refused? })`, toasts, for a call that throws, the message `refused` reads from the data the action's handler passed to `ctx.fail`; else a refusal of the whole call, such as a limit; else `failure`. An empty or undefined answer from `refused` falls through to the next. Type `refused`'s parameter as the handler's data: `(data: { error: string }) => data.error`.
 
 A toast stays for four seconds, or until its close button is pressed. Its clock stops while the pointer rests on the toasts or focus is inside them, and goes on with the time it had left once both are gone. Toaster is a manual popover in the top layer, so toasts show above an open dialog.
 
@@ -182,7 +186,7 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
   - A click, or the arrows (wrapping), Home and End, show a tab and focus it; only the shown tab is in the page's tab order. `onChange(value)` runs on each switch, and a parent passing another `value` shows that tab.
   - It renders inside an island, since its panels come from a block.
 - `Toggle(label="Public" checked={post.public} name="public" onChange={setPublic})`: a checkbox drawn as a switch, with `role="switch"`, that posts like a checkbox. Without `label`, give it `aria-label`.
-  - `onChange` may return a promise: the switch is `aria-busy` and flips no further until it settles, and goes back where it was when it resolves to `false`, rejects or throws (logged), unless the parent set `checked` meanwhile. A void answer leaves the switch as clicked. The switch jumping back is all the user sees, so toast the failure too. `attempt` resolves to `undefined` on failure, so turn that into `false`: `onChange={async checked => (await attempt(async () => { await setPublic({ id, public: checked }); return true }, 'Could not publish')) ?? false}`.
+  - `onChange` may return a promise: the switch is `aria-busy` and flips no further until it settles, and goes back where it was when it resolves to `false`, rejects or throws (logged), unless the parent set `checked` meanwhile. A void answer leaves the switch as clicked. The switch jumping back is all the user sees, so toast the failure too. `attempt` resolves to `undefined` on failure, so turn that into `false`: `onChange={async checked => (await attempt(() => setPublic({ id, public: checked }), 'Could not publish')) ?? false}`.
 
 ### Pagination, QrCode
 

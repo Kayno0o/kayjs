@@ -10,6 +10,12 @@ beforeEach(() => {
   toasts.set([])
 })
 
+// The fixture site renders Toaster in this same process, so no toast may outlive its test.
+afterEach(() => {
+  for (const { id } of toasts())
+    dismissToast(id)
+})
+
 describe('toast', () => {
   test('queues each message with its type, in order', () => {
     toast.success('Saved')
@@ -108,5 +114,15 @@ describe('attempt', () => {
   test('stays quiet when the call goes through, and hands back what it returned', async () => {
     expect(await attempt(async () => Promise.resolve(42), 'Could not save')).toBe(42)
     expect(toasts()).toHaveLength(0)
+  })
+
+  test('resolves to true for a call returning nothing, so only a failure is undefined', async () => {
+    expect(await attempt(async () => undefined, 'Could not save')).toBe(true)
+  })
+
+  test('takes its messages as options, toasting `success` once the call goes through', async () => {
+    expect(await attempt(async () => undefined, { failure: 'Could not save', success: 'Saved' })).toBe(true)
+    expect(await attempt(async () => Promise.reject(new ActionError(409, '', {}, { error: 'Taken' })), { failure: 'Could not save', success: 'Saved', refused: (data: { error: string }) => data.error })).toBeUndefined()
+    expect(shown()).toEqual([{ message: 'Saved', type: 'success' }, { message: 'Taken', type: 'error' }])
   })
 })
