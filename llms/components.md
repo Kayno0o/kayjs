@@ -27,10 +27,18 @@ Props are declared once, at the top level, with the `props<T>()` macro. It needs
 ---
 import type { Todo } from './todo'
 
-const { todo, size = 'md', onToggle } = props<{ todo: Todo, size?: 'sm' | 'md', onToggle?: (id: number) => void }>()
+const { todo, size = 'md', onToggle } = props<{
+  todo: Todo
+  size?: 'sm' | 'md'
+  onToggle?: (id: number) => void
+}>()
 ---
 li(class={size})
-  input(type="checkbox" checked={todo.done} onChange={() => onToggle?.(todo.id)})
+  input(
+    type="checkbox"
+    checked={todo.done}
+    onChange={() => onToggle?.(todo.id)}
+  )
   span {todo.title}
 ```
 

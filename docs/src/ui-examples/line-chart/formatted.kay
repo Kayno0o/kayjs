@@ -1,12 +1,32 @@
 ---
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 
-const labels = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05']
-const series = [{ name: 'Revenue', values: [1200, 1800, 1500, 2100, 2600], color: 'var(--color-kui-success)' }]
+const labels = [
+  '2026-09-01',
+  '2026-09-02',
+  '2026-09-03',
+  '2026-09-04',
+  '2026-09-05',
+]
+const series = [{
+  name: 'Revenue',
+  values: [1200, 1800, 1500, 2100, 2600],
+  color: 'var(--color-kui-success)',
+}]
 const thousands = signal(false)
+const format = (value: number) => thousands()
+  ? `${value / 1000}k EUR`
+  : `${value.toLocaleString()} EUR`
 ---
 .flex.max-w-xl.flex-col.gap-2
   label.flex.items-center.gap-2
     input(type="checkbox" bind:checked={thousands})
     | In thousands
-  LineChart(label="Revenue in the first days of September" labels={labels} series={series} xLabels legend formatValue={value => thousands() ? `${value / 1000}k EUR` : `${value.toLocaleString()} EUR`})
+  LineChart(
+    label="Revenue in the first days of September"
+    labels={labels}
+    series={series}
+    xLabels
+    legend
+    formatValue={format}
+  )

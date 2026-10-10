@@ -68,7 +68,9 @@ Icons are slots (`close`, `delete`, `search`, ...) mapped to any icon set. Repla
 
 ```ts
 // kay.config.ts
-export default defineConfig({ settings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' } })
+export default defineConfig({
+  settings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' },
+})
 ```
 
 ```ts

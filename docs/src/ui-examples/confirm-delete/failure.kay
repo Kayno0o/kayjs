@@ -6,4 +6,8 @@ async function remove() {
   throw new Error('The server said no')
 }
 ---
-ConfirmDelete(message="Delete this post?" failure="Could not delete the post" onConfirm={remove})
+ConfirmDelete(
+  message="Delete this post?"
+  failure="Could not delete the post"
+  onConfirm={remove}
+)

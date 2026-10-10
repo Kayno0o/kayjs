@@ -107,7 +107,13 @@ import { createAuth, discordProvider } from '@kaynooo/kayjs-auth'
 createAuth({
   // ...
   url: 'https://example.com',
-  oauth: { discord: { provider: discordProvider(), clientId: process.env.DISCORD_CLIENT_ID!, clientSecret: process.env.DISCORD_CLIENT_SECRET! } },
+  oauth: {
+    discord: {
+      provider: discordProvider(),
+      clientId: process.env.DISCORD_CLIENT_ID!,
+      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+    },
+  },
 })
 ```
 

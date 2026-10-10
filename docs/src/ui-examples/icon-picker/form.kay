@@ -14,7 +14,8 @@ const all: IconChoice[] = [
 ]
 const submitted = signal('')
 
-const search = async (query: string, limit: number) => all.filter(choice => choice.name.includes(query)).slice(0, limit)
+const search = async (query: string, limit: number) =>
+  all.filter(choice => choice.name.includes(query)).slice(0, limit)
 
 function read(event: Event) {
   const data = new FormData(event.currentTarget as HTMLFormElement)

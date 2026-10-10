@@ -1,8 +1,14 @@
 ---
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 
-const links = [{ href: '/', label: 'Home' }, { href: '/guides', label: 'Guides' }, { href: '/ui', label: 'Components' }]
+const links = [
+  { href: '/', label: 'Home' },
+  { href: '/guides', label: 'Guides' },
+  { href: '/ui', label: 'Components' },
+]
 ---
-header.flex.items-center.gap-4.rounded.border.border-kui-overlay1.bg-kui-surface0.px-3.py-2
+header.flex.items-center.gap-4.rounded.border(
+  class="border-kui-overlay1 bg-kui-surface0 px-3 py-2"
+)
   strong kay
   SiteNav(links={links} current="/guides/tutorial" label="Main")

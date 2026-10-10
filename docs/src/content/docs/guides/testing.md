@@ -49,7 +49,9 @@ Cookies a response sets go with the next request, so an app on `session()` stays
 
 ```ts
 const site = await testSite({ use: [sessions] })
-const admin = await testSite({ locals: () => ({ user: { id: 1, admin: true } }) })
+const admin = await testSite({
+  locals: () => ({ user: { id: 1, admin: true } }),
+})
 ```
 
 ## In a browser

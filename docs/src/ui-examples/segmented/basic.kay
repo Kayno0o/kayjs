@@ -1,8 +1,18 @@
 ---
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 
+const PERIODS = [
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
+]
 const period = signal('week')
 ---
 .flex.flex-col.items-start.gap-2
-  Segmented(options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }]} value={period} label="Period" onChange={period.set})
+  Segmented(
+    options={PERIODS}
+    value={period}
+    label="Period"
+    onChange={period.set}
+  )
   p Showing one {period}.

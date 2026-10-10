@@ -9,5 +9,13 @@ const days: ContributionDay[] = Array.from({ length: 70 }, (_, index) => ({
 }))
 ---
 .flex.flex-col.gap-4
-  ContributionGraph(days={days} color="var(--color-kui-success)" today="2026-06-20")
-  ContributionGraph(days={days} color="var(--color-kui-error)" today="2026-06-20")
+  ContributionGraph(
+    days={days}
+    color="var(--color-kui-success)"
+    today="2026-06-20"
+  )
+  ContributionGraph(
+    days={days}
+    color="var(--color-kui-error)"
+    today="2026-06-20"
+  )

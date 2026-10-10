@@ -5,5 +5,10 @@ const title = signal('Moons of Jupiter')
 const saved = signal('Moons of Jupiter')
 ---
 .flex.max-w-sm.flex-col.gap-2
-  TextInput(value={title} onInput={title.set} onChange={saved.set} aria-label="Title")
+  TextInput(
+    value={title}
+    onInput={title.set}
+    onChange={saved.set}
+    aria-label="Title"
+  )
   p.text-kui-subtext0 Typed: {title}. Saved on blur or Enter: {saved}.

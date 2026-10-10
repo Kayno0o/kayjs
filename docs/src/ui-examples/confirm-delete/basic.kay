@@ -7,4 +7,8 @@ async function remove() {
   toast.success('Deleted')
 }
 ---
-ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})
+ConfirmDelete(
+  message="Delete this post?"
+  failure="Could not delete"
+  onConfirm={remove}
+)

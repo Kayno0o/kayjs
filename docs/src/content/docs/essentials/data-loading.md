@@ -47,7 +47,10 @@ A page exports a `query` schema to read the search params typed. A value the sch
 --- server
 import { t } from 'kay'
 
-export const query = t.Object({ q: t.String({ default: '' }), page: t.Optional(t.Integer()) })
+export const query = t.Object({
+  q: t.String({ default: '' }),
+  page: t.Optional(t.Integer()),
+})
 
 const { q, page = 1 } = ctx.query
 ---

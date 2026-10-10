@@ -6,5 +6,11 @@ const series = [{ name: 'Visits', values: [120, 180, 150, 210, 260, 190, 240] }]
 const span = signal('none yet')
 ---
 .flex.max-w-xl.flex-col.gap-2
-  LineChart(label="Visits over a week" labels={labels} series={series} xLabels onRange={(from, to) => span.set(`${labels[from]} to ${labels[to]}`)})
+  LineChart(
+    label="Visits over a week"
+    labels={labels}
+    series={series}
+    xLabels
+    onRange={(from, to) => span.set(`${labels[from]} to ${labels[to]}`)}
+  )
   p.text-kui-subtext0 Picked: {span}.

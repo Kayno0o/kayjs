@@ -11,9 +11,13 @@ interface Moon {
 
 const columns: Column<Moon>[] = [{ key: 'name', header: 'Name' }]
 const moons = signal<Moon[]>([])
+const addMoon = () => {
+  const id = moons().length
+  moons.set([...moons(), { id, name: `Moon ${id + 1}` }])
+}
 ---
 .flex.flex-col.items-start.gap-2
   Table(columns={columns} rows={moons()} rowKey="id")
     @empty
       EmptyState(title="No moons yet")
-  Button(label="Add a moon" onClick={() => moons.set([...moons(), { id: moons().length, name: `Moon ${moons().length + 1}` }])})
+  Button(label="Add a moon" onClick={addMoon})

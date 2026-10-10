@@ -10,10 +10,19 @@ A component is a `.kay` file: up to two fences, then the template. Both fences a
 ---
 import type { Todo } from '../data'
 
-const { todo, size = 'md', onToggle } = props<{ todo: Todo, size?: 'sm' | 'md', onToggle?: (id: number) => void }>()
+const { todo, size = 'md', onToggle } = props<{
+  todo: Todo
+  size?: 'sm' | 'md'
+  onToggle?: (id: number) => void
+}>()
 ---
 li(class={size})
-  input(type="checkbox" aria-label="Done" checked={todo.done} onChange={() => onToggle?.(todo.id)})
+  input(
+    type="checkbox"
+    aria-label="Done"
+    checked={todo.done}
+    onChange={() => onToggle?.(todo.id)}
+  )
   span {todo.title}
 ```
 

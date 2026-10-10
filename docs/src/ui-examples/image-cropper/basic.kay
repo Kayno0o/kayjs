@@ -1,9 +1,23 @@
 ---
 import ImageCropper from '@kaynooo/kayjs-ui/image-cropper.kay'
 
-const photo = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6c8ef5"/><stop offset="1" stop-color="#f58fb0"/></linearGradient></defs><rect width="800" height="500" fill="url(#g)"/><circle cx="560" cy="170" r="70" fill="#fff" opacity=".7"/></svg>')
+const photo = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500">'
+  + '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+  + '<stop offset="0" stop-color="#6c8ef5"/>'
+  + '<stop offset="1" stop-color="#f58fb0"/></linearGradient></defs>'
+  + '<rect width="800" height="500" fill="url(#g)"/>'
+  + '<circle cx="560" cy="170" r="70" fill="#fff" opacity=".7"/></svg>',
+)
 const crop = signal('')
+const describe = (rect: { x: number, y: number, w: number, h: number }) =>
+  `${rect.w} by ${rect.h} pixels at ${rect.x}, ${rect.y}`
 ---
 .flex.max-w-md.flex-col.gap-2
-  ImageCropper(src={photo} ratio={16 / 9} alt="A pink and blue gradient" onCrop={rect => crop.set(`${rect.w} by ${rect.h} pixels at ${rect.x}, ${rect.y}`)})
+  ImageCropper(
+    src={photo}
+    ratio={16 / 9}
+    alt="A pink and blue gradient"
+    onCrop={rect => crop.set(describe(rect))}
+  )
   p.text-kui-subtext0 Crop: {crop || 'not loaded yet'}.

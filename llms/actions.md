@@ -7,7 +7,11 @@ A page's or a layout's server fence exports actions: an Elysia schema and a hand
 import { t } from 'kay'
 import { addTodo, listTodos } from '../data'
 
-export const add = action(t.Object({ title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }) }), async ({ title }, ctx) => {
+const newTodo = t.Object({
+  title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+})
+
+export const add = action(newTodo, async ({ title }, ctx) => {
   if ((await listTodos()).some(todo => todo.title === title))
     return ctx.fail(409, { message: 'Already on the list' })
 

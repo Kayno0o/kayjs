@@ -37,7 +37,12 @@ export default defineConfig({
     imageAlt: 'The Example shop front',
     twitter: '@example',
     locale: 'en_GB',
-    jsonLd: [{ '@context': 'https://schema.org', '@type': 'WebSite', 'name': 'Example', 'url': 'https://example.com' }],
+    jsonLd: [{
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      'name': 'Example',
+      'url': 'https://example.com',
+    }],
   },
 })
 ```
@@ -85,7 +90,12 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({
   favicon: 'src/favicon.png',
   seo: { name: 'Example' },
-  manifest: { shortName: 'Ex', themeColor: '#1e1e2e', backgroundColor: '#11111b', display: 'standalone' },
+  manifest: {
+    shortName: 'Ex',
+    themeColor: '#1e1e2e',
+    backgroundColor: '#11111b',
+    display: 'standalone',
+  },
 })
 ```
 
@@ -117,7 +127,12 @@ import { defineConfig } from 'kay/server'
 
 export default defineConfig({
   fonts: [
-    { family: 'Inter', src: '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', weight: '100 900', preload: true },
+    {
+      family: 'Inter',
+      src: '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2',
+      weight: '100 900',
+      preload: true,
+    },
     { family: 'Lora', src: 'src/fonts/lora-italic.woff2', style: 'italic' },
   ],
 })

@@ -13,4 +13,9 @@ const days: ContributionDay[] = Array.from({ length: 140 }, (_, index) => {
   }
 })
 ---
-ContributionGraph(days={days} color="var(--color-kui-accent)" today="2026-09-20" months)
+ContributionGraph(
+  days={days}
+  color="var(--color-kui-accent)"
+  today="2026-09-20"
+  months
+)

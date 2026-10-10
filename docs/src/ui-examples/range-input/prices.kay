@@ -10,10 +10,24 @@ const products = [
   { name: 'Chair', price: 310 },
 ]
 const range = signal<RangeValue>([null, null])
-const shown = memo(() => products.filter(item => item.price >= (range()[0] ?? -Infinity) && item.price <= (range()[1] ?? Infinity)))
+const shown = memo(() =>
+  products.filter(
+    item =>
+      item.price >= (range()[0] ?? -Infinity) &&
+      item.price <= (range()[1] ?? Infinity),
+  ),
+)
 ---
 .flex.flex-col.items-start.gap-2
-  RangeInput(label="Price" min={0} max={500} step={5} unit="EUR" value={range} onChange={range.set})
+  RangeInput(
+    label="Price"
+    min={0}
+    max={500}
+    step={5}
+    unit="EUR"
+    value={range}
+    onChange={range.set}
+  )
   ul.text-kui-subtext0
     for item of shown key={item.name}
       li {item.name}, {item.price} EUR

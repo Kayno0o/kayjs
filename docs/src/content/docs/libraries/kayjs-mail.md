@@ -66,8 +66,18 @@ import { t } from 'kay'
 import { mail } from '../mail'
 import Welcome from '../mails/welcome.kay'
 
-export const signUp = action(t.Object({ name: t.String({ maxLength: 100 }), email: t.String({ format: 'email', maxLength: 254 }) }), async ({ name, email }) => {
-  await mail.enqueue({ to: email, subject: `Welcome, ${name}`, view: Welcome, props: { name, url: 'https://example.com/confirm' } })
+const newUser = t.Object({
+  name: t.String({ maxLength: 100 }),
+  email: t.String({ format: 'email', maxLength: 254 }),
+})
+
+export const signUp = action(newUser, async ({ name, email }) => {
+  await mail.enqueue({
+    to: email,
+    subject: `Welcome, ${name}`,
+    view: Welcome,
+    props: { name, url: 'https://example.com/confirm' },
+  })
 })
 ---
 ```
@@ -84,7 +94,11 @@ import { testSite } from 'kay/test'
 
 const site = await testSite()
 
-await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/' })
+await site.submit(
+  signUp,
+  { name: 'Ada', email: 'ada@example.com' },
+  { from: '/' },
+)
 await site.runJobs()
 
 expect(outbox.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')

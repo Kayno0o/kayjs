@@ -22,7 +22,11 @@ import { defineMessages } from 'kay/i18n'
 export default defineMessages({
   nav: { home: 'Accueil' },
   greeting: 'Bonjour {name}',
-  items: { zero: 'Aucun article', one: '{count} article', other: '{count} articles' },
+  items: {
+    zero: 'Aucun article',
+    one: '{count} article',
+    other: '{count} articles',
+  },
 })
 ```
 

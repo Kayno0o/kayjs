@@ -8,7 +8,10 @@ kay is published as `@kaynooo/kayjs` to the registry at `https://git.kaynooo.fr/
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-export const app = new Elysia().get('/feed.xml', feed).use(await pages()).listen(3000)
+export const app = new Elysia()
+  .get('/feed.xml', feed)
+  .use(await pages())
+  .listen(3000)
 ```
 
 Exporting `app` lets links and redirects point at the app's own GET routes, such as `/feed.xml`, which `kay check` otherwise reports as served by no page, and types `ctx.locals` (see [Locals](server.md#locals)). An entry `kay check` does not read registers it instead: `declare module 'kay' { interface Register { app: typeof app } }`.
@@ -18,7 +21,13 @@ Project settings live in an optional `kay.config.ts` at the root, read by `pages
 ```ts
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ routes: 'src/routes', lang: 'en', minify: true, prefetch: 'moderate', plugins: [] })
+export default defineConfig({
+  routes: 'src/routes',
+  lang: 'en',
+  minify: true,
+  prefetch: 'moderate',
+  plugins: [],
+})
 ```
 
 A directory inside the project holding a `kay.config.ts` of its own, such as an example app or a documentation site, is another project: its components are never the outer one's islands, and it checks and builds from its own root.

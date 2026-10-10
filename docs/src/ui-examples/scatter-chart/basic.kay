@@ -10,4 +10,11 @@ const points = [
 ]
 ---
 .max-w-xl
-  ScatterChart(label="Games" points={points} x={{ label: 'Hours', scale: 'log' }} y={{ label: 'Score', domain: [0, 100] }} quadrant={{ x: 20, y: 80 }} corners={{ topRight: 'Long and loved', topLeft: 'Short and sweet' }})
+  ScatterChart(
+    label="Games"
+    points={points}
+    x={{ label: 'Hours', scale: 'log' }}
+    y={{ label: 'Score', domain: [0, 100] }}
+    quadrant={{ x: 20, y: 80 }}
+    corners={{ topRight: 'Long and loved', topLeft: 'Short and sweet' }}
+  )

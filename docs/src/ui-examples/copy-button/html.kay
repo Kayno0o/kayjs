@@ -1,4 +1,9 @@
 ---
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 ---
-CopyButton(text="kay docs" html="<strong>kay</strong> docs" label="Copy" copiedLabel="Done")
+CopyButton(
+  text="kay docs"
+  html="<strong>kay</strong> docs"
+  label="Copy"
+  copiedLabel="Done"
+)

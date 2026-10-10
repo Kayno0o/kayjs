@@ -1,7 +1,13 @@
 ---
 import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
 
-const panel = (color: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="${color}"/></svg>`)}`
+const panel = (color: string) => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" '
+    + 'width="640" height="480">'
+    + `<rect width="640" height="480" fill="${color}"/></svg>`
+
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
 
 const slides = [
   { src: panel('#6d8f7a'), alt: 'A green panel' },

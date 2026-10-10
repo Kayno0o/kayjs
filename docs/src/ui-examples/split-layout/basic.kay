@@ -8,6 +8,10 @@ const picked = signal<string>()
   SplitLayout(detailOpen={picked() !== undefined})
     @list
       for moon of moons key={moon}
-        button.block.w-full.px-3.py-2.text-left(type="button" onClick={() => picked.set(moon)}) {moon}
+        button.block.w-full.px-3.py-2.text-left(
+          type="button"
+          onClick={() => picked.set(moon)}
+        )
+          | {moon}
     @detail
       p.p-4 {picked() ?? 'Pick a moon.'}

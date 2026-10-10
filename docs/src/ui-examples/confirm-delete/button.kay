@@ -7,4 +7,10 @@ async function empty() {
   toast.success('Emptied')
 }
 ---
-ConfirmDelete(message="Empty the trash?" failure="Could not empty it" onConfirm={empty} trigger="button" label="Empty trash")
+ConfirmDelete(
+  message="Empty the trash?"
+  failure="Could not empty it"
+  onConfirm={empty}
+  trigger="button"
+  label="Empty trash"
+)

@@ -34,7 +34,11 @@ section.todo-list
   input(type="search" bind:value={filter} placeholder="Filter")
   ul
     for todo, i of shown
-      TodoItem(todo={todo} index={i} onToggle={id => selected.set(todos.find(t => t.id === id))})
+      TodoItem(
+        todo={todo}
+        index={i}
+        onToggle={id => selected.set(todos.find(t => t.id === id))}
+      )
     else
       li.empty Nothing matches
   if selected as todo
@@ -87,7 +91,10 @@ A block taking parameters is passed as a function the component calls, once per 
 --- <T extends { id: number }>
 import type { JSX } from 'kay'
 
-const { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()
+const { items, row } = props<{
+  items: T[]
+  row: (item: T, index: number) => JSX.Element
+}>()
 ---
 ul
   for item, i of items

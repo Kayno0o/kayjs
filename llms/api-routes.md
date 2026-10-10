@@ -16,7 +16,11 @@ export default api()
       ws.send({ from: ws.data.user?.name ?? 'guest', text })
     },
   })
-  .post('/answer', ({ body }) => eventStream(complete(body.prompt)), { body: t.Object({ prompt: t.String() }) })
+  .post(
+    '/answer',
+    ({ body }) => eventStream(complete(body.prompt)),
+    { body: t.Object({ prompt: t.String() }) },
+  )
 ```
 
 - A route answering a plain object or array holding a bigint, as a database's bigint ids are, gives JSON with each written as its digits, `{"id":"9007199254740993"}`, where `JSON.stringify` would throw; `resource()` types such a field as a `string`.
@@ -56,14 +60,22 @@ import { t } from 'elysia'
 import { dispatch } from 'kay'
 import { api, rooms } from 'kay/server'
 
-type Sent = { type: 'said', from: string, text: string } | { type: 'board', cells: string[] }
+type Sent =
+  | { type: 'said', from: string, text: string }
+  | { type: 'board', cells: string[] }
 
 const games = rooms<Sent, string>()
-const sendBoard = games.coalesce(room => ({ type: 'board', cells: boardOf(room) }))
+const sendBoard = games.coalesce(room => ({
+  type: 'board',
+  cells: boardOf(room),
+}))
 
 export default api()
   .ws('/:room', {
-    body: t.Union([t.Object({ type: t.Literal('say'), text: t.String() }), t.Object({ type: t.Literal('play'), cell: t.Integer() })]),
+    body: t.Union([
+      t.Object({ type: t.Literal('say'), text: t.String() }),
+      t.Object({ type: t.Literal('play'), cell: t.Integer() }),
+    ]),
     open(ws) {
       games.join(ws, ws.data.params.room, ws.data.user.name)
     },
@@ -71,7 +83,11 @@ export default api()
       const room = ws.data.params.room
 
       dispatch(body, {
-        say: ({ text }) => games.publish(room, { type: 'said', from: ws.data.user.name, text }, { except: ws }),
+        say: ({ text }) => games.publish(
+          room,
+          { type: 'said', from: ws.data.user.name, text },
+          { except: ws },
+        ),
         play: ({ cell }) => {
           play(room, cell)
           sendBoard(room)

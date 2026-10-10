@@ -7,9 +7,25 @@ const open = signal(false)
 const recent = signal<string[]>([])
 const entries: PaletteEntry[] = [
   { label: 'Bun', group: 'Links', href: 'https://bun.sh', external: true },
-  { label: 'MDN', group: 'Links', href: 'https://developer.mozilla.org', external: true },
-  { label: 'Tailwind CSS', group: 'Links', href: 'https://tailwindcss.com', external: true },
+  {
+    label: 'MDN',
+    group: 'Links',
+    href: 'https://developer.mozilla.org',
+    external: true,
+  },
+  {
+    label: 'Tailwind CSS',
+    group: 'Links',
+    href: 'https://tailwindcss.com',
+    external: true,
+  },
 ]
 ---
 Button(label="Open the palette" onClick={() => open.set(true)})
-CommandPalette(open={open} onOpenChange={open.set} entries={entries} recent={recent()} onRecentChange={recent.set})
+CommandPalette(
+  open={open}
+  onOpenChange={open.set}
+  entries={entries}
+  recent={recent()}
+  onRecentChange={recent.set}
+)

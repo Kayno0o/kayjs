@@ -12,8 +12,16 @@ import { api } from 'kay/server'
 import { addNote, listNotes } from '../data'
 
 export default api()
-  .get('/', ({ query }) => listNotes(query.prefix ?? ''), { query: t.Object({ prefix: t.Optional(t.String()) }) })
-  .post('/', ({ body }) => addNote(body.text), { body: t.Object({ text: t.String() }) })
+  .get(
+    '/',
+    ({ query }) => listNotes(query.prefix ?? ''),
+    { query: t.Object({ prefix: t.Optional(t.String()) }) },
+  )
+  .post(
+    '/',
+    ({ body }) => addNote(body.text),
+    { body: t.Object({ text: t.String() }) },
+  )
 ```
 
 `api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. A `_guard.ts` in `src/api/` protects its routes like it protects pages.
@@ -53,7 +61,11 @@ Answer with `eventStream()` from a generator, an async iterable or an array, and
 ```ts
 import { api, eventStream } from 'kay/server'
 
-export default api().post('/answer', ({ body }) => eventStream(complete(body.prompt)), { body: t.Object({ prompt: t.String() }) })
+export default api().post(
+  '/answer',
+  ({ body }) => eventStream(complete(body.prompt)),
+  { body: t.Object({ prompt: t.String() }) },
+)
 ```
 
 ```kay
@@ -61,7 +73,10 @@ export default api().post('/answer', ({ body }) => eventStream(complete(body.pro
 import { stream } from 'kay'
 import chat from '../api/chat'
 
-const answer = stream(chat, '/answer', { method: 'post', body: { prompt: 'Hello' } })
+const answer = stream(chat, '/answer', {
+  method: 'post',
+  body: { prompt: 'Hello' },
+})
 ---
 p {answer.last()}
 ```

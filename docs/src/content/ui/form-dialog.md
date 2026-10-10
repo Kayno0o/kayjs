@@ -9,7 +9,19 @@ FormDialog needs an action exported by a page, so it is shown here as code. `src
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const rename = action(t.Object({ id: t.String({ maxLength: 64 }), title: t.String({ minLength: 2, maxLength: 200, error: 'Two letters at least' }) }), async ({ id, title }) => posts.rename(id, title))
+const renaming = t.Object({
+  id: t.String({ maxLength: 64 }),
+  title: t.String({
+    minLength: 2,
+    maxLength: 200,
+    error: 'Two letters at least',
+  }),
+})
+
+export const rename = action(
+  renaming,
+  async ({ id, title }) => posts.rename(id, title),
+)
 ---
 ```
 
@@ -28,7 +40,15 @@ const editing = signal(false)
 const title = signal(post.title)
 ---
 Button(label="Rename" onClick={() => editing.set(true)})
-FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" onSaved={saved => title.set(saved.title)} onClose={() => editing.set(false)})
+FormDialog(
+  open={editing()}
+  title="Rename"
+  action={rename}
+  submitLabel="Rename"
+  failure="Could not rename"
+  onSaved={saved => title.set(saved.title)}
+  onClose={() => editing.set(false)}
+)
   input(type="hidden" name="id" value={post.id})
   FormField(label="Title" name="title" required)
     input.kui-field-input(name="title" value={title()})
@@ -41,7 +61,15 @@ The dialog calls `action` with the form's data. Give each control the `name` of 
 A handler refusing with `ctx.fail(400, { error: 'Slug taken' })` reaches the dialog through `refused`, which answers a message per field, or one message that is toasted. Without it, `failure` is toasted.
 
 ```kay
-FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" refused={data => ({ slug: data.error })} onClose={() => editing.set(false)})
+FormDialog(
+  open={editing()}
+  title="Rename"
+  action={rename}
+  submitLabel="Rename"
+  failure="Could not rename"
+  refused={data => ({ slug: data.error })}
+  onClose={() => editing.set(false)}
+)
 ```
 
 `extra` fills the left end of the footer, for a [ConfirmDelete](/ui/confirm-delete) with `trigger="button"`.

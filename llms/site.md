@@ -11,7 +11,11 @@ import { defineConfig } from 'kay/server'
 
 export default defineConfig({
   lang: 'en',
-  seo: { name: 'Journal', titleTemplate: '%s | Journal', description: 'Notes worth keeping' },
+  seo: {
+    name: 'Journal',
+    titleTemplate: '%s | Journal',
+    description: 'Notes worth keeping',
+  },
 })
 ```
 
@@ -28,7 +32,11 @@ const section = ctx.url.pathname.split('/')[1]
 header
   a(href="/") Journal
   nav(aria-label="Main")
-    a(href="/posts" aria-current={section === 'posts' ? 'page' : undefined}) Posts
+    a(
+      href="/posts"
+      aria-current={section === 'posts' ? 'page' : undefined}
+    )
+      | Posts
     a(href="/about") About
 main
   slot
@@ -46,7 +54,11 @@ import { t } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: t.Object({ title: t.String(), date: t.Date(), tags: t.Array(t.String(), { default: [] }) }),
+  schema: t.Object({
+    title: t.String(),
+    date: t.Date(),
+    tags: t.Array(t.String(), { default: [] }),
+  }),
 })
 ```
 
@@ -86,7 +98,10 @@ A component whose template handles an event, `onClick`, or binds a field, `bind:
 import { posts } from '../../content.config'
 import PostFilter from '../../components/post-filter.kay'
 
-const list = (await posts.all()).map(post => ({ slug: post.slug, title: post.data.title }))
+const list = (await posts.all()).map(post => ({
+  slug: post.slug,
+  title: post.data.title,
+}))
 ---
 head
   title Posts
@@ -98,7 +113,11 @@ PostFilter(posts={list})
 ---
 const { posts } = props<{ posts: { slug: string, title: string }[] }>()
 const query = signal('')
-const shown = memo(() => posts.filter(post => post.title.toLowerCase().includes(query().toLowerCase())))
+const shown = memo(() =>
+  posts.filter(post =>
+    post.title.toLowerCase().includes(query().toLowerCase()),
+  ),
+)
 ---
 input(type="search" aria-label="Filter posts" bind:value={query})
 ul
@@ -139,7 +158,12 @@ import { t } from 'kay'
 import { checkComment } from '../comment'
 import CommentForm from '../components/comment-form.kay'
 
-export const comment = action(t.Object({ name: t.String({ maxLength: 100 }), text: t.String({ maxLength: 2000 }) }), (input, ctx) => {
+const newComment = t.Object({
+  name: t.String({ maxLength: 100 }),
+  text: t.String({ maxLength: 2000 }),
+})
+
+export const comment = action(newComment, (input, ctx) => {
   const errors = checkComment(input)
 
   if (Object.keys(errors).length > 0)
@@ -169,7 +193,10 @@ async function submit(event: SubmitEvent) {
   event.preventDefault()
   const form = event.currentTarget as HTMLFormElement
   const fields = new FormData(form)
-  const found = checkComment({ name: String(fields.get('name')), text: String(fields.get('text')) })
+  const found = checkComment({
+    name: String(fields.get('name')),
+    text: String(fields.get('text')),
+  })
 
   errors.set(found)
 

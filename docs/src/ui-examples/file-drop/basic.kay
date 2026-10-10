@@ -3,7 +3,11 @@ import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 
 const names = signal<string[]>([])
 ---
-FileDrop(accept="image/*" multiple onFiles={files => names.set(files.map(file => file.name))})
+FileDrop(
+  accept="image/*"
+  multiple
+  onFiles={files => names.set(files.map(file => file.name))}
+)
   @content(zone)
     .p-6.text-center
       if zone.dragging()

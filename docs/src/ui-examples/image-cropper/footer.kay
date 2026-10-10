@@ -2,7 +2,11 @@
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import ImageCropper from '@kaynooo/kayjs-ui/image-cropper.kay'
 
-const photo = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="#6c8ef5"/><circle cx="560" cy="170" r="70" fill="#fff" opacity=".7"/></svg>')
+const photo = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500">'
+  + '<rect width="800" height="500" fill="#6c8ef5"/>'
+  + '<circle cx="560" cy="170" r="70" fill="#fff" opacity=".7"/></svg>',
+)
 ---
 .max-w-md
   ImageCropper(src={photo} ratio={1} grid minSize={64} alt="A blue picture")

@@ -10,4 +10,11 @@ const upload = async (file: File) => {
 }
 ---
 .max-w-xl
-  MarkdownEditor(value={body} onInput={body.set} onImage={upload} name="body" placeholder="Paste or drop an image…" rows={6})
+  MarkdownEditor(
+    value={body}
+    onInput={body.set}
+    onImage={upload}
+    name="body"
+    placeholder="Paste or drop an image…"
+    rows={6}
+  )

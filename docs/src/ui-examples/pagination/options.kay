@@ -1,4 +1,10 @@
 ---
 import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 ---
-Pagination(page={10} pages={40} url="/ui/pagination?q=moons" param="p" siblings={2})
+Pagination(
+  page={10}
+  pages={40}
+  url="/ui/pagination?q=moons"
+  param="p"
+  siblings={2}
+)

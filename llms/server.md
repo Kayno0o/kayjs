@@ -8,7 +8,10 @@
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-const auth = new Elysia({ name: 'auth' }).derive({ as: 'scoped' }, async ({ cookie }) => ({ user: await findSession(cookie.session?.value) }))
+const auth = new Elysia({ name: 'auth' })
+  .derive({ as: 'scoped' }, async ({ cookie }) => ({
+    user: await findSession(cookie.session?.value),
+  }))
 
 export const app = new Elysia().use(auth).use(await pages()).listen(3000)
 ```
@@ -24,7 +27,10 @@ export const app = new Elysia().use(auth).use(await pages()).listen(3000)
 import { session, sqliteStore } from 'kay/server'
 import { env } from './env'
 
-export const sessions = session<{ userId: string }>({ secret: env.SESSION_SECRET, store: sqliteStore('sessions.sqlite') })
+export const sessions = session<{ userId: string }>({
+  secret: env.SESSION_SECRET,
+  store: sqliteStore('sessions.sqlite'),
+})
 ```
 
 The server entry exports the app using it before the pages, `export const app = new Elysia().use(sessions).use(await pages())`, which types `ctx.locals.session` (see [Locals](#locals)).
@@ -33,7 +39,12 @@ The server entry exports the app using it before the pages, `export const app = 
 --- server
 import { t } from 'kay'
 
-export const signIn = action(t.Object({ email: t.String({ maxLength: 254 }), password: t.String() }), async (input, ctx) => {
+const credentials = t.Object({
+  email: t.String({ maxLength: 254 }),
+  password: t.String(),
+})
+
+export const signIn = action(credentials, async (input, ctx) => {
   const user = await verify(input)
 
   if (!user)
@@ -77,7 +88,12 @@ A number or boolean is read from its text as a form field is, a variable left ou
 import { t } from 'kay'
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ publicEnv: t.Object({ MAP_KEY: t.String(), ANALYTICS_ID: t.Optional(t.String()) }) })
+export default defineConfig({
+  publicEnv: t.Object({
+    MAP_KEY: t.String(),
+    ANALYTICS_ID: t.Optional(t.String()),
+  }),
+})
 ```
 
 - They are read from the environment as the server boots, as `defineEnv` reads its own, a missing or refused one stopping it. The browser gets them from `/_kay/env.js`, which the server answers from its environment and the island entry imports before any island hydrates, so an executable, or a page prerendered at build time, carries the values of the environment it runs in; `kay build --static` writes that file with the build's. The markup a prerendered page rendered holds the build's values, though: an island showing a variable that differs at runtime hydrates with a mismatch, so a page showing one renders per request.

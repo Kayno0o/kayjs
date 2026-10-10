@@ -24,7 +24,8 @@ A matcher checks a param, `[name=matcher]` or `[[name=matcher]]`: it returns the
 
 ```ts
 // src/params/even.ts
-export default (value: string) => Number(value) % 2 === 0 ? Number(value) : undefined
+export default (value: string) =>
+  Number(value) % 2 === 0 ? Number(value) : undefined
 ```
 
 A URL a matcher refuses falls through to the page without one serving the same path, `items/[slug].kay` beside `items/[id=integer].kay`, and is a 404 when none does; several pages with matchers on one path are tried in the order of their file paths. Two pages serving one path, neither with a matcher, stop the server, whatever they name their params: `todos/[id].kay` and `todos/[slug].kay`, `blog/index.kay` and `blog/[[page]].kay`, `about.kay` and `(site)/about.kay`. A `prerender` list leaves an optional param out to prerender the path without it, and an entry a matcher refuses fails the build.
@@ -162,7 +163,9 @@ export default defineConfig({
 
 ```ts
 export default defineConfig({
-  rewrite: url => url.hostname === 'shop.example.com' ? `/shop${url.pathname}${url.search}` : undefined,
+  rewrite: url => url.hostname === 'shop.example.com'
+    ? `/shop${url.pathname}${url.search}`
+    : undefined,
 })
 ```
 

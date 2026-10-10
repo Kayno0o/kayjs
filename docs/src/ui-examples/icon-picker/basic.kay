@@ -16,7 +16,8 @@ const all: IconChoice[] = [
 ]
 const picked = signal('tabler:rocket')
 
-const search = async (query: string, limit: number) => all.filter(choice => choice.name.includes(query)).slice(0, limit)
+const search = async (query: string, limit: number) =>
+  all.filter(choice => choice.name.includes(query)).slice(0, limit)
 ---
 .flex.flex-col.items-start.gap-2
   IconPicker(search={search} value={picked} onChange={picked.set})

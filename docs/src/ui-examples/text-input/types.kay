@@ -5,5 +5,17 @@ const email = signal('')
 const quantity = signal('1')
 ---
 .flex.max-w-sm.flex-col.gap-2
-  TextInput(type="email" value={email} onInput={email.set} placeholder="you@example.com" aria-label="Email")
-  TextInput(type="number" value={quantity} onInput={quantity.set} min="1" aria-label="Quantity")
+  TextInput(
+    type="email"
+    value={email}
+    onInput={email.set}
+    placeholder="you@example.com"
+    aria-label="Email"
+  )
+  TextInput(
+    type="number"
+    value={quantity}
+    onInput={quantity.set}
+    min="1"
+    aria-label="Quantity"
+  )

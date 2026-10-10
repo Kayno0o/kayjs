@@ -1,7 +1,11 @@
 ---
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 
-const tabs = [{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }]
+const tabs = [
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
+  { value: 'year', label: 'Year' },
+]
 const range = signal('week')
 ---
 .flex.flex-col.gap-3

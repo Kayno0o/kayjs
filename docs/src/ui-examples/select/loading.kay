@@ -3,4 +3,11 @@ import Select from '@kaynooo/kayjs-ui/select.kay'
 
 const kind = signal('')
 ---
-Select(value={kind} options={[]} onChange={kind.set} loading loadingLabel="Loading kinds…" aria-label="Kind")
+Select(
+  value={kind}
+  options={[]}
+  onChange={kind.set}
+  loading
+  loadingLabel="Loading kinds…"
+  aria-label="Kind"
+)

@@ -94,7 +94,11 @@ export const posts = collection('content/posts', {
   feed: {
     path: '/blog/rss.xml',
     title: 'Blog',
-    item: post => ({ title: post.data.title, path: `/blog/${post.slug}`, date: post.data.date }),
+    item: post => ({
+      title: post.data.title,
+      path: `/blog/${post.slug}`,
+      date: post.data.date,
+    }),
   },
 })
 ```
@@ -106,7 +110,11 @@ When the entries live in a headless CMS, an API or a database, pass a loader ins
 ```ts
 export const news = collection({
   name: 'news',
-  load: async () => (await listPosts()).map(post => ({ slug: post.slug, data: { title: post.title }, html: post.content })),
+  load: async () => (await listPosts()).map(post => ({
+    slug: post.slug,
+    data: { title: post.title },
+    html: post.content,
+  })),
   ttl: '15m',
 }, {
   schema: t.Object({ title: t.String() }),

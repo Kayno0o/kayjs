@@ -12,9 +12,10 @@ description: Share request data with pages through ctx.locals, keep a session, p
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-const auth = new Elysia({ name: 'auth' }).derive({ as: 'scoped' }, async ({ cookie }) => ({
-  user: await findSession(cookie.session?.value),
-}))
+const auth = new Elysia({ name: 'auth' })
+  .derive({ as: 'scoped' }, async ({ cookie }) => ({
+    user: await findSession(cookie.session?.value),
+  }))
 
 export const app = new Elysia().use(auth).use(await pages()).listen(3000)
 ```
@@ -47,7 +48,12 @@ Without a store the data travels in the cookie, sealed but limited to about 3.5 
 --- server
 import { t } from 'kay'
 
-export const signIn = action(t.Object({ email: t.String({ maxLength: 254 }), password: t.String() }), async (input, ctx) => {
+const credentials = t.Object({
+  email: t.String({ maxLength: 254 }),
+  password: t.String(),
+})
+
+export const signIn = action(credentials, async (input, ctx) => {
   const user = await verify(input)
 
   if (!user)

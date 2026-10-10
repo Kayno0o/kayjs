@@ -1,9 +1,20 @@
 ---
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 
-const planets = [{ value: 'mercury', label: 'Mercury' }, { value: 'venus', label: 'Venus' }, { value: 'earth', label: 'Earth' }, { value: 'mars', label: 'Mars' }, { value: 'jupiter', label: 'Jupiter' }]
+const planets = [
+  { value: 'mercury', label: 'Mercury' },
+  { value: 'venus', label: 'Venus' },
+  { value: 'earth', label: 'Earth' },
+  { value: 'mars', label: 'Mars' },
+  { value: 'jupiter', label: 'Jupiter' },
+]
 const picked = signal(['mars'])
 ---
 .flex.flex-col.items-start.gap-2
-  MultiSelect(label="Planets" options={planets} value={picked} onChange={picked.set})
+  MultiSelect(
+    label="Planets"
+    options={planets}
+    value={picked}
+    onChange={picked.set}
+  )
   p.text-kui-subtext0 Picked: {picked.join(', ') || 'none'}.

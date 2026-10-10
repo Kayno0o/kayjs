@@ -11,7 +11,11 @@ An action is a schema and a handler exported from a page's server fence. It beco
 import { t } from 'kay'
 import { addTodo } from '../data'
 
-export const add = action(t.Object({ title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }) }), async ({ title }) => {
+const newTodo = t.Object({
+  title: t.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+})
+
+export const add = action(newTodo, async ({ title }) => {
   return (await addTodo(title)).id
 })
 ---

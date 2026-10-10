@@ -2,7 +2,11 @@
 import WhenVisible from '@kaynooo/kayjs-ui/when-visible.kay'
 
 const rows = signal(Array.from({ length: 8 }, (_, index) => index + 1))
-const more = () => rows.set(current => [...current, ...Array.from({ length: 4 }, (_, index) => current.length + index + 1)])
+const more = () =>
+  rows.set(current => [
+    ...current,
+    ...Array.from({ length: 4 }, (_, index) => current.length + index + 1),
+  ])
 ---
 .h-48.overflow-y-auto.rounded-lg.border.border-kui-overlay1.bg-kui-surface0
   for row of rows() key={row}

@@ -39,7 +39,12 @@ export interface Book {
 }
 
 const books: Book[] = [
-  { id: 1, title: 'The Left Hand of Darkness', author: 'Ursula K. Le Guin', read: true },
+  {
+    id: 1,
+    title: 'The Left Hand of Darkness',
+    author: 'Ursula K. Le Guin',
+    read: true,
+  },
   { id: 2, title: 'Piranesi', author: 'Susanna Clarke', read: false },
 ]
 
@@ -52,7 +57,8 @@ export async function findBook(id: number): Promise<Book | undefined> {
 }
 
 export async function addBook(title: string, author: string): Promise<Book> {
-  const book = { id: Math.max(0, ...books.map(each => each.id)) + 1, title, author, read: false }
+  const id = Math.max(0, ...books.map(each => each.id)) + 1
+  const book = { id, title, author, read: false }
 
   books.push(book)
 
@@ -153,10 +159,19 @@ import { memo, signal } from 'kay'
 const { books } = props<{ books: Book[] }>()
 const query = signal('')
 const unreadOnly = signal(false)
-const shown = memo(() => books.filter(book => (!unreadOnly() || !book.read) && `${book.title} ${book.author}`.toLowerCase().includes(query().trim().toLowerCase())))
+const shown = memo(() => books.filter(book =>
+  (!unreadOnly() || !book.read)
+  && `${book.title} ${book.author}`.toLowerCase()
+    .includes(query().trim().toLowerCase()),
+))
 ---
 .filters
-  input(type="search" aria-label="Search the books" placeholder="Search" bind:value={query})
+  input(
+    type="search"
+    aria-label="Search the books"
+    placeholder="Search"
+    bind:value={query}
+  )
   label
     input(type="checkbox" bind:checked={unreadOnly})
     |  Unread only

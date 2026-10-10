@@ -85,7 +85,10 @@ An icon known only at runtime, such as one a user picks from a search, is built 
 import tabler from '@iconify-json/tabler/icons.json'
 import { iconNames, iconProps } from 'kay/icons'
 
-const found = iconNames(tabler).filter(name => name.includes('home')).slice(0, 20).map(name => ({ name, icon: iconProps(tabler, name)! }))
+const found = iconNames(tabler)
+  .filter(name => name.includes('home'))
+  .slice(0, 20)
+  .map(name => ({ name, icon: iconProps(tabler, name)! }))
 ```
 
 - Both are plain functions, so an island can call them too, though a set imported there ships whole to the browser: search on the server and send the props.

@@ -9,7 +9,15 @@ const points = [
 ]
 
 const picked = signal('Pick a dot')
+const pick = (point: { label: string, x: number, y: number }) =>
+  picked.set(`${point.label}: ${point.x} h, score ${point.y}`)
 ---
 .flex.flex-col.gap-2.max-w-xl
-  ScatterChart(label="Games by length and score" points={points} x={{ label: 'Hours' }} y={{ label: 'Score' }} onSelect={point => picked.set(`${point.label}: ${point.x} h, score ${point.y}`)})
+  ScatterChart(
+    label="Games by length and score"
+    points={points}
+    x={{ label: 'Hours' }}
+    y={{ label: 'Score' }}
+    onSelect={pick}
+  )
   p.rounded.border.border-kui-overlay1.bg-kui-surface0.px-3.py-2 {picked}

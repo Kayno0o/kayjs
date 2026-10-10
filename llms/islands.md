@@ -81,7 +81,12 @@ import { uid } from 'kay'
 const id = uid()
 const open = signal(false)
 ---
-button(aria-controls={id} aria-expanded={open ? 'true' : 'false'} onClick={() => open.set(!open)}) Menu
+button(
+  aria-controls={id}
+  aria-expanded={open ? 'true' : 'false'}
+  onClick={() => open.set(!open)}
+)
+  | Menu
 ul(id={id} hidden={!open})
   slot
 ```

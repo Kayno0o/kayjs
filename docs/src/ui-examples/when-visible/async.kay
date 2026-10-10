@@ -6,7 +6,10 @@ const rows = signal(Array.from({ length: PAGE }, (_, index) => index + 1))
 
 async function more() {
   await new Promise(resolve => setTimeout(resolve, 600))
-  rows.set(current => [...current, ...Array.from({ length: PAGE }, (_, index) => current.length + index + 1)])
+  rows.set(current => [
+    ...current,
+    ...Array.from({ length: PAGE }, (_, index) => current.length + index + 1),
+  ])
 }
 ---
 .h-48.overflow-y-auto.rounded-lg.border.border-kui-overlay1.bg-kui-surface0

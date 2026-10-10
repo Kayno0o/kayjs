@@ -8,7 +8,12 @@ const items: MenuEntry[] = [
   { label: 'Rename', icon: Pencil, onSelect: () => picked.set('Rename') },
   { label: 'Duplicate', onSelect: () => picked.set('Duplicate') },
   'separator',
-  { label: 'Delete', icon: 'delete', danger: true, onSelect: () => picked.set('Delete') },
+  {
+    label: 'Delete',
+    icon: 'delete',
+    danger: true,
+    onSelect: () => picked.set('Delete'),
+  },
 ]
 ---
 .flex.items-center.gap-3

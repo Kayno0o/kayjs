@@ -8,14 +8,29 @@ import { collection } from 'kay/content'
 import Callout from './components/callout.kay'
 
 export const posts = collection('content/posts', {
-  schema: t.Object({ title: t.String(), date: t.Date(), tags: t.Array(t.String(), { default: [] }), draft: t.Optional(t.Boolean()) }),
+  schema: t.Object({
+    title: t.String(),
+    date: t.Date(),
+    tags: t.Array(t.String(), { default: [] }),
+    draft: t.Optional(t.Boolean()),
+  }),
   components: { Callout },
   draft: post => post.data.draft === true,
   sort: (a, b) => b.data.date.getTime() - a.data.date.getTime(),
-  feed: { path: '/blog/rss.xml', title: 'Blog', item: post => ({ title: post.data.title, path: `/blog/${post.slug}`, date: post.data.date }) },
+  feed: {
+    path: '/blog/rss.xml',
+    title: 'Blog',
+    item: post => ({
+      title: post.data.title,
+      path: `/blog/${post.slug}`,
+      date: post.data.date,
+    }),
+  },
 })
 
-export const authors = collection('content/authors', { schema: t.Object({ name: t.String() }) })
+export const authors = collection('content/authors', {
+  schema: t.Object({ name: t.String() }),
+})
 ```
 
 A page reads it in its server fence, typed from the schema:
@@ -61,7 +76,12 @@ import { listPosts } from './cms'
 
 export const news = collection({
   name: 'news',
-  load: async ({ preview }) => (await listPosts({ drafts: preview })).map(post => ({ slug: post.slug, data: { title: post.title, published: post.status === 'published' }, html: post.content })),
+  load: async ({ preview }) => (await listPosts({ drafts: preview }))
+    .map(post => ({
+      slug: post.slug,
+      data: { title: post.title, published: post.status === 'published' },
+      html: post.content,
+    })),
   ttl: '15m',
 }, {
   schema: t.Object({ title: t.String(), published: t.Boolean() }),

@@ -12,4 +12,9 @@ const points = [
 const hours = [1, 10, 100].map(value => ({ value, label: `${value} h` }))
 ---
 .max-w-xl
-  ScatterChart(label="Games by length and score" points={points} x={{ label: 'Hours', scale: 'log', ticks: hours }} y={{ label: 'Score', domain: [0, 100] }})
+  ScatterChart(
+    label="Games by length and score"
+    points={points}
+    x={{ label: 'Hours', scale: 'log', ticks: hours }}
+    y={{ label: 'Score', domain: [0, 100] }}
+  )

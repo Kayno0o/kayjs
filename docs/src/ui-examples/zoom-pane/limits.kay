@@ -1,10 +1,29 @@
 ---
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
 ---
-ZoomPane(label="Grid, up to 3 times" most={3} tools={false} class="h-56 w-full rounded-lg border border-kui-overlay1 bg-kui-surface0")
+ZoomPane(
+  label="Grid, up to 3 times"
+  most={3}
+  tools={false}
+  class="h-56 w-full rounded-lg border border-kui-overlay1 bg-kui-surface0"
+)
   svg(viewBox="0 0 100 60" width="100%" height="100%")
     for column of [10, 20, 30, 40, 50, 60, 70, 80, 90]
-      line(x1={column} y1="0" x2={column} y2="60" stroke="currentColor" stroke-width="0.3")
+      line(
+        x1={column}
+        y1="0"
+        x2={column}
+        y2="60"
+        stroke="currentColor"
+        stroke-width="0.3"
+      )
     for row of [10, 20, 30, 40, 50]
-      line(x1="0" y1={row} x2="100" y2={row} stroke="currentColor" stroke-width="0.3")
+      line(
+        x1="0"
+        y1={row}
+        x2="100"
+        y2={row}
+        stroke="currentColor"
+        stroke-width="0.3"
+      )
     circle(cx="50" cy="30" r="6" fill="currentColor")

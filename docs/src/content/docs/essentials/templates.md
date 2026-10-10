@@ -8,7 +8,9 @@ The template is what follows the fences of a `.kay` file. Each line is an elemen
 
 ```kay
 ---
-const { todos } = props<{ todos: { id: number, title: string, done: boolean }[] }>()
+const { todos } = props<{
+  todos: { id: number, title: string, done: boolean }[]
+}>()
 ---
 section.todo-list
   h2 Todos

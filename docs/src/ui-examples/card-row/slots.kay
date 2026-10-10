@@ -2,7 +2,11 @@
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 
-const moons = [{ name: 'Io', radius: 1822 }, { name: 'Europa', radius: 1561 }, { name: 'Ganymede', radius: 2634 }]
+const moons = [
+  { name: 'Io', radius: 1822 },
+  { name: 'Europa', radius: 1561 },
+  { name: 'Ganymede', radius: 2634 },
+]
 ---
 .flex.flex-col.gap-2
   for moon of moons key={moon.name}

@@ -48,7 +48,11 @@ A queue holds jobs that must not be lost: an action enqueues one and goes on, an
 // src/jobs.ts
 import { queue } from 'kay/server'
 
-export const welcomeMails = queue('welcome-mails', async ({ to }: { to: string }) => sendWelcome(to), { attempts: 5, backoff: '30s' })
+export const welcomeMails = queue(
+  'welcome-mails',
+  async ({ to }: { to: string }) => sendWelcome(to),
+  { attempts: 5, backoff: '30s' },
+)
 ```
 
 ```ts
@@ -85,7 +89,16 @@ export default defineConfig({
 Every response the app sends, its own routes included, carries a Content-Security-Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: SAMEORIGIN`, `Cross-Origin-Opener-Policy: same-origin`, `X-Permitted-Cross-Domain-Policies: none` and `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()`. The policy:
 
 ```text
-default-src 'self'; script-src 'self' <kay's hashes>; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
+default-src 'self';
+script-src 'self' <kay's hashes>;
+style-src 'self' 'unsafe-inline';
+img-src 'self' data: https:;
+font-src 'self';
+connect-src 'self';
+object-src 'none';
+base-uri 'self';
+form-action 'self';
+frame-ancestors 'self'
 ```
 
 Every inline script kay writes is the same on every page: the hydration bootstrap, the speculation rules, the swap of streamed blocks, with `offline` the service worker's registration, and, in development, live reload and the problems panel. The policy allows them by hash, with no `'unsafe-inline'` and no nonce. `security` in `kay.config.ts` adjusts it:
@@ -95,10 +108,16 @@ import { defineConfig } from 'kay/server'
 
 export default defineConfig({
   security: {
-    csp: { 'img-src': ['\'self\'', 'https://images.example.com'], 'frame-ancestors': false },
+    csp: {
+      'img-src': ['\'self\'', 'https://images.example.com'],
+      'frame-ancestors': false,
+    },
     reportOnly: { 'style-src': ['\'self\''] },
     reports: true,
-    headers: { 'strict-transport-security': 'max-age=63072000; includeSubDomains', 'x-frame-options': false },
+    headers: {
+      'strict-transport-security': 'max-age=63072000; includeSubDomains',
+      'x-frame-options': false,
+    },
   },
 })
 ```

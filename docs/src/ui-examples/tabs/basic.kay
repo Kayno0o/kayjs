@@ -1,7 +1,10 @@
 ---
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 
-const tabs = [{ value: 'details', label: 'Details' }, { value: 'reviews', label: 'Reviews' }]
+const tabs = [
+  { value: 'details', label: 'Details' },
+  { value: 'reviews', label: 'Reviews' },
+]
 const shown = signal('details')
 ---
 Tabs(tabs={tabs} value={shown} label="Product" onChange={shown.set})

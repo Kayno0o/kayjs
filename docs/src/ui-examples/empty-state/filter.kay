@@ -3,13 +3,22 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 
 const planets = ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn']
 const query = signal('')
-const matching = memo(() => planets.filter(planet => planet.toLowerCase().includes(query().trim().toLowerCase())))
+const matching = memo(() => planets.filter(
+  planet => planet.toLowerCase().includes(query().trim().toLowerCase()),
+))
 ---
 .flex.flex-col.gap-3.rounded-lg.border.border-kui-overlay1.bg-kui-surface0.p-4
-  input.kui-field-input(bind:value={query} placeholder="Filter planets" aria-label="Filter planets")
+  input.kui-field-input(
+    bind:value={query}
+    placeholder="Filter planets"
+    aria-label="Filter planets"
+  )
   if matching().length > 0
     ul
       for planet of matching()
         li {planet}
   else
-    EmptyState(title="No planet found" description="Try another name, or clear the filter.")
+    EmptyState(
+      title="No planet found"
+      description="Try another name, or clear the filter."
+    )

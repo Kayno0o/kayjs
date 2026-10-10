@@ -96,7 +96,8 @@ export default defineConfig({
 import { jsonLd } from 'kay/seo'
 ---
 head
-  script(type="application/ld+json") {jsonLd({ '@type': 'LocalBusiness', 'name': 'Example' })}
+  script(type="application/ld+json")
+    | {jsonLd({ '@type': 'LocalBusiness', 'name': 'Example' })}
 ```
 
 `seo.jsonLd` in the config takes the same data for every page.

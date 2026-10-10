@@ -3,16 +3,35 @@ import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
 
 const notes = [
   { id: 1, title: 'Groceries', body: 'Milk, eggs, bread, coffee, apples.' },
-  { id: 2, title: 'Idea', body: 'A docs site built with the framework it documents.' },
+  {
+    id: 2,
+    title: 'Idea',
+    body: 'A docs site built with the framework it documents.',
+  },
   { id: 3, title: 'Call', body: 'Ask about the invoice.' },
-  { id: 4, title: 'Reading list', body: 'Three books, one paper and a long article that will not fit on one line of a narrow tile.' },
+  {
+    id: 4,
+    title: 'Reading list',
+    body:
+      'Three books, one paper and a long article that will not fit ' +
+      'on one line of a narrow tile.',
+  },
   { id: 5, title: 'Reminder', body: 'Water the plants.' },
 ]
 const query = signal('')
-const shown = memo(() => notes.filter(note => `${note.title} ${note.body}`.toLowerCase().includes(query().toLowerCase())))
+const shown = memo(() =>
+  notes.filter(note =>
+    `${note.title} ${note.body}`.toLowerCase().includes(query().toLowerCase()),
+  ),
+)
 ---
 .flex.flex-col.gap-3
-  input.rounded-lg.border.border-kui-overlay1.px-3.py-1(type="search" aria-label="Filter notes" placeholder="Filter" bind:value={query})
+  input.rounded-lg.border.border-kui-overlay1.px-3.py-1(
+    type="search"
+    aria-label="Filter notes"
+    placeholder="Filter"
+    bind:value={query}
+  )
   Masonry(items={shown} key={note => note.id} minWidth={180} gap={12})
     @tile(note)
       .rounded-lg.bg-kui-surface0.p-3

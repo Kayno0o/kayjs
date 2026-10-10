@@ -1,7 +1,11 @@
 ---
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 
-const links = [{ href: '/', label: 'Overview' }, { href: '/guides/tutorial', label: 'Tutorial' }, { href: '/ui/site-nav', label: 'SiteNav' }]
+const links = [
+  { href: '/', label: 'Overview' },
+  { href: '/guides/tutorial', label: 'Tutorial' },
+  { href: '/ui/site-nav', label: 'SiteNav' },
+]
 ---
 header.flex.items-center.gap-4
   strong kay
