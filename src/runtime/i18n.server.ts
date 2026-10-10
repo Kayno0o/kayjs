@@ -1,10 +1,10 @@
-import type { Locale, Localize, MessageValue, Translate } from './i18n'
+import type { Direction, Locale, Localize, MessageValue, RelativeTimeOptions, Translate } from './i18n'
 import type { LocaleState } from './locale-state'
-import { formatDate as formatDateIn, formatNumber as formatNumberIn, localePath, translate } from './i18n'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState } from './locale-state'
 
-export type { Locale, LocaleSettings, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory } from './i18n'
+export type { Direction, Locale, LocaleSettings, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions } from './i18n'
 export { defineMessages } from './i18n'
 
 function current(name: string): LocaleState {
@@ -51,4 +51,19 @@ export function formatNumber(value: number, options?: Intl.NumberFormatOptions):
 
 export function formatDate(value: Date | number, options?: Intl.DateTimeFormatOptions): string {
   return formatDateIn(current('formatDate()').locale, value, options)
+}
+
+export function formatRelativeTime(value: Date | number, options?: RelativeTimeOptions): string
+export function formatRelativeTime(value: number, unit: Intl.RelativeTimeFormatUnit, options?: Intl.RelativeTimeFormatOptions): string
+export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: Intl.RelativeTimeFormatOptions): string {
+  return formatRelativeTimeIn(current('formatRelativeTime()').locale, value, unitOrOptions, options)
+}
+
+export function formatList(items: Iterable<string>, options?: Intl.ListFormatOptions): string {
+  return formatListIn(current('formatList()').locale, items, options)
+}
+
+// Which way a locale's script runs, the request's or any one given, for what lays itself out by hand: `rtl` or `ltr`.
+export function direction(of?: string): Direction {
+  return textDirection(of ?? current('direction()').locale)
 }

@@ -6,7 +6,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { check } from '../src/check'
-import { flattenMessages, translate } from '../src/runtime/i18n'
+import { flattenMessages, textDirection, translate } from '../src/runtime/i18n'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { acceptedLocale, localeSettings, requestLocale } from '../src/server/i18n'
@@ -55,6 +55,26 @@ describe('locale prefixes', () => {
     expect(english.html).toContain('<p class="items">No items / 1 item / 1,234 items</p>')
     expect(english.html).toContain('<p class="price">€1,234.50</p>')
     expect(english.html).toContain('<p class="saved">Saved on Oct 4, 2026</p>')
+  })
+
+  it('format relative times in the largest unit they reach, lists, and say which way a locale runs', async () => {
+    const french = await get('/')
+    const english = await get('/en')
+
+    expect(french.html).toContain('<p class="ago">il y a 3 jours / hier / dans 2 heures / dans 2 semaines</p>')
+    expect(english.html).toContain('<p class="ago">3 days ago / yesterday / in 2 hours / in 2 weeks</p>')
+    expect(french.html).toContain('<p class="listed">Ada, Grace et Linus</p>')
+    expect(english.html).toContain('<p class="listed">Ada, Grace, and Linus</p>')
+    expect(english.html).toContain('<p class="direction">ltr rtl</p>')
+  })
+
+  it('write dir="rtl" on a page in a locale written right to left, and nothing on one written left to right', async () => {
+    expect(['ar', 'he', 'fa-IR', 'ur', 'yi', 'en', 'fr', 'az-Arab', 'zz-invalid-tag-!'].map(textDirection)).toEqual(['rtl', 'rtl', 'rtl', 'rtl', 'rtl', 'ltr', 'ltr', 'rtl', 'ltr'])
+
+    const arabic = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.example', i18n: { ...i18n, locales: ['fr', 'ar'], messages: `${FIXTURE}/rtl-messages` } }))
+
+    expect((await get('/ar', arabic)).html).toContain('<html lang="ar" dir="rtl">')
+    expect((await get('/', arabic)).html).toContain('<html lang="fr">')
   })
 
   it('send an island only the messages it uses', async () => {

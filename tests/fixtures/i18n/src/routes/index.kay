@@ -1,5 +1,5 @@
 --- server
-import { formatNumber, t } from 'kay/i18n'
+import { direction, formatList, formatNumber, formatRelativeTime, t } from 'kay/i18n'
 import Counter from '../components/counter.kay'
 
 export const prerender = true
@@ -10,6 +10,10 @@ const one = t('items', { count: 1 })
 const many = t('items', { count: 1234 })
 const price = formatNumber(1234.5, { style: 'currency', currency: 'EUR' })
 const saved = t('saved', { date: new Date(Date.UTC(2026, 9, 4, 12)) })
+const now = Date.UTC(2026, 9, 4, 12)
+const ago = [formatRelativeTime(now - 3 * 86_400_000, { now }), formatRelativeTime(now - 86_400_000, { now }), formatRelativeTime(now + 90 * 60_000, { now }), formatRelativeTime(2, 'week')].join(' / ')
+const listed = formatList(['Ada', 'Grace', 'Linus'])
+const written = `${direction()} ${direction('ar')}`
 const { locale } = ctx
 ---
 h1 {greeting}
@@ -17,4 +21,7 @@ p.items {none} / {one} / {many}
 p.price {price}
 p.saved {saved}
 p.locale {locale}
+p.ago {ago}
+p.listed {listed}
+p.direction {written}
 Counter

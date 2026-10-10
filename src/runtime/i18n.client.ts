@@ -1,8 +1,8 @@
-import type { Locale, LocaleSettings, Localize, Message, MessageValue, Translate } from './i18n'
+import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue, RelativeTimeOptions, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
-import { formatDate as formatDateIn, formatNumber as formatNumberIn, localePath, splitLocale, translate } from './i18n'
+import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, splitLocale, textDirection, translate } from './i18n'
 
-export type { Locale, LocaleSettings, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory } from './i18n'
+export type { Direction, Locale, LocaleSettings, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions } from './i18n'
 export { defineMessages } from './i18n'
 
 // What the server writes for a page's islands, one script per part of a streamed page: the locale, and the messages its islands use.
@@ -74,4 +74,19 @@ export function formatNumber(value: number, options?: Intl.NumberFormatOptions):
 
 export function formatDate(value: Date | number, options?: Intl.DateTimeFormatOptions): string {
   return formatDateIn(translations().locale, value, options)
+}
+
+export function formatRelativeTime(value: Date | number, options?: RelativeTimeOptions): string
+export function formatRelativeTime(value: number, unit: Intl.RelativeTimeFormatUnit, options?: Intl.RelativeTimeFormatOptions): string
+export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: Intl.RelativeTimeFormatOptions): string {
+  return formatRelativeTimeIn(translations().locale, value, unitOrOptions, options)
+}
+
+export function formatList(items: Iterable<string>, options?: Intl.ListFormatOptions): string {
+  return formatListIn(translations().locale, items, options)
+}
+
+// Which way a locale's script runs, the request's or any one given, for what lays itself out by hand: `rtl` or `ltr`.
+export function direction(of?: string): Direction {
+  return textDirection(of ?? translations().locale)
 }

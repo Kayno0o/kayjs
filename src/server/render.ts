@@ -19,6 +19,7 @@ import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
 import { component, newServerIslands, withServerIslands } from '../runtime/html'
+import { textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -552,7 +553,8 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shipsEntry = hasIslands || posts || (client.entry !== undefined && scan?.modes.includes('defer') === true)
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') : ''
   const locale = localeState()
-  const start = `<!doctype html><html lang="${escapeAttribute(locale?.locale ?? options.lang ?? DEFAULT_LANG)}"><head>${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}${stylesheets(client, files)}${head.html}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) : ''}${options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS : ''}</head><body>${body}`
+  const lang = locale?.locale ?? options.lang ?? DEFAULT_LANG
+  const start = `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head>${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}${stylesheets(client, files)}${head.html}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) : ''}${options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS : ''}</head><body>${body}`
 
   if (!streamed)
     return `${start}</body></html>`

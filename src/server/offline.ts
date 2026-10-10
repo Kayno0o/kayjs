@@ -5,6 +5,7 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { escapeAttribute } from '../runtime/escape'
+import { textDirection } from '../runtime/i18n'
 import { PUBLIC_ENV_PATH } from './env'
 
 export const SERVICE_WORKER = '/sw.js'
@@ -202,7 +203,7 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     env: `${base}${PUBLIC_ENV_PATH}`,
     network: [`${base}${ASSET_PREFIX}`, `${base}/api/`],
     api: `${base}/api`,
-    offline: `<!doctype html><html lang="${escapeAttribute(options.lang ?? 'en')}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offline</title></head><body><h1>Offline</h1><p>This page needs a connection, and none is open.</p></body></html>`,
+    offline: `<!doctype html><html lang="${escapeAttribute(options.lang ?? 'en')}"${textDirection(options.lang ?? 'en') === 'rtl' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offline</title></head><body><h1>Offline</h1><p>This page needs a connection, and none is open.</p></body></html>`,
   }
 
   return `const KAY = ${JSON.stringify(settings)}\n${WORKER}`

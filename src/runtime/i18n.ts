@@ -56,6 +56,20 @@ const PLURAL_CATEGORIES: ReadonlySet<string> = new Set<PluralCategory>(['zero', 
 const numberFormats = new Map<string, Intl.NumberFormat>()
 const dateFormats = new Map<string, Intl.DateTimeFormat>()
 const pluralRules = new Map<string, Intl.PluralRules>()
+const relativeFormats = new Map<string, Intl.RelativeTimeFormat>()
+const listFormats = new Map<string, Intl.ListFormat>()
+const directions = new Map<string, Direction>()
+// Scripts written right to left: Arabic, Hebrew, Thaana, Syriac, N'Ko, Adlam, Hanifi Rohingya, Mandaic and Samaritan.
+const RTL_SCRIPTS: ReadonlySet<string> = new Set(['Arab', 'Hebr', 'Thaa', 'Syrc', 'Nkoo', 'Adlm', 'Rohg', 'Mand', 'Samr'])
+// Each unit with its length in seconds, a relative time taking the largest one the span reaches.
+const RELATIVE_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [['year', 31_536_000], ['month', 2_592_000], ['week', 604_800], ['day', 86_400], ['hour', 3600], ['minute', 60], ['second', 1]]
+
+export type Direction = 'ltr' | 'rtl'
+
+// What `formatRelativeTime` takes besides `Intl`'s options: the moment the time is relative to, now by default.
+export interface RelativeTimeOptions extends Intl.RelativeTimeFormatOptions {
+  now?: Date | number | undefined
+}
 
 // The message files' default export: it keeps the literal text, so `t` knows each message's placeholders.
 export function defineMessages<const Tree extends MessageTree>(messages: Tree): Tree {
@@ -134,6 +148,37 @@ export function formatNumber(locale: string, value: number, options?: Intl.Numbe
 // A date as the locale writes it, `medium` by default: `4 oct. 2026`.
 export function formatDate(locale: string, value: Date | number, options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' }): string {
   return cached(dateFormats, `${locale}\n${JSON.stringify(options)}`, () => new Intl.DateTimeFormat(locale, options)).format(value)
+}
+
+// A date relative to now in the largest unit it reaches, `3 days ago`, or a value in the unit given; `numeric: 'auto'` by default, so a day back reads `yesterday`.
+export function formatRelativeTime(locale: string, value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: Intl.RelativeTimeFormatOptions): string {
+  const { now, ...format } = typeof unitOrOptions === 'object' ? unitOrOptions : { ...options, now: undefined }
+  const formatter = cached(relativeFormats, `${locale}\n${JSON.stringify(format)}`, () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto', ...format }))
+
+  if (typeof unitOrOptions === 'string')
+    return formatter.format(Number(value), unitOrOptions)
+
+  const seconds = (Number(value) - Number(now ?? Date.now())) / 1000
+  const [unit, length] = RELATIVE_UNITS.find(([, length]) => Math.abs(seconds) >= length) ?? ['second', 1]
+
+  return formatter.format(Math.round(seconds / length), unit)
+}
+
+// Items joined as the locale writes a list, `a, b and c`.
+export function formatList(locale: string, items: Iterable<string>, options?: Intl.ListFormatOptions): string {
+  return cached(listFormats, `${locale}\n${options === undefined ? '' : JSON.stringify(options)}`, () => new Intl.ListFormat(locale, options)).format(items)
+}
+
+// Which way a locale's script runs, `rtl` for Arabic, Hebrew, Persian or Urdu, read off the script the locale is most likely written in.
+export function textDirection(locale: string): Direction {
+  return cached(directions, locale, () => {
+    try {
+      return RTL_SCRIPTS.has(new Intl.Locale(locale).maximize().script ?? '') ? 'rtl' : 'ltr'
+    }
+    catch {
+      return 'ltr'
+    }
+  })
 }
 
 // Building a formatter costs far more than using one, and a site formats with few options.
