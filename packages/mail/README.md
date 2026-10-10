@@ -44,7 +44,7 @@ export const signUp = action(schema, async ({ name, email }) => {
 ---
 ```
 
-In production it sends over SMTP from `SMTP_HOST`, `SMTP_PORT` (465 by default), `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM`, and stops the boot naming any that is missing. In development and under `bun test` mails stay in the process's outbox.
+In production it sends over SMTP from `SMTP_HOST`, `SMTP_PORT` (465 by default), `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM`, and stops the boot naming any that is missing. A mail naming no recipient, such as a contact form's, goes to `MAIL_TO`. In development and under `bun test` mails stay in the process's outbox.
 
 The full reference, for people and for LLMs, is [llms.txt](./llms.txt).
 

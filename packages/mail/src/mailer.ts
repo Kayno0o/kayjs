@@ -1,5 +1,5 @@
 import type { EnqueueOptions, KayExtension, QueueOptions } from 'kay/server'
-import type { Address, Delivery, Mail, Message, Transport } from './types'
+import type { Address, Delivery, Envelope, Mail, Message, Transport } from './types'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { t } from 'kay'
@@ -15,6 +15,8 @@ export interface MailerOptions {
   from?: Address | undefined
   // The name shown beside a bare `SMTP_FROM`, so the environment holds the address alone.
   fromName?: string | undefined
+  // Where a mail naming no recipient goes, such as a contact form's, `MAIL_TO` when left out.
+  to?: Address | Address[] | undefined
   // Where mails go: the outbox in development and under `bun test`, else SMTP configured from the environment.
   transport?: Transport | undefined
   // The `lang` of the html document a mail's markup is wrapped in. `en` by default.
@@ -30,7 +32,7 @@ export class MailNotConfigured extends Error {
   override name = 'MailNotConfigured'
 
   constructor(readonly missing: string[]) {
-    super(`${missing.join(' and ')} must be set to send mail`)
+    super(`${missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}` : missing[0]} must be set to send mail`)
   }
 }
 
@@ -51,6 +53,9 @@ const HTML_ROOT = /^\s*<html[\s>]/i
 const LINE_BREAK = /[\r\n]/
 // `Name <address>` or a bare address, as `SMTP_FROM` holds one.
 const SENDER = '^(?:[^<>]*<[^\\s<>@]+@[^\\s<>@]+>|[^\\s<>@]+@[^\\s<>@]+)$'
+// One address or more, apart by commas, as `MAIL_TO` holds them: a name in it holds no comma.
+const RECIPIENT = '(?:[^<>,]*<[^\\s<>@,]+@[^\\s<>@,]+>|[^\\s<>@,]+@[^\\s<>@,]+)'
+const RECIPIENTS = `^\\s*${RECIPIENT}(?:\\s*,\\s*${RECIPIENT})*\\s*$`
 // Keeps Outlook for Windows from scaling the mail on a high-DPI screen and from switching to its own typography.
 const OUTLOOK_SETTINGS = '<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings><w:WordDocument><w:DontUseAdvancedTypographyReadingMail/></w:WordDocument></xml></noscript><![endif]-->'
 
@@ -100,8 +105,8 @@ function delivering(): 'outbox' | 'smtp' {
   return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? 'outbox' : 'smtp'
 }
 
-// SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT`, `SMTP_DKIM_*` and `SMTP_FROM`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
-function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, missing: () => string[] } {
+// SMTP from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_RATE_LIMIT`, `SMTP_DKIM_*`, `SMTP_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
+function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean): { transport: Transport, from: Address, to: string | undefined, missing: () => string[] } {
   const env = defineEnv(t.Object({
     SMTP_HOST: optional ? t.Optional(t.String()) : t.String(),
     SMTP_PORT: t.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
@@ -112,6 +117,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
     SMTP_DKIM_PRIVATE_KEY: t.Optional(t.String()),
     SMTP_DKIM_DOMAIN: t.Optional(t.String()),
     SMTP_FROM: optional || from !== undefined ? t.Optional(t.String({ pattern: SENDER })) : t.String({ pattern: SENDER }),
+    MAIL_TO: t.Optional(t.String({ pattern: RECIPIENTS })),
   }))
 
   // Optional both, so reading them never throws under `kay build`, and a server given one without the other stops as it boots.
@@ -143,6 +149,9 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
     get from() {
       return sender()
     },
+    get to() {
+      return env.MAIL_TO
+    },
     missing,
   }
 }
@@ -160,16 +169,32 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const transport = options.transport ?? configured?.transport ?? outbox
   const sender = (): Address => configured?.from ?? options.from ?? named(process.env.SMTP_FROM || 'kay@localhost', options.fromName)
 
+  // The message's own, else the mailer's; undefined when it names none and the mailer has none to give.
+  const recipients = (message: Envelope): Address[] | undefined => {
+    if (message.to !== undefined)
+      return list(message.to)
+
+    if (options.to !== undefined)
+      return list(options.to)
+
+    const fromEnv = configured === undefined ? process.env.MAIL_TO : configured.to
+
+    return fromEnv ? fromEnv.split(',').map(address => address.trim()) : undefined
+  }
+
   // Before rendering, so a mail that cannot go is neither rendered nor queued to fail every retry.
-  const ready = (): void => {
-    const missing = configured?.missing() ?? []
+  const ready = (message: Envelope): void => {
+    const missing = [...configured?.missing() ?? [], ...recipients(message) === undefined ? ['MAIL_TO'] : []]
 
     if (missing.length > 0)
       throw new MailNotConfigured(missing)
   }
 
   const render = async <P extends object>(message: Message<P>): Promise<Mail> => {
-    const to = list(message.to)
+    const to = recipients(message)
+
+    if (to === undefined)
+      throw new MailNotConfigured(['MAIL_TO'])
 
     if (to.length === 0)
       throw new Error(`kayjs-mail: "${message.subject}" has no recipient`)
@@ -220,12 +245,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   const sending = Object.assign(plugin, {
     send: async <P extends object>(message: Message<P>) => {
-      ready()
+      ready(message)
 
       return deliver(await render(message))
     },
     enqueue: async <P extends object>(message: Message<P>, enqueueOptions?: EnqueueOptions) => {
-      ready()
+      ready(message)
 
       return jobs.enqueue(await render(message), enqueueOptions)
     },

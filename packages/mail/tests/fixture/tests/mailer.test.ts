@@ -231,6 +231,41 @@ describe('configuration', () => {
     expect(mailer({ optional: true, queue: { name: 'optional-set' } }).configured).toBe(true)
   })
 
+  it('sends a mail naming no recipient to the mailer\'s own, `to` or else MAIL_TO, and throws MailNotConfigured naming MAIL_TO without one', async () => {
+    delete process.env.MAIL_TO
+
+    const team = mailer({ from: 'site@example.com', to: 'team@example.com', queue: { name: 'team-mail' } })
+    const fromEnv = mailer({ from: 'site@example.com', queue: { name: 'env-to-mail' } })
+
+    expect((await team.render({ subject: 'Contact', text: 'Hi' })).to).toEqual(['team@example.com'])
+    expect((await team.render({ to: 'ada@example.com', subject: 'Contact', text: 'Hi' })).to).toEqual(['ada@example.com'])
+    await expect(fromEnv.render({ subject: 'Contact', text: 'Hi' })).rejects.toThrow('MAIL_TO must be set to send mail')
+    await expect(fromEnv.render({ to: [], subject: 'Nobody', text: 'Hi' })).rejects.toThrow('"Nobody" has no recipient')
+
+    process.env.MAIL_TO = 'team@example.com, Support <support@example.com>'
+    expect((await fromEnv.render({ subject: 'Contact', text: 'Hi' })).to).toEqual(['team@example.com', 'Support <support@example.com>'])
+  })
+
+  it('counts MAIL_TO among what an optional mailer misses for a send naming no recipient, and stops a production boot on a malformed one', async () => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.SMTP_HOST
+    delete process.env.SMTP_FROM
+    delete process.env.MAIL_TO
+
+    const optional = mailer({ optional: true, queue: { name: 'optional-to' } })
+
+    await expect(optional.send({ subject: 'Contact', text: 'Hi' })).rejects.toThrow('SMTP_HOST, SMTP_FROM and MAIL_TO must be set to send mail')
+    await expect(optional.send({ to: 'ada@example.com', subject: 'Contact', text: 'Hi' })).rejects.toThrow('SMTP_HOST and SMTP_FROM must be set to send mail')
+
+    process.env.SMTP_HOST = 'smtp.example.com'
+    process.env.SMTP_FROM = 'site@example.com'
+    process.env.MAIL_TO = 'team'
+    expect(() => mailer({ queue: { name: 'malformed-to' } })).toThrow('MAIL_TO')
+
+    process.env.MAIL_TO = 'team@example.com,support@example.com'
+    expect(() => mailer({ queue: { name: 'valid-to' } })).not.toThrow()
+  })
+
   it('stops a production boot on a SMTP_FROM that is no address', () => {
     process.env.NODE_ENV = 'production'
     process.env.SMTP_HOST = 'smtp.example.com'

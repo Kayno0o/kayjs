@@ -12,7 +12,8 @@ export interface Attachment {
 }
 
 export interface Envelope {
-  to: Address | Address[]
+  // The mailer's `to`, or `MAIL_TO`, when left out.
+  to?: Address | Address[] | undefined
   cc?: Address | Address[] | undefined
   bcc?: Address | Address[] | undefined
   replyTo?: Address | undefined

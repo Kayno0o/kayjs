@@ -33,7 +33,7 @@ export default defineConfig({ extensions: [mailExtension(async () => (await impo
 - An Elysia app not served by `pages()`, or kay before 1.26, uses it as a plugin instead: `new Elysia().use(mail)`.
 
 - `mailer(options)` returns an Elysia plugin: the server using it, through `mailExtension` or `.use(mail)`, runs the queue `enqueue` fills and, in development, serves the outbox page. A script that only sends need not use it.
-- Options: `from`, the default sender, `SMTP_FROM` when left out; `fromName`, the name shown beside a bare `SMTP_FROM`; `lang`, the `<html lang>` of the mail documents, `en` by default, which a message's own `lang` replaces; `transport`, where mails go in place of the default; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment.
+- Options: `from`, the default sender, `SMTP_FROM` when left out; `fromName`, the name shown beside a bare `SMTP_FROM`; `to`, the recipient of a mail naming none, `MAIL_TO` when left out, read from the environment in development too; `lang`, the `<html lang>` of the mail documents, `en` by default, which a message's own `lang` replaces; `transport`, where mails go in place of the default; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment.
 
 ## Environment
 
@@ -48,10 +48,11 @@ In production the mailer reads, as the server boots, through kay's `defineEnv`:
 | `SMTP_DKIM_SELECTOR`, `SMTP_DKIM_PRIVATE_KEY` | both or neither: signs each mail with DKIM, for a relay that does not, the public key published at `<selector>._domainkey.<domain>`; the PEM key's line breaks may be written `\n` to hold it on one line |
 | `SMTP_DKIM_DOMAIN` | the domain the signature vouches for, the sender's by default |
 | `SMTP_FROM` | required unless `mailer({ from })` gives the sender: `Name <address>` or a bare address |
+| `MAIL_TO` | optional: where a mail naming no `to` goes, such as a contact form's, unless `mailer({ to })` gives it; addresses apart by commas, a name holding none |
 
 A missing or refused variable stops the boot, naming each one. `kay build` runs without them and leaves them to the server. The client greets the server with the sender's domain, not the container's hostname, and gives up on a server silent for 10 seconds. It keeps up to 5 connections open while mails keep coming, so a burst reuses them, and closes them a second after the last mail, so a script ends. Development and tests need none of them.
 
-`mailer({ optional: true })` boots without `SMTP_HOST` and `SMTP_FROM` instead, for a site whose mail can wait to be set up: `mail.configured` reads `false`, and `send` and `enqueue` throw `MailNotConfigured`, whose `missing` names the variables, before rendering or queueing anything, so a contact form can catch it and tell the visitor to write or call instead. An app throws it too for a setting of its own, `new MailNotConfigured(['CONTACT_TO'])`.
+`mailer({ optional: true })` boots without `SMTP_HOST` and `SMTP_FROM` instead, for a site whose mail can wait to be set up: `mail.configured` reads `false`, and `send` and `enqueue` throw `MailNotConfigured`, whose `missing` names the variables, before rendering or queueing anything, so a contact form can catch it and tell the visitor to write or call instead. A mail naming no `to` while the mailer has none, in any environment, throws it naming `MAIL_TO`, alongside the others, so a contact form sends to `MAIL_TO` with nothing to check itself. An app throws it too for a setting of its own, `new MailNotConfigured(['SUPPORT_PHONE'])`.
 
 ## Writing a mail
 
@@ -99,7 +100,7 @@ export const signUp = action(t.Object({ name: t.String({ maxLength: 100 }), emai
 ---
 ```
 
-- A message takes `to`, `cc` and `bcc` (an address or a list), `replyTo`, `from`, `subject`, `lang`, `headers`, `attachments` and `unsubscribe` (`{ filename, content, contentType?, cid? }`, `content` a string or bytes), and its content: `view` and `props` for a component (`props` left out when it takes none required), `html` for markup made elsewhere, or `text` alone.
+- A message takes `to` (the mailer's `to` or `MAIL_TO` when left out), `cc` and `bcc` (an address or a list), `replyTo`, `from`, `subject`, `lang`, `headers`, `attachments` (`{ filename, content, contentType?, cid? }`, `content` a string or bytes) and `unsubscribe`, and its content: `view` and `props` for a component (`props` left out when it takes none required), `html` for markup made elsewhere, or `text` alone.
 - A message's `lang` is its `<html lang>` and the locale its component renders in, so `t()` and the formatters from `kay/i18n` read the recipient's language: one of the site's locales, `renderToString` refusing another. Without it the component renders in the site's default locale, or the request's while one runs.
 - `unsubscribe` offers one-click unsubscribe (RFC 8058), which Gmail and Yahoo require of bulk senders: an https URL that unsubscribes the recipient when it receives a POST, or `{ url, address }` to offer an address to write to as well. It is written as the `List-Unsubscribe` and `List-Unsubscribe-Post` headers; a URL that is not https is refused.
 - An address is `'Name <address>'`, a bare address, or `{ name, address }`, which needs no quoting of a name holding a comma.
