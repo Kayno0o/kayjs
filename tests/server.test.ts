@@ -18,6 +18,7 @@ import { compressFiles, preferredEncoding } from '../src/server/compress'
 import { sourceHash } from '../src/server/csp'
 import { submittedValues } from '../src/server/flash'
 import { prerenderPages } from '../src/server/prerender'
+import { htmlFallbacks } from '../src/server/public'
 import { renderPage } from '../src/server/render'
 import { refuseClashes, scanRoutes } from '../src/server/routes'
 import { speculationRules } from '../src/server/speculation'
@@ -1208,7 +1209,7 @@ describe('public files', () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-public-'))
 
     try {
-      const files = { 'books.html': 'books', 'books/index.html': 'books index', 'shelf/index.html': 'shelf', 'notes': 'notes', 'notes.html': 'notes html', 'about.html': 'about html', 'index.html': 'home html' }
+      const files = { 'books.html': 'books', 'books/index.html': 'books index', 'shelf/index.html': 'shelf', 'notes': 'notes', 'notes.html': 'notes html', 'about.html': 'about html', 'index.html': 'home html', 'docs/guide.html': 'guide' }
 
       for (const [name, body] of Object.entries(files))
         await Bun.write(join(dir, name), body)
@@ -1225,6 +1226,9 @@ describe('public files', () => {
       expect(await visit('/about')).not.toBe('about html')
       expect(await visit('/')).not.toBe('home html')
       expect(await visit('/about.html')).toBe('about html')
+      // A page taking the path through a parameter loses to it, as it loses to the file itself.
+      expect(await visit('/docs/guide')).toBe('guide')
+      expect(htmlFallbacks([{ path: 'index.html', url: '/index.html' }], new Set())).toEqual([{ path: 'index.html', url: '/index' }, { path: 'index.html', url: '/' }])
     }
     finally {
       await rm(dir, { recursive: true, force: true })

@@ -418,8 +418,12 @@ function warnOtherKay(command: string, root: string): void {
 
   const running = realpathSync(resolve(import.meta.dir, 'runtime/index.ts'))
 
-  if (imported !== running)
-    console.warn(`kay ${command}: this is the kay at ${resolve(running, '../../..')}, but the project imports the one at ${resolve(imported, '../../..')}; run the project's own, \`bun node_modules/kay/src/cli.ts\`, or reinstall if its node_modules/.bin/kay links elsewhere`)
+  if (imported === running)
+    return
+
+  const own = resolve(imported, '../../..')
+
+  console.warn(`kay ${command}: this is the kay at ${resolve(running, '../../..')}, but the project imports the one at ${own}; run the project's own, \`bun ${relative(realpathSync(root), join(own, 'src/cli.ts'))}\`, or reinstall if its node_modules/.bin/kay links elsewhere`)
 }
 
 // What a command did, on stdout so a terminal does not take it for an error: the verb in green, the timing dimmed.

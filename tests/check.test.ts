@@ -95,7 +95,7 @@ describe('kay check', () => {
       const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root], { stdout: 'pipe', stderr: 'pipe' })
       const [errors] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
-      expect(errors).toContain(`kay check: this is the kay at ${join(import.meta.dir, '..')}, but the project imports the one at ${join(root, 'node_modules/kay')}`)
+      expect(errors).toContain(`kay check: this is the kay at ${join(import.meta.dir, '..')}, but the project imports the one at ${join(root, 'node_modules/kay')}; run the project's own, \`bun node_modules/kay/src/cli.ts\``)
     }
     finally {
       await rm(root, { recursive: true, force: true })
