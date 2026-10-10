@@ -1,0 +1,6 @@
+--- server
+import { files } from 'kay/server'
+
+const src = files.url('photos/0123456789abcdef0123.4x3.png')
+---
+img(src={src} alt="Stored")

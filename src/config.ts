@@ -11,6 +11,7 @@ import type { PageHook } from './server/page-hook'
 import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
+import type { FileStore } from './server/storage'
 import type { Tracer } from './server/trace'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -88,6 +89,8 @@ export interface KayConfig {
   lints?: LintLevels | undefined
   // Lets an editor see drafts on the live site: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
   preview?: PreviewConfig | undefined
+  // Where `files` from `kay/server` keeps what it stores: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`.
+  storage?: FileStore | undefined
   // Receives every error a load, a render, a guard or an action throws, as it is logged: the place to send them to an error tracker.
   onError?: ((error: unknown, request: Request) => void | Promise<void>) | undefined
   // What libraries add to the app, each listed once: `extensions: [authPages()]`.

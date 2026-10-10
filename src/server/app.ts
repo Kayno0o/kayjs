@@ -56,6 +56,7 @@ import { headerCopies, ownHeaders, securityHeaders, setSecurityHeaders } from '.
 import { configHead, siteOrigin } from './seo'
 import { serveServerIslands } from './server-islands'
 import { serveSitemap } from './sitemap'
+import { serveFiles, setupStorage } from './storage'
 import { answered, SERVER_SPAN, setTracer, traced } from './trace'
 import { serveViolationReports } from './violations'
 
@@ -409,6 +410,8 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     security,
   }
 
+  setupStorage(options.storage, join(imageCache, 'stored'))
+  serveFiles(app)
   serveImages(app, imageRoute)
   const cards = await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (options.fonts?.length ?? 0) > 0, config: options.images?.card, name: options.seo?.name, quality: options.images?.quality, bundled: bundle !== undefined })
 

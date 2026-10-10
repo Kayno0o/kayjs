@@ -1,0 +1,14 @@
+--- server
+import { action, s } from 'kay'
+import { files } from 'kay/server'
+
+export const upload = action(s.Object({ photo: s.File(), locked: s.Optional(s.Boolean()) }), async ({ photo, locked }) => files.put(photo, { private: locked, folder: 'photos' }))
+
+const key = ctx.url.searchParams.get('key')
+const src = key === null ? undefined : files.url(key)
+--- script
+import Uploader from '../components/uploader.kay'
+---
+if src as stored
+  img(src={stored} alt="Stored")
+Uploader

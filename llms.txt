@@ -30,6 +30,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Locales](llms/locales.md): i18n: locale prefixes, typed messages, number and date formatting, redirecting a visitor to their locale
 - [Caching and streaming](llms/rendering.md): caching rendered pages and data, streaming deferred values with `await` blocks, `renderToString` for mails and feeds
 - [Actions](llms/actions.md): form posts that work without JavaScript and calls from islands, typed by a schema: validation errors, files, redirects, rate limits
+- [Stored files](llms/files.md): `files` keeps uploads on disk or in an S3 bucket, links them from pages, resizes stored images, signs links to private files, and islands read upload progress
 - [Locals, sessions and guards](llms/server.md): per-request `ctx.locals`, cookie sessions and their stores, a typed `defineEnv`, `_guard.ts` route guards
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, server-sent events, websockets and rooms, and reading them typed from islands
 - [Testing](llms/testing.md): `kay/test`: rendering pages and posting actions in `bun test`, browser tests

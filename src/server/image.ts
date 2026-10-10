@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
-import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, variantHeight, variantSuffix } from '../runtime/image'
 import { AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
 import { limiter } from './limit'
@@ -15,6 +15,7 @@ import { revalidated } from './public'
 import { remoteAllowed, remotePatterns } from './remote'
 import { decodePath } from './routes'
 import { headerCopies, ownHeaders } from './security'
+import { storedImage } from './storage'
 
 export interface ImageRouteOptions {
   // The built client, where imported images and the variants `kay build` made live.
@@ -267,7 +268,13 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       return remembered(key, variantFile, headers, set)
     }
 
-    return revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, negotiated ? negotiatedRevalidated : revalidatedAs))
+    const response = revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, negotiated ? negotiatedRevalidated : revalidatedAs))
+
+    // Its URL carries the signed link, which no shared cache should keep.
+    if (source.private === true)
+      response.headers.set('cache-control', 'private, no-cache')
+
+    return response
   })
 
   function remembered(key: string, file: Bun.BunFile, headers: HeaderCopies, set: Context['set']): Response {
@@ -324,8 +331,11 @@ export async function builtVariant(url: URL, clientDir: string, aspects?: readon
   }
 }
 
-// The file a `src` names, a remote image's downloaded copy included, or why the remote one is refused.
-export async function findSource(src: string, options: ImageRouteOptions, client?: string): Promise<{ path: string, immutable: boolean, key?: string } | { status: number, message: string } | undefined> {
+// The file a `src` names, a remote image's downloaded copy or a stored one included, or why the remote or private one is refused.
+export async function findSource(src: string, options: ImageRouteOptions, client?: string): Promise<{ path: string, immutable: boolean, key?: string, private?: boolean } | { status: number, message: string } | undefined> {
+  if (src.startsWith(FILES_ROUTE))
+    return RESIZABLE.test(src) ? storedImage(src) : undefined
+
   const local = sourceFile(src, options)
 
   if (local || !options.remote || !REMOTE_URL.test(src) || !RESIZABLE.test(src))

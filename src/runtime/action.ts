@@ -31,6 +31,9 @@ export const INPUT_PART = '$kay'
 export const FILE_MARK = '$kayFile'
 const FILE_TYPE = 'KayFile'
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
+// Statuses whose response has no body, which a Response refuses one for.
+const NULL_BODY = new Set([204, 205, 304])
+const HEADER_LINE = /\r?\n/
 
 // The `x-kay-action` of a call whose input is a form's fields rather than encoded.
 export const FORM_CALL = 'form'
@@ -185,6 +188,8 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   (form: FormData, options?: CallOptions): Promise<Success<Output>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
+  // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
+  readonly progress: () => number | undefined
   // How the form post the page renders for went, refused, as `ctx.failed` reads it; in an island, how its last call went, read reactively.
   readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
   readonly succeeded: () => FormSuccess<Success<Output>> | undefined
@@ -420,6 +425,7 @@ function pageOutcome(): Outcome | undefined {
 function callable(url: () => string): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
   const [inFlight, setInFlight] = createSignal(0, undefined, false)
   const [last, setLast] = createSignal<{ page: number, outcome: Outcome | null } | undefined>(undefined, undefined, false)
+  const [progress, setProgress] = createSignal<number | undefined>(undefined, undefined, false)
   const shift = (by: number) => setInFlight(untrack(inFlight) + by)
   const called = (outcome: Outcome | null) => setLast({ page: swapState.page, outcome })
   const outcome = () => {
@@ -447,7 +453,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       try {
         undo = options?.optimistic ? undoable(options.optimistic) : undefined
 
-        const data = await post(url(), input)
+        const data = await post(url(), input, setProgress)
 
         posted = true
 
@@ -474,10 +480,12 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       }
       finally {
         shift(-1)
+        setProgress(undefined)
       }
     },
     reads: {
       pending: read(() => inFlight() > 0),
+      progress: read(progress),
       failed: read(failed),
       succeeded: read(() => {
         const found = outcome()
@@ -490,7 +498,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-async function post<Output>(url: string, input: unknown): Promise<Output> {
+async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void): Promise<Output> {
   const { headers, body } = encodeCall(input)
   const sent: Record<string, string> = { ...headers }
 
@@ -498,11 +506,44 @@ async function post<Output>(url: string, input: unknown): Promise<Output> {
   if (typeof location !== 'undefined')
     sent[PAGE_HEADER] = location.pathname + location.search
 
-  const response = await fetch(withBase(url), { method: 'POST', headers: sent, body })
+  // fetch tells nothing of an upload's progress, which a call carrying files reports.
+  const response = body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? await uploaded(withBase(url), sent, body, onProgress) : await fetch(withBase(url), { method: 'POST', headers: sent, body })
 
   prefetched.clear()
 
   return readActionResponse(response, url)
+}
+
+async function uploaded(url: string, headers: Record<string, string>, body: FormData, onProgress: (sent: number) => void): Promise<Response> {
+  const request = new XMLHttpRequest()
+
+  request.open('POST', url)
+  request.responseType = 'blob'
+
+  for (const [name, value] of Object.entries(headers))
+    request.setRequestHeader(name, value)
+
+  request.upload.onprogress = event => event.lengthComputable && onProgress(event.loaded / event.total)
+
+  return new Promise((resolve, reject) => {
+    request.onload = () => resolve(new Response(NULL_BODY.has(request.status) ? null : request.response as Blob, { status: request.status, headers: responseHeaders(request.getAllResponseHeaders()) }))
+    // As fetch rejects on a network error.
+    request.onerror = () => reject(new TypeError('Failed to fetch'))
+    request.send(body)
+  })
+}
+
+function responseHeaders(text: string): Headers {
+  const headers = new Headers()
+
+  for (const line of text.trim().split(HEADER_LINE)) {
+    const colon = line.indexOf(':')
+
+    if (colon > 0)
+      headers.append(line.slice(0, colon).trim(), line.slice(colon + 1).trim())
+  }
+
+  return headers
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.

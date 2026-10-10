@@ -1,0 +1,22 @@
+---
+import { effect, signal } from 'kay'
+import { upload } from '../routes/index.kay'
+
+const seen = signal<number[]>([])
+const key = signal('')
+
+effect(() => {
+  const sent = upload.progress()
+
+  if (sent !== undefined)
+    seen.set(list => [...list, sent])
+})
+
+async function send() {
+  key = await upload({ photo: new File([new Uint8Array(300_000)], 'big.bin') })
+}
+---
+button.send(onClick={send}) Send
+p.key {key}
+p.seen {seen.join(' ')}
+p.progress {upload.progress() ?? 'none'}

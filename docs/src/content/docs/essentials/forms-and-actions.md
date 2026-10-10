@@ -119,7 +119,7 @@ Once a call goes through, the page's loads run again, so the list it shows is up
 
 ## File uploads
 
-Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form, and the handler receives a `File`. A post carries 1 MB at most, so raise `bodyLimit` in the third argument of `action`.
+Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form, and the handler receives a `File`, which `files.put` stores. A post carries 1 MB at most, so raise `bodyLimit` in the third argument of `action`. An island calling the action reads `add.progress()` while the file uploads. See [File storage](/guides/file-storage).
 
 ## Rate limit, honeypot and minimum time
 

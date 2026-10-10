@@ -54,6 +54,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts |
 | `renderToString` | Renders a component to a string, for mails and feeds |
 | `processImage`, `imageSize` | Resize or measure an image |
+| `files`, `diskFiles`, `s3Files`, `memoryFiles` | Stored uploads and their stores. See [File storage](/guides/file-storage) |
 | `shutdown` | Stops the server gracefully |
 
 ## Other entry points

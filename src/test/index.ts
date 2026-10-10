@@ -24,6 +24,7 @@ import { drainQueues } from '../server/queue'
 import { sendFrom } from '../server/rewrite'
 import { SITEMAP } from '../server/sitemap'
 import { signStamp, stampTime } from '../server/stamp'
+import { memoryFiles } from '../server/storage'
 import { servedThrough } from '../server/visit'
 import { browse } from './browser'
 import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
@@ -140,8 +141,8 @@ function postedStamp(action: Action<never, unknown> & { protection?: ActionProte
 export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const root = testRoot(options.root)
   const loaded = await withConfig(root, options)
-  // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production.
-  const config = { ...loaded, site: loaded.site ?? ORIGIN }
+  // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names.
+  const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles() }
   const client: ClientBuild = options.browser !== undefined && options.browser !== false
     ? await buildClient(root, { plugins: config.plugins, routes: config.routes, extensions: config.extensions, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined })
     : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(outputDir(root), 'dist') }

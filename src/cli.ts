@@ -44,6 +44,7 @@ import { avifQuality, writeImageVariants, writeRemoteVariants } from './server/i
 import { hookPrerendered } from './server/page-hook'
 import { ExportError, prerenderPages } from './server/prerender'
 import { remoteImages, remotePatterns } from './server/remote'
+import { linkStoredFiles } from './server/storage'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
@@ -401,9 +402,11 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   // Before prerendering, whose pages read the collections from what it writes.
   const entries = await writeContentManifests(root, outputDir(root), config.content)
 
-  // A static host has no image route, so pages link the variant files the build writes.
-  if (exported)
+  // A static host has no image route, so pages link the variant files the build writes, and no file route, so stored files where their store serves them.
+  if (exported) {
     linkVariantFiles()
+    linkStoredFiles(config.storage)
+  }
 
   const rendered: RenderedPage[] = []
   const prerendered = await prerenderPages(root, config, client, { exportAll: exported, rendered })

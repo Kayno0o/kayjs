@@ -2,7 +2,7 @@ import { setStamper, STAMP_FIELD } from '../runtime/action'
 import { prerendering } from '../runtime/html'
 import { nodeCrypto } from './builtins'
 
-// What signs the stamps `minTime` reads: the preview secret, else a session's, else one of this process, which a restart changes, refusing the forms loaded before it.
+// What signs the stamps `minTime` reads and the links to private stored files: the preview secret, else a session's, else one of this process, which a restart changes, refusing what was signed before it.
 let secret: { key: string | Uint8Array, from: 'process' | 'session' | 'preview' } = { key: crypto.getRandomValues(new Uint8Array(32)), from: 'process' }
 
 export function useStampSecret(key: string, from: 'session' | 'preview'): void {
@@ -15,8 +15,20 @@ const STAMP_MARK = 'kay-stamp:'
 
 export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}([^"]*)"`, 'g')
 
+// `use` keeps what one feature signs from passing for another's.
+export function signText(use: string, text: string): string {
+  return nodeCrypto().createHmac('sha256', secret.key).update(`${use}\0${text}`).digest('base64url')
+}
+
+export function signedText(use: string, text: string, given: string): boolean {
+  const a = Buffer.from(given)
+  const b = Buffer.from(signText(use, text))
+
+  return a.length === b.length && nodeCrypto().timingSafeEqual(a, b)
+}
+
 function signature(action: string, at: string): string {
-  return nodeCrypto().createHmac('sha256', secret.key).update(`kay-min-time\0${action}\0${at}`).digest('base64url')
+  return signText('kay-min-time', `${action}\0${at}`)
 }
 
 // `<rendered at, base 36>.<signature>`, bound to the action so one form's stamp is no good for another.
@@ -32,11 +44,8 @@ export function stampTime(action: string, stamp: unknown): number | undefined {
     return undefined
 
   const [time = '', given = ''] = stamp.split('.')
-  const expected = signature(action, time)
-  const a = Buffer.from(given)
-  const b = Buffer.from(expected)
 
-  if (a.length !== b.length || !nodeCrypto().timingSafeEqual(a, b))
+  if (!signedText('kay-min-time', `${action}\0${time}`, given))
     return undefined
 
   return Number.parseInt(time, 36)

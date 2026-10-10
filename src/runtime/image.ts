@@ -6,6 +6,9 @@ export const CARD_ROUTE = '/_kay/card'
 // Where imported images are served, and the variants `kay build` writes of them.
 export const IMPORTED = '/_kay/assets/'
 export const VARIANTS = '/_kay/images/'
+// Where stored files are served. An image's key holds its size, `avatars/1f3a.1600x1200.jpg`, so a page sizes it without reading it.
+export const FILES_ROUTE = '/_kay/files/'
+const STORED_SIZE = /\.(\d{1,5})x(\d{1,5})\.[a-z\d]+(?:\?.*)?$/i
 const EXTENSION = /\.[^.]+$/
 const QUERY = /\?.*$/
 const FUNCTION_NAME = /[a-z-]*$/i
@@ -196,9 +199,16 @@ export function importedSize(url: string): { width: number, height: number } | u
   return sizes.get(url)
 }
 
-// An imported image, or one from a directory in `images.dirs` or a host in `images.remote` given its size, served as WebP variants at each width of the ladder up to its own.
+// The size a stored image's URL holds.
+export function storedSize(src: string): { width: number, height: number } | undefined {
+  const match = src.startsWith(FILES_ROUTE) ? STORED_SIZE.exec(src) : null
+
+  return match ? { width: Number(match[1]), height: Number(match[2]) } : undefined
+}
+
+// An imported or stored image, or one from a directory in `images.dirs` or a host in `images.remote` given its size, served as WebP variants at each width of the ladder up to its own.
 export function image(src: string, options: ImageOptions = {}): ImageProps {
-  const own = sizes.get(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
+  const own = sizes.get(src) ?? storedSize(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
 
   if (!own || !RESIZABLE.test(src) || unlisted(src, 'image()'))
     return Object.assign(options.sizes === undefined ? { src } : { src, sizes: options.sizes }, own)
@@ -307,9 +317,9 @@ function splitSizes(sizes: string): string[] {
   return entries.map(entry => entry.trim()).filter(entry => entry !== '')
 }
 
-// What `img(src={hero})` takes for an imported image: its variants, its `sizes` capped, and its size unless the template gives one. Any other `src` goes as it is, `sizes` too.
+// What `img(src={hero})` takes for an imported or stored image: its variants, its `sizes` capped, and its size unless the template gives one. Any other `src` goes as it is, `sizes` too.
 export function imageSource(src: unknown, sized: boolean, sizesAttribute?: unknown): ImageProps | { src: unknown, sizes?: unknown } {
-  if (typeof src !== 'string' || !sizes.has(src))
+  if (typeof src !== 'string' || !(sizes.has(src) || storedSize(src)))
     return sizesAttribute == null ? { src } : { src, sizes: sizesAttribute }
 
   const props = image(src, sizesAttribute == null ? {} : { sizes: String(sizesAttribute) })
