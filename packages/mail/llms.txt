@@ -124,7 +124,7 @@ it('welcomes a new account', async () => {
 
 ## Development
 
-With `NODE_ENV=development`, `kay dev`'s, each mail sent is logged with its subject and kept in the outbox, and `/_kay/mail` lists them, newest first, each with its headers, its html in a sandboxed frame and its text. The outbox lives in the server's process: a restart empties it.
+Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged with its subject and kept in the outbox, and `/_kay/mail` lists them, newest first, each with its headers, its html in a sandboxed frame and its text. The outbox lives in the server's process: a restart empties it.
 
 ## Other transports
 
