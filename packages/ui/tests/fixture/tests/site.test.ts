@@ -316,6 +316,14 @@ describe('Pagination', () => {
     expect(await element('/paging', 'single')).not.toContain('kui-pagination')
   })
 
+  test('takes a page kay\'s paginate() gave, linking each page at the path it names', async () => {
+    const paged = (await element('/paging', 'paged')).replaceAll(/<!--[^>]*-->/g, '')
+
+    expect(paged).toContain('<a class="kui-pagination-step" href="/blog" rel="prev">Previous</a>')
+    expect(paged).toContain('<a class="kui-pagination-page" href="/blog/2" aria-current="page">2</a>')
+    expect(paged).toContain('<a class="kui-pagination-step" href="/blog/3" rel="next">Next</a>')
+  })
+
   test('shows a page past the ends, or none at all, as the nearest that exists', async () => {
     const strip = (html: string) => html.replaceAll(/<!--[^>]*-->/g, '')
 

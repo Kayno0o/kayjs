@@ -1,3 +1,10 @@
+// A page of a list kay's `paginate()` split, which links each page itself.
+export interface PagedList {
+  page: number
+  pages: number
+  href: (page: number) => string
+}
+
 // A page left out between two shown, drawn as an ellipsis.
 export type PageGap = 'gap'
 

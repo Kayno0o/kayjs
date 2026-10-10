@@ -11,6 +11,8 @@ main
     Pagination(page={1} pages={3} url="/posts?tag=kay")
   article#middle
     Pagination(page={page} pages={20} url={here} label="Posts" previousLabel="Précédent" nextLabel="Suivant")
+  article#paged
+    Pagination(of={{ page: 2, pages: 3, href: n => n === 1 ? '/blog' : `/blog/${n}` }})
   article#single
     Pagination(page={1} pages={1} url="/posts")
   article#qr

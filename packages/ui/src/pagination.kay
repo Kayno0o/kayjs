@@ -1,14 +1,23 @@
 ---
 import type { JSX } from 'kay'
+import type { PagedList } from './pagination'
 import { currentPage, pageHref, pageItems } from './pagination'
 
-const { page, pages, url, param = 'page', siblings = 1, label = 'Pagination', previousLabel = 'Previous', nextLabel = 'Next', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+const { of, page, pages, url, param = 'page', siblings = 1, label = 'Pagination', previousLabel = 'Previous', nextLabel = 'Next', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & ({
+  // A page kay's `paginate()` gave, which links each page at its own path: `Pagination(of={list})`.
+  of: PagedList
+  page?: never
+  pages?: never
+  url?: never
+} | {
+  of?: never
   // The page on screen, from 1; one past the ends, or no whole number, such as `?page=abc` read as `NaN`, shows as the nearest that exists.
   page: number
   // How many pages there are; with one or none, nothing is drawn.
   pages: number
   // The URL of the page on screen, `ctx.url`: each link keeps its path and query, `param` set to the page.
   url: URL | string
+}) & {
   // The query parameter holding the page, `page` by default.
   param?: string | undefined
   // How many pages show on each side of the current one, 1 by default.
@@ -20,22 +29,24 @@ const { page, pages, url, param = 'page', siblings = 1, label = 'Pagination', pr
   class?: string | undefined
 }>()
 
+const total = of?.pages ?? pages ?? 0
 // The page as one that exists, whatever the query held.
-const shown = () => currentPage(page, pages)
+const shown = () => currentPage(of?.page ?? page ?? 1, total)
+const href = (target: number) => of ? of.href(target) : pageHref(url ?? '', target, param)
 ---
-// Plain links through the query, so a page renders on the server, its pages crawlable, and needs no island.
-if pages > 1
+// Plain links, through the query or at the paths `paginate()` gives, so a page renders on the server, its pages crawlable, and needs no island.
+if total > 1
   nav.kui-pagination({...rest} aria-label={label} class={className})
     if shown() > 1
-      a.kui-pagination-step(href={pageHref(url, shown() - 1, param)} rel="prev") {previousLabel}
+      a.kui-pagination-step(href={href(shown() - 1)} rel="prev") {previousLabel}
     else
       span.kui-pagination-step {previousLabel}
-    for item, index of pageItems(shown(), pages, siblings) key={index}
+    for item, index of pageItems(shown(), total, siblings) key={index}
       if item === 'gap'
         span.kui-pagination-gap(aria-hidden="true") …
       else
-        a.kui-pagination-page(href={pageHref(url, item, param)} aria-current={item === shown() ? 'page' : undefined}) {item}
-    if shown() < pages
-      a.kui-pagination-step(href={pageHref(url, shown() + 1, param)} rel="next") {nextLabel}
+        a.kui-pagination-page(href={href(item)} aria-current={item === shown() ? 'page' : undefined}) {item}
+    if shown() < total
+      a.kui-pagination-step(href={href(shown() + 1)} rel="next") {nextLabel}
     else
       span.kui-pagination-step {nextLabel}
