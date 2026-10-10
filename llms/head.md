@@ -82,7 +82,7 @@ In production the sitemap is built on the first request and kept for an hour; de
 
 ## Favicon and web manifest
 
-`favicon` in `kay.config.ts` names a square image relative to the root, 512 pixels wide or more for sharp icons (a smaller one is enlarged, with a warning naming it): `favicon: 'src/favicon.png'`. kay serves it as `/favicon.ico` (16, 32 and 48 pixels), `/apple-touch-icon.png` (180), `/icon-192.png` and `/icon-512.png`, plus `/manifest.webmanifest`, and links them from every page. `kay build` writes them; development makes them from the image on first request. Each path a public file or a page already serves is left to it. A project that names none gets kay's own mark, and `favicon: false` turns the favicon, its links and the manifest off.
+`favicon` in `kay.config.ts` names a square image relative to the root, 512 pixels wide or more for sharp icons (a smaller one is enlarged, with a warning naming it): `favicon: 'src/favicon.png'`. kay serves it as `/favicon.ico` (16, 32 and 48 pixels), `/apple-touch-icon.png` (180), `/icon-192.png` and `/icon-512.png`, plus `/manifest.webmanifest`, and links them from every page. `kay build` writes them; development makes them from the image on first request. Each path a public file or a page already serves is left to it. A project that names none gets kay's own mark, served as `/favicon.svg` as well and linked after the ICO, so browsers drawing SVG icons show it sharp at any size; a project's own favicon stays a raster image, since kay makes no icons from an SVG. `favicon: false` turns the favicon, its links and the manifest off.
 
 ```ts
 import { defineConfig } from 'kay/server'

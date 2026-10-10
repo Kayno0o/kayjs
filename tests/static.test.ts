@@ -162,10 +162,12 @@ describe('kay build --static', () => {
     expect(total, `${total} bytes of gzipped JS load up front, over the ${EAGER_JS_BUDGET} budget: ${[...loaded].map(([url, size]) => `${url} ${size}`).join(', ')}`).toBeLessThanOrEqual(EAGER_JS_BUDGET)
   })
 
-  it('writes the public files, the sitemap and robots.txt under the mount point, and 404.html', async () => {
+  it('writes the public files, the sitemap, robots.txt and kay\'s mark under the mount point, and 404.html', async () => {
     expect((await get('/humans.txt')).text).toBe('User-agent: test\n')
     expect((await get('/sitemap.xml')).text).toContain('<loc>https://x.example/repo/about</loc>')
     expect((await get('/robots.txt')).text).toContain('Sitemap: https://x.example/repo/sitemap.xml')
+    expect((await get('/favicon.svg')).text).toBe(await Bun.file('src/server/favicon.svg').text())
+    expect((await get('/about')).text).toContain('<link rel="icon" href="/repo/favicon.svg" type="image/svg+xml">')
 
     const missing = await get('/nowhere')
 

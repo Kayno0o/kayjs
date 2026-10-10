@@ -6,8 +6,10 @@ import { join, resolve } from 'node:path'
 import { revalidated } from './public'
 
 export const FAVICON_DIR = 'favicon'
-// kay's own mark, served when a project names no favicon.
+// kay's own mark, served when a project names no favicon: the PNG the icons are made from, and the SVG browsers draw at any size.
 const DEFAULT_FAVICON = join(import.meta.dir, 'favicon.png')
+const DEFAULT_SVG = join(import.meta.dir, 'favicon.svg')
+const SVG = '/favicon.svg'
 const MANIFEST = '/manifest.webmanifest'
 // Browsers ask for the first two at these paths on their own; the manifest points at the others.
 const PNG_FILES: Record<string, number> = { '/apple-touch-icon.png': 180, '/icon-192.png': 192, '/icon-512.png': 512 }
@@ -16,8 +18,16 @@ const ICO_SIZES = [16, 32, 48]
 const LARGEST = 512
 const ICO = '/favicon.ico'
 
-// Every path the favicon serves.
-export const FAVICON_PATHS = [ICO, ...Object.keys(PNG_FILES), MANIFEST]
+// Every path the favicon serves, kay's mark adding its SVG.
+export const FAVICON_PATHS = [ICO, ...Object.keys(PNG_FILES), MANIFEST, SVG]
+
+// The paths a project's `favicon` setting serves.
+export function faviconPaths(favicon: string | false | undefined): string[] {
+  if (favicon === false)
+    return []
+
+  return favicon === undefined ? FAVICON_PATHS : FAVICON_PATHS.filter(path => path !== SVG)
+}
 
 // The favicon's source, absolute: the project's own, kay's mark when it names none, or none once turned off.
 export function faviconSource(root: string, favicon: string | false | undefined): string | undefined {
@@ -58,6 +68,9 @@ export async function faviconFiles(source: string): Promise<Map<string, Uint8Arr
 
   files.set(ICO, ico(await Promise.all(ICO_SIZES.map(png)), ICO_SIZES))
 
+  if (source === DEFAULT_FAVICON)
+    files.set(SVG, await Bun.file(DEFAULT_SVG).bytes())
+
   return files
 }
 
@@ -94,10 +107,11 @@ function ico(images: Uint8Array[], sizes: number[]): Uint8Array<ArrayBuffer> {
   return bytes
 }
 
-// The links every page carries for them, which a page's own replace.
-export function faviconTags(): HeadTag[] {
+// The links every page carries for them, which a page's own replace; kay's mark links its SVG after the ICO, which browsers drawing SVG icons then prefer.
+export function faviconTags(mark = false): HeadTag[] {
   return [
     { tag: 'link', props: { rel: 'icon', href: ICO, sizes: ICO_SIZES.map(size => `${size}x${size}`).join(' ') } },
+    ...mark ? [{ tag: 'link', props: { rel: 'icon', href: SVG, type: 'image/svg+xml' } } satisfies HeadTag] : [],
     { tag: 'link', props: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
     { tag: 'link', props: { rel: 'manifest', href: MANIFEST } },
   ]
@@ -120,10 +134,11 @@ export function manifestJson(name: string | undefined, description: string | und
 // Serves the favicon files and the manifest at their paths, except one a public file or a page already serves; made from the source on first request unless `kay build` wrote them.
 export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconOptions): void {
   let files: Promise<Map<string, Uint8Array<ArrayBuffer>>> | undefined
+  const paths = [...Object.keys(PNG_FILES), ICO, ...options.source === DEFAULT_FAVICON ? [SVG] : []]
   const read = async () => {
     const built = new Map<string, Uint8Array<ArrayBuffer>>()
 
-    for (const path of [...Object.keys(PNG_FILES), ICO]) {
+    for (const path of paths) {
       const file = Bun.file(join(options.builtDir, path.slice(1)))
 
       if (!await file.exists())
@@ -137,7 +152,7 @@ export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconO
 
   const respond = (request: Request, body: Uint8Array<ArrayBuffer> | string, type: string) => revalidated(request, `"${Bun.hash(body).toString(36)}"`, () => body, { 'content-type': type })
 
-  for (const path of [...Object.keys(PNG_FILES), ICO]) {
+  for (const path of paths) {
     if (taken.has(path))
       continue
 
@@ -145,7 +160,7 @@ export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconO
       files ??= read()
 
       try {
-        return respond(request, (await files).get(path)!, path === ICO ? 'image/x-icon' : 'image/png')
+        return respond(request, (await files).get(path)!, path === ICO ? 'image/x-icon' : path === SVG ? 'image/svg+xml' : 'image/png')
       }
       catch (error) {
         // The next request tries again, once the source is fixed.

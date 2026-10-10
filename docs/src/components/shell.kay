@@ -12,7 +12,7 @@ a.skip-link(href="#content") Skip to the content
   aside.side
     header.bar
       a.brand(href="/")
-        img(src="/icon-192.png" alt="" width="28" height="28")
+        img(src="/favicon.svg" alt="" width="28" height="28")
         span kay
       Search(persist)
       button.menu(type="button" popovertarget="sidebar")

@@ -27,6 +27,7 @@ describe('favicon', () => {
     const html = await (await get('/about')).text()
 
     expect(html).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">')
+    expect(html).not.toContain('favicon.svg')
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">')
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest">')
     expect(html).toContain('<meta name="theme-color" content="#1e1e2e">')
@@ -50,6 +51,10 @@ describe('favicon', () => {
       expect(png.headers.get('content-type')).toBe('image/png')
       expect(await widthOf(await png.bytes())).toBe(size)
     }
+  })
+
+  it('serves no SVG for a project\'s own favicon', async () => {
+    expect((await get('/favicon.svg')).status).toBe(404)
   })
 
   it('revalidates each file by its ETag', async () => {
@@ -88,11 +93,15 @@ describe('favicon', () => {
     const off = await pages({ routes: ROUTES, prebuilt: false, favicon: false })
     const icon = await plain.handle(new Request('http://localhost/icon-512.png'))
 
+    const svg = await plain.handle(new Request('http://localhost/favicon.svg'))
+
     expect(await icon.bytes()).toEqual((await faviconFiles('src/server/favicon.png')).get('/icon-512.png')!)
-    expect(await (await plain.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="icon" href="/favicon.ico"')
+    expect(svg.headers.get('content-type')).toBe('image/svg+xml')
+    expect(await svg.text()).toBe(await Bun.file('src/server/favicon.svg').text())
+    expect(await (await plain.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
     expect(await (await off.handle(new Request('http://localhost/about'))).text()).not.toContain('rel="icon"')
 
-    for (const path of ['/favicon.ico', '/manifest.webmanifest'])
+    for (const path of ['/favicon.ico', '/favicon.svg', '/manifest.webmanifest'])
       expect((await off.handle(new Request(`http://localhost${path}`))).status).toBe(404)
   })
 
