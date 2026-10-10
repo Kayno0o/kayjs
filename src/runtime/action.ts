@@ -191,6 +191,9 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   // The message a refused post got for one field, or for the whole form under ''; a method, so any action still passes where `Action<never, unknown>` is expected.
   // eslint-disable-next-line ts/method-signature-style
   error(field?: Extract<keyof Input, string> | Honeypot | ''): string | undefined
+  // Whether `error` is a call to this action the server refused, its `data` typed as the handler passes it to `ctx.fail`.
+  // eslint-disable-next-line ts/method-signature-style
+  refused(error: unknown): error is ActionError<FailureData<Output>>
   readonly url: string
   readonly [ACTION]: true
   readonly [RESULT]?: Output
@@ -204,11 +207,11 @@ export interface ServerAction<Schema extends TSchema, Output, Honeypot extends s
   readonly protection?: ActionProtection<string>
 }
 
-export class ActionError extends Error {
+export class ActionError<Data = unknown> extends Error {
   override name = 'ActionError'
 
-  // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.fail`.
-  constructor(readonly status: number, readonly body: string, readonly errors: Record<string, string> = {}, readonly data?: unknown, message = `Action failed with ${status}: ${body}`) {
+  // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.fail`, undefined when the call was refused before it ran.
+  constructor(readonly status: number, readonly body: string, readonly errors: Record<string, string> = {}, readonly data?: Data, message = `Action failed with ${status}: ${body}`) {
     super(message)
   }
 }
@@ -395,6 +398,9 @@ export function formError(target: unknown, field: string): string | undefined {
 }
 
 // The post a page with islands was rendered in answer to, read again once a swap brings another page.
+// The action URL each refused call was made to, which `refused` matches.
+const refusedAt = new WeakMap<ActionError, string>()
+
 let pageRead: [Element | null, Outcome | undefined] | undefined
 
 function pageOutcome(): Outcome | undefined {
@@ -479,6 +485,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
         return found?.succeeded ? { data: found.data } : undefined
       }),
       error: read((field = '') => failed()?.errors[field]),
+      refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),
     },
   }
 }
@@ -495,7 +502,7 @@ async function post<Output>(url: string, input: unknown): Promise<Output> {
 
   prefetched.clear()
 
-  return readActionResponse(response)
+  return readActionResponse(response, url)
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
@@ -540,8 +547,8 @@ export function decodeCall(body: unknown): unknown {
   return typeof input === 'string' ? decodeValue(input, revivers) : unflattenValue(input, revivers)
 }
 
-// What a call got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
-export async function readActionResponse<Output>(response: Response): Promise<Output> {
+// What a call to `action` got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
+export async function readActionResponse<Output>(response: Response, action: string): Promise<Output> {
   const target = response.headers.get(REDIRECT_HEADER)
 
   if (target !== null) {
@@ -563,7 +570,11 @@ export async function readActionResponse<Output>(response: Response): Promise<Ou
   if (!response.ok) {
     const failed = response.headers.get(FAILURE_HEADER) === null ? {} : decodeValue(body) as { errors?: Record<string, string>, data?: unknown }
 
-    throw new ActionError(response.status, body, failed.errors, failed.data)
+    const error = new ActionError(response.status, body, failed.errors, failed.data)
+
+    refusedAt.set(error, action)
+
+    throw error
   }
 
   return (body === '' ? undefined : decodeValue(body)) as Output

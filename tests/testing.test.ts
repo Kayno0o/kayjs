@@ -191,6 +191,52 @@ describe('kay/test', () => {
     await expect(site.call(demote, { name: 'ada' }, { headers: { 'x-user': 'ada' } })).rejects.toMatchObject({ status: 422, data: { error: 'ada stays an admin' } })
   })
 
+  it('tells a refused call of an action apart, its data typed from the handler', async () => {
+    const { promote, demote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as {
+      promote: Action<{ name: string }, string>
+      demote: ServerAction<Named, Failure<{ error: string }> | undefined>
+    }
+    let reason: string | undefined
+
+    try {
+      await site.call(demote, { name: 'ada' }, { headers: { 'x-user': 'ada' } })
+    }
+    catch (error) {
+      expect(promote.refused(error)).toBe(false)
+
+      if (demote.refused(error))
+        reason = error.data?.error
+    }
+
+    try {
+      await site.call(promote, { name: 'bob' })
+    }
+    catch (error) {
+      expect(error).toMatchObject({ name: 'ActionRedirect' })
+      expect(promote.refused(error)).toBe(false)
+    }
+
+    expect(reason).toBe('ada stays an admin')
+    expect(demote.refused(new ActionError(422, '', {}, { error: 'forged' }))).toBe(false)
+  })
+
+  it('reads back a call expected to be refused, and fails one that went through', async () => {
+    const { promote, demote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as {
+      promote: Action<{ name: string }, string>
+      demote: ServerAction<Named, Failure<{ error: string }> | undefined>
+    }
+    const refused = await site.refusal(demote, { name: 'ada' }, { headers: { 'x-user': 'ada' } })
+    const reason: string | undefined = refused.data?.error
+
+    expect(refused).toMatchObject({ status: 422, errors: {} })
+    expect(reason).toBe('ada stays an admin')
+    expect(await site.refusal(add, { title: '' })).toMatchObject({ status: 422, errors: { title: 'Write a title' }, data: undefined })
+    // @ts-expect-error: the handler fails with `error` alone.
+    expect(refused.data?.message).toBeUndefined()
+    await expect(site.refusal(demote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).rejects.toThrow('went through, where a refusal was expected')
+    await expect(site.refusal(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirect', location: '/about' })
+  })
+
   it('calls an action reading its params from the page it names', async () => {
     const { which } = await import(join(import.meta.dir, 'fixtures/site/src/routes/todos/[id].kay')) as { which: Action<Record<string, never>, Record<string, unknown>> }
 
@@ -274,11 +320,11 @@ describe('kay/test', () => {
     GlobalRegistrator.register({ url: 'http://localhost/admin' })
 
     try {
-      void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }))
+      void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')
       // The swap is imported first, which takes a tick.
       await Bun.sleep(10)
       expect(window.location.href).toBe('http://localhost/about')
-      await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': 'javascript:alert(1)' } }))).rejects.toThrow('which is no page')
+      await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': 'javascript:alert(1)' } }), '/_kay/action/test/go')).rejects.toThrow('which is no page')
       expect(window.location.href).toBe('http://localhost/about')
     }
     finally {

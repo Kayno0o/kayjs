@@ -1,5 +1,5 @@
 import type { AnyElysia } from 'elysia'
-import type { Action, ActionProtection, ResultOf, Success } from '../runtime/action'
+import type { Action, ActionError, ActionProtection, FailureData, ResultOf, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
@@ -71,6 +71,8 @@ export interface TestSite {
   submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit, openedFor?: Duration | 0 }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects. `from` names the page it is made on, whose params the action reads.
   call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<Success<ResultOf<Target>>>
+  // A call expected to be refused, as `call` makes it: the `ActionError` with its status, errors and typed data; one that went through fails the test, and any other error is thrown.
+  refusal: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailureData<ResultOf<Target>>>>
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
   fetch: (path: string, init?: Omit<RequestInit, 'headers'> & VisitInit) => Promise<Response>
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
@@ -235,6 +237,17 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return server
   }
 
+  const call: TestSite['call'] = async (action, input, init = {}) => {
+    const { headers, body } = encodeCall(input)
+
+    const sent: Record<string, string> = { ...headers, origin: ORIGIN }
+
+    if (init.from !== undefined)
+      sent[PAGE_HEADER] = init.from
+
+    return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...sent, ...init.headers }, body }), action.url)
+  }
+
   return {
     cookies,
     handle,
@@ -336,15 +349,20 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
       return visit
     },
-    call: async (action, input, init = {}) => {
-      const { headers, body } = encodeCall(input)
+    call,
+    refusal: async (action, input, init) => {
+      try {
+        await call(action, input, init)
+      }
+      catch (error) {
+        // `Target` only bounds the action, so its own `refused` types the data as unknown.
+        if (action.refused(error))
+          return error as ActionError<FailureData<ResultOf<typeof action>>>
 
-      const sent: Record<string, string> = { ...headers, origin: ORIGIN }
+        throw error
+      }
 
-      if (init.from !== undefined)
-        sent[PAGE_HEADER] = init.from
-
-      return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...sent, ...init.headers }, body }))
+      throw new Error(`kay: the call to ${action.url} went through, where a refusal was expected`)
     },
   }
 }

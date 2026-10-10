@@ -1,3 +1,4 @@
+import type { Action, Failure } from '../src/runtime'
 import type { ClientBuild, ClientManifest } from '../src/server/client'
 import type { Encoding } from '../src/server/compress'
 import type { Span, SpanOptions, Tracer } from '../src/server/trace'
@@ -1246,7 +1247,7 @@ describe('failed actions', () => {
   })
 
   it('rejects a call from the browser with an ActionError carrying the failure', async () => {
-    const { add } = await import(join(import.meta.dir, 'fixtures/site/src/routes/index.kay')) as { add: (input: { title: string }) => Promise<number> }
+    const { add } = await import(join(import.meta.dir, 'fixtures/site/src/routes/index.kay')) as { add: Action<{ title: string }, Failure<{ message: string }> | number> }
     const realFetch = globalThis.fetch
     let error: unknown
 
@@ -1264,6 +1265,7 @@ describe('failed actions', () => {
 
     expect(error).toBeInstanceOf(ActionError)
     expect(error).toMatchObject({ status: 409, errors: {}, data: { message: 'Already on the list' } })
+    expect(add.refused(error) && error.data?.message).toBe('Already on the list')
   })
 
   it('renders the page the post came from under the mount point it is served at', async () => {

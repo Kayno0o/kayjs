@@ -234,7 +234,7 @@ form(action={comment} novalidate onSubmit={submit})
   button Send
 ```
 
-Without JavaScript the same form posts as a plain one, and the island's first render reads the refused post's errors, or the success. A call the server refuses throws `ActionError`, whose `data` is what `ctx.fail` received. See [Actions](actions.md).
+Without JavaScript the same form posts as a plain one, and the island's first render reads the refused post's errors, or the success. A call the server refuses throws `ActionError`, whose `data` is what `ctx.fail` received, typed once `comment.refused(error)` says the error is that call's. See [Actions](actions.md).
 
 ## Check, build, run
 
