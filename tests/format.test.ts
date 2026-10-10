@@ -107,6 +107,10 @@ describe('formatKay', () => {
     expect(format('List\n    @row(\n      todo,\n    )\n        li x\n')).toBe('List\n  @row(\n    todo,\n  )\n    li x\n')
   })
 
+  it('keeps a named slot, its arguments and the lines under it, and a line made of an expression', () => {
+    expect(format('ul\n    slot row(\n      item,\n    )\n        li x\n    {label}\n    slot\n')).toBe('ul\n  slot row(\n    item,\n  )\n    li x\n  {label}\n  slot\n')
+  })
+
   it('indents a try and its catch block like any block', () => {
     expect(format('try\n    p {\n      a\n    }\ncatch error\n      p b\n')).toBe('try\n  p {\n    a\n  }\ncatch error\n  p b\n')
   })

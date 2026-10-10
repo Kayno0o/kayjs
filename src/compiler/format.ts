@@ -147,7 +147,7 @@ function lineEnd(source: string, from: number): number {
 function multiLineSpans(nodes: Node[]): Span[] {
   return nodes.flatMap((node): Span[] => {
     if (node.kind === 'element')
-      return [...(node.parens ? [node.parens] : []), ...multiLineSpans(node.children)]
+      return [...(node.parens ? [node.parens] : []), ...(node.outlet?.args ? [node.outlet.args] : []), ...multiLineSpans(node.children)]
 
     if (node.kind === 'text')
       return node.parts.flatMap(part => part.kind === 'chunk' ? [] : part.kind === 'expression' ? [part] : multiLineSpans([part]))

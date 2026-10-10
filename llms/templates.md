@@ -13,7 +13,9 @@ Each line is one of the following; deeper indentation nests children under the l
 | `if user() as u` | Binds the truthy value to `u` for the children. |
 | `for item of list` | A list, its rows matched across renders by `item.id`, else by the item itself; `key={item.slug}` names another key. A row keeps its key, so in an island a new copy of the item redraws what reads the rest of it, never what reads the key alone; in development, a part drawn again in place of the focused element warns in the console. `else` right after it renders when the list is empty. |
 | `for item, i of list key={i}` | Rows matched by position. |
-| `slot` | Where a layout or wrapper renders its children. |
+| `slot` | Where a layout or wrapper renders its children; the lines under it render when it gets none. |
+| `slot name` | Where a component renders its `name` block prop, the lines under it when the prop is not given. |
+| `slot name(a, b)` | The same for a block taking parameters, called with these arguments. |
 | `@name` | Directly under a component: passes the indented block as its `name` prop. |
 | `@name(a, b)` | The same, as a function of its parameters the component calls. |
 | `head` | At the top level: its `title`, `meta`, `link`, `style`, `script` and `base` children go in the document head. |
@@ -54,6 +56,7 @@ section.todo-list
 - `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways. On `type="number"` and `type="range"` the signal holds a `number`, and keeps its last one while the input is empty.
 - `ref={el => ...}` receives the DOM element.
 - `innerHTML` renders its value as markup, unescaped, and so does an `iframe`'s `srcdoc`. Written out, `innerHTML="<b>hi</b>"` or `innerHTML={'<b>hi</b>'}`, it is the app's own; bound to a computed string, a template literal with values in it included, `kay check` and the editor report it unless the value is a `SafeHtml`, which `sanitizeHtml(markup)` and `trustHtml(markup)` from `kay` return. `sanitizeHtml` is for markup a user wrote: it keeps `p`, `br`, `hr`, `b`, `strong`, `i`, `em`, `u`, `s`, `del`, `ins`, `small`, `sub`, `sup`, `code`, `pre`, `blockquote`, `h1` to `h6`, `ul`, `ol`, `li` and `a`, balanced and without attributes, a link's `href` kept when it is an http(s), `mailto:` or site URL and given `rel="nofollow ugc"`; it drops other tags, keeping their text, and `script`, `style`, `iframe`, `svg` and comments whole, and gives the same result on the server and in an island. A second argument keeps more: `sanitizeHtml(html, { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'] } })` keeps images and tables, a URL, such as an `href`, a `src`, a `poster` or each one of a `srcset`, only when it is an http(s), `mailto:` or site URL; a tag that runs code, loads another document or takes input, such as `script`, `iframe` or `form`, an `on*`, `style` or `srcdoc` attribute, and attributes for a tag `tags` does not name are refused with an error. The options are read once per object, so declare them once outside the function. `trustHtml` vouches for markup the app made, such as its own Markdown renderer's, and changes nothing. An icon's markup is already a `SafeHtml`. Only an `innerHTML` or `srcdoc` written as an attribute is checked, not one a spread of props carries.
+- A line starting with `{expression}` is text, as `| {expression}` is.
 - Inline text follows the tag after one space. `\{` and `\#` are a literal brace and hash.
 - `#[tag inline]` puts an element inside text: `p Read #[a(href="/docs") the docs] first`.
 - `tag: child` nests one element on the same line: `li: a(href="/") Home`.
@@ -69,11 +72,12 @@ const { title, actions } = props<{ title: string, actions?: JSX.Element }>()
 article.card
   header
     h2 {title}
-    | {actions}
+    slot actions
   slot
+    p Nothing here yet
 ```
 
-A parent fills it like this: the `@actions` block becomes the `actions` prop and the other children go to `slot`.
+A parent fills it like this: the `@actions` block becomes the `actions` prop, which `slot actions` renders, and the other children go to `slot`. The lines under a `slot` render when it gets nothing to show. `kay check` reports a `slot name` naming no prop, as a call with the wrong arguments.
 
 ```kay
 ---
@@ -98,7 +102,7 @@ const { items, row } = props<{
 ---
 ul
   for item, i of items
-    | {row(item, i)}
+    slot row(item, i)
 ```
 
 ```kay

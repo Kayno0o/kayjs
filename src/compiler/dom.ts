@@ -5,7 +5,7 @@ import { URL_ATTRIBUTES } from '../runtime/base'
 import { actionOf, describedByOf, formFieldOf, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
-import { childItems, soleDynamic } from './items'
+import { childItems, slotValue, soleDynamic } from './items'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
 const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
@@ -108,7 +108,18 @@ export class DomTemplate {
 
         break
       case 'slot':
-        b.wrap(item.node, () => b.add(`KayInsert(${at}, () => __props.children);`))
+        b.wrap(item.node, () => {
+          b.add(`KayInsert(${at}, () => `)
+          slotValue(b, item.node)
+
+          if (item.node.children.length > 0) {
+            b.add(' ?? (')
+            this.childrenValue(item.node.children)
+            b.add(')')
+          }
+
+          b.add(');')
+        })
 
         break
       case 'if':

@@ -215,6 +215,12 @@ describe('elements', () => {
     expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain('<List items={[1]} row={(n) => <li>{n}</li>} />')
   })
 
+  it('renders a block prop through a named slot, the lines under a slot standing in when there is none', () => {
+    expect(jsx('---\nconst { row } = props<{ row?: (n: number) => string }>()\n---\nul\n  slot row(1)\n    li none\n  slot')).toBe('<ul>{__props.row?.(1) ?? <li>none</li>}{__props.children}</ul>')
+    expect(errors('slot actions extra')).toEqual(['Nothing may follow a slot name on its line'])
+    expect(errors('slot.x')).toEqual(['`slot` takes no attributes'])
+  })
+
   it('reports a prop a slot passes a second time', () => {
     expect(reports('Card\n  @a\n    p x\n  @a\n    p y')).toEqual([{ message: '`a` is passed twice', at: 'a', label: 'passed again here', related: [['a', 'passed by this `@a`']] }])
     expect(reports('Card(a="1")\n  @a\n    p x')).toEqual([{ message: '`a` is passed twice', at: 'a', label: 'passed again here', related: [['a', 'passed by this attribute']] }])

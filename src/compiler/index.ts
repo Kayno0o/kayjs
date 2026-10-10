@@ -4,7 +4,7 @@ import type { FoundRewrites } from './rewrite'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
-import { awaitBlocks, drawIcons, tryBlocks } from './ast'
+import { awaitBlocks, drawIcons, tryBlocks, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandMessages, mayPromote } from './codegen'
 import { applyLints, templateLints } from './lints'
@@ -124,7 +124,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (options.check)
-    diagnostics.push(...unboundedFields(source, file.server), ...broken ? [] : [...unreadNames(source, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
+    diagnostics.push(...unboundedFields(source, file.server), ...broken ? [] : [...unreadNames(source, file.template, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
@@ -146,12 +146,19 @@ export function compileKay(source: string, filename: string, options: CompileOpt
 }
 
 // Props and server data nothing reads: a prop beside a `...rest` is left out of it on purpose, and a name starting with `_` is unused on purpose, as TypeScript takes it.
-function unreadNames(source: string, script: ScriptAnalysis, server: ServerAnalysis | undefined, found: FoundRewrites): Diagnostic[] {
+function unreadNames(source: string, template: Node[], script: ScriptAnalysis, server: ServerAnalysis | undefined, found: FoundRewrites): Diagnostic[] {
   const unread: Diagnostic[] = []
   const unused = (span: Span) => found.unread.has(span.start) && !source.startsWith('_', span.start)
+  // A `slot name` reads its prop off the props object, not through the destructured name.
+  const slotted = new Set<string>()
+
+  visitNodes(template, (node) => {
+    if (node.kind === 'element' && node.outlet)
+      slotted.add(source.slice(node.outlet.name.start, node.outlet.name.end))
+  })
 
   for (const binding of script.props?.rest ? [] : script.props?.bindings ?? []) {
-    if (unused(binding.local))
+    if (unused(binding.local) && !slotted.has(binding.key))
       unread.push({ ...binding.local, checkOnly: true, code: 'unread-name', message: `The prop \`${binding.key}\` is never read`, fixes: binding.removal && [{ title: `Remove \`${binding.key}\``, edits: [{ ...binding.removal, text: '' }], safe: true }] })
   }
 

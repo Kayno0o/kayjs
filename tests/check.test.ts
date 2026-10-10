@@ -150,6 +150,20 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('reports a named slot naming no prop, or calling its block with the wrong arguments', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '---\nimport Card from \'../card.kay\'\n---\nCard\n',
+      'src/card.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { row } = props<{ row?: (n: number) => JSX.Element }>()\n---\nslot actions\nslot row(\'x\')\nslot row(1)\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.file.slice(root.length + 1), d.line, d.code])).toEqual([['src/card.kay', 6, 'TS2339'], ['src/card.kay', 7, 'TS2345']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves a kay project nested inside, holding its own kay.config.ts, to its own check', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p Home\n',

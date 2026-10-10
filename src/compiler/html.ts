@@ -3,7 +3,7 @@ import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import { actionOf, describedByOf, formFieldOf, marksServerIsland, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
-import { childItems, soleDynamic } from './items'
+import { childItems, slotValue, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
 const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'head', 'imageAttributes', 'localHref', 'loop', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
@@ -155,7 +155,18 @@ export class HtmlTemplate {
 
         break
       case 'slot':
-        b.wrap(item.node, () => b.add(`${htmlAlias('child')}(__props.children)`))
+        b.wrap(item.node, () => {
+          b.add(`${htmlAlias('child')}(`)
+          slotValue(b, item.node)
+
+          if (item.node.children.length > 0) {
+            b.add(' ?? (')
+            this.childrenValue(item.node.children)
+            b.add(')')
+          }
+
+          b.add(')')
+        })
 
         break
       case 'if':

@@ -19,6 +19,12 @@
       "include": "#slot"
     },
     {
+      "include": "#named-slot"
+    },
+    {
+      "include": "#expression-line"
+    },
+    {
       "include": "#for"
     },
     {
@@ -126,6 +132,40 @@
           "name": "punctuation.definition.parameters.end.kay"
         }
       }
+    },
+    "named-slot": {
+      "match": "^[ \\t]*(slot)[ \\t]+([A-Za-z_$][\\w$]*)(?:(\\()(.*)(\\)))?",
+      "captures": {
+        "1": {
+          "name": "entity.name.tag.kay"
+        },
+        "2": {
+          "name": "entity.other.attribute-name.slot.kay"
+        },
+        "3": {
+          "name": "punctuation.definition.parameters.begin.kay"
+        },
+        "4": {
+          "name": "meta.embedded.expression.kay",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        },
+        "5": {
+          "name": "punctuation.definition.parameters.end.kay"
+        }
+      }
+    },
+    "expression-line": {
+      "begin": "^[ \\t]*(?=\\{)",
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#text"
+        }
+      ]
     },
     "for": {
       "match": "^[ \\t]*(for)[ \\t]+([A-Za-z_$][\\w$]*)(?:[ \\t]*(,)[ \\t]*([A-Za-z_$][\\w$]*))?[ \\t]+(of)[ \\t]+(.*?)[ \\t]+(key)(=)(\\{.*\\})[ \\t]*$",

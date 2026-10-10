@@ -171,6 +171,22 @@ describe('slots with parameters', () => {
   })
 })
 
+describe('named slots', () => {
+  it('render the block prop they name, called with their arguments, or the lines under them when it is not given', async () => {
+    await Bun.write(join(scratch, 'card.kay'), '---\nimport type { JSX } from \'kay\'\n\nconst { items, actions, row } = props<{ items: string[], actions?: JSX.Element, row?: (item: string, index: number) => JSX.Element }>()\n---\nheader\n  slot actions\n    | No actions\nul\n  for item, i of items key={i}\n    slot row(item, i)\n      li {item}\nslot\n  p Empty\n')
+
+    const filled = await renderKay('---\nimport Card from \'./card.kay\'\n---\nCard(items={[\'a\', \'b\']})\n  @actions\n    button Add\n  @row(name, i)\n    li {i}: {name}\n  p Body')
+    const bare = await renderKay('---\nimport Card from \'./card.kay\'\n---\nCard(items={[\'a\']})')
+
+    expect(filled).toBe('<header><button>Add</button></header><ul><li>0: a</li><li>1: b</li></ul><p>Body</p>')
+    expect(bare).toBe('<header>No actions</header><ul><li>a</li></ul><p>Empty</p>')
+  })
+
+  it('read a line made of an expression as text', async () => {
+    expect(await renderKay('---\nconst { name } = props<{ name: string }>()\n---\np\n  {name} <b>\n  | !', { name: 'kay' })).toBe('<p>kay &lt;b>\n!</p>')
+  })
+})
+
 describe('typeof in a template expression', () => {
   it('reads the type of a loop item, an alias and a prop with a default, which render as values', async () => {
     const source = '---\nconst { rows, size = \'md\' } = props<{ rows: { id: number }[], size?: string }>()\n---\nfor row of rows key={row.id}\n  p {[row.id as typeof row.id, size as typeof size].join()}\nif rows[0] as first\n  p {(first as typeof first).id}'

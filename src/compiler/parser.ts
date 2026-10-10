@@ -10,6 +10,8 @@ const CLASS_NAME = /[\w\-:/@!]+/y
 const ID_NAME = /[\w-]+/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const SLOT_NAME = /@[A-Z_$][\w$]*/iy
+// `slot actions`: where a component renders its `actions` block prop.
+const NAMED_SLOT = /slot[ \t]+([A-Z_$][\w$]*)/diy
 const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
 const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch|try)(?=[ \t]|\r?\n|$)/y
 // Pug lines kay has no counterpart for, which would otherwise read as an element named after the keyword.
@@ -215,6 +217,14 @@ class TemplateParser {
       return
     }
 
+    // A line made of an expression is text, as `| {expr}` is.
+    if (this.src[start] === '{') {
+      siblings.push(this.parseText(start, '\n'))
+      this.rejectChildren(indent, 'Text lines cannot have children')
+
+      return
+    }
+
     if (this.src[start] === '@') {
       siblings.push(this.parseSlot(indent))
 
@@ -271,6 +281,15 @@ class TemplateParser {
       return
     }
 
+    NAMED_SLOT.lastIndex = start
+    const outlet = NAMED_SLOT.exec(this.src)
+
+    if (outlet) {
+      siblings.push(this.parseOutlet(indent, outlet))
+
+      return
+    }
+
     const element = this.parseElement(start, '\n')
 
     if (!element) {
@@ -289,6 +308,26 @@ class TemplateParser {
     for (let node: ElementNode | undefined = element; node; node = node === target ? undefined : node.children[0] as ElementNode)
       node.end = end
     siblings.push(element)
+  }
+
+  private parseOutlet(indent: number, match: RegExpExecArray): ElementNode {
+    const start = this.pos
+    const [nameStart, nameEnd] = match.indices![1]!
+    let args: Span | undefined
+
+    this.pos = nameEnd
+
+    if (this.src[this.pos] === '(') {
+      const close = this.scanBalanced(this.pos)
+
+      args = { start: this.pos + 1, end: close - 1 }
+      this.pos = close
+    }
+
+    this.expectLineEnd(args ? 'Nothing may follow the arguments of a slot on its line' : 'Nothing may follow a slot name on its line', { help: 'the lines under it render when the block is not given' })
+    const children = this.parseBlock(indent)
+
+    return { kind: 'element', start, end: this.lastContentEnd(), tag: { start, end: start + 4 }, name: 'slot', component: false, classes: [], attributes: [], outlet: { name: { start: nameStart, end: nameEnd }, args }, children }
   }
 
   private parseSlot(indent: number): SlotNode {

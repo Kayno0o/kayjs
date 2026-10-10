@@ -657,6 +657,26 @@ describe('slots with parameters', () => {
   })
 })
 
+describe('named slots', () => {
+  it('render the block prop they name as it comes and goes, the lines under them standing in for it', async () => {
+    const { root, dispose } = await mountKay({
+      'card.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, actions, row } = props<{ items: string[], actions?: JSX.Element, row?: (item: string, index: number) => JSX.Element }>()\n---\nheader\n  slot actions\n    | No actions\nul\n  for item, i of items key={i}\n    slot row(item, i)\n      li {item}\nslot\n  p Empty\n',
+      'main.kay': '---\nimport { signal } from \'kay\'\nimport Card from \'./card.kay\'\n\nconst names = signal([\'a\'])\n---\nbutton#grow(onClick={() => names.set([\'a\', \'b\'])}) Grow\nCard(items={names()})\n  @row(name, i)\n    li.row {i}: {name}\n',
+    })
+
+    try {
+      expect([root.querySelector('header')!.textContent, root.querySelector('p')!.textContent]).toEqual(['No actions', 'Empty'])
+      expect([...root.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['0: a'])
+      root.querySelector<HTMLButtonElement>('#grow')!.click()
+      await settle()
+      expect([...root.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['0: a', '1: b'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('bind:value on a number input', () => {
   it('keeps the signal\'s last number while the input is empty', async () => {
     const dir = await mkdtemp(join(import.meta.dir, '.dom-'))

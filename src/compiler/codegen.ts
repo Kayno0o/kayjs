@@ -3,11 +3,12 @@ import type { LintName } from './lints'
 import type { Rewrite } from './mapping'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, awaitBlocks, errorMessages, isChildrenSlot, isHead, serverIslandOf, tryBlocks } from './ast'
+import { actionOf, awaitBlocks, errorMessages, isChildrenSlot, isHead, isSlot, serverIslandOf, tryBlocks } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression, mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
+import { slotValue } from './items'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 
 export interface GenerateOptions {
@@ -181,7 +182,7 @@ class Generator {
         b.add(`export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`)
     }
 
-    const childrenSlot = usesChildrenSlot(this.file.template)
+    const childrenSlot = usesSlot(this.file.template, isChildrenSlot)
     const childrenType = ' & { children?: KayJSX.Element }'
 
     if (childrenSlot)
@@ -262,6 +263,9 @@ class Generator {
     }
     else if (childrenSlot) {
       b.add('__props: { children?: KayJSX.Element }')
+    }
+    else if (usesSlot(this.file.template, isSlot)) {
+      b.add('__props: {}')
     }
 
     b.add(') {\n')
@@ -624,7 +628,7 @@ class Generator {
   private emitRoot(nodes: Node[]) {
     const visible = this.withoutSlots(nodes)
 
-    if (visible.length === 1 && visible[0]!.kind === 'element' && !isChildrenSlot(visible[0]!)) {
+    if (visible.length === 1 && visible[0]!.kind === 'element' && !isSlot(visible[0]!)) {
       this.emitElement(visible[0]!)
 
       return
@@ -898,11 +902,21 @@ class Generator {
     if (isHead(element))
       this.error(element, 'A `head` block sits at the top level of a template')
 
-    if (isChildrenSlot(element)) {
-      if (element.attributes.length > 0 || element.classes.length > 0 || element.id || element.children.length > 0)
-        this.error(element, '`slot` takes no attributes or content', { note: '`slot` marks where a layout or wrapper renders its children' })
+    if (isSlot(element)) {
+      if (element.attributes.length > 0 || element.classes.length > 0 || element.id)
+        this.error(element, '`slot` takes no attributes', { note: '`slot` marks where a layout or wrapper renders its children, and `slot name` its `name` block prop' })
 
-      b.wrap(element, () => b.add('{__props.children}'))
+      b.wrap(element, () => {
+        b.add('{')
+        slotValue(b, element)
+
+        if (element.children.length > 0) {
+          b.add(' ?? ')
+          this.emitRoot(element.children)
+        }
+
+        b.add('}')
+      })
 
       return
     }
@@ -1574,25 +1588,27 @@ function helperAlias(helper: Helper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
 }
 
-function usesChildrenSlot(nodes: Node[]): boolean {
+function usesSlot(nodes: Node[], found: (node: Node) => boolean): boolean {
+  const uses = (inner: Node[]) => usesSlot(inner, found)
+
   return nodes.some((node) => {
-    if (isChildrenSlot(node))
+    if (found(node))
       return true
 
     switch (node.kind) {
       case 'element':
       case 'slot':
-        return usesChildrenSlot(node.children)
+        return uses(node.children)
       case 'text':
-        return usesChildrenSlot(node.parts.filter(part => part.kind === 'element'))
+        return uses(node.parts.filter(part => part.kind === 'element'))
       case 'if':
-        return node.branches.some(branch => usesChildrenSlot(branch.children))
+        return node.branches.some(branch => uses(branch.children))
       case 'for':
-        return usesChildrenSlot(node.children) || usesChildrenSlot(node.fallback ?? [])
+        return uses(node.children) || uses(node.fallback ?? [])
       case 'await':
-        return awaitBlocks(node).some(usesChildrenSlot)
+        return awaitBlocks(node).some(uses)
       case 'try':
-        return tryBlocks(node).some(usesChildrenSlot)
+        return tryBlocks(node).some(uses)
     }
 
     return false

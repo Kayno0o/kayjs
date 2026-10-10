@@ -126,6 +126,8 @@ describe('kay grammar', () => {
       '@fallback',
       '// note',
       '| plain {x}',
+      'slot row(item)',
+      '{x}',
     ].join('\n'))
 
     expect(lines[0]).toEqual([
@@ -149,6 +151,8 @@ describe('kay grammar', () => {
     expect(lines[6]).toEqual(['@: punctuation.definition.slot.kay', 'fallback: entity.other.attribute-name.slot.kay'])
     expect(lines[7]).toEqual(['// note: comment.line.double-slash.kay'])
     expect(lines[8]).toEqual(['|: punctuation.definition.text.kay', 'plain: source.kay', '{: punctuation.section.embedded.begin.kay', 'x: variable.other.ts', '}: punctuation.section.embedded.end.kay'])
+    expect(lines[9]).toEqual(['slot: entity.name.tag.kay', 'row: entity.other.attribute-name.slot.kay', '(: punctuation.definition.parameters.begin.kay', 'item: variable.other.ts', '): punctuation.definition.parameters.end.kay'])
+    expect(lines[10]).toEqual(['{: punctuation.section.embedded.begin.kay', 'x: variable.other.ts', '}: punctuation.section.embedded.end.kay'])
   })
 
   it('reads a try block with its catch branch', () => {

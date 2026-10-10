@@ -66,7 +66,7 @@ ul
 
 ## Slots and blocks
 
-Children of a component go to its `slot`. A `@name` block directly under it becomes the prop `name`. `src/components/card.kay`:
+Children of a component go to its `slot`. A `@name` block directly under it becomes the prop `name`, which the component renders with `slot name`; the lines under a `slot` render when it gets nothing. `src/components/card.kay`:
 
 ```kay
 ---
@@ -77,7 +77,7 @@ const { title, actions } = props<{ title: string, actions?: JSX.Element }>()
 article.card
   header
     h2 {title}
-    | {actions}
+    slot actions
   slot
 ```
 

@@ -1,8 +1,8 @@
 import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
-import type { Diagnostic, Fix, KayFile, Node, Span } from './ast'
+import type { Diagnostic, Fix, KayFile, Span } from './ast'
 import { parse } from '@babel/parser'
-import { awaitBlocks, tryBlocks } from './ast'
+import { visitNodes } from './ast'
 import { browserGlobals } from './globals'
 import { loadTraverse } from './rewrite'
 
@@ -300,7 +300,7 @@ function templateNames(file: KayFile): string[] {
   const names: string[] = []
   const words = (span: Span | undefined) => span ? Array.from(file.source.slice(span.start, span.end).matchAll(WORD), match => match[0]) : []
 
-  visit(file.template, (node) => {
+  visitNodes(file.template, (node) => {
     if (node.kind === 'for') {
       names.push(...words(node.item), ...words(node.index))
     }
@@ -324,7 +324,7 @@ function templateNames(file: KayFile): string[] {
 function templateExpressions(file: KayFile): { span: Span, deferred: boolean }[] {
   const found: { span: Span, deferred: boolean }[] = []
 
-  visit(file.template, (node) => {
+  visitNodes(file.template, (node) => {
     if (node.kind === 'element') {
       for (const attribute of node.attributes) {
         if (attribute.kind === 'spread') {
@@ -358,37 +358,6 @@ function templateExpressions(file: KayFile): { span: Span, deferred: boolean }[]
   })
 
   return found
-}
-
-function visit(nodes: Node[], each: (node: Node) => void): void {
-  for (const node of nodes) {
-    each(node)
-
-    if (node.kind === 'element') {
-      visit(node.children, each)
-    }
-    else if (node.kind === 'text') {
-      visit(node.parts.filter(part => part.kind === 'element'), each)
-    }
-    else if (node.kind === 'if') {
-      for (const branch of node.branches) {
-        visit(branch.children, each)
-      }
-    }
-    else if (node.kind === 'await') {
-      for (const block of awaitBlocks(node)) {
-        visit(block, each)
-      }
-    }
-    else if (node.kind === 'try') {
-      for (const block of tryBlocks(node)) {
-        visit(block, each)
-      }
-    }
-    else {
-      visit([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], each)
-    }
-  }
 }
 
 // A statement of the script reading the global as it runs wraps into `effect`, which the compiler imports; a declaration would take its name out of reach of the rest, so only an expression statement does.

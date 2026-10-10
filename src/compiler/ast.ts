@@ -56,6 +56,8 @@ export interface ElementNode extends Span {
   attributes: Attribute[]
   // The `(...)` holding the attributes, brackets included.
   parens?: Span
+  // `slot actions` or `slot row(item, i)`: the block prop it renders, and inside the brackets what it calls the block with.
+  outlet?: { name: Span, args?: Span | undefined } | undefined
   children: Node[]
 }
 
@@ -382,9 +384,13 @@ export function isHead(node: Node): node is ElementNode & { name: 'head' } {
   return node.kind === 'element' && !node.component && node.name === 'head'
 }
 
-// `slot` renders the children a layout or wrapper component receives, like Astro's `<slot />`.
-export function isChildrenSlot(node: Node): boolean {
+// `slot` renders the children a layout or wrapper component receives, like Astro's `<slot />`, and `slot name` the block prop of that name; the lines under either render when there is none.
+export function isSlot(node: Node): boolean {
   return node.kind === 'element' && node.name === 'slot' && !node.component
+}
+
+export function isChildrenSlot(node: Node): boolean {
+  return isSlot(node) && (node as ElementNode).outlet === undefined
 }
 
 // The pending, resolved and failed blocks, in source order.
@@ -450,6 +456,38 @@ export function drawIcons(nodes: Node[], icons: ReadonlySet<string>): void {
         drawIcons(tryBlocks(node).flat(), icons)
 
         break
+    }
+  }
+}
+
+// Calls `each` on every node of a template, nested ones included, in source order.
+export function visitNodes(nodes: Node[], each: (node: Node) => void): void {
+  for (const node of nodes) {
+    each(node)
+
+    if (node.kind === 'element') {
+      visitNodes(node.children, each)
+    }
+    else if (node.kind === 'text') {
+      visitNodes(node.parts.filter(part => part.kind === 'element'), each)
+    }
+    else if (node.kind === 'if') {
+      for (const branch of node.branches) {
+        visitNodes(branch.children, each)
+      }
+    }
+    else if (node.kind === 'await') {
+      for (const block of awaitBlocks(node)) {
+        visitNodes(block, each)
+      }
+    }
+    else if (node.kind === 'try') {
+      for (const block of tryBlocks(node)) {
+        visitNodes(block, each)
+      }
+    }
+    else {
+      visitNodes([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], each)
     }
   }
 }
