@@ -1,5 +1,6 @@
 ---
 import type { JSX } from 'kay'
+import { CARD_PADDING_X } from './card'
 import { ghostTable } from './mso'
 import settings from './settings'
 
@@ -16,7 +17,7 @@ table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0
       {open}
       table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style={`max-width:${settings.width}px;margin:0 auto`})
         tr
-          td(align="left" bgcolor={settings.surface} style={`background:${settings.surface};border:1px solid ${settings.border};border-radius:${settings.radius};padding:32px 28px;font-family:${settings.font};color:${settings.text}`})
+          td(align="left" bgcolor={settings.surface} style={`background:${settings.surface};border:1px solid ${settings.border};border-radius:${settings.radius};padding:32px ${CARD_PADDING_X}px;font-family:${settings.font};color:${settings.text}`})
             slot
       {close}
       if footer

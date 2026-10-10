@@ -1,0 +1,8 @@
+---
+import { mso } from './mso'
+---
+// Columns side by side, stacking on a screen too narrow for them; Outlook, which ignores their widths, gets a table.
+div(style="text-align:left")
+  {mso('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>', 'true')}
+  slot
+  {mso('</tr></table>', 'true')}

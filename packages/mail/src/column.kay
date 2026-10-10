@@ -1,0 +1,14 @@
+---
+import { contentWidth } from './card'
+import { mso } from './mso'
+import settings from './settings'
+
+// The share of the card's width the column takes beside the others, half by default.
+const { share = 0.5 } = props<{ share?: number | undefined }>()
+const width = Math.floor(contentWidth(settings.width) * share)
+---
+{mso(`<td width="${width}" valign="top">`, 'true')}
+div(style={`display:inline-block;width:100%;max-width:${width}px;vertical-align:top`})
+  div(style="padding:0 8px")
+    slot
+{mso('</td>', 'true')}

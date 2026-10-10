@@ -4,6 +4,7 @@ import { mailer, MailNotConfigured, outbox } from '@kaynooo/kayjs-mail'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { mail } from '../src/mail'
 import Hello from '../src/mails/hello.kay'
+import Kit from '../src/mails/kit.kay'
 import Plain from '../src/mails/plain.kay'
 import Welcome from '../src/mails/welcome.kay'
 
@@ -58,6 +59,19 @@ describe('rendering', () => {
     expect(single.headers).toEqual({ 'List-Unsubscribe': '<https://fixture.test/unsubscribe?u=1&t=%3Cx%3E>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' })
     expect(both.headers['List-Unsubscribe']).toBe('<https://fixture.test/u>, <mailto:unsubscribe@fixture.test>')
     await expect(mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: 'http://fixture.test/u' })).rejects.toThrow('it takes an https URL')
+  })
+
+  it('ships a code, a divider, an image, a link, headings by level and columns, each built for Outlook too', async () => {
+    const { html, text } = await mail.render({ to: 'ada@example.com', subject: 'Kit', view: Kit })
+
+    expect(html).toContain('<img src="https://fixture.test/logo.png" alt="Fixture" width="120" height="40"')
+    expect(html).toContain('font-family:ui-monospace')
+    expect(html).toContain('letter-spacing:6px')
+    expect(html).toContain('border-top:1px solid #e5e5e0')
+    expect(html).toContain('<h2 style="font-size:18px')
+    expect(html).toContain('<!--[if true]><td width="251" valign="top"><![endif]--><div style="display:inline-block;width:100%;max-width:251px;vertical-align:top">')
+    expect(html).toContain('<a href="https://fixture.test/help" style="color:#0047ff;text-decoration:underline">the help</a>')
+    expect(text).toBe('Fixture\n\nYour code\n\n482 913\n\nDetails\n\nLeft\n\nRight\n\nRead the help (https://fixture.test/help).')
   })
 
   it('takes no props for a mail without required ones, and the text it is given over the one written from the html', async () => {
