@@ -5,7 +5,7 @@ import { chmod, readdir } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { checklist, select } from './prompt'
-import { templateFiles } from './templates'
+import { agentsFile, templateFiles } from './templates'
 
 // The kay this command runs from: a git checkout, which a new project depends on a packed copy of, or the published package.
 const KAY_ROOT = resolve(import.meta.dir, '..')
@@ -136,6 +136,9 @@ export async function createProject(target: string, options: NewOptions = {}): P
   ].filter(entry => entry !== false)
   const files: Record<string, string> = {
     ...templateFiles(features),
+    'AGENTS.md': agentsFile(scripts),
+    // Claude Code reads AGENTS.md itself only from v2.1.277, and not in every kind of session.
+    'CLAUDE.md': '@AGENTS.md\n',
     'package.json': `${JSON.stringify({
       name,
       type: 'module',

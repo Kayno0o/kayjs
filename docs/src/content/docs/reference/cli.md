@@ -37,6 +37,8 @@ kay new my-app --template app --without docker
 
 In a terminal with none of these options, `kay new` asks for a preset, then for each feature.
 
+Every project gets an `AGENTS.md` for coding agents. It points them at kay's docs for the installed version, `node_modules/kay/llms.txt`, which Claude Code loads at the start of each session through its `@node_modules/kay/llms.txt` line, and names the checks the project's scripts run. A `CLAUDE.md` imports it with `@AGENTS.md`. A project made before these files existed adds the same two by hand.
+
 ### Features
 
 | Feature | Adds | In the presets |

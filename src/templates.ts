@@ -740,7 +740,19 @@ it('tells every visitor how many are online', async () => {
 })
 `
 
-// Every file but package.json and tsconfig.json, which `createProject` writes from the same features.
+// The project's AGENTS.md, naming the checks its scripts run. Claude Code expands the `@` line into kay's docs as installed, other agents read it as a path.
+export function agentsFile(scripts: Record<string, string>): string {
+  const checks = ['check', 'fmt', 'lint', 'test'].filter(script => script in scripts).map(script => `\`bun run ${script}\``)
+
+  return blocks(
+    '# __NAME__',
+    'Built with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`:',
+    '@node_modules/kay/llms.txt',
+    `Before calling a change done, run ${new Intl.ListFormat('en').format(checks)}.`,
+  )
+}
+
+// Every file but package.json, tsconfig.json and the agents' instructions, which `createProject` writes from the same features and scripts.
 export function templateFiles(features: ReadonlySet<Feature>): Record<string, string> {
   const has = (feature: Feature) => features.has(feature)
   const setup: Setup = { has, tw: classes => has('tailwind') ? classes : '' }

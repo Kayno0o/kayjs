@@ -171,7 +171,7 @@ describe('kay command line', () => {
 
     try {
       expect((await kay(['new', 'styled', '--kay', '^1.0.0', '--template', 'blank', '--with', 'tailwind, tests'], dir)).code).toBe(0)
-      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.npmrc', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
+      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.npmrc', 'AGENTS.md', 'CLAUDE.md', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
       expect((await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)).code).toBe(0)
       expect(await readdir(join(dir, 'lean'))).not.toEqual(expect.arrayContaining(['Dockerfile']))
       expect(await Bun.file(join(dir, 'lean/src/server.ts')).exists()).toBe(true)
@@ -266,6 +266,7 @@ describe('kay new', () => {
       expect(manifest.scripts.compile).toBe('kay build --compile server')
       // A warning fails CI as an error does, so none piles up unread.
       expect(manifest.scripts.check).toBe('kay check --deny-warnings')
+      expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toContain('run `bun run check`, `bun run fmt`, `bun run lint`, and `bun run test`.')
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
       expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
@@ -414,10 +415,15 @@ describe('kay new', () => {
       const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.blank.features })
       const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
 
-      expect(files).toEqual(['.gitignore', '.npmrc', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
+      expect(files).toEqual(['.gitignore', '.npmrc', 'AGENTS.md', 'CLAUDE.md', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
       // kay itself comes from the registry this names, whatever else is left out.
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.scripts).toEqual({ dev: 'kay dev', build: 'kay build --static', check: 'kay check --deny-warnings', fmt: 'kay fmt' })
+      // An agent reads kay's docs as installed, and runs the checks this project's scripts hold.
+      expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toBe('# my-app\n\nBuilt with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`:\n\n@node_modules/kay/llms.txt\n\nBefore calling a change done, run `bun run check` and `bun run fmt`.\n')
+      expect(await Bun.file(join(dir, 'CLAUDE.md')).text()).toBe('@AGENTS.md\n')
+      // Published, so the docs AGENTS.md imports are in node_modules/kay.
+      expect(((await Bun.file(join(repo, 'package.json')).json()) as { files: string[] }).files).toEqual(expect.arrayContaining(['llms', 'llms.txt']))
       expect(Object.keys(manifest.devDependencies)).toEqual(['@types/bun'])
       expect(Object.keys(manifest.dependencies)).toEqual(['elysia', 'kay'])
 
