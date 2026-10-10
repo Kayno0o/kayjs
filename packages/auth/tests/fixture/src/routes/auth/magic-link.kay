@@ -3,7 +3,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const query = t.Object({ token: t.Optional(t.String()) })
+export const page = { query: t.Object({ token: t.Optional(t.String()) }) }
 
 // The link only shows this button: a mail scanner opening it spends nothing.
 export const spend = action(t.Object({ token: t.String() }), async ({ token }, ctx) => {
