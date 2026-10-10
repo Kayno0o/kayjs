@@ -27,6 +27,8 @@ export interface Lint {
   typed?: boolean
   // Found in kay.config.ts by `kay check`, or in the pages `kay build` prerenders, never in a template, so no `// kay-allow` comment reaches it.
   site?: boolean
+  // What a site lacks before it goes public rather than a fault of the code, which a scaffold lacks too: reported by `kay build` and `kay check --only seo`, never a plain `kay check`.
+  launch?: boolean
 }
 
 // What kay reports as advice rather than as an error in the code: each lint's level is set in `kay.config.ts`'s `lints`, and a `// kay-allow <lint>` comment allows it on the line it ends or the one after it.
@@ -211,6 +213,7 @@ export const LINTS = {
     level: 'warn',
     group: 'seo',
     site: true,
+    launch: true,
     summary: '`seo` set with no `site`, in kay.config.ts or `SITE_URL`: pages get no canonical link and no `og:url`, a share image no absolute URL, and the site no sitemap or robots.txt.',
     wrong: 'seo: { name: \'Example\' }',
     right: 'site: \'https://example.com\',\nseo: { name: \'Example\' }',
@@ -227,6 +230,7 @@ export const LINTS = {
     level: 'warn',
     group: 'seo',
     site: true,
+    launch: true,
     summary: 'A public site with no `seo.image` and no page or layout setting an `og:image`: a link shared to a social network shows no picture.',
     wrong: 'seo: { name: \'Example\' }',
     right: 'seo: { name: \'Example\', image: \'/og.png\' }',
@@ -235,6 +239,7 @@ export const LINTS = {
     level: 'warn',
     group: 'seo',
     site: true,
+    launch: true,
     summary: 'A public site with no `favicon`, so browser tabs, bookmarks and search results show kay\'s mark rather than the site\'s.',
     wrong: 'seo: { name: \'Example\' }',
     right: 'favicon: \'src/favicon.png\',\nseo: { name: \'Example\' }',
@@ -466,6 +471,10 @@ export function lintList(group?: LintGroup): string {
   return group === undefined ? rows : `${group}: ${LINT_GROUPS[group]}\n\n${rows}`
 }
 
+export function isLaunchLint(code: string | undefined): boolean {
+  return isLint(code) && (LINTS[code] as Lint).launch === true
+}
+
 // What `kay explain <lint>` prints: what it reports, an example it reports and the same written right, and how to change its level.
 export function explainLint(name: LintName): string {
   const lint: Lint = LINTS[name]
@@ -474,6 +483,7 @@ export function explainLint(name: LintName): string {
   return [
     `${name}: ${lint.level} by default, in ${lint.group}`,
     lint.summary,
+    ...lint.launch === true ? ['Reported by `kay build` and `kay check --only seo`, never a plain `kay check`: a site lacks it until it goes public, a fresh project included.'] : [],
     `Reported:\n\n${indent(lint.wrong)}`,
     `Written right:\n\n${indent(lint.right)}`,
     `Its level is set in kay.config.ts, as \`lints: { '${name}': '${lint.level === 'deny' ? 'warn' : 'deny'}' }\`, to \`allow\`, \`warn\` or \`deny\`, or with its group's, \`lints: { ${lint.group}: '${lint.level === 'deny' ? 'warn' : 'deny'}' }\`${lint.site === true ? '.' : `; a \`// kay-allow ${name}\` comment allows it on the line it ends, or alone on its line, on the line after it.`}`,

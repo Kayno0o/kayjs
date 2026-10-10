@@ -6,7 +6,8 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { buildClient } from '../src/build/client'
-import { check } from '../src/check'
+import { check, configCheckOptions } from '../src/check'
+import { loadConfig } from '../src/config'
 import { formatFiles } from '../src/format'
 import { createProject, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
 import { limiter } from '../src/server/limit'
@@ -52,6 +53,11 @@ it('changes the accent on a click', async () => {
 `
 
 // Stands in for `bun install` of a packed kay: its source and what `prepack` emits, the declarations and the ESLint processor, beside this checkout's dependencies.
+// What `kay check` reports of the project, kay.config.ts read as it reads it: a warning fails the `check` script a scaffold writes.
+async function checked(dir: string) {
+  return check(dir, configCheckOptions(await loadConfig(dir)))
+}
+
 async function installKay(dir: string) {
   const modules = join(dir, 'node_modules')
   const kay = join(modules, 'kay')
@@ -278,7 +284,7 @@ describe('kay new', () => {
       const tsconfig = JSON.parse(scaffolded) as { compilerOptions: Record<string, unknown> }
 
       await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, exactOptionalPropertyTypes: true } }))
-      expect(await check(dir)).toEqual([])
+      expect(await checked(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
       // The scaffolded tsconfig, as lint reads every file of the project.
       await Bun.write(join(dir, 'tsconfig.json'), scaffolded)
@@ -286,7 +292,7 @@ describe('kay new', () => {
 
       // A page's server fence is linted with the project's types, at its .kay line.
       await Bun.write(join(dir, 'src/routes/later.kay'), '--- server\nBun.write(\'later.txt\', \'later\')\n---\np Later\n')
-      expect(await check(dir)).toEqual([])
+      expect(await checked(dir)).toEqual([])
       expect((await lint(dir, 'src/routes/later.kay'))[0]!.messages).toEqual([expect.objectContaining({ ruleId: 'ts/no-floating-promises', line: 2 })])
       await rm(join(dir, 'src/routes/later.kay'))
 
@@ -328,7 +334,7 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run build\n\n.*\n {6}- name: Lint\n {8}run: bun run lint\n/)
 
       await installKay(dir)
-      expect(await check(dir)).toEqual([])
+      expect(await checked(dir)).toEqual([])
       expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
       // With no server entry, `kay dev` serves the pages with kay's own, live reload included.
@@ -380,7 +386,7 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, 'compose.prod.yaml')).text()).toContain('SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}')
 
       await installKay(dir)
-      expect(await check(dir)).toEqual([])
+      expect(await checked(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
       expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
@@ -416,7 +422,7 @@ describe('kay new', () => {
       expect(Object.keys(manifest.dependencies)).toEqual(['elysia', 'kay'])
 
       await installKay(dir)
-      expect(await check(dir)).toEqual([])
+      expect(await checked(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
 
       const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--static'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
@@ -443,7 +449,7 @@ describe('kay new', () => {
         try {
           await createProject(dir, { kay: '^1.0.0', features })
           await installKay(dir)
-          expect({ features, problems: await check(dir) }).toEqual({ features, problems: [] })
+          expect({ features, problems: await checked(dir) }).toEqual({ features, problems: [] })
           expect({ features, changed: (await formatFiles([join(dir, 'src')], { write: false })).changed }).toEqual({ features, changed: [] })
 
           if (variant.has('docker') && !variant.has('server'))

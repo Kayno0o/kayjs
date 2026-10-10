@@ -20,7 +20,7 @@ import { compileServer } from './build/compile'
 import { formatSizeReport } from './build/report'
 import { exportStatic, refuseStaticConfig } from './build/static'
 import { KayCompileError } from './build/transform'
-import { applySafeFixes, check, formatCheckDiagnostic } from './check'
+import { applySafeFixes, check, configCheckOptions, formatCheckDiagnostic } from './check'
 import { pageSeoLints } from './check/seo'
 import { formatDiagnostic } from './compiler'
 import { explainLint, isLint, isLintGroup, LINT_GROUPS, lintList, LINTS } from './compiler/lints'
@@ -185,7 +185,7 @@ async function runCheck(args: string[]): Promise<number> {
   buildingWithoutEnv()
 
   const started = performance.now()
-  const { failing, found } = await checkProject(root, await loadConfig(root), tsconfig, typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: parsed.values['deny-warnings'] === true, fix: parsed.values.fix === true, only })
+  const { failing, found } = await checkProject(root, await loadConfig(root), tsconfig, typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: parsed.values['deny-warnings'] === true, fix: parsed.values.fix === true, only, launch: only === 'seo' })
 
   if (found === 0)
     done('checked', 'with no problems', started)
@@ -195,9 +195,8 @@ async function runCheck(args: string[]): Promise<number> {
 
 // Prints what `kay check` finds in the project, as it finds it, and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
 // With `fix`, applies the safe fixes first, then checks again and prints what is left; with `only`, prints that group's lints alone.
-async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string, { denyWarnings = false, fix = false, only }: { denyWarnings?: boolean, fix?: boolean, only?: LintGroup | undefined } = {}): Promise<{ failing: number, found: number }> {
-  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon } = config
-  const options = { tsconfig, entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon }
+async function checkProject(root: string, config: KayConfig, tsconfig: string, entry?: string, { denyWarnings = false, fix = false, only, launch = false }: { denyWarnings?: boolean, fix?: boolean, only?: LintGroup | undefined, launch?: boolean } = {}): Promise<{ failing: number, found: number }> {
+  const options = { ...configCheckOptions(config), tsconfig, entry, launch }
   let diagnostics = await check(root, options)
   const fixed = fix ? await applySafeFixes(root, diagnostics) : 0
 
@@ -289,7 +288,7 @@ async function build(args: string[]): Promise<number> {
     await rm(previous, { recursive: true, force: true })
 
   const started = performance.now()
-  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined) : { failing: 0, found: 0 }, bundleClient(root, config, exported, parsed.values.analyze === true)])
+  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { launch: true }) : { failing: 0, found: 0 }, bundleClient(root, config, exported, parsed.values.analyze === true)])
 
   if (checked.status === 'rejected' || checked.value.failing > 0) {
     await putBack(output, previous)

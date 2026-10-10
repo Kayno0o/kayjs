@@ -72,7 +72,7 @@ What the markup alone cannot tell, such as text too faint on its background, con
 
 The `seo` group reads what search engines and social networks see of a public site: one with `site` or `seo` set, or exported with `kay build --static`. On any other site they are allowed unless `lints` sets them or `seo`. No `// kay-allow` comment reaches them, as no template reports them.
 
-- `kay check` reads kay.config.ts: `missing-site`, `missing-description`, `missing-share-image`, `default-favicon`. They point at kay.config.ts.
+- `kay check` reads kay.config.ts: `missing-site`, `missing-description`, `missing-share-image`, `default-favicon`. They point at kay.config.ts. `missing-site`, `missing-share-image` and `default-favicon` name what a site lacks until it goes public, as a fresh project from `kay new` does, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`, whose `--deny-warnings` they would fail.
 - `kay build` reads the head of every page it prerenders once the check passed: `untitled-page`, `undescribed-page`, `duplicate-title`, `long-description`, `unsized-share-image`, `noindex-in-sitemap`. They point at the page's module and name the path; a page rendered per request is not read. One at `deny` fails the build and leaves the last one in place, as a failing check does; `--no-check` reads none.
 
 ## Linting

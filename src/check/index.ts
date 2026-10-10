@@ -2,7 +2,7 @@ import type { KayLibrary, SettingsReplacement } from '../build/libraries'
 import type { Diagnostic, Fix } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
 import type { LintLevel, LintLevels, TypeLint } from '../compiler/lints'
-import type { FaviconConfig, I18nConfig, KayExtension, SeoConfig } from '../config'
+import type { FaviconConfig, I18nConfig, KayConfig, KayExtension, SeoConfig } from '../config'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { Duration } from '../runtime/duration'
@@ -24,7 +24,7 @@ import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacement
 import { cacheEntry } from '../build/transform'
 import { componentName, rendersAsIsland, SourceMap } from '../compiler'
 import { formatReport } from '../compiler/frame'
-import { isLint, isLintGroup, LEVELS, lintLevels, typeLint } from '../compiler/lints'
+import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels, typeLint } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
@@ -83,6 +83,8 @@ export interface CheckOptions {
   // What a public site's head starts from, which the `seo` lints read.
   seo?: SeoConfig | undefined
   favicon?: string | FaviconConfig | false | undefined
+  // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
+  launch?: boolean | undefined
 }
 
 export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity' | 'fixes'> {
@@ -508,11 +510,18 @@ function spellings(path: string): string[] {
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
+// What `check` reads of kay.config.ts.
+export function configCheckOptions(config: KayConfig): CheckOptions {
+  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon } = config
+
+  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon }
+}
+
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const { files, diagnostics, unreached, libraries, settings, exports } = await writeShadowTypes(root, options)
 
-  diagnostics.push(...lintConfigProblems(root, options.lints), ...configSeoLints(options, join(root, CONFIG_FILE), [...files.values()].map(file => file.source)))
+  diagnostics.push(...lintConfigProblems(root, options.lints), ...configSeoLints(options, join(root, CONFIG_FILE), [...files.values()].map(file => file.source)).filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code)))
   const settingsFile = join(resolve(root), SHADOW_DIR, SETTINGS_CHECK)
   const exportsFile = join(resolve(root), SHADOW_DIR, EXPORTS_CHECK)
   const contentFile = join(resolve(root), SHADOW_DIR, CONTENT_CHECK)
