@@ -464,10 +464,10 @@ function isDirectory(path: string): boolean {
 }
 
 // The root is watched for the entries it gains and loses, each top-level directory recursively, and a directory created again gets a new watcher, the old one staying on the inode that is gone.
-// `onChange` gets the changed path relative to the root; the returned function stops watching.
-export function watchProject(root: string, onChange: (file: string) => void): () => void {
+// `onChange` gets the changed path relative to the root; the returned function stops watching. `tests` watches the tests too, as `kay check` reads them.
+export function watchProject(root: string, onChange: (file: string) => void, { tests = false }: { tests?: boolean } = {}): () => void {
   const ignored = gitIgnoredNames(root)
-  const watched = (name: string) => watchedName(name) && !ignored.has(name)
+  const watched = (name: string) => (watchedName(name) || (tests && TEST_DIRS.has(name))) && !ignored.has(name)
   const directories = new Map<string, FSWatcher>()
   const watchDirectory = (name: string) => {
     directories.get(name)?.close()
@@ -479,7 +479,7 @@ export function watchProject(root: string, onChange: (file: string) => void): ()
     // The directory may go between the check and the watch, or the system run out of watchers: `kay dev` keeps going without it.
     try {
       const watcher = watch(join(root, name), { recursive: true }, (_event, file) => {
-        if (file === null || !TEST_FILE.test(file))
+        if (file === null || tests || !TEST_FILE.test(file))
           onChange(`${name}/${file ?? ''}`)
       })
 

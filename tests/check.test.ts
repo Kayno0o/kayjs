@@ -114,13 +114,14 @@ describe('kay check', () => {
     }
   })
 
-  it('refuses a path that is no directory, for check and build alike', async () => {
+  it('refuses a path that is not there, for check and build alike', async () => {
     for (const command of ['check', 'build']) {
       const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), command, join(fixtures, 'missing')], { stdout: 'pipe', stderr: 'pipe' })
       const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
       expect(code).toBe(1)
-      expect(errors).toBe(`kay ${command}: ${join(fixtures, 'missing')} is not a directory\n`)
+      // A path check is given is what to report on, unless it is a project.
+      expect(errors).toBe(`kay ${command}: ${join(fixtures, 'missing')} ${command === 'check' ? 'does not exist' : 'is not a directory'}\n`)
     }
   })
 })
@@ -1458,6 +1459,63 @@ describe('kay check, unused code', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('reports the problems of the files and directories named alone, the project still checked as a whole', async () => {
+    const root = await scratchProject({
+      'src/a.kay': 'img(src="/a.png")\n',
+      'src/b/c.kay': 'img(src="/c.png")\n',
+      'src/d.ts': 'export const d: number = \'d\'\n',
+    })
+    const codes = async (...paths: string[]) => (await runCheck(root, '--format', 'json', ...paths.map(path => join(root, path)))).report
+    const files = async (...paths: string[]) => (JSON.parse(await codes(...paths)) as { problems: { file: string, code: string }[] }).problems.map(problem => [basename(problem.file), problem.code])
+
+    try {
+      expect(await files()).toEqual([['a.kay', 'missing-alt'], ['c.kay', 'missing-alt'], ['d.ts', 'TS2322']])
+      expect(await files('src/a.kay')).toEqual([['a.kay', 'missing-alt']])
+      expect(await files('src/b', 'src/d.ts')).toEqual([['c.kay', 'missing-alt'], ['d.ts', 'TS2322']])
+      expect(await runCheck(root, join(root, 'src/nope.kay'))).toEqual({ code: 1, output: `kay check: ${join(root, 'src/nope.kay')} does not exist\n`, report: '' })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('checks again on every change with --watch', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch', '--format', 'json'], { stdout: 'pipe', stderr: 'pipe' })
+    const reader = child.stdout.getReader()
+    let output = ''
+    // The next report, one JSON document per line.
+    const report = async () => {
+      while (!output.includes('\n')) {
+        const { value, done } = await reader.read()
+
+        if (done)
+          throw new Error('kay check --watch exited')
+
+        output += new TextDecoder().decode(value)
+      }
+
+      const line = output.slice(0, output.indexOf('\n'))
+
+      output = output.slice(line.length + 1)
+
+      return JSON.parse(line) as { errors: number }
+    }
+
+    try {
+      expect(await report()).toMatchObject({ errors: 0 })
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
+      expect(await report()).toMatchObject({ errors: 1 })
+      await Bun.write(join(root, 'src/a.kay'), 'p a\n')
+      expect(await report()).toMatchObject({ errors: 0 })
+    }
+    finally {
+      child.kill()
+      await child.exited
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
 
   it('leaves a file outside the project alone when applying safe fixes', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })

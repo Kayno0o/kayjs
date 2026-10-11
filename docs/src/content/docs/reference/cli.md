@@ -149,11 +149,16 @@ Ctrl-C, `SIGTERM` and `SIGHUP` reach the server once each, whether sent to the t
 
 ```sh
 kay check --deny-warnings --fix
+kay check src/routes/blog src/lib/feed.ts   # only the problems in those
+kay check --watch
 ```
+
+The first path is the project when it holds a `kay.config.ts`, a `package.json` or a `tsconfig.json`; the other paths, relative to the current directory, narrow the report to the problems in those files and directories. The project is still type-checked as a whole.
 
 | Option | Effect |
 | --- | --- |
 | `--deny-warnings` | Fails on warnings too, not only on errors |
+| `--watch` | Checks again on every change to the project, tests included, clearing the previous report in a terminal |
 | `--fix` | Applies the fixes that change nothing else, then reports what is left |
 | `--only <group>` | Reports one group's lints alone, such as `seo`, as an audit |
 | `--format <format>` | `text` by default; `github` prints each problem as a workflow command, `::error file=src/a.kay,line=4,col=3,title=missing-alt::...`, which GitHub and Forgejo Actions show on the diff; `json` prints them as one document on stdout, `{ errors, warnings, problems }`, each problem with its `file` relative to the current directory, `line`, `column`, `endLine` and `endColumn` past the span, `severity`, `code`, `message`, and `label`, `note`, `help` and `related` when it has them. The exit code is the same in every format |
