@@ -62,29 +62,26 @@ async function remove(): Promise<void> {
     await navigate(collectionPath(prefix, collection.name), { replace: true })
 }
 ---
-if entry?.problem as problem
+form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); void save() }})
+  if entry?.problem as problem
+    p.kcms-entry-failure(role="alert") This entry's file does not parse: {problem}. Saving writes the form over it.
   .kcms-entry-editor-bar
-    p.kcms-entry-failure This entry's file does not parse, so it cannot be edited here: {problem}
-    ConfirmDelete(message="Delete this entry? This cannot be undone." failure="Could not delete" trigger="button" onConfirm={remove})
-else
-  form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); void save() }})
-    .kcms-entry-editor-bar
-      if draft()
-        Badge(tone="warning" label="Draft")
-      .kcms-entry-actions
-        if entry
-          if entry.url as url
-            Button(href={onPagePath(prefix, url)} label="Edit on page")
-          if draft()
-            Button(label="Publish" disabled={saving} onClick={publish})
-          ConfirmDelete(message="Delete this entry? This cannot be undone." failure="Could not delete" trigger="button" onConfirm={remove})
-        if drafts.changed(ref)
-          Button(label="Reset" disabled={saving} onClick={() => drafts.reset(ref)})
-        Button(type="submit" label={saving ? 'Saving…' : entry ? 'Save' : 'Create'} variant="accent" busy={saving})
-    if !entry
-      FormField(label="Slug" hint={collection.kind === 'folder' ? "The file's path in the collection's folder, with / between folders" : undefined} required)
-        TextInput(value={slug} onInput={text => slug = text} required)
-      if collection.localized
-        FormField(label="Locale" required)
-          Select(value={newLocale} options={(collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={code => newLocale = code})
-    EntryFields(drafts={drafts} entry={ref} collection={collection})
+    if draft()
+      Badge(tone="warning" label="Draft")
+    .kcms-entry-actions
+      if entry
+        if entry.url as url
+          Button(href={onPagePath(prefix, url)} label="Edit on page")
+        if draft()
+          Button(label="Publish" disabled={saving} onClick={publish})
+        ConfirmDelete(message="Delete this entry? This cannot be undone." failure="Could not delete" trigger="button" onConfirm={remove})
+      if drafts.changed(ref)
+        Button(label="Reset" disabled={saving} onClick={() => drafts.reset(ref)})
+      Button(type="submit" label={saving ? 'Saving…' : entry ? 'Save' : 'Create'} variant="accent" busy={saving})
+  if !entry
+    FormField(label="Slug" hint={collection.kind === 'folder' ? "The file's path in the collection's folder, with / between folders" : undefined} required)
+      TextInput(value={slug} onInput={text => slug = text} required)
+    if collection.localized
+      FormField(label="Locale" required)
+        Select(value={newLocale} options={(collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={code => newLocale = code})
+  EntryFields(drafts={drafts} entry={ref} collection={collection})

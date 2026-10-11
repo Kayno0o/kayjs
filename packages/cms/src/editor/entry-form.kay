@@ -22,8 +22,9 @@ let box: HTMLElement | undefined
 effect(() => {
   const answer = source.value()
 
-  if (answer?.entry.data)
-    drafts.open({ ...entry, data: answer.entry.data, body: answer.entry.body })
+  // A file that does not parse opens empty, and saving writes the form over it.
+  if (answer)
+    drafts.open({ ...entry, data: answer.entry.data ?? {}, body: answer.entry.body })
 })
 
 // A click on the page brings its field into view and puts the caret in it, once the form has loaded.
@@ -62,9 +63,9 @@ section.kcms-entry(ref={element => box = element})
         Button(label={saving ? 'Saving…' : 'Save'} variant="accent" busy={saving} onClick={save})
   if source.status() === 'failed'
     p.kcms-entry-failure Could not load this entry: {source.error()?.message}
-  else if source.value()?.entry.problem as problem
-    p.kcms-entry-failure This entry's file does not parse: {problem}
   else if source.value() as answer
+    if answer.entry.problem as problem
+      p.kcms-entry-failure(role="alert") This entry's file does not parse: {problem}. Saving writes the form over it.
     EntryFields(drafts={drafts} entry={entry} collection={answer.collection})
   else
     p.kcms-entry-loading Loading…

@@ -170,7 +170,7 @@ test('a loaded slug starting with / opens at its escaped path', async () => {
   }
 })
 
-test('a file that does not parse lists as broken, and its screen only offers to delete it', async () => {
+test('a file that does not parse lists as broken, and is written over or deleted', async () => {
   const file = join(ROOT, 'src/content/posts/broken.json')
 
   await Bun.write(file, '{ "title": ')
@@ -181,12 +181,13 @@ test('a file that does not parse lists as broken, and its screen only offers to 
     const page = await site.visit('/admin/collections/posts/broken')
 
     expect(page.text('.kcms-entry-failure')).toContain('does not parse')
-    expect(page.find('[data-kcms-path]')).toEqual([])
+    expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['title', 'draft', 'tags'])
 
     saved.length = 0
 
+    expect((await send('POST', 'posts/broken', { data: { title: 'Mended' } })).answer).toHaveProperty('saved', true)
     expect((await send('DELETE', 'posts/broken')).answer).toHaveProperty('saved', true)
-    expect(saved.map(({ repoPath, text }) => [repoPath, text])).toEqual([['tests/fixture/src/content/posts/broken.json', undefined]])
+    expect(saved.map(({ repoPath, text }) => [repoPath, text === undefined ? undefined : JSON.parse(text)])).toEqual([['tests/fixture/src/content/posts/broken.json', { title: 'Mended' }], ['tests/fixture/src/content/posts/broken.json', undefined]])
   }
   finally {
     await rm(file, { force: true })
