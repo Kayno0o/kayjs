@@ -62,17 +62,27 @@ test('the screens and the editor render their own toaster, for an app rendering 
   expect((await editor.visit('/admin/page?path=/blog/hello')).find('.kui-toaster')).toHaveLength(1)
 })
 
-// Built by kay itself in the fixture: testSite's own build leaves out the app's layout stylesheet when run from another directory.
-test('the fixture ships kayjs-ui\'s theme built by Tailwind', async () => {
-  const build = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'build'], { cwd: ROOT, stdout: 'ignore', stderr: 'ignore' })
-
-  expect(await build.exited).toBe(0)
-
-  const sheets = await Array.fromAsync(new Bun.Glob('*.css').scan(join(ROOT, '.kay', 'client', 'dist')))
-  const css = (await Promise.all(sheets.map(async sheet => Bun.file(join(ROOT, '.kay', 'client', 'dist', sheet)).text()))).join('\n')
+test('the screens ship kayjs-ui\'s theme built by Tailwind', async () => {
+  const built = await testSite({ root: ROOT, browser: true })
+  const links = (await built.visit('/admin')).find('link').filter(link => link.attributes.rel === 'stylesheet').map(link => link.attributes.href ?? '')
+  const css = (await Promise.all(links.map(async href => (await built.fetch(href)).text()))).join('\n')
 
   expect(css).toContain('.kui-btn')
   expect(css).not.toContain('@apply')
+}, 60_000)
+
+test('typing in the editor shows the draft on the page and keeps the field focused', async () => {
+  const built = await testSite({ root: ROOT, browser: true })
+  const page = await built.open('/admin/page?path=/blog/hello')
+  const title = '.kcms-editor input[type="text"]'
+
+  await page.click(title)
+  await page.press('End')
+  await page.type(' again')
+  await page.waitUntil(() => document.querySelector('h1')?.textContent?.endsWith(' again'))
+
+  expect(await page.evaluate(selector => document.activeElement === document.querySelector(selector), title)).toBe(true)
+  expect(page.errors).toEqual([])
 }, 60_000)
 
 test('a collection lists its entries, with a draft to publish, and searches them', async () => {

@@ -69,7 +69,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
       if (inner.format === 'date-time')
         return { ...base, kind: 'datetime' }
 
-      return { ...base, kind: (inner.maxLength ?? 0) > LONG_TEXT ? 'textarea' : 'text' }
+      return { ...base, kind: typeof inner.maxLength === 'number' && inner.maxLength > LONG_TEXT ? 'textarea' : 'text' }
     case 'Date':
       return { ...base, kind: 'date' }
     case 'number':
@@ -79,7 +79,8 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     case 'boolean':
       return { ...base, kind: 'boolean' }
     case 'array':
-      return inner.items === undefined ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: fieldOf(0, inner.items, true), numbered: withoutNull(inner.items).schema.title === undefined }
+      // A tuple, items listed one schema per place, is edited as JSON.
+      return inner.items === undefined || Array.isArray(inner.items) ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: fieldOf(0, inner.items, true), numbered: withoutNull(inner.items).schema.title === undefined }
     case 'object':
       return { ...base, kind: 'group', fields: fieldsOf(inner) }
     default:

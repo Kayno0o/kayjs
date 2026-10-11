@@ -1,7 +1,6 @@
 import type { Commit } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, SourceEntry } from './kay/contract'
-import { join } from 'node:path'
-import { collections, entries, entrySource, removeEntry, repositoryRoot, saveEntry as saveLoaded } from './kay/content'
+import { collections, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
 import { settings } from './settings'
 
 export type SaveOutcome = { issues: Issue[] } | { saved: true, commit?: Commit | undefined }
@@ -63,16 +62,16 @@ export async function deleteEntry(ref: EntryRef): Promise<SaveOutcome> {
     return issues?.length ? { issues } : { saved: true }
   }
 
-  const existing = await entryOf(ref)
-
-  if (!existing)
-    return refused(ref, `${ref.slug} does not exist`, 'slug')
-
-  // The file goes by the path kay listed it under, so one that no longer parses can be deleted too.
-  if (existing.path === undefined)
+  if (collection.dir === undefined)
     return refused(ref, `${collection.name}'s folder lies outside the repository, so its files cannot be committed`)
 
-  const commit = await settings().files.save({ repoPath: existing.path, absolute: join(repositoryRoot(), existing.path), text: undefined, message: `content(${collection.name}): delete ${ref.slug}` })
+  // kay finds the file whether or not it still parses, so a broken one can be deleted too.
+  const found = await entryFile(collection.name, ref.slug, { locale: ref.locale })
+
+  if ('issues' in found)
+    return found
+
+  const commit = await settings().files.save({ repoPath: found.file.repoPath, absolute: found.file.absolute, text: undefined, message: `content(${collection.name}): delete ${ref.slug}` })
 
   return { saved: true, commit }
 }

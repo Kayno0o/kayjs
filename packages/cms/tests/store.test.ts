@@ -4,10 +4,12 @@ import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { configure } from '../src/settings'
 
-const posts: CollectionInfo = { name: 'posts', kind: 'folder', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, components: [], localized: false, draftField: 'draft' }
+const posts: CollectionInfo = { name: 'posts', kind: 'folder', dir: 'content/posts', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, components: [], localized: false, draftField: 'draft' }
+const outside: CollectionInfo = { ...posts, name: 'outside', dir: undefined }
 const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { type: 'object', properties: { name: { type: 'string' } } }, components: [], localized: false }
 
 const TAKEN = 'names an entry the collection already holds'
+const MISSING = 'names no entry of the collection'
 
 let saved: FileChange[]
 let loaded: { slug: string, data: unknown }[]
@@ -16,11 +18,11 @@ let stored: Record<string, SourceEntry[]>
 
 // kay's content API, answering from `stored` and recording what a loader was handed.
 const content: typeof Content = {
-  collections: async () => [posts, products],
+  collections: async () => [posts, products, outside],
   entries: async collection => stored[collection] ?? [],
   entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
     ? { issues: [{ collection, slug, path: '', key: 'slug', message: TAKEN }] }
-    : data.title === ''
+    : (data as Record<string, unknown>).title === ''
       ? { issues: [{ collection, slug, path: 'title', message: 'Required' }] }
       : { file: { path: `${slug}.md`, absolute: `/site/content/${collection}/${slug}.md`, repoPath: `content/${collection}/${slug}.md`, text: `${JSON.stringify(data)}\n${options?.body ?? ''}` } },
   saveEntry: async (collection, entry, options) => {
@@ -31,15 +33,19 @@ const content: typeof Content = {
 
     return {}
   },
+  entryFile: async (collection, slug) => {
+    const path = stored[collection]?.find(entry => entry.slug === slug)?.path
+
+    return path === undefined ? { issues: [{ collection, slug, path: '', key: 'slug', message: MISSING }] } : { file: { path, absolute: `/site/${path}`, repoPath: path } }
+  },
   removeEntry: async (collection, slug) => {
     if (!stored[collection]?.some(entry => entry.slug === slug))
-      return { issues: [{ collection, slug, path: '', key: 'slug', message: 'names no entry of the collection' }] }
+      return { issues: [{ collection, slug, path: '', key: 'slug', message: MISSING }] }
 
     removed.push(slug)
 
     return {}
   },
-  repositoryRoot: () => '/site',
 }
 
 void mock.module('../src/kay/content', () => content)
@@ -94,21 +100,21 @@ describe('deleteEntry', () => {
     expect(saved).toEqual([{ repoPath: 'content/posts/hello.md', absolute: '/site/content/posts/hello.md', text: undefined, message: 'content(posts): delete hello' }])
   })
 
-  test('says so for an entry that does not exist', async () => {
-    expect(await deleteEntry({ collection: 'posts', slug: 'nope' })).toHaveProperty('issues.0.message', 'nope does not exist')
+  test('passes on kay\'s issue for an entry that does not exist', async () => {
+    expect(await deleteEntry({ collection: 'posts', slug: 'nope' })).toHaveProperty('issues.0.message', MISSING)
   })
 
-  test('commits away the file of an entry that no longer parses, by the path kay listed', async () => {
+  test('commits away the file of an entry that no longer parses, as kay finds it', async () => {
     stored.posts = [{ slug: 'broken', path: 'content/posts/broken.md', data: undefined, problem: 'bad YAML', draft: false }]
 
     expect(await deleteEntry({ collection: 'posts', slug: 'broken' })).toHaveProperty('saved', true)
     expect(saved.map(change => [change.repoPath, change.absolute])).toEqual([['content/posts/broken.md', '/site/content/posts/broken.md']])
   })
 
-  test('refuses a folder entry kay lists without a path, outside the repository', async () => {
-    stored.posts = [{ slug: 'hello', data: { title: 'Hello' }, draft: false }]
+  test('refuses an entry of a folder outside the repository', async () => {
+    stored.outside = [{ slug: 'hello', data: { title: 'Hello' }, draft: false }]
 
-    expect(await deleteEntry({ collection: 'posts', slug: 'hello' })).toHaveProperty('issues.0.message', 'posts\'s folder lies outside the repository, so its files cannot be committed')
+    expect(await deleteEntry({ collection: 'outside', slug: 'hello' })).toHaveProperty('issues.0.message', 'outside\'s folder lies outside the repository, so its files cannot be committed')
     expect(saved).toEqual([])
   })
 

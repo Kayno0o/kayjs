@@ -3,7 +3,7 @@ import { localPath } from 'kay'
 import { enterPreview } from 'kay/server'
 import { settings } from '../settings'
 
-// The screens' guard let the request in, so it may edit the page it names; a missing or outside path lands on the screens, which every app has.
+// The screens' guard let the request in, so it may edit the page it names; a missing or outside path lands back on the screens.
 enterPreview(ctx, { edit: true })
 ctx.redirect(localPath(ctx.url.searchParams.get('path'), settings().prefix))
 ---
