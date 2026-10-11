@@ -632,6 +632,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
   const region = new Region(element, start, end)
   // The fallback, and whether the loop rendered before, so the rows it makes then play their enter phase.
   const empty = blockIn(region)
+  // The rows a run made, which enter once it is done.
   const built: Row[] = []
   let rows: Row[] = []
 
@@ -673,6 +674,13 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
     untrack(() => {
       const entering = empty.rendered
 
+      // A run that threw part way leaves the rows it made and never kept.
+      for (const row of built) {
+        if (!rows.includes(row))
+          removeRow(row)
+      }
+
+      built.length = 0
       rows = claim && !entering ? region.claim(() => list.map((item, index) => makeRow(item, index, key === false ? index : key(item)))) : reconcileRows(region, rows, list, key, makeRow)
 
       if (entering) {

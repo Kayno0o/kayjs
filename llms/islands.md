@@ -25,7 +25,7 @@ A signal a `.ts` module exports is one state for every island of the page that i
 
 ### Transitions
 
-`transition="fade"` on the element an `if` branch, a `for` row or an `await` block shows animates it in as the block shows it and out before the block takes it away, as Vue's `<Transition>` does, with CSS alone:
+`transition="fade"` on the element an `if` branch, a `for` row, a `for`'s `else`, a `try`'s `catch` or an `await` block shows animates it in as the block shows it and out before the block takes it away, as Vue's `<Transition>` does, with CSS alone:
 
 ```kay
 if open()
@@ -37,7 +37,7 @@ if open()
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 ```
 
-- Entering, the element gets `fade-enter-from` and `fade-enter-active`, then from the next frame `fade-enter-to` in place of `fade-enter-from`, and loses them all once the longest transition or animation they start has run. Leaving goes the same way with `fade-leave-`, then removes the element. The rest of the block changes at once: a row taken out of a `for` stays where it was while it leaves, and a row added plays in where it goes.
+- Entering, the element gets `fade-enter-from` and `fade-enter-active`, then from the next frame `fade-enter-to` in place of `fade-enter-from`, and loses them all once the longest transition or animation they start has run. Leaving goes the same way with `fade-leave-`, then removes the element. The rest of the block changes at once: a row taken out of a `for` stays where it was while it leaves, and a row added plays in where it goes. What leaves stays while what takes its place enters: the last rows of a `for` and its `else`, either way round.
 - Each phase takes classes of its own too, so Tailwind's utilities need no stylesheet: `li(transition:enter="transition duration-200" transition:enter-from="opacity-0" transition:leave="transition duration-150" transition:leave-to="opacity-0")`. `transition:enter` and `transition:leave` hold for the whole phase, `-from` for its first frame and `-to` after it; they add to the named classes when `transition` names some.
 - Elements animating alike share their classes through a preset: a module exports `export const fade: TransitionClasses = { enter: 'transition duration-200', enterFrom: 'opacity-0', leave: 'transition duration-150', leaveTo: 'opacity-0' }`, `TransitionClasses` from `kay`, and `li(transition={fade})` plays it. The `transition:` attributes add to a preset's classes, and Tailwind finds them in the module as it scans the app's files.
 - Only the element a block shows plays: the first element of its branch or row, or the root of a component it renders. What renders with the island, or with the first render of a block, shows as it is, and a row moving to another place in the list does not play.

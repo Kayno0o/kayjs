@@ -659,6 +659,71 @@ describe('transitions', () => {
     }
   })
 
+  it('take out the rows a run that threw made, and play in only the rows the next one makes', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    const { root, dispose } = await mountKay({
+      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a'])\nconst shown = (item: string) => {\n  if (item === 'bad')\n    throw new Error('bad')\n\n  return item\n}\n---\nbutton.bad(onClick={() => items.set(['a', 'b', 'bad'])}) Bad\nbutton.fix(onClick={() => items.set(['a', 'b2', 'c'])}) Fix\nul\n  for item, i of items() key={i}\n    li(transition="row" ${STYLE}) {shown(item)}\n`,
+    })
+
+    try {
+      const rows = () => [...root.querySelectorAll('li')].map(row => [row.textContent, row.className])
+
+      root.querySelector<HTMLElement>('button.bad')!.click()
+      await updated()
+      root.querySelector<HTMLElement>('button.fix')!.click()
+      await updated()
+      expect(rows()).toEqual([['a', ''], ['b', 'row-leave-from row-leave-active'], ['b2', 'row-enter-from row-enter-active'], ['c', 'row-enter-from row-enter-active']])
+      await done()
+      expect(rows()).toEqual([['a', ''], ['b2', ''], ['c', '']])
+    }
+    finally {
+      errors.mockRestore()
+      await dispose()
+    }
+  })
+
+  it('keep the rows leaving a list their element holds alone while the next rows enter', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.clear(onClick={() => items.set([])}) Clear\nbutton.add(onClick={() => items.set(['z'])}) Add\nul\n  for item of items() key={item}\n    li(transition="row" ${STYLE}) {item}\n`,
+    })
+
+    try {
+      const rows = () => [...root.querySelectorAll('li')].map(row => [row.textContent, row.className])
+
+      root.querySelector<HTMLElement>('button.clear')!.click()
+      await updated()
+      await twoFrames()
+      root.querySelector<HTMLElement>('button.add')!.click()
+      await updated()
+      expect(rows()).toEqual([['a', 'row-leave-active row-leave-to'], ['b', 'row-leave-active row-leave-to'], ['c', 'row-leave-active row-leave-to'], ['z', 'row-enter-from row-enter-active']])
+      await done()
+      expect(rows()).toEqual([['z', '']])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('play a try\'s catch block in when what it renders throws after its first render', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    const { root, dispose } = await mountKay({
+      'main.kay': `---\nimport { signal } from 'kay'\n\nconst broken = signal(false)\nconst read = () => {\n  if (broken())\n    throw new Error('broken')\n\n  return 'fine'\n}\n---\nbutton(onClick={() => broken.set(true)}) Break\ntry\n  p.content {read()}\ncatch error\n  p.caught(transition="fade" ${STYLE}) Oops\n`,
+    })
+
+    try {
+      expect(root.querySelector('.content')?.textContent).toBe('fine')
+      root.querySelector('button')!.click()
+      await updated()
+      expect([root.querySelector('.content'), root.querySelector('.caught')?.className]).toEqual([null, 'caught fade-enter-from fade-enter-active'])
+      await done()
+      expect(root.querySelector('.caught')?.className).toBe('caught')
+    }
+    finally {
+      errors.mockRestore()
+      await dispose()
+    }
+  })
+
   it('skip both phases when the user asks for reduced motion', async () => {
     const matchMedia = spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: query === '(prefers-reduced-motion: reduce)' }) as MediaQueryList)
     const { root, dispose } = await mountKay({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
