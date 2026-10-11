@@ -109,6 +109,7 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat):
   let running: Promise<void> | undefined
   let timer: Timer | undefined
   let child: Subprocess | undefined
+  let stopping = false
   const checks = async () => {
     do {
       changed = false
@@ -121,33 +122,57 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat):
 
       const code = await child.exited
 
+      // Stopped by the watch, which exits starting no other.
+      if (stopping)
+        break
+
       // A config or a module it imports calling `process.exit()`, or a crash, leaves no report of its own.
-      if (code > 1 && child.signalCode === null)
-        printFailure('check', `the check stopped with exit code ${code} before reporting`, format)
+      if (code > 1)
+        printFailure('check', child.signalCode ? `the check died of ${child.signalCode} before reporting` : `the check stopped with exit code ${code} before reporting`, format)
     } while (changed)
 
     child = undefined
     running = undefined
   }
 
+  const signalGroup = (signal: NodeJS.Signals) => {
+    try {
+      process.kill(-child!.pid, signal)
+    }
+    catch {
+      // The check ended meanwhile, its group with it.
+    }
+  }
+  // A second interrupt kills a check that has not stopped at the first.
   const stop = async (signal: NodeJS.Signals, code: number) => {
+    if (stopping) {
+      if (child)
+        signalGroup('SIGKILL')
+
+      return
+    }
+
+    stopping = true
+
     if (child) {
-      process.kill(-child.pid, signal)
+      signalGroup(signal)
       await child.exited
     }
 
     process.exit(code)
   }
 
-  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]] as const)
-    process.once(signal, () => void stop(signal, code))
+  // A closed terminal hangs up on the watch alone, the check running in a session of its own.
+  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]] as const)
+    process.on(signal, () => void stop(signal, code))
 
   running = checks()
   watchProject(root, () => {
     changed = true
     clearTimeout(timer)
     timer = setTimeout(() => {
-      running ??= checks()
+      if (!stopping)
+        running ??= checks()
     }, WATCH_DEBOUNCE_MS)
   }, { tests: true })
 

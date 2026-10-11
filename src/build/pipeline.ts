@@ -257,8 +257,9 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
 
   const favicon = faviconSource(root, config.favicon, config.manifest)
 
+  // The check warned of what an SVG draws poorly already.
   if (favicon !== undefined)
-    await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR))
+    await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR), checking ? () => undefined : undefined)
 
   await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects })
   await Promise.all([compressFiles(client.dir), compressFiles(join(paths.output, PRERENDERED_DIR))])

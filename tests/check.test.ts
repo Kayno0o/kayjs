@@ -149,7 +149,7 @@ async function runCheckIn(env: Record<string, string>, root: string, ...flags: s
 }
 
 // `kay check --watch` with JSON reports, the next of them at each `report()`, one document per line.
-function watchChecks(root: string, ...flags: string[]): { report: () => Promise<{ errors: number }>, stop: () => Promise<void> } {
+function watchChecks(root: string, ...flags: string[]): { report: () => Promise<{ errors: number }>, stop: (signal?: NodeJS.Signals) => Promise<number> } {
   const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch', '--format', 'json', ...flags], { stdout: 'pipe', stderr: 'pipe' })
   const reader = child.stdout.getReader()
   let output = ''
@@ -171,9 +171,10 @@ function watchChecks(root: string, ...flags: string[]): { report: () => Promise<
 
       return JSON.parse(line) as { errors: number }
     },
-    stop: async () => {
-      child.kill()
-      await child.exited
+    stop: async (signal = 'SIGTERM') => {
+      child.kill(signal)
+
+      return child.exited
     },
   }
 }
@@ -1646,8 +1647,8 @@ describe('kay check, unused code', () => {
     }
   }, 30_000)
 
-  it('keeps watching after a check that exits, as a kay.config.ts calling process.exit(), saying so', async () => {
-    const root = await scratchProject({ 'kay.config.ts': 'if (await Bun.file(import.meta.dir + \'/crash\').exists())\n  process.exit(9)\n\nexport default {}\n', 'src/a.kay': 'p a\n' })
+  it('keeps watching after a check that exits or dies, as a kay.config.ts calling process.exit(), saying so', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'const crash = Bun.file(import.meta.dir + \'/crash\')\n\nif (await crash.exists() && await crash.text() === \'kill\')\n  process.kill(process.pid, \'SIGKILL\')\nelse if (await crash.exists())\n  process.exit(9)\n\nexport default {}\n', 'src/a.kay': 'p a\n' })
     const watch = watchChecks(root)
 
     try {
@@ -1655,6 +1656,9 @@ describe('kay check, unused code', () => {
       await Bun.write(join(root, 'crash'), '')
       await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
       expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null, message: 'the check stopped with exit code 9 before reporting' }] })
+      await Bun.write(join(root, 'crash'), 'kill')
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/b.png")\n')
+      expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null, message: 'the check died of SIGKILL before reporting' }] })
       await rm(join(root, 'crash'))
       await Bun.write(join(root, 'src/a.kay'), 'p a\n')
       expect(await watch.report()).toMatchObject({ errors: 0 })
@@ -1665,8 +1669,17 @@ describe('kay check, unused code', () => {
     }
   }, 30_000)
 
-  it('stops the check running, and what it started, when the watch is interrupted', async () => {
-    const root = await scratchProject({ 'kay.config.ts': 'const started = Bun.spawn([\'sleep\', \'30\'])\n\nawait Bun.write(import.meta.dir + \'/pid\', String(started.pid))\nawait Bun.sleep(30_000)\n\nexport default {}\n' })
+  it.each([
+    ['SIGTERM', [], 143],
+    ['SIGHUP', [], 129],
+    // A check and what it runs ignoring the first interrupt, killed at the second.
+    ['SIGINT', ['SIGINT'], 130],
+  ] as const)('stops the check running, and what it started, when the watch gets %s', async (signal, before, code) => {
+    const ignoring = before.length > 0
+    const config = ignoring
+      ? 'process.on(\'SIGINT\', () => {})\n\nconst started = Bun.spawn([\'sh\', \'-c\', \'trap "" INT; exec sleep 30\'])\n'
+      : 'const started = Bun.spawn([\'sleep\', \'30\'])\n'
+    const root = await scratchProject({ 'kay.config.ts': `${config}\nawait Bun.write(import.meta.dir + '/pid', String(started.pid))\nawait Bun.sleep(30_000)\n\nexport default {}\n` })
     const watch = watchChecks(root)
     const pid = join(root, 'pid')
     const alive = (id: number) => {
@@ -1685,7 +1698,14 @@ describe('kay check, unused code', () => {
       const started = Number(await Bun.file(pid).text())
 
       expect(alive(started)).toBe(true)
-      await watch.stop()
+
+      for (const first of before) {
+        void watch.stop(first)
+        await Bun.sleep(200)
+        expect(alive(started)).toBe(true)
+      }
+
+      expect(await watch.stop(signal)).toBe(code)
 
       for (let wait = 0; wait < 50 && alive(started); wait++)
         await Bun.sleep(20)

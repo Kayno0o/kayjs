@@ -12,6 +12,7 @@ export const MIN_WORD = 2
 const WORD = /[\p{L}\p{N}]+/gu
 
 // Soft hyphens, zero-width joiners and byte order marks, dropped from a word they sit in, in the index and the query alike; a zero-width space parts words, as in Thai.
+// The zero-width joiner stays last: anywhere else, no-misleading-character-class reads it as joining its neighbours.
 export const INVISIBLE = /[\u00AD\u200C\u2060\uFEFF\u200D]/g
 const MARK = /\p{M}/gu
 // Characters of text kept on either side of the first word found.

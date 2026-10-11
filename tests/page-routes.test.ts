@@ -36,7 +36,7 @@ describe('routeTable', () => {
     expect(match(about, '/orgs/acme')).toBeUndefined()
   })
 
-  it('tries the pages a matcher checks before the one without, then by file path in code-point order, upper case first', () => {
+  it('tries the pages a matcher checks before the one without, then by file path in UTF-16 code unit order, upper case first', () => {
     const plain = served('items/[id].kay')
     const even = served('items/[id=even].kay')
     const admin = served('(admin)/items/[id=odd].kay')

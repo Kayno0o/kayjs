@@ -61,7 +61,7 @@ export async function findKayLibraries(root: string): Promise<KayLibrary[]> {
   if (manifest)
     await visit(root, manifest, APP_DEPENDENCIES)
 
-  // In the code-point order of their directories, so what is generated from them reads the same from one run and one machine to the next.
+  // In the UTF-16 code unit order of their directories, so what is generated from them reads the same from one run and one machine to the next.
   return [...found.values()].sort((a, b) => a.dir < b.dir ? -1 : 1)
 }
 

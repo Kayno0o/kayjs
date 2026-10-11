@@ -117,7 +117,7 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = []): Promis
     }
   }
 
-  // By code point, as every machine orders them alike.
+  // By UTF-16 code unit, as every machine orders them alike.
   return modules.sort((a, b) => a.file < b.file ? -1 : Number(a.file > b.file))
 }
 

@@ -74,7 +74,8 @@ const ENTITIES: Record<string, string> = {
 const MAX_CODE_POINT = 0x10FFFF
 // What a link to its own heading shows beside the heading's text, left out of it: a mark, or nothing visible.
 const ANCHOR_MARKS = /^[\s#¶§\u200B]*$/
-const SPACES = /\s+/g
+// A zero-width space parts words as a space does, which `\s` and `trim()` leave out.
+const SPACES = /[\s\u200B]+/g
 // Characters past which the file of a two-letter start is split by three.
 const SHARD_SIZE = 16_384
 const MAIN = /<main[\s>]/

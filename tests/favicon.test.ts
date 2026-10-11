@@ -211,6 +211,8 @@ describe('favicon', () => {
       expect(warned).toHaveBeenCalledWith(`kay: the favicon ${lettered} has text, which kay draws without fonts, so as nothing; turn the text into paths`)
       warned.mockClear()
       expect((await bootProblems(scratch, { favicon: 'lettered.svg' })).filter(problem => problem.file === lettered)).toEqual([{ file: lettered, line: 1, column: 1, severity: 'warning', message: `kay: the favicon ${lettered} has text, which kay draws without fonts, so as nothing; turn the text into paths` }])
+      // As `kay build` writes them once its check warned.
+      await writeFavicons({ image: lettered, svg: lettered }, join(scratch, 'built-lettered'), () => undefined)
       expect(warned).not.toHaveBeenCalled()
     }
     finally {

@@ -298,7 +298,7 @@ describe('page swap, checking a form in the browser', () => {
     expect(persisted<number>('page', 1, { storage: 'query' })()).toBe(1)
   })
 
-  it('parses each page data script once, a script a swap brings afresh, and skips one that does not parse after reporting it once', () => {
+  it('parses each page data script once, a script a swap brings afresh, and skips one that does not parse after reporting it once, until its text changes', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const seen: string[] = []
     const parse = (text: string) => {
@@ -317,9 +317,14 @@ describe('page swap, checking a form in the browser', () => {
       expect(seen).toHaveLength(3)
       expect(logged).toHaveBeenCalledTimes(1)
 
+      // As a script read before the stream ended it.
+      document.querySelectorAll('script[data-test]')[1]!.textContent = '{"c":3}'
+      expect(pageData<object>('script[data-test]', parse)).toEqual([{ a: 1 }, { c: 3 }, { b: 2 }])
+      expect(seen).toHaveLength(4)
+
       document.body.innerHTML = '<script type="application/json" data-test>{"a":1}</script>'
       expect(pageData<object>('script[data-test]', parse)[0]).not.toBe(first[0]!)
-      expect(seen).toHaveLength(4)
+      expect(seen).toHaveLength(5)
     }
     finally {
       logged.mockRestore()

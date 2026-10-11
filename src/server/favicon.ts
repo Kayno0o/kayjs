@@ -67,10 +67,10 @@ export interface FaviconOptions {
   base?: string | undefined
 }
 
-// The favicon in the sizes browsers ask for: an ICO of PNGs, the Apple touch icon and the manifest's icons, maskable ones included.
-export async function faviconFiles({ image: source, svg, maskable }: FaviconSource): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
-  const png = await drawer(source, 'favicon')
-  const maskablePng = maskable === undefined ? undefined : await drawer(maskable, 'maskable icon')
+// The favicon in the sizes browsers ask for: an ICO of PNGs, the Apple touch icon and the manifest's icons, maskable ones included; what an SVG draws poorly goes to `warn`, kay's log by default.
+export async function faviconFiles({ image: source, svg, maskable }: FaviconSource, warn?: (message: string) => void): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
+  const png = await drawer(source, 'favicon', warn)
+  const maskablePng = maskable === undefined ? undefined : await drawer(maskable, 'maskable icon', warn)
   const files = new Map<string, Uint8Array<ArrayBuffer>>()
 
   for (const [path, size] of Object.entries(PNG_FILES))
@@ -90,9 +90,9 @@ export async function faviconFiles({ image: source, svg, maskable }: FaviconSour
 }
 
 // Draws the image at each size: an SVG drawn at it, so even the 16-pixel icon is sharp, an image resized to it once checked square.
-async function drawer(image: string, what: string): Promise<(size: number) => Promise<Uint8Array<ArrayBuffer>>> {
+async function drawer(image: string, what: string, warn?: (message: string) => void): Promise<(size: number) => Promise<Uint8Array<ArrayBuffer>>> {
   if (SVG_FILE.test(image)) {
-    const draw = await svgIconOf(image, what)
+    const draw = await svgIconOf(image, what, warn)
 
     return async size => draw(size)
   }
@@ -142,10 +142,10 @@ async function checkSquare(source: string, what: string): Promise<void> {
     kayLog('warn', `the ${what} ${source} is ${width}x${height}, enlarged to the icons up to ${LARGEST}x${LARGEST}, which look blurred; a source of ${LARGEST}x${LARGEST} or more keeps them sharp`)
 }
 
-export async function writeFavicons(source: FaviconSource, dir: string): Promise<void> {
+export async function writeFavicons(source: FaviconSource, dir: string, warn?: (message: string) => void): Promise<void> {
   await mkdir(dir, { recursive: true })
 
-  for (const [path, bytes] of await faviconFiles(source))
+  for (const [path, bytes] of await faviconFiles(source, warn))
     await Bun.write(join(dir, path.slice(1)), bytes)
 }
 

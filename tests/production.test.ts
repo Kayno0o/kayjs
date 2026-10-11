@@ -45,12 +45,15 @@ async function refusalOf(...args: Parameters<typeof protectionRefusal>): Promise
   return await protectionRefusal(...args) as ProtectionRefusal | undefined
 }
 
-async function until(holds: () => Promise<boolean>, timeout = 10_000): Promise<void> {
+// Bun's own timeout per test is 5 s: a test waiting here sets a longer one, so this error shows first.
+const UNTIL_TEST_MS = 20_000
+
+async function until(holds: () => Promise<boolean>, what: string, timeout = 10_000): Promise<void> {
   const end = performance.now() + timeout
 
   while (!await holds()) {
     if (performance.now() > end)
-      throw new Error('timed out')
+      throw new Error(`timed out waiting for ${what}`)
 
     await Bun.sleep(10)
   }
@@ -972,7 +975,7 @@ describe('revalidation', () => {
       // The first request past the period still gets the page as it was built, as does one while the new render runs.
       expect(await (await visit()).text()).toContain('<h1>Edition 1</h1>')
       expect(await (await visit()).text()).toContain('<h1>Edition 1</h1>')
-      await until(async () => (await (await visit()).text()).includes('<h1>Edition 2</h1>'))
+      await until(async () => (await (await visit()).text()).includes('<h1>Edition 2</h1>'), 'edition 2 to be served')
 
       const fresh = await visit({ 'if-none-match': etag, 'accept-encoding': 'br' })
 
@@ -987,7 +990,7 @@ describe('revalidation', () => {
       await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
-  })
+  }, UNTIL_TEST_MS)
 
   it('keeps the page it has when a render fails, trying again a minute later at most', async () => {
     const root = process.cwd()
@@ -1003,18 +1006,19 @@ describe('revalidation', () => {
       news.failing = true
       setSystemTime(Date.now() + 61_000)
       await visit()
-      await until(async () => logged.mock.calls.length > 0)
+      await until(async () => logged.mock.calls.length > 0, 'the failed render to be logged')
       expect(await visit()).toContain('<h1>Edition 1</h1>')
 
       news.failing = false
       news.edition = 3
       await visit()
-      await Bun.sleep(50)
+      // Long enough for a render tried again too soon to be served, however loaded the machine.
+      await Bun.sleep(500)
       expect(await visit()).toContain('<h1>Edition 1</h1>')
 
       setSystemTime(Date.now() + 122_000)
       await visit()
-      await until(async () => (await visit()).includes('<h1>Edition 3</h1>'))
+      await until(async () => (await visit()).includes('<h1>Edition 3</h1>'), 'edition 3 to be served')
     }
     finally {
       setSystemTime()
@@ -1024,7 +1028,7 @@ describe('revalidation', () => {
       await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
-  })
+  }, UNTIL_TEST_MS)
 
   it('renders the pages again on their first request when the server runs for another site than the build', async () => {
     const root = process.cwd()
@@ -1046,15 +1050,18 @@ describe('revalidation', () => {
       const moved = await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' })
       const html = await (await moved.handle(new Request('http://localhost/news'))).text()
 
-      await Bun.sleep(100)
-      expect(await (await moved.handle(new Request('http://localhost/news', { headers: { 'accept-encoding': 'br' } }))).bytes()).toEqual((await compressTextStrongest(html)).br!)
+      const strongest = (await compressTextStrongest(html)).br!
+      const served = async () => (await moved.handle(new Request('http://localhost/news', { headers: { 'accept-encoding': 'br' } }))).bytes()
+
+      // The strongest compression runs in the background, after the page is served.
+      await until(async () => Buffer.from(await served()).equals(strongest), 'the strongest brotli to be served')
     }
     finally {
       warned.mockRestore()
       await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
-  })
+  }, UNTIL_TEST_MS)
 
   it('builds a page reading the site with none set, and renders it again for the site the server runs for', async () => {
     const root = process.cwd()
