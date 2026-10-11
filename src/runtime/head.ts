@@ -100,7 +100,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
 
       if (tag.tag === 'html') {
         for (const [name, value] of Object.entries(tag.props)) {
-          if (!LOCALE_ATTRIBUTES.includes(name.toLowerCase()))
+          if (!LOCALE_ATTRIBUTES.has(name.toLowerCase()))
             root[name.toLowerCase()] = value
         }
 
@@ -182,7 +182,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   const rootAttributes = attributesOf(root)
 
   if (rootAttributes.size > 0)
-    metas += tagMarkup({ tag: 'meta', props: { name: ROOT_ATTRIBUTES, content: JSON.stringify(Object.fromEntries([...rootAttributes].map(([name, value]) => [name, value === true ? '' : value]))) } })
+    metas += tagMarkup({ tag: 'meta', props: { name: ROOT_ATTRIBUTES, content: servedJson(rootAttributes) } })
 
   return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, root: markupOf(rootAttributes), charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
 }
@@ -306,6 +306,11 @@ function attributesOf(props: Record<string, unknown>): Map<string, string | true
   }
 
   return attributes
+}
+
+// The attributes `<html>` takes, as JSON by name for the page swap, which reads one written bare as the browser does, `""`.
+function servedJson(attributes: Map<string, string | true>): string {
+  return JSON.stringify(Object.fromEntries([...attributes].map(([name, value]) => [name, value === true ? '' : value])))
 }
 
 function markupOf(attributes: Map<string, string | true>): string {

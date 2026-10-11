@@ -290,33 +290,42 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.locator('section.box:has(p.boxed-bumps) button.box-count', { hasText: 'Box 1' }).waitFor()
   })
 
-  it('changes on <html> only what the server sets differently for the next page, a class token by token, keeping what a script set', async () => {
+  it('changes on <html> only what the server sets differently for the next page, where a script left it as served, a class token by token', async () => {
+    const label = 'say "hi" & <b>'
+
     await page.goto(origin)
+    // A theme toggle, and a class token the server set already, which stays the server's.
     await page.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
       document.documentElement.dataset.theme = 'dark'
-      document.documentElement.classList.add('dark')
+      document.documentElement.classList.add('dark', 'served')
     })
     const root = async (): Promise<Record<string, string | string[]>> => page.evaluate(() => {
       const { attributes, classList } = document.documentElement
 
       return { ...Object.fromEntries([...attributes].filter(({ name }) => name !== 'class' && name !== 'aria-busy').map(({ name, value }) => [name, value])), class: [...classList].sort() }
     })
-    const go = async (link: string, heading: string) => {
-      await page.click(`a.${link}`)
+    const shown = async (heading: string) => {
       await page.locator('h1', { hasText: heading }).waitFor()
       expect(await sameDocument()).toBe(true)
     }
 
-    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'class': ['dark', 'served'] })
-    // The layout sets the same theme on the next page, so the toggle's stays, and the page's class replaces the layout's.
-    await go('second', 'Second')
-    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-second': '', 'class': ['dark', 'second'] })
-    // A page whose server sets nothing takes off what the last one's set, and no more.
-    await go('later', 'Later')
-    expect(await root()).toEqual({ lang: 'en', class: ['dark'] })
-    await go('home', 'Home')
-    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'light', 'class': ['dark', 'served'] })
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'class': ['dark', 'served'] })
+    // The page's class replaces the layout's, and the theme the server sets again stays the toggle's.
+    await page.click('a.second')
+    await shown('Second')
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['dark', 'second'] })
+    // A page whose server sets nothing takes off what the last one's set, but for the theme the toggle changed.
+    await page.click('a.later')
+    await shown('Later')
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'class': ['dark'] })
+    // Back, the server's values come back through the meta's JSON as they were, the toggle's theme still kept.
+    await page.goBack()
+    await shown('Second')
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['dark', 'second'] })
+    await page.click('a.home')
+    await shown('Home')
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'class': ['dark', 'served'] })
   })
 
   it('restores where the page was scrolled to when going back', async () => {

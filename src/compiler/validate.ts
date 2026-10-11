@@ -136,7 +136,7 @@ class Validator {
   // `lang` and `dir` follow the page's locale, which an `html` tag cannot set apart from its messages and dates.
   private rootAttributes(tag: ElementNode): void {
     for (const attribute of tag.attributes) {
-      if (attribute.kind !== 'spread' && LOCALE_ATTRIBUTES.includes(this.text(attribute.name).toLowerCase()))
+      if (attribute.kind !== 'spread' && LOCALE_ATTRIBUTES.has(this.text(attribute.name).toLowerCase()))
         this.error(attribute.name, `kay sets \`${this.text(attribute.name)}\` on \`<html>\` from the page's locale`, { help: 'set `lang` in kay.config.ts, or the locales of `i18n`' })
     }
   }

@@ -31,7 +31,7 @@ head
 slot
 ```
 
-`lang` and `dir` stay kay's, set from `lang` in kay.config.ts or from the page's locale. When a link swaps the page in, `<html>` changes only where the server sets something else for the next page, a `class` token by token, so what a script set, as a theme toggle does, stays.
+`lang` and `dir` stay kay's, set from `lang` in kay.config.ts or from the page's locale. When a link swaps the page in, `<html>` changes only where the server sets something else for the next page, and only where a script left it as the server set it, so a theme a toggle changed stays. A `class` changes token by token: a token the server set is the server's, even when a script added it too.
 
 ## Site defaults
 
