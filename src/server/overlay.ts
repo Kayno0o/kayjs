@@ -2,7 +2,7 @@ import type { FileDiagnostic } from '../build/transform'
 import type { PageError } from '../runtime'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { mapStack } from '../build/sourcemap'
+import { mappedStack } from '../build/sourcemap'
 import { formatDiagnostic } from '../compiler/frame'
 
 const STYLE = 'body{margin:0;padding:2rem;font:14px/1.5 ui-monospace,monospace;background:#fff;color:#1a1a1a}h1{font-size:1.1rem;color:#b00020;white-space:pre-wrap}h2{font-size:1rem}pre{padding:1rem;border:1px solid #ddd;overflow-x:auto}'
@@ -17,7 +17,7 @@ export function errorPage(error: PageError): string {
 // Development only: every compile error at its `.kay` line, or the error that stopped the server from booting.
 export function compileErrorPage(diagnostics: FileDiagnostic[], error: unknown): string {
   if (diagnostics.length === 0) {
-    const message = error instanceof Error ? mapStack(error.stack ?? error.message) : String(error)
+    const message = error instanceof Error ? mappedStack(error) ?? error.message : String(error)
 
     return document('Boot failed', `<h1>The server failed to boot</h1><pre>${Bun.escapeHTML(message)}</pre>`)
   }

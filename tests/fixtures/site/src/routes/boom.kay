@@ -9,6 +9,14 @@ export const explode = action(t.Object({}), () => {
 if (ctx.url.searchParams.has('fail'))
   throw new Error('Kaboom')
 
+// A stack starting with the error's name alone, as Bun 1.4 sometimes writes one.
+if (ctx.url.searchParams.has('bare')) {
+  const error = new Error('Kaboom bare')
+
+  error.stack = error.stack!.replace('Error: Kaboom bare', 'Error')
+  throw error
+}
+
 const later = defer(ctx.url.searchParams.has('later') ? Promise.reject(new Error('Kaboom later')) : Promise.resolve('Fine'))
 
 export const send = action(t.Object({ message: t.String({ maxLength: 1000 }) }), () => {

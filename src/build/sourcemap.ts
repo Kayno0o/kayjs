@@ -171,9 +171,14 @@ function mapPosition(file: string, line: string, column: string): string | undef
   return position ? `${withoutTwin(file)}:${position.line}:${position.column}` : undefined
 }
 
+// An error's stack mapped to `.kay` lines, starting with its message; undefined when it has none.
+export function mappedStack(error: Error): string | undefined {
+  return error.stack !== undefined && error.stack !== '' ? mapStack(withMessage(error, error.stack)) : undefined
+}
+
 // What a log says of something thrown: an error's stack mapped to `.kay` lines, after what to do about a browser-only global, rather than the compiled code around the throw Bun would print.
 export function describeThrown(error: unknown): string {
-  const stack = error instanceof Error && error.stack !== undefined && error.stack !== '' ? mapStack(withMessage(error, error.stack)) : undefined
+  const stack = error instanceof Error ? mappedStack(error) : undefined
 
   if (stack === undefined || stack === '')
     return typeof error === 'string' ? error : Bun.inspect(error)

@@ -18,7 +18,7 @@ import type { Prefetch } from './speculation'
 import type { Rendered } from './stream'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { browserOnlyHint, mapStack } from '../build/sourcemap'
+import { browserOnlyHint, mappedStack } from '../build/sourcemap'
 import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
@@ -703,8 +703,8 @@ function describeError(error: unknown, dev = false): PageError {
   if (!(error instanceof Error))
     return { status: 500, message: String(error) }
 
-  const stack = error.stack === undefined || error.stack === '' ? error.stack : mapStack(error.stack)
-  const hint = stack !== undefined && stack !== '' ? browserOnlyHint(error, stack) : undefined
+  const stack = mappedStack(error)
+  const hint = stack === undefined ? undefined : browserOnlyHint(error, stack)
 
   return { status: 500, message: hint !== undefined && hint !== '' ? hint : error.message, stack }
 }
