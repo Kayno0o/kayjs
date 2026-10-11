@@ -189,7 +189,7 @@ export interface ManifestConfig {
   backgroundColor?: string | undefined
   display?: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser' | undefined
   orientation?: 'any' | 'natural' | 'landscape' | 'landscape-primary' | 'landscape-secondary' | 'portrait' | 'portrait-primary' | 'portrait-secondary' | undefined
-  // The page the installed app opens, a path of the site; defaults to `/`.
+  // The page the installed app opens, a path of the site; defaults to `scope`, else `/`.
   startUrl?: string | undefined
   // The paths the installed app keeps in its window, a path of the site; browsers default to the start page's directory.
   scope?: string | undefined

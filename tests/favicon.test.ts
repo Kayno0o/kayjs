@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { pages } from '../src/server'
-import { faviconFiles, manifestJson, writeFavicons } from '../src/server/favicon'
+import { faviconFiles, faviconPaths, manifestJson, writeFavicons } from '../src/server/favicon'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 const SOURCE = 'tests/fixtures/seo/src/favicon.png'
@@ -80,15 +80,42 @@ describe('favicon', () => {
   })
 
   it('carries the start page, scope, orientation, shortcuts and maskable icons the config sets, made from their own image', async () => {
-    const installed = await pages({ routes: ROUTES, prebuilt: false, favicon: SOURCE, seo: { name: 'Kay site' }, manifest: { maskable: SOURCE, startUrl: '/notes', scope: '/', orientation: 'any', shortcuts: [{ name: 'New note', shortName: 'New', description: 'Write a note', url: '/notes/new' }] } })
-    const manifest = await (await installed.handle(new Request('http://localhost/manifest.webmanifest'))).json() as { icons: unknown[] }
-    const maskable = await installed.handle(new Request('http://localhost/icon-maskable-512.png'))
+    const maskableSource = join(scratch, 'maskable.png')
+
+    await Bun.write(maskableSource, await new Bun.Image(SOURCE).modulate({ brightness: 0.5 }).png().bytes())
+
+    const installed = await pages({ routes: ROUTES, prebuilt: false, favicon: SOURCE, seo: { name: 'Kay site' }, manifest: { maskable: maskableSource, startUrl: '/notes', scope: '/', orientation: 'any', shortcuts: [{ name: 'New note', shortName: 'New', description: 'Write a note', url: '/notes/new' }] } })
+    const fetch = async (path: string, headers: Record<string, string> = {}) => installed.handle(new Request(`http://localhost${path}`, { headers }))
+    const manifest = await (await fetch('/manifest.webmanifest')).json() as { icons: unknown[] }
+    const maskable = await fetch('/icon-maskable-512.png')
+    const maskableBytes = await maskable.bytes()
 
     expect(manifest).toMatchObject({ start_url: '/notes', scope: '/', orientation: 'any', shortcuts: [{ name: 'New note', short_name: 'New', description: 'Write a note', url: '/notes/new' }] })
     expect(manifest.icons.slice(2)).toEqual([{ src: '/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' }, { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }])
     expect(maskable.headers.get('content-type')).toBe('image/png')
-    expect(await widthOf(await maskable.bytes())).toBe(512)
+    expect(await widthOf(maskableBytes)).toBe(512)
+    expect(maskableBytes).not.toEqual(await (await fetch('/icon-512.png')).bytes())
+    expect(await (await fetch('/icon-maskable-192.png')).bytes()).not.toEqual(await (await fetch('/icon-192.png')).bytes())
+    expect((await fetch('/icon-maskable-512.png', { 'if-none-match': maskable.headers.get('etag')! })).status).toBe(304)
     expect((await get('/icon-maskable-512.png')).status).toBe(404)
+
+    await writeFavicons({ image: SOURCE, maskable: maskableSource }, join(scratch, 'built-maskable'))
+
+    expect((await readdir(join(scratch, 'built-maskable'))).sort()).toEqual(['apple-touch-icon.png', 'favicon.ico', 'icon-192.png', 'icon-512.png', 'icon-maskable-192.png', 'icon-maskable-512.png'])
+    expect(await Bun.file(join(scratch, 'built-maskable/icon-maskable-512.png')).bytes()).toEqual(maskableBytes)
+  })
+
+  it('lists the maskable icons among the paths a static export fetches only when the manifest names one', () => {
+    expect(faviconPaths(SOURCE, { maskable: SOURCE })).toContain('/icon-maskable-512.png')
+    expect(faviconPaths(SOURCE)).not.toContain('/icon-maskable-192.png')
+    expect(faviconPaths(false, { maskable: SOURCE })).toEqual([])
+  })
+
+  it('refuses a maskable image that is not square', async () => {
+    const wide = join(scratch, 'maskable-wide.png')
+
+    await Bun.write(wide, await new Bun.Image(SOURCE).resize(512, 256).png().bytes())
+    await expect(faviconFiles({ image: SOURCE, maskable: wide })).rejects.toThrow(`kay: the maskable icon ${wide} is 512x256; it has to be square`)
   })
 
   it('puts the manifest\'s pages under the site\'s mount point, and refuses one that is no path of the site', () => {
@@ -96,7 +123,14 @@ describe('favicon', () => {
 
     expect(manifest).toMatchObject({ start_url: '/docs/notes', scope: '/docs/', shortcuts: [{ name: 'New', url: '/docs/notes/new' }] })
     expect(() => manifestJson('Kay site', undefined, { startUrl: 'notes' })).toThrow('kay: the manifest\'s startUrl is a path of the site')
-    expect(() => manifestJson('Kay site', undefined, { shortcuts: [{ name: 'Out', url: '//example.com' }] })).toThrow('a shortcut\'s url')
+    expect(() => manifestJson('Kay site', undefined, { shortcuts: [{ name: 'Out', url: '//example.com' }] })).toThrow('kay: the manifest\'s shortcuts[0].url is a path of the site')
+    expect(() => manifestJson('Kay site', undefined, { startUrl: '/\\evil.example' })).toThrow('startUrl is a path of the site')
+    expect(() => manifestJson('Kay site', undefined, { scope: '/app/', startUrl: '/' })).toThrow('kay: the manifest\'s startUrl, /, lies outside its scope /app/')
+    expect(() => manifestJson('Kay site', undefined, { scope: '/app/', shortcuts: [{ name: 'Out', url: '/admin' }] })).toThrow('shortcuts[0].url, /admin, lies outside its scope /app/')
+  })
+
+  it('stops the server as it boots on a manifest path that is no path of the site', async () => {
+    await expect(pages({ routes: ROUTES, prebuilt: false, manifest: { startUrl: 'notes' } })).rejects.toThrow('kay: the manifest\'s startUrl is a path of the site')
   })
 
   it('leaves a path to the public file serving it', async () => {

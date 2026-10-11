@@ -16,6 +16,8 @@ const MANIFEST = '/manifest.webmanifest'
 const PNG_FILES: Record<string, number> = { '/apple-touch-icon.png': 180, '/icon-192.png': 192, '/icon-512.png': 512 }
 const MASKABLE_FILES: Record<string, number> = { '/icon-maskable-192.png': 192, '/icon-maskable-512.png': 512 }
 const MANIFEST_SIZES = [192, 512]
+// A path of the site: one leading slash, not two, nor a backslash a browser reads as one.
+const SITE_PATH = /^\/(?![/\\])/
 const ICO_SIZES = [16, 32, 48]
 // The widest icon kay writes, which the source must reach so none is upscaled.
 const LARGEST = 512
@@ -148,6 +150,14 @@ export function faviconTags(favicon: string | FaviconConfig | undefined): HeadTa
 
 // Its icons, pages and scope under the site's mount point.
 export function manifestJson(name: string | undefined, description: string | undefined, manifest: ManifestConfig = {}, base = ''): string {
+  const scope = manifest.scope === undefined ? undefined : sitePath(manifest.scope, 'scope')
+  // A browser ignores the scope when the start page lies outside it, and a shortcut outside it.
+  const page = (path: string, what: string) => {
+    if (scope !== undefined && !sitePath(path, what).startsWith(scope))
+      throw new Error(`kay: the manifest's ${what}, ${path}, lies outside its scope ${scope}, so browsers would ignore it`)
+
+    return base + sitePath(path, what)
+  }
   const icon = (kind: string, purpose?: string) => (size: number) => ({ src: `${base}/${kind}-${size}.png`, sizes: `${size}x${size}`, type: 'image/png', purpose })
 
   return JSON.stringify({
@@ -155,18 +165,18 @@ export function manifestJson(name: string | undefined, description: string | und
     short_name: manifest.shortName ?? name,
     description,
     icons: [...MANIFEST_SIZES.map(icon('icon')), ...manifest.maskable === undefined ? [] : MANIFEST_SIZES.map(icon('icon-maskable', 'maskable'))],
-    start_url: base + sitePath(manifest.startUrl ?? '/', 'startUrl'),
-    scope: manifest.scope === undefined ? undefined : base + sitePath(manifest.scope, 'scope'),
+    start_url: page(manifest.startUrl ?? scope ?? '/', 'startUrl'),
+    scope: scope === undefined ? undefined : base + scope,
     display: manifest.display,
     orientation: manifest.orientation,
     theme_color: manifest.themeColor,
     background_color: manifest.backgroundColor,
-    shortcuts: manifest.shortcuts?.map(shortcut => ({ name: shortcut.name, short_name: shortcut.shortName, description: shortcut.description, url: base + sitePath(shortcut.url, `a shortcut's url`) })),
+    shortcuts: manifest.shortcuts?.map((shortcut, index) => ({ name: shortcut.name, short_name: shortcut.shortName, description: shortcut.description, url: page(shortcut.url, `shortcuts[${index}].url`) })),
   })
 }
 
 function sitePath(path: string, what: string): string {
-  if (!path.startsWith('/') || path.startsWith('//'))
+  if (!SITE_PATH.test(path))
     throw new Error(`kay: the manifest's ${what} is a path of the site, starting with a single /, not ${path}`)
 
   return path

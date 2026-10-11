@@ -105,7 +105,7 @@ export default defineConfig({
 })
 ```
 
-The manifest is named after `seo.name`, `shortName` defaulting to it, and described by `seo.description`; `themeColor` is also every page's `theme-color`, `favicon: false` included. `startUrl` is the page the installed app opens, `/` by default, and `scope` the paths it keeps in its window; they and each shortcut's `url` (`name`, `shortName`, `description`) are paths of the site, put under `base`, and one not starting with `/` stops the server as it boots. `maskable` names a square image whose subject sits inside the middle 80%, which a launcher may crop to a circle or a squircle: kay serves it as `/icon-maskable-192.png` and `/icon-maskable-512.png`, listed in the manifest with `purpose: "maskable"`, as it serves the favicon.
+The manifest is named after `seo.name`, `shortName` defaulting to it, and described by `seo.description`; `themeColor` is also every page's `theme-color`, `favicon: false` included. `startUrl` is the page the installed app opens, `scope` by default, else `/`, and `scope` the paths it keeps in its window; they and each shortcut's `url` (`name`, `shortName`, `description`) are paths of the site, put under `base`, and one not starting with a single `/`, or a start page or shortcut outside `scope`, which browsers would ignore, stops the server as it boots. `maskable` names a square image whose subject sits inside the middle 80%, which a launcher may crop to a circle or a squircle: kay serves it as `/icon-maskable-192.png` and `/icon-maskable-512.png`, listed in the manifest with `purpose: "maskable"`, as it serves the favicon.
 
 ## Offline
 
