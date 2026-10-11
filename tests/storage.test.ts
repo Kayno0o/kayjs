@@ -10,6 +10,7 @@ import { image } from '../src/runtime/image'
 import { diskFiles, files, memoryFiles, pages, s3Files } from '../src/server'
 import { linkStoredFiles, setupStorage } from '../src/server/storage'
 import { browserPath, testSite } from '../src/test'
+import { scratchDir } from './scratch'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 const ROUTES = 'tests/fixtures/storage/src/routes'
@@ -309,6 +310,39 @@ describe('kay/test', () => {
 
     await testSite({ routes: ROUTES })
     expect(await files.get(key)).toBeUndefined()
+  })
+})
+
+describe('the upload\'s chunk', () => {
+  it('loads with the first call carrying files, and fails that call alone when it cannot load, as one a deploy replaced', async () => {
+    // A process of its own, where the chunk fails to load rather than staying loaded from another test.
+    const child = Bun.spawn([process.execPath, 'tests/fixtures/upload/fails.ts'], { stdout: 'pipe', stderr: 'pipe' })
+    const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect({ code, errors }).toEqual({ code: 0, errors: '' })
+    expect(JSON.parse(output)).toEqual({
+      json: { name: 'TypeError', message: 'offline' },
+      loadsAfterJson: 0,
+      filed: { name: 'Error', message: 'stale chunk' },
+      pending: false,
+      count: 0,
+      called: { name: 'ApiError', message: 'stale chunk', status: 0 },
+      progress: [],
+      loaded: true,
+    })
+  })
+
+  it('stays out of the bundle of an island calling actions', async () => {
+    const dir = await scratchDir('action-bundle-')
+    const entry = join(dir, 'entry.ts')
+
+    await Bun.write(entry, `import { actionStub } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/action.ts'))}\nconsole.log(actionStub)\n`)
+
+    const build = await Bun.build({ entrypoints: [entry], target: 'browser', minify: true, splitting: true, outdir: join(dir, 'out') })
+    const [main, ...chunks] = await Promise.all(build.outputs.filter(output => output.kind !== 'sourcemap').sort((a, b) => Number(b.kind === 'entry-point') - Number(a.kind === 'entry-point')).map(async output => output.text()))
+
+    expect(main).not.toContain('new XMLHttpRequest')
+    expect(chunks.some(chunk => chunk.includes('new XMLHttpRequest'))).toBe(true)
   })
 })
 

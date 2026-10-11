@@ -1,6 +1,7 @@
 import { withoutBase } from './base'
 import { busyForms, checkedForms, leave, navigation, prefetched, submitNatively, swappable } from './navigation'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { uploaded } from './upload'
 
 // Form posting, which `./navigate` loads once a form posting to an action takes focus or is submitted: checked, then sent, then the page it answers shown through the swap.
 // The swap is imported as `./navigate` imports it, so that the two load as chunks of their own rather than through a third holding what they share.
@@ -181,37 +182,21 @@ function urlEncoded(data: FormData): URLSearchParams {
   return body
 }
 
-// XMLHttpRequest rather than fetch, for the upload's progress: `--kay-progress` on the form, and the value of each `progress` inside it, go from 0 to 1.
-// Not `./upload`'s, which action calls import: the build would put it in the chunk every page loads.
+// Through `./upload`'s XMLHttpRequest, for the upload's progress: `--kay-progress` on the form, and the value of each `progress` inside it, go from 0 to 1.
 async function post(url: URL, body: FormData | URLSearchParams, form: HTMLFormElement, work: string | undefined): Promise<Answer> {
-  return new Promise((resolve, reject) => {
-    const request = new XMLHttpRequest()
+  const headers: Record<string, string> = { [NAVIGATE_HEADER]: '1', [PAGE_HEADER]: location.pathname + location.search }
 
-    request.open('POST', url)
-    request.setRequestHeader(NAVIGATE_HEADER, '1')
-    request.setRequestHeader(PAGE_HEADER, location.pathname + location.search)
+  if (work !== undefined)
+    headers[WORK_HEADER] = work
 
-    if (work !== undefined)
-      request.setRequestHeader(WORK_HEADER, work)
+  const response = await uploaded('POST', url.href, headers, body, (done) => {
+    form.style.setProperty('--kay-progress', String(done))
 
-    request.upload.addEventListener('progress', (event) => {
-      if (!event.lengthComputable)
-        return
-
-      const done = event.loaded / event.total
-
-      form.style.setProperty('--kay-progress', String(done))
-
-      for (const bar of form.querySelectorAll('progress')) {
-        bar.max = 1
-        bar.value = done
-      }
-    })
-    request.addEventListener('load', () => resolve({ type: request.getResponseHeader('content-type') ?? '', text: request.responseText, redirect: request.getResponseHeader(REDIRECT_HEADER), refused: request.getResponseHeader(FAILURE_HEADER) !== null, work: request.getResponseHeader(WORK_HEADER) }))
-
-    for (const failure of ['error', 'abort', 'timeout'])
-      request.addEventListener(failure, () => reject(new Error('kay: the form could not be sent')))
-
-    request.send(body)
+    for (const bar of form.querySelectorAll('progress')) {
+      bar.max = 1
+      bar.value = done
+    }
   })
+
+  return { type: response.headers.get('content-type') ?? '', text: await response.text(), redirect: response.headers.get(REDIRECT_HEADER), refused: response.headers.has(FAILURE_HEADER), work: response.headers.get(WORK_HEADER) }
 }

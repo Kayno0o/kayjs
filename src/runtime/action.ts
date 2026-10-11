@@ -544,11 +544,15 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
   const send = async (solution: string | undefined) => {
     const headers = solution === undefined ? sent : { ...sent, [WORK_HEADER]: solution }
 
+    const files = body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? body : undefined
+    // Loaded before the call counts as sent, as an abort while it loads sends nothing.
+    const upload = files && await import('./upload')
+
     // A signal aborted already sends nothing.
     if (signal?.aborted !== true)
       onSent?.()
 
-    return body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? (await import('./upload')).uploaded('POST', withBase(url), headers, body, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } })
+    return files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } })
   }
 
   // A page holding a challenge for the action solves it from the moment one of its forms takes focus.

@@ -2,7 +2,7 @@ const NULL_BODY = new Set([204, 205, 304])
 const HEADER_LINE = /\r?\n/
 
 // Sends a form as fetch would, through an XMLHttpRequest, which tells how much of it went: rejecting as fetch does on a network error, and with the signal's reason once it aborts.
-export async function uploaded(method: string, url: string, headers: Record<string, string>, body: FormData, onProgress: (sent: number) => void, signal?: AbortSignal): Promise<Response> {
+export async function uploaded(method: string, url: string, headers: Record<string, string>, body: FormData | URLSearchParams, onProgress: (sent: number) => void, signal?: AbortSignal): Promise<Response> {
   signal?.throwIfAborted()
 
   const request = new XMLHttpRequest()

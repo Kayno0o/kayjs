@@ -489,13 +489,13 @@ describe('AVIF', () => {
 
 describe('crops and share cards', () => {
   const hero = registerImage('/_kay/assets/crop-abc.png', 1000, 600)
+  const heroSrc = () => `/_kay/assets/${heroUrl}`
+  const route = async (query: string) => get(`/_kay/image?src=${encodeURIComponent(heroSrc())}&${query}`)
 
   // What the server installs to record the variants pages ask for, which `writeImageVariants` writes.
   beforeAll(() => {
     recordVariants()
   })
-  const heroSrc = () => `/_kay/assets/${heroUrl}`
-  const route = async (query: string) => get(`/_kay/image?src=${encodeURIComponent(heroSrc())}&${query}`)
 
   it('cuts an image to an aspect ratio, in lowest terms, each variant no wider than the cut', () => {
     const square = image(hero, { aspect: '2/2' })
