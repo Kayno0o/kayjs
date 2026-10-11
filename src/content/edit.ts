@@ -75,8 +75,8 @@ const SLASHES = /[\\/]/
 const CRLF = /\r\n/g
 const TRAILING_NEWLINES = /\n+$/
 const LEADING_NEWLINE = /^\n/
-// The first control character, then the one past the last of them.
-const CONTROL = 0x20
+// Control characters are the codes below a space, and DEL.
+const SPACE = 0x20
 const DELETE = 0x7F
 
 type StringOptions = Parameters<typeof t.String>[0]
@@ -85,9 +85,13 @@ type ContentLoaderOf<Name extends 'save' | 'remove'> = NonNullable<Collection<un
 let registered: [string, Collection<unknown>][] = []
 let site: EditSite | undefined
 
-// The collections the content config exports, by name, as the server read them when it started.
-export function registerCollections(named: [string, Collection<unknown>][]): void {
+// The collections the content config exports, by name, as the server read them when it started; gives back those registered before, for a test to put back.
+export function registerCollections(named: [string, Collection<unknown>][]): [string, Collection<unknown>][] {
+  const previous = registered
+
   registered = named
+
+  return previous
 }
 
 // Gives back what was registered before, for a test to put back.
@@ -207,9 +211,14 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
   const files = await folderFiles(name, dir)
   const place = options.locale === undefined ? slug : `${options.locale}/${slug}`
   const existing = files.find(file => slugOf(file) === place)
+  const at = { collection: name, slug, ...options.locale !== undefined && { locale: options.locale }, path: '' }
+
+  // A new `a/index` file reads back as `a`, a locale's `en/index` as no entry of a locale at all; an existing one keeps its file.
+  if (existing === undefined && place.includes('/') && place.endsWith('/index'))
+    return { issues: [{ ...at, key: 'slug', message: `has a slug whose file, ${place}, reads back as another entry: the last part of a slug is not index` }] }
 
   if (existing !== undefined && options.body !== undefined && !MARKDOWN.test(existing))
-    return { issues: [{ collection: name, slug, ...options.locale !== undefined && { locale: options.locale }, path: '', body: true, message: `goes to ${existing}, a data file holding no body` }] }
+    return { issues: [{ ...at, body: true, message: `goes to ${existing}, a data file holding no body` }] }
 
   const relativeFile = existing ?? `${place}.${options.body !== undefined || files.some(file => MARKDOWN.test(file)) ? 'md' : 'json'}`
   const absolute = join(dir, relativeFile)
@@ -218,7 +227,7 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
   if (inRepo === undefined)
     throw new Error(`kay: ${name}'s folder lies outside the repository holding the project, so a CMS cannot commit its files`)
 
-  const body = options.body ?? (existing === undefined ? undefined : (await readEntry(dir, existing)).body)
+  const body = options.body ?? (existing !== undefined && MARKDOWN.test(existing) ? await keptBody(dir, existing) : undefined)
 
   return { file: { path: relative(contentPlace().root, absolute).split(sep).join('/'), absolute, repoPath: inRepo, text: entryText(relativeFile, data, body) } }
 }
@@ -245,7 +254,9 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
   const at = { collection: name, slug, ...locale !== undefined && { locale } }
   const issues = placeIssues(collection, at)
 
-  if (issues.length === 0 && !(await entries(name, locale === undefined ? {} : { locale })).some(entry => entry.slug === slug))
+  const place = locale === undefined ? slug : `${locale}/${slug}`
+
+  if (issues.length === 0 && !(await loadedEntries(name, collection)).some(entry => entry.slug === place))
     issues.push({ ...at, path: '', key: 'slug', message: 'names no entry of the collection' })
 
   if (issues.length > 0)
@@ -257,16 +268,15 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
   return {}
 }
 
-// Where an entry's slug or locale points elsewhere: a part `.` or `..`, and in a folder an empty one, a hidden file, or `a/index` that reads back as `a`; a locale missing, extra, or one the site does not serve.
+// Where an entry's slug or locale points elsewhere: a part `.` or `..` by either slash, and in a folder an empty one or a hidden file; a locale missing, extra, or one the site does not serve.
 function placeIssues(collection: Collection<unknown>, at: { collection: string, slug: string, locale?: string }): DraftIssue[] {
   const { slug, locale } = at
   const localized = collection.options.localized === true
   const folder = collection.dir !== undefined
-  const parts = slug.split('/')
   const issues: DraftIssue[] = []
 
-  if (folder ? !parts.every(filePart) || (parts.length > 1 && parts.at(-1) === 'index') : slug === '' || [...parts].some(part => part === '.' || part === '..' || hasControl(part)))
-    issues.push({ ...at, path: '', key: 'slug', message: folder ? 'has a slug naming another file than its own: its parts are not empty, ., .., hidden, nor a last index' : 'has a slug naming another place than an entry: it is not empty and has no . or .. part' })
+  if (folder ? !slug.split('/').every(filePart) : slug === '' || slug.split(SLASHES).some(part => part === '.' || part === '..' || hasControl(part)))
+    issues.push({ ...at, path: '', key: 'slug', message: folder ? 'has a slug naming another file than its own: its parts are not empty, ., .. nor hidden' : 'has a slug naming another place than an entry: it is not empty and has no . or .. part' })
 
   if (localized !== (locale !== undefined))
     issues.push({ ...at, path: '', key: 'locale', message: localized ? 'names no locale, which each entry of a localized collection has' : 'names a locale, which the collection is not localized by' })
@@ -285,7 +295,7 @@ function hasControl(text: string): boolean {
   for (let index = 0; index < text.length; index++) {
     const code = text.charCodeAt(index)
 
-    if (code < CONTROL || code === DELETE)
+    if (code < SPACE || code === DELETE)
       return true
   }
 
@@ -349,6 +359,16 @@ async function folderEntries(name: string, dir: string): Promise<Omit<SourceEntr
   }))
 }
 
+// The body of the Markdown file an entry is written over, none when it does not parse: the editor writes it whole again.
+async function keptBody(dir: string, file: string): Promise<string | undefined> {
+  try {
+    return (await readEntry(dir, file)).body
+  }
+  catch {
+    return undefined
+  }
+}
+
 // A folder entry's data and body as the collection reads them, a file that does not parse named in the error.
 async function readEntry(dir: string, file: string): Promise<{ data: unknown, body?: string }> {
   const absolute = join(dir, file)
@@ -382,22 +402,17 @@ async function loadedEntries(name: string, collection: Collection<unknown>): Pro
   })
 }
 
-// Whether a collection's entries hold a Markdown body: a folder's in Markdown files, a loader's as `body` rather than `html`; one with no entry yet, or one whose source fails to read, may.
+// Whether a collection's entries hold a Markdown body: a folder's in Markdown files, a loader's as `body` rather than `html`; one with no entry yet, or a folder missing, as beside a build alone, may.
 async function holdsBody(name: string, collection: Collection<unknown>, dir: string | undefined): Promise<boolean> {
-  try {
-    if (dir !== undefined) {
-      const files = await folderFiles(name, dir)
+  if (dir !== undefined) {
+    const files = existsSync(dir) ? await entryFiles(dir) : []
 
-      return files.length === 0 || files.some(file => MARKDOWN.test(file))
-    }
-
-    const loaded = await loadedEntries(name, collection)
-
-    return loaded.length === 0 || loaded.some(entry => entry.body !== undefined)
+    return files.length === 0 || files.some(file => MARKDOWN.test(file))
   }
-  catch {
-    return true
-  }
+
+  const loaded = await loadedEntries(name, collection)
+
+  return loaded.length === 0 || loaded.some(entry => entry.body !== undefined)
 }
 
 // The entry's data as the schema decodes it, or undefined when the schema refuses it.
