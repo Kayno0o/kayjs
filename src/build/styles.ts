@@ -1,8 +1,8 @@
 import type { BunPlugin } from 'bun'
 import type { KayLibrary } from './libraries'
-import { dirname, join, sep } from 'node:path'
+import { dirname, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
-import { ASSET_FILE, writeAsset } from './assets'
+import { ASSET_FILE, classesFile, writeAsset } from './assets'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
@@ -23,7 +23,7 @@ function importing(paths: string[]): string {
 export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlugin {
   const project = root + sep
   // Tailwind reads the class names of every module the bundle parses, so importing the ones kay collected from the `.class` shorthand hands them over with no `@source` line.
-  const classes = `import ${JSON.stringify(join(root, '.kay', 'classes.txt'))}\n`
+  const classes = `import ${JSON.stringify(classesFile(root))}\n`
   const resolve = (specifier: string, importer: string): string | undefined => {
     try {
       return Bun.resolveSync(specifier, dirname(importer))

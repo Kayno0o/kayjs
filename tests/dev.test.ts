@@ -467,20 +467,24 @@ describe('kay dev', () => {
     }
   })
 
-  it('opens the debugger --inspect names on every server it runs, at the address it prints once', async () => {
+  it('opens the debugger --inspect names on every server it runs, at the address it prints once, which a client closing as it connects never ends', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const free = Bun.serve({ port: 0, fetch: () => new Response() })
     const port = free.port!
 
     await free.stop()
-    await Bun.write(join(root, 'src/server.ts'), 'Bun.serve({ port: 0, fetch: () => new Response() })\nawait Bun.write(\'spawned.txt\', String(Bun.env.BUN_INSPECT))\n')
+    // Outside the project, whose changes restart the server, and written before it listens, so it is there once kay dev prints the address.
+    const spawned = `${root}-spawned.txt`
+
+    await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(spawned)}, String(Bun.env.BUN_INSPECT))\nBun.serve({ port: 0, fetch: () => new Response() })\n`)
     const child = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root, `--inspect=${port}`], { stdout: 'pipe', stderr: 'pipe' })
     const output: string[] = []
     const reading = (async () => {
       for await (const chunk of child.stdout.pipeThrough(new TextDecoderStream()))
         output.push(...chunk.split('\n').filter(Boolean))
     })()
-    const connects = async () => {
+    // Closed as soon as it opens, as a debugger tab reloading does, which under Bun 1.4 let a server's process exit (#285).
+    const opens = async () => {
       const socket = new WebSocket(`ws://localhost:${port}/kay`)
       const { promise, resolve } = Promise.withResolvers<boolean>()
 
@@ -492,24 +496,64 @@ describe('kay dev', () => {
 
       return open
     }
+    // A debugger staying connected: the process it reaches, and its connection closing.
+    const session = async () => {
+      const socket = new WebSocket(`ws://localhost:${port}/kay`)
+      const answers = new Map<number, (value: unknown) => void>()
+      const closed = new Promise<void>(resolve => socket.addEventListener('close', () => resolve()))
+      let id = 0
+
+      socket.addEventListener('message', (event) => {
+        const { id, result } = JSON.parse(String(event.data)) as { id: number, result: { result: { value: unknown } } }
+
+        answers.get(id)?.(result.result.value)
+      })
+      await new Promise(resolve => socket.addEventListener('open', resolve))
+
+      return {
+        pid: async () => new Promise((resolve) => {
+          answers.set(++id, resolve)
+          socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression: 'process.pid' } }))
+        }),
+        closed,
+      }
+    }
 
     try {
       await until(() => output.length === 2, 10_000)
       expect(output[1]).toBe(`kay dev: debugger on ws://localhost:${port}/kay, https://debug.bun.sh/#localhost:${port}/kay`)
-      expect(await connects()).toBe(true)
-      // The app's own processes do not try to open it again.
-      expect(await Bun.file(join(root, 'spawned.txt')).text()).toBe('undefined')
 
+      for (let attempt = 0; attempt < 10; attempt++)
+        expect(await opens()).toBe(true)
+
+      // The app's own processes do not try to open it again.
+      expect(await Bun.file(spawned).text()).toBe('undefined')
+
+      const first = await session()
+      const pid = await first.pid()
+
+      // Every attempt from the moment the next server starts, when its inspector is setting up.
       await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
-      await until(() => output.length === 3, 10_000)
+      for (const start = Date.now(); output.length < 3 && Date.now() - start < 10_000;)
+        await opens()
+
       expect(output[2]).toMatch(/restarted in/)
-      expect(await connects()).toBe(true)
+
+      for (let attempt = 0; attempt < 10; attempt++)
+        expect(await opens()).toBe(true)
+
+      // The debugger's connection ends with its server, and connecting again reaches the next.
+      await first.closed
+      expect(await (await session()).pid()).not.toBe(pid)
+      // A server let go of exits within milliseconds and says so.
+      await Bun.sleep(500)
+      expect(output).toHaveLength(3)
     }
     finally {
       child.kill('SIGTERM')
       await child.exited
       await reading
-      await rm(root, { recursive: true, force: true })
+      await Promise.all([rm(root, { recursive: true, force: true }), rm(spawned, { force: true })])
     }
   })
 

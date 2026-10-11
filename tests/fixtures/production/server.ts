@@ -5,6 +5,7 @@ import { pages } from '../../../src/server'
 new Elysia()
   .use(await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, security: false, shutdownTimeout: Number(process.env.SHUTDOWN_TIMEOUT ?? 10) }))
   .get('/slow', async () => {
+    console.log('slow started')
     await Bun.sleep(Number(process.env.SLOW_MS ?? 300))
 
     return 'slow done'

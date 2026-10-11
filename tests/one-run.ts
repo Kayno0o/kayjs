@@ -94,8 +94,8 @@ function clearStale(stale: string) {
 }
 
 if (process.env[HELD] === undefined) {
-  // Under `bun test --parallel` the run is the parent process, whose workers all share the lock the first of them took.
-  const worker = process.env.BUN_TEST_WORKER_ID !== undefined
+  // Under `bun test --parallel` the run is the parent process, whose workers all share the lock the first of them took; a run of one file stays in that process, which sets BUN_TEST_WORKER_ID all the same.
+  const worker = read('/proc/self/cmdline')?.split('\0').includes('--test-worker') ?? process.env.BUN_TEST_WORKER_ID !== undefined
   const own = identity(worker ? process.ppid : process.pid)
   let told = false
 

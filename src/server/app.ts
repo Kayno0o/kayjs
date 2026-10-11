@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join, normalize, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import { ASSET_PREFIX } from '../build/assets'
+import { ASSET_PREFIX, testWorker } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { extensionServers, pageHooks } from '../config'
 import { projectCollections, serveFeeds } from '../content/server'
@@ -397,7 +397,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     servePreview(app)
 
   // An executable runs from wherever it was copied, away from the project it was built in.
-  const imageCache = bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', 'images')
+  const imageCache = bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', `images${testWorker()}`)
   const imageRoute = {
     clientDir: client.dir,
     cacheDir: imageCache,

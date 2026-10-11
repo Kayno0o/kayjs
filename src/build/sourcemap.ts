@@ -170,7 +170,7 @@ function mapPosition(file: string, line: string, column: string): string | undef
 
 // What a log says of something thrown: an error's stack mapped to `.kay` lines, after what to do about a browser-only global, rather than the compiled code around the throw Bun would print.
 export function describeThrown(error: unknown): string {
-  const stack = error instanceof Error && error.stack !== undefined && error.stack !== '' ? mapStack(error.stack) : undefined
+  const stack = error instanceof Error && error.stack !== undefined && error.stack !== '' ? mapStack(withMessage(error, error.stack)) : undefined
 
   if (stack === undefined || stack === '')
     return typeof error === 'string' ? error : Bun.inspect(error)
@@ -178,6 +178,14 @@ export function describeThrown(error: unknown): string {
   const hint = browserOnlyHint(error, stack)
 
   return hint !== undefined && hint !== '' ? `${hint}\n${stack}` : stack
+}
+
+// A stack whose first line is the error's name alone says its message again: Bun 1.4 sometimes writes one so, in a process where other code ran before.
+function withMessage(error: Error, stack: string): string {
+  const end = stack.indexOf('\n')
+  const header = end === -1 ? stack : stack.slice(0, end)
+
+  return header === error.name && error.message !== '' ? `${error.name}: ${error.message}${stack.slice(header.length)}` : stack
 }
 
 // What a server render failing on a browser-only global should say: the global, the `.kay` line reading it, and the two ways out.

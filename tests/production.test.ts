@@ -1319,7 +1319,18 @@ describe('lifecycle', () => {
       }
     })()
 
-    return { server, url: `http://localhost:${port}`, output: async () => rest }
+    const url = `http://localhost:${port}`
+    // Sent, and resolving once the server is answering it, which a loaded machine may take longer than a sleep to get to.
+    const slow = async () => {
+      const response = fetch(`${url}/slow`)
+
+      for (const start = Date.now(); !output.includes('slow started\n') && Date.now() - start < 10_000;)
+        await Bun.sleep(10)
+
+      return { response }
+    }
+
+    return { server, url, slow, output: async () => rest }
   }
 
   it('answers the health route while it takes requests', async () => {
@@ -1365,36 +1376,35 @@ describe('lifecycle', () => {
   })
 
   it('on SIGTERM lets open requests finish, runs the stop hooks, and exits', async () => {
-    const { server, url, output } = await startServer()
+    const { server, url, slow, output } = await startServer()
 
     expect((await fetch(`${url}/_kay/health`)).status).toBe(200)
 
-    const slow = fetch(`${url}/slow`)
+    const { response } = await slow()
 
-    await Bun.sleep(50)
     server.kill('SIGTERM')
 
-    expect(await (await slow).text()).toBe('slow done')
+    expect(await (await response).text()).toBe('slow done')
     expect(await server.exited).toBe(0)
     expect(await output()).toContain('jobs stopped')
   }, 20_000)
 
   it('closes what is still open past the shutdown timeout and exits with 1', async () => {
-    const { server, url } = await startServer({ SHUTDOWN_TIMEOUT: '0.2', SLOW_MS: '5000' })
-    const slow = (async () => {
+    const { server, slow } = await startServer({ SHUTDOWN_TIMEOUT: '0.2', SLOW_MS: '5000' })
+    const { response } = await slow()
+    const status = (async () => {
       try {
-        return (await fetch(`${url}/slow`)).status
+        return (await response).status
       }
       catch {
         return 'closed'
       }
     })()
 
-    await Bun.sleep(50)
     server.kill('SIGTERM')
 
     expect(await server.exited).toBe(1)
-    expect(await slow).toBe('closed')
+    expect(await status).toBe('closed')
   }, 20_000)
 })
 

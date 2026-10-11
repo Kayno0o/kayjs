@@ -2,17 +2,19 @@ import type { Subprocess } from 'bun'
 import type { FSWatcher } from 'node:fs'
 import type { I18nConfig, KayExtension } from '../config'
 import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { IGNORED_DIRS } from '../build/files'
 import { writeShadowTypes } from '../check'
+import { inspectorProxy } from './inspector'
 
 export interface DevOptions {
   // The server entry, relative to the root, `src/server.ts` by default; with no file there, a server of kay's own serves the pages.
   entry?: string | undefined
   // The `PORT` the server gets, over the shell's and the `.env`'s.
   port?: number | undefined
-  // The debugger every server opens, as `BUN_INSPECT` takes it, such as `ws://localhost:6499/kay`.
+  // The address of the debugger every server opens, such as `ws://localhost:6499/kay`.
   inspect?: string | undefined
   // Opens the address in the browser once the first server listens.
   open?: boolean | undefined
@@ -86,6 +88,15 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // The port the first server asked for and the one it moved to, busy, which every next server takes first.
   let moved: string | undefined
   const log = options.log ?? console.log
+  // The inspector socket of each server process.
+  const sockets = new Map<Subprocess, string>()
+  const inspector = options.inspect === undefined ? undefined : inspectorProxy(options.inspect, () => child && sockets.get(child))
+  // Bun removes its socket as it exits, unless it was killed outright.
+  const forgetSocket = async (server: Subprocess, socket: string) => {
+    await server.exited
+    sockets.delete(server)
+    await rm(socket, { force: true })
+  }
   const color = options.log === undefined && process.stdout.isTTY && process.env.NO_COLOR === undefined
   const stamp = () => {
     const time = new Date().toLocaleTimeString('en-GB')
@@ -106,8 +117,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (address === undefined) {
       log(`kay dev: ${url} (ready in ${took}${moved === undefined ? '' : `, ${asked} was in use`})`)
 
-      if (options.inspect !== undefined)
-        log(`kay dev: debugger on ${options.inspect}, https://debug.bun.sh/#${options.inspect.replace(WS_SCHEME, '')}`)
+      if (inspector !== undefined)
+        log(`kay dev: debugger on ${inspector.url}, https://debug.bun.sh/#${inspector.url.replace(WS_SCHEME, '')}`)
 
       if (options.open === true)
         openBrowser(url, log)
@@ -131,9 +142,18 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // Chosen again for each process, so a `src/server.ts` written or deleted while running takes over at the next restart.
   const entryToRun = () => options.entry === undefined && !existsSync(entry) ? PAGES_ENTRY : entry
   const spawn = () => {
+    const socket = inspector?.socketFor()
+
     spareEntry = entryToRun()
 
-    return Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, ...options.inspect === undefined ? {} : { BUN_INSPECT: options.inspect } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => listened(server, message) })
+    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => listened(server, message) })
+
+    if (socket !== undefined) {
+      sockets.set(server, socket)
+      void forgetSocket(server, socket)
+    }
+
+    return server
   }
   // Each restart takes the process waiting with kay loaded, and readies the next one.
   const start = () => {
@@ -148,8 +168,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     startedAt = codeVersion
     changedFiles = new Set()
     void child.stdin.flush()
-    // Two processes cannot hold the debugger's port, so under it each server starts once the last one exited.
-    spare = options.inspect === undefined ? spawn() : undefined
+    spare = spawn()
     options.onRestart?.(child)
     void reportExit(child)
   }
@@ -203,7 +222,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await restarting
     child?.kill()
     spare?.kill()
-    await Promise.all([child?.exited, spare?.exited])
+    await Promise.all([child?.exited, spare?.exited, inspector?.stop()])
   }
 }
 

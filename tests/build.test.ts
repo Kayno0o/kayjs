@@ -1,18 +1,19 @@
 import type { BunPlugin } from 'bun'
 import type { KayConfig } from '../src/config'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rename, rm, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
-import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
+import { ASSET_FILE, classesFile, clientDir, outputDir, writeAsset } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
+import { writeIfChanged } from '../src/build/files'
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
-import { mapBundleToKay, mapStack } from '../src/build/sourcemap'
+import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { scratchDir } from './scratch'
@@ -793,5 +794,62 @@ describe('the runtime chunk', () => {
 
     expect(anchorModule(other)).toBe(anchorModule(one))
     expect(anchorModule(one)).toContain('import { refresh as k0, signal as k1 } from "kay"')
+  })
+})
+
+describe('the files a build writes', () => {
+  it('keeps each worker of bun test --parallel to its own output and class list, and the paths an app names otherwise', () => {
+    const worker = process.env.BUN_TEST_WORKER_ID
+
+    try {
+      process.env.BUN_TEST_WORKER_ID = '3'
+      expect([outputDir('/app'), classesFile('/app')]).toEqual(['/app/.kay/client-3', '/app/.kay/classes-3.txt'])
+      delete process.env.BUN_TEST_WORKER_ID
+      expect([outputDir('/app'), classesFile('/app')]).toEqual(['/app/.kay/client', '/app/.kay/classes.txt'])
+    }
+    finally {
+      if (worker === undefined)
+        delete process.env.BUN_TEST_WORKER_ID
+      else
+        process.env.BUN_TEST_WORKER_ID = worker
+    }
+  })
+
+  it('leaves a file whose text is the same alone, moves a changed one into place whole, and leaves no draft behind a write that failed', async () => {
+    const dir = await scratchDir('write-')
+    const file = join(dir, 'deep/classes.txt')
+
+    try {
+      await writeIfChanged(file, 'a')
+
+      const written = (await stat(file)).mtimeMs
+
+      await Bun.sleep(10)
+      await writeIfChanged(file, 'a')
+      expect((await stat(file)).mtimeMs).toBe(written)
+      await writeIfChanged(file, 'b')
+      expect(await Bun.file(file).text()).toBe('b')
+      expect(await readdir(join(dir, 'deep'))).toEqual(['classes.txt'])
+
+      // A directory where the file goes, which no rename replaces.
+      await mkdir(join(dir, 'taken'))
+      await expect(writeIfChanged(join(dir, 'taken'), 'c')).rejects.toThrow()
+      expect((await readdir(dir)).sort()).toEqual(['deep', 'taken'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('says an error\'s message when its stack starts with the name alone', () => {
+    const error = new Error('database is locked')
+
+    error.stack = 'Error\n    at claim (/app/src/jobs.ts:3:9)'
+    expect(describeThrown(error)).toBe('Error: database is locked\n    at claim (/app/src/jobs.ts:3:9)')
+    const bare = new Error('kept')
+
+    bare.message = ''
+    bare.stack = 'Error\n    at x (/a.ts:1:1)'
+    expect(describeThrown(bare)).toBe('Error\n    at x (/a.ts:1:1)')
   })
 })

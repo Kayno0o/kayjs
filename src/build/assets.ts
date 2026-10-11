@@ -11,9 +11,19 @@ const ASSETS_DIR = 'assets'
 
 // What `kay build` writes and production serves; a `kay dev` server builds into a directory of its own, so a build or a test run beside it never deletes the files its pages link, and so does each worker of `bun test --parallel`, the processes its tests start included.
 export function outputDir(root: string): string {
+  return join(root, '.kay', `${underKayDev() ? 'dev' : 'client'}${testWorker()}`)
+}
+
+// The class names kay collects for Tailwind, at the path an app's own `@source` line may name, but for each test worker's.
+export function classesFile(root: string): string {
+  return join(root, '.kay', `classes${testWorker()}.txt`)
+}
+
+// What sets apart the files each worker of `bun test --parallel` writes, which would otherwise overwrite one another's in a checkout they share.
+export function testWorker(): string {
   const worker = process.env.BUN_TEST_WORKER_ID
 
-  return join(root, '.kay', `${underKayDev() ? 'dev' : 'client'}${worker === undefined ? '' : `-${worker}`}`)
+  return worker === undefined ? '' : `-${worker}`
 }
 
 export function clientDir(root: string): string {

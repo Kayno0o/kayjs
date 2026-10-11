@@ -6,6 +6,7 @@ import { deflateSync, inflateSync } from 'node:zlib'
 import decodeAvif from '@jsquash/avif/decode.js'
 import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
+import { testWorker } from '../src/build/assets'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
 import { AVIF_SPEED } from '../src/server/avif'
@@ -209,13 +210,7 @@ describe('image route', () => {
     expect(responses.map(response => response.status)).toEqual([200, 200, 200, 200, 200, 200])
     expect(new Set(bodies.map(body => Bun.hash(body))).size).toBe(1)
     expect((await new Bun.Image(bodies[0]!).metadata()).width).toBe(960)
-    // Polled, as a test file running beside this one under `bun test --parallel` writes variants into the same cache: a file left behind stays, one being written goes.
-    const partials = async () => (await readdir(join(process.cwd(), '.kay/cache/images'))).filter(name => name.endsWith('.tmp'))
-
-    for (let start = Date.now(); (await partials()).length > 0 && Date.now() - start < 2000;)
-      await Bun.sleep(50)
-
-    expect(await partials()).toEqual([])
+    expect((await readdir(join(process.cwd(), `.kay/cache/images${testWorker()}`))).filter(name => name.endsWith('.tmp'))).toEqual([])
   })
 
   it('refuses a runtime image too large to decode safely, from its header alone', async () => {

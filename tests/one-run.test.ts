@@ -70,4 +70,16 @@ describe('the test run lock', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('leaves no lock behind a parallel run of one file, which runs in the run\'s own process', async () => {
+    const root = await checkout()
+
+    try {
+      expect(await run(root, 'a', '--parallel').exited).toBe(0)
+      expect(await Bun.file(join(root, '.kay/test-run.lock')).exists()).toBe(false)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

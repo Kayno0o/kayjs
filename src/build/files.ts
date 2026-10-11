@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs'
-import { mkdir, readdir, readFile, rename } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 // Never source at any depth: dependencies, kay's own output and version control.
@@ -118,6 +118,14 @@ export async function writeIfChanged(path: string, content: string) {
   const draft = `${path}.${crypto.randomUUID()}.tmp`
 
   await mkdir(dirname(path), { recursive: true })
-  await Bun.write(draft, content)
-  await rename(draft, path)
+
+  try {
+    await Bun.write(draft, content)
+    await rename(draft, path)
+  }
+  catch (error) {
+    await rm(draft, { force: true })
+
+    throw error
+  }
 }
