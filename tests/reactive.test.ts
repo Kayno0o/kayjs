@@ -3,7 +3,9 @@ import { describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { batch, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
 import { ActionError, actionStub } from '../src/runtime/action'
+import * as navigation from '../src/runtime/navigate'
 import { createSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded } from '../src/runtime/reactive'
+import { swapState } from '../src/runtime/swap'
 
 describe('signals', () => {
   it('read the last value written, a function written being an updater', () => {
@@ -386,6 +388,39 @@ describe('optimistic changes', () => {
       expect(move.failed()).toBeUndefined()
     }
     finally {
+      fetched.mockRestore()
+    }
+  })
+
+  it('refresh the page when a call is aborted once sent, as the server may have run it, unless the call says refresh: false', async () => {
+    const move = actionStub('/_kay/action/test/sent') as unknown as Action<{ to: number }, number>
+    const refreshed = spyOn(navigation, 'refresh').mockImplementation(async () => undefined)
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (_: unknown, init?: RequestInit) => {
+      init?.signal?.throwIfAborted()
+
+      return new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)))
+    }) as unknown as typeof fetch)
+    const aborted = async (options: { refresh?: false }) => {
+      const controller = new AbortController()
+      const moving = move({ to: 1 }, { ...options, signal: controller.signal })
+
+      controller.abort(new Error('the user left'))
+      await expect(moving).rejects.toThrow('the user left')
+    }
+
+    swapState.started = true
+
+    try {
+      await aborted({})
+      expect(refreshed).toHaveBeenCalledTimes(1)
+      await aborted({ refresh: false })
+      expect(refreshed).toHaveBeenCalledTimes(1)
+      await expect(move({ to: 1 }, { signal: AbortSignal.abort(new Error('never sent')) })).rejects.toThrow('never sent')
+      expect(refreshed).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      swapState.started = false
+      refreshed.mockRestore()
       fetched.mockRestore()
     }
   })

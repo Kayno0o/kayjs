@@ -77,7 +77,7 @@ ul
 
 Options given as a function are reactive: when `search` changes, the route is asked again. `refresh()` asks again by hand. A resource opens once the island is in the page, never on the server.
 
-An event handler calls any route with `call`, from an island or a module several islands share. `method` is GET unless named, `params`, `query` and `body` are typed from the route, and so is the answer. A refusal throws an `ApiError` with its `status` and `message`.
+An event handler calls any route with `call`, from an island or a module several islands share. `method` is GET unless named, `params`, `query` and `body` are typed from the route, and so is the answer. A refusal throws an `ApiError` with its `status` and `message`, status 0 when no answer came. A file the route answers arrives as a `Blob`, and a route answering nothing as `''`.
 
 ```kay
 ---

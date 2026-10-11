@@ -7,6 +7,7 @@ import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
 import { ApiError, call, dispatch, readEvents, resource, socket, stream } from '../src/runtime/live'
+import { encodeValue } from '../src/runtime/wire'
 import { apiStubs, scanApi } from '../src/server/api'
 import { rooms, sqliteRooms } from '../src/server/rooms'
 import { testSite } from '../src/test'
@@ -268,6 +269,34 @@ describe('stream() started from a handler', () => {
     forever.close()
   })
 
+  it('stops the route\'s source once the island goes', async () => {
+    const stopped = async () => Number(await (await site.fetch('/api/chat/forever/stopped')).text())
+    const before = await stopped()
+    const [forever, dispose] = root(dispose => [stream(chat, '/forever'), dispose] as const)
+
+    await until(() => (forever.last() ?? 0) >= 1)
+    dispose()
+    await until(() => false)
+    expect(await stopped()).toBe(before + 1)
+  })
+
+  it('delivers nothing more of a run once a listener starts another, events left in its chunk included', async () => {
+    const answer = (values: number[]) => async () => new Response(values.map(value => `data: ${encodeValue(value)}\n\n`).join(''))
+    const reader = readEvents<number>(answer([1, 2, 3]), false, true)
+    const seen: number[] = []
+
+    reader.on((value) => {
+      seen.push(value)
+
+      if (value === 1)
+        reader.start(answer([10]))
+    })
+    reader.start()
+    await until(() => seen.includes(10))
+    await Bun.sleep(10)
+    expect(seen).toEqual([1, 10])
+  })
+
   it('posts a body carrying a file, or a FormData, as a form', async () => {
     const lines = root(() => stream(chat, '/lines', { method: 'post', start: false }))
     const values: string[] = []
@@ -500,6 +529,68 @@ describe('call()', () => {
     finally {
       Reflect.deleteProperty(globalThis, 'XMLHttpRequest')
     }
+  })
+
+  it('throws an ApiError with status 0 for an answer cut off, and the status for a refusal whose JSON does not parse or that is empty', async () => {
+    const answer = (body: BodyInit | null, init: ResponseInit) => served.mockImplementationOnce((async () => new Response(body, init)) as unknown as typeof fetch)
+    const cut = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        controller.enqueue(new TextEncoder().encode('[1,'))
+        controller.error(new TypeError('ECONNRESET'))
+      },
+    })
+
+    answer(cut, { headers: { 'content-type': 'application/json' } })
+    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'ECONNRESET' })
+    answer('{oops', { status: 500, headers: { 'content-type': 'application/json' } })
+    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 500, message: '{oops', answer: '{oops' })
+    answer('<p>Down</p>', { status: 502, headers: { 'content-type': 'text/html' } })
+    await expect(call(notes, '/')).rejects.toMatchObject({ status: 502, message: '<p>Down</p>' })
+    answer(null, { status: 503 })
+    await expect(call(notes, '/')).rejects.toMatchObject({ status: 503, message: 'HTTP 503' })
+    answer('', { headers: { 'content-type': 'application/json' } })
+    expect(await call(notes, '/') as unknown).toBe('')
+  })
+
+  it('rejects with the signal\'s reason when aborted while the answer is read', async () => {
+    const controller = new AbortController()
+
+    served.mockImplementationOnce((async () => new Response(new ReadableStream({
+      start: (body) => {
+        body.enqueue(new TextEncoder().encode('[1,'))
+        controller.signal.addEventListener('abort', () => body.error(controller.signal.reason))
+      },
+    }), { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch)
+
+    const reading = call(notes, '/', { signal: controller.signal })
+
+    await Bun.sleep(5)
+    controller.abort(new Error('left'))
+    await expect(reading).rejects.toThrow('left')
+    await expect(reading).rejects.not.toBeInstanceOf(ApiError)
+  })
+
+  it('reads a file as a Blob, nothing as \'\', and reaches a path named like a method', async () => {
+    const bytes: Blob | string = await call(notes, '/bytes')
+    const touched: '' = await call(notes, '/touch', { method: 'post' })
+
+    expect(bytes).toBeInstanceOf(Blob)
+    expect([...await (bytes as Blob).bytes()]).toEqual([0, 255])
+    expect(touched).toBe('')
+    expect(await call(notes, '/post/:id', { params: { id: '7' } })).toBe('post 7')
+  })
+
+  it('sends a Date as its ISO text and an object as JSON, in a query or a form, leaving null out', async () => {
+    const at = new Date(Date.UTC(2026, 0, 2))
+
+    await call(notes, '/', { query: { since: at, filter: { done: false }, none: null } })
+    expect(String(served.mock.calls.at(-1)?.[0])).toBe(`/api/notes?since=${encodeURIComponent(at.toISOString())}&filter=${encodeURIComponent('{"done":false}')}`)
+
+    await Promise.allSettled([call(notes, '/attachments', { method: 'post', body: { file: new File(['a'], 'a.txt'), caption: 'Hi', at, none: null } as never })])
+    const form = served.mock.calls.at(-1)?.[1]?.body as FormData
+
+    expect(form.get('at')).toBe(at.toISOString())
+    expect(form.has('none')).toBe(false)
   })
 
   it('works from a module several islands share, as from an island', async () => {

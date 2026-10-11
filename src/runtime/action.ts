@@ -32,7 +32,6 @@ export const INPUT_PART = '$kay'
 export const FILE_MARK = '$kayFile'
 const FILE_TYPE = 'KayFile'
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
-// Statuses whose response has no body, which a Response refuses one for.
 
 // The `x-kay-action` of a call whose input is a form's fields rather than encoded.
 export const FORM_CALL = 'form'
@@ -487,22 +486,28 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 
       let undo: (() => void) | undefined
       let posted = false
+      let sent = false
+      // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; the swap is loaded already.
+      const refreshPage = async () => {
+        if (!swapState.started || options?.refresh === false)
+          return
+
+        const { refresh } = await import('./navigate')
+
+        void refresh()
+      }
 
       try {
         undo = options?.optimistic ? undoable(options.optimistic) : undefined
 
-        const data = await post(url(), input, setProgress, options?.signal)
+        const data = await post(url(), input, setProgress, options?.signal, () => {
+          sent = true
+        })
 
         posted = true
 
         called({ action: url(), succeeded: true, data })
-
-        // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; the swap is loaded already.
-        if (swapState.started && options?.refresh !== false) {
-          const { refresh } = await import('./navigate')
-
-          void refresh()
-        }
+        await refreshPage()
 
         return data
       }
@@ -510,6 +515,10 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
         // A redirect leaves the page as it is until the next one shows.
         if (!posted && !(error instanceof ActionRedirect))
           undo?.()
+
+        // The server may have run a call aborted once it was sent, which the page then shows as it stands.
+        if (sent && options?.signal?.aborted === true)
+          await refreshPage()
 
         if (error instanceof ActionError && !(error instanceof ActionRedirect))
           called({ action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
@@ -536,7 +545,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal?: AbortSignal): Promise<Output> {
+async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal?: AbortSignal, onSent?: () => void): Promise<Output> {
   const { headers, body } = encodeCall(input)
   const sent: Record<string, string> = { ...headers }
 
@@ -547,6 +556,10 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
   // fetch tells nothing of an upload's progress, which a call carrying files reports.
   const send = async (solution: string | undefined) => {
     const headers = solution === undefined ? sent : { ...sent, [WORK_HEADER]: solution }
+
+    // A signal aborted already sends nothing.
+    if (signal?.aborted !== true)
+      onSent?.()
 
     return body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? uploaded('POST', withBase(url), headers, body, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } })
   }

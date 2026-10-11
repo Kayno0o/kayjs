@@ -28,6 +28,9 @@ const LINE_BREAK = /\r\n|\r(?!$)|\n/
 const PARAM_SEGMENT = /^:(.+)$/
 // The one space a field's value may start with, which is not part of it.
 const LEADING_SPACE = /^ /
+const JSON_TYPE = /^application\/(?:[\w.+-]+\+)?json\b/i
+// An answer without a type, an empty one say, reads as text too.
+const TEXT_TYPE = /^(?:text\/|$)/i
 
 type Method = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options' | 'connect' | 'trace' | 'all' | 'subscribe'
 
@@ -36,10 +39,16 @@ type RoutesOf<Module> = Module extends { '~Routes': infer Routes } ? Routes : ne
 // One less, to stop walking a route tree past any depth an app reaches, and never instantiate it without end while `Module` is still generic.
 type Shallower = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
+// The keys of a node that are its methods' routes, a path segment named like a method, `/post`, being none.
+type RouteKey<Node> = { [Key in keyof Node & Method]: Node[Key] extends { response: unknown } ? Key : never }[keyof Node & Method]
+type RouteField = 'body' | 'params' | 'query' | 'headers' | 'response'
+// What a key leads down to: a segment's node, or what a method's route holds besides itself, the segments of a path named like the method, `/post/:id` beside a POST to `/`.
+type Below<Tree, Key extends keyof Tree> = Key extends RouteKey<Tree> ? Omit<Tree[Key], RouteField> : Tree[Key]
+
 // Every node of an Elysia route tree with the path reaching it: keys are path segments down to the methods.
 type Nodes<Tree, Path extends string = '', Depth extends number = 10> = [Depth] extends [never] ? never : { path: Path extends '' ? '/' : Path, node: Tree } | {
-  [Key in Exclude<keyof Tree & string, Method>]: Nodes<Tree[Key], `${Path}/${Key}`, Shallower[Depth]>
-}[Exclude<keyof Tree & string, Method>]
+  [Key in keyof Tree & string]: [keyof Below<Tree, Key>] extends [never] ? never : Nodes<Below<Tree, Key>, `${Path}/${Key}`, Shallower[Depth]>
+}[keyof Tree & string]
 
 export type NodeAt<Module, Path> = Extract<Nodes<RoutesOf<Module>>, { path: Path }>['node']
 
@@ -47,19 +56,20 @@ export type NodeAt<Module, Path> = Extract<Nodes<RoutesOf<Module>>, { path: Path
 export type SocketPath<Module> = Extract<Nodes<RoutesOf<Module>>, { node: { subscribe: unknown } }>['path']
 type SocketRoute<Module, Path> = NodeAt<Module, Path> extends { subscribe: infer Route } ? Route : never
 
-export type StreamMethod<Node> = { [M in keyof Node & Method]: Node[M] extends { response: { 200: EventStream<unknown> } } ? M : never }[keyof Node & Method]
+export type StreamMethod<Node> = { [M in RouteKey<Node>]: Node[M] extends { response: { 200: EventStream<unknown> } } ? M : never }[RouteKey<Node>]
 
 // The routes of a module answering with `eventStream()`.
 export type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? [StreamMethod<Node>] extends [never] ? never : Path : never : never
 // The route a method of a path answers with.
-type MethodRoute<Module, Path, M> = NodeAt<Module, Path> extends infer Node ? M extends keyof Node ? Node[M] : never : never
+type MethodRoute<Module, Path, M> = NodeAt<Module, Path> extends infer Node ? M extends RouteKey<Node> ? Node[M] : never : never
 type StreamValue<Route> = Route extends { response: { 200: EventStream<infer Value> } } ? Value : never
 
 // What the route's schema asks of the URL: params a path names are required, a query only when its schema requires one.
 type UrlOptions<Route> = (Route extends { params: infer Params } ? Record<never, never> extends Params ? { params?: Params } : { params: Params } : { params?: Record<string, unknown> })
   & (Route extends { query: infer Query } ? unknown extends Query ? { query?: Record<string, unknown> } : Record<never, never> extends Query ? { query?: Query } : { query: Query } : { query?: Record<string, unknown> })
 
-type Received<Route> = Route extends { response: { 200: infer Message } } ? Message : unknown
+// A route answering nothing, `() => {}`, declares no response at all.
+type Received<Route> = Route extends { response: infer Responses } ? Responses extends { 200: infer Message } ? Message : keyof Responses extends never ? undefined : unknown : unknown
 type Sent<Route> = Route extends { body: infer Body } ? Body : unknown
 type Body<Route> = Route extends { body: infer Input } ? unknown extends Input ? { body?: unknown } : { body: Input } : { body?: unknown }
 
@@ -250,6 +260,12 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     try {
       const response = await request(controller.signal)
 
+      if (controller.signal.aborted) {
+        void response.body?.cancel()
+
+        return
+      }
+
       if (!response.ok || !response.body) {
         if (!controller.signal.aborted)
           settle('failed')
@@ -364,6 +380,10 @@ async function parseEvents(body: ReadableStream<Uint8Array>, signal: AbortSignal
     buffer = lines.pop() ?? ''
 
     for (const line of lines) {
+      // A listener starting another run aborts this one, whose chunk holds events of its own still.
+      if (signal.aborted)
+        return undefined
+
       if (line === '') {
         const ended = data.length > 0 || event !== '' ? onEvent(event, data.join('\n')) : undefined
 
@@ -425,9 +445,9 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   const query = new URLSearchParams()
 
   for (const [name, value] of Object.entries(options.query ?? {})) {
-    for (const item of Array.isArray(value) ? value : [value]) {
-      if (item !== undefined)
-        query.append(name, String(item))
+    for (const item of Array.isArray(value) ? value as unknown[] : [value]) {
+      if (item !== undefined && item !== null)
+        query.append(name, fieldText(item))
     }
   }
 
@@ -435,6 +455,14 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   const joined = segments.join('/')
 
   return `${mount}${joined === '/' ? '' : joined}${search}`
+}
+
+// A value as a form field or a query param carries it: a Date as its ISO text, an object as JSON.
+function fieldText(value: unknown): string {
+  if (value instanceof Date)
+    return value.toISOString()
+
+  return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)
 }
 
 export type SocketOptions<Module, Path> = UrlOptions<SocketRoute<Module, Path>>
@@ -542,8 +570,36 @@ export type ResourceOptions<Module, Path> = UrlOptions<GetRoute<Module, Path>>
 export type ResourceOf<Module, Path> = Resource<GetRoute<Module, Path> extends { response: { 200: infer Value } } ? Jsonified<Value> : unknown>
 
 // An answer as Elysia sends it: JSON for an object, text for anything else.
-async function readAnswer(response: Response): Promise<unknown> {
-  return response.headers.get('content-type')?.startsWith('application/json') ? response.json() : response.text()
+// What a route answered: JSON, text, or the bytes of anything else, a file say. A refusal whose JSON does not parse reads as its text, and an answer cut off throws an ApiError with status 0, unless the call was aborted.
+async function readAnswer(response: Response, signal?: AbortSignal): Promise<unknown> {
+  const type = response.headers.get('content-type') ?? ''
+  let text: string
+
+  try {
+    if (!JSON_TYPE.test(type) && !TEXT_TYPE.test(type))
+      return await response.blob()
+
+    text = await response.text()
+  }
+  catch (failure) {
+    if (signal?.aborted === true)
+      throw failure
+
+    throw new ApiError(0, failure instanceof Error ? failure.message : String(failure))
+  }
+
+  if (!JSON_TYPE.test(type) || text === '')
+    return text
+
+  try {
+    return JSON.parse(text) as unknown
+  }
+  catch {
+    if (!response.ok)
+      return text
+
+    throw new ApiError(response.status, `kay: the route answered JSON that does not parse: ${text.slice(0, 80)}`, text)
+  }
 }
 
 // Why a route refused: the text it answered, the message of a JSON error such as a validation failure, else its status text.
@@ -553,7 +609,7 @@ function refusal(answer: unknown, response: Response): string {
 
   const message = typeof answer === 'object' && answer !== null && 'message' in answer ? answer.message : undefined
 
-  return typeof message === 'string' ? message : response.statusText
+  return typeof message === 'string' ? message : response.statusText || `HTTP ${response.status}`
 }
 
 // Reads a GET route of a module under `src/api` from an island, once it is in the page, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
@@ -575,7 +631,7 @@ export function resource<Module, const Path extends ResourcePath<Module>>(module
 
     try {
       const response = await fetch(withBase(url), { headers: { accept: 'application/json' }, signal: controller.signal })
-      const answer = await readAnswer(response)
+      const answer = await readAnswer(response, controller.signal)
 
       if (controller.signal.aborted)
         return
@@ -595,7 +651,7 @@ export function resource<Module, const Path extends ResourcePath<Module>>(module
       if (controller.signal.aborted)
         return
 
-      setError({ status: 0, message: failure instanceof Error ? failure.message : String(failure) })
+      setError({ status: failure instanceof ApiError ? failure.status : 0, message: failure instanceof Error ? failure.message : String(failure) })
       setStatus('failed')
     }
   }
@@ -624,13 +680,13 @@ export class ApiError extends Error {
 }
 
 // The methods a node answers over HTTP, a websocket's left out.
-export type CallMethod<Node> = Exclude<keyof Node & Method, 'subscribe'>
+export type CallMethod<Node> = Exclude<RouteKey<Node>, 'subscribe'>
 
 // The routes of a module answering over HTTP.
 export type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? [CallMethod<Node>] extends [never] ? never : Path : never : never
 
 // GET unless the options name another method, which a path answering no GET requires.
-type MethodOption<Node, M> = 'get' extends keyof Node ? { method?: M } : { method: M }
+type MethodOption<Node, M> = 'get' extends RouteKey<Node> ? { method?: M } : { method: M }
 type CallBody<Route> = Route extends { body: infer Input } ? unknown extends Input ? { body?: unknown } : { body: Input | FormData } : { body?: unknown }
 
 export type ApiCallOptions<Module, Path, M> = MethodOption<NodeAt<Module, Path>, M> & UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>> & {
@@ -641,7 +697,8 @@ export type ApiCallOptions<Module, Path, M> = MethodOption<NodeAt<Module, Path>,
 }
 
 // What an answer reads back as: an object as JSON, a Date in it as its ISO text, while a number or a boolean arrives as the text Elysia sends, and nothing as ''.
-export type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null | undefined | void ? '' : Jsonified<Value>
+// A file arrives as a Blob, or as text when its type is text; a Response the route built is read by its type, which the route's type does not say.
+export type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends Response ? unknown : Value extends Blob ? Blob | string : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null | undefined | void ? '' : Jsonified<Value>
 export type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>
 
 // Calls a route of a module under `src/api`, from an event handler or any code running in the browser, typed from the route: resolves with what it answered, and throws an `ApiError` when it refused.
@@ -664,7 +721,7 @@ export async function call<Module, const Path extends CallPath<Module>, const M 
     throw new ApiError(0, failure instanceof Error ? failure.message : String(failure))
   }
 
-  const answer = await readAnswer(response)
+  const answer = await readAnswer(response, signal)
 
   if (!response.ok)
     throw new ApiError(response.status, refusal(answer, response), answer)
@@ -686,8 +743,8 @@ function callBody(body: unknown): { body?: BodyInit | undefined, headers?: Recor
 
   for (const [name, value] of fields) {
     for (const item of Array.isArray(value) ? value as unknown[] : [value]) {
-      if (item !== undefined)
-        form.append(name, item instanceof Blob ? item : typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item))
+      if (item !== undefined && item !== null)
+        form.append(name, item instanceof Blob ? item : fieldText(item))
     }
   }
 

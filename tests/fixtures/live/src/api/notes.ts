@@ -26,6 +26,9 @@ export default api()
   }, { params: t.Object({ id: t.Numeric() }), body: t.Object({ title: t.String() }) })
   .delete('/:id', ({ params }) => notes.delete(params.id), { params: t.Object({ id: t.Numeric() }) })
   .post('/attachments', ({ body }) => ({ name: body.file.name, size: body.file.size, caption: body.caption }), { body: t.Object({ file: t.File(), caption: t.String() }) })
+  .get('/bytes', () => new Blob([new Uint8Array([0, 255])], { type: 'application/octet-stream' }))
+  .post('/touch', () => undefined)
+  .get('/post/:id', ({ params }) => `post ${params.id}`)
   .get('/slow', async () => {
     await Bun.sleep(500)
 
