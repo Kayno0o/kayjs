@@ -500,6 +500,39 @@ describe('optimistic changes', () => {
     }
   })
 
+  it('keeps an action called inside another\'s optimistic function pending until its own call settles, the outer one failing first', async () => {
+    const outer = actionStub('/_kay/action/test/outer') as unknown as Action<object, null>
+    const inner = actionStub('/_kay/action/test/inner') as unknown as Action<object, null>
+    const a = signal(0)
+    const failing = new Map<string, () => void>()
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL) => new Promise((_, reject) => {
+      failing.set(String(input), () => reject(new TypeError('offline')))
+    })) as unknown as typeof fetch)
+    let nested: Promise<null> | undefined
+
+    try {
+      const call = outer({}, {
+        optimistic: () => {
+          a.set(1)
+          nested = inner({}, { optimistic: () => a.set(2) })
+        },
+      })
+      const settled = Promise.allSettled([call, nested!])
+
+      expect([inner.pending(), outer.pending()]).toEqual([true, true])
+      await Bun.sleep(0)
+      failing.get('/_kay/action/test/outer')!()
+      await Bun.sleep(0)
+      expect([a(), inner.pending(), outer.pending()]).toEqual([0, true, false])
+      failing.get('/_kay/action/test/inner')!()
+      expect((await settled).map(result => result.status)).toEqual(['rejected', 'rejected'])
+      expect([a(), inner.pending()]).toEqual([0, false])
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
   it('undo what they wrote, but not what was written since', () => {
     const count = signal(1)
     const label = signal('a')

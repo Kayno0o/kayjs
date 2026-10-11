@@ -126,9 +126,25 @@ export function createSignal<T>(value: T, options?: SignalOptions<T>): [read: ()
   return [read, write]
 }
 
-// kay's own signal, such as a socket's status, which an edited island never takes back.
+// kay's own signal, such as a socket's status or an action's pending, which an edited island never takes back, nor an optimistic change written in.
 export function ownSignal<T>(value: T, options?: SignalOptions<T>): [read: () => T, write: (next: T) => void] {
-  return unrecorded(() => createSignal(value, options))
+  const [read, write] = unrecorded(() => createSignal(value, options))
+
+  return [read, (next) => {
+    const writing = interceptor?.writing
+
+    if (!writing)
+      return write(next)
+
+    interceptor!.writing = undefined
+
+    try {
+      write(next)
+    }
+    finally {
+      interceptor!.writing = writing
+    }
+  }]
 }
 
 // Runs `change`, giving back what undoes it: each signal it wrote goes back to what it held, unless something wrote it since. A change that throws is undone at once.
