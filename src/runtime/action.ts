@@ -8,7 +8,7 @@ import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
 import { leave, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
-import { createSignal, undoable, untrack } from './reactive'
+import { ownSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { uploaded } from './upload'
@@ -452,9 +452,9 @@ function pageOutcome(): Outcome | undefined {
 // Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes.
 // How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
 function callable(url: () => string): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
-  const [inFlight, setInFlight] = createSignal(0, undefined, false)
-  const [last, setLast] = createSignal<{ page: number, outcome: Outcome | null } | undefined>(undefined, undefined, false)
-  const [progress, setProgress] = createSignal<number | undefined>(undefined, undefined, false)
+  const [inFlight, setInFlight] = ownSignal(0)
+  const [last, setLast] = ownSignal<{ page: number, outcome: Outcome | null } | undefined>(undefined)
+  const [progress, setProgress] = ownSignal<number | undefined>(undefined)
   const shift = (by: number) => setInFlight(untrack(inFlight) + by)
   const called = (outcome: Outcome | null) => setLast({ page: navigation.page, outcome })
   const outcome = () => {

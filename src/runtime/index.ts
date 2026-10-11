@@ -8,7 +8,7 @@ import type { PersistStorage } from './persist'
 import type { SignalOptions } from './reactive'
 import { keepValue } from './persist'
 import { keepParam } from './query-param'
-import { createSignal, effect, memo, onCleanup, provideContext, readContext, tracking, untrack } from './reactive'
+import { createSignal, effect, memo, onCleanup, ownSignal, provideContext, readContext, tracking, untrack } from './reactive'
 
 // Writes a value, or what a function makes of the current one.
 export type Setter<T> = (next: T | ((current: T) => T)) => void
@@ -207,7 +207,7 @@ export function selection<Key extends string | number>(initial?: Key): Selection
     let flag = flags.get(key)
 
     if (!flag) {
-      const [readFlag, writeFlag] = createSignal(key === current, undefined, false)
+      const [readFlag, writeFlag] = ownSignal(key === current)
 
       flag = { read: readFlag, write: writeFlag, readers: 0 }
       flags.set(key, flag)

@@ -1,7 +1,7 @@
 import { withBase } from './base'
 import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
-import { batch, createSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
+import { batch, ownSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { decodeValue } from './wire'
 
@@ -307,7 +307,7 @@ function liveProps(initial: Record<string, unknown>): [props: object, update: (n
   const props = {}
   const writes = new Map<string, (value: unknown) => void>()
   const define = (key: string, value: unknown) => {
-    const [read, write] = createSignal(value, { equals: sameData }, false)
+    const [read, write] = ownSignal(value, { equals: sameData })
 
     writes.set(key, write)
     Object.defineProperty(props, key, { get: read, enumerable: true, configurable: true })

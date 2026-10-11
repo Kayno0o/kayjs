@@ -1,5 +1,5 @@
 import { withBase } from './base'
-import { createSignal, effect, onCleanup, onMount } from './reactive'
+import { effect, onCleanup, onMount, ownSignal } from './reactive'
 import { uploaded } from './upload'
 import { decodeValue } from './wire'
 
@@ -111,7 +111,7 @@ interface Listeners<T> {
 }
 
 function listeners<T>(): Listeners<T> {
-  const [last, setLast] = createSignal<T | undefined>(undefined, { equals: false }, false)
+  const [last, setLast] = ownSignal<T | undefined>(undefined, { equals: false })
   const all = new Set<(value: T) => void>()
 
   return {
@@ -173,7 +173,7 @@ function backoff(attempt: number): number {
 
 // A websocket that reconnects after a drop, waiting longer each time, until `close()`; `connect` gives none where there is nothing to connect from.
 export function openSocket<Send, Receive>(connect: () => WebSocket | undefined): Socket<Send, Receive> & { start: () => void } {
-  const [status, setStatus] = createSignal<SocketStatus>('connecting', undefined, false)
+  const [status, setStatus] = ownSignal<SocketStatus>('connecting')
   const messages = listeners<Receive>()
   const opened = listeners<undefined>()
   const queued: string[] = []
@@ -242,7 +242,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
 // An event stream read as it arrives, through `request`; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is.
 // `start()` opens it once; given a request, it opens a new run of it, closing the one going and forgetting its last value.
 export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response>, reconnect: boolean, idle = false): EventReader<T> & { start: (next?: (signal: AbortSignal) => Promise<Response>) => void } {
-  const [status, setStatus] = createSignal<StreamStatus>(idle ? 'idle' : 'connecting', undefined, false)
+  const [status, setStatus] = ownSignal<StreamStatus>(idle ? 'idle' : 'connecting')
   const values = listeners<T>()
   let run: AbortController | undefined
   let started = false
@@ -614,9 +614,9 @@ function refusal(answer: unknown, response: Response): string {
 
 // Reads a GET route of a module under `src/api` from an island, once it is in the page, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
 export function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<ResourceOptions<Module, Path> | (() => ResourceOptions<Module, Path>)>): ResourceOf<Module, Path> {
-  const [value, setValue] = createSignal<unknown>(undefined, { equals: false }, false)
-  const [status, setStatus] = createSignal<ResourceStatus>('loading', undefined, false)
-  const [error, setError] = createSignal<ResourceFailure | undefined>(undefined, undefined, false)
+  const [value, setValue] = ownSignal<unknown>(undefined, { equals: false })
+  const [status, setStatus] = ownSignal<ResourceStatus>('loading')
+  const [error, setError] = ownSignal<ResourceFailure | undefined>(undefined)
   let current: AbortController | undefined
   let asked = ''
   let gone = false

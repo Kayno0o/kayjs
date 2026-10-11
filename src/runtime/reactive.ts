@@ -41,7 +41,7 @@ const DISPOSED = 3
 type State = typeof CLEAN | typeof CHECK | typeof DIRTY | typeof DISPOSED
 
 // What owns child computations and cleanups: a root, a memo or an effect.
-interface Owner {
+export interface Owner {
   owner: Owner | undefined
   children: Owner[] | undefined
   cleanups: (() => void)[] | undefined
@@ -62,6 +62,16 @@ interface Computation extends Owner, Source {
   effect: 'render' | 'user' | undefined
 }
 
+// What the server's request scope, development's hot swap and an optimistic change each hook into signals, set by the function installing it, so a browser build that never calls one ships none of it.
+interface Interceptor {
+  // The server: what the request rendering now keeps of the shared signals it writes.
+  values?: (() => WeakMap<object, unknown> | undefined) | undefined
+  // An island rendering in development: a signal made, answering the value it starts with.
+  created?: ((node: SignalNode<unknown>) => unknown) | undefined
+  // An optimistic change applying: a signal about to be written, with how to write it back.
+  writing?: ((node: SignalNode<unknown>, write: (value: unknown) => void) => void) | undefined
+}
+
 let owner: Owner | undefined
 let listener: Computation | undefined
 let renderQueue: Computation[] = []
@@ -71,28 +81,20 @@ let batching = 0
 // Set while an island renders on the server, where nothing reacts afterwards: effects there never run.
 let serverRendering = 0
 const MAX_ROUNDS = 100_000
+let interceptor: Interceptor | undefined
 let serverScope: (() => ServerScope | undefined) | undefined
 let reporter: (error: unknown, island?: string) => void = error => console.error(error)
-// While an island renders in development: the signals it creates, in order, and the values an edited version of it takes back.
-let recording: SignalNode<unknown>[] | undefined
-let restoring: unknown[] | undefined
-// Inside a block that may render or not, or once per row: its signals' order says nothing about which is which, so they start afresh.
-let unrecordedDepth = 0
 // Set while an island claims its server markup, with what waits for it to be done.
 let hydrating = 0
 let afterHydration: (() => void)[] = []
-// While an optimistic change applies: each signal it writes, with what it held before its first write.
-let undoing: Map<SignalNode<unknown>, { before: unknown, write: (value: unknown) => void }> | undefined
 
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
-// `kept` is false for kay's own signals, such as a socket's status, which an edited island never takes back.
-export function createSignal<T>(value: T, options?: SignalOptions<T>, kept = true): [read: () => T, write: (next: T) => void] {
-  const noted = kept && unrecordedDepth === 0
-  const node: SignalNode<T> = { value: noted ? restored(value) : value, observers: undefined, equals: options?.equals ?? defaultEquals, shared: serverRendering === 0 }
+export function createSignal<T>(value: T, options?: SignalOptions<T>): [read: () => T, write: (next: T) => void] {
+  const node: SignalNode<T> = { value, observers: undefined, equals: options?.equals ?? defaultEquals, shared: serverRendering === 0 }
 
-  if (noted)
-    recording?.push(node as SignalNode<unknown>)
+  if (interceptor?.created)
+    node.value = interceptor.created(node as SignalNode<unknown>) as T
 
   const read = () => {
     track(node)
@@ -114,9 +116,7 @@ export function createSignal<T>(value: T, options?: SignalOptions<T>, kept = tru
     if (node.equals !== false && node.equals(node.value, next))
       return
 
-    if (undoing && !undoing.has(node as SignalNode<unknown>))
-      undoing.set(node as SignalNode<unknown>, { before: node.value, write: write as (value: unknown) => void })
-
+    interceptor?.writing?.(node as SignalNode<unknown>, write as (value: unknown) => void)
     node.value = next
     notify(node)
   }
@@ -124,11 +124,17 @@ export function createSignal<T>(value: T, options?: SignalOptions<T>, kept = tru
   return [read, write]
 }
 
+// kay's own signal, such as a socket's status, which an edited island never takes back.
+export function ownSignal<T>(value: T, options?: SignalOptions<T>): [read: () => T, write: (next: T) => void] {
+  return unrecorded(() => createSignal(value, options))
+}
+
 // Runs `change`, giving back what undoes it: each signal it wrote goes back to what it held, unless something wrote it since. A change that throws is undone at once.
 // Two changes over one signal undone out of order may leave the first one's value, its undo seeing the second's and keeping it.
 export function undoable(change: () => void): () => void {
-  const writes: NonNullable<typeof undoing> = new Map()
-  const outer = undoing
+  const writes = new Map<SignalNode<unknown>, { before: unknown, write: (value: unknown) => void }>()
+  const slot = interceptor ??= {}
+  const outer = slot.writing
   let written: Map<SignalNode<unknown>, unknown> | undefined
   const undo = () => batch(() => {
     for (const [node, { before, write }] of writes) {
@@ -137,19 +143,22 @@ export function undoable(change: () => void): () => void {
     }
   })
 
-  undoing = writes
+  slot.writing = (node, write) => {
+    if (!writes.has(node))
+      writes.set(node, { before: node.value, write })
+  }
 
   try {
     batch(change)
   }
   catch (error) {
-    undoing = outer
+    slot.writing = outer
     undo()
 
     throw error
   }
   finally {
-    undoing = outer
+    slot.writing = outer
   }
 
   written = new Map([...writes.keys()].map(node => [node, node.value]))
@@ -159,20 +168,7 @@ export function undoable(change: () => void): () => void {
 
 // A component's call: an owner of its own, so what it provides reaches what it renders and nothing beside it. `detached`, as an island is, it reads nothing provided above.
 export function scope<T>(fn: () => T, detached = false): T {
-  const node: Owner = { owner: detached ? undefined : owner, children: undefined, cleanups: undefined, state: CLEAN }
-  const previous = owner
-
-  if (owner && !detached)
-    (owner.children ??= []).push(node)
-
-  owner = node
-
-  try {
-    return fn()
-  }
-  finally {
-    owner = previous
-  }
+  return runWithOwner(ownerUnder(detached ? undefined : owner, true), fn)
 }
 
 export function provideContext(key: symbol, value: unknown): void {
@@ -194,14 +190,14 @@ export function readContext(key: symbol): { found: boolean, value?: unknown } {
 }
 
 // The owner now, for a block rendered later to read what was provided where it was declared.
-export function getOwner(): object | undefined {
+export function getOwner(): Owner | undefined {
   return owner
 }
 
-export function runWithOwner<T>(parent: object | undefined, fn: () => T): T {
+export function runWithOwner<T>(parent: Owner | undefined, fn: () => T): T {
   const previous = owner
 
-  owner = parent as Owner | undefined
+  owner = parent
 
   try {
     return fn()
@@ -213,20 +209,21 @@ export function runWithOwner<T>(parent: object | undefined, fn: () => T): T {
 
 // Runs `fn` under an owner of its own, so an effect created in it that throws later hands the error to `handler` rather than the console.
 export function catchError<T>(fn: (dispose: () => void) => T, handler: (error: unknown) => void): T {
-  const node: Owner = { owner, children: undefined, cleanups: undefined, state: CLEAN, catcher: handler }
-  const previous = owner
+  const node = ownerUnder(owner, true)
 
-  if (owner)
-    (owner.children ??= []).push(node)
+  node.catcher = handler
 
-  owner = node
+  return runWithOwner(node, () => fn(() => dispose(node)))
+}
 
-  try {
-    return fn(() => dispose(node))
-  }
-  finally {
-    owner = previous
-  }
+// An owner below `parent`; `attached`, it goes away with it.
+function ownerUnder(parent: Owner | undefined, attached: boolean): Owner {
+  const node: Owner = { owner: parent, children: undefined, cleanups: undefined, state: CLEAN }
+
+  if (parent && attached)
+    (parent.children ??= []).push(node)
+
+  return node
 }
 
 // Logs an error no `try` block caught, or one it did, and hands it to what the page reports errors to, with the island it happened in when known.
@@ -242,51 +239,59 @@ export function setErrorReporter(report: (error: unknown, island?: string) => vo
 // Renders `fn` noting the signals it creates, the first ones taking `values` back in order; returns what reads their values now, for the next version of the island.
 export function recordSignals<T>(fn: () => T, values?: unknown[]): { result: T, values: () => unknown[] } {
   const nodes: SignalNode<unknown>[] = []
-  const previous = [recording, restoring, unrecordedDepth] as const
+  const slot = interceptor ??= {}
+  const outer = slot.created
+  let restoring = values && [...values]
 
-  recording = nodes
-  restoring = values && [...values]
-  unrecordedDepth = 0
+  // A value kept from the last version while its kind matches the initial one; past the first mismatch the island's signals start afresh, its code having changed shape there.
+  slot.created = (node) => {
+    const { value } = node
+
+    nodes.push(node)
+
+    if (!restoring || restoring.length === 0)
+      return value
+
+    const kept = restoring.shift()
+
+    // A signal made empty, as `signal<string>()`, takes whatever it held.
+    if (value === undefined || (typeof kept === typeof value && (kept === null) === (value === null) && Array.isArray(kept) === Array.isArray(value)))
+      return kept
+
+    restoring = undefined
+
+    return value
+  }
 
   try {
     return { result: fn(), values: () => nodes.map(node => node.value) }
   }
   finally {
-    [recording, restoring, unrecordedDepth] = previous
+    slot.created = outer
   }
 }
 
-// Runs `fn` with what it creates left out of an island's recorded signals.
+// Runs `fn` with the signals it creates left out of an island's recorded ones: kay's own, such as a socket's status, and those of a block that may render or not, or once per row, whose order says nothing about which is which.
 export function unrecorded<T>(fn: () => T): T {
-  unrecordedDepth++
+  const created = interceptor?.created
+
+  if (!created)
+    return fn()
+
+  interceptor!.created = undefined
 
   try {
     return fn()
   }
   finally {
-    unrecordedDepth--
+    interceptor!.created = created
   }
-}
-
-// A value kept from the last version while its kind matches the initial one; past the first mismatch the island's signals start afresh, its code having changed shape there.
-function restored<T>(value: T): T {
-  if (!restoring || restoring.length === 0)
-    return value
-
-  const kept = restoring.shift()
-
-  // A signal made empty, as `signal<string>()`, takes whatever it held.
-  if (value === undefined || (typeof kept === typeof value && (kept === null) === (value === null) && Array.isArray(kept) === Array.isArray(value)))
-    return kept as T
-
-  restoring = undefined
-
-  return value
 }
 
 // Installed by the server: the scope of the request being rendered.
 export function setServerScope(scope: () => ServerScope | undefined): void {
   serverScope = scope
+  ;(interceptor ??= {}).values = () => scope()?.values
 }
 
 // The scope of the request rendering now, on the server.
@@ -296,7 +301,7 @@ export function currentServerScope(): ServerScope | undefined {
 
 // Any write while a request renders, a page's script or an island's, stays with that request; the browser installs no scope.
 function scopedValues(node: { shared: boolean }): WeakMap<object, unknown> | undefined {
-  return node.shared && serverScope !== undefined ? serverScope()?.values : undefined
+  return node.shared ? interceptor?.values?.() : undefined
 }
 
 // Runs `fn` now, or once the islands claiming their server markup are done, so a value they did not render with never meets that markup.
@@ -333,7 +338,7 @@ export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
 
   return () => {
     // A module's memo on the server would keep what one request's render derived for the next.
-    if (shared && serverScope?.() !== undefined)
+    if (shared && interceptor?.values?.() !== undefined)
       return untrack(fn)
 
     if (node.state !== DISPOSED) {
@@ -408,20 +413,9 @@ export function batch<T>(fn: () => T): T {
 
 // An owner of its own: what `fn` creates lives until `dispose` is called.
 export function root<T>(fn: (dispose: () => void) => T): T {
-  const node: Owner = { owner, children: undefined, cleanups: undefined, state: CLEAN }
-  const previousOwner = owner
-  const previousListener = listener
+  const node = ownerUnder(owner, false)
 
-  owner = node
-  listener = undefined
-
-  try {
-    return fn(() => dispose(node))
-  }
-  finally {
-    owner = previousOwner
-    listener = previousListener
-  }
+  return runWithOwner(node, () => untrack(() => fn(() => dispose(node))))
 }
 
 // Runs every effect whose sources changed, now.

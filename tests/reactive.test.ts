@@ -4,7 +4,7 @@ import { stringify } from 'devalue'
 import { batch, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
 import { ActionError, actionStub } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
-import { createSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded } from '../src/runtime/reactive'
+import { createSignal, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded } from '../src/runtime/reactive'
 
 describe('signals', () => {
   it('read the last value written, a function written being an updater', () => {
@@ -266,12 +266,12 @@ describe('recordSignals', () => {
       createSignal(1)[1](5)
       unrecorded(() => createSignal('row')[1]('changed row'))
       createSignal('text')[1]('typed')
-      createSignal(false, undefined, false)[1](true)
+      ownSignal(false)[1](true)
     })
 
     expect(first.values()).toEqual([5, 'typed'])
 
-    const again = recordSignals(() => [createSignal(0)[0](), createSignal('')[0](), createSignal(false, undefined, false)[0]()], first.values())
+    const again = recordSignals(() => [createSignal(0)[0](), createSignal('')[0](), ownSignal(false)[0]()], first.values())
 
     expect(again.result).toEqual([5, 'typed', false])
 

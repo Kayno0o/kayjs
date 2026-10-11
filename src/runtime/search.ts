@@ -1,5 +1,5 @@
 import { withBase } from './base'
-import { createSignal, effect } from './reactive'
+import { effect, ownSignal } from './reactive'
 
 // What `kay build` writes with `search` on: the manifest naming the index of the build and each language's, served revalidated, and the index under a directory named by its hash, served for good.
 export const SEARCH_MANIFEST = '/_kay/search.json'
@@ -128,9 +128,9 @@ export async function searchSite(query: string, options: SearchOptions = {}): Pr
 
 // In an island, the hits of `searchSite` for `query` as it changes: only the latest query's are shown, whichever answers first.
 export function searchResults(query: () => string, options?: SearchOptions): SearchResults {
-  const [hits, setHits] = createSignal<SearchHit[]>([], undefined, false)
-  const [loading, setLoading] = createSignal(false, undefined, false)
-  const [error, setError] = createSignal<Error | undefined>(undefined, undefined, false)
+  const [hits, setHits] = ownSignal<SearchHit[]>([])
+  const [loading, setLoading] = ownSignal(false)
+  const [error, setError] = ownSignal<Error | undefined>(undefined)
   let asked = 0
 
   const ask = async (text: string, turn: number) => {
