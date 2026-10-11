@@ -36,6 +36,14 @@ test('kay renders the editor in edit mode alone, a form per entry the page read,
   expect(page.find('.kcms-entry-loading')).toHaveLength(1)
 })
 
+test('stopping editing leaves edit mode, the page rendering no editor again', async () => {
+  const leaving = await testSite({ root: ROOT })
+
+  expect((await leaving.visit('/admin/page?path=/blog/hello')).find('aside.kcms-editor')).toHaveLength(1)
+  expect(await (await leaving.fetch('/api/cms/preview/exit', { method: 'POST' })).json()).toEqual({ left: true })
+  expect((await leaving.visit('/blog/hello')).find('aside.kcms-editor')).toEqual([])
+})
+
 test('the editor says when nothing on the page comes from a collection', async () => {
   const page = await editor.visit('/empty')
 

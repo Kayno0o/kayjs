@@ -2,10 +2,13 @@
 import type { EditorProps } from 'kay/edit'
 import type { EntryRef } from '../kay/contract'
 import type { FieldMarker, FieldPath } from '../markers'
+import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
-import { listen } from 'kay'
+import { attempt } from '@kaynooo/kayjs-ui'
+import { call, listen } from 'kay'
+import previewApi from '../api/preview'
 import { entryKey, fieldsAt } from '../markers'
 import { drafts } from './drafts'
 import EntryForm from './entry-form.kay'
@@ -16,6 +19,7 @@ const { entries } = props<EditorProps>()
 
 const open = signal(true)
 const focused = signal<FieldMarker>()
+const leaving = signal(false)
 let panel: HTMLElement | undefined
 
 // The field a click on the page asked for, when it belongs to that entry.
@@ -46,7 +50,20 @@ listen(() => document, 'click', (event) => {
   focused = field.marker
 }, { capture: true })
 
-// A site page may render no Toaster or TooltipHost of its own; where it does, the ones below give way to them.
+// Loads the page again as visitors see it, once kay forgot the edit mode.
+async function stopEditing(): Promise<void> {
+  leaving = true
+
+  if (!await attempt(() => call(previewApi, '/exit', { method: 'post' }), 'Could not leave edit mode')) {
+    leaving = false
+
+    return
+  }
+
+  location.reload()
+}
+
+// The page outlines its fields while the editor is open. The Toaster and TooltipHost below give way to a site page's own.
 effect(() => {
   document.documentElement.classList.toggle('kcms-editing', open())
 })
@@ -55,6 +72,7 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
   header.kcms-editor-head
     if open
       h2.kcms-editor-title Edit this page
+      Button(label={leaving ? 'Leaving…' : 'Stop editing'} busy={leaving} onClick={stopEditing})
     IconButton(icon={open ? 'close' : 'menu'} label={open ? 'Hide the editor' : 'Edit this page'} variant="ghost" onClick={() => open = !open})
   if open
     .kcms-editor-body
