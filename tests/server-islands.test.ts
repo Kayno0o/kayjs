@@ -19,6 +19,8 @@ const STAMP = /<p class="stamp">(stamp-\d+)<\/p>/g
 const INLINE = '<!--kay-server:0--><!--/kay-server:0-->'
 const ACTION = /<form method="post" action="([^"]+)"/
 const DEFERRED = /<!--kay-server:1--><slot data-kay-server="1" inert>[\s\S]*?<!--\/kay-server:1-->/
+// The markers around each value an island hydrates.
+const VALUE_MARKERS = /<!--[[\]]-->/g
 
 function stamps(html: string): string[] {
   return [...html.matchAll(STAMP)].map(match => match[1]!)
@@ -123,6 +125,14 @@ describe('server islands', () => {
       expect(asking.headers.get('etag')).toBeTruthy()
       expect(await asking.text()).toBe(await Bun.file(join(outputDir(root), 'pages/ask.html')).text())
       expect(await (await visit('/ask?kay_island=0', { [ISLAND_HEADER]: '1' })).text()).toMatch(/<input type="hidden" name="kay_since" value="[\da-z]+\.[\w-]+">/)
+
+      // An island reads the query as the page's schema reads it, and a query the schema refuses fails its request as it fails the page's.
+      const counted = async (path: string, headers: Record<string, string> = {}) => (/<p class="counted">([^<]*)<\/p>/).exec((await (await visit(path, headers)).text()).replaceAll(VALUE_MARKERS, ''))?.[1]
+
+      expect(written['/typed']!.islands).toEqual(['inline', 'defer'])
+      expect(await counted('/typed?n=5')).toBe('number:5')
+      expect(await counted('/typed?kay_island=1&n=7', { [ISLAND_HEADER]: '1' })).toBe('number:7')
+      expect((await visit('/typed?kay_island=1&n=abc', { [ISLAND_HEADER]: '1' })).status).toBe(400)
     }
     finally {
       await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })

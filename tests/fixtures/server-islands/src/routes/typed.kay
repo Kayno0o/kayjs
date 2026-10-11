@@ -1,0 +1,10 @@
+--- server
+import { t } from 'elysia'
+
+export const page = { prerender: true, query: t.Object({ n: t.Optional(t.Integer()) }) }
+--- script
+import Counted from '../components/counted.kay'
+---
+h1 Typed
+Counted(server)
+Counted(server="defer")

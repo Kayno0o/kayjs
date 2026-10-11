@@ -57,7 +57,9 @@ interface PageModule {
 }
 
 type Loaded = PromiseSettledResult<Record<string, unknown>>
-type Body = string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array> | Bun.BunFile
+// What a render writes; a prerendered page also goes out as its file.
+type Written = string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>
+type Body = Written | Bun.BunFile
 
 // HTML under the mount point already, as `kay build` rendered it or a server island's was rebased, which goes out as it is.
 class Rebased {
@@ -252,7 +254,7 @@ function serverTiming(files: string[], modules: PageModule[], timings: number[],
 
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
 // `spliced` gives the page with what changes per request filled in, as its stamps, gzipped when the browser takes it.
-export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>, gzip: boolean }>): Promise<Response> {
+export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: Written, gzip: boolean }>): Promise<Response> {
   const rendering = createRendering(context, params, options)
   const refusal = await refused(route, rendering, client, options)
 
@@ -318,7 +320,7 @@ export interface RenderedServerIslands {
   path: Set<unknown>
   headers: Headers
   // Answers with what the page's loads set, cookies included, for this visitor alone.
-  reply: (body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>) => Response
+  reply: (body: Written) => Response
 }
 
 // The server islands of a prerendered page, rendered for this request: its loads run again, then only the components on the way to an island render, as `path` lists them; without one, the whole page renders once to find them.
@@ -337,7 +339,8 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
     try {
       const started = performance.now()
       const islands = newServerIslands(path === undefined, path, skip)
-      const inScope = <T>(run: () => T) => inServerScope(request, report, run, () => rendering.headers.append('vary', 'cookie'))
+      const rules = queryRules(pageSetting(page.modules.at(-1)!, 'query'))
+      const inScope = <T>(run: () => T) => inServerScope(request, report, run, () => rendering.headers.append('vary', 'cookie'), rules)
       const { deferred } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data))))
       // What a block inside an island renders is the island's own, every component of it included.
       const within = (view: () => unknown) => inScope(() => withServerIslands({ ...islands, inside: 1 }, () => renderStatic(view)))
