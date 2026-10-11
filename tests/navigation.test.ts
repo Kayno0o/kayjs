@@ -456,6 +456,32 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await sameDocument()).toBe(false)
   })
 
+  it('loads fully a page asking for it, and one whose cross-origin isolation differs from this one\'s', async () => {
+    const mark = async () => page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    const follow = async (link: string, title: string) => {
+      await mark()
+      await page.click(link)
+      await page.locator('h1', { hasText: title }).waitFor()
+    }
+
+    await page.goto(origin)
+    await follow('a.whole', 'Whole')
+    expect(await sameDocument()).toBe(false)
+
+    await follow('a.isolated', 'Isolated')
+    expect(await sameDocument()).toBe(false)
+    expect(await page.evaluate(() => crossOriginIsolated)).toBe(true)
+
+    await follow('a.second', 'Second')
+    expect(await sameDocument()).toBe(false)
+    expect(await page.evaluate(() => crossOriginIsolated)).toBe(false)
+
+    await follow('a.home', 'Home')
+    expect(await sameDocument()).toBe(true)
+  })
+
   it('shares a module\'s signal between the islands of a page', async () => {
     await page.goto(`${origin}/state`)
     await page.locator('p.total', { hasText: 'Total 5' }).waitFor()

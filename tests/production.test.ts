@@ -31,7 +31,7 @@ import { securityHeaders } from '../src/server/security'
 import { signStamp, stampTime, useStampSecret } from '../src/server/stamp'
 import { CspViolation } from '../src/server/violations'
 import { testSite } from '../src/test'
-import { fixtureCopy } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 
@@ -138,6 +138,49 @@ describe('security headers', () => {
     expect(response.headers.has('x-frame-options')).toBe(false)
     expect(response.headers.get('permissions-policy')).toBe('geolocation=(self)')
     expect(response.headers.has('cross-origin-opener-policy')).toBe(false)
+  })
+
+  it('sends what a page and its layouts set in `security` over the site\'s headers, and marks a page asking for full loads', async () => {
+    const dir = await scratchDir('page-security-')
+    const settings = (page: string) => `--- server\nexport const page = ${page}\n---\n`
+
+    try {
+      await Promise.all([
+        Bun.write(join(dir, 'index.kay'), 'h1 Home\n'),
+        Bun.write(join(dir, 'games/_layout.kay'), `${settings('{ security: { csp: { \'script-src\': [\'https://cdn.example.com\'] } } }')}slot\n`),
+        Bun.write(join(dir, 'games/index.kay'), 'h1 Games\n'),
+        Bun.write(join(dir, 'games/emulator.kay'), `${settings('{ security: { headers: { \'cross-origin-embedder-policy\': \'require-corp\', \'x-frame-options\': false }, csp: { \'worker-src\': [\'blob:\'], \'object-src\': false } } }')}h1 Emulator\n`),
+        Bun.write(join(dir, 'player.kay'), `${settings('{ reload: true }')}h1 Player\n`),
+      ])
+      const app = await pages({ routes: dir, prebuilt: false, security: { csp: { 'script-src': ['\'self\'', 'https://site.example.com'] } } })
+      const get = async (path: string) => app.handle(new Request(`http://localhost${path}`))
+      const [home, games, emulator, player] = await Promise.all(['/', '/games', '/games/emulator', '/player'].map(get))
+      const policy = directives(emulator!.headers.get('content-security-policy'))
+
+      expect(directives(home!.headers.get('content-security-policy')).get('script-src')).toEqual(['\'self\'', 'https://site.example.com', ...inlineScriptHashes()])
+      expect(directives(games!.headers.get('content-security-policy')).get('script-src')).toEqual(['\'self\'', 'https://site.example.com', 'https://cdn.example.com', ...inlineScriptHashes()])
+      expect(policy.get('script-src')).toEqual(['\'self\'', 'https://site.example.com', 'https://cdn.example.com', ...inlineScriptHashes()])
+      // A directive the policy lacks starts from the one it falls back to: `worker-src` from `script-src`, past `child-src`.
+      expect(policy.get('worker-src')).toEqual(['\'self\'', 'https://site.example.com', 'https://cdn.example.com', 'blob:'])
+      expect(policy.has('object-src')).toBe(false)
+      expect(emulator!.headers.get('cross-origin-embedder-policy')).toBe('require-corp')
+      expect(emulator!.headers.get('cross-origin-opener-policy')).toBe('same-origin')
+      expect(emulator!.headers.has('x-frame-options')).toBe(false)
+      expect(games!.headers.get('x-frame-options')).toBe('SAMEORIGIN')
+      expect(games!.headers.has('cross-origin-embedder-policy')).toBe(false)
+      expect(player!.headers.get('x-kay-reload')).toBe('1')
+      expect(player!.headers.get('content-security-policy')).toBe(home!.headers.get('content-security-policy'))
+      expect(home!.headers.has('x-kay-reload')).toBe(false)
+
+      // A site sending no security headers still sends what a page asks for.
+      const bare = await (await pages({ routes: dir, prebuilt: false, security: false })).handle(new Request('http://localhost/games/emulator'))
+
+      expect(bare.headers.get('cross-origin-embedder-policy')).toBe('require-corp')
+      expect(bare.headers.has('content-security-policy')).toBe(false)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('keeps a header a route sets, on its Response or through set.headers', async () => {

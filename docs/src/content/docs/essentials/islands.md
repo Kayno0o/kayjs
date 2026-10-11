@@ -107,6 +107,22 @@ button(onClick={() => navigate('/todos')}) Todos
 
 `navigate({ query: { sort: 'name', page: null } })` changes the current page's query in place, keeping the scroll and the focus; a null or empty value drops its param.
 
+A link with `data-reload` loads its page fully. So does every link to a page whose `page` sets `reload: true`, and to a page whose cross-origin isolation differs from the current one, since a document cannot change it in place:
+
+```kay
+--- server
+export const page = {
+  security: {
+    csp: { 'script-src': ['https://cdn.example.com'] },
+    headers: { 'cross-origin-embedder-policy': 'require-corp' },
+  },
+}
+---
+h1 Emulator
+```
+
+`security` adds CSP sources to the site's directives and merges headers over its own, for this page's responses alone, or every page under a layout setting it.
+
 ## Browser-only code
 
 `window`, `document` and `localStorage` do not exist on the server. Read them in `onMount` or `effect`, which run in the browser only:

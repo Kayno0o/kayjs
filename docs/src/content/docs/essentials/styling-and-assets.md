@@ -81,7 +81,7 @@ An island, and any package it imports, names a file shipped beside a module with
 - Only a relative path written as a string, naming a file, is shipped: a directory, a template with a part, an absolute path or a call inside a comment is left as written.
 - A worker bundles as an island does, its stylesheets dropped and its API imports as stubs, but without the config's `plugins`. One that fails to build fails the build, each error at its `file:line:column`.
 - When an island or its worker compiles wasm, kay's content security policy adds `'wasm-unsafe-eval'` to `script-src`, and `worker-src 'self' blob:` when one starts a worker from a blob. They join a `csp` setting its own `script-src` or `worker-src` too, unless it sets that directive to `false` or `'none'`.
-- Threads sharing memory need a page isolated from other origins: set `security: { headers: { 'cross-origin-embedder-policy': 'credentialless' } }`; kay already sends `cross-origin-opener-policy: same-origin`.
+- Threads sharing memory need a page isolated from other origins: set `security: { headers: { 'cross-origin-embedder-policy': 'credentialless' } }`; kay already sends `cross-origin-opener-policy: same-origin`. Set it in kay.config.ts for the whole site, or in a page's `page` for that page alone, which links then load fully.
 
 ## Responsive images
 

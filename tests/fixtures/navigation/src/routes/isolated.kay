@@ -1,0 +1,6 @@
+--- server
+export const page = { security: { headers: { 'cross-origin-embedder-policy': 'require-corp' } } }
+---
+head
+  title Isolated
+h1 Isolated

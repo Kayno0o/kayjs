@@ -70,7 +70,7 @@ export const page = { prerender: true, revalidate: '1h' }
 ---
 ```
 
-The keys are `prerender` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), and `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)). `kay check` types the object, so the editor completes the keys and an unknown one is an error. A setting exported under its own name, `export const prerender = true`, is a compile error, and `kay check --fix` moves it into `page`.
+The keys are `prerender` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)), `guards: false` to skip the guards above (see [Sessions and guards](/guides/sessions-and-guards)), `security` to add CSP sources or headers to the page's responses, and `reload: true` to have every link load the page fully. A layout's `layouts`, `guards`, `security` and `reload` apply to the pages under it. `kay check` types the object, so the editor completes the keys and an unknown one is an error. A setting exported under its own name, `export const prerender = true`, is a compile error, and `kay check --fix` moves it into `page`.
 
 ## Loading data
 

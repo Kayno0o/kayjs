@@ -1,0 +1,6 @@
+--- server
+export const page = { reload: true }
+---
+head
+  title Whole
+h1 Whole

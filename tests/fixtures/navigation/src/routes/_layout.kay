@@ -11,6 +11,8 @@ nav
   a.second(href="/second") Second
   a.later(href="/later") Later
   a.reload(href="/plain" data-reload) Plain
+  a.whole(href="/whole") Whole
+  a.isolated(href="/isolated") Isolated
 ul#side(style="height: 40px; overflow-y: auto; margin: 0")
   li(style="height: 400px") Side
 div#drawer(popover) Drawer

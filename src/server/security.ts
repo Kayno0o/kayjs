@@ -1,5 +1,6 @@
 import type { Context } from 'elysia'
 import type { KayConfig, SecurityConfig } from '../config'
+import type { PageSecurity } from '../runtime'
 import type { Prefetch } from './speculation'
 import { isNotEmpty } from 'elysia/utils'
 import { offlineOf } from '../project'
@@ -40,6 +41,18 @@ const STYLE_DIRECTIVES = ['style-src', 'style-src-elem']
 const UNSAFE_INLINE = '\'unsafe-inline\''
 const NONE = '\'none\''
 
+// The directive a browser reads in place of one the policy lacks, which a page adding sources to it starts from; any other fetch directive falls back to `default-src`.
+const FALLBACKS: Record<string, string> = {
+  'script-src-elem': 'script-src',
+  'script-src-attr': 'script-src',
+  'style-src-elem': 'style-src',
+  'style-src-attr': 'style-src',
+  'worker-src': 'child-src',
+  'frame-src': 'child-src',
+  'child-src': 'script-src',
+}
+const FETCH_DIRECTIVE = /-src(?:-elem|-attr)?$/
+
 const HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
@@ -53,10 +66,13 @@ const HEADERS: Record<string, string> = {
   'x-permitted-cross-domain-policies': 'none',
 }
 
-// The headers every response carries unless the app sets its own, or undefined with `security: false`.
-export function securityHeaders(options: SecurityOptions): Record<string, string> | undefined {
+// The headers every response carries unless the app sets its own, or undefined with `security: false`; with the `security` settings of a page and its layouts, outermost first, those of its responses.
+export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] = []): Record<string, string> | undefined {
+  const pageHeaders = pages.flatMap(page => page.headers ? [page.headers] : [])
+
+  // A site sending none still sends what a page asks for.
   if (options.security === false)
-    return undefined
+    return pageHeaders.length > 0 ? withHeaders({}, pageHeaders) : undefined
 
   const headers: Record<string, string> = { ...HEADERS }
   const { csp, reports, reportOnly } = options.security ?? {}
@@ -68,17 +84,25 @@ export function securityHeaders(options: SecurityOptions): Record<string, string
   if (reportTo !== undefined)
     headers['reporting-endpoints'] = `${CSP_ENDPOINT}="${reportTo}"`
 
+  const added = pages.flatMap(page => page.csp ? [page.csp] : [])
+
   if (csp !== false)
-    headers['content-security-policy'] = policy([csp ?? {}], hashes, styles, reportTo, options.islands)
+    headers['content-security-policy'] = policy([csp ?? {}], hashes, styles, reportTo, options.islands, added)
 
   if (reportOnly)
-    headers['content-security-policy-report-only'] = policy([csp === false || csp === undefined ? {} : csp, reportOnly], hashes, styles, reportTo, options.islands)
+    headers['content-security-policy-report-only'] = policy([csp === false || csp === undefined ? {} : csp, reportOnly], hashes, styles, reportTo, options.islands, added)
 
-  for (const [name, value] of Object.entries(options.security?.headers ?? {})) {
-    if (value === false)
-      delete headers[name.toLowerCase()]
-    else
-      headers[name.toLowerCase()] = value
+  return withHeaders(headers, [options.security?.headers ?? {}, ...pageHeaders])
+}
+
+function withHeaders(headers: Record<string, string>, layers: Record<string, string | false>[]): Record<string, string> {
+  for (const layer of layers) {
+    for (const [name, value] of Object.entries(layer)) {
+      if (value === false)
+        delete headers[name.toLowerCase()]
+      else
+        headers[name.toLowerCase()] = value
+    }
   }
 
   return headers
@@ -113,8 +137,9 @@ export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<st
 
 // kay's directives, plus the sources its islands need, with each layer of the app's merged over them in turn, a directive given `false` left out; `script-src` and `script-src-elem` always keep the hashes of kay's inline scripts, and `style-src` and `style-src-elem` those of its inline styles.
 // A hash switches `'unsafe-inline'` off, so a style directive allowing it gets none.
+// A page's sources are then added to what the site's directives hold.
 // `report-uri` is for browsers that predate `report-to`, which those that know it read instead.
-function policy(layers: Record<string, string[] | false>[], hashes: string[], styles: string[], reportTo: string | undefined, islands: Record<string, string[]> = {}): string {
+function policy(layers: Record<string, string[] | false>[], hashes: string[], styles: string[], reportTo: string | undefined, islands: Record<string, string[]> = {}, added: Record<string, string[] | false>[] = []): string {
   const directives = new Map(Object.entries(DIRECTIVES))
   const removed = new Set<string>()
 
@@ -139,6 +164,19 @@ function policy(layers: Record<string, string[] | false>[], hashes: string[], st
       directives.set(name, [...new Set([...own ?? [], ...sources])])
   }
 
+  for (const sources of added) {
+    for (const [name, value] of Object.entries(sources)) {
+      if (value === false) {
+        directives.delete(name)
+      }
+      else {
+        const own = directives.get(name) ?? fallbackSources(directives, name)
+
+        directives.set(name, [...new Set([...own.filter(source => source !== NONE), ...value])])
+      }
+    }
+  }
+
   if (reportTo !== undefined) {
     directives.set('report-uri', [reportTo])
     directives.set('report-to', [CSP_ENDPOINT])
@@ -160,4 +198,14 @@ function policy(layers: Record<string, string[] | false>[], hashes: string[], st
   }
 
   return [...directives].map(([name, sources]) => sources.length > 0 ? `${name} ${sources.join(' ')}` : name).join('; ')
+}
+
+// What the browser enforces for a fetch directive the policy lacks: that of the directive it falls back to, or nothing for any other.
+function fallbackSources(directives: Map<string, string[]>, name: string): string[] {
+  if (!FETCH_DIRECTIVE.test(name) || name === 'default-src')
+    return []
+
+  const fallback = FALLBACKS[name] ?? 'default-src'
+
+  return directives.get(fallback) ?? fallbackSources(directives, fallback)
 }

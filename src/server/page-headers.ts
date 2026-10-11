@@ -1,0 +1,63 @@
+import type { Context } from 'elysia'
+import type { PageSecurity } from '../runtime'
+import type { ServedRoute } from './guards'
+import type { PageResponder } from './page-routes'
+import type { SecurityOptions } from './security'
+import { RELOAD_HEADER } from '../runtime/swap'
+import { importModule } from './bundle'
+import { pageSetting } from './page-settings'
+import { securityHeaders } from './security'
+
+interface RouteHeaders {
+  headers: Record<string, string>
+  // The site's headers the route's settings change or leave out, which the request's context then drops.
+  replaced: string[]
+}
+
+// The page responder, with what the `security` and `reload` settings of a route's page and layouts add to its responses; a header the response sets itself wins.
+export function withPageHeaders(respond: PageResponder, options: SecurityOptions, site: Record<string, string> | undefined): PageResponder {
+  const byRoute = new Map<string, Promise<RouteHeaders | undefined>>()
+
+  return async (route, params, context, url) => {
+    const key = [...route.layouts, route.file].join('\0')
+    let own = byRoute.get(key)
+
+    if (!own)
+      byRoute.set(key, own = routeHeaders(route, options, site))
+
+    const [response, headers] = await Promise.all([respond(route, params, context, url), own])
+
+    if (!headers)
+      return response
+
+    const { set } = context as { set?: Context['set'] }
+
+    for (const name of headers.replaced) {
+      if (set && set.headers[name] === site?.[name])
+        delete set.headers[name]
+    }
+
+    for (const [name, value] of Object.entries(headers.headers)) {
+      if (!response.headers.has(name))
+        response.headers.set(name, value)
+    }
+
+    return response
+  }
+}
+
+async function routeHeaders(route: ServedRoute, options: SecurityOptions, site: Record<string, string> | undefined): Promise<RouteHeaders | undefined> {
+  const modules = await Promise.all([...route.layouts, route.file].map(async file => importModule<object>(file)))
+  const security = modules.flatMap(module => (pageSetting(module, 'security') as PageSecurity | undefined) ?? [])
+  const reload = modules.some(module => pageSetting(module, 'reload') === true)
+
+  if (security.length === 0 && !reload)
+    return undefined
+
+  const headers = security.length > 0 ? securityHeaders(options, security) ?? {} : { ...site }
+
+  if (reload)
+    headers[RELOAD_HEADER] = '1'
+
+  return { headers, replaced: Object.keys(site ?? {}).filter(name => headers[name] !== site![name]) }
+}

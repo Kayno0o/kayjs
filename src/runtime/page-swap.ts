@@ -4,7 +4,7 @@ import { withoutBase } from './base'
 import { focusInvalid } from './focus'
 import { ISLAND } from './markers'
 import { busyForms, checkedForms, leave, navigation, pageKey, restoreScroll, saveScroll, submitNatively, swappable, takeFormChecks, writeHistory } from './navigate'
-import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, RELOAD_HEADER, swapState, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { decodeValue } from './wire'
 
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link or post a form.
@@ -33,6 +33,9 @@ const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
 const RUNNABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/javascript', 'importmap'])
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
 const ID_LIST = /\s+/
+const ISOLATING_EMBEDDERS = new Set(['require-corp', 'credentialless'])
+// What follows a policy's value, such as `; report-to="endpoint"`.
+const POLICY_PARAMS = /;.*/
 
 let current = 0
 let checks: Promise<typeof import('./validate')> | undefined
@@ -73,14 +76,23 @@ async function fetchPage(url: URL): Promise<FetchedPage> {
   const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1' } })
   const type = response.headers.get('content-type') ?? ''
 
-  // A file the browser loads itself once the swap gives up on it, so it is not read twice.
-  if (!HTML.test(type)) {
+  const full = response.headers.has(RELOAD_HEADER) || (isSecureContext && isolated(response.headers) !== crossOriginIsolated)
+
+  // A file or a page the browser loads itself once the swap gives up on it, so it is not read twice.
+  if (!HTML.test(type) || full) {
     void response.body?.cancel()
 
-    return { url: response.url, type, html: '' }
+    return { url: response.url, type, html: '', ...full && { full } }
   }
 
   return { url: response.url, type, html: await response.text() }
+}
+
+// Whether a page with these headers is cross-origin isolated, as a secure document is with both policies set so.
+function isolated(headers: Headers): boolean {
+  const value = (name: string) => headers.get(name)?.replace(POLICY_PARAMS, '').trim()
+
+  return value('cross-origin-opener-policy') === 'same-origin' && ISOLATING_EMBEDDERS.has(value('cross-origin-embedder-policy') ?? '')
 }
 
 // The page a navigation shows: one prefetched in the last few seconds, else fetched now.
@@ -147,7 +159,7 @@ async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () =
 
   target.hash = hash
 
-  if (!HTML.test(page.type)) {
+  if (!HTML.test(page.type) || page.full) {
     leave(target, swap)
 
     return

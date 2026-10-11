@@ -36,6 +36,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
 import { serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
+import { withPageHeaders } from './page-headers'
 import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { servePreview } from './preview'
@@ -171,7 +172,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const table = routeTable(routes, i18n?.settings, served)
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
-  const security = securityHeaders({ ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) })
+  const securityOptions = { ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) }
+  const security = securityHeaders(securityOptions)
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])
   const log = options.log ?? process.env.NODE_ENV === 'production'
@@ -282,7 +284,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   await servePublic(app, served, publicServed)
   serveRedirects(app, redirects)
 
-  const respond = pageResponder({ client, renderOptions, prerendered, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) })
+  const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
 
   servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback: source.fallback(paths.routes, mounts), respond })
 
