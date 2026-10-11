@@ -13,7 +13,7 @@ import { constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
-import { defaultName, LOAD, PROPS } from './names'
+import { defaultName, LOAD, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { headTagProblem, sharedImports } from './validate'
 
@@ -54,6 +54,8 @@ export interface GenerateOptions {
   relocateImport?: ((specifier: string) => string | undefined) | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
   rewrites?: ReadonlyMap<number, Rewrite & { end: number }> | undefined
+  // Type checking's final pass: the value of each signal the template reads, declared under `VALUES`.
+  values?: ReadonlyMap<string, string> | undefined
 }
 
 export interface Generated {
@@ -150,6 +152,9 @@ class ModuleShell {
 
     this.signature()
     this.emitBody()
+
+    if (this.options.values !== undefined && this.options.values.size > 0)
+      this.b.add(`\nconst ${VALUES} = { ${[...this.options.values].map(([name, value]) => `${name}: ${value}`).join(', ')} }\n`)
 
     for (const node of hoisted)
       this.emitHoistedConst(node)

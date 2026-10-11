@@ -4,6 +4,8 @@
 export const PROPS = '__props'
 // The value an updater gets, as `count += 1` writes `count.set((KayCurrent) => KayCurrent + 1)`.
 export const CURRENT = 'KayCurrent'
+// What type checking reads a template's signal through, `(void count, __values.count)`: a property TypeScript narrows, as it narrows no call, beside the signal's own name, which the editor renames and finds.
+export const VALUES = '__values'
 // A `case` block's subject, read once for every `when`.
 export const SUBJECT = 'KaySubject'
 // The server fence's function, which hands its data to the template.
@@ -19,4 +21,4 @@ export function defaultName(index: number): string {
 }
 
 // What the editor leaves out of completions: the names above a completion can reach, and what the generated code imports or declares.
-export const GENERATED_NAME = new RegExp(`^(?:${[PROPS, CURRENT, 'kayEvent'].join('|')}|${DEFAULT_PREFIX}\\d+|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|IdentityKey|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$`)
+export const GENERATED_NAME = new RegExp(`^(?:${[PROPS, VALUES, CURRENT, 'kayEvent'].join('|')}|${DEFAULT_PREFIX}\\d+|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|IdentityKey|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$`)

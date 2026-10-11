@@ -43,10 +43,17 @@ export class CodeBuilder {
 
     for (const [start, rewrite] of this.rewritesIn(span)) {
       this.copy(cursor, start)
+
+      const wrapped = this.code.length
+
       this.code += rewrite.before ?? ''
 
       if (rewrite.replace === undefined) {
         this.copy(start, rewrite.end)
+
+        // What wraps the name maps to it, so an error on the whole of `(void count, __values.count)` lands on `count`.
+        if (rewrite.before !== undefined || rewrite.after !== undefined)
+          this.ranges.push({ generated: { start: wrapped, end: this.code.length + (rewrite.after?.length ?? 0) }, source: { start, end: rewrite.end } })
       }
       else {
         const generated = this.code.length

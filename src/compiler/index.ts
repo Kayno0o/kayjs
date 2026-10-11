@@ -113,7 +113,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const found = findRewrites({ code: analysis.builder.code, map: analysis.builder.map(), sites: analysis.sites, values, templateStart: file.templateStart, imported, component: componentName(filename) })
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   const name = freeName(componentName(filename), fences, found.findings.globalReads)
-  const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates })
+  const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates, values: found.plan.values })
   const diagnostics = [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...server ? separatePageSettings(source, server) : [], ...validate(file, script, server, generateOptions), ...found.diagnostics]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.

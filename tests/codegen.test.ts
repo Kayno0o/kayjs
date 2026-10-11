@@ -304,9 +304,11 @@ describe('islands', () => {
   it('reads a signal by name through optional chaining, a shorthand property and await blocks', () => {
     const code = tsx('---\nconst user = signal<{ name: string }>()\nconst count = memo(() => 1)\nconst later = Promise.resolve(2)\n---\np(title={JSON.stringify({ count })}) {user?.name}\nawait later\n  p {count}\nthen value\n  p {count + value}\n')
 
-    expect(code).toContain('user()?.name')
-    expect(code).toContain('{ count: count() }')
-    expect(code.match(/count\(\)/g)).toHaveLength(3)
+    // Type checking reads each through `__values`, which it narrows.
+    expect(code).toContain('const __values = { user: user(), count: count() }')
+    expect(code).toContain('(void user, __values.user)?.name')
+    expect(code).toContain('{ count: (void count, __values.count) }')
+    expect(code.match(/\(void count, __values\.count\)/g)).toHaveLength(3)
   })
 
   it('leaves a name the file declares or imports itself', () => {
@@ -675,17 +677,18 @@ describe('signal writes', () => {
     const code = tsx('---\nconst count = signal(0)\nconst open = signal(false)\nfunction f() {\n  count=count() + 1\n  count *= 2\n  --count\n}\n---\nbutton(onClick={() => { count++; open = !open }}) {count}')
 
     expect(code).toContain('count.set(count() + 1)\n  count.set((KayCurrent) => KayCurrent * (2))\n  count.set((KayCurrent) => KayCurrent - 1)')
-    expect(code).toContain('count.set((KayCurrent) => KayCurrent + 1); open.set(!open())')
+    expect(code).toContain('count.set((KayCurrent) => KayCurrent + 1); open.set(!(void open, __values.open))')
   })
 
   it('read and write by name a prop typed Signal, inline or through a type of the script, and a signal a module exports', () => {
     const typed = '---\nimport type { Signal as S } from \'kay\'\ninterface Props { open: S<boolean>, label: string }\nconst { open, label } = props<Props>()\n---\nbutton(onClick={() => open = false}) {open} {label}'
 
-    expect(jsx(typed)).toBe('<button onClick={() => __props.open.set(false)}>{__props.open()} {__props.label}</button>')
+    expect(jsx(typed)).toBe('<button onClick={() => __props.open.set(false)}>{(void __props.open, __values.open)} {__props.label}</button>')
+    expect(tsx(typed)).toContain('const __values = { open: __props.open() }')
 
     const imported = compileKay('---\nimport { accent as tone } from \'./theme\'\n---\nbutton(onClick={() => tone += \'!\'}) {tone}', 'test.kay', { importedSignals: { './theme': { accent: 'signal' } } })
 
-    expect(imported.tsx).toContain('<button onClick={() => tone.set((KayCurrent) => KayCurrent + (\'!\'))}>{tone()}</button>')
+    expect(imported.tsx).toContain('<button onClick={() => tone.set((KayCurrent) => KayCurrent + (\'!\'))}>{(void tone, __values.tone)}</button>')
   })
 
   it('reject a write to a memo, a signal written by destructuring and a name kay cannot tell is a signal', () => {

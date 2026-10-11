@@ -215,6 +215,34 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('narrows a signal the template reads twice in one expression, by name or by call, as it narrows a const', async () => {
+    const meter = [
+      '---',
+      'import type { Memo } from \'kay\'',
+      'import { memo, signal } from \'kay\'',
+      '',
+      'const { total } = props<{ total: Memo<number | undefined> }>()',
+      'const sent = signal<number | undefined>(undefined)',
+      'const doubled = memo(() => sent() === undefined ? undefined : sent()! * 2)',
+      '---',
+      'p {sent() === undefined ? \'x\' : sent() * 100}',
+      'p {sent === undefined ? \'x\' : sent * 100}',
+      'p {total() === undefined ? \'x\' : total * 2}',
+      'p {doubled !== undefined && doubled + 1}',
+      'button(onClick={() => sent.set(1)}) {sent * 2}',
+      'p {sent.toFixed(1)} {sent?.toFixed(1)}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/components/meter.kay': meter })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a named slot naming no prop, or calling its block with the wrong arguments', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': '---\nimport Card from \'../card.kay\'\n---\nCard\n',

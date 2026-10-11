@@ -7,7 +7,7 @@ import type { SignalKind } from './module-signals'
 import type { PropsBinding } from './script'
 import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
-import { CURRENT, defaultName, PROPS } from './names'
+import { CURRENT, defaultName, PROPS, VALUES } from './names'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 // What `kay` exports that is read by calling it, which the template reads by name.
@@ -62,6 +62,8 @@ export interface RewritePlan {
   rewrites: Rewrites
   // True when the component reads a `t` nothing declares or imports: the translation function, which the compiler imports.
   translates: boolean
+  // Type checking: the value of each signal the template reads, by name, which `VALUES` holds.
+  values: Map<string, string>
 }
 
 export interface ConstantSignal {
@@ -103,7 +105,7 @@ export function findRewrites(input: RewriteInput): FoundRewrites {
     ast = parse(input.code, { sourceType: 'module', plugins: ['typescript', 'jsx'] })
   }
   catch (error) {
-    return { plan: { rewrites: new Map(), translates: false }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }
+    return { plan: { rewrites: new Map(), translates: false, values: new Map() }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }
   }
 
   return new RewriteFinder(input).run(ast)
@@ -141,6 +143,7 @@ class RewriteFinder {
   // Writes to a constant or an import, reported once every name kay knows is found.
   private readonly assigned: { binding: Binding, identifier: t.Identifier }[] = []
   private translates = false
+  private readonly values = new Map<string, string>()
   // The names nothing in the module declares, of which `globalReads` keeps those read as values.
   private globals: Record<string, unknown> = {}
 
@@ -166,7 +169,7 @@ class RewriteFinder {
     this.unassignable()
 
     return {
-      plan: { rewrites: this.rewrites, translates: this.translates },
+      plan: { rewrites: this.rewrites, translates: this.translates, values: this.values },
       findings: { unread: this.unread, serverReads: this.serverReads, constantSignals: [...this.constantSignals.values()], globalReads: this.globalReads },
       diagnostics: this.diagnostics,
     }
@@ -312,15 +315,41 @@ class RewriteFinder {
     this.insert(rightEnd! + 1, operator === '' ? ')' : '))')
   }
 
+  // A call reading a signal in the template, `count()`, which type checking reads as the name alone: the source offset of the name.
+  private templateCall(reference: NodePath): number | undefined {
+    const { node, parent } = reference
+    const source = this.input.map.isExact(node.start!) ? this.input.map.toSource(node.start!) : undefined
+
+    if (!this.input.values || source === undefined || source < this.input.templateStart || parent.type !== 'CallExpression' || parent.callee !== node || parent.arguments.length > 0)
+      return undefined
+
+    // Written so in the source, copied in one run, rather than a call the compiler made of a name, as `bind:` does.
+    const close = parent.end! - 1
+
+    if (!this.input.map.isExact(close) || this.input.map.toSource(close) !== source + close - node.start!)
+      return undefined
+
+    this.rewrites.set(source + node.end! - node.start!, { replace: '', end: source + parent.end! - node.start! })
+
+    return source
+  }
+
+  // How type checking reads the signal `name`, whose value `access` spells: through `VALUES`, which TypeScript narrows.
+  private valueRead(name: string, access: Rewrite = {}): Rewrite {
+    this.values.set(name, `${access.before ?? ''}${access.replace ?? name}${access.after ?? ''}()`)
+
+    return { ...access, before: `(void ${access.before ?? ''}`, after: `${access.after ?? ''}, ${VALUES}.${name})` }
+  }
+
   // A signal or memo kay sees made: in the template its name reads its value, and an assignment to a signal writes it.
   private signalBinding(binding: Binding, name: string, kind: SignalKind) {
     this.known.add(binding)
 
     for (const reference of binding.referencePaths) {
-      const source = this.templateRead(reference) ? this.input.map.toSource(reference.node.start!) : undefined
+      const source = this.templateRead(reference) ? this.input.map.toSource(reference.node.start!) : this.templateCall(reference)
 
       if (source !== undefined)
-        this.rewrites.set(source, { ...withShorthand(reference, name, { after: '()' }), end: source + name.length })
+        this.rewrites.set(source, { ...withShorthand(reference, name, this.input.values ? this.valueRead(name) : { after: '()' }), end: source + name.length })
     }
     for (const violation of binding.constantViolations)
       this.signalWrite(violation, name, kind, {})
@@ -409,7 +438,14 @@ class RewriteFinder {
     const { signal } = prop.binding
 
     // A prop typed `Signal<T>` or `Memo<T>` reads its value by the name in the template, as the script's own signals do.
-    this.visitBinding(path.scope, name, reference => withShorthand(reference, name, signal && this.templateRead(reference) ? { ...access, after: `${access.after ?? ''}()` } : access), signal ? undefined : { message: `\`${name}\` is a prop, and props are read-only`, help: 'copy it into a signal to change it locally' }, propType(prop.binding))
+    const read = (reference: NodePath): Rewrite => {
+      if (signal && (this.templateRead(reference) || this.templateCall(reference) !== undefined))
+        return this.input.values ? this.valueRead(name, access) : { ...access, after: `${access.after ?? ''}()` }
+
+      return access
+    }
+
+    this.visitBinding(path.scope, name, reference => withShorthand(reference, name, read(reference)), signal ? undefined : { message: `\`${name}\` is a prop, and props are read-only`, help: 'copy it into a signal to change it locally' }, propType(prop.binding))
 
     const binding = path.scope.getBinding(name)
 
