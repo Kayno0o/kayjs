@@ -587,6 +587,24 @@ describe('kay build checks the project first', () => {
     }
   }, 60_000)
 
+  it('prints what the check found before what the prerendered pages log, and though their code ends the process', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'src/routes/index.kay': '--- server\nimport process from \'node:process\'\n\nexport const page = { prerender: true }\nconsole.error(\'prerendering\')\nprocess.exit(3)\n---\nh1 Home\nh3 Skipped\n',
+    })
+
+    try {
+      const { report, code } = await build(root)
+
+      expect(code).toBe(3)
+      expect(report).toContain('warning[skipped-heading]')
+      expect(report.indexOf('warning[skipped-heading]')).toBeLessThan(report.indexOf('prerendering'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('builds nothing from a project kay check refuses, and builds it with --no-check', async () => {
     const root = await scratchProject({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': 'a(href="/nowhere") Lost\n' })
 

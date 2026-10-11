@@ -1,3 +1,4 @@
+import type { BuildResult, BuildStage } from '../build/pipeline'
 import type { Command } from './command'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -45,10 +46,9 @@ export const build: Command = {
       exportTo: exported ? resolve(typeof outdir === 'string' ? outdir : join(root, 'dist')) : undefined,
       compile: typeof compile === 'string' ? { outfile: resolve(compile), entry } : undefined,
       analyze: values.analyze === true,
+      onStage: printStage,
     })
-    const { failed, built } = result
-
-    await printProblems(result.checked)
+    const { failed } = result
 
     if (failed?.stage === 'check') {
       console.error('kay build: nothing built, as kay check found the problems above; --no-check builds anyway')
@@ -56,28 +56,11 @@ export const build: Command = {
       return 1
     }
 
-    await printProblems(result.linted)
-
-    if (failed && !('error' in failed)) {
+    if (failed?.stage === 'output' && failed.error === undefined) {
       console.error('kay build: nothing built, as the prerendered pages break the lints above; --no-check builds anyway')
 
       return 1
     }
-
-    if (built) {
-      const { islands, stylesheets, prerendered, entries, report, ms } = built
-
-      done('built', `${count(islands, 'island')}, ${count(stylesheets, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''}`, ms)
-
-      if (report)
-        console.log(formatSizeReport(report))
-    }
-
-    if (result.exported)
-      done('exported', `${count(result.exported.pages, 'page')} and ${count(result.exported.files, 'other file')} to ${relative(process.cwd(), result.exported.dir) || '.'}`, result.exported.ms)
-
-    if (result.compiled)
-      done('compiled', relative(process.cwd(), result.compiled.executable), result.compiled.ms)
 
     if (failed) {
       console.error(buildError(failed.error))
@@ -87,6 +70,31 @@ export const build: Command = {
 
     return 0
   },
+}
+
+// Each stage as it ends, so its problems come before what a later stage's code logs, and are shown though that code ends the process.
+async function printStage(stage: BuildStage, result: BuildResult): Promise<void> {
+  if (stage === 'check')
+    await printProblems(result.checked)
+
+  if (stage === 'output') {
+    await printProblems(result.linted)
+
+    if (result.built) {
+      const { islands, stylesheets, prerendered, entries, report, ms } = result.built
+
+      done('built', `${count(islands, 'island')}, ${count(stylesheets, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''}`, ms)
+
+      if (report)
+        console.log(formatSizeReport(report))
+    }
+  }
+
+  if (stage === 'export' && result.exported)
+    done('exported', `${count(result.exported.pages, 'page')} and ${count(result.exported.files, 'other file')} to ${relative(process.cwd(), result.exported.dir) || '.'}`, result.exported.ms)
+
+  if (stage === 'compile' && result.compiled)
+    done('compiled', relative(process.cwd(), result.compiled.executable), result.compiled.ms)
 }
 
 function buildError(error: unknown): unknown {

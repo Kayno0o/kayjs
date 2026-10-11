@@ -42,6 +42,8 @@ export interface BuildOptions {
   compile?: { outfile: string, entry?: string | undefined } | undefined
   // Breaks the size report down by module.
   analyze?: boolean | undefined
+  // Called with the result so far once each stage that answers something is done, for the command line to print it as it comes rather than after a later stage's own output: the check, the output, the export and the compile.
+  onStage?: ((stage: BuildStage, result: BuildResult) => Promise<void> | void) | undefined
 }
 
 export interface BuildResult {
@@ -82,6 +84,7 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   }
 
   result.checked = checked.value
+  await options.onStage?.('check', result)
 
   if (failing(checked.value)) {
     await putBack(output, previous)
@@ -97,25 +100,31 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   }
 
   const client = bundled.value
+  let made: Awaited<ReturnType<typeof outputStage>>
 
   try {
-    const { prerendered, entries, linted } = await outputStage(project, exported, client, checking)
-
-    result.linted = linted
-
-    if (failing(linted)) {
-      await putBack(output, previous)
-
-      return { ...result, failed: { stage: 'output' } }
-    }
-
-    result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: client.report, ms: performance.now() - started }
+    made = await outputStage(project, exported, client, checking)
   }
   catch (error) {
     if (checking)
       await putBack(output, previous)
 
     return { ...result, failed: { stage: 'output', error } }
+  }
+
+  const { prerendered, entries, linted } = made
+
+  result.linted = linted
+
+  if (!failing(linted))
+    result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: client.report, ms: performance.now() - started }
+
+  await options.onStage?.('output', result)
+
+  if (failing(linted)) {
+    await putBack(output, previous)
+
+    return { ...result, failed: { stage: 'output' } }
   }
 
   await rm(previous, { recursive: true, force: true })
@@ -132,6 +141,8 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
     catch (error) {
       return { ...result, failed: { stage: 'export', error } }
     }
+
+    await options.onStage?.('export', result)
   }
 
   if (options.compile) {
@@ -147,6 +158,8 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
     catch (error) {
       return { ...result, failed: { stage: 'compile', error } }
     }
+
+    await options.onStage?.('compile', result)
   }
 
   return result
