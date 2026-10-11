@@ -3,6 +3,8 @@ import process from 'node:process'
 import { beforeAll, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { BODY, parseMarker } from '../../../src/markers'
+import { products } from '../src/products'
+import { saved } from '../src/saved'
 
 // Until kay renders the editor in edit mode (kaynooo/kayjs#262), the fixture's pages render it themselves.
 const ROOT = join(import.meta.dir, '..')
@@ -41,7 +43,7 @@ test('the editor says when nothing on the page comes from a collection', async (
 test('the screens list each collection with its entry count', async () => {
   const page = await site.visit('/admin')
 
-  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts'], ['Pages', '/admin/collections/pages']])
+  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts'], ['Products', '/admin/collections/products']])
   expect(page.text('main')).toContain('2 entries')
 })
 
@@ -52,25 +54,25 @@ test('a collection lists its entries, with a draft to publish, and searches them
     ['Hello world', '/admin/collections/posts/hello'],
     ['Edit on page', '/admin/page?path=%2Fblog%2Fhello'],
     ['Spring garden', '/admin/collections/posts/notes/garden'],
+    ['Edit on page', '/admin/page?path=%2Fblog%2Fnotes%252Fgarden'],
   ])
   expect(page.find('.kcms-entries button').map(button => button.text)).toContain('Publish')
 
   const searched = await site.visit('/admin/collections/posts?q=garden')
 
-  expect(searched.find('.kcms-entries a').map(link => link.text)).toEqual(['Spring garden'])
+  expect(searched.find('.kcms-entries a').map(link => link.text)).toEqual(['Spring garden', 'Edit on page'])
 })
 
 test('an entry opens in a form of its collection\'s fields, nested slugs included', async () => {
   const page = await site.visit('/admin/collections/posts/notes/garden')
 
   expect(page.title()).toBe('notes/garden - Posts')
-  expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['title', 'draft'])
+  expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['title', 'draft', 'tags'])
   expect(page.find('[data-kcms-body]')).toHaveLength(1)
 })
 
-test('a new entry asks for its slug, and a locale in a localized collection', async () => {
-  expect((await site.visit('/admin/new/posts')).find('.kui-label-text').map(label => label.text)).not.toContain('Locale')
-  expect((await site.visit('/admin/new/pages')).find('.kui-label-text').map(label => label.text)).toContain('Locale')
+test('a new entry asks for its slug, and no locale in a plain collection', async () => {
+  expect((await site.visit('/admin/new/posts')).find('.kui-label-text').map(label => label.text)).toEqual(['Slug*', 'Title*', 'Tags', 'Body'])
 })
 
 test('an unknown collection or entry is a 404', async () => {
@@ -99,4 +101,46 @@ test('opening a page through the screens puts it in edit mode, its fields marked
     ['article', 'data-kay-body', { collection: 'posts', slug: 'hello', path: BODY }],
   ])
   expect(page.html).toContain('<!--kay-field posts:hello:title-->Hello world<!--/kay-field-->')
+})
+
+async function send(method: string, path: string, body?: object): Promise<{ status: number, answer: unknown }> {
+  const response = await site.fetch(`/api/cms/entries/${path}`, body === undefined ? { method } : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+
+  return { status: response.status, answer: await response.json() }
+}
+
+test('saving a file entry hands the file kay wrote to the saver, as a commit', async () => {
+  saved.length = 0
+
+  expect(await send('POST', 'posts/hello', { data: { title: 'Hello again', tags: ['kay'] }, body: 'New body.\n' })).toEqual({ status: 200, answer: { saved: true, commit: { sha: 'c0ffee' } } })
+  expect(saved.map(({ repoPath, message }) => [repoPath, message])).toEqual([['tests/fixture/src/content/posts/hello.md', 'content(posts): update hello']])
+  expect(saved[0]?.text).toContain('title: Hello again')
+  expect(saved[0]?.text).toContain('New body.')
+})
+
+test('a save kay\'s schema refuses comes back as issues, and nothing is written', async () => {
+  saved.length = 0
+
+  const { answer } = await send('POST', 'posts/hello', { data: { title: 3 } }) as { answer: { issues: { path: string }[] } }
+
+  expect(answer.issues.map(issue => issue.path)).toContain('title')
+  expect((await send('POST', 'posts/hello', { data: { title: 'Again' }, create: true })).answer).toEqual({ issues: [{ collection: 'posts', slug: 'hello', path: '', key: 'slug', message: 'hello already exists' }] })
+  expect(saved).toEqual([])
+})
+
+test('a nested slug is published and deleted through its file', async () => {
+  saved.length = 0
+
+  expect((await send('POST', 'posts/notes%2Fgarden/publish')).answer).toHaveProperty('saved', true)
+  expect(saved[0]?.text).toContain('draft: false')
+  expect((await send('DELETE', 'posts/notes%2Fgarden')).answer).toHaveProperty('saved', true)
+  expect(saved.map(({ repoPath, text }) => [repoPath, text])[1]).toEqual(['tests/fixture/src/content/posts/notes/garden.md', undefined])
+})
+
+test('a loaded entry is created and removed through its loader', async () => {
+  expect((await send('POST', 'products/lamp', { data: { name: 'Lamp' }, create: true })).answer).toEqual({ saved: true })
+  expect(products.map(product => product.slug)).toEqual(['mug', 'lamp'])
+  expect((await send('GET', 'products/lamp')).answer).toHaveProperty('entry.data.name', 'Lamp')
+  expect((await send('DELETE', 'products/lamp')).answer).toEqual({ saved: true })
+  expect(products.map(product => product.slug)).toEqual(['mug'])
 })

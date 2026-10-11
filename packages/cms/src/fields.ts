@@ -45,7 +45,8 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
   const base: FieldBase = {
     key,
     label: inner.title ?? schema.title ?? (typeof key === 'number' ? `Item ${key + 1}` : humanize(key)),
-    required: required && !nullable,
+    // A field with a default is filled in when left out, so nothing has to be typed in it.
+    required: required && !nullable && schema.default === undefined,
     hint: inner.description ?? schema.description,
   }
   const hint = inner['x-kay']

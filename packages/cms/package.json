@@ -42,7 +42,7 @@
     "postpack": "rm -rf types",
     "lint": "keslint --cache",
     "lint:fix": "keslint --fix --cache",
-    "test": "bun test && bun run test:dom",
+    "test": "bun test --isolate && bun run test:dom",
     "test:dom": "bun --config=tests-dom/bunfig.toml test"
   },
   "peerDependencies": {

@@ -2,7 +2,7 @@
 
 A CMS for kay sites, in the spirit of TinaCMS: open the real page in edit mode, click a title, edit it in a sidebar, and the page updates as you type. The same package holds collection screens, generated from each collection's schema, to list, search, add, edit, publish and delete entries. Both save the same way: a file entry as a Forgejo commit, or in the working tree under `kay dev`, and a loaded entry through its collection's loader.
 
-Work in progress: kay's side of the on-page editing is kaynooo/kayjs#262. Field markers, edit mode and draft rendering come from kay; until its schema and write API ships, `src/kay/` stubs that part, so the screens are built and tested against it. The plan is kaynooo/kayjs-cms#1.
+Work in progress: kay's side of it is kaynooo/kayjs#262, all landed but kay rendering the editor in edit mode by itself; until then a page renders `@kaynooo/kayjs-cms/editor.kay` itself. The plan is kaynooo/kayjs-cms#1.
 
 ## Install
 

@@ -1,17 +1,40 @@
 import type { FileChange } from '../src/files'
+import type * as Content from '../src/kay/content'
 import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
-import { beforeEach, describe, expect, test } from 'bun:test'
-import { stubContent } from '../src/kay/content'
+import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { configure } from '../src/settings'
-import { deleteEntry, publishEntry, saveEntry, UnknownCollection } from '../src/store'
 
-const posts: CollectionInfo = { name: 'posts', kind: 'folder', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, localized: false, draftField: 'draft' }
-const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { type: 'object', properties: { name: { type: 'string' } } }, localized: false }
+const posts: CollectionInfo = { name: 'posts', kind: 'folder', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, components: [], localized: false, draftField: 'draft' }
+const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { type: 'object', properties: { name: { type: 'string' } } }, components: [], localized: false }
 
 let saved: FileChange[]
-let loaded: { slug: string, data: Record<string, unknown> }[]
+let loaded: { slug: string, data: unknown }[]
 let removed: string[]
 let stored: Record<string, SourceEntry[]>
+
+// kay's content API, answering from `stored` and recording what a loader was handed.
+const content: typeof Content = {
+  collections: async () => [posts, products],
+  entries: async collection => stored[collection] ?? [],
+  entrySource: async (collection, slug, data, options) => data.title === ''
+    ? { issues: [{ collection, slug, path: 'title', message: 'Required' }] }
+    : { file: { path: `${slug}.md`, absolute: `/site/content/${collection}/${slug}.md`, repoPath: `content/${collection}/${slug}.md`, text: `${JSON.stringify(data)}\n${options?.body ?? ''}` } },
+  saveEntry: async (_collection, entry) => {
+    loaded.push(entry)
+
+    return {}
+  },
+  removeEntry: async (_collection, slug) => {
+    removed.push(slug)
+
+    return {}
+  },
+}
+
+void mock.module('../src/kay/content', () => content)
+
+// Imported once the mock is in place, so the store reads it.
+const { deleteEntry, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
 
 beforeEach(() => {
   saved = []
@@ -23,23 +46,6 @@ beforeEach(() => {
 
     return { sha: 'abc' }
   } } })
-  stubContent({
-    collections: async () => [posts, products],
-    entries: async collection => stored[collection] ?? [],
-    entrySource: async (collection, slug, data, options) => data.title === ''
-      ? { issues: [{ collection, slug, path: 'title', message: 'Required' }] }
-      : { file: { path: `${slug}.md`, absolute: `/site/content/${collection}/${slug}.md`, repoPath: `content/${collection}/${slug}.md`, text: `${JSON.stringify(data)}\n${options?.body ?? ''}` } },
-    saveEntry: async (_collection, entry) => {
-      loaded.push(entry)
-
-      return {}
-    },
-    removeEntry: async (_collection, slug) => {
-      removed.push(slug)
-
-      return {}
-    },
-  })
 })
 
 describe('saveEntry', () => {

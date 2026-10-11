@@ -6,6 +6,7 @@ const posts: CollectionInfo = {
   name: 'posts',
   kind: 'folder',
   localized: false,
+  components: [],
   schema: { properties: { published: { type: 'boolean' }, title: { type: 'string' }, summary: { type: 'string' } } },
 }
 

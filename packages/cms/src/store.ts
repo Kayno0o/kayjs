@@ -27,8 +27,8 @@ export async function entryOf({ collection, slug, locale }: EntryRef): Promise<S
   return (await entries(collection, locale === undefined ? {} : { locale })).find(entry => entry.slug === slug)
 }
 
-function refused(ref: EntryRef, message: string): SaveOutcome {
-  return { issues: [{ collection: ref.collection, slug: ref.slug, locale: ref.locale, path: '', message }] }
+function refused(ref: EntryRef, message: string, key?: Issue['key']): SaveOutcome {
+  return { issues: [{ collection: ref.collection, slug: ref.slug, locale: ref.locale, path: '', ...(key === undefined ? {} : { key }), message }] }
 }
 
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
@@ -36,10 +36,10 @@ export async function saveEntry(entry: DraftEntry, { create = false, verb }: { c
   const collection = await collectionNamed(entry.collection)
 
   if (!SLUG.test(entry.slug))
-    return refused(entry, 'A slug holds letters, digits, dashes and underscores, with `/` between folders')
+    return refused(entry, 'A slug holds letters, digits, dashes and underscores, with `/` between folders', 'slug')
 
   if (create && await entryOf(entry))
-    return refused(entry, `${entry.slug} already exists`)
+    return refused(entry, `${entry.slug} already exists`, 'slug')
 
   if (collection.kind === 'loaded') {
     const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body })

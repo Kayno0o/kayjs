@@ -1,4 +1,4 @@
-// The shapes kay agreed to in kaynooo/kayjs#262. Once kay ships them, these types come from kay and this file goes.
+// kay's shapes from kaynooo/kayjs#262, typed as kayjs-cms reads them: a schema as JSON Schema, and data as values an island can take as props.
 
 export interface EntryRef {
   collection: string
@@ -10,6 +10,8 @@ export interface Issue extends EntryRef {
   // Dotted, relative to the data; `''` for the entry as a whole, or its body when `body` is set.
   path: string
   body?: true | undefined
+  // Set with `path: ''` when the slug or the locale itself is refused.
+  key?: 'slug' | 'locale' | undefined
   message: string
 }
 
@@ -45,12 +47,15 @@ export interface CollectionInfo {
   name: string
   kind: 'folder' | 'loaded'
   schema: JsonSchema
-  // The Markdown body, set when the collection's entries have one.
-  body?: JsonSchema | undefined
+  // Set when the collection's entries have a Markdown body.
+  body?: { kind: 'markdown' } | undefined
+  // The components a body may use, by the name it writes them with.
+  components: string[]
   localized: boolean
+  // The locales the site serves, for a localized collection.
+  locales?: string[] | undefined
   draftField?: string | undefined
   dir?: string | undefined
-  extensions?: string[] | undefined
 }
 
 export interface SourceEntry {

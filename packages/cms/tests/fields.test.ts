@@ -27,6 +27,10 @@ describe('fieldsOf', () => {
     ])
   })
 
+  it('counts a field with a default as optional, since it is filled in when left out', () => {
+    expect(fieldsOf({ properties: { tags: { type: 'array', items: { type: 'string' }, default: [] } }, required: ['tags'] })[0]?.required).toBe(false)
+  })
+
   it('reads the kind kay hints, a reference naming its collection', () => {
     const [cover, body, author] = fieldsOf({
       properties: {
