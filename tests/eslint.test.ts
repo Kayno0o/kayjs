@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { writeShadowTypes } from '../src/check'
-import { readShadowSettings } from '../src/check/shadow'
+import { readShadowSettings, serializeShadowSettings, SHADOW_SETTINGS } from '../src/check/shadow'
 import { positionAt } from '../src/compiler/mapping'
 import { processor, shadowParser } from '../src/eslint'
+import { projectPaths } from '../src/project'
 
 const FILE = join(import.meta.dir, 'fixtures', 'lint', 'src', 'components', 'card.kay')
 const CARD = `---
@@ -73,6 +74,28 @@ describe('kay/eslint', () => {
       expect(processor.preprocess(source, page)[0]!.text).toContain('"id": string')
       // And the lint levels it compiled with.
       expect(readShadowSettings(root).lints).toEqual({ 'unread-name': 'allow' })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('types the params of an extension\'s page from its own routes, as the last kay check mounted them, and of none from settings written before mounts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-eslint-'))
+    const page = join(root, 'lib', 'routes', 'posts', '[id].kay')
+    const source = '--- server\nconst id = ctx.params.id\n---\np {id}\n'
+    const settings = join(projectPaths(root).types, SHADOW_SETTINGS)
+
+    try {
+      await Bun.write(join(root, 'tsconfig.json'), '{}')
+      await Bun.write(page, source)
+      await Bun.write(settings, JSON.stringify({ routes: 'src/routes', islandOnly: [] }))
+
+      expect(processor.preprocess(source, page)[0]!.text).not.toContain('"id": string')
+
+      await Bun.write(settings, serializeShadowSettings(root, { routesDir: join(root, 'src/routes'), mounts: [join(root, 'lib/routes')], islandOnly: new Set() }))
+
+      expect(processor.preprocess(source, page)[0]!.text).toContain('"id": string')
     }
     finally {
       await rm(root, { recursive: true, force: true })

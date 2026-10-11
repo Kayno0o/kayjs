@@ -44,7 +44,7 @@ export const processor = {
     const file = resolve(filename)
     const root = projectRootOf(file)
     const settings = readShadowSettings(root)
-    const { shadow } = compileShadow(root, file, text, { ...settings, insideIsland: settings.islandOnly.has(file) })
+    const { shadow } = compileShadow(root, file, text, { routesDir: settings.routesDir, mounts: settings.mounts, insideIsland: settings.islandOnly.has(file), lints: settings.lints })
 
     compiled.set(filename, shadow)
 
