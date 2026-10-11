@@ -22,7 +22,7 @@ export async function notify(state: RequestState, record: UserRecord, event: Sec
   try {
     const { locale, templates } = writing(mail, [record.locale, ...state.languages])
 
-    await mail.mailer.send({ to, kind: event, locale, ...url === undefined ? {} : { url }, ...templates[event]({ site: core.site, email: to, detail, url, locale }) })
+    await mail.mailer.send({ to, kind: event, site: core.site, locale, ...url === undefined ? {} : { url }, ...detail === undefined ? {} : { detail }, ...templates[event]({ site: core.site, email: to, detail, url, locale }) })
   }
   catch (error) {
     console.error(`kayjs-auth: mailing ${event} failed`, error)

@@ -1,6 +1,5 @@
 import type { Mail } from '../src/mail'
 import { describe, expect, test } from 'bun:test'
-import { defaultTemplates, frenchTemplates } from '../src/mail'
 import { testApp, userRecord } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -37,7 +36,7 @@ describe('verifying an email', () => {
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(mails).toHaveLength(1)
-    expect(mails[0]).toMatchObject({ to: 'ada@example.com', kind: 'verify-email', subject: 'Confirm your email for Site' })
+    expect(mails[0]).toMatchObject({ to: 'ada@example.com', kind: 'verify-email', site: 'Site', subject: 'Confirm your email for Site' })
     expect(mails[0]!.url).toStartWith('https://site.test/verify?token=')
     expect(mails[0]!.html).toContain(mails[0]!.url!.replaceAll('&', '&amp;'))
 
@@ -379,13 +378,4 @@ test('an app without a mailer answers that mail is unavailable', async () => {
   await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
 
   expect(await browser().call('requestPasswordReset', 'ada@example.com')).toEqual({ ok: false, error: 'unavailable' })
-})
-
-describe('the wording of a mail', () => {
-  test('comes in parts as well, for a mailer drawing its own html around it', () => {
-    const data = { site: 'Site', email: 'ada@example.com', url: 'https://site.test/v', code: '123456', locale: 'en' }
-
-    expect(defaultTemplates['verify-email'](data).parts).toEqual({ type: 'link', lead: 'Confirm ada@example.com as the address of your Site account.', button: 'Confirm my email', orPaste: 'Or paste this into your browser:', codeLead: 'Or type this code where you asked for it:', ending: 'The link works for 24 hours. The code works for 10 minutes, typed where you asked for it. If you did not create an account, ignore this mail.' })
-    expect(frenchTemplates['new-sign-in']({ ...data, locale: 'fr' }).parts).toEqual({ type: 'notice', lead: 'Votre compte Site vient d\'être utilisé depuis un appareil ou un réseau qu\'il n\'avait jamais utilisé.', review: 'Voyez où votre compte est connecté, et mettez fin à ce que vous ne reconnaissez pas :', ending: 'Si ce n\'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.' })
-  })
 })

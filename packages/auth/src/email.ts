@@ -413,7 +413,7 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
 
   const { locale, templates } = writing(mail, [record.locale, ...state.languages])
 
-  await mail.mailer.send({ to: email, kind: type, locale, ...content, ...templates[type]({ site: core.site, email, locale, ...content }) })
+  await mail.mailer.send({ to: email, kind: type, site: core.site, locale, ...content, ...templates[type]({ site: core.site, email, locale, ...content }) })
 }
 
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.

@@ -117,7 +117,7 @@ describe('organizations', () => {
     const { invitation } = await ada.browser.call('invite', org, 'Grace@Example.com')
 
     expect(invitation).toMatchObject({ email: 'grace@example.com', roles: ['member'], invitedBy: ada.id, organization: { name: 'Acme' } })
-    expect(mails.at(-1)).toMatchObject({ kind: 'invitation', to: 'grace@example.com', url: `https://site.test/invitation?invitation=${invitation.id}`, subject: 'Join Acme on Site' })
+    expect(mails.at(-1)).toMatchObject({ kind: 'invitation', site: 'Site', detail: 'Acme', to: 'grace@example.com', url: `https://site.test/invitation?invitation=${invitation.id}`, subject: 'Join Acme on Site' })
     expect(await alan.browser.call('invitation', invitation.id)).toMatchObject({ email: 'grace@example.com', organization: { name: 'Acme' } })
     expect(await alan.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'wrong-account' })
     expect(await grace.browser.call('myInvitations')).toEqual([])

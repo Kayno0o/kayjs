@@ -67,7 +67,7 @@ describe('changes to what protects the account', () => {
     await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')
     await ada.call('confirmEmailChange', new URL(mails.at(-1)!.url!).searchParams.get('token'))
 
-    expect(mails.at(-1)).toMatchObject({ to: 'ada@example.com', kind: 'email-changed' })
+    expect(mails.at(-1)).toMatchObject({ to: 'ada@example.com', kind: 'email-changed', site: 'Site', detail: 'ada@new.test' })
     expect(mails.at(-1)!.text).toContain('ada@new.test')
   })
 

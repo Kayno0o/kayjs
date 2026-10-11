@@ -8,39 +8,20 @@ export type SecurityEvent = 'new-sign-in' | 'password-changed' | 'email-changed'
 // What a mail is about: a link to follow, news of a change to the account, or an invitation to join an organization.
 export type MailKind = LinkType | SecurityEvent | 'invitation'
 
-// The wording a mail is built from, for a mailer drawing its own html around it, as kayjs-mail's `authMailer` does: a link to follow or a code to type, or news of a change to the account.
-export type MailParts = {
-  type: 'link'
-  lead: string
-  // The link's button.
-  button: string
-  // Before the link written out, for a reader whose client shows no button.
-  orPaste: string
-  // Before the code, when the mail carries one.
-  codeLead: string
-  // How long it works, and what to do when it was not asked for.
-  ending: string
-} | {
-  type: 'notice'
-  lead: string
-  // Before the link to where the user reviews what happened, when the mail carries one.
-  review: string
-  // What to do when it was not the user.
-  ending: string
-}
-
 export interface MailContent {
   subject: string
   text: string
   html: string
-  // Left out by an app's own templates.
-  parts?: MailParts
 }
 
-// A mail for the app's mailer to send: `subject`, `text` and `html` are filled from the templates, and `kind` and `url` let an app with its own templating ignore them.
+// A mail for the app's mailer to send: `subject`, `text` and `html` are filled from the templates, and `kind`, `site`, `detail` and `url` let an app with its own templating ignore them.
 export interface Mail extends MailContent {
   to: string
   kind: MailKind
+  // The site's name, as the templates write it.
+  site: string
+  // The organization an invitation is to, or the provider, passkey, token or new address an event is about.
+  detail?: string
   url?: string
   // The code to type instead of following `url`, when the app sends codes.
   code?: string
@@ -120,7 +101,6 @@ function linkMail(words: Wording, data: MailData, subject: string, lead: string,
   return {
     subject,
     text,
-    parts: { type: 'link', lead, button, orPaste: words.orPaste, codeLead, ending },
     html: `<div lang="${escape(data.locale)}" style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
   <p style="font-size:16px;line-height:1.5;margin:0 0 20px">${escape(lead)}</p>${url === undefined
     ? ''
@@ -147,7 +127,6 @@ function lasting(words: Wording, data: MailData, link: string): string {
 function noticeMail(words: Wording, data: MailData, subject: string, lead: string, ending = words.notYou): MailContent {
   return {
     subject: words.onSite(subject, data.site),
-    parts: { type: 'notice', lead, review: words.review, ending },
     text: [lead, data.url === undefined ? undefined : `${words.review} ${data.url}`, ending].filter(part => part !== undefined).join('\n\n'),
     html: `<div lang="${escape(data.locale)}" style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
   <p style="font-size:16px;line-height:1.5;margin:0 0 20px">${escape(lead)}</p>${data.url === undefined
