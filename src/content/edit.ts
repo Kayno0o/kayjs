@@ -60,10 +60,13 @@ export interface SourceEntry {
 export type WrittenEntry = Omit<DraftEntry, 'collection'>
 
 // The file a folder entry is written to: its path relative to the project root, absolute and relative to the repository root, and its text; `absolute` is the server's, never for the editor's browser.
-export interface EntryFile {
+export interface EntryPath {
   path: string
   absolute: string
   repoPath: string
+}
+
+export interface EntryFile extends EntryPath {
   text: string
 }
 
@@ -226,15 +229,43 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
     return { issues: [{ collection: name, slug, ...options.locale !== undefined && { locale: options.locale }, path: '', body: true, message: `goes to ${existing}, a data file holding no body` }] }
 
   const relativeFile = existing ?? `${place}.${options.body !== undefined || files.some(file => MARKDOWN.test(file)) ? 'md' : 'json'}`
-  const absolute = join(dir, relativeFile)
+  const file = fileIn(name, dir, relativeFile)
+  const body = options.body ?? (existing !== undefined && MARKDOWN.test(existing) ? (await readEntry(dir, existing)).body : undefined)
+
+  return { file: { ...file, text: entryText(relativeFile, data, body) } }
+}
+
+// The file a folder collection's entry is read from, for a CMS to delete it; or why its slug or locale names none.
+export async function entryFile(name: string, slug: string, options: { locale?: string | undefined } = {}): Promise<{ file: EntryPath } | { issues: DraftIssue[] }> {
+  const collection = collectionNamed(name)
+
+  if (collection.dir === undefined)
+    throw new Error(`kay: entryFile() gives a folder collection's files, and ${name} is loaded: removeEntry() hands its entries to its loader's remove`)
+
+  const at = { collection: name, slug, ...options.locale !== undefined && { locale: options.locale } }
+  const issues = placeIssues(collection, at)
+
+  if (issues.length > 0)
+    return { issues }
+
+  const dir = folderOf(collection.dir)
+  const place = options.locale === undefined ? slug : `${options.locale}/${slug}`
+  const existing = (await folderFiles(name, dir)).find(file => slugOf(file) === place)
+
+  if (existing === undefined)
+    return { issues: [{ ...at, path: '', key: 'slug', message: 'names no entry of the collection' }] }
+
+  return { file: fileIn(name, dir, existing) }
+}
+
+function fileIn(name: string, dir: string, file: string): EntryPath {
+  const absolute = join(dir, file)
   const inRepo = repoPath(repositoryRoot(), absolute)
 
   if (inRepo === undefined)
     throw new Error(`kay: ${name}'s folder lies outside the repository holding the project, so a CMS cannot commit its files`)
 
-  const body = options.body ?? (existing !== undefined && MARKDOWN.test(existing) ? (await readEntry(dir, existing)).body : undefined)
-
-  return { file: { path: relative(contentPlace().root, absolute).split(sep).join('/'), absolute, repoPath: inRepo, text: entryText(relativeFile, data, body) } }
+  return { path: relative(contentPlace().root, absolute).split(sep).join('/'), absolute, repoPath: inRepo }
 }
 
 // Hands an entry the editor wrote to a loaded collection's `save`, then reads the collection afresh; or resolves where it fails the collection, saving nothing.

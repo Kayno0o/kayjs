@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { readClientSources } from '../src/build/client'
-import { collection, collections, entries, entrySource, removeEntry, saveEntry } from '../src/content'
+import { collection, collections, entries, entryFile, entrySource, removeEntry, saveEntry } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
@@ -257,6 +257,27 @@ describe('the collections a CMS edits', () => {
       { collection: 'articles', slug: '../escape', path: 'title', message: expect.any(String) },
     ] })
     expect(await rejection(entrySource('news', 'launch', {}))).toMatchObject({ message: expect.stringContaining('saveEntry()') })
+  })
+
+  it('gives the file a folder entry is read from, for the CMS to delete', async () => {
+    const hello = 'tests/fixtures/cms/src/content/articles/fr/hello.md'
+    const contact = 'tests/fixtures/cms/src/content/pages/contact.yaml'
+
+    expect(await entryFile('articles', 'hello', { locale: 'fr' })).toEqual({ file: { path: hello, absolute: join(process.cwd(), hello), repoPath: hello } })
+    expect(await entryFile('pages', 'contact')).toEqual({ file: { path: contact, absolute: join(process.cwd(), contact), repoPath: contact } })
+    expect(await entryFile('pages', 'missing')).toEqual({ issues: [{ collection: 'pages', slug: 'missing', path: '', key: 'slug', message: 'names no entry of the collection' }] })
+    expect(await entryFile('articles', 'hello')).toMatchObject({ issues: [{ key: 'locale' }] })
+    expect(await entryFile('pages', '../pages/about')).toMatchObject({ issues: [{ key: 'slug' }] })
+    expect(await rejection(entryFile('news', 'launch'))).toMatchObject({ message: expect.stringContaining('removeEntry()') })
+
+    const base = await scratchDir('cms-')
+
+    await readingFrom(base, ['content/pages'], async () => {
+      await mkdir(join(base, 'content/pages/guide'), { recursive: true })
+      await writeFile(join(base, 'content/pages/guide/index.md'), '---\ntitle: Guide\norder: 5\n---\n')
+
+      expect(await entryFile('pages', 'guide')).toMatchObject({ file: { absolute: join(base, 'content/pages/guide/index.md') } })
+    })
   })
 
   it('refuses a slug naming another file in a folder: hidden, a new file reading back as another entry, a control character, an empty part', async () => {
