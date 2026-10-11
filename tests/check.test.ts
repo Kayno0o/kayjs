@@ -1628,7 +1628,8 @@ describe('kay check, unused code', () => {
     }
   }, 30_000)
 
-  it('keeps watching after a check that throws, as a fix it cannot write', async () => {
+  // Root writes a read-only file, as in a CI container, and nothing else makes a write fail for it.
+  it.skipIf(process.getuid?.() === 0)('keeps watching after a check that throws, as a fix it cannot write', async () => {
     const root = await scratchProject({ 'src/a.kay': '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n' })
     const file = join(root, 'src/a.kay')
 

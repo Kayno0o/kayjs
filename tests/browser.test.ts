@@ -368,7 +368,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a docs-lik
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browser\'s profile', () => {
   const LOCKED = 'kay-chrome-999999998-locked'
-  const kinds = (names: string[]) => names.filter(name => name !== LOCKED).map(name => name.startsWith('kay-chrome-') ? 'kay' : name.endsWith('.bun-chrome') ? 'bun' : name.startsWith('org.chromium.') ? 'chrome' : name).sort()
+  const kinds = (names: string[]) => names.filter(name => name !== LOCKED).map(name => name.startsWith('kay-chrome-') ? 'kay' : name.endsWith('.bun-chrome') ? 'bun' : name.includes('url_fetcher') ? 'fetcher' : name.startsWith('org.chromium.') ? 'chrome' : name).sort()
+  // The directory some Chrome makes of its own as it runs, Alpine's among them.
+  const running = (kinds: string[]) => kinds.filter(kind => kind !== 'fetcher')
   // A temp directory of its own, short as Chrome's socket path must be, which macOS's own is not.
   const shortTemp = async () => mkdtemp(join(process.platform === 'darwin' ? '/tmp' : tmpdir(), 'kt-'))
   const server = 'const server = Bun.serve({ port: 0, fetch: () => new Response(\'<p>Hi</p>\', { headers: { \'content-type\': \'text/html\' } }) })\n'
@@ -410,14 +412,17 @@ process.exit(0)
 
       expect({ code, errors }).toEqual({ code: 0, errors: '' })
       // One owned directory, the killed run's gone; Bun's profile stays empty, Chrome running on kay's.
-      expect(opened).toEqual(['bun', 'chrome', 'kay'])
-      expect(closed).toEqual(['bun', 'chrome', 'kay'])
+      expect(running(opened!)).toEqual(['bun', 'chrome', 'kay'])
+      expect(running(closed!)).toEqual(['bun', 'chrome', 'kay'])
       expect(idle).toEqual([])
       // The page opened last, left open, goes at exit.
       expect(kinds(await readdir(temp))).toEqual([])
     }
     finally {
-      await chmod(join(temp, LOCKED, 'profile'), 0o700)
+      // Root removes it whatever its mode.
+      if (existsSync(join(temp, LOCKED)))
+        await chmod(join(temp, LOCKED, 'profile'), 0o700)
+
       await rm(temp, { recursive: true, force: true })
     }
   }, 60_000)

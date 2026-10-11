@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import process from 'node:process'
@@ -101,16 +101,19 @@ const BUN_PROFILE = /^--user-data-dir=(.+\.bun-chrome)$/
 const BUN_DIR = /^\.[\w-]+\.bun-chrome$/
 // Chrome's lock, beside the profile, which a killed Chrome leaves.
 const SINGLETON = /^org\.chromium\.Chromium\./
+const FETCHER = /^org\.chromium\.Chromium\.chromium_chrome_url_fetcher_\./
 // Where the owned directory notes the profile Bun made.
 const BUN_RECORD = 'bun-profile'
 // Chrome's lock names its host and process.
 const LOCK_PID = /-(\d+)$/
+// The parent's process in a /proc stat line, read from the end of the command's name.
+const STAT_PARENT = /^\) \S (\d+)/
 const EXIT_WAIT_MS = 5000
 // How long the browser outlives its last page, for the next test's.
 const IDLE_MS = 1000
 
 // The browser of this process's pages. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the browser closes.
-let browser: { dir: string, pages: number, ready: Promise<void>, idle?: Timer } | undefined
+let browser: { dir: string, pages: number, ready: Promise<void>, startedAt: number, idle?: Timer } | undefined
 // The process of the Chrome the last close killed: Bun spawns another only once it reaped that one, and fails a view made sooner.
 let killed: number | undefined
 let exitHooked = false
@@ -404,7 +407,7 @@ async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
   }
 
   sweepProfiles()
-  browser = { dir: mkdtempSync(join(tmpdir(), `kay-chrome-${process.pid}-`)), pages: 1, ready: killed === undefined ? Promise.resolve() : exited(killed) }
+  browser = { dir: mkdtempSync(join(tmpdir(), `kay-chrome-${process.pid}-`)), pages: 1, ready: killed === undefined ? Promise.resolve() : exited(killed), startedAt: Date.now() }
   killed = undefined
 
   if (!exitHooked)
@@ -435,15 +438,20 @@ function closeBrowser() {
   if (!browser)
     return
 
-  const { dir, idle } = browser
+  const { dir, idle, startedAt } = browser
   const pid = LOCK_PID.exec(attempt(() => readlinkSync(join(dir, 'profile', 'SingletonLock'))) ?? '')?.[1]
+  // Read before Chrome is killed, which hands what it started to another parent.
+  const tree = pid === undefined ? [] : processTree(Number(pid))
 
   browser = undefined
   clearTimeout(idle)
   // Closing the views leaves Chrome running, and would leave it writing to the profile.
   attempt(() => Bun.WebView.closeAll())
   killed = pid === undefined ? undefined : Number(pid)
+  // Some Chrome's processes outlive it, Alpine's among them, and would write the profile again once removed.
+  killAll(tree)
   attempt(() => removeProfile(dir))
+  removeFetcherDirs(startedAt)
 }
 
 // The directory kay owns, Chrome's lock beside the profile, which a killed Chrome leaves, and the empty profile Bun made, each only where it is directly in the temp directory, whatever a killed run's files say.
@@ -461,6 +469,56 @@ function removeProfile(dir: string) {
     attempt(() => rmdirSync(bun))
 
   rmSync(dir, { recursive: true, force: true, maxRetries: 3 })
+}
+
+// A process and every one it started, read from /proc, the process alone where there is none.
+function processTree(pid: number): number[] {
+  const tree = [pid]
+  const children = new Map<number, number[]>()
+
+  for (const name of attempt(() => readdirSync('/proc')) ?? []) {
+    const stat = attempt(() => readFileSync(`/proc/${name}/stat`, 'utf8'))
+
+    // The parent follows the state, after the command's name, which may hold spaces and parentheses.
+    const parent = stat === undefined ? undefined : STAT_PARENT.exec(stat.slice(stat.lastIndexOf(')')))?.[1]
+
+    if (parent !== undefined)
+      children.set(Number(parent), [...children.get(Number(parent)) ?? [], Number(name)])
+  }
+
+  // Each child found is visited in turn, as it joins the tree.
+  for (const member of tree)
+    tree.push(...children.get(member) ?? [])
+
+  return tree
+}
+
+// Kills the processes, waiting a moment for them to be gone.
+function killAll(tree: number[]) {
+  for (const member of tree)
+    attempt(() => process.kill(member, 'SIGKILL'))
+
+  const until = Date.now() + EXIT_WAIT_MS
+
+  while (tree.some(running) && Date.now() < until)
+    Bun.sleepSync(POLL_MS)
+}
+
+// Whether a process still runs, a zombie no longer writing anything.
+function running(pid: number): boolean {
+  const stat = attempt(() => readFileSync(`/proc/${pid}/stat`, 'utf8'))
+
+  return stat !== undefined && stat[stat.lastIndexOf(')') + 2] !== 'Z'
+}
+
+// The empty directories some Chrome makes beside its lock while it runs and leaves once killed, Alpine's among them, which name no process: each made since the browser started.
+function removeFetcherDirs(startedAt: number) {
+  for (const name of attempt(() => readdirSync(tmpdir())) ?? []) {
+    const path = join(tmpdir(), name)
+
+    if (FETCHER.test(name) && (attempt(() => statSync(path).ctimeMs) ?? 0) >= startedAt)
+      attempt(() => rmdirSync(path))
+  }
 }
 
 // What the browsers of killed runs left, their process gone, as far as it can be removed: a directory another user owns stays.
