@@ -1,10 +1,11 @@
 ---
 import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 
-const { onPlanet, onCommit } = props<{ onPlanet: (value: string) => void, onCommit: (value: string) => void }>()
+const { onPlanet, onCommit, onFilter } = props<{ onPlanet: (value: string) => void, onCommit: (value: string) => void, onFilter?: (query: string) => void }>()
 
 const name = signal('Ada')
 // Kept as the figure the box spells, as a parent parsing what is typed would.
@@ -21,3 +22,6 @@ Select#planet(value="mars" loading options={[{ value: 'mars', label: 'Mars' }, {
 TextInput#plain(name="email" aria-label="Email")
 Textarea#roster(aria-label="Roster" value={roster()} onInput={value => roster.set(value.split('\n').map(line => line.trim()).filter(Boolean).join('\n'))})
 p#names {roster()}
+form#filters(method="get" onSubmit={event => { event.preventDefault(); onFilter?.(String(new FormData(event.currentTarget).get('period'))) }})
+  FormField(label="Period" compact)
+    Select(name="period" value="" emptyOption="Any" submit options={[{ value: '7d', label: '7 days' }]})

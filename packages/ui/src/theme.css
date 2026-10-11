@@ -488,6 +488,10 @@
   /* One wrapping row, the label taking no box of its own: the head and the action share the first line, the action wrapping under the head rather than over the control, and the rest take a line each. */
   .kui-form-field {
     @apply flex w-full flex-wrap items-center gap-1;
+
+    &:where([data-compact]) {
+      @apply w-auto;
+    }
   }
 
   .kui-form-field-label {

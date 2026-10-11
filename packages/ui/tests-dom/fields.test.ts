@@ -6,15 +6,17 @@ import { click } from './dom'
 let mounted: Mounted | undefined
 const planets: string[] = []
 const commits: string[] = []
+const filters: string[] = []
 
 afterEach(() => {
   mounted?.unmount()
   planets.length = 0
   commits.length = 0
+  filters.length = 0
 })
 
 async function fields() {
-  mounted = await mount('src/components/fields.kay', { onPlanet: (value: string) => planets.push(value), onCommit: (value: string) => commits.push(value) })
+  mounted = await mount('src/components/fields.kay', { onPlanet: (value: string) => planets.push(value), onCommit: (value: string) => commits.push(value), onFilter: (query: string) => filters.push(query) })
 
   return mounted.root
 }
@@ -103,5 +105,16 @@ describe('Select', () => {
     await settle()
 
     expect(planets).toEqual(['earth'])
+  })
+
+  test('submits the form holding it once an option is picked, when asked', async () => {
+    const root = await fields()
+    const select = root.querySelector<HTMLSelectElement>('#filters select')!
+
+    select.value = '7d'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+    await settle()
+
+    expect(filters).toEqual(['7d'])
   })
 })

@@ -171,6 +171,10 @@ describe('FormField', () => {
 
     expect(refused.html).toContain('<span class="kui-form-field-issue">Two letters at least</span>')
   })
+
+  test('sizes itself by its control when compact, holding no message region without a name or an issue', async () => {
+    expect((await element('/form', 'compact')).replaceAll(/<!--[^>]*-->/g, '')).toBe('<section id="compact"><div class="kui-form-field" data-compact=""><label class="kui-form-field-label"><span class="kui-form-field-head"><span class="kui-label-text">Period</span></span><select name="period"></select></label></div></section>')
+  })
 })
 
 test('TextInput and Textarea without onInput render plain fields whose attributes post with the form', async () => {

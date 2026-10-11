@@ -20,3 +20,7 @@ main
       TextInput(name="email" type="email" required autocomplete="email" aria-label="Email")
       Textarea(name="bio" value="Hi" rows={3} aria-label="Bio")
     button Rename
+  form#filters(method="get")
+    section#compact
+      FormField(label="Period" compact)
+        select(name="period")
