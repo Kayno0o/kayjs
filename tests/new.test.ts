@@ -254,6 +254,7 @@ describe('kay command line', () => {
 })
 
 describe('kay new', () => {
+  // Installing, checking, linting, testing and building the app takes about 30 s in CI, so it is given twice that.
   it('scaffolds a project that type-checks against the declarations of kay, is formatted and builds as it is', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
@@ -318,7 +319,7 @@ describe('kay new', () => {
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
     }
-  }, 30_000)
+  }, 60_000)
 
   it('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-site')
@@ -374,7 +375,7 @@ describe('kay new', () => {
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
     }
-  }, 30_000)
+  }, 60_000)
 
   it('scaffolds an app with sessions, members in Postgres, a guarded section and a websocket island, which checks, tests and builds as it is', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
