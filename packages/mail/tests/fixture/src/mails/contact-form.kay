@@ -1,0 +1,22 @@
+---
+import Button from '@kaynooo/kayjs-mail/button.kay'
+import Fields from '@kaynooo/kayjs-mail/fields.kay'
+import Heading from '@kaynooo/kayjs-mail/heading.kay'
+import Layout from '@kaynooo/kayjs-mail/layout.kay'
+import Quote from '@kaynooo/kayjs-mail/quote.kay'
+
+const { name, email, phone, topic, message } = props<{ name: string, email: string, phone?: string, topic: string, message: string }>()
+
+const fields = [
+  { label: 'Name', value: name },
+  { label: 'Email', value: email, href: `mailto:${email}` },
+  { label: 'Phone', value: phone, href: phone && `tel:${phone.replaceAll(' ', '')}` },
+]
+---
+Layout(preheader={message.slice(0, 120)})
+  @footer
+    | Sent from the contact form. Replying to this mail writes to {name}.
+  Heading {topic}
+  Fields(fields={fields} empty="not given")
+  Quote(text={message})
+  Button(href={`mailto:${email}?subject=${encodeURIComponent(`Re: ${topic}`)}`}) Reply to {name}

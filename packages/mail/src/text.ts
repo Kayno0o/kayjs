@@ -6,7 +6,7 @@ const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input'
 const DISPLAY_NONE = /display\s*:\s*none/i
 const BOOLEAN_HIDDEN = /(?:^|\s)hidden(?=[\s/=]|$)/i
 const QUOTED = /"[^"]*"|'[^']*'/g
-const BLOCKS = new Set(['address', 'article', 'aside', 'blockquote', 'body', 'center', 'dd', 'div', 'dl', 'dt', 'figcaption', 'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'html', 'main', 'nav', 'p', 'section', 'table', 'tr'])
+const BLOCKS = new Set(['address', 'article', 'aside', 'blockquote', 'body', 'center', 'dd', 'div', 'dl', 'dt', 'figcaption', 'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'html', 'main', 'nav', 'p', 'section', 'table'])
 const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi
 // kay escapes the first five alone, so a component's other characters arrive as themselves; the rest are what html written by hand often holds.
 const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ', ...Object.fromEntries(Object.entries({ copy: 169, reg: 174, trade: 8482, hellip: 8230, mdash: 8212, ndash: 8211, lsquo: 8216, rsquo: 8217, ldquo: 8220, rdquo: 8221, laquo: 171, raquo: 187, middot: 183, bull: 8226, euro: 8364 }).map(([name, code]) => [name, String.fromCodePoint(code)])) }
@@ -21,7 +21,7 @@ const BLANK_LINES = /\n{3,}/g
 const LINK_SCHEMES = /^(?:https?:|mailto:|tel:)/i
 const CONTACT_SCHEMES = /^(?:mailto|tel):/i
 
-// What a mail reads as in a client showing text only, written from its html: blocks on lines of their own, links followed by their address, list items dashed, images by their alt text, and what the html hides, such as a preheader, left out.
+// What a mail reads as in a client showing text only, written from its html: blocks on lines of their own, links followed by their address, list items dashed, table rows one to a line with a row header as `Label: value`, images by their alt text, and what the html hides, such as a preheader, left out.
 export function htmlToText(html: string): string {
   let text = ''
   let href: string | undefined
@@ -29,6 +29,7 @@ export function htmlToText(html: string): string {
   // The element whose content is left out, and how many of the same tag opened inside it since.
   let skipping: { tag: string, depth: number } | undefined
   let preformatted = 0
+  let rowHeader = false
   const lists: { ordered: boolean, index: number }[] = []
   // A pre block's text, as written, kept out of the tidying until the end.
   const kept: string[] = []
@@ -96,6 +97,17 @@ export function htmlToText(html: string): string {
 
         text += `\n${'  '.repeat(Math.max(0, lists.length - 1))}${list?.ordered ? `${++list.index}.` : '-'} `
       }
+    }
+    else if (tag === 'tr') {
+      if (closing)
+        text += '\n'
+    }
+    else if (tag === 'th' && !closing) {
+      rowHeader = attribute(attributes!, 'scope') === 'row'
+    }
+    else if (tag === 'th' && rowHeader) {
+      text = `${text.trimEnd()}: `
+      rowHeader = false
     }
     else if (tag === 'td' || tag === 'th') {
       if (closing)

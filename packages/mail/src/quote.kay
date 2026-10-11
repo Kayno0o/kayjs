@@ -1,0 +1,11 @@
+---
+import { withBreaks } from './breaks'
+import settings from './settings'
+
+const { text } = props<{ text: string }>()
+---
+// A cell rather than a padded div or a pre, whose padding, border and font Outlook for Windows drops or replaces.
+table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0")
+  tr
+    td(class="km-bg km-text km-quote" bgcolor={settings.background} style={`padding:16px 18px;background:${settings.background};border-left:3px solid ${settings.accent};font-size:15px;line-height:1.6;color:${settings.text};word-break:break-word;overflow-wrap:anywhere`})
+      {withBreaks(text)}

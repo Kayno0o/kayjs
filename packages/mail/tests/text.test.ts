@@ -31,7 +31,11 @@ describe('htmlToText', () => {
     expect(htmlToText('<p>5 < 6 &copy; &hellip; &#x110000;</p>')).toBe(`5 < 6 ${String.fromCharCode(169)} ${String.fromCharCode(8230)} &#x110000;`)
   })
 
+  it('writes a row header as a label before its value, one row to a line', () => {
+    expect(htmlToText('<table><tr><th scope="row">Name</th><td>Ada</td></tr><tr><th scope="row">Email </th><td><a href="mailto:ada@example.com">ada@example.com</a></td></tr></table><p>After</p>')).toBe('Name: Ada\nEmail: ada@example.com\n\nAfter')
+  })
+
   it('separates table cells', () => {
-    expect(htmlToText('<table><tr><th>Item</th><th>Price</th></tr><tr><td>Tea</td><td>3 €</td></tr></table>')).toBe('Item Price\n\nTea 3 €')
+    expect(htmlToText('<table><tr><th>Item</th><th>Price</th></tr><tr><td>Tea</td><td>3 €</td></tr></table>')).toBe('Item Price\nTea 3 €')
   })
 })

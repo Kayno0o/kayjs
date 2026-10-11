@@ -70,3 +70,10 @@ export interface Delivery {
 export interface Transport {
   send: (mail: Mail) => Promise<Delivery>
 }
+
+// One line of a `Fields`: a label, its value, blank or left out for one not given, and where the value links to, a `mailto:` or `tel:` say.
+export interface Field {
+  label: string
+  value?: string | undefined
+  href?: string | undefined
+}

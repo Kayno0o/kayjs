@@ -3,6 +3,8 @@ import process from 'node:process'
 import { darkPalette, defaults, mailer, MailNotConfigured, outbox } from '@kaynooo/kayjs-mail'
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { mail } from '../src/mail'
+import ContactForm from '../src/mails/contact-form.kay'
+import Contact from '../src/mails/contact.kay'
 import Hello from '../src/mails/hello.kay'
 import Kit from '../src/mails/kit.kay'
 import Plain from '../src/mails/plain.kay'
@@ -97,6 +99,27 @@ describe('rendering', () => {
     expect(html).toContain('<!--[if true]><td width="251" valign="top"><![endif]--><div style="display:inline-block;width:100%;max-width:251px;vertical-align:top">')
     expect(html).toContain('<a class="km-link" href="https://fixture.test/help" style="color:#0047ff;text-decoration:underline">the help</a>')
     expect(text).toBe('Fixture\n\nYour code\n\n482 913\n\nDetails\n\nLeft\n\nRight\n\nRead the help (https://fixture.test/help).')
+  })
+
+  it('lays out a contact form\'s fields and quotes its message, line breaks kept, in html and text alike', async () => {
+    const fields = [{ label: 'Name', value: 'Ada <Lovelace>' }, { label: 'Email', value: 'ada@example.com', href: 'mailto:ada@example.com' }, { label: 'Address', value: '1 Main St\nLondon' }, { label: 'Phone', value: ' ' }, { label: 'Topic' }]
+    const { html, text } = await mail.render({ to: 'ada@example.com', subject: 'Contact', view: Contact, props: { fields, message: 'Hello,\n\nA quote for <the> kitchen?\r\nThanks' } })
+
+    expect(html).toContain('<th class="km-muted" scope="row" align="left" valign="top"')
+    expect(html).toContain('>Ada &lt;Lovelace&gt;</td>')
+    expect(html).toContain('<a class="km-link" href="mailto:ada@example.com" style="color:#0047ff;text-decoration:underline">ada@example.com</a>')
+    expect(html).toContain('>1 Main St<br>London</td>')
+    expect(html).toContain('word-break:break-word;overflow-wrap:anywhere')
+    expect(html).toContain('bgcolor="#f4f4f2" style="padding:16px 18px;background:#f4f4f2;border-left:3px solid #0047ff')
+    expect(html).toContain('>Hello,<br><br>A quote for &lt;the&gt; kitchen?<br>Thanks</td>')
+    expect(html).toContain('.km-quote{border-color:#477bff!important}')
+    expect(text).toBe('A message from the site\n\nName: Ada <Lovelace>\nEmail: ada@example.com\nAddress: 1 Main St\nLondon\nPhone: not given\nTopic: not given\n\nHello,\n\nA quote for <the> kitchen?\nThanks')
+  })
+
+  it('renders the contact form mail llms.txt shows', async () => {
+    const { text } = await mail.render({ to: 'site@fixture.test', subject: 'Contact', view: ContactForm, props: { name: 'Ada', email: 'ada@example.com', topic: 'A kitchen', message: 'Hello,\nA quote?' } })
+
+    expect(text).toBe('A kitchen\n\nName: Ada\nEmail: ada@example.com\nPhone: not given\n\nHello,\nA quote?\n\nReply to Ada (ada@example.com?subject=Re%3A%20A%20kitchen)\n\nSent from the contact form. Replying to this mail writes to Ada.')
   })
 
   it('takes no props for a mail without required ones, and the text it is given over the one written from the html', async () => {

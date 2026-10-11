@@ -122,6 +122,7 @@ const RULES: [className: string, declarations: (palette: Palette) => string[]][]
   ['km-border', palette => [`border-color:${palette.border}`]],
   ['km-button', palette => [`background-color:${palette.accent}`, `color:${palette.onAccent}`]],
   ['km-link', palette => [`color:${palette.accent}`]],
+  ['km-quote', palette => [`border-color:${palette.accent}`]],
 ]
 
 // Dark colours for clients honouring `prefers-color-scheme`, such as Apple Mail, and for Outlook.com, which marks the elements it recolours with `data-ogsc` and `data-ogsb`. The mail's document moves it into its head.
