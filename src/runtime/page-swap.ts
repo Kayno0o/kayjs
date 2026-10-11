@@ -364,6 +364,7 @@ async function loaded(link: HTMLLinkElement): Promise<void> {
 function swapBody(next: Document, policy: Policy): void {
   const body = document.adoptNode(next.body)
   const old = document.body
+  const focused = heldFocus()
 
   const kept = new Set<Element>()
 
@@ -424,6 +425,9 @@ function swapBody(next: Document, policy: Policy): void {
 
   morph(old, body)
 
+  if (focused && document.activeElement !== focused.element && [...kept].some(island => island.contains(focused.element)))
+    focused.restore()
+
   // A drawer or a menu left open closes as the page changes, as it would on a page loaded afresh.
   for (const popover of opened) {
     if (popover.isConnected && popover instanceof HTMLElement && popover.matches(':popover-open'))
@@ -435,6 +439,47 @@ function swapBody(next: Document, policy: Policy): void {
     for (let parent = (document.querySelector('[autofocus]') ?? document.querySelector('h1'))?.parentElement; parent && parent !== document.body; parent = parent.parentElement)
       parent.scrollTo(0, 0)
   }
+}
+
+// The focused element with its caret and selection, which moving the island holding it takes away: the swap gives them back, so a field typed in keeps taking the keys.
+function heldFocus(): { element: HTMLElement, restore: () => void } | undefined {
+  const element = document.activeElement
+
+  if (!(element instanceof HTMLElement) || element === document.body)
+    return undefined
+
+  if ((element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) && element.selectionStart !== null) {
+    const { selectionStart: start, selectionEnd: end, selectionDirection: direction, scrollLeft, scrollTop } = element
+
+    return {
+      element,
+      restore: () => {
+        element.focus({ preventScroll: true })
+        element.setSelectionRange(start, end, direction ?? undefined)
+        element.scrollLeft = scrollLeft
+        element.scrollTop = scrollTop
+      },
+    }
+  }
+
+  // Offsets rather than a range: a live range moves out of the island as it is taken out.
+  const selection = document.getSelection()
+  const at = selection?.anchorNode && selection.focusNode ? [selection.anchorNode, selection.anchorOffset, selection.focusNode, selection.focusOffset] as const : undefined
+
+  return {
+    element,
+    restore: () => {
+      element.focus({ preventScroll: true })
+
+      if (at && element.contains(at[0]) && element.contains(at[2]) && fits(at[0], at[1]) && fits(at[2], at[3]))
+        document.getSelection()?.setBaseAndExtent(...at)
+    },
+  }
+}
+
+// Whether an offset is still inside a node, which an island's render may have shortened.
+function fits(node: Node, offset: number): boolean {
+  return offset <= (node instanceof CharacterData ? node.length : node.childNodes.length)
 }
 
 // Two nodes the morph makes one of: of one kind and tag, and for an element, the same id and class.

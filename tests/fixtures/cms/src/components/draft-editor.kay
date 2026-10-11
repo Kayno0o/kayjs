@@ -16,6 +16,7 @@ button.draft(onClick={async () => draft({ title: 'Draft title', published: true,
 button.refused(onClick={async () => draft({ title: 3, published: true, tags: [] })}) Refused
 button.slow(onClick={async () => draft({ title: 'Slow draft', published: true, tags: [] })}) Slow
 p.issues {issues()}
+input.title(aria-label="Title" onInput={async kayEvent => draft({ title: kayEvent.currentTarget.value, published: true, tags: [] })})
 ul.edited
   for entry of entries
     li {entry.collection}:{entry.slug}{entry.locale === undefined ? '' : `@${entry.locale}`}

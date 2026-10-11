@@ -427,6 +427,23 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
 
       expect(await editor.text('h1')).toBe('Draft title')
 
+      // A field typed in inside the editor keeps the focus and the caret across the swap each key shows, typed at its end or in its middle.
+      const typed = async (key: string, title: string, caret: number) => {
+        await editor.type(key)
+        await editor.waitUntil(text => document.querySelector('h1')?.textContent === text, {}, title)
+
+        expect(await editor.evaluate(() => [document.activeElement?.className, (document.activeElement as HTMLInputElement).selectionStart])).toEqual(['title', caret])
+      }
+
+      await editor.click('input.title')
+
+      for (const [index, key] of [...'Typed'].entries())
+        await typed(key, 'Typed'.slice(0, index + 1), index + 1)
+
+      await editor.press('ArrowLeft')
+      await editor.press('ArrowLeft')
+      await typed('x', 'Typxed', 4)
+
       // Leaving the page while a draft renders keeps the page gone to.
       await editor.click('button.slow')
       await editor.click('a.away')
