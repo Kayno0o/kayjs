@@ -1,5 +1,6 @@
 import { withBase } from './base'
 import { createSignal, effect, onCleanup, onMount } from './reactive'
+import { uploaded } from './upload'
 import { decodeValue } from './wire'
 
 // Set by the server on every module it mounts under `/api`, and by the browser build on the stub standing in for one: where the module's routes are served.
@@ -50,7 +51,8 @@ export type StreamMethod<Node> = { [M in keyof Node & Method]: Node[M] extends {
 
 // The routes of a module answering with `eventStream()`.
 export type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? [StreamMethod<Node>] extends [never] ? never : Path : never : never
-type StreamRoute<Module, Path, M> = NodeAt<Module, Path> extends infer Node ? M extends keyof Node ? Node[M] : never : never
+// The route a method of a path answers with.
+type MethodRoute<Module, Path, M> = NodeAt<Module, Path> extends infer Node ? M extends keyof Node ? Node[M] : never : never
 type StreamValue<Route> = Route extends { response: { 200: EventStream<infer Value> } } ? Value : never
 
 // What the route's schema asks of the URL: params a path names are required, a query only when its schema requires one.
@@ -379,7 +381,7 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   const mount = (module as { [API_MOUNT]?: string } | undefined)?.[API_MOUNT]
 
   if (mount === undefined)
-    throw new TypeError('kay: socket(), stream() and resource() take the default export of a module under src/api')
+    throw new TypeError('kay: socket(), stream(), resource() and call() take the default export of a module under src/api')
 
   const segments = path.split('/').map((segment) => {
     if (segment === '*')
@@ -449,14 +451,14 @@ export function streamRequest(options: unknown): RequestInit & { method: string,
   return { method: method.toUpperCase(), headers: { 'accept': 'text/event-stream', 'content-type': 'application/json' }, body: JSON.stringify(body) }
 }
 
-export type StreamOf<Module, Path, M> = EventReader<StreamValue<StreamRoute<Module, Path, Chosen<M>>>>
-export type StreamOptions<Module, Path, M> = { method?: M } & UrlOptions<StreamRoute<Module, Path, Chosen<M>>> & Body<StreamRoute<Module, Path, Chosen<M>>>
+export type StreamOf<Module, Path, M> = EventReader<StreamValue<MethodRoute<Module, Path, Chosen<M>>>>
+export type StreamOptions<Module, Path, M> = { method?: M } & UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & Body<MethodRoute<Module, Path, Chosen<M>>>
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page: each value typed as the route sends it, Dates, Maps and Sets included.
 // A GET stream that drops reconnects; a stream closes with the component that opened it.
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M> {
   const init = streamRequest(options)
-  const reader = readEvents<StreamValue<StreamRoute<Module, Path, Chosen<M>>>>(async signal => fetch(withBase(routeUrl(module, path, options as UrlInput | undefined)), { ...init, signal }), init.method === 'GET')
+  const reader = readEvents<StreamValue<MethodRoute<Module, Path, Chosen<M>>>>(async signal => fetch(withBase(routeUrl(module, path, options as UrlInput | undefined)), { ...init, signal }), init.method === 'GET')
 
   onMount(() => {
     if (typeof document !== 'undefined')
@@ -569,4 +571,85 @@ export function resource<Module, const Path extends ResourcePath<Module>>(module
   })
 
   return { value, status, error, refresh: () => asked === '' || gone ? undefined : void load(asked) } as ResourceOf<Module, Path>
+}
+
+// What `call()` throws when a route refused or no answer came, aborting aside.
+export class ApiError extends Error {
+  override name = 'ApiError'
+
+  // `status` is the one the route answered with, 0 when no answer came; `answer` what it answered, read as JSON or as text.
+  constructor(readonly status: number, message: string, readonly answer?: unknown) {
+    super(message)
+  }
+}
+
+// The methods a node answers over HTTP, a websocket's left out.
+export type CallMethod<Node> = Exclude<keyof Node & Method, 'subscribe'>
+
+// The routes of a module answering over HTTP.
+export type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? [CallMethod<Node>] extends [never] ? never : Path : never : never
+
+// GET unless the options name another method, which a path answering no GET requires.
+type MethodOption<Node, M> = 'get' extends keyof Node ? { method?: M } : { method: M }
+type CallBody<Route> = Route extends { body: infer Input } ? unknown extends Input ? { body?: unknown } : { body: Input | FormData } : { body?: unknown }
+
+export type ApiCallOptions<Module, Path, M> = MethodOption<NodeAt<Module, Path>, M> & UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>> & {
+  // Aborts the call, which rejects with the signal's reason.
+  signal?: AbortSignal | undefined
+  // Called as a body carrying files uploads, with how much of it went, from 0 to 1.
+  progress?: ((sent: number) => void) | undefined
+}
+
+// What an answer reads back as: an object as JSON, a Date in it as its ISO text, while a number or a boolean arrives as the text Elysia sends, and nothing as ''.
+export type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null | undefined | void ? '' : Jsonified<Value>
+export type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>
+
+// Calls a route of a module under `src/api`, from an event handler or any code running in the browser, typed from the route: resolves with what it answered, and throws an `ApiError` when it refused.
+export async function call<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<ApiAnswer<Module, Path, M>> {
+  const { method = 'get', body, signal, progress } = (options ?? {}) as { method?: string, body?: unknown, signal?: AbortSignal, progress?: (sent: number) => void }
+  const url = withBase(routeUrl(module, path, options as UrlInput | undefined))
+  const sent = callBody(body)
+  const headers = { accept: 'application/json', ...sent.headers }
+  let response: Response
+
+  try {
+    response = sent.body instanceof FormData && progress && typeof XMLHttpRequest !== 'undefined'
+      ? await uploaded(method.toUpperCase(), url, headers, sent.body, progress, signal)
+      : await fetch(url, { method: method.toUpperCase(), headers, body: sent.body ?? null, ...signal && { signal } })
+  }
+  catch (failure) {
+    if (signal?.aborted === true)
+      throw failure
+
+    throw new ApiError(0, failure instanceof Error ? failure.message : String(failure))
+  }
+
+  const answer = await readAnswer(response)
+
+  if (!response.ok)
+    throw new ApiError(response.status, refusal(answer, response), answer)
+
+  return answer as ApiAnswer<Module, Path, M>
+}
+
+// A body carrying files goes as a form, its other fields as text, which Elysia reads against the route's schema; anything else goes as JSON.
+function callBody(body: unknown): { body?: BodyInit | undefined, headers?: Record<string, string> } {
+  if (body === undefined || body instanceof FormData)
+    return { body }
+
+  const fields = typeof body === 'object' && body !== null && !Array.isArray(body) ? Object.entries(body) : []
+
+  if (!fields.some(([, value]) => value instanceof Blob || (Array.isArray(value) && value.some(item => item instanceof Blob))))
+    return { body: JSON.stringify(body), headers: { 'content-type': 'application/json' } }
+
+  const form = new FormData()
+
+  for (const [name, value] of fields) {
+    for (const item of Array.isArray(value) ? value as unknown[] : [value]) {
+      if (item !== undefined)
+        form.append(name, item instanceof Blob ? item : typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item))
+    }
+  }
+
+  return { body: form }
 }

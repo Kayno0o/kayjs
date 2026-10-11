@@ -27,7 +27,7 @@ import { collection } from 'kay/content'
 | `defer` | Makes a promise an `await` block can stream |
 | `navigate`, `refresh` | Go to a page, or re-render the current one, without a reload |
 | `guardLeave` | Warns before leaving a page with unsaved changes |
-| `resource`, `socket`, `stream`, `dispatch` | Typed reads of API routes, websockets and event streams from islands. See [API routes](/guides/api-routes) |
+| `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables `publicEnv` in the config exposed to islands |
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, or mark HTML as safe to render |

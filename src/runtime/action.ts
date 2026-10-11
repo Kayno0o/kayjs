@@ -9,6 +9,7 @@ import { escapeAttribute } from './escape'
 import { createSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { uploaded } from './upload'
 import { decodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
@@ -32,8 +33,6 @@ export const FILE_MARK = '$kayFile'
 const FILE_TYPE = 'KayFile'
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
 // Statuses whose response has no body, which a Response refuses one for.
-const NULL_BODY = new Set([204, 205, 304])
-const HEADER_LINE = /\r?\n/
 
 // The `x-kay-action` of a call whose input is a form's fields rather than encoded.
 export const FORM_CALL = 'form'
@@ -197,6 +196,8 @@ export interface CallOptions {
   refresh?: boolean | undefined
   // Shows the change at once, as the call goes: the signals it writes go back to what they held if the call fails, unless something wrote them since.
   optimistic?: (() => void) | undefined
+  // Aborts the call: it rejects with the signal's reason, and the change `optimistic` showed goes back.
+  signal?: AbortSignal | undefined
 }
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
@@ -490,7 +491,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       try {
         undo = options?.optimistic ? undoable(options.optimistic) : undefined
 
-        const data = await post(url(), input, setProgress)
+        const data = await post(url(), input, setProgress, options?.signal)
 
         posted = true
 
@@ -535,7 +536,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void): Promise<Output> {
+async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal?: AbortSignal): Promise<Output> {
   const { headers, body } = encodeCall(input)
   const sent: Record<string, string> = { ...headers }
 
@@ -547,7 +548,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
   const send = async (solution: string | undefined) => {
     const headers = solution === undefined ? sent : { ...sent, [WORK_HEADER]: solution }
 
-    return body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? uploaded(withBase(url), headers, body, onProgress) : fetch(withBase(url), { method: 'POST', headers, body })
+    return body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? uploaded('POST', withBase(url), headers, body, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } })
   }
 
   // A page holding a challenge for the action solves it from the moment one of its forms takes focus.
@@ -561,38 +562,6 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
   prefetched.clear()
 
   return readActionResponse(response, url)
-}
-
-async function uploaded(url: string, headers: Record<string, string>, body: FormData, onProgress: (sent: number) => void): Promise<Response> {
-  const request = new XMLHttpRequest()
-
-  request.open('POST', url)
-  request.responseType = 'blob'
-
-  for (const [name, value] of Object.entries(headers))
-    request.setRequestHeader(name, value)
-
-  request.upload.onprogress = event => event.lengthComputable && onProgress(event.loaded / event.total)
-
-  return new Promise((resolve, reject) => {
-    request.onload = () => resolve(new Response(NULL_BODY.has(request.status) ? null : request.response as Blob, { status: request.status, headers: responseHeaders(request.getAllResponseHeaders()) }))
-    // As fetch rejects on a network error.
-    request.onerror = () => reject(new TypeError('Failed to fetch'))
-    request.send(body)
-  })
-}
-
-function responseHeaders(text: string): Headers {
-  const headers = new Headers()
-
-  for (const line of text.trim().split(HEADER_LINE)) {
-    const colon = line.indexOf(':')
-
-    if (colon > 0)
-      headers.append(line.slice(0, colon).trim(), line.slice(colon + 1).trim())
-  }
-
-  return headers
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.

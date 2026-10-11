@@ -369,6 +369,27 @@ describe('optimistic changes', () => {
     }
   })
 
+  it('roll back when the call is aborted, which rejects with the signal\'s reason and records no outcome', async () => {
+    const move = actionStub('/_kay/action/test/aborted') as unknown as Action<{ to: number }, number>
+    const at = signal(0)
+    const controller = new AbortController()
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (_: unknown, init?: RequestInit) => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)))) as unknown as typeof fetch)
+
+    try {
+      const moving = move({ to: 1 }, { optimistic: () => at.set(1), signal: controller.signal })
+
+      expect(at()).toBe(1)
+      controller.abort(new Error('the user left'))
+      await expect(moving).rejects.toThrow('the user left')
+      expect(at()).toBe(0)
+      expect(move.pending()).toBe(false)
+      expect(move.failed()).toBeUndefined()
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
   it('roll back when the action call fails, and stand once it went through', async () => {
     const move = actionStub('/_kay/action/test/move') as unknown as Action<{ to: number }, number>
     const at = signal(0)

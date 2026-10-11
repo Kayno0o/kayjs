@@ -77,6 +77,21 @@ ul
 
 Options given as a function are reactive: when `search` changes, the route is asked again. `refresh()` asks again by hand. A resource opens once the island is in the page, never on the server.
 
+An event handler calls any route with `call`, from an island or a module several islands share. `method` is GET unless named, `params`, `query` and `body` are typed from the route, and so is the answer. A refusal throws an `ApiError` with its `status` and `message`.
+
+```kay
+---
+import { call } from 'kay'
+import notes from '../api/notes'
+
+const title = signal('')
+---
+input(bind:value={title})
+button(onClick={() => call(notes, '/', { method: 'post', body: { title } })}) Add
+```
+
+`signal` aborts a call. A body holding a `File` goes as a multipart form, and `progress: sent => ...` reports how much of it went, from 0 to 1.
+
 ## Server-sent events
 
 Answer with `eventStream()` from a generator, an async iterable or an array, and read it with `stream()`:

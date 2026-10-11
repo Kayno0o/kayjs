@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
-import { dispatch, readEvents, resource, socket } from '../src/runtime/live'
+import { ApiError, call, dispatch, readEvents, resource, socket } from '../src/runtime/live'
 import { apiStubs, scanApi } from '../src/server/api'
 import { rooms, sqliteRooms } from '../src/server/rooms'
 import { testSite } from '../src/test'
@@ -27,6 +27,8 @@ const site = await testSite({ routes: `${fixture}/src/routes`, api: `${fixture}/
 const { default: chat } = await import(join(apiDir, 'chat.ts')) as typeof import('./fixtures/live/src/api/chat')
 const { default: secret } = await import(join(apiDir, 'private/index.ts')) as typeof import('./fixtures/live/src/api/private/index')
 const { default: party } = await import(join(apiDir, 'party.ts')) as typeof import('./fixtures/live/src/api/party')
+const { default: notes } = await import(join(apiDir, 'notes.ts')) as typeof import('./fixtures/live/src/api/notes')
+const { addNote } = await import(resolve(fixture, 'src/lib/notes.ts')) as typeof import('./fixtures/live/src/lib/notes')
 
 function upgrade(path: string, headers: Record<string, string> = {}): Request {
   return new Request(`http://localhost${path}`, { headers: { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13', ...headers } })
@@ -42,6 +44,7 @@ describe('API modules', () => {
     expect(await scanApi(apiDir)).toEqual([
       { file: join(apiDir, 'chat.ts'), mount: '/api/chat', guards: [] },
       { file: join(apiDir, 'index.ts'), mount: '/api', guards: [] },
+      { file: join(apiDir, 'notes.ts'), mount: '/api/notes', guards: [] },
       { file: join(apiDir, 'party.ts'), mount: '/api/party', guards: [] },
       { file: join(apiDir, 'private/index.ts'), mount: '/api/private', guards: [{ file: join(apiDir, 'private/_guard.ts'), path: 'private/_guard.ts' }] },
     ])
@@ -199,6 +202,11 @@ describe('API modules', () => {
       expect(build.success).toBe(true)
       expect(code).toContain('"/api/chat"')
       expect(code).not.toContain('elysia')
+
+      const shared = await Bun.build({ entrypoints: [join(fixture, 'src/lib/notes.ts')], outdir, target: 'browser', plugins: [apiStubs([{ dir: apiDir, prefix: '' }]), kay()] })
+
+      expect(shared.success).toBe(true)
+      expect(await shared.outputs[0]!.text()).toContain('"/api/notes"')
     }
     finally {
       await rm(outdir, { recursive: true, force: true })
@@ -322,6 +330,156 @@ describe('resource()', () => {
     expect(typed).toBeFunction()
   })
 })
+
+describe('call()', () => {
+  let served: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>
+
+  // A fetch the site answers, rejecting with the signal's reason once it aborts, as fetch does.
+  beforeAll(() => {
+    served = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL, init?: RequestInit) => {
+      init?.signal?.throwIfAborted()
+
+      return Promise.race([site.fetch(String(input), init as never), new Promise<never>((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)))])
+    }) as typeof fetch)
+  })
+
+  afterAll(() => served.mockRestore())
+
+  it('calls any method of a route, sending its body as JSON and reading its answer typed', async () => {
+    const added = await call(notes, '/', { method: 'post', body: { title: 'Milk' } })
+
+    expect(added).toEqual({ id: added.id, title: 'Milk', at: '2026-01-01T00:00:00.000Z' })
+    expect(served.mock.calls.at(-1)?.[1]).toMatchObject({ method: 'POST', headers: { 'accept': 'application/json', 'content-type': 'application/json' }, body: '{"title":"Milk"}' })
+    expect(await call(notes, '/:id', { method: 'patch', params: { id: added.id }, body: { title: 'Oat milk' } })).toMatchObject({ title: 'Oat milk' })
+    expect((await call(notes, '/')).map(note => note.title)).toContain('Oat milk')
+    expect(await call(notes, '/:id', { method: 'delete', params: { id: added.id } })).toBe('true')
+  })
+
+  it('throws an ApiError with the status and message of a refusal, and status 0 when no answer came', async () => {
+    const missing = call(notes, '/:id', { method: 'patch', params: { id: 404 }, body: { title: 'x' } })
+
+    await expect(missing).rejects.toBeInstanceOf(ApiError)
+    await expect(missing).rejects.toMatchObject({ status: 404, message: 'No such note', answer: 'No such note' })
+    await expect(call(notes, '/', { method: 'post', body: { title: '' } })).rejects.toMatchObject({ status: 422 })
+
+    served.mockImplementationOnce((async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)
+    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'Failed to fetch' })
+  })
+
+  it('aborts a call with its signal, which rejects with the signal\'s reason', async () => {
+    const controller = new AbortController()
+    const slow = call(notes, '/slow', { signal: controller.signal })
+
+    controller.abort()
+    await expect(slow).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(call(notes, '/slow', { signal: AbortSignal.abort(new Error('gone')) })).rejects.toThrow('gone')
+  })
+
+  it('sends a body carrying a file as a form, and reports its upload where the browser can', async () => {
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
+
+    expect(await call(notes, '/attachments', { method: 'post', body: { file, caption: 'Hi' } })).toEqual({ name: 'hello.txt', size: 5, caption: 'Hi' })
+    expect(served.mock.calls.at(-1)?.[1]?.body).toBeInstanceOf(FormData)
+
+    const form = new FormData()
+    const sent: number[] = []
+
+    form.append('file', file)
+    form.append('caption', 'Form')
+    globalThis.XMLHttpRequest = UploadRequest as unknown as typeof XMLHttpRequest
+
+    try {
+      expect(await call(notes, '/attachments', { method: 'post', body: form, progress: fraction => void sent.push(fraction) })).toEqual({ name: 'hello.txt', size: 5, caption: 'Form' })
+      expect(sent).toEqual([0.5, 1])
+
+      const controller = new AbortController()
+      const aborted = call(notes, '/attachments', { method: 'post', body: form, progress: () => undefined, signal: controller.signal })
+
+      controller.abort(new Error('cancelled'))
+      await expect(aborted).rejects.toThrow('cancelled')
+    }
+    finally {
+      Reflect.deleteProperty(globalThis, 'XMLHttpRequest')
+    }
+  })
+
+  it('works from a module several islands share, as from an island', async () => {
+    expect(await addNote('Bread')).toBeNumber()
+  })
+
+  it('takes the methods, params and body each route declares', () => {
+    const typed = async () => {
+      // @ts-expect-error: a websocket route is opened with socket()
+      void call(chat, '/:room', { params: { room: 'a' } })
+      // @ts-expect-error: the note's id is a param the path names
+      void call(notes, '/:id', { method: 'delete' })
+      // @ts-expect-error: the route takes a title
+      void call(notes, '/', { method: 'post', body: {} })
+      // @ts-expect-error: the path answers no GET, so the method is named
+      void call(notes, '/attachments', { body: { file: new File([], 'a'), caption: '' } })
+      // @ts-expect-error: a value from JSON has no Date
+      void (await call(notes, '/'))[0]?.at.getTime() // eslint-disable-line ts/no-unsafe-call -- the line is a type test: it must fail to type, which leaves the call unresolved
+    }
+
+    expect(typed).toBeFunction()
+  })
+})
+
+// An XMLHttpRequest as far as a call reads it: the site answers, and the upload goes in two halves.
+class UploadRequest {
+  readonly upload: { onprogress: ((event: { lengthComputable: boolean, loaded: number, total: number }) => void) | null } = { onprogress: null }
+  responseType = ''
+  status = 0
+  response: Blob | null = null
+  onload: (() => void) | null = null
+  onerror: (() => void) | null = null
+  ontimeout: (() => void) | null = null
+  onabort: (() => void) | null = null
+  private method = ''
+  private url = ''
+  private readonly headers: Record<string, string> = {}
+  private answered = ''
+  private aborted = false
+
+  open(method: string, url: string) {
+    this.method = method
+    this.url = url
+  }
+
+  setRequestHeader(name: string, value: string) {
+    this.headers[name] = value
+  }
+
+  getAllResponseHeaders(): string {
+    return this.answered
+  }
+
+  abort() {
+    this.aborted = true
+    this.onabort?.()
+  }
+
+  send(body: FormData) {
+    void this.answer(body)
+  }
+
+  private async answer(body: FormData) {
+    await Bun.sleep(1)
+
+    if (this.aborted)
+      return
+
+    this.upload.onprogress?.({ lengthComputable: true, loaded: 1, total: 2 })
+    this.upload.onprogress?.({ lengthComputable: true, loaded: 2, total: 2 })
+
+    const response = await site.fetch(this.url, { method: this.method, headers: this.headers, body })
+
+    this.status = response.status
+    this.response = await response.blob()
+    this.answered = [...response.headers].map(([name, value]) => `${name}: ${value}`).join('\r\n')
+    this.onload?.()
+  }
+}
 
 describe('kay check, API modules', () => {
   it('types an island\'s sockets and streams from the modules it imports', async () => {
