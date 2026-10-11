@@ -121,7 +121,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
 
     await writeClasses(root, sources.classes)
 
-    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, options) : Promise.resolve(undefined), stylesAgain ? bundleStyles(root, sources, options) : Promise.resolve(undefined))
+    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, options) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
     const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, problems: sources.problems, options: key }
     const text = JSON.stringify(manifest)
 

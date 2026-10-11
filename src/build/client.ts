@@ -111,9 +111,12 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   return built
 }
 
-// Fails on either only once both stopped, so neither goes on writing into the output of the build after.
-export async function bothBundles<Islands, Styles>(islands: Promise<Islands>, styles: Promise<Styles>): Promise<[Islands, Styles]> {
+// Fails on either only once both stopped, so neither goes on writing into the output of the build after; failing both, it reports what each logged.
+export async function bothBundles<Islands extends Promise<unknown> | undefined, Styles extends Promise<unknown> | undefined>(islands: Islands, styles: Styles): Promise<[Awaited<Islands>, Awaited<Styles>]> {
   const [scripts, sheets] = await Promise.allSettled([islands, styles])
+
+  if (scripts.status === 'rejected' && sheets.status === 'rejected')
+    throw new AggregateError([scripts.reason, sheets.reason].flatMap((reason: unknown): unknown[] => reason instanceof AggregateError ? reason.errors as unknown[] : [reason]), (scripts.reason as Error).message)
 
   if (scripts.status === 'rejected')
     throw scripts.reason

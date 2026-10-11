@@ -1049,7 +1049,7 @@ describe('the files a build writes', () => {
       return { contents: '', loader: 'js' }
     }) }] })
 
-    // Released once the stylesheet build started, as the held build would hold its plugins back until then.
+    // Bun holds every build's plugins back while one's onLoad waits, so the held build lets go as the stylesheet build starts: a build started while another runs reads the listings that one took, whenever it ends.
     const started: BunPlugin = { name: 'started', setup: (build) => {
       if (build.config.entrypoints.some(entry => entry.endsWith('index.kay')))
         released.resolve()
@@ -1074,7 +1074,7 @@ describe('the files a build writes', () => {
         throw new Error('no islands')
 
       build.onLoad({ filter: /theme\.css$/ }, async () => {
-        await Bun.sleep(500)
+        await Bun.sleep(100)
         styled = true
 
         return { contents: 'p { color: red }', loader: 'css' }
