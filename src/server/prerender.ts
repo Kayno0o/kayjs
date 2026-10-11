@@ -113,7 +113,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           throw new Error(`kay: it holds ${islands.length === 1 ? 'a server island' : `${islands.length} server islands`}, which only a server renders per request`)
 
         if (options.exportAll && stamps)
-          throw new Error('kay: a form in it posts to an action with `minTime`, whose stamp only a server signs per request')
+          throw new Error('kay: a form in it posts to an action with `minTime` or `proofOfWork`, whose stamp or challenge only a server signs per request')
 
         if (islands.includes('defer') && client.entry === undefined)
           throw new Error(`kay: it defers a server island, which kay's browser entry fetches, and with no island and \`navigation: false\` the build has none; mark it \`server\` to render it inline instead`)

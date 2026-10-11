@@ -308,7 +308,7 @@ describe('kay new', () => {
 
       const client = await buildClient(dir)
 
-      expect(Object.keys(client.islands)).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
+      expect(Object.keys(client.islands).sort()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
       const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
 
       expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toMatch(/@media \(prefers-reduced-motion: ?no-preference\) ?\{\s*@view-transition/)

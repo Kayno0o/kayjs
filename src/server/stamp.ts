@@ -13,7 +13,11 @@ export function useStampSecret(key: string, from: 'session' | 'preview'): void {
 // The value a prerendered page holds in place of a stamp, with the action it is for: the server signs one each time it serves the page.
 const STAMP_MARK = 'kay-stamp:'
 
-export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}([^"]*)"`, 'g')
+// The same for a `proofOfWork` challenge, in the page's data script: the action, its difficulty and its `maxAge`.
+export const WORK_MARK = 'kay-work:'
+
+// A stamp's hole holds its action in the first group, a challenge's its mark in the second.
+export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}([^"]*)"|"${WORK_MARK}([^"]*)"`, 'g')
 
 // `use` keeps what one feature signs from passing for another's.
 export function signText(use: string, text: string): string {

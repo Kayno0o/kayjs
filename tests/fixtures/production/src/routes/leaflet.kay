@@ -1,0 +1,12 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const page = { prerender: true }
+
+// Rendered once at build, its form still gets a fresh challenge on each visit.
+export const subscribe = action(t.Object({ email: t.String({ maxLength: 200 }) }), ({ email }) => email.length, { proofOfWork: 500 })
+---
+form(action={subscribe})
+  input(name="email" aria-label="Email")
+  button Subscribe

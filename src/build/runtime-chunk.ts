@@ -197,16 +197,13 @@ export function anchorModule(used: Map<string, Set<string>>): string {
   return `${imports.join('\n')}\n;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.runtime')] = () => [${kept.join(', ')}]\n`
 }
 
-// Serves the module every entry point imports, `boot` in it when given, and has each lazy runtime module import it too.
+// Serves the module every entry point imports, `boot` in it when given; kay's plugin has each lazy runtime module import it too, as it ships the files they point at.
 export function runtimeAnchor(chunk: RuntimeChunk, boot?: string): BunPlugin {
   return {
     name: 'kay-runtime-chunk',
     setup(build) {
       build.onResolve({ filter: new RegExp(`^${RegExp.escape(ANCHOR)}$`) }, () => ({ path: ANCHOR, namespace: ANCHOR_NAMESPACE }))
       build.onLoad({ filter: /.*/, namespace: ANCHOR_NAMESPACE }, () => ({ contents: boot !== undefined && boot !== '' ? `${chunk.anchor}import ${JSON.stringify(boot)}\n` : chunk.anchor, loader: 'ts', resolveDir: chunk.dir }))
-
-      for (const file of chunk.lazy)
-        build.onLoad({ filter: new RegExp(`^${RegExp.escape(file)}$`) }, async () => ({ contents: `${await Bun.file(file).text()}\nimport ${JSON.stringify(ANCHOR)}\n`, loader: 'ts' }))
     },
   }
 }

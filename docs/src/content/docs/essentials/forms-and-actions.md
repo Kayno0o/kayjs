@@ -121,9 +121,11 @@ Once a call goes through, the page's loads run again, so the list it shows is up
 
 Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form, and the handler receives a `File`, which `files.put` stores. A post carries 1 MB at most, so raise `bodyLimit` in the third argument of `action`. An island calling the action reads `add.progress()` while the file uploads. See [File storage](/guides/file-storage).
 
-## Rate limit, honeypot and minimum time
+## Rate limit, honeypot, minimum time and proof-of-work
 
 The third argument of `action` protects it from scripts. `rateLimit` answers 429 past `max` posts per `window`, `honeypot` names a hidden field that kay renders for you and bots fill in, and `minTime` refuses a form posted sooner than that after its page rendered, through a stamp kay signs into the form itself, a prerendered page included.
+
+For spam that still gets through, `proofOfWork: true` makes each post cost CPU, as ALTCHA does, with no third-party script and no new CSP source: kay's script solves a signed challenge in a worker while the visitor fills the form in, and a post without the solution fails with 422. A form posted without JavaScript is refused, unless the action sets `minTime` too. The difficulty is settable, `proofOfWork: 300_000`, 100,000 by default.
 
 ```kay
 export const contact = action(schema, send, {

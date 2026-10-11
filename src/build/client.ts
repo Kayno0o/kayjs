@@ -199,7 +199,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
   const define: Record<string, string> = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' } }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = async (anchor?: string) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
+  const plugins = async (anchor?: string, anchored?: ReadonlySet<string>) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 
@@ -221,7 +221,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     define,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
     external,
-    plugins: chunk ? [runtimeAnchor(chunk, options.hot ? undefined : bootFile), ...await plugins(ANCHOR)] : await plugins(),
+    plugins: chunk ? [runtimeAnchor(chunk, options.hot ? undefined : bootFile), ...await plugins(ANCHOR, chunk.lazy)] : await plugins(),
     throw: false,
   } satisfies Bun.BuildConfig
   const build = await Bun.build({ ...config, outdir: clientDir(root) })

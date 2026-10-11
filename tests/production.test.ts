@@ -17,6 +17,7 @@ import { compileKay } from '../src/compiler'
 import { resolveProject } from '../src/project'
 import { action } from '../src/runtime'
 import { sqliteCache } from '../src/runtime/cache.server'
+import { solveWork } from '../src/runtime/work'
 import { inlineScriptHashes, invalidatePage, pages, requestId, shutdown, sqliteJobs, sqliteStore } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
@@ -1023,6 +1024,7 @@ describe('a prerendered page posted to', () => {
   // Held in a variable so tsc leaves the .kay import to Bun.
   const NEWSLETTER = './fixtures/production/src/routes/newsletter.kay'
   const BROCHURE = './fixtures/production/src/routes/brochure.kay'
+  const LEAFLET = './fixtures/production/src/routes/leaflet.kay'
 
   it('renders for the post a form sent, and for the request carrying how it went, kept by no cache, the built file served before and after', async () => {
     const root = process.cwd()
@@ -1119,6 +1121,34 @@ describe('a prerendered page posted to', () => {
     }
     finally {
       setSystemTime()
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('signs a fresh proof-of-work challenge into a prerendered page on every visit, each solved once', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const client = { ...(await readClient(root))!, entry: '/_kay/entry.js', navigation: true }
+
+    try {
+      await prerenderPages(resolveProject(root, { routes }), client)
+      expect(await Bun.file(join(outputDir(root), 'pages/leaflet.html')).text()).toContain('"kay-work:')
+
+      const app = await pages({ routes, prebuilt: true, security: false })
+      const { subscribe } = await import(LEAFLET) as { subscribe: Action<{ email: string }, number> }
+      const challengeOf = async () => Object.values(JSON.parse((/data-kay-work>(.*?)<\/script>/).exec(await (await app.handle(new Request('http://localhost/leaflet'))).text())![1]!) as Record<string, string>)[0]!
+      const post = async (solution: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/leaflet', 'x-kay-work': solution }, body: new URLSearchParams({ email: 'a@b.c' }) }))
+      const first = await challengeOf()
+
+      expect(await challengeOf()).not.toBe(first)
+
+      const solution = solveWork(first)!
+
+      expect((await post(solution)).status).toBe(303)
+      expect((await post(solution)).status).toBe(422)
+    }
+    finally {
       await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }

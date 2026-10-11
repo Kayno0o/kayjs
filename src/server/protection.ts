@@ -7,8 +7,10 @@ import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { WORK_HEADER } from '../runtime/swap'
 import { rewrittenAddress } from './rewrite'
 import { stampTime } from './stamp'
+import { proofOfWork, signWork, workRefusal } from './work'
 
 export interface ProtectionRefusal {
   status: number
@@ -199,6 +201,23 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
       const message = messages?.minTime ?? (refusal => refusal === 'early' ? 'Sent too fast; take a moment, then send it again' : 'This form has expired; send it again')
 
       return { status: 422, field: '', message: typeof message === 'string' ? message : message(reason) }
+    }
+  }
+
+  const work = proofOfWork(action)
+
+  // A form posted without kay's script sends no solution, refused unless `minTime` let it through above.
+  if (work && !(plain && minTime && !request.headers.has(WORK_HEADER))) {
+    const reason = await workRefusal(action.url, request.headers.get(WORK_HEADER), work.store ?? memoryOf(`${action.url}#work`))
+
+    if (reason === 'wrong' && work.pretend)
+      return PRETEND
+
+    if (reason !== undefined) {
+      const message = messages?.proofOfWork ?? (refusal => refusal === 'missing' ? 'Turn JavaScript on to send this form' : refusal === 'expired' ? 'This form has expired; send it again' : 'This form could not be checked; send it again')
+
+      // The fresh challenge kay's script solves to send the post again.
+      return { status: 422, field: '', message: typeof message === 'string' ? message : message(reason), headers: { [WORK_HEADER]: signWork(action.url, work.difficulty, work.maxAge) } }
     }
   }
 

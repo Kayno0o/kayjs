@@ -255,7 +255,8 @@ describe('kay build', () => {
     try {
       const client = await buildClient(site)
 
-      expect((await readdir(join(client.dir, 'assets'))).sort()).toEqual([expect.stringMatching(/^logo-\w+\.png$/), expect.stringMatching(/^og-\w+\.svg$/)])
+      // Beside the worker kay's script solves an action's proof-of-work in.
+      expect((await readdir(join(client.dir, 'assets'))).sort()).toEqual([expect.stringMatching(/^logo-\w+\.png$/), expect.stringMatching(/^og-\w+\.svg$/), expect.stringMatching(/^work-worker-\w+\.js$/)])
     }
     finally {
       await rm(outputDir(site), { recursive: true, force: true })
@@ -297,7 +298,7 @@ describe('kay build', () => {
       const echo = await Bun.file(join(client.dir, 'assets', assets.find(file => file.startsWith('echo-'))!)).text()
       const threads = await Bun.file(join(client.dir, 'assets', assets.find(file => file.startsWith('index-'))!)).text()
 
-      expect(assets).toEqual([expect.stringMatching(/^add-\w+\.wasm$/), expect.stringMatching(/^echo-\w+\.js$/), expect.stringMatching(/^index-\w+\.js$/), expect.stringMatching(/^threads-\w+\.wasm$/)])
+      expect(assets).toEqual([expect.stringMatching(/^add-\w+\.wasm$/), expect.stringMatching(/^echo-\w+\.js$/), expect.stringMatching(/^index-\w+\.js$/), expect.stringMatching(/^threads-\w+\.wasm$/), expect.stringMatching(/^work-worker-\w+\.js$/)])
       // Relative to the chunk, so the URLs hold under any base.
       expect(island).toMatch(/new URL\("\.\/assets\/echo-\w+\.js", import\.meta\.url\)/)
       expect(island).toMatch(/new URL\("\.\/assets\/index-\w+\.js", import\.meta\.url\)/)

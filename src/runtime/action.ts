@@ -8,7 +8,7 @@ import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
 import { createSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
-import { FAILURE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
+import { FAILURE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { decodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
@@ -85,6 +85,20 @@ export interface MinTimeOptions {
   pretend?: boolean | undefined
 }
 
+export interface ProofOfWorkOptions {
+  // The highest number the server picks a challenge's from, which the browser finds by hashing every number from 0 up: half of it on average, so the time a post costs a bot, and a person's browser, grows with it. 100,000 by default.
+  difficulty?: number | undefined
+  // How long a challenge stays good: a day by default.
+  maxAge?: Duration | undefined
+  // Answers a wrong or replayed solution as if it went through, the handler never running, rather than refusing it.
+  pretend?: boolean | undefined
+  // Where the solutions already used are kept until their challenge expires: this process's memory by default, `sqliteRates(path)` to share them between the processes of a machine.
+  store?: RateStore | undefined
+}
+
+// `missing` for a post without a solution, `expired` for one to a challenge past `maxAge` or signed before a restart, `wrong` for a number that does not solve it or a solution used before.
+export type ProofOfWorkRefusal = 'missing' | 'expired' | 'wrong'
+
 export interface ActionProtection<Field extends string = never> {
   // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
   // Several limits all apply, such as one on every attempt and a tighter one on the posts that went through.
@@ -93,6 +107,8 @@ export interface ActionProtection<Field extends string = never> {
   honeypot?: Field | HoneypotOptions<Field> | undefined
   // The least time a person takes to fill the form in, `'3s'`: a form posting to the action carries a signed stamp of when it rendered, and a post sooner than this, or with a stamp missing, forged or too old, fails with 422 without reaching the handler.
   minTime?: Duration | MinTimeOptions | undefined
+  // A challenge kay's script solves in a worker while the visitor fills the form in, so each post costs CPU: `true`, the difficulty, or options. A post without the solution fails with 422 without reaching the handler, a form posted without JavaScript included unless `minTime` is set too.
+  proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
   // The most bytes a post may send, files included, in place of the app's `bodyLimit`; a bigger one fails with 413 before it is read.
   bodyLimit?: number | undefined
   // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
@@ -105,6 +121,7 @@ export interface ProtectionMessages {
   honeypot?: string | undefined
   // Given `early` for a post sent sooner than `minTime`, `expired` for a stamp missing, forged or past `maxAge`.
   minTime?: (string | ((reason: MinTimeRefusal) => string)) | undefined
+  proofOfWork?: (string | ((reason: ProofOfWorkRefusal) => string)) | undefined
   // Given the most bytes a post may send.
   bodyLimit?: (string | ((bytes: number) => string)) | undefined
   // When the handler throws, a service it sends to being down say: the error is logged, and the visitor reads this instead.
@@ -252,6 +269,9 @@ export function action<Schema extends TSchema, Output, const Honeypot extends st
   if (protection?.minTime !== undefined)
     minTimeOf(protection)
 
+  if (protection?.proofOfWork !== undefined)
+    workOf(protection)
+
   for (const limit of [protection?.rateLimit ?? []].flat()) {
     durationSeconds(limit.window, 'rateLimit.window')
 
@@ -361,6 +381,22 @@ export function formProtection(target: unknown): string {
 
 export function setStamper(sign: typeof stamper): void {
   stamper = sign
+}
+
+// `proofOfWork` with its defaults, `maxAge` in milliseconds; undefined when it is off.
+export function workOf(protection: ActionProtection<string>): { difficulty: number, maxAge: number, pretend: boolean, store: RateStore | undefined } | undefined {
+  const { proofOfWork } = protection
+
+  if (proofOfWork === undefined || proofOfWork === false)
+    return undefined
+
+  const options = typeof proofOfWork === 'object' ? proofOfWork : typeof proofOfWork === 'number' ? { difficulty: proofOfWork } : {}
+  const difficulty = options.difficulty ?? 100_000
+
+  if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 1e9)
+    throw new Error(`kay: proofOfWork's difficulty is ${difficulty}; it takes a whole number from 1 to 1,000,000,000`)
+
+  return { difficulty, maxAge: durationSeconds(options.maxAge ?? DAY, 'proofOfWork.maxAge') * 1000, pretend: options.pretend === true, store: options.store }
 }
 
 // `minTime` in milliseconds, read once it is set.
@@ -507,7 +543,19 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
     sent[PAGE_HEADER] = location.pathname + location.search
 
   // fetch tells nothing of an upload's progress, which a call carrying files reports.
-  const response = body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? await uploaded(withBase(url), sent, body, onProgress) : await fetch(withBase(url), { method: 'POST', headers: sent, body })
+  const send = async (solution: string | undefined) => {
+    const headers = solution === undefined ? sent : { ...sent, [WORK_HEADER]: solution }
+
+    return body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? uploaded(withBase(url), headers, body, onProgress) : fetch(withBase(url), { method: 'POST', headers, body })
+  }
+
+  // A page holding a challenge for the action solves it from the moment one of its forms takes focus.
+  let response = await send(typeof document !== 'undefined' && document.querySelector(`script[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(url) : undefined)
+  const challenge = response.status === 422 ? response.headers.get(WORK_HEADER) : null
+
+  // A call with no challenge to solve, or a stale one, is answered a fresh one, and goes again with its solution.
+  if (challenge !== null)
+    response = await send(await (await import('./work.client')).spendWork(url, challenge))
 
   prefetched.clear()
 

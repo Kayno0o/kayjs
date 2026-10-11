@@ -74,6 +74,18 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(await page.value('input[name="title"]')).toBe('')
   })
 
+  it('solves an action\'s proof-of-work in a worker under the default csp, for a form the swap posts and an island\'s call alike', async () => {
+    const costly = await site.open('/costly')
+
+    await costly.fill('input[name="title"]', 'form')
+    await costly.click('form button')
+    await costly.waitFor('p.paid', { text: 'Paid form' })
+    await costly.click('button.payer')
+    await costly.waitFor('p.island-paid', { text: 'island' })
+
+    expect(costly.errors).toEqual([])
+  })
+
   it('collects the errors of the page, uncaught ones included', async () => {
     await page.goto('/fallback')
     await page.click('button.break')

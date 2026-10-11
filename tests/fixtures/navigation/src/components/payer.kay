@@ -1,0 +1,11 @@
+---
+import { pay } from '../routes/costly.kay'
+
+const paid = signal('')
+
+async function press() {
+  paid.set(await pay({ title: 'island' }, { refresh: false }))
+}
+---
+button.payer(onClick={press}) Pay from an island
+p.island-paid {paid}

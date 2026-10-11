@@ -17,7 +17,8 @@ import { encodeCall, minTimeOf, readActionResponse, STAMP_FIELD } from '../runti
 import { durationSeconds } from '../runtime/duration'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
-import { PAGE_HEADER } from '../runtime/swap'
+import { PAGE_HEADER, WORK_HEADER } from '../runtime/swap'
+import { solveWork } from '../runtime/work'
 import { servePages } from '../server/app'
 import { shutdown } from '../server/lifecycle'
 import { drainQueues } from '../server/queue'
@@ -26,6 +27,7 @@ import { SITEMAP } from '../server/sitemap'
 import { signStamp, stampTime } from '../server/stamp'
 import { memoryFiles } from '../server/storage'
 import { servedThrough } from '../server/visit'
+import { proofOfWork, signWork } from '../server/work'
 import { browse } from './browser'
 import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
 import { readPage, sitemapUrls } from './page'
@@ -135,6 +137,13 @@ function postedStamp(action: Action<never, unknown> & { protection?: ActionProte
   const at = stampTime(action.url, rendered)
 
   return at !== undefined && at <= latest ? rendered : signStamp(action.url, latest)
+}
+
+// The solution kay's script sends to an action with `proofOfWork`, to a challenge signed here, as a test posts without a page's script.
+function workHeaders(action: Action<never, unknown>): Record<string, string> {
+  const work = proofOfWork(action)
+
+  return work ? { [WORK_HEADER]: solveWork(signWork(action.url, work.difficulty, work.maxAge))! } : {}
 }
 
 // The project's pages and actions without a server, and without a browser build unless `browser` is set: pages then render their islands' markup and no scripts.
@@ -247,7 +256,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     if (init.from !== undefined)
       sent[PAGE_HEADER] = init.from
 
-    return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...sent, ...init.headers }, body }), action.url)
+    return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...sent, ...workHeaders(action), ...init.headers }, body }), action.url)
   }
 
   return {
@@ -341,7 +350,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
       const response = await send(posted, {
         method: 'POST',
-        headers: { origin: ORIGIN, referer: new URL((page && answeredAt.get(page)) ?? from, ORIGIN).href, ...init.headers },
+        headers: { origin: ORIGIN, referer: new URL((page && answeredAt.get(page)) ?? from, ORIGIN).href, ...workHeaders(action), ...init.headers },
         body: form,
       })
       const visit = await follow(response, from, init.headers)

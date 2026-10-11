@@ -68,7 +68,8 @@ describe('service worker', () => {
     expect(settings!.network).toEqual(['/repo/_kay/', '/repo/api/'])
     expect(settings!.files.every(file => file.startsWith('/repo/_kay/') && !file.endsWith('.br') && !file.endsWith('.gz') && !file.endsWith('.map'))).toBe(true)
     expect(settings!.precache).toContain(settings!.files.find(file => file.endsWith('.js'))!)
-    expect(settings!.precache.filter(file => file.includes('/assets/'))).toEqual([])
+    // Of the assets, only scripts, such as the worker kay's script solves an action's proof-of-work in.
+    expect(settings!.precache.filter(file => file.includes('/assets/') && !file.endsWith('.js'))).toEqual([])
     expect(settings!.precache).toEqual(expect.arrayContaining(['/repo/', '/repo/about']))
 
     const dev = await pages({ routes: ROUTES, prebuilt: false, site: 'https://x.example', dev: true, offline: true })

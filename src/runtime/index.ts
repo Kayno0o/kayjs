@@ -333,7 +333,7 @@ export type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
 
 export { s, t } from '#schema'
-export type { Action, ActionContext, ActionProtection, ActionRateLimit, CallOptions, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, HoneypotOptions, MinTimeOptions, MinTimeRefusal, ProtectionMessages, RateLimit, RateStore, RateWindow, ServerAction, Success, SuccessOf } from './action'
+export type { Action, ActionContext, ActionProtection, ActionRateLimit, CallOptions, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, HoneypotOptions, MinTimeOptions, MinTimeRefusal, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateLimit, RateStore, RateWindow, ServerAction, Success, SuccessOf } from './action'
 export { action, ActionError, ActionRedirect } from './action'
 export { localPath, withBase } from './base'
 export type { ApiRoutesOf, AwaitProps, CheckedHref, CheckedHtml, Deferred, ExtensionServersOf, FunctionProp, HydrateWhen, IdentityKeyed, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, RouteParams, SafeHtml, TemplateHelpers } from './checks'

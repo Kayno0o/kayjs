@@ -47,6 +47,7 @@ import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
 import { renderStatic, settle, streamDocument } from './stream'
 import { traced } from './trace'
+import { workScript } from './work'
 
 interface PageModule {
   default: (props: Record<string, unknown>) => unknown
@@ -555,7 +556,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const posts = client.entry !== undefined && client.navigation === true && forms.size > 0
   // The entry fetches a deferred server island as it nears the viewport.
   const shipsEntry = hasIslands || posts || (client.entry !== undefined && scan?.modes.includes('defer') === true)
-  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') : ''
+  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') + workScript(forms, options.prerendering === true) : ''
   const locale = localeState()
   const lang = locale?.locale ?? options.lang ?? DEFAULT_LANG
   const start = `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head>${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}${stylesheets(client, files)}${head.html}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) + queryScript(rules) : ''}${options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${hasIslands && options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS + A11Y_SCRIPT + inspectorScript() : ''}</head><body>${body}`

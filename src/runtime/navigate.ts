@@ -1,6 +1,6 @@
 import type { CheckedHref } from './checks'
 import { withBase, withoutBase } from './base'
-import { prefetched, swapState } from './swap'
+import { prefetched, swapState, WORK_SCRIPT } from './swap'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
@@ -530,7 +530,21 @@ function onFormFocus(event: FocusEvent): void {
   if (form) {
     takeFormCheck(form)
     void preloadChecks()
+    void startWork(form)
   }
+}
+
+// A form posting to an action with `proofOfWork` starts on its challenge as the visitor fills it in, so its post seldom waits for it.
+async function startWork(form: HTMLFormElement): Promise<void> {
+  const url = actionUrl(form, null)
+
+  if (!url || !document.querySelector(`script[${WORK_SCRIPT}]`))
+    return
+
+  try {
+    (await import('./work.client')).startWork(withoutBase(url.pathname))
+  }
+  catch {}
 }
 
 // A form taking focus is about to be posted: the swap and the form checks load then, so a page with no form never fetches them.

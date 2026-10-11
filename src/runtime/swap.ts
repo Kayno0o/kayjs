@@ -8,6 +8,10 @@ export const NAVIGATE_HEADER = 'x-kay-navigate'
 export const FAILURE_HEADER = 'x-kay-failure'
 // Names the page an action is called, or a form posted, from, which its params, its locale and where a form post goes back to are read off: a `Referer` the app's `referrer-policy` may cut.
 export const PAGE_HEADER = 'x-kay-page'
+// Carries the solution to an action's `proofOfWork` challenge, and the fresh challenge a post refused for lacking one gets back.
+export const WORK_HEADER = 'x-kay-work'
+// Marks the data script holding the challenges of the actions a page's forms post to, by action URL.
+export const WORK_SCRIPT = 'data-kay-work'
 
 export interface FetchedPage {
   url: string

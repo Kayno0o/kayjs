@@ -28,6 +28,8 @@ export interface KayPluginOptions {
   settings?: Record<string, string> | undefined
   // A module every component imports, which ties the runtime it uses to the chunk the page loads first: see runtime-chunk.ts.
   anchor?: string | undefined
+  // The runtime's lazy modules, which import `anchor` too.
+  anchored?: ReadonlySet<string> | undefined
   // Development: every element carries its source position, for `kay dev`'s inspector.
   inspect?: boolean | undefined
   // A browser build's API trees, whose modules islands get as stubs, and the modules it leaves to the page, which a worker's bundle takes as the islands do.
@@ -91,7 +93,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const bundled = new Map<string, Promise<string>>()
 
       const bundleWorker = async (path: string): Promise<string> => {
-        const bundle: WorkerBundle = { entry: path, outdir: join(clientDir(root), 'assets'), minify: config.minify ?? false, define: config.define ?? {}, options: { ...options, root, anchor: undefined }, workers: [...workers, path] }
+        const bundle: WorkerBundle = { entry: path, outdir: join(clientDir(root), 'assets'), minify: config.minify ?? false, define: config.define ?? {}, options: { ...options, root, anchor: undefined, anchored: undefined }, workers: [...workers, path] }
         const child = Bun.spawn([process.execPath, WORKER_BUNDLE, JSON.stringify(bundle)], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
         const [name, problems, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
@@ -151,6 +153,8 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         })
       }
 
+      const anchoring = (path: string, contents: string) => options.anchored?.has(path) === true ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
+
       const load = async (file: string) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
@@ -208,7 +212,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       build.onLoad({ filter: projectScript }, async ({ path }) => {
         const source = await Bun.file(path).text()
         const loader = scriptLoader(path)
-        const contents = await shippingFiles(expandGlobs(source, path, root, loader), path, loader)
+        const contents = anchoring(path, await shippingFiles(expandGlobs(source, path, root, loader), path, loader))
 
         return contents === source && build.config !== undefined ? undefined : { contents, loader }
       })
@@ -220,7 +224,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
             return undefined
 
           const source = await Bun.file(path).text()
-          const contents = await shippingFiles(source, path, scriptLoader(path))
+          const contents = anchoring(path, await shippingFiles(source, path, scriptLoader(path)))
 
           return contents === source ? undefined : { contents, loader: scriptLoader(path) }
         })

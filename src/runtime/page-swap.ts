@@ -3,7 +3,7 @@ import type { FetchedPage } from './swap'
 import { withoutBase } from './base'
 import { focusInvalid } from './focus'
 import { busyForms, checkedForms, leave, navigation, pageKey, restoreScroll, saveScroll, submitNatively, swappable, takeFormChecks, writeHistory } from './navigate'
-import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState } from './swap'
+import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { decodeValue } from './wire'
 
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link or post a form.
@@ -646,7 +646,10 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
   let response: Answer
 
   try {
-    response = await upload(url, multipart ? data : urlEncoded(data), form)
+    // The solution to the action's `proofOfWork` challenge, under way since the form took focus.
+    const work = document.querySelector(`script[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(withoutBase(url.pathname)) : undefined
+
+    response = await upload(url, multipart ? data : urlEncoded(data), form, work)
   }
   catch {
     // The swap could not send it: the browser does, as it would have.
@@ -717,13 +720,17 @@ function urlEncoded(data: FormData): URLSearchParams {
 }
 
 // XMLHttpRequest rather than fetch, for the upload's progress: `--kay-progress` on the form, and the value of each `progress` inside it, go from 0 to 1.
-async function upload(url: URL, body: FormData | URLSearchParams, form: HTMLFormElement): Promise<Answer> {
+async function upload(url: URL, body: FormData | URLSearchParams, form: HTMLFormElement, work: string | undefined): Promise<Answer> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest()
 
     request.open('POST', url)
     request.setRequestHeader(NAVIGATE_HEADER, '1')
     request.setRequestHeader(PAGE_HEADER, location.pathname + location.search)
+
+    if (work !== undefined)
+      request.setRequestHeader(WORK_HEADER, work)
+
     request.upload.addEventListener('progress', (event) => {
       if (!event.lengthComputable)
         return

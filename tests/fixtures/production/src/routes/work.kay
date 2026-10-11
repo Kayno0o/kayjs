@@ -1,0 +1,31 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+// Each post costs the browser a challenge; `gated` lets a form posted without JavaScript through on its stamp, `faked` answers a wrong solution as sent.
+export const solve = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { proofOfWork: 500 })
+export const gated = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { proofOfWork: 500, minTime: '1s' })
+export const faked = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { proofOfWork: { difficulty: 500, maxAge: '1h', pretend: true }, messages: { proofOfWork: reason => `${reason}!` } })
+
+const failure = ctx.failed(solve) ?? ctx.failed(gated) ?? ctx.failed(faked)
+const solved = ctx.succeeded(solve)
+const passed = ctx.succeeded(gated)
+const sent = ctx.succeeded(faked)
+---
+form(action={solve})
+  input(name="message" aria-label="Message")
+  button Send
+form(action={gated})
+  input(name="message" aria-label="Message")
+  button Send
+form(action={faked})
+  input(name="message" aria-label="Message")
+  button Send
+if failure
+  p.error {failure.status} {Object.values(failure.errors).join(' ')}
+if solved
+  p.solved Solved {solved.data}
+if passed
+  p.passed Passed {passed.data}
+if sent
+  p.sent Sent {sent.data}
