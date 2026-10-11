@@ -75,8 +75,8 @@ const CHECKOUT = join(import.meta.dir, '../..')
 const PUBLISHED = '@kaynooo/kayjs'
 // Beside a kay dev copy's install: where its kay came from.
 const KAY_SOURCE = 'kay-bench-source.txt'
-// The dev copies `staleInstalls` warned of.
-const stale = new Set<string>()
+// The dev copies `staleInstalls` warned of, with why.
+const stale = new Map<string, string>()
 
 export const VARIANTS: Variant[] = SITES.flatMap((site, index) => (['astro', 'kay'] as const).map((kind, offset) => {
   const slot = index * 2 + offset + 1
@@ -130,15 +130,15 @@ function kayPackage(): { specifier: string, source: string } | undefined {
   if (KAY_PACKAGE === '')
     return undefined
 
-  if (KAY_PACKAGE === 'checkout') {
-    const source = checkoutSource()
+  const source = wantedSource(KAY_PACKAGE, checkoutSource)
 
+  if (KAY_PACKAGE === 'checkout') {
     run([process.execPath, 'pm', 'pack', '--filename', join(WORK, 'kay-checkout.tgz'), '--quiet'], CHECKOUT)
 
     return { specifier: `file:${join(WORK, 'kay-checkout.tgz')}`, source }
   }
 
-  return { specifier: KAY_PACKAGE.includes(':') ? KAY_PACKAGE : `npm:${PUBLISHED}@${KAY_PACKAGE}`, source: wantedSource(KAY_PACKAGE, checkoutSource) }
+  return { specifier: KAY_PACKAGE.includes(':') ? KAY_PACKAGE : `npm:${PUBLISHED}@${KAY_PACKAGE}`, source }
 }
 
 // What a kay copy's source file says of an install from `kayPackage`, a checkout's read only when asked for.
@@ -177,7 +177,7 @@ export async function staleInstalls(): Promise<string[]> {
     const warning = staleWarning(label(variant), await source.exists() ? await source.text() : 'an unknown kay', wanted)
 
     if (warning !== undefined)
-      stale.add(variant.devDir)
+      stale.set(variant.devDir, warning.includes('uncommitted changes as packed') ? 'uncommitted changes packed by an earlier prepare' : 'not what KAY_PACKAGE names now')
 
     return warning ?? []
   }))
@@ -236,7 +236,7 @@ export async function versionIn(dir: string, name: string): Promise<string> {
 export async function kayIn(dir: string): Promise<string> {
   const source = Bun.file(join(dir, KAY_SOURCE))
 
-  return `kay ${await versionIn(dir, 'kay')}${await source.exists() ? `, ${await source.text()}` : ''}${stale.has(dir) ? ' (reused by SKIP_PREPARE, not what KAY_PACKAGE names now)' : ''}`
+  return `kay ${await versionIn(dir, 'kay')}${await source.exists() ? `, ${await source.text()}` : ''}${stale.has(dir) ? ` (reused by SKIP_PREPARE: ${stale.get(dir)})` : ''}`
 }
 
 export function label(variant: Variant): string {
