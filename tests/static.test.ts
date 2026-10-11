@@ -8,6 +8,7 @@ import { joinBase } from '../src/runtime/base'
 import { pages } from '../src/server'
 import { rebaseHtml } from '../src/server/base'
 import { IMAGE_LINK } from '../src/server/prerender'
+import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/static')
 const CLI = resolve('src/cli.ts')
@@ -22,8 +23,8 @@ let server: ReturnType<typeof Bun.serve>
 // The host a page links an image of, which the export downloads.
 const remoteHost = Bun.serve({ port: 0, fetch: () => new Response(Bun.file(join(FIXTURE, 'src/hero.png'))) })
 
-async function exportSite(outdir: string): Promise<{ code: number, errors: string }> {
-  const child = Bun.spawn([process.execPath, CLI, 'build', FIXTURE, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_TEST_REMOTE_ORIGIN: `http://127.0.0.1:${remoteHost.port}` } })
+async function exportSite(outdir: string, root = FIXTURE): Promise<{ code: number, errors: string }> {
+  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_TEST_REMOTE_ORIGIN: `http://127.0.0.1:${remoteHost.port}` } })
   const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
   return { code, errors }
@@ -210,9 +211,10 @@ describe('kay build --static', () => {
   })
 
   it('names every page only a server could answer, and fails', async () => {
-    const guarded = join(FIXTURE, 'src/routes/members')
-    const tags = join(FIXTURE, 'src/routes/tags')
-    const api = join(FIXTURE, 'src/api')
+    const fixture = await fixtureCopy('static')
+    const guarded = join(fixture, 'src/routes/members')
+    const tags = join(fixture, 'src/routes/tags')
+    const api = join(fixture, 'src/api')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
 
     try {
@@ -223,7 +225,7 @@ describe('kay build --static', () => {
       await Bun.write(join(api, 'ping.ts'), 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'pong\')\n')
       await Bun.write(join(tags, '[tag].json.ts'), 'export function GET() {\n  return \'{}\'\n}\n')
 
-      const { code, errors } = await exportSite(elsewhere)
+      const { code, errors } = await exportSite(elsewhere, fixture)
 
       expect(code).toBe(1)
       expect(errors).toContain('kay: 3 pages, 1 endpoint and 1 API module cannot be exported to static files, which no server answers for:')
@@ -234,9 +236,7 @@ describe('kay build --static', () => {
       expect(errors).toContain('src/routes/tags/[tag].kay: it takes tag, so `prerender` lists the values to export')
     }
     finally {
-      await rm(guarded, { recursive: true, force: true })
-      await rm(tags, { recursive: true, force: true })
-      await rm(api, { recursive: true, force: true })
+      await rm(fixture, { recursive: true, force: true })
       await rm(elsewhere, { recursive: true, force: true })
     }
   })
