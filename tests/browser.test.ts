@@ -1,6 +1,6 @@
 import type { TestPage, TestSite } from '../src/test'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -345,29 +345,37 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('publicEnv'
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browser\'s profile', () => {
-  const kinds = (names: string[]) => names.map(name => name.startsWith('kay-chrome-') ? 'kay' : name.endsWith('.bun-chrome') ? 'bun' : name.startsWith('org.chromium.') ? 'chrome' : name).sort()
+  const LOCKED = 'kay-chrome-999999998-locked'
+  const kinds = (names: string[]) => names.filter(name => name !== LOCKED).map(name => name.startsWith('kay-chrome-') ? 'kay' : name.endsWith('.bun-chrome') ? 'bun' : name.startsWith('org.chromium.') ? 'chrome' : name).sort()
+  // A temp directory of its own, short as Chrome's socket path must be, which macOS's own is not.
+  const shortTemp = async () => mkdtemp(join(process.platform === 'darwin' ? '/tmp' : tmpdir(), 'kt-'))
+  const server = 'const server = Bun.serve({ port: 0, fetch: () => new Response(\'<p>Hi</p>\', { headers: { \'content-type\': \'text/html\' } }) })\n'
 
-  it('leaves nothing in the temp directory once the last page closes or the process exits, and removes what a killed run left', async () => {
-    // A temp directory of its own, short as Chrome's socket path must be.
-    const temp = await mkdtemp(join(tmpdir(), 'kay-temp-'))
+  it('keeps the browser for the next page a moment, then leaves nothing in the temp directory, at exit too, and removes what a killed run left as far as it can', async () => {
+    const temp = await shortTemp()
     const script = join(await scratchDir('profile-'), 'run.ts')
 
     await mkdir(join(temp, 'kay-chrome-999999999-killed', 'profile'), { recursive: true })
+    // A killed run's directory kay cannot remove, which leaves the browser to start.
+    await Bun.write(join(temp, LOCKED, 'profile/f'), '')
+    await chmod(join(temp, LOCKED, 'profile'), 0o500)
     await Bun.write(script, `import { readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import process from 'node:process'
 import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
 
-const server = Bun.serve({ port: 0, fetch: () => new Response('<p>Hi</p>', { headers: { 'content-type': 'text/html' } }) })
-const open = async () => browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
+${server}const open = async () => browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
 const pages = [await open(), await open()]
+const listed = () => console.log(JSON.stringify(readdirSync(tmpdir())))
 
-console.log(JSON.stringify(readdirSync(tmpdir())))
+listed()
 
 for (const page of pages)
   page.close()
 
-console.log(JSON.stringify(readdirSync(tmpdir())))
+listed()
+await Bun.sleep(2000)
+listed()
 await open()
 await server.stop()
 process.exit(0)
@@ -376,13 +384,43 @@ process.exit(0)
     try {
       const child = Bun.spawn([process.execPath, script, path!], { env: { ...process.env, TMPDIR: temp }, stdout: 'pipe', stderr: 'pipe' })
       const [out, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-      const [opened, closed] = out.trim().split('\n').map(line => kinds(JSON.parse(line) as string[]))
+      const [opened, closed, idle] = out.trim().split('\n').map(line => kinds(JSON.parse(line) as string[]))
 
       expect({ code, errors }).toEqual({ code: 0, errors: '' })
       // One owned directory, the killed run's gone; Bun's profile stays empty, Chrome running on kay's.
       expect(opened).toEqual(['bun', 'chrome', 'kay'])
-      expect(closed).toEqual([])
+      expect(closed).toEqual(['bun', 'chrome', 'kay'])
+      expect(idle).toEqual([])
       // The page opened last, left open, goes at exit.
+      expect(kinds(await readdir(temp))).toEqual([])
+    }
+    finally {
+      await chmod(join(temp, LOCKED, 'profile'), 0o700)
+      await rm(temp, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('closes the browser after the tests of bun test, which runs no exit handler, a page left open included', async () => {
+    const temp = await shortTemp()
+    const dir = await scratchDir('profile-test-')
+
+    await Bun.write(join(dir, 'open.test.ts'), `import process from 'node:process'
+import { expect, it } from 'bun:test'
+import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
+
+${server}
+it('opens a page and never closes it', async () => {
+  const page = await browse(\`http://localhost:\${server.port}/\`, { path: process.env.KAY_TEST_CHROME })
+
+  expect(await page.text('p')).toBe('Hi')
+}, 30_000)
+`)
+
+    try {
+      const child = Bun.spawn([process.execPath, 'test', './open.test.ts'], { cwd: dir, env: { ...process.env, TMPDIR: temp, KAY_TEST_CHROME: path! }, stdout: 'pipe', stderr: 'pipe' })
+      const [out, code] = await printed(child)
+
+      expect({ code, out }).toMatchObject({ code: 0 })
       expect(kinds(await readdir(temp))).toEqual([])
     }
     finally {
@@ -390,3 +428,9 @@ process.exit(0)
     }
   }, 60_000)
 })
+
+async function printed(child: { stdout: ReadableStream<Uint8Array>, stderr: ReadableStream<Uint8Array>, exited: Promise<number> }): Promise<[string, number]> {
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  return [stdout + stderr, code]
+}

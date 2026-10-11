@@ -1,8 +1,9 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { afterAll } from 'bun:test'
 import { ISLAND } from '../runtime/markers'
 
 export interface BrowserOptions {
@@ -92,8 +93,9 @@ const SETTLED = `document.readyState === 'complete' && !document.documentElement
 
 // What kay makes for the Chrome of a process, named after it so a later run removes what a killed one left.
 const OWNED = /^kay-chrome-(\d+)-/
-// The profile Bun makes for Chrome even when given another, left empty then.
+// The profile Bun makes for Chrome even when given another, left empty then, in the temp directory.
 const BUN_PROFILE = /^--user-data-dir=(.+\.bun-chrome)$/
+const BUN_DIR = /^\.[\w-]+\.bun-chrome$/
 // Chrome's lock, beside the profile, which a killed Chrome leaves.
 const SINGLETON = /^org\.chromium\.Chromium\./
 // Where the owned directory notes the profile Bun made.
@@ -101,12 +103,20 @@ const BUN_RECORD = 'bun-profile'
 // Chrome's lock names its host and process.
 const LOCK_PID = /-(\d+)$/
 const EXIT_WAIT_MS = 5000
+// How long the browser outlives its last page, for the next test's.
+const IDLE_MS = 1000
 
-// The browser of this process's pages. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the last page closes, or at exit.
-let browser: { dir: string, pages: number, ready: Promise<void> } | undefined
-// The process of the Chrome the last page's close killed: Bun spawns another only once it reaped that one, and fails a view made sooner.
+// The browser of this process's pages. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the browser closes.
+let browser: { dir: string, pages: number, ready: Promise<void>, idle?: Timer } | undefined
+// The process of the Chrome the last close killed: Bun spawns another only once it reaped that one, and fails a view made sooner.
 let killed: number | undefined
 let exitHooked = false
+
+// bun test runs no exit handler, so the browser closes after the tests: after the whole run, or each file of a parallel one, from a preload such as kay/test/preload, else after the file that loaded kay/test first.
+try {
+  afterAll(closeBrowser)
+}
+catch {}
 
 // The browser pages are opened in, or undefined when there is none: for `describe.skipIf(!browserPath())`.
 export function browserPath(path?: string): string | undefined {
@@ -319,7 +329,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await poll(SETTLED, 'the page to reload and hydrate its islands')
     }),
     close: () => {
-      view.close()
+      attempt(() => view.close())
 
       if (!closed)
         releaseBrowser()
@@ -329,26 +339,29 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     [Symbol.asyncDispose]: async () => page.close(),
   }
 
-  // A blank page first: the DevTools session the next calls use starts with a navigation.
-  await view.navigate('about:blank')
-
-  if (first)
-    await noteBunProfile(view, dir)
-
-  await view.cdp('Runtime.enable')
-  view.addEventListener('Runtime.exceptionThrown', (event) => {
-    const { exceptionDetails } = (event as MessageEvent<{ exceptionDetails: { text: string, exception?: { description?: string } } }>).data
-
-    errors.push(exceptionDetails.exception?.description ?? exceptionDetails.text)
-  })
-  // Pages share one browser, whose cookies and storage outlive a page.
-  await view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: 'all' })
-
-  // Once open, a page is the caller's to close; one that failed to load is closed here.
+  // Once open, a page is the caller's to close; one that failed to open is closed here.
   try {
+    // A blank page first: the DevTools session the next calls use starts with a navigation.
+    await view.navigate('about:blank')
+
+    if (first)
+      await noteBunProfile(view, dir)
+
+    await view.cdp('Runtime.enable')
+    view.addEventListener('Runtime.exceptionThrown', (event) => {
+      const { exceptionDetails } = (event as MessageEvent<{ exceptionDetails: { text: string, exception?: { description?: string } } }>).data
+
+      errors.push(exceptionDetails.exception?.description ?? exceptionDetails.text)
+    })
+    // Pages share one browser, whose cookies and storage outlive a page.
+    await view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: 'all' })
     await page.goto(url)
   }
   catch (error) {
+    // The profile Bun made is noted while the browser still answers, should the blank page have failed.
+    if (first)
+      await within(noteBunProfile(view, dir), timeout)
+
     page.close()
 
     throw error
@@ -360,6 +373,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 // A share of the browser for a page, the directory kay owns for it, and whether this page starts the browser.
 async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
   if (browser) {
+    clearTimeout(browser.idle)
     browser.pages++
     await browser.ready
 
@@ -379,50 +393,68 @@ async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
   return { dir: browser.dir, first: true }
 }
 
-// The last page gone, the browser goes with its profile, and the next page starts another.
+// A while after the last page closed, the browser goes with its profile, and the next page starts another.
 function releaseBrowser() {
-  if (browser && --browser.pages === 0)
-    closeBrowser()
+  if (!browser || --browser.pages > 0)
+    return
+
+  const idle = browser
+
+  idle.idle = setTimeout(() => {
+    if (browser === idle)
+      closeBrowser()
+  }, IDLE_MS)
+  idle.idle.unref()
 }
 
+// Pages still open close with it. It never throws, running from a page's close and at exit.
 function closeBrowser() {
   if (!browser)
     return
 
-  const { dir } = browser
+  const { dir, idle } = browser
   const pid = LOCK_PID.exec(attempt(() => readlinkSync(join(dir, 'profile', 'SingletonLock'))) ?? '')?.[1]
 
-  // Closing the views leaves Chrome running, and would leave it writing to the profile.
-  Bun.WebView.closeAll()
-  killed = pid === undefined ? undefined : Number(pid)
-  removeProfile(dir)
   browser = undefined
+  clearTimeout(idle)
+  // Closing the views leaves Chrome running, and would leave it writing to the profile.
+  attempt(() => Bun.WebView.closeAll())
+  killed = pid === undefined ? undefined : Number(pid)
+  attempt(() => removeProfile(dir))
 }
 
-// The directory kay owns, Chrome's lock beside the profile, which a killed Chrome leaves, and the empty profile Bun made.
+// The directory kay owns, Chrome's lock beside the profile, which a killed Chrome leaves, and the empty profile Bun made, each only where it is directly in the temp directory, whatever a killed run's files say.
 function removeProfile(dir: string) {
   const socket = attempt(() => readlinkSync(join(dir, 'profile', 'SingletonSocket')))
+  const lock = socket === undefined ? undefined : dirname(socket)
 
-  if (socket !== undefined && SINGLETON.test(basename(dirname(socket))))
-    rmSync(dirname(socket), { recursive: true, force: true })
+  if (lock !== undefined && SINGLETON.test(basename(lock)) && inTemp(lock))
+    rmSync(lock, { recursive: true, force: true })
 
   const bun = attempt(() => readFileSync(join(dir, BUN_RECORD), 'utf8'))
 
   // Only while empty: a Chrome the app's own view started runs on Bun's.
-  if (bun !== undefined)
+  if (bun !== undefined && BUN_DIR.test(basename(bun)) && inTemp(bun))
     attempt(() => rmdirSync(bun))
 
   rmSync(dir, { recursive: true, force: true, maxRetries: 3 })
 }
 
-// What the browsers of killed runs left, their process gone.
+// What the browsers of killed runs left, their process gone, as far as it can be removed: a directory another user owns stays.
 function sweepProfiles() {
-  for (const name of readdirSync(tmpdir())) {
+  for (const name of attempt(() => readdirSync(tmpdir())) ?? []) {
     const pid = OWNED.exec(name)?.[1]
 
     if (pid !== undefined && !alive(Number(pid)))
-      removeProfile(join(tmpdir(), name))
+      attempt(() => removeProfile(join(tmpdir(), name)))
   }
+}
+
+// Chrome may name the temp directory through its links resolved.
+function inTemp(path: string): boolean {
+  const temp = attempt(() => realpathSync(tmpdir()))
+
+  return temp !== undefined && attempt(() => realpathSync(dirname(path))) === temp
 }
 
 async function exited(pid: number) {

@@ -81,7 +81,7 @@ it('counts the clicks', async () => {
 
 <Callout type="note">
 
-The browser is `Bun.WebView` on Chrome. kay finds Chrome on the `PATH`, or reads `BUN_CHROME_PATH`. `describe.skipIf(!browserPath())` skips a suite when there is none. Chrome's profile lives in the temp directory only while pages are open: kay removes it once the last one closes, or when the process exits.
+The browser is `Bun.WebView` on Chrome. kay finds Chrome on the `PATH`, or reads `BUN_CHROME_PATH`. `describe.skipIf(!browserPath())` skips a suite when there is none. Chrome's profile lives in the temp directory only while the browser runs: kay closes it a second after the last page closes, and once the tests ran, `kay/test/preload` closing it after the run. Closing it also closes a `Bun.WebView` the test made itself.
 
 </Callout>
 

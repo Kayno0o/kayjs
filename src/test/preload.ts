@@ -1,6 +1,8 @@
 import { isolateEnv } from './env'
 import { testRoot } from './root'
 import './natives'
+// Closes the browser of the pages tests open once they ran.
+import './browser'
 
 // Listed under `[test] preload` in bunfig.toml, so test files can import `.kay` pages and their actions.
 // The developer's own `.env` is dropped first, and kay's server code imported after, so no module reads it.
