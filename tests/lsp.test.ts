@@ -300,6 +300,7 @@ describe('kay lsp imports', () => {
       Bun.write(join(dir, 'node_modules/kay-lib/package.json'), JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } })),
       Bun.write(join(dir, 'node_modules/kay-lib/src/tag-pill.kay'), '---\nconst { label } = props<{ label: string }>()\n---\nspan.pill {label}\n'),
       Bun.write(join(dir, 'node_modules/kay-lib/src/unused-pill.kay'), '---\nconst count: number = \'one\'\n---\nspan.pill {count}\n'),
+      Bun.write(join(dir, 'node_modules/kay-lib/src/broken-pill.kay'), 'div(\n  p {a\n'),
       Bun.write(join(dir, 'src/actions.ts'), 'import { action } from \'kay\'\n\nexport const add = action(() => 1)\n'),
       Bun.write(join(dir, 'src/data.ts'), 'export function listTodos(): string[] {\n  return []\n}\n'),
       Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n'),
@@ -433,8 +434,9 @@ describe('kay lsp imports', () => {
   })
 
   // Last, as opening another file publishes the page's diagnostics again, which a later change would take for its own.
-  it('leaves the type errors of a library component the app never imports to the library, as kay check does', async () => {
+  it('leaves the errors of a library component the app never imports to the library, as kay check does', async () => {
     expect(await editor.open('node_modules/kay-lib/src/unused-pill.kay')).toEqual([])
+    expect(await editor.open('node_modules/kay-lib/src/broken-pill.kay')).toEqual([])
   })
 })
 

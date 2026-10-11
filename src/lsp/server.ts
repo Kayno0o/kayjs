@@ -334,7 +334,9 @@ export class KayLanguageServer {
   private async publishDiagnostics(document: Document) {
     const project = this.projectAt(projectRootOf(document.file, this.root))
     const rangeOf = (span: Span) => ({ start: toPosition(document.source, span.start), end: toPosition(document.source, Math.max(span.end, span.start + 1)) })
-    const compileErrors = document.diagnostics.map(diagnostic => ({
+    // A library component the app never imports is the library's to check, as `kay check` leaves it.
+    const reached = !project.unreached.has(document.file)
+    const compileErrors = (reached ? document.diagnostics : []).map(diagnostic => ({
       range: rangeOf(diagnostic),
       severity: diagnostic.severity === 'warning' ? WARNING : ERROR,
       source: 'kay',

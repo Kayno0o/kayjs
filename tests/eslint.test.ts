@@ -79,6 +79,16 @@ describe('kay/eslint', () => {
     }
   })
 
+  it('ends a message whose end falls in generated code at the end of the word it starts on', () => {
+    const [block] = processor.preprocess(CARD, FILE)
+    const tsx = block!.text
+    const declaration = tsx.indexOf('let count')
+    const end = positionAt(tsx, tsx.length)
+    const messages = processor.postprocess([[at(tsx, declaration, { endLine: end.line, endColumn: end.column })]], FILE)
+
+    expect(messages).toEqual([expect.objectContaining({ line: 5, column: 1, endLine: 5, endColumn: 4 })])
+  })
+
   it('drops a fix reaching past the code copied from the fence', () => {
     const [block] = processor.preprocess(CARD, FILE)
     const tsx = block!.text

@@ -571,7 +571,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
     const shadow = files.get(diagnostic.file)
     const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow))
 
-    if (shadow ? !diagnosed : !shownOutsideKay(tsgoDiagnostic(diagnostic, '').code, projectUnused))
+    if (shadow ? !diagnosed : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
       continue
 
     const remapped: CheckDiagnostic = shadow && diagnosed
@@ -718,7 +718,6 @@ async function resolvedConfig(root: string, tsconfig: string): Promise<string | 
   return code === 0 ? output : undefined
 }
 
-// The unused code the project's own tsconfig asks to be reported, in its .ts files too.
 // Runs tsgo incrementally, or not at all when its last run was clean and nothing it read has changed since: tsgo's own incremental mode still parses every file, most of a warm run's time.
 async function typecheck(root: string, tsconfig: string, shown: string | undefined): Promise<{ output: string, errors: string, code: number }> {
   const { cache, types: shadowDir } = projectPaths(root)
@@ -792,7 +791,12 @@ async function stillClean(run: CleanRun, shadowDir: string): Promise<boolean> {
 function tsgoDiagnostic(diagnostic: CheckDiagnostic, text: string): TsgoDiagnostic {
   const start = offsetAt(text, diagnostic)
 
-  return { code: diagnostic.code === undefined ? undefined : Number(diagnostic.code.slice(2)), message: diagnostic.message, start, end: start }
+  return { code: tsgoCode(diagnostic), message: diagnostic.message, start, end: start }
+}
+
+// `TS2322` as tsgo numbers it.
+function tsgoCode(diagnostic: CheckDiagnostic): number | undefined {
+  return diagnostic.code === undefined ? undefined : Number(diagnostic.code.slice(2))
 }
 
 // With a code frame when the file's source is given.
