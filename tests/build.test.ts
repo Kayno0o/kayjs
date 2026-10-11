@@ -1,4 +1,5 @@
 import type { BunPlugin } from 'bun'
+import type { BuildOptions, BuildResult } from '../src/build/pipeline'
 import type { KayConfig } from '../src/config'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from 'node:fs/promises'
@@ -653,6 +654,41 @@ describe('kay build checks the project first', () => {
       expect(failed.code).toBe(1)
       expect(await Bun.file(prerendered).text()).toContain('Second')
       expect(existsSync(previous)).toBe(false)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('answers what each stage of the build found and made, called without the command line', async () => {
+    const root = await scratchProject({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\na(href="/nowhere") Lost\n' })
+    // In a process of its own, as the prerender registers the .kay loader for the project.
+    const buildProject = async (options: BuildOptions = {}) => {
+      const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nconst { built, ...result } = await buildProject(${JSON.stringify(root)}, {}, ${JSON.stringify(options)})\n\nconsole.log(JSON.stringify({ ...result, built: built && { ...built, report: undefined } }))\n`
+      const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect({ code, errors }).toEqual({ code: 0, errors: '' })
+
+      return JSON.parse(output.trim().split('\n').at(-1)!) as BuildResult
+    }
+
+    try {
+      const refused = await buildProject()
+
+      expect(refused.failed).toEqual({ stage: 'check' })
+      expect(refused.checked.map(diagnostic => diagnostic.message)).toEqual([expect.stringContaining('/nowhere')])
+      expect(refused.built).toBeUndefined()
+      expect(existsSync(outputDir(root))).toBe(false)
+
+      await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/") Home\n')
+
+      const built = await buildProject({ exportTo: 'dist' })
+
+      // The heads' lints only warn, which fails no stage.
+      expect(built).toMatchObject({ checked: [], linted: [{ code: 'untitled-page', severity: 'warning' }, { code: 'undescribed-page', severity: 'warning' }], built: { islands: 0, stylesheets: 0, prerendered: 1, entries: 0 }, exported: { pages: 1, dir: join(root, 'dist') } })
+      expect(built.failed).toBeUndefined()
+      expect(await Bun.file(join(root, 'dist/index.html')).text()).toContain('>Home</a>')
     }
     finally {
       await rm(root, { recursive: true, force: true })
