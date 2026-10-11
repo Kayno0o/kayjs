@@ -133,8 +133,11 @@ export function ownSignal<T>(value: T, options?: SignalOptions<T>): [read: () =>
   return [read, (next) => {
     const writing = interceptor?.writing
 
-    if (!writing)
-      return write(next)
+    if (!writing) {
+      write(next)
+
+      return
+    }
 
     interceptor!.writing = undefined
 

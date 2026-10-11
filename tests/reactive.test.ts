@@ -383,6 +383,27 @@ describe('linked', () => {
 })
 
 describe('optimistic changes', () => {
+  it('leave kay\'s own signals as they are, undoing what the change writes after one', () => {
+    const [own, setOwn] = ownSignal(0)
+    const a = signal(0)
+
+    expect(() => undoable(() => {
+      setOwn(1)
+      a.set(1)
+
+      throw new Error('no such tier')
+    })).toThrow('no such tier')
+    expect([own(), a()]).toEqual([1, 0])
+
+    const undo = undoable(() => {
+      setOwn(2)
+      a.set(2)
+    })
+
+    undo()
+    expect([own(), a()]).toEqual([2, 0])
+  })
+
   it('undo a change made inside another with the outer one, and keep the outer one\'s undo once an inner change throws', () => {
     const count = signal(1)
     const label = signal('a')
