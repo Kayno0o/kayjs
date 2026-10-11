@@ -2,7 +2,7 @@
 // It runs in the browser from its own route, so it imports nothing.
 const ISLAND = 'slot[data-component]'
 const UNSAFE = `${ISLAND},script`
-// The path of `DEV_EVENTS`, which names the live-reload script: its boot id differs on every server.
+// The path of `DEV_EVENTS`, which names the live-reload script.
 const LIVE_RELOAD = '/_kay/dev/events'
 
 // False when the change cannot be applied in place, for the caller to load the page fully; the page may be half patched then.
@@ -37,7 +37,7 @@ function ignored(node: Node): boolean {
 
   const name = node.localName
 
-  return name === 'kay-problems' || (name === 'link' && node.getAttribute('rel') === 'stylesheet') || (name === 'script' && node.textContent.includes(LIVE_RELOAD))
+  return name === 'kay-problems' || (name === 'link' && node.getAttribute('rel') === 'stylesheet') || (name === 'script' && node.textContent.includes(LIVE_RELOAD)) || (name === 'meta' && node.getAttribute('name') === 'kay-boot')
 }
 
 function kept(parent: Node): ChildNode[] {

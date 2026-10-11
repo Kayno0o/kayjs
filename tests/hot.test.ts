@@ -137,6 +137,39 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
   }, 60_000)
 
+  // Chromium holds six connections to a host: a live reload connecting again on every swap would leave none for the page by the seventh edit, and a copy the policy refuses logs an error each time.
+  it('keeps its one live reload connection through many server restarts, each edit shown without a reload', async () => {
+    await page.evaluate(() => {
+      const Source = window.EventSource
+      const opened = window as { kaySources?: number }
+
+      opened.kaySources = 0
+      window.EventSource = class extends Source {
+        constructor(...args: ConstructorParameters<typeof EventSource>) {
+          super(...args)
+          opened.kaySources! += 1
+        }
+      }
+    })
+
+    const refused: string[] = []
+
+    page.on('console', (message) => {
+      if (message.text().includes('Content Security Policy'))
+        refused.push(message.text())
+    })
+
+    for (let edit = 1; edit <= 8; edit++) {
+      await Bun.write(join(root, 'src/greeting.ts'), `export const greeting = 'Edit ${edit}'\n`)
+      await page.locator('p.static', { hasText: `Edit ${edit}` }).waitFor({ timeout: 30_000 })
+    }
+
+    expect(await sameDocument()).toBe(true)
+    expect(await page.evaluate(() => (window as { kaySources?: number }).kaySources)).toBe(0)
+    expect(await page.evaluate(() => [...document.scripts].filter(script => script.textContent.includes('/_kay/dev/events')).length)).toBe(1)
+    expect(refused).toEqual([])
+  }, 180_000)
+
   it('loads the page fully when the swap cannot apply the edit, as when a new island makes a new browser build', async () => {
     await Bun.write(join(root, 'src/components/extra.kay'), extra)
     await Bun.write(join(root, 'src/routes/index.kay'), home('Grown', true))

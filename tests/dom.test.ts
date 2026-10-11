@@ -820,7 +820,8 @@ describe('the problems panel', () => {
 describe('the live reload script', () => {
   it('swaps the stylesheets when the server comes back running the same code, and reloads on any other change or a page that fails', async () => {
     const script = (/<script>([\s\S]*)<\/script>/).exec(LIVE_RELOAD)![1]!
-    const boot = (/let b="([^"]+)"/).exec(script)![1]!
+    const meta = (/<meta name="kay-boot" content="([^"]+)">/).exec(LIVE_RELOAD)!
+    const boot = meta[1]!
     let onBoot: (event: { data: string }) => Promise<void> = async () => undefined
     const fetched: string[] = []
     let status = 200
@@ -842,7 +843,9 @@ describe('the live reload script', () => {
     // A stylesheet link resolves against the page and fires `load` without fetching anything.
     happyDOM.setURL('http://localhost/page')
     Object.assign(happyDOM.settings, { disableCSSFileLoading: true, handleDisabledFileLoadingAsSuccess: true })
-    document.head.innerHTML = '<link rel="stylesheet" href="/_kay/app-1.css"><link rel="stylesheet" href="/theme.css">'
+    document.head.innerHTML = `${meta[0]}<link rel="stylesheet" href="/_kay/app-1.css"><link rel="stylesheet" href="/theme.css">`
+    // The id stays out of the script, which then reads the same on every server.
+    expect(script).not.toContain(boot)
 
     try {
       // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
