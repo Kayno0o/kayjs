@@ -3,7 +3,7 @@ import { broadcast, onPagesInvalidated } from '../runtime/cache'
 import { compressText, compressTextStrongest } from './compress'
 import { pageEtag, storedHeaders } from './prerendered'
 
-interface Revalidation {
+export interface Revalidation {
   // The invalidation count when the render of the page in place started: one named after that is not in it.
   renderedAfter: number
   // When its `revalidate` period runs out.
@@ -15,8 +15,7 @@ interface Revalidation {
   running?: Promise<void> | undefined
 }
 
-const revalidations = new WeakMap<ServedPage, Revalidation>()
-// The prerendered pages of every `pages()`, by path as the routes serve it.
+// The prerendered pages of every `pages()` still running, by path as the routes serve it.
 const served = new Set<Map<string, ServedPage>>()
 // After a render that failed, the longest a page waits before the next request tries again.
 const RETRY_MS = 60_000
@@ -27,14 +26,16 @@ onPagesInvalidated((paths) => {
   markStale(path => paths.includes(path))
 })
 
-// A page `stale` picks waits for a fresh render on its first request, as one the build rendered for another site.
-export function trackPrerendered(pages: Map<string, ServedPage>, stale: (page: ServedPage) => boolean = () => false): void {
+// A page `stale` picks waits for a fresh render on its first request, as one the build rendered for another site. The function returned lets go of the pages, as their app stops, so `invalidatePage` no longer reaches them.
+export function trackPrerendered(pages: Map<string, ServedPage>, stale: (page: ServedPage) => boolean = () => false): () => void {
   served.add(pages)
 
   for (const page of pages.values()) {
     if (stale(page))
       revalidationOf(page).invalidatedAt = ++invalidations
   }
+
+  return () => served.delete(pages)
 }
 
 // Marks the prerendered page at `path`, or every one the function matches, as `/blog/` + anything, stale: the next request for it waits for a fresh render instead of getting it as it was.
@@ -64,15 +65,7 @@ function markStale(matches: (path: string) => boolean): string[] {
 }
 
 function revalidationOf(page: ServedPage): Revalidation {
-  let revalidation = revalidations.get(page)
-
-  if (!revalidation) {
-    const renderedAt = page.renderedAt ?? 0
-
-    revalidations.set(page, revalidation = { renderedAfter: invalidations, staleAt: page.revalidate === undefined ? Infinity : renderedAt + page.revalidate * 1000, invalidatedAt: 0, retryAt: 0 })
-  }
-
-  return revalidation
+  return page.revalidation ??= { renderedAfter: invalidations, staleAt: page.revalidate === undefined ? Infinity : (page.renderedAt ?? 0) + page.revalidate * 1000, invalidatedAt: 0, retryAt: 0 }
 }
 
 // A page `invalidatePage` named since its render is rendered again before this resolves, concurrent requests waiting for the same render. One older than its `revalidate` period is rendered again in the background, every request getting the page as it was until that lands.

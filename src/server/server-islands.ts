@@ -22,7 +22,7 @@ interface Cut {
   holes: Hole[]
 }
 
-interface Islands {
+export interface CutIslands {
   // The page text the parts were cut from: a revalidation replaces it.
   html: ServedPage['html']
   text: Promise<string>
@@ -31,7 +31,6 @@ interface Islands {
   all?: Promise<Cut>
 }
 
-const cut = new WeakMap<ServedPage, Islands>()
 // The components on the way to each route's islands, found by the first request rendering them.
 const paths = new Map<string, Set<unknown>>()
 
@@ -41,13 +40,12 @@ export function serverIslandModes(html: string): ServerIslandMode[] {
 }
 
 async function cutOf(page: ServedPage, all: boolean): Promise<Cut> {
-  let islands = cut.get(page)
+  let { cut: islands } = page
 
   if (islands?.html !== page.html) {
     const { html } = page
 
-    islands = { html, text: typeof html === 'string' ? Promise.resolve(html) : html.text() }
-    cut.set(page, islands)
+    page.cut = islands = { html, text: typeof html === 'string' ? Promise.resolve(html) : html.text() }
   }
 
   const { text } = islands

@@ -801,6 +801,32 @@ describe('revalidation', () => {
   // Held in a variable so tsc leaves the .kay import to Bun.
   const NEWS = './fixtures/production/src/routes/news.kay'
 
+  it('invalidates the prerendered pages of the apps still running, an app stopped letting go of its own', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const { news } = await import('./fixtures/production/src/news')
+
+    try {
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
+      const stopped = await pages({ routes, prebuilt: true, security: false, log: false })
+      const running = await pages({ routes, prebuilt: true, security: false, log: false })
+      const edition = async (app: typeof running) => (await (await app.handle(new Request('http://localhost/news'))).text()).match(/<h1>(Edition \d)<\/h1>/)?.[1]
+
+      stopped.listen(0)
+      await shutdown(stopped)
+      news.edition = 2
+      invalidatePage('/news')
+
+      expect(await edition(running)).toBe('Edition 2')
+      expect(await edition(stopped)).toBe('Edition 1')
+    }
+    finally {
+      news.edition = 1
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
   it('serves a stale prerendered page while rendering it again in the background, then the new one with its own tag', async () => {
     const root = process.cwd()
     const manifest = (await readManifest(root))!

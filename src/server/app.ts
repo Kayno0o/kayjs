@@ -412,8 +412,12 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
   const transforms = pageHooks(options.extensions)
   const pageFile = assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects })
 
-  for (const pages of prerendered.values())
-    trackPrerendered(pages, page => moved || page.readsSite === true)
+  const tracked = [...prerendered.values()].map(pages => trackPrerendered(pages, page => moved || page.readsSite === true))
+
+  app.onStop(() => {
+    for (const release of tracked)
+      release()
+  })
 
   // `kay dev` prints its own.
   if (log !== false && !mode.dev)

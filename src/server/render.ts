@@ -10,8 +10,10 @@ import type { ClientBuild, PrerenderedPage } from './client'
 import type { Encoding } from './compress'
 import type { Flash, SuccessFlash } from './flash'
 import type { ServedRoute } from './guards'
+import type { Revalidation } from './revalidate'
 import type { SpecialPage, SpecialPages } from './routes'
 import type { SeoHead } from './seo'
+import type { CutIslands } from './server-islands'
 import type { Prefetch } from './speculation'
 import type { Rendered } from './stream'
 import { relative } from 'node:path'
@@ -62,6 +64,9 @@ export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | '
   // The compressed copies `kay build` wrote, or a revalidation made.
   encoded: Partial<Record<Encoding, Uint8Array<ArrayBuffer> | Bun.BunFile>>
   headers: [string, string][]
+  // Set on the first request needing it: when to render the page again, and the parts its server islands cut it into.
+  revalidation?: Revalidation | undefined
+  cut?: CutIslands | undefined
 }
 
 export interface RenderOptions {
