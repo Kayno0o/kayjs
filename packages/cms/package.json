@@ -1,0 +1,60 @@
+{
+  "name": "@kaynooo/kayjs-cms",
+  "type": "module",
+  "version": "0.0.0",
+  "description": "A CMS for kay sites: collection screens, and content edited on the page it renders",
+  "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs-cms"
+  },
+  "bugs": {
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs-cms/issues"
+  },
+  "publishConfig": {
+    "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./editor.kay": "./src/editor/editor.kay"
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "llms.txt",
+    "src",
+    "types"
+  ],
+  "engines": {
+    "bun": ">=1.4.2"
+  },
+  "scripts": {
+    "prepare": "bun scripts/link-fixture.ts",
+    "check": "$npm_execpath check",
+    "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
+    "prepack": "bun run build:types",
+    "postpack": "rm -rf types",
+    "lint": "keslint --cache",
+    "lint:fix": "keslint --fix --cache",
+    "test": "bun test && bun run test:dom",
+    "test:dom": "bun --config=tests-dom/bunfig.toml test"
+  },
+  "peerDependencies": {
+    "kay": "~1.37.0"
+  },
+  "dependencies": {
+    "@kaynooo/kayjs-ui": "^0.5.4"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.14.5",
+    "@kaynooo/eslint": "^6.0.1",
+    "@types/bun": "^1.4.2",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "kay": "npm:@kaynooo/kayjs@~1.37.0",
+    "typescript": "^6.0.3"
+  }
+}

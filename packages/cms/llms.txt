@@ -1,0 +1,28 @@
+# kayjs-cms
+
+> A CMS for kay sites: content edited on the page it renders, and collection screens. Work in progress: what it needs from kay is kaynooo/kayjs#262, stubbed in `src/kay/` until kay ships it.
+
+## Rules that are easy to get wrong
+
+- The app writes no marker: in edit mode kay marks each element rendering an entry's field itself, `data-kay-field="<collection>:<slug>[@<locale>]:<path>"`, each segment URI-encoded, the path dotted with list indexes (`sections.1.heading`). A field in an attribute is `data-kay-field-<attribute>`, a field sharing its element's text sits between `<!--kay-field …-->` and `<!--/kay-field-->`, and a Markdown body is `data-kay-body="<collection>:<slug>"` or a `kay-body` comment pair.
+- The body's path is the `BODY` symbol, never a string, so a data field named `body` stays a data field.
+- Outside edit mode the page is unchanged and the editor is not rendered.
+- Draft rendering happens on the server: the editor sends the changed entries, kay renders the page with them and swaps it in, islands kept.
+
+## Setup
+
+```ts
+import { cms } from '@kaynooo/kayjs-cms'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({ extensions: [cms()] })
+```
+
+## API
+
+- `fieldsOf(schema)`: the form fields of a collection's JSON Schema, in order, each `{ key, label, required, hint, kind }`. Kinds: `text`, `textarea` (a string whose `maxLength` is over 120), `markdown`, `number`, `integer`, `boolean`, `date`, `datetime`, `image`, `file`, `json` (any shape without a control), `select` (an enum or a union of literals, with `options`), `reference` (with `collection`), `list` (with `item`) and `group` (with `fields`). kay's `x-kay: { kind }` hint wins over the type. A nullable field is optional.
+- `emptyValue(field)`: what a new list item starts as.
+- `parseMarker(value, body?)`, `formatMarker(marker)`, `entryKey(ref)`: read and write kay's markers.
+- `fieldsAt(node)`: the fields rendered at a node, innermost first.
+- `createDrafts({ show, delay })`: the unsaved edits of a page's entries. `open(entry)`, `value(ref, path)`, `set(ref, path, value)`, `changed(ref)`, `reset(ref)`, `issues(ref, path?)`, `failure()` and `rendering()`. Each change renders the page with every changed entry once typing pauses `delay` ms (150), keeping only the latest render's issues.
+- `valueAt(data, path)`, `withValueAt(data, path, value)`, `joinPath(parent, key)`: field paths.
