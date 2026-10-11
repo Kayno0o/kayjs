@@ -7,7 +7,7 @@ import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import { existsSync, realpathSync } from 'node:fs'
-import { basename, dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
@@ -194,7 +194,7 @@ export class KayLanguageServer {
 
   // A file changing on disk rewrites the shadow tree, which reads the config, guards, API modules and settings beside the .kay files; any file but a .kay one goes to tsgo as is. What kay writes under `.kay` is its own.
   private async filesChanged(changes: FileEvent[]) {
-    const changed = changes.flatMap(change => change.uri.startsWith('file:') && !fileURLToPath(change.uri).split(sep).includes(KAY_DIR) ? [{ path: fileURLToPath(change.uri), type: change.type }] : [])
+    const changed = changes.flatMap(change => change.uri.startsWith('file:') && !relative(this.root, fileURLToPath(change.uri)).split(sep).includes(KAY_DIR) ? [{ path: fileURLToPath(change.uri), type: change.type }] : [])
     const others = changed.filter(change => !change.path.endsWith('.kay')).map(change => ({ uri: pathToFileURL(change.path).href, type: change.type }))
 
     if (changed.length === 0)

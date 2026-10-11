@@ -1,12 +1,12 @@
 import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
 import { cp, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Connection } from '../src/lsp/rpc'
-import { fixtureCopy } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -518,8 +518,8 @@ describe('kay lsp reporting what kay check finds across the project', () => {
   beforeAll(async () => {
     real = await mkdtemp(join(tmpdir(), 'kay-project-'))
 
-    // Opened through a symlink, while Bun keys the modules a config read again must import afresh by real path.
-    dir = `${real}-link`
+    // Opened through a symlink, while Bun keys the modules a config read again must import afresh by real path, and from under a `.kay` directory, which only the project's own is.
+    dir = join(await scratchDir('lsp-'), 'project')
     await symlink(real, dir)
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
@@ -540,7 +540,7 @@ describe('kay lsp reporting what kay check finds across the project', () => {
 
   afterAll(async () => {
     await editor.stop()
-    await Promise.all([rm(dir, { force: true }), rm(real, { recursive: true, force: true })])
+    await Promise.all([rm(dirname(dir), { recursive: true, force: true }), rm(real, { recursive: true, force: true })])
   })
 
   it('reports the config, the messages, the collections and the exports kay check reads, at their files, once it started and after a change on disk', async () => {
