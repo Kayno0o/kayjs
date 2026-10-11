@@ -1,3 +1,5 @@
+export type { AuthLinkParts, AuthMail, AuthMailerOptions, AuthNoticeParts, AuthView } from './auth'
+export { authMailer } from './auth'
 export { cssColours } from './css'
 export { darkPalette } from './dark'
 export type { Palette, Settings } from './defaults'

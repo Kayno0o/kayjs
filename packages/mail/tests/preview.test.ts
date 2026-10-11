@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
+import { authMailer } from '../src/auth'
 import { mailer, mailExtension } from '../src/mailer'
 import { outbox } from '../src/outbox'
 import { startSmtp } from './helpers/smtp'
@@ -199,6 +200,24 @@ describe('the mail samples page', () => {
     expect(await (await get(mail, '/_kay/mail/samples?mail=plain.kay')).text()).toContain('<th>Props</th><td>none, as there is no plain.preview.ts</td>')
     expect(frame.headers.get('content-security-policy')).toStartWith('sandbox')
     expect(await frame.text()).toContain('<!doctype html><html lang="en"')
+    expect(outbox.mails).toEqual([])
+  })
+
+  it('lists the views kayjs-auth\'s mails render through once an app uses authMailer, each with a sample of its wording', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+
+    authMailer(mail.enqueue)
+
+    const list = await (await get(mail, '/_kay/mail/samples')).text()
+    const page = await (await get(mail, '/_kay/mail/samples?mail=kayjs-auth%2Fverify-email')).text()
+    const frame = await (await get(mail, '/_kay/mail/samples/html?mail=kayjs-auth%2Fnew-sign-in')).text()
+
+    expect(list).toContain('<a href="/_kay/mail/samples?mail=kayjs-auth%2Fverify-email">kayjs-auth/verify-email</a>')
+    expect(list).toContain('<a href="/_kay/mail/samples?mail=kayjs-auth%2Finvitation">kayjs-auth/invitation</a>')
+    expect(page).toContain('<th>Props</th><td>a sample of kayjs-auth\'s, through authMailer</td>')
+    expect(page).toContain('Or type this code where you asked for it: 482913')
+    expect(frame).toContain('<html lang="en"')
+    expect(frame).toContain('See where your account is signed in, and end what you do not know: <a class="km-link"')
     expect(outbox.mails).toEqual([])
   })
 

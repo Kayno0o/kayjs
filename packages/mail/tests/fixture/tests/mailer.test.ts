@@ -99,7 +99,7 @@ describe('rendering', () => {
     expect(html).toContain('border-top:1px solid #e5e5e0')
     expect(html).toContain('<h2 class="km-text" style="font-size:18px')
     expect(html).toContain('<!--[if true]><td width="251" valign="top"><![endif]--><div style="display:inline-block;width:100%;max-width:251px;vertical-align:top">')
-    expect(html).toContain('<a class="km-link" href="https://fixture.test/help" style="color:#0047ff;text-decoration:underline">the help</a>')
+    expect(html).toContain('<a class="km-link" href="https://fixture.test/help" style="color:#0047ff;text-decoration:underline;overflow-wrap:anywhere;word-break:break-word">the help</a>')
     expect(text).toBe('Fixture\n\nYour code\n\n482 913\n\nDetails\n\nLeft\n\nRight\n\nRead the help (https://fixture.test/help).')
   })
 

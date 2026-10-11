@@ -198,4 +198,25 @@ export default { name: 'Ada', url: 'https://example.com/confirm' } satisfies Par
 
 ## kayjs-auth
 
-kayjs-auth's `email.mailer` takes the mailer's `send` or `enqueue`: `email: { mailer: { send: mail.enqueue } }` queues its security mails and retries them.
+`authMailer(send)` is kayjs-auth's `email.mailer`, rendering its verification, password reset, magic link, code, security and invitation mails through the components above, themed by the app's mail settings, rather than kayjs-auth's own html:
+
+```ts
+// src/auth.ts
+import { createAuth } from '@kaynooo/kayjs-auth'
+import { authMailer } from '@kaynooo/kayjs-mail'
+import { mail } from './mail'
+
+export const auth = createAuth({
+  // ...
+  email: { mailer: authMailer(mail.enqueue), links: { /* ... */ } },
+})
+```
+
+- `authMailer(mail.enqueue)` renders each mail at once and leaves it to the queue, which retries a mail server that is away; `authMailer(mail.send)` sends it before kayjs-auth's call answers.
+- The wording is kayjs-auth's own, in English or French as it writes it, and so is the text part: a mail with a link shows a button, the link written out and the code when it carries one; news of a change to the account shows the link to review it. Each ends on how long the link or code works, or on what to do when it was not the user.
+- The mail's `locale` becomes its `lang`, its `<html lang>` and the locale its view renders `t()` in, so kayjs-auth's `email.locales` must be among the site's.
+- `authMailer(send, { views: { 'reset-password': ResetPassword } })` renders a kind through the app's own `.kay` view, given `{ mail }`: `mail.subject`, `mail.url`, `mail.code` and kayjs-auth's wording in `mail.parts` (the `AuthMail` type).
+- kayjs-auth gives its wording in parts from 0.10; an older one, and a kind its `templates` option replaces, give none, so their html is sent as it is.
+- Once an app uses it, `/_kay/mail/samples` lists the views with a sample of each: `kayjs-auth/verify-email`, `kayjs-auth/magic-link`, `kayjs-auth/invitation` and `kayjs-auth/new-sign-in`, rendered in the site's default language.
+
+`{ send: mail.enqueue }` also fits `email.mailer` as it is, sending kayjs-auth's own html.

@@ -1,0 +1,21 @@
+---
+import type { AuthLinkParts, AuthMail } from './auth'
+import Button from './button.kay'
+import Code from './code.kay'
+import Heading from './heading.kay'
+import Layout from './layout.kay'
+import Link from './link.kay'
+import Paragraph from './paragraph.kay'
+
+const { mail, parts } = props<{ mail: AuthMail, parts: AuthLinkParts }>()
+---
+Layout(preheader={parts.lead})
+  Heading {mail.subject}
+  Paragraph {parts.lead}
+  if mail.url as url
+    Button(href={url}) {parts.button}
+    Paragraph(muted) {parts.orPaste} #[Link(href={url}) {url}]
+  if mail.code as code
+    Paragraph(muted) {parts.codeLead}
+    Code {code}
+  Paragraph(muted) {parts.ending}
