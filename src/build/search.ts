@@ -59,6 +59,9 @@ const ENTITIES: Record<string, string> = {
   rdquo: '”',
   bdquo: '„',
   hellip: '…',
+  ZeroWidthSpace: '\u200B',
+  zwnj: '\u200C',
+  zwj: '\u200D',
   bull: '•',
   prime: '′',
   Prime: '″',
@@ -69,8 +72,10 @@ const ENTITIES: Record<string, string> = {
   ...Object.fromEntries(LATIN_1.split(' ').map((name, index) => [name, String.fromCodePoint(0xA0 + index)])),
 }
 const MAX_CODE_POINT = 0x10FFFF
-// What a link to its own heading shows beside the heading's text.
-const HEADING_MARKS = /^[\s#¶§]+|[\s#¶§]+$/g
+// What a link to its own heading shows beside the heading's text, left out of it: a mark, or nothing visible.
+const ANCHOR_MARKS = /^[\s#¶§]*$/
+// Soft hyphens and zero-width characters, which would otherwise split the word they sit in.
+const INVISIBLE = /[\u00AD\u200B-\u200D\u2060\uFEFF]/g
 const SPACES = /\s+/g
 // Characters past which the file of a two-letter start is split by three.
 const SHARD_SIZE = 16_384
@@ -82,8 +87,12 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
 
   for (const page of pages) {
     const read = readPage(page)
+    const ofLang = byLang.get(read.lang)
 
-    byLang.set(read.lang, [...byLang.get(read.lang) ?? [], read])
+    if (ofLang)
+      ofLang.push(read)
+    else
+      byLang.set(read.lang, [read])
   }
 
   const files = new Map<string, unknown>()
@@ -194,7 +203,8 @@ function readPage(page: SearchPage): ReadPage {
   let h1 = ''
   let inMain = 0
   let skipped = 0
-  let target: 'title' | 'h1' | 'heading' | 'text' = 'text'
+  let target: 'title' | 'h1' | 'heading' | 'anchor' | 'text' = 'text'
+  let anchor = ''
   const toText = () => {
     target = 'text'
   }
@@ -241,6 +251,21 @@ function readPage(page: SearchPage): ReadPage {
         atEnd(element, toText)
       },
     })
+    .on('h2 a[href^="#"], h3 a[href^="#"], h4 a[href^="#"]', {
+      element: (element) => {
+        if (target !== 'heading')
+          return
+
+        anchor = ''
+        target = 'anchor'
+        atEnd(element, () => {
+          if (!ANCHOR_MARKS.test(plain(anchor)))
+            sections.at(-1)!.heading += anchor
+
+          target = 'heading'
+        })
+      },
+    })
     .onDocument({
       text: (chunk) => {
         if (target === 'title') {
@@ -256,6 +281,8 @@ function readPage(page: SearchPage): ReadPage {
           h1 += chunk.text
         else if (target === 'heading')
           sections.at(-1)!.heading += chunk.text
+        else if (target === 'anchor')
+          anchor += chunk.text
         else
           sections.at(-1)!.text += chunk.text
       },
@@ -273,7 +300,7 @@ function readPage(page: SearchPage): ReadPage {
   return {
     lang,
     weight: page.weight,
-    sections: sections.map(section => ({ page: name, ...section.heading !== undefined && { heading: plain(section.heading).replace(HEADING_MARKS, '') }, href: section.anchor === undefined ? page.path : `${page.path}#${encodeURIComponent(section.anchor)}`, text: plain(section.text) })).filter((section, index) => index === 0 || section.heading !== '' || section.text !== ''),
+    sections: sections.map(section => ({ page: name, ...section.heading !== undefined && { heading: plain(section.heading) }, href: section.anchor === undefined ? page.path : `${page.path}#${encodeURIComponent(section.anchor)}`, text: plain(section.text) })).filter((section, index) => index === 0 || section.heading !== '' || section.text !== ''),
   }
 }
 
@@ -290,5 +317,5 @@ function plain(html: string): string {
     const code = decimal !== undefined ? Number(decimal) : hex !== undefined ? Number.parseInt(hex, 16) : undefined
 
     return code === undefined ? ENTITIES[name!] ?? ENTITIES[name!.toLowerCase()] ?? entity : code <= MAX_CODE_POINT ? String.fromCodePoint(code) : entity
-  }).replace(SPACES, ' ').trim()
+  }).replace(INVISIBLE, '').replace(SPACES, ' ').trim()
 }

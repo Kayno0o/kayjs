@@ -194,6 +194,27 @@ describe('favicon', () => {
     expect((await readdir(join(scratch, 'built-only-svg'))).sort()).toEqual(['apple-touch-icon.png', 'favicon.ico', 'favicon.svg', 'icon-192.png', 'icon-512.png'])
   })
 
+  it('reads an SVG\'s size off its root tag past a comment and a quoted >, and warns of text, which it draws as nothing', async () => {
+    const commented = join(scratch, 'commented.svg')
+    const lettered = join(scratch, 'lettered.svg')
+
+    await Bun.write(commented, '<!-- <svg width="5"> --><svg xmlns="http://www.w3.org/2000/svg" data-x="a>b" viewBox="0 0 32 32"><rect width="32" height="32"/></svg>')
+    await Bun.write(lettered, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text x="4" y="24">K</text></svg>')
+
+    expect(await widthOf((await faviconFiles({ image: commented, svg: commented })).get('/icon-512.png')!)).toBe(512)
+
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      await faviconFiles({ image: lettered, svg: lettered })
+
+      expect(warned).toHaveBeenCalledWith(`kay: the favicon ${lettered} has text, which kay draws without fonts, so as nothing; turn the text into paths`)
+    }
+    finally {
+      warned.mockRestore()
+    }
+  })
+
   it('refuses an SVG favicon with no size, not square or not drawable, naming it, as kay check reports it', async () => {
     const svgs: Record<string, [string, string]> = {
       'unsized.svg': ['<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect width="10" height="10"/></svg>', 'has no viewBox, nor a width and height, so it has no size to draw at'],
