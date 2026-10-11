@@ -1,0 +1,4 @@
+--- server
+throw new Error('the screen is down')
+---
+p Never shown

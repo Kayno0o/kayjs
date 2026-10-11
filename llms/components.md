@@ -149,4 +149,4 @@ export default defineConfig({ extensions: [authPages()] })
 - `kay dev` watches the app's files, not `node_modules`: after editing a linked library's pages, restart it.
 - `messages` names a directory of catalogs, `<locale>.ts` each, laid under the app's `src/messages` key by key, with or without `i18n`: see [Locales](locales.md).
 - `transformPage` rewrites each prerendered page before it is written: see [Page hooks](routing.md#page-hooks).
-- `editor` names a `.kay` island, `${import.meta.dir}/editor.kay`, that every page renders last in edit mode but the extensions' own, its stylesheets linked after the page's, and carried by `kay build --compile`: see [A CMS editing on the page](content.md#preview-mode).
+- `editor` names a `.kay` island, `${import.meta.dir}/editor.kay`, that every page renders last in edit mode but the pages its own `routes` serve, its stylesheets linked after the page's, and carried by `kay build --compile`: see [A CMS editing on the page](content.md#preview-mode).

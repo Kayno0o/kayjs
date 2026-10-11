@@ -750,7 +750,7 @@ describe('a library\'s route tree', () => {
       const [login] = at('/auth/login')
 
       expect(login!.layouts).toEqual([ours('_layout.kay'), ours('auth/_layout.kay')])
-      expect(login!.special).toEqual({ notFound: { file: ours('_404.kay'), layouts: [ours('_layout.kay')] }, error: { file: theirs('_error.kay'), layouts: [ours('_layout.kay'), ours('auth/_layout.kay')], mounted: true } })
+      expect(login!.special).toEqual({ notFound: { file: ours('_404.kay'), layouts: [ours('_layout.kay')] }, error: { file: theirs('_error.kay'), layouts: [ours('_layout.kay'), ours('auth/_layout.kay')] } })
       expect(login!.guards).toEqual([
         { file: ours('_guard.ts'), special: { notFound: { file: ours('_404.kay'), layouts: [] }, error: undefined } },
         { file: theirs('_guard.ts'), special: { notFound: { file: ours('_404.kay'), layouts: [ours('_layout.kay')] }, error: undefined } },

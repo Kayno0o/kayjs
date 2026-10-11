@@ -24,8 +24,8 @@ export interface Route {
   guards: GuardFile[]
   // No guard is asked of it on a site with `requireGuards`: it sets `guards: false`, or a library serves it.
   open?: true | undefined
-  // An extension's routes serve it, which renders no editor in edit mode over its own screens.
-  mounted?: true | undefined
+  // The extension giving the editor serves it: one of its own screens, which renders no editor over it in edit mode.
+  editorOwn?: true | undefined
 }
 
 // What a layout's actions run: the guards of its own directory and above, none when it sets `guards: false`, and `open` when it does or a library serves it.
@@ -55,14 +55,16 @@ export interface GuardFile {
 export interface SpecialPage {
   file: string
   layouts: string[]
-  // An extension's routes hold it, as `Route`'s.
-  mounted?: true | undefined
+  // The extension giving the editor holds it, as `Route`'s.
+  editorOwn?: true | undefined
 }
 
 // A library's pages laid over the app's routes under `prefix`, `/auth` or `''` for the root, as an extension in `extensions` mounts them.
 export interface RouteMount {
   dir: string
   prefix: string
+  // The extension gives the editor too.
+  editor?: true | undefined
 }
 
 // The nearest `_404.kay` and `_error.kay` up the directory tree.
@@ -189,8 +191,9 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
         const open = setsFalse(file, 'guards', read)
 
         const layouts = layoutsOf(trees, at, file, read)
+        const mounted = tree !== trees[0]
 
-        own.push({ ...route, layouts, layoutAccess: layouts.map(accessOf), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || tree !== trees[0]) && { open: true }, ...tree !== trees[0] && { mounted: true } })
+        own.push({ ...route, layouts, layoutAccess: layouts.map(accessOf), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || mounted) && { open: true }, ...tree.editor && { editorOwn: true } })
       }
     }
 
@@ -475,17 +478,25 @@ function guardsOf(trees: RouteMount[], at: string, read: LayoutsRead): GuardFile
 
 function withoutLayouts(special: SpecialPages): SpecialPages {
   return {
-    notFound: special.notFound && { file: special.notFound.file, layouts: [] },
-    error: special.error && { file: special.error.file, layouts: [] },
+    notFound: special.notFound && { ...special.notFound, layouts: [] },
+    error: special.error && { ...special.error, layouts: [] },
   }
 }
 
 // The special pages for a directory of the URL tree, `''` for the root, `/account` below it.
 export function specialPagesOf(trees: RouteMount[], at: string, read: LayoutsRead = new Map()): SpecialPages {
   const nearest = (name: string): SpecialPage | undefined => {
-    const file = directoriesUp(at).map(dir => fileAt(trees, dir, name)).find(path => path !== undefined)
+    for (const dir of directoriesUp(at)) {
+      const tree = treeHolding(trees, dir, name)
 
-    return file !== undefined ? { file, layouts: layoutsOf(trees, virtualDir(trees, dirname(file)), file, read), ...!file.startsWith(trees[0]!.dir + sep) && { mounted: true } } : undefined
+      if (tree) {
+        const file = join(tree.dir, dir.slice(tree.prefix.length), name)
+
+        return { file, layouts: layoutsOf(trees, virtualDir(trees, dirname(file)), file, read), ...tree.editor && { editorOwn: true } }
+      }
+    }
+
+    return undefined
   }
 
   return { notFound: nearest(NOT_FOUND), error: nearest(ERROR) }
@@ -498,7 +509,7 @@ export function routeTrees(routesDir: string, mounts: RouteMount[] = []): RouteM
 
 // The routes each extension in `extensions` mounts, its directory as the project reaches it under `node_modules`, where a linked library's real path would name its actions after a path outside the project.
 export function routeMounts(root: string, extensions: KayExtension[] = []): RouteMount[] {
-  return extensions.flatMap(({ routes }) => routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix) }] : [])
+  return extensions.flatMap(({ routes, editor }) => routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [])
 }
 
 // The API directories each extension in `extensions` mounts, reached as its routes are.
@@ -525,16 +536,14 @@ function mountPrefix(prefix = '/'): string {
 
 // The file a directory of the URL tree holds under `name`: the app's, else the first mounted library's.
 export function fileAt(trees: RouteMount[], at: string, name: string): string | undefined {
-  for (const { dir, prefix } of trees) {
-    if (at === prefix || at.startsWith(`${prefix}/`)) {
-      const file = join(dir, at.slice(prefix.length), name)
+  const tree = treeHolding(trees, at, name)
 
-      if (existsSync(file))
-        return file
-    }
-  }
+  return tree && join(tree.dir, at.slice(tree.prefix.length), name)
+}
 
-  return undefined
+// The first of the trees holding `name` at a directory of the URL tree.
+function treeHolding(trees: RouteMount[], at: string, name: string): RouteMount | undefined {
+  return trees.find(({ dir, prefix }) => (at === prefix || at.startsWith(`${prefix}/`)) && existsSync(join(dir, at.slice(prefix.length), name)))
 }
 
 // Where a directory of one of the trees sits in the URL tree.

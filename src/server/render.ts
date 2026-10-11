@@ -152,7 +152,7 @@ const NOT_ASCII = /[^\x20-\x7E]/g
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
   const rendering = createRendering(context, params, options)
 
-  return withOutcome(rendering.outcome, async () => renderRoute(route, rendering, client, options))
+  return withOutcome(rendering.outcome, async () => renderRoute(route, rendering, client, withEditor(route, options)))
 }
 
 async function renderRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response> {
@@ -163,7 +163,7 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
 
   try {
     const started = performance.now()
-    const body = traced(`kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, withEditor(route, options)))
+    const body = traced(`kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options))
 
     timed(page, rendering, started)
 
@@ -270,7 +270,7 @@ function serverTiming(files: string[], modules: PageModule[], timings: number[],
 // `spliced` gives the page with what changes per request filled in, as its stamps, gzipped when the browser takes it.
 export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: Written, gzip: boolean }>): Promise<Response> {
   const rendering = createRendering(context, params, options)
-  const refusal = await refused(route, rendering, client, options)
+  const refusal = await refused(route, rendering, client, withEditor(route, options))
 
   if (refusal)
     return refusal
@@ -345,7 +345,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
   const report = (error: unknown) => reportServerError(error, request, options.onError)
 
   return withOutcome(rendering.outcome, async () => {
-    const page = await loadRoute(route, rendering, client, options)
+    const page = await loadRoute(route, rendering, client, withEditor(route, options))
 
     if (page instanceof Response)
       return page
@@ -576,12 +576,12 @@ async function importAll(files: string[], options: RenderOptions): Promise<PageM
   return Promise.all(files.map(async file => importModule<PageModule>(file)))
 }
 
-// The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
-// An extension's own pages, its admin screens say, render no editor over them.
-function withEditor(page: { mounted?: true | undefined }, options: RenderOptions): RenderOptions {
-  return page.mounted === true && options.editor !== undefined ? { ...options, editor: undefined } : options
+// The editor's own extension's pages, its admin screens say, render no editor over them, nor does what they fail with, whichever page shows it.
+function withEditor(page: { editorOwn?: true | undefined }, options: RenderOptions): RenderOptions {
+  return page.editorOwn === true && options.editor !== undefined ? { ...options, editor: undefined } : options
 }
 
+// The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
 function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
   const rules = queryRules(pageSetting(modules.at(-1)!, 'query'))
 
