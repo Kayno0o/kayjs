@@ -133,7 +133,8 @@ describe('the file route', () => {
       expect(response.status).toBe(200)
       expect(response.headers.get('cache-control')).toStartWith('private, max-age=')
       expect(await response.text()).toBe('secret')
-      expect((await get(url.replace(/sig=./, 'sig=A'))).status).toBe(403)
+      // Another first character, as one the signature starts with would leave it valid.
+      expect((await get(url.replace(/sig=(.)/, (_, first: string) => `sig=${first === 'A' ? 'B' : 'A'}`))).status).toBe(403)
       expect((await get(url.replace(/until=\d+/, `until=${until + 600}`))).status).toBe(403)
       expect(files.url(key, { expires: '1d' })).not.toBe(url)
 
