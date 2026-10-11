@@ -195,7 +195,8 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
   const routesDir = projectPaths(root, options).routes
 
-  return { islands, classes, problems, pages: [...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted], libraries }
+  // The editor gathers its stylesheet as a page does, an app's own file or not.
+  return { islands, classes, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries }
 }
 
 // A failed build must not leave the previous manifest pointing at files that are gone.

@@ -1207,6 +1207,49 @@ process.exit(0)
   }, 60_000)
 })
 
+describe('a compiled server with an editor', () => {
+  it('renders the editor an extension gives, with its stylesheet, in edit mode with its sources gone', async () => {
+    const secret = 'a-preview-secret-long-enough-for-kay-0123456789'
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': `export default { favicon: false, preview: { secret: '${secret}' }, extensions: [{ name: 'lib', editor: 'lib/editor.kay' }] }\n`,
+      'lib/editor.css': '.edited { outline: 1px dashed teal }\n',
+      'lib/editor.kay': '---\nimport { signal } from \'kay\'\nimport \'./editor.css\'\n\nconst clicks = signal(0)\n---\nbutton.edited(onClick={() => clicks.set(n => n + 1)}) Edit {clicks()}\n',
+      'src/routes/index.kay': 'h1 Home\n',
+      'src/server.ts': `import process from 'node:process'
+import { Elysia } from 'elysia'
+import { pages } from 'kay/server'
+
+const app = new Elysia().use(await pages({ security: false }))
+const get = async (path: string, cookie = '') => app.handle(new Request(\`http://localhost\${path}\`, { headers: { cookie } }))
+const cookie = (await get('/_kay/preview?path=/&edit&secret=${secret}')).headers.getSetCookie()[0]!.split(';')[0]!
+const page = await (await get('/', cookie)).text()
+const sheet = /<link rel="stylesheet" href="([^"]+)">/.exec(page)?.[1]
+
+console.log(JSON.stringify({ editor: page.includes('class="edited"'), sheet: sheet !== undefined && (await (await get(sheet)).text()).includes('dashed teal') }))
+process.exit(0)
+`,
+    })
+
+    try {
+      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+
+      expect(report).not.toContain('error')
+      expect(code).toBe(0)
+      await rename(join(root, 'src'), join(root, 'moved'))
+      await rename(join(root, 'lib'), join(root, 'moved-lib'))
+      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ editor: true, sheet: true })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+})
+
 describe('a compiled server with an SVG favicon', () => {
   it('serves the icons kay build drew from it, carrying no resvg', async () => {
     const root = await scratchProject({

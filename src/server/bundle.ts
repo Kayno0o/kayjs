@@ -16,6 +16,8 @@ export interface Bundle {
   modules: Record<string, unknown>
   // The message catalogs the extensions gave each locale, found where the build ran: an extension names its own under the executable's.
   extensionMessages?: Record<string, string[]>
+  // The editor an extension gives, by the path its module is held under.
+  editor?: string
   config: KayConfig
   clientDir: string
   publicDir: string

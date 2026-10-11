@@ -20,7 +20,7 @@ import { applyImageConfig } from './image'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
 import { refuseClashes } from './route-table'
-import { extensionEditor, routeMounts } from './routes'
+import { routeMounts } from './routes'
 import { configHead, siteOrigin } from './seo'
 import { projectSource } from './source'
 import { setupStorage } from './storage'
@@ -93,5 +93,5 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
   }
   const [{ head, scripts, styles, cards }, collections] = await Promise.all([headAndCards(), projectCollections(root, config.content)])
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: { ...renderOptionsOf(config, mode, { head, maxDensity }), editor: extensionEditor(root, config.extensions) }, cards }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, editor: source.editor(root, config) }), cards }
 }

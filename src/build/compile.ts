@@ -105,6 +105,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     `  api: ${JSON.stringify(api)},`,
     `  endpoints: ${JSON.stringify(endpoints)},`,
     `  extensionMessages: ${JSON.stringify(extensionMessages)},`,
+    ...editor === undefined ? [] : [`  editor: ${JSON.stringify(editor)},`],
     `  modules: { ${modules.map((file, index) => `${JSON.stringify(file)}: module${index}`).join(', ')} },`,
     '  config,',
     `  clientDir: ${embedded(clientBase)},`,

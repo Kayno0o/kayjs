@@ -2,6 +2,7 @@
 import type { EditorProps } from 'kay/edit'
 import { signal } from 'kay'
 import { showDraft } from 'kay/edit'
+import './draft-editor.css'
 
 // The editor the test extension gives, which every page renders in edit mode.
 const { entries } = props<EditorProps>()

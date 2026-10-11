@@ -14,7 +14,7 @@ import { cacheDir, clientOptionsOf, modeOf, PRODUCTION } from '../project'
 import { kayLog } from '../runtime/log'
 import { bundled } from './bundle'
 import { readClient } from './client'
-import { routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from './routes'
+import { extensionEditor, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from './routes'
 
 // Where a project's config, routes, modules and built files come from: the files on disk, compiled as they load, or what `kay build --compile` embedded in the executable.
 export interface ProjectSource {
@@ -34,6 +34,8 @@ export interface ProjectSource {
   endpoints: (routesDir: string, mounts: RouteMount[]) => Promise<Endpoint[]>
   // The catalogs the extensions give a locale, of `files`, those the extensions name where the server runs.
   extensionCatalogs: (locale: string, files: string[]) => string[]
+  // The editor an extension gives, which a page in edit mode renders.
+  editor: (root: string, config: Pick<KayConfig, 'extensions'>) => string | undefined
   // What paths the config names resolve against as the server runs.
   runtimeRoot: (root: string) => string
   imageCache: (root: string) => string
@@ -80,6 +82,7 @@ const DISK: ProjectSource = {
   api: async (root, config) => (await import('./api')).projectApi(root, config),
   endpoints: async (routesDir, mounts) => scanEndpoints(routesDir, mounts),
   extensionCatalogs: (_, files) => files.filter(file => existsSync(file)),
+  editor: (root, config) => extensionEditor(root, config.extensions),
   runtimeRoot: root => root,
   imageCache: root => cacheDir(root, `images${testWorker()}`),
   contentBuild: (root, prebuilt) => prebuilt ? outputDir(root) : undefined,
@@ -108,6 +111,8 @@ function embeddedSource(bundle: Bundle): ProjectSource {
     endpoints: async () => bundle.endpoints ?? [],
     // An extension names its catalogs under the executable's own path, so the build's are kept.
     extensionCatalogs: locale => bundle.extensionMessages?.[locale] ?? [],
+    // The build resolved it where the extension was, under the path the executable holds its module by.
+    editor: () => bundle.editor,
     // An executable is copied away from the project it was built in, to run where its files are.
     runtimeRoot: () => process.cwd(),
     imageCache: () => join(tmpdir(), 'kay-images'),

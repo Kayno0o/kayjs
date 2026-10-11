@@ -606,9 +606,12 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const scan = options.prerendering ? newServerIslands(true) : undefined
   // In edit mode the page's markup is marked with the fields of the entries it renders, once whole.
   const marks = editMarks()
-  const editor = marks === undefined || options.editor === undefined ? undefined : editors.get(options.editor)
+  const file = marks === undefined ? undefined : options.editor
+  const editor = file === undefined ? undefined : editors.get(file)
   // The editor renders once the page did, given each entry the page read, kept alive by the page swap, which hands it the next page's.
-  const shown = editor === undefined ? view : () => ({ t: child(view()) + child(editor.default({ entries: [...marks!.entries.values()], persist: true })) })
+  const shown = marks === undefined || editor === undefined ? view : () => ({ t: child(view()) + child(editor.default({ entries: [...marks.entries.values()], persist: true })) })
+  // Its stylesheet comes last, after the page's.
+  const styled = file === undefined || editor === undefined ? files : [...files, file]
   const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown)) : renderStatic(shown), pageHead(modules[page]!, options.head?.(rendering.ctx.url, rendering.status)))))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
@@ -619,7 +622,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
   const islandData = hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) + queryScript(rules) : ''
-  const written = `${htmlOpen(lang)}<head>${headStart(head)}${stylesheets(client, files)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) : ''}</head><body>${body}`
+  const written = `${htmlOpen(lang)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) : ''}</head><body>${body}`
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
   if (!streamed)

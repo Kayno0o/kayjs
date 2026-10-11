@@ -357,6 +357,20 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
       // The editor lived on through the navigation, given the entries of the page gone to.
       expect(await editor.text('button.count')).toBe('Clicked 1')
       expect(await editor.text('ul.edited')).toBe('news:roadmap')
+
+      // Out of edit mode, the next page swapped in leaves the editor and its stylesheet out.
+      const sheets = await editor.count('link[rel="stylesheet"]')
+
+      // The page left from links back to the first, which no prefetch in edit mode holds.
+      await editor.evaluate(async () => {
+        await fetch('/_kay/preview?exit&path=/')
+        document.querySelector('a.away')!.setAttribute('href', '/marks/launch')
+      })
+      await editor.click('a.away')
+      await editor.waitFor('h1', { text: 'Launch day' })
+
+      expect(await editor.count('ul.edited')).toBe(0)
+      expect(await editor.count('link[rel="stylesheet"]')).toBe(sheets - 1)
       expect(editor.errors).toEqual([])
     }
     finally {

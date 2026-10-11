@@ -521,6 +521,12 @@ describe('preview mode', () => {
     expect(await edited('/news')).toBe('<li>news:launch</li><li>news:roadmap</li>')
     expect(await edited('/articles/hello')).toBe('<li>articles:hello@fr</li>')
     expect((await get('/marks/launch', preview)).html).not.toContain('draft-editor')
+    // Its stylesheet comes with it, after the page's.
+    const sheets = (html: string) => [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(link => link[1]!)
+    const linked = sheets((await get('/marks/launch', edit)).html)
+
+    expect(linked).toEqual([...sheets((await get('/marks/launch', preview)).html), expect.any(String)])
+    expect(await (await app.handle(new Request(`http://localhost${linked.at(-1)!}`))).text()).toContain('dashed teal')
     expect(() => extensionEditor('.', [EDITOR, { name: 'other', editor: 'other.kay' }])).toThrow('kay: the extensions editor and other each give an editor')
     expect(await rejection(readClientSources(FIXTURE, { extensions: [{ name: 'static', editor: 'src/components/headline.kay' }] }))).toMatchObject({ message: expect.stringContaining('runs nothing in the browser') })
   })
