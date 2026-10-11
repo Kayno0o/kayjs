@@ -347,6 +347,14 @@ describe('Pagination', () => {
     expect(paged).toContain('<a class="kui-pagination-step" href="/blog/3" rel="next">Next</a>')
   })
 
+  test('links only the steps either side of a list whose length is unknown, by page or by offset, and draws nothing for its one page', async () => {
+    const strip = async (id: string) => (await element('/paging', id)).replaceAll(/<!--[^>]*-->/g, '')
+
+    expect(await strip('open')).toBe('<article id="open"><nav aria-label="Pagination" class="kui-pagination"><a class="kui-pagination-step" href="/gallery?tag=kay" rel="prev">Previous</a><a class="kui-pagination-step" href="/gallery?tag=kay&amp;page=3" rel="next">Next</a></nav></article>')
+    expect(await strip('offset')).toBe('<article id="offset"><nav aria-label="Pagination" class="kui-pagination"><a class="kui-pagination-step" href="/gallery?offset=20&amp;tag=kay" rel="prev">Previous</a><span class="kui-pagination-step">Next</span></nav></article>')
+    expect(await strip('open-single')).toBe('<article id="open-single"></article>')
+  })
+
   test('shows a page past the ends, or none at all, as the nearest that exists', async () => {
     const strip = (html: string) => html.replaceAll(/<!--[^>]*-->/g, '')
 

@@ -15,6 +15,12 @@ main
     Pagination(of={{ page: 2, pages: 3, href: n => n === 1 ? '/blog' : `/blog/${n}` }})
   article#single
     Pagination(page={1} pages={1} url="/posts")
+  article#open
+    Pagination(page={2} more url="/gallery?tag=kay")
+  article#offset
+    Pagination(offset={40} limit={20} more={false} url="/gallery?offset=40&tag=kay")
+  article#open-single
+    Pagination(offset={0} limit={20} more={false} url="/gallery")
   article#qr
     QrCode(value="https://kaynooo.fr" label="kaynooo.fr" size={160})
   article#qr-other

@@ -43,12 +43,43 @@ export function pageItems(page: number, pages: number, siblings = 1): (number | 
 
 // The link to a page: the current URL's path and query with `param` set to it, left out for the first page so it keeps one URL.
 export function pageHref(url: URL | string, page: number, param = 'page'): string {
+  return withParam(url, param, page > 1 ? page : undefined)
+}
+
+// The link to the stretch of a list starting at `offset`, left out at 0 as the first page is.
+export function offsetHref(url: URL | string, offset: number, param = 'offset'): string {
+  return withParam(url, param, offset > 0 ? offset : undefined)
+}
+
+function withParam(url: URL | string, param: string, value: number | undefined): string {
   const target = new URL(url, 'http://localhost')
 
-  if (page <= 1)
+  if (value === undefined)
     target.searchParams.delete(param)
   else
-    target.searchParams.set(param, String(page))
+    target.searchParams.set(param, String(value))
 
   return `${target.pathname}${target.search}`
+}
+
+// Where the list is, for one whose length is unknown: a page from 1, or an offset and how many rows a page holds.
+export type OpenPosition = { page: number, offset?: never, limit?: never } | { page?: never, offset: number, limit: number }
+
+// The links either side of the page on screen of a list whose length is unknown: previous past the first page, next when the caller knows there is more. A position that is no whole number, such as `?offset=abc`, reads as the start.
+export function openSteps(position: OpenPosition, more: boolean, url: URL | string, param?: string): { previous: string | undefined, next: string | undefined } {
+  if (position.limit !== undefined) {
+    const start = Math.max(Math.trunc(position.offset) || 0, 0)
+
+    return {
+      previous: start > 0 ? offsetHref(url, Math.max(start - position.limit, 0), param) : undefined,
+      next: more ? offsetHref(url, start + position.limit, param) : undefined,
+    }
+  }
+
+  const page = Math.max(Math.trunc(position.page) || 1, 1)
+
+  return {
+    previous: page > 1 ? pageHref(url, page - 1, param) : undefined,
+    next: more ? pageHref(url, page + 1, param) : undefined,
+  }
 }

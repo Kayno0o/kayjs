@@ -1,13 +1,16 @@
 ---
 import type { JSX } from 'kay'
 import type { PagedList } from './pagination'
-import { currentPage, pageHref, pageItems } from './pagination'
+import { currentPage, openSteps, pageHref, pageItems } from './pagination'
 
-const { of, page, pages, url, param = 'page', siblings = 1, label = 'Pagination', previousLabel = 'Previous', nextLabel = 'Next', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & ({
+const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = 'Pagination', previousLabel = 'Previous', nextLabel = 'Next', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & ({
   // A page kay's `paginate()` gave, which links each page at its own path: `Pagination(of={list})`.
   of: PagedList
   page?: never
   pages?: never
+  offset?: never
+  limit?: never
+  more?: never
   url?: never
 } | {
   of?: never
@@ -15,10 +18,31 @@ const { of, page, pages, url, param = 'page', siblings = 1, label = 'Pagination'
   page: number
   // How many pages there are; with one or none, nothing is drawn.
   pages: number
+  offset?: never
+  limit?: never
+  more?: never
   // The URL of the page on screen, `ctx.url`: each link keeps its path and query, `param` set to the page.
   url: URL | string
+} | {
+  // A list whose length is unknown, by page number: only Previous and Next, Next while `more` says there is a page after this one.
+  of?: never
+  page: number
+  pages?: never
+  offset?: never
+  limit?: never
+  more: boolean
+  url: URL | string
+} | {
+  // The same by offset, `?offset=40`, a page holding `limit` rows.
+  of?: never
+  page?: never
+  pages?: never
+  offset: number
+  limit: number
+  more: boolean
+  url: URL | string
 }) & {
-  // The query parameter holding the page, `page` by default.
+  // The query parameter holding the page, `page` by default, or the offset, `offset` by default.
   param?: string | undefined
   // How many pages show on each side of the current one, 1 by default.
   siblings?: number | undefined
@@ -33,9 +57,21 @@ const total = of?.pages ?? pages ?? 0
 // The page as one that exists, whatever the query held.
 const shown = () => currentPage(of?.page ?? page ?? 1, total)
 const href = (target: number) => of ? of.href(target) : pageHref(url ?? '', target, param)
+const steps = () => more === undefined ? undefined : openSteps(limit === undefined ? { page: page ?? 1 } : { offset: offset ?? 0, limit }, more, url ?? '', param)
 ---
 // Plain links, through the query or at the paths `paginate()` gives, so a page renders on the server, its pages crawlable, and needs no island.
-if total > 1
+if steps() as open
+  if open.previous || open.next
+    nav.kui-pagination({...rest} aria-label={label} class={className})
+      if open.previous
+        a.kui-pagination-step(href={open.previous} rel="prev") {previousLabel}
+      else
+        span.kui-pagination-step {previousLabel}
+      if open.next
+        a.kui-pagination-step(href={open.next} rel="next") {nextLabel}
+      else
+        span.kui-pagination-step {nextLabel}
+else if total > 1
   nav.kui-pagination({...rest} aria-label={label} class={className})
     if shown() > 1
       a.kui-pagination-step(href={href(shown() - 1)} rel="prev") {previousLabel}
