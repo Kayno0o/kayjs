@@ -111,7 +111,7 @@ function withDefaults(data: unknown, schema: TSchema): unknown {
   return filled
 }
 
-function unknownComponents(segments: Segment[], components: Record<string, unknown>, found: ComponentSegment[] = []): ComponentSegment[] {
+export function unknownComponents(segments: Segment[], components: Record<string, unknown>, found: ComponentSegment[] = []): ComponentSegment[] {
   for (const segment of segments) {
     if (typeof segment === 'string')
       continue

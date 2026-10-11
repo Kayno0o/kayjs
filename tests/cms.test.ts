@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
+import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { collection, collections, entries } from '../src/content'
@@ -14,7 +14,7 @@ import { editing, previewing } from '../src/runtime/preview'
 import { editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
-import { inPreview, previewRequested } from '../src/server/preview'
+import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
 import { cms, resetCms } from './fixtures/cms/src/cms'
 import { articles, news } from './fixtures/cms/src/content.config'
 
@@ -268,6 +268,21 @@ describe('preview mode', () => {
     }, true)
   })
 
+  it('marks a number only rendered right after its field is read, nothing else read or rendered between', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { rating: 3, order: 1, label: 'L', tags: ['a', 'b', 'c'] }, Content: () => ({ t: '' }) })
+      const html = withFieldMarks(marks, () => {
+        const shown = entry.data.rating >= 3 ? child(entry.data.tags.length) : ''
+        const order = entry.data.order
+
+        return `<p>${shown}</p><p>${child(order === 1 ? 'first' : 'later')}${child(1)}</p><p>${order === 1 ? child(entry.data.label) : ''}${child(1)}</p>`
+      })
+
+      expect(placeFieldMarks(html, marks)).toBe('<p>3</p><p>first1</p><p><!--kay-field news:a:label-->L<!--/kay-field-->1</p>')
+    }, true)
+  })
+
   it('marks a text rendered after the field read it, never a blank one, one already rendered, or a field\'s own private-use characters', () => {
     inPreview(() => {
       const marks = editMarks()!
@@ -279,6 +294,20 @@ describe('preview mode', () => {
       })
 
       expect(placeFieldMarks(html, marks)).toBe('<p>x</p><h1 data-kay-field="news:a:title">Same</h1><h2 data-kay-field="news:a:subtitle">Same</h2><p>Same</p><i data-kay-field="news:a:icon">\uE002\uE000f0\uE001</i>')
+    }, true)
+  })
+
+  it('marks a text once per render of its field, however often it was read', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'Same' }, Content: () => ({ t: '' }) })
+      const html = withFieldMarks(marks, () => {
+        const read = [entry.data.title, entry.data.title]
+
+        return `<h1>${child(read[0]!)}</h1><p>${child('Same')}</p>`
+      })
+
+      expect(placeFieldMarks(html, marks)).toBe('<h1 data-kay-field="news:a:title">Same</h1><p>Same</p>')
     }, true)
   })
 
@@ -323,7 +352,53 @@ describe('preview mode', () => {
     ] })
     expect((await post(draft, preview)).status).toBe(403)
     expect((await post(draft, edit, { origin: 'https://evil.example' })).status).toBe(403)
+    expect((await post(draft, edit, { 'sec-fetch-site': 'same-site' })).status).toBe(403)
+    expect((await post(draft, edit, { 'sec-fetch-site': 'same-origin' })).status).toBe(200)
     expect((await post({ path: '//evil.example', entries: [] })).status).toBe(400)
+    expect((await post({ ...draft, entries: [{ ...draft.entries[0]!, body: 'x'.repeat(1024 * 1024) }] })).status).toBe(413)
+  })
+
+  it('refuses a draft body using a component its collection does not name, and a locale a localized collection alone has', async () => {
+    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
+    const post = async (entries: unknown[], path = '/marks/launch') => app.handle(new Request('http://localhost/_kay/draft', { method: 'POST', headers: { 'cookie': edit, 'content-type': 'application/json' }, body: JSON.stringify({ path, entries }) }))
+    const refused = await post([
+      { collection: 'news', slug: 'launch', data: { title: 'T', published: true, tags: [] }, body: 'Hi\n\n<Nope />' },
+      { collection: 'news', slug: 'launch', locale: 'fr', data: { title: 'T', published: true, tags: [] } },
+      { collection: 'articles', slug: 'hello', data: { title: 'T' } },
+    ])
+
+    expect(refused.status).toBe(422)
+    expect(await refused.json()).toEqual({ issues: [
+      { collection: 'news', slug: 'launch', path: 'body', message: 'uses <Nope> on line 3, which the collection\'s components do not name' },
+      { collection: 'news', slug: 'launch', locale: 'fr', path: '', message: 'names a locale, which the collection is not localized by' },
+      { collection: 'articles', slug: 'hello', path: '', message: 'names no locale, which each entry of a localized collection has' },
+    ] })
+
+    const created = await post([{ collection: 'articles', slug: 'nouveau', locale: 'fr', data: { title: 'Nouveau' }, body: 'Tout neuf.' }], '/articles/nouveau')
+
+    expect(created.status).toBe(200)
+    expect(await created.text()).toContain('<h1 data-kay-field="articles:nouveau@fr:title">Nouveau</h1>')
+    expect((await get('/articles/nouveau', edit)).status).toBe(404)
+  })
+
+  it('forgets the drafts once their page is rendered, so the id naming them shows nothing again', async () => {
+    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
+    const id = '00000000-0000-4000-8000-000000000000'
+    const uuid = spyOn(crypto, 'randomUUID').mockReturnValue(id)
+
+    try {
+      const drafted = await app.handle(new Request('http://localhost/_kay/draft', { method: 'POST', headers: { 'cookie': edit, 'content-type': 'application/json' }, body: JSON.stringify({ path: '/marks/launch', entries: [{ collection: 'news', slug: 'launch', data: { title: 'Draft title', published: true, tags: [] } }] }) }))
+
+      expect(await drafted.text()).toContain('>Draft title</h1>')
+    }
+    finally {
+      uuid.mockRestore()
+    }
+
+    const replayed = await app.handle(new Request('http://localhost/marks/launch', { headers: { 'cookie': edit, 'x-kay-draft': id } }))
+
+    expect(requestDrafts(new Request('http://localhost/marks/launch', { headers: { 'x-kay-draft': id } }))).toBeUndefined()
+    expect(await replayed.text()).toContain('>Launch day</h1>')
   })
 
   it('shows drafts to that visitor alone, from a fresh load no cache keeps, until the cookie runs out or they leave', async () => {

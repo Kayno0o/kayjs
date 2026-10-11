@@ -10,7 +10,7 @@ export interface EntryRef {
   locale?: string
 }
 
-// What one request in edit mode read of the entries: each field by an index the markers carry, the fields whose text was read and not rendered yet, by that text, the number read last, and every entry read.
+// What one request in edit mode read of the entries: each field by an index the markers carry, the fields whose text was read and not rendered yet, by that text and in the order read, the number read last when nothing was read or rendered since, and every entry read.
 export interface FieldMarks {
   refs: string[]
   indexes: Map<string, number>
@@ -125,7 +125,7 @@ export function editableEntry<E extends Editable>(marks: FieldMarks, collection:
   return editable
 }
 
-// A text or a number a helper renders, fenced when a field gave it: a text a field read and not rendered yet, the first such when several were, or the number read last.
+// A text or a number a helper renders, fenced when a field gave it: a text a field read and not rendered yet, the first such when several were, or a number read right before.
 export function markedText(value: string | number, markup: string): string {
   const ref = fieldOf(value)
 
@@ -206,19 +206,15 @@ function fenced(marks: FieldMarks, kind: Kind, ref: number, markup: string): str
 function fieldOf(value: string | number): number | undefined {
   const marks = fieldMarks.marking!
 
+  // Anything rendered forgets the number read last, so one rendered later, a row's index say, is not taken for the field.
+  const last = marks.last
+
+  marks.last = undefined
+
   if (typeof value === 'string')
     return marks.unrendered.get(value)?.shift()
 
-  // Taken once, so a number rendered later, a row's index say, is not taken for the field.
-  if (marks.last?.value === value) {
-    const { ref } = marks.last
-
-    marks.last = undefined
-
-    return ref
-  }
-
-  return undefined
+  return last?.value === value ? last.ref : undefined
 }
 
 function refIndex(marks: FieldMarks, ref: string): number {
@@ -249,6 +245,10 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
         return ref()
 
       const read = Reflect.get(target, key, receiver) as unknown
+
+      // Any other read comes between a number and its render, the number then no longer told apart from one computed.
+      if (typeof key === 'string')
+        marks.last = undefined
 
       if (typeof key === 'symbol' || !Object.hasOwn(target, key) || !configurable(target, key) || (key === 'length' && Array.isArray(target)))
         return read

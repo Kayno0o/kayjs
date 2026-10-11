@@ -9,4 +9,5 @@ const draft = async (data: unknown, body?: string) => issues.set(JSON.stringify(
 button.count(onClick={() => clicks.set(n => n + 1)}) Clicked {clicks()}
 button.draft(onClick={async () => draft({ title: 'Draft title', published: true, tags: ['draft'] }, '## Drafted')}) Draft
 button.refused(onClick={async () => draft({ title: 3, published: true, tags: [] })}) Refused
+button.slow(onClick={async () => draft({ title: 'Slow draft', published: true, tags: [] })}) Slow
 p.issues {issues()}

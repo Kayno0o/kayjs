@@ -1,3 +1,5 @@
+import type { CompiledMarkdown } from '../content/markdown'
+import type { DraftEntry } from './edit'
 import type { FieldMarks } from './fields'
 
 // What a request in preview mode carries while it renders: each loaded collection's entries, loaded once per request, and whether it is in edit mode.
@@ -9,12 +11,9 @@ export interface PreviewState {
   drafts?: Map<string, EntryDraft[]>
 }
 
-// An entry as an editor has it before saving: its data, and its Markdown body when it changed.
-export interface EntryDraft {
-  slug: string
-  locale?: string | undefined
-  data: unknown
-  body?: string | undefined
+// A draft as the page renders it, its body compiled once, as `/_kay/draft` checked the components it uses.
+export interface EntryDraft extends Omit<DraftEntry, 'collection'> {
+  compiled?: CompiledMarkdown | undefined
 }
 
 export type PreviewMode = 'preview' | 'edit'

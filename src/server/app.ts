@@ -17,6 +17,7 @@ import { serveFeeds } from '../content/server'
 import { offlineOf } from '../project'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
+import { DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi, sharedGuards } from './api'
 import { rebaseCss, rebaseRedirects } from './base'
@@ -39,7 +40,7 @@ import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './open
 import { withPageHeaders } from './page-headers'
 import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
-import { serveDrafts, servePreview } from './preview'
+import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
 import { requestId, trustProxy } from './protection'
 import { claimPublic, publicFiles, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
@@ -240,7 +241,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
-  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, api.limits)
+  limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, options.preview ? new Map([...actionLimits, [DRAFT_ROUTE, DRAFT_BODY_LIMIT]]) : actionLimits, api.limits)
 
   if (servesOpenApi) {
     // On a site requiring guards, the document is refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.

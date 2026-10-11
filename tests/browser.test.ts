@@ -344,6 +344,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
       await editor.waitFor('p.issues', { text: '[{"collection":"news","slug":"launch","path":"title","message":"Expected property \'title\' to be string but found: 3"}]' })
 
       expect(await editor.text('h1')).toBe('Draft title')
+
+      // Leaving the page while a draft renders keeps the page gone to.
+      await editor.click('button.slow')
+      await editor.click('a.away')
+      await editor.waitFor('h1', { text: 'Next year' })
+      await Bun.sleep(800)
+
+      expect(await editor.text('h1')).toBe('Next year')
+      expect(await editor.path()).toBe('/marks/roadmap')
       expect(editor.errors).toEqual([])
     }
     finally {

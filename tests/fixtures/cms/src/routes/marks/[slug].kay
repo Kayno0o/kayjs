@@ -3,6 +3,10 @@ import { news } from '../../content.config'
 
 const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = entry
+
+// Holds a draft back, so a test leaves the page while it renders.
+if (entry.data.title === 'Slow draft')
+  await Bun.sleep(500)
 --- script
 import DraftEditor from '../../components/draft-editor.kay'
 import Headline from '../../components/headline.kay'
@@ -19,5 +23,6 @@ textarea Draft: {entry.data.title}
 article
   Content
 DraftEditor
+a.away(href="/marks/roadmap") Away
 IslandTitle(title={entry.data.title})
   em.slotted {entry.data.title}

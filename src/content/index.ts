@@ -213,11 +213,11 @@ export function collection<Schema extends TSchema, Components extends Record<str
       preview.loads.set(draftKey, drafted = (async () => {
         const raw = [...raws.get(entries) ?? []]
 
+        // Every entry is decoded again, once per draft render: cheap beside the render, and a collection's decoded entries are never shared with one.
         for (const draft of drafts) {
           const slug = localized ? `${draft.locale}/${draft.slug}` : draft.slug
           const at = raw.findIndex(entry => entry.slug === slug)
-          const compiled = draft.body === undefined ? undefined : await compileMarkdown(draft.body, 1, options.highlight)
-          const entry: RawEntry = { ...raw[at] ?? { file: `${name}/${slug}` }, slug, data: draft.data, lines: {}, ...compiled }
+          const entry: RawEntry = { ...raw[at] ?? { file: `${name}/${slug}` }, slug, data: draft.data, lines: {}, ...draft.compiled }
 
           if (at === -1)
             raw.push(entry)
