@@ -1,8 +1,4 @@
 ---
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import '../app.css'
 ---
 slot
-Toaster
-TooltipHost

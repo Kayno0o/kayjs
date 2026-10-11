@@ -1,11 +1,16 @@
 --- server
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { settings } from '../settings'
 import './admin.css'
 
 const { prefix } = settings()
+// Toaster and TooltipHost give way to the app's own when its root layout renders them.
 ---
 .kcms-admin
   header.kcms-admin-head
     a.kcms-admin-home(href={prefix}) Content
   main.kcms-admin-main
     slot
+Toaster
+TooltipHost

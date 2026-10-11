@@ -3,6 +3,8 @@ import type { EditorProps } from 'kay/edit'
 import type { EntryRef } from '../kay/contract'
 import type { FieldMarker, FieldPath } from '../markers'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { listen } from 'kay'
 import { entryKey, fieldsAt } from '../markers'
 import { drafts } from './drafts'
@@ -44,6 +46,7 @@ listen(() => document, 'click', (event) => {
   focused = field.marker
 }, { capture: true })
 
+// A site page may render no Toaster or TooltipHost of its own; where it does, the ones below give way to them.
 effect(() => {
   document.documentElement.classList.toggle('kcms-editing', open())
 })
@@ -61,3 +64,5 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
         EntryForm(entry={entry} focus={focusIn(entry)})
       else
         p.kcms-editor-empty Nothing on this page comes from a collection.
+Toaster
+TooltipHost
