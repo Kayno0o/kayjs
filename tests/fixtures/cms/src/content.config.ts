@@ -1,5 +1,5 @@
 import { t } from 'elysia'
-import { collection } from 'kay/content'
+import { collection, imageField, reference } from 'kay/content'
 import { cms } from './cms'
 
 export const news = collection({
@@ -17,6 +17,7 @@ export const news = collection({
 
 // A folder collection exported under another name than its folder's.
 export const articles = collection('content/articles', {
-  schema: t.Object({ title: t.String() }),
+  schema: t.Object({ title: t.String(), hidden: t.Optional(t.Boolean()), author: t.Optional(reference('news')), cover: t.Optional(imageField()), published: t.Optional(t.Date()) }),
   localized: true,
+  draft: 'hidden',
 })

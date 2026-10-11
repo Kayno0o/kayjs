@@ -13,6 +13,7 @@ import { runInLocale } from '../runtime/locale-state'
 import { importModule } from '../server/bundle'
 import { hostLocale, stateFor } from '../server/i18n'
 import { projectSource } from '../server/source'
+import { registerCollections } from './edit'
 import { feedXml } from './feed'
 import { isCollection } from './index'
 import { loadEntries, manifestFile, setContentPlace } from './load'
@@ -76,6 +77,8 @@ async function namedCollections(root: string, config?: string): Promise<[string,
 
   for (const [exported, collection] of collections)
     nameCollection(collection.name, exported)
+
+  registerCollections(collections)
 
   return collections
 }

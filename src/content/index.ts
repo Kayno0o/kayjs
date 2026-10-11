@@ -17,6 +17,8 @@ import { contentMode, loadEntries } from './load'
 import { compileMarkdown, MarkdownError } from './markdown'
 import { ContentError, decodeEntries } from './validate'
 
+export type { CollectionInfo, FieldKind, SourceEntry } from './edit'
+export { collections, entries, fileField, imageField, markdownField, reference } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { highlightCode, renderMarkdown } from './markdown'
@@ -74,8 +76,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   components?: Record<string, Component<never>> | undefined
   // Highlights code blocks when the entries compile, at build time, such as with Shiki.
   highlight?: Highlighter | undefined
-  // Entries left out everywhere but `kay dev` and preview mode: from `all()`, `get()`, prerendering, the sitemap and the feed.
-  draft?: ((entry: Entry<Static<Schema>>) => boolean) | undefined
+  // Entries left out everywhere but `kay dev` and preview mode: from `all()`, `get()`, prerendering, the sitemap and the feed. A boolean field's name, `'draft'`, leaves out those where it is true, which a CMS then reads and writes.
+  draft?: ((entry: Entry<Static<Schema>>) => boolean) | (keyof Static<Schema> & string) | undefined
   // The order `all()` lists entries in; by slug otherwise.
   sort?: ((a: Entry<Static<Schema>>, b: Entry<Static<Schema>>) => number) | undefined
   // An RSS or Atom feed of the collection, served at its path.
@@ -91,6 +93,8 @@ export interface Collection<Data, Components extends Record<string, Component<ne
   readonly name: string
   // The folder, or undefined for a collection a loader fills.
   readonly dir: string | undefined
+  // The loader filling it, or undefined for a folder's.
+  readonly loader: ContentLoader | undefined
   readonly options: CollectionOptions<TSchema>
   // The components its Markdown entries may use, typed as given, which `kay check` reads their props from.
   readonly components: Components
@@ -228,7 +232,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     return drafted
   }
   const loaded = async () => withDrafts(await (loader ? fromLoader : fromFolder)())
-  const hidden = (entry: Entry<Data>) => draft !== undefined && !contentMode().dev && !previewing() && draft(entry)
+  const hidden = (entry: Entry<Data>) => draft !== undefined && !contentMode().dev && !previewing() && isDraft(draft, entry)
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined
 
@@ -236,7 +240,8 @@ export function collection<Schema extends TSchema, Components extends Record<str
     [COLLECTION]: true,
     name,
     dir: loader ? undefined : name,
-    options,
+    loader,
+    options: options as CollectionOptions<TSchema>,
     components: components as Components,
     all: async (locale) => {
       const { list, byLocale } = await loaded()
@@ -319,6 +324,11 @@ export type FeedPathsOf<Module> = { [Name in keyof Module]: Module[Name] extends
 
 export function isCollection(value: unknown): value is Collection<unknown> {
   return typeof value === 'object' && value !== null && COLLECTION in value
+}
+
+// Whether the collection's `draft` holds an entry back: its function, or its boolean field set.
+export function isDraft<Data>(draft: ((entry: Entry<Data>) => boolean) | string, entry: Entry<Data>): boolean {
+  return typeof draft === 'string' ? (entry.data as Record<string, unknown> | undefined)?.[draft] === true : draft(entry)
 }
 
 function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean): Entry<Data> {

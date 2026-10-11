@@ -4,7 +4,7 @@ import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
-import { collection } from '../src/content'
+import { collection, collections, entries } from '../src/content'
 import { ContentError } from '../src/content/validate'
 import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
@@ -16,7 +16,7 @@ import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { inPreview, previewRequested } from '../src/server/preview'
 import { cms, resetCms } from './fixtures/cms/src/cms'
-import { news } from './fixtures/cms/src/content.config'
+import { articles, news } from './fixtures/cms/src/content.config'
 
 const FIXTURE = 'tests/fixtures/cms'
 const SECRET = 'a-preview-secret-long-enough-for-kay-0123456789'
@@ -141,6 +141,32 @@ describe('a CMS behind a collection', () => {
     expect(sitemap).not.toContain('roadmap')
     expect(feed).toContain('<title>Launch day</title>')
     expect(feed).not.toContain('Next year')
+  })
+})
+
+describe('the collections a CMS edits', () => {
+  it('describes each exported collection: its JSON Schema with the kinds kay knows, its folder in the repository and its draft field', async () => {
+    const found = await collections()
+    const repoRoot = process.cwd()
+    const articles = found.find(each => each.name === 'articles')!
+
+    expect(found.map(each => each.name)).toEqual(['articles', 'news'])
+    expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, localized: false, repoRoot })
+    expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden', repoRoot })
+    expect(articles.schema.properties).toMatchObject({ author: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'news' } }, cover: { 'type': 'string', 'x-kay': { kind: 'image' } } })
+    expect(JSON.stringify(articles.schema)).not.toContain('"Date"')
+  })
+
+  it('lists entries as their source holds them, drafts included and told apart, one locale\'s when asked', async () => {
+    expect(await entries('news')).toEqual([
+      { slug: 'launch', data: { title: 'Launch day', published: true, tags: ['launch'] }, body: '## What ships\n\nEverything.', draft: false },
+      { slug: 'roadmap', data: { title: 'Next year', published: false, tags: ['roadmap'] }, body: 'Not yet.', draft: true },
+    ])
+    expect(cms.loads).toEqual([true])
+    expect(await entries('articles', { locale: 'fr' })).toEqual([{ slug: 'hello', locale: 'fr', path: 'tests/fixtures/cms/src/content/articles/fr/hello.md', data: { title: 'Bonjour' }, body: '\nSalut.\n', draft: false }])
+    expect((await entries('articles')).map(entry => [entry.locale, entry.draft])).toEqual([['en', true], ['fr', false]])
+    expect(await articles.all('en')).toEqual([])
+    expect(await rejection(entries('posts'))).toMatchObject({ message: 'kay: no collection is exported from the content config as posts; it exports articles, news' })
   })
 })
 

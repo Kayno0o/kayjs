@@ -58,6 +58,11 @@ export function contentMode(): ContentMode {
   return mode ?? modeOf()
 }
 
+// Where the content config sits, and the project around it, for a CMS reading the collections' files.
+export function contentPlace(): { root: string, base: string } {
+  return { root: rootOf(), base: baseOf() }
+}
+
 function rootOf(): string {
   return place?.root ?? process.cwd()
 }
