@@ -6,6 +6,7 @@ import { Database } from 'bun:sqlite'
 import { afterAll, afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
+import { resolveProject } from '../src/project'
 import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
@@ -195,7 +196,7 @@ describe('cached with a store', () => {
     sqliteCache(path)
 
     try {
-      await prerenderPages(root, { routes: 'tests/fixtures/production/src/routes' }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes: 'tests/fixtures/production/src/routes' }), (await readClient(root))!)
       const app = await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: true, security: false, serverTiming: true })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 

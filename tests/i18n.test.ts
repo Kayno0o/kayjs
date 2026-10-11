@@ -13,6 +13,7 @@ import { compileKay } from '../src/compiler'
 import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
+import { resolveProject } from '../src/project'
 import { flattenMessages, localePath, localizedLink, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
 import { relativeTime } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
@@ -423,7 +424,7 @@ describe('prerendering', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      expect(await prerenderPages(root, { routes, i18n: config }, (await readClient(root))!)).toBe(2)
+      expect(await prerenderPages(resolveProject(root, { routes, i18n: config }), (await readClient(root))!)).toBe(2)
       await check()
     }
     finally {

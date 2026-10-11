@@ -12,7 +12,7 @@ import { Elysia } from 'elysia'
 import { outputDir } from '../build/assets'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
-import { clientOptionsOf } from '../project'
+import { clientOptionsOf, resolveProject } from '../project'
 import { encodeCall, minTimeOf, readActionResponse, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
@@ -143,11 +143,12 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names.
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles() }
+  const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false })
   const client: ClientBuild = options.browser !== undefined && options.browser !== false
     ? await buildClient(root, clientOptionsOf(config, { dev: false, underKayDev: false }))
     : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(outputDir(root), 'dist') }
   const browser = typeof options.browser === 'object' ? options.browser : {}
-  const pages = await servePages(root, config, async () => client)
+  const pages = await servePages(project, async () => client)
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)

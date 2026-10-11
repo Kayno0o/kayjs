@@ -1,34 +1,29 @@
 import type { RenderedPage } from '../check/seo'
-import type { KayConfig } from '../config'
+import type { Project } from '../project'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
-import { outputDir } from '../build/assets'
 import { elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
-import { PRODUCTION, projectPaths, renderOptionsOf } from '../project'
 import { isAction } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { runInLocale } from '../runtime/locale-state'
-import { setSite, standInReads } from '../runtime/site'
+import { standInReads } from '../runtime/site'
 import { projectApi } from './api'
-import { basePath } from './base'
 import { setupCards } from './card'
-import { PRERENDERED_DIR, readInlineStyles, readManifest, writeManifest } from './client'
+import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { exportedEndpoints } from './endpoints'
-import { implicitI18n, loadI18n, localeCopies, routedSettings, stateFor } from './i18n'
-import { applyImageConfig } from './image'
-import { registerLoader } from './loader'
+import { localeCopies, stateFor } from './i18n'
 import { pageSetting } from './page-settings'
-import { loadMatchers, matchedParams } from './params'
+import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pathOf, storedHeaders } from './prerendered'
 import { renderPage } from './render'
-import { refuseClashes, routeMounts, scanEndpoints, scanRoutes } from './routes'
-import { configHead, siteOrigin } from './seo'
+import { scanEndpoints } from './routes'
 import { serverIslandModes } from './server-islands'
+import { setupPages } from './setup'
 import { STAMP_HOLE } from './stamp'
 
 const KAY_PREFIX = /^kay: /
@@ -51,40 +46,20 @@ export interface PrerenderOptions {
 }
 
 // Renders every page whose server fence exports `prerender = true` into `.kay/client/pages`, listing them in the manifest the server boots from.
-export async function prerenderPages(root: string, config: KayConfig, client: ClientBuild, options: PrerenderOptions = {}): Promise<number> {
-  await registerLoader(root, config.settings)
-
+export async function prerenderPages(project: Project, client: ClientBuild, options: PrerenderOptions = {}): Promise<number> {
+  const { root, config, paths: { routes: routesDir, output } } = project
   const manifest = await readManifest(root)
 
   if (!manifest)
     throw new Error('kay: no client build to add prerendered pages to; run buildClient first')
 
-  const dir = join(outputDir(root), PRERENDERED_DIR)
-  const { head } = await configHead(root, config, client.dir)
-
-  if (config.inlineStyles === true)
-    client.inlineStyles = await readInlineStyles(client, basePath(config.base))
+  const dir = join(output, PRERENDERED_DIR)
+  const { mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, async () => client, true)
 
   await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (config.fonts?.length ?? 0) > 0, config: config.images?.card, name: config.seo?.name, quality: config.images?.quality, collect: true })
 
-  const site = config.site === undefined ? undefined : siteOrigin(config.site) + basePath(config.base)
-
-  setSite(site, config.trailingSlash, true)
-  const maxDensity = applyImageConfig(config.images)
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
-
-  const routesDir = projectPaths(root, config).routes
-  const routes = await scanRoutes(routesDir, routeMounts(root, config.extensions))
-
-  refuseClashes(routesDir, routes)
-  const matchers = await loadMatchers(routesDir, routes)
-  const i18n = config.i18n ? await loadI18n(root, config.i18n, config.extensions) : undefined
-
-  if (i18n)
-    i18n.settings = routedSettings(i18n.settings, routes)
-
-  const locales = i18n ?? await implicitI18n(root, config.lang, config.extensions)
 
   async function prerenderRoute(route: Route, file: string, marked: boolean): Promise<void> {
     const module = await import(route.file) as Record<string, unknown>
@@ -112,7 +87,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()
-        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptionsOf(config, PRODUCTION, { head, maxDensity }), prerendering: true })
+        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, prerendering: true })
         const response = await runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
 
         if (response.status >= 500)
@@ -185,7 +160,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   }
 
   const apiProblems = options.exportAll ? (await projectApi(root, config)).map(module => `${relative(root, module.file)}: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file`) : []
-  const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, routeMounts(root, config.extensions)))).problems : []
+  const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts))).problems : []
 
   if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
     throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)

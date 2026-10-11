@@ -5,6 +5,7 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
+import { resolveProject } from '../src/project'
 import { localPath } from '../src/runtime/base'
 import { integer } from '../src/runtime/params'
 import { pages } from '../src/server'
@@ -197,7 +198,7 @@ describe('prerendering', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(2)
+      expect(await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)).toBe(2)
       expect(await Bun.file(join(outputDir(root), 'pages/blog.html')).text()).toContain('<p class="page">Page 1, a undefined</p>')
       expect(await Bun.file(join(outputDir(root), 'pages/blog/2.html')).text()).toContain('<p class="page">Page 2, a number</p>')
     }

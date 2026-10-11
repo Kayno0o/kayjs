@@ -6,6 +6,7 @@ import type { Paint } from './compiler/frame'
 import type { LintGroup } from './compiler/lints'
 import type { KayConfig } from './config'
 import type { Feature, Preset } from './new'
+import type { Project } from './project'
 import type { ClientBuild } from './server/client'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
@@ -14,7 +15,6 @@ import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
-import { outputDir } from './build/assets'
 import { buildClient } from './build/client'
 import { compileServer } from './build/compile'
 import { formatSizeReport } from './build/report'
@@ -33,7 +33,7 @@ import { formatFiles } from './format'
 import { startServer } from './lsp/server'
 import { migrateAstroProject } from './migrate/project'
 import { createProject, FEATURE_NAMES, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from './new'
-import { cacheDir, clientOptionsOf, projectPaths } from './project'
+import { cacheDir, clientOptionsOf, resolveProject } from './project'
 import { linkVariantFiles } from './runtime/image'
 import { setAvifThreads } from './server/avif'
 import { basePath } from './server/base'
@@ -245,11 +245,11 @@ async function build(args: string[]): Promise<number> {
   if (typeof parsed === 'number')
     return parsed
 
-  const { compile, entry, outdir, project } = parsed.values
+  const { compile, entry, outdir, project: tsconfig } = parsed.values
   const exported = parsed.values.static === true
   const skipCheck = parsed.values['no-check'] === true
 
-  if (skipCheck && typeof project === 'string') {
+  if (skipCheck && typeof tsconfig === 'string') {
     console.error(`kay: -p names the tsconfig the build checks with, so it does not go with --no-check\n${USAGE}`)
 
     return 1
@@ -281,8 +281,8 @@ async function build(args: string[]): Promise<number> {
   buildingWithoutEnv()
 
   const config = await loadConfig(root)
-
-  const output = outputDir(root)
+  const project = resolveProject(root, config)
+  const { output } = project.paths
   const previous = `${output}-previous`
   const checking = !skipCheck
 
@@ -293,7 +293,7 @@ async function build(args: string[]): Promise<number> {
     await rm(previous, { recursive: true, force: true })
 
   const started = performance.now()
-  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { launch: true }) : { failing: 0, found: 0 }, bundleClient(root, config, exported, parsed.values.analyze === true)])
+  const [checked, bundled] = await Promise.allSettled([checking ? checkProject(root, config, typeof tsconfig === 'string' ? tsconfig : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { launch: true }) : { failing: 0, found: 0 }, bundleClient(project, exported, parsed.values.analyze === true)])
 
   if (checked.status === 'rejected' || checked.value.failing > 0) {
     await putBack(output, previous)
@@ -314,7 +314,7 @@ async function build(args: string[]): Promise<number> {
 
     client = bundled.value
 
-    const { prerendered, entries, failing } = await finishOutput(root, config, exported, client, checking)
+    const { prerendered, entries, failing } = await finishOutput(project, exported, client, checking)
 
     if (failing > 0) {
       await putBack(output, previous)
@@ -343,14 +343,14 @@ async function build(args: string[]): Promise<number> {
     if (exported) {
       const written = performance.now()
       const target = resolve(typeof outdir === 'string' ? outdir : join(root, 'dist'))
-      const site = await exportStatic(root, config, client, target)
+      const site = await exportStatic(project, client, target)
 
       done('exported', `${count(site.pages, 'page')} and ${count(site.files, 'other file')} to ${relative(process.cwd(), target) || '.'}`, written)
     }
 
     if (typeof compile === 'string') {
       const compiled = performance.now()
-      const executable = await compileServer(root, config, { outfile: resolve(compile), entry: typeof entry === 'string' ? resolve(entry) : undefined })
+      const executable = await compileServer(project, { outfile: resolve(compile), entry: typeof entry === 'string' ? resolve(entry) : undefined })
 
       done('compiled', relative(process.cwd(), executable), compiled)
     }
@@ -384,11 +384,13 @@ function buildError(error: unknown): unknown {
 }
 
 // The browser bundles and the variants of the images they import, which run no page, API module or guard, so they build while the check runs.
-async function bundleClient(root: string, config: KayConfig, exported: boolean, analyze: boolean): Promise<ClientBuild> {
+async function bundleClient(project: Project, exported: boolean, analyze: boolean): Promise<ClientBuild> {
+  const { root, config } = project
+
   if (exported)
     refuseStaticConfig(config)
 
-  const client = await buildClient(root, clientOptionsOf(config, { dev: false, underKayDev: false }, { exported, report: analyze ? 'modules' : 'sizes' }))
+  const client = await buildClient(root, clientOptionsOf(config, project.mode, { exported, report: analyze ? 'modules' : 'sizes' }))
 
   // A static host cannot pick a format by `Accept`, so an export links WebP alone.
   const avif = exported ? undefined : avifQuality(config.images)
@@ -402,9 +404,10 @@ async function bundleClient(root: string, config: KayConfig, exported: boolean, 
 }
 
 // The rest of what the server serves from `.kay/client`, which runs the app's content config and pages, so only once the check passed: content manifests, prerendered pages, the variants of images only they import, and favicons, compressed.
-async function finishOutput(root: string, config: KayConfig, exported: boolean, client: ClientBuild, checking: boolean): Promise<{ prerendered: number, entries: number, failing: number }> {
+async function finishOutput(project: Project, exported: boolean, client: ClientBuild, checking: boolean): Promise<{ prerendered: number, entries: number, failing: number }> {
+  const { root, config, paths } = project
   // Before prerendering, whose pages read the collections from what it writes.
-  const entries = await writeContentManifests(root, outputDir(root), config.content)
+  const entries = await writeContentManifests(root, paths.output, config.content)
 
   // A static host has no image route, so pages link the variant files the build writes, and no file route, so stored files where their store serves them.
   if (exported) {
@@ -413,7 +416,7 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   }
 
   const rendered: RenderedPage[] = []
-  const prerendered = await prerenderPages(root, config, client, { exportAll: exported, rendered })
+  const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered })
   // The heads are the check's to read, so `--no-check` skips them with it.
   const { failing } = checking ? await printProblems(pageSeoLints(config, rendered, exported)) : { failing: 0 }
 
@@ -429,8 +432,8 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   if (favicon !== undefined)
     await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR))
 
-  await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: projectPaths(root, config).public, base: basePath(config.base), aspects: config.images?.aspects })
-  await Promise.all([compressFiles(client.dir), compressFiles(join(outputDir(root), PRERENDERED_DIR))])
+  await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects })
+  await Promise.all([compressFiles(client.dir), compressFiles(join(paths.output, PRERENDERED_DIR))])
 
   return { prerendered, entries, failing }
 }

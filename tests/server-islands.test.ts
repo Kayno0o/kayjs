@@ -6,6 +6,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { compileKay } from '../src/compiler'
+import { resolveProject } from '../src/project'
 import { hydrateIslands } from '../src/runtime/client'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
 import { pages } from '../src/server'
@@ -29,7 +30,7 @@ describe('server islands', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
 
       const written = (await readManifest(root))!.pages!
 
@@ -130,7 +131,7 @@ describe('server islands', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      const exporting = prerenderPages(root, { routes }, (await readClient(root))!, { exportAll: true })
+      const exporting = prerenderPages(resolveProject(root, { routes }), (await readClient(root))!, { exportAll: true })
 
       await expect(exporting).rejects.toThrow(ExportError)
       await expect(exporting).rejects.toThrow('deferred.kay: it holds a server island, which only a server renders per request')

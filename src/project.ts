@@ -77,6 +77,18 @@ export function renderOptionsOf(config: RenderConfig, mode: Pick<Mode, 'dev'>, b
   return { lang: config.lang, dev: mode.dev, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, onError: config.onError, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode) }
 }
 
+// A project as every entry point takes it: where it is, its config, where it keeps each part and how it runs.
+export interface Project<Config extends KayConfig = KayConfig> {
+  root: string
+  config: Config
+  paths: ProjectPaths
+  mode: Mode
+}
+
+export function resolveProject<Config extends KayConfig>(root: string, config: Config, mode: Mode = PRODUCTION): Project<Config> {
+  return { root: resolve(root), config, paths: projectPaths(root, config), mode }
+}
+
 // The browser build a config asks for. `kay build`'s (`build` given) minifies unless the config says not to; one a server or a test makes on demand does only when the config says so.
 export function clientOptionsOf(config: ClientConfig, mode: Pick<Mode, 'dev' | 'underKayDev'>, build?: Pick<ClientOptions, 'exported' | 'report'>): ClientOptions {
   return {

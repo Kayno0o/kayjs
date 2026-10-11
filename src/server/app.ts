@@ -1,4 +1,5 @@
 import type { KayConfig, TrailingSlash } from '../config'
+import type { Project } from '../project'
 import type { GuardContext } from '../runtime'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { RouteMatch } from './actions'
@@ -10,23 +11,22 @@ import { tmpdir } from 'node:os'
 import { join, normalize, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import { ASSET_PREFIX, testWorker, underKayDev } from '../build/assets'
+import { ASSET_PREFIX, testWorker } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { extensionServers, pageHooks } from '../config'
 import { projectCollections, serveFeeds } from '../content/server'
-import { cacheDir, offlineOf, projectPaths, renderOptionsOf } from '../project'
+import { cacheDir, offlineOf } from '../project'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
-import { setSite } from '../runtime/site'
 import { overHttps, registerActionRoutes } from './actions'
 import { projectApi, serveApi, sharedGuards } from './api'
-import { basePath, rebaseCss, rebaseRedirects } from './base'
+import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { bundled } from './bundle'
 import { serveCards, setupCards } from './card'
-import { PRERENDERED_DIR, readInlineStyles } from './client'
+import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, filesUnder, fixedTexts, preferredEncoding } from './compress'
 import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, devA11y, devAxe, devEvents, devInspector, devPatch, hotSwap, openInEditor } from './dev'
 import { serveEndpoints } from './endpoints'
@@ -35,15 +35,14 @@ import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuard, loadGuards } from './guards'
-import { cookieLocale, hostLocale, implicitI18n, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, routedSettings, serveLocales, stateFor } from './i18n'
-import { applyImageConfig, avifQuality, serveImages } from './image'
+import { cookieLocale, hostLocale, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, serveLocales, stateFor } from './i18n'
+import { avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
-import { registerLoader } from './loader'
 import { announceStart, answeringRequest, logRequests, pathOf, useLogger } from './log'
 import { serveServiceWorker } from './offline'
 import { openApiDocument, openApiSettings, refuseOpenApiClashes, serveOpenApi } from './openapi'
 import { assetFiles, hookedResponse } from './page-hook'
-import { isPlain, loadMatchers, matchedParams, positionalParams, routerShapes, shapeParams } from './params'
+import { isPlain, matchedParams, positionalParams, routerShapes, shapeParams } from './params'
 import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
 import { requestId, trustProxy } from './protection'
 import { servePublic } from './public'
@@ -53,10 +52,10 @@ import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './rende
 import { reportServerError } from './report'
 import { revalidateStale, trackPrerendered } from './revalidate'
 import { rewriteRequests } from './rewrite'
-import { decodePath, refuseClashes, refuseEndpointClashes, routeMounts, routeTrees, scanEndpoints, scanRoutes, servedPaths, specialPagesOf, withoutSlash } from './routes'
+import { decodePath, refuseEndpointClashes, routeTrees, scanEndpoints, servedPaths, specialPagesOf, withoutSlash } from './routes'
 import { headerCopies, ownHeaders, securityHeaders, setSecurityHeaders } from './security'
-import { configHead, siteOrigin } from './seo'
 import { serveServerIslands } from './server-islands'
+import { setupPages } from './setup'
 import { serveSitemap } from './sitemap'
 import { serveFiles, setupStorage } from './storage'
 import { answered, SERVER_SPAN, setTracer, traced } from './trace'
@@ -186,24 +185,12 @@ function remembered(response: Response, request: Request, locale: string): Respo
 }
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
-export async function servePages(root: string, options: PagesOptions, loadClient: () => Promise<ClientBuild>) {
-  const paths = projectPaths(root, options)
-  const mode = { dev: options.dev === true }
+export async function servePages(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>) {
+  const { root, config: options, paths, mode } = project
   const routesDir = paths.routes
-  const mounts = routeMounts(root, options.extensions)
-
-  // An executable carries its routes and modules compiled; anything else finds them on disk and compiles them as they load.
   const bundle = bundled()
-
-  if (!bundle)
-    await registerLoader(root, options.settings)
-
-  const [scanned, client] = await Promise.all([bundle?.routes ?? scanRoutes(routesDir, mounts), loadClient()])
-
-  refuseClashes(routesDir, scanned)
+  const { client, mounts, routes: scanned, matchers, i18n, locales, base, site, scripts, styles, renderOptions } = await setupPages(project, loadClient)
   const routes = await Promise.all(scanned.map(loadGuards))
-  const i18n = options.i18n ? await loadI18n(root, options.i18n, options.extensions) : undefined
-
   const collections = await projectCollections(root, options.content)
 
   if (i18n) {
@@ -211,28 +198,13 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     // A localized collection's feed is served once per locale, as a page is; any other's once for all of them.
     const feeds = i18n.settings.hosts ? [] : collections.flatMap(({ options }) => options.feed && options.localized === true ? [options.feed.path] : [])
 
-    i18n.settings = { ...routedSettings(i18n.settings, routes), pages: routes.map(route => route.pattern), ...feeds.length > 0 && { feeds } }
+    i18n.settings = { ...i18n.settings, pages: routes.map(route => route.pattern), ...feeds.length > 0 && { feeds } }
   }
-
-  // Without `i18n`, every request runs in the site's one language, its extensions' messages and the app's read.
-  const locales = i18n ?? await implicitI18n(root, options.lang, options.extensions)
 
   serveLocales(root, locales)
   const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
 
-  const base = basePath(options.base)
-  const maxDensity = applyImageConfig(options.images)
-
   setTracer(options.tracer)
-  const site = options.site === undefined ? undefined : siteOrigin(options.site) + base
-
-  setSite(site, options.trailingSlash)
-
-  if (options.inlineStyles === true && !options.dev)
-    client.inlineStyles = await readInlineStyles(client, base)
-
-  const { head, scripts, styles } = await configHead(root, options, client.dir, bundle !== undefined)
-  const renderOptions = renderOptionsOf(options, mode, { head, maxDensity })
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
@@ -289,10 +261,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     servePublicEnv(app, options.publicEnv)
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
-  if (!options.dev)
+  if (!mode.dev)
     stopOnSignal(app, lifecycle, options.shutdownTimeout)
 
-  if (options.dev) {
+  if (mode.dev) {
     const hot = hotSwap(root, client)
 
     app.get(DEV_EVENTS, () => devEvents(false, hot))
@@ -300,7 +272,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     app.get(DEV_A11Y, () => devA11y())
     app.get(DEV_AXE, () => devAxe())
 
-    if (underKayDev()) {
+    if (mode.underKayDev) {
       app.get(DEV_INSPECTOR, () => devInspector())
       app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
     }
@@ -335,7 +307,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
       if (!path.startsWith(client.dir + sep) || !await file.exists())
         return status(404)
 
-      if (!options.dev)
+      if (!mode.dev)
         assets.set(path, file)
     }
 
@@ -359,15 +331,14 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     if (!encoded) {
       encoded = Bun.file(copy)
 
-      if (!options.dev)
+      if (!mode.dev)
         assets.set(copy, encoded)
     }
 
     return new Response(encoded, { headers: { ...headers, 'content-encoding': encoding, 'content-type': file.type } })
   })
 
-  const matchers = await loadMatchers(routesDir, routes)
-  const actionOptions = { dev: options.dev, onError: options.onError, i18n: locales, base }
+  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base }
   const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, paths.public, routes), bundle?.api ?? projectApi(root, options)])
 
   const api = await serveApi(app, apiModules, actionOptions)
@@ -382,7 +353,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, api.limits)
 
-  if (openapi && (openapi.dev !== true || options.dev)) {
+  if (openapi && (openapi.dev !== true || mode.dev)) {
     const guards = await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} })))
 
     refuseOpenApiClashes(api.mounted, openapi)
@@ -409,7 +380,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(bundle ? process.cwd() : root, dir)])),
     quality: options.images?.quality,
     // Development serves WebP, so a page's first load does not wait on AVIF encoding.
-    avif: options.dev ? undefined : avifQuality(options.images),
+    avif: mode.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
     remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache),
     security,
@@ -427,10 +398,10 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   serveCards(app, cards, imageRoute)
 
-  serveFeeds(app, collections, site, options.dev, i18n)
+  serveFeeds(app, collections, site, mode.dev, i18n)
 
   if (site !== undefined)
-    serveSitemap(app, routes, site, taken, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
+    serveSitemap(app, routes, site, taken, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
 
   const favicon = faviconSource(root, options.favicon, options.manifest)
 
@@ -457,7 +428,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     trackPrerendered(pages, page => moved || page.readsSite === true)
 
   // `kay dev` prints its own.
-  if (log !== false && !options.dev)
+  if (log !== false && !mode.dev)
     announceStart(app, log, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
 
   const trailingSlash = options.trailingSlash ?? 'never'

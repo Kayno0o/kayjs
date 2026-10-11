@@ -1,10 +1,9 @@
 import type { BunPlugin } from 'bun'
-import type { KayConfig } from '../config'
+import type { Project } from '../project'
 import type { Route, SpecialPages } from '../server/routes'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
-import { projectPaths } from '../project'
 import { projectApi } from '../server/api'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
@@ -41,9 +40,10 @@ function withoutCompiler(): BunPlugin {
 
 // Bundles the server, its pages and the client build `kay build` wrote into one executable, which runs as `NODE_ENV=production bun <entry>` would.
 // The entry it generates registers every route module before the server entry calls `pages()`, which then reads nothing from disk but the embedded files.
-export async function compileServer(root: string, config: KayConfig, options: CompileOptions): Promise<string> {
-  const paths = projectPaths(root, { ...config, entry: options.entry })
-  const { routes: routesDir, public: publicDir, output: clientBase, entry } = paths
+export async function compileServer(project: Project, options: CompileOptions): Promise<string> {
+  const { root, config, paths } = project
+  const { routes: routesDir, public: publicDir, output: clientBase } = paths
+  const entry = options.entry === undefined ? paths.entry : resolve(root, options.entry)
   const outfile = resolve(root, options.outfile)
 
   if (!existsSync(entry))

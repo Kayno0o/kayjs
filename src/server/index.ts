@@ -4,7 +4,7 @@ import type { ClientBuild } from './client'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { mergeConfig, withConfig } from '../config'
-import { clientOptionsOf, modeOf, PRODUCTION } from '../project'
+import { clientOptionsOf, modeOf, PRODUCTION, resolveProject } from '../project'
 import { kayLog } from '../runtime/log'
 import { servePages } from './app'
 import { bundled } from './bundle'
@@ -56,7 +56,7 @@ export async function pages(options: PagesOptions = {}) {
   if (bundle) {
     const config = { ...mergeConfig(bundle.config, options), root: bundle.root, dev: mode.dev, prebuilt: mode.prebuilt, publicDir: bundle.publicDir }
 
-    return servePages(bundle.root, config, async () => {
+    return servePages(resolveProject(bundle.root, config, mode), async () => {
       const client = await readClient(bundle.root, bundle.clientDir)
 
       if (!client)
@@ -68,13 +68,14 @@ export async function pages(options: PagesOptions = {}) {
 
   const root = resolve(options.root ?? process.cwd())
   const config = { ...await withConfig(root, options), dev: mode.dev, prebuilt: mode.prebuilt }
+  const project = resolveProject(root, config, mode)
   const loadClient = async () => clientFor(root, config, mode)
 
   if (!mode.dev)
-    return servePages(root, config, loadClient)
+    return servePages(project, loadClient)
 
   try {
-    return await servePages(root, config, loadClient)
+    return await servePages(project, loadClient)
   }
   catch (error) {
     kayLog('error', 'the server could not start', error)

@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { classesFile, outputDir } from '../src/build/assets'
+import { resolveProject } from '../src/project'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
 import { readClient, readInlineStyles, readManifest, writeManifest } from '../src/server/client'
@@ -610,7 +611,7 @@ describe('route params in guards and actions', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      await prerenderPages(root, { routes: dir }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)
       const file = await Bun.file(join(outputDir(root), 'pages/orgs/acme/report.html')).text()
       const prerendered = await pages({ routes: dir, prebuilt: true })
       const acme = await prerendered.handle(new NativeRequest('http://localhost/orgs/acme/report'))
@@ -835,7 +836,7 @@ describe('prerendering', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(4)
+      expect(await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)).toBe(4)
       const file = await Bun.file(join(outputDir(root), 'pages/admin/report.html')).text()
       const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const visit = async (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
@@ -861,7 +862,7 @@ describe('prerendering', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      await prerenderPages(root, { routes, inlineStyles: true }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes, inlineStyles: true }), (await readClient(root))!)
       const file = await Bun.file(join(outputDir(root), 'pages/admin/report.html')).text()
 
       expect(file).toContain('<style>')
@@ -879,7 +880,7 @@ describe('prerendering', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const visit = async (path: string) => {
         const response = await served.handle(new NativeRequest(`http://localhost${path}`))
@@ -909,7 +910,7 @@ describe('prerendering', () => {
     const client = (await readClient(root))!
 
     try {
-      await prerenderPages(root, { routes }, client)
+      await prerenderPages(resolveProject(root, { routes }), client)
       await Promise.all([compressFiles(client.dir), compressFiles(join(outputDir(root), 'pages'))])
       const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const fetch = async (path: string, headers: Record<string, string> = {}) => served.handle(new NativeRequest(`http://localhost${path}`, { headers }))
@@ -988,17 +989,17 @@ describe('prerendering', () => {
 
     try {
       await Bun.write(join(dir, 'posts/[slug].kay'), '--- server\nexport const page = { prerender: true }\n---\np {ctx.params.slug}\n')
-      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('so `prerender` lists them: export const page = { prerender: [{ slug: \'...\' }] }')
+      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('so `prerender` lists them: export const page = { prerender: [{ slug: \'...\' }] }')
       await rm(join(dir, 'posts'), { recursive: true })
       // Another file, since the first one stays in the module cache.
       await Bun.write(join(dir, 'tags/[slug].kay'), '--- server\nexport const page = { prerender: [{ slug: 1 }] }\n---\np {ctx.params.slug}\n')
-      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('lists {"slug":1} in prerender, which needs a string for each of slug')
+      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('lists {"slug":1} in prerender, which needs a string for each of slug')
       await rm(join(dir, 'tags'), { recursive: true })
       await Bun.write(join(dir, 'files/[...path].kay'), '--- server\nexport const page = { prerender: [{ path: \'a/../../x\' }] }\n---\np {ctx.params.path}\n')
-      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('with no empty, . or .. segment')
+      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('with no empty, . or .. segment')
       await rm(join(dir, 'files'), { recursive: true })
       await Bun.write(join(dir, 'notes/[slug].kay'), '--- server\nexport const page = { prerender: \'yes\' }\n---\np {ctx.params.slug}\n')
-      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('exports a prerender that is neither true, false')
+      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('exports a prerender that is neither true, false')
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -1014,7 +1015,7 @@ describe('prerendering', () => {
     try {
       await Bun.write(join(dir, 'index.kay'), '--- server\nexport const page = { prerender: true }\n---\np Home\n')
       await Bun.write(join(dir, '[slug].kay'), '--- server\nexport const page = { prerender: [{ slug: \'index\' }] }\nconst slug = ctx.params.slug\n---\np {slug}\n')
-      await expect(prerenderPages(root, { routes: dir }, (await readClient(root))!)).rejects.toThrow('kay: /index and / would both be prerendered to index.html')
+      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('kay: /index and / would both be prerendered to index.html')
     }
     finally {
       await rm(dir, { recursive: true, force: true })

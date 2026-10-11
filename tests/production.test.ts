@@ -14,6 +14,7 @@ import { version } from '../package.json'
 import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
+import { resolveProject } from '../src/project'
 import { action } from '../src/runtime'
 import { sqliteCache } from '../src/runtime/cache.server'
 import { inlineScriptHashes, invalidatePage, pages, requestId, shutdown, sqliteJobs, sqliteStore } from '../src/server'
@@ -805,7 +806,7 @@ describe('revalidation', () => {
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       const app = await pages({ routes, prebuilt: true, security: false })
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
       const built = await visit()
@@ -841,7 +842,7 @@ describe('revalidation', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       const app = await pages({ routes, prebuilt: true, security: false })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
@@ -880,7 +881,7 @@ describe('revalidation', () => {
     const canonical = async (app: Awaited<ReturnType<typeof pages>>) => (await (await app.handle(new Request('http://localhost/news'))).text()).match(/<link rel="canonical" href="([^"]+)">/)?.[1]
 
     try {
-      await prerenderPages(root, { routes, site: 'https://example.com' }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes, site: 'https://example.com' }), (await readClient(root))!)
 
       expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'https://example.com' }))).toBe('https://example.com/news')
       expect(warned).not.toHaveBeenCalled()
@@ -909,7 +910,7 @@ describe('revalidation', () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
 
       expect((await readManifest(root))!.pages!['/origin']!.readsSite).toBe(true)
 
@@ -918,7 +919,7 @@ describe('revalidation', () => {
       expect(await (await app.handle(new Request('http://localhost/origin'))).text()).toContain('<p class="origin">https://example.com</p>')
       // Built for no site and served for one, as one build for several hosts is, it goes quietly.
       expect(warned).not.toHaveBeenCalled()
-      await expect(prerenderPages(root, { routes }, (await readClient(root))!, { exportAll: true })).rejects.toThrow('origin.kay: it reads the site, through siteUrl() or siteOrigin()')
+      await expect(prerenderPages(resolveProject(root, { routes }), (await readClient(root))!, { exportAll: true })).rejects.toThrow('origin.kay: it reads the site, through siteUrl() or siteOrigin()')
     }
     finally {
       warned.mockRestore()
@@ -933,7 +934,7 @@ describe('revalidation', () => {
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       const app = await pages({ routes, prebuilt: true, security: false })
       const { publish } = await import(NEWS) as { publish: Action<{ edition: number }, void> }
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
@@ -974,7 +975,7 @@ describe('revalidation', () => {
     const extensions = [{ name: 'signed', transformPage: ({ path, html }: { path: string, html: string }) => html.replace('</body>', `<!--signed ${path}--></body>`) }]
 
     try {
-      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       await hookPrerendered(root, extensions.map(extension => extension.transformPage), { clientDir: (await readClient(root))!.dir, publicDir: join(root, 'public'), base: '' })
 
       const app = await pages({ routes, prebuilt: true, security: false, extensions })
@@ -1008,7 +1009,7 @@ describe('revalidation', () => {
     try {
       await Bun.write(join(copy, 'src/routes/broken.kay'), '--- server\nexport const page = { prerender: true, revalidate: \'hourly\' }\n---\np Broken\n')
 
-      await expect(prerenderPages(root, { routes: `${copy}/src/routes` }, (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration')
+      await expect(prerenderPages(resolveProject(root, { routes: `${copy}/src/routes` }), (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration')
     }
     finally {
       await rm(copy, { recursive: true, force: true })
@@ -1028,7 +1029,7 @@ describe('a prerendered page posted to', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       const app = await pages({ routes, prebuilt: true, security: false })
       const { join: subscribe } = await import(NEWSLETTER) as { join: Action<{ email: string }, string> }
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/newsletter', { headers }))
@@ -1084,7 +1085,7 @@ describe('a prerendered page posted to', () => {
     const start = Date.now()
 
     try {
-      await prerenderPages(root, { routes }, (await readClient(root))!)
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       expect(await Bun.file(join(outputDir(root), 'pages/brochure.html')).text()).toContain('name="kay_since" value="kay-stamp:')
 
       const app = await pages({ routes, prebuilt: true, security: false })

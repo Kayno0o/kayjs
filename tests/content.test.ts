@@ -12,6 +12,7 @@ import { feedXml } from '../src/content/feed'
 import { setContentPlace } from '../src/content/load'
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
 import { writeContentManifests } from '../src/content/server'
+import { resolveProject } from '../src/project'
 import { sanitizeHtml } from '../src/runtime'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
@@ -96,7 +97,7 @@ describe('prerendering a collection', () => {
 
     try {
       expect(await writeContentManifests(root, outputDir(root), content)).toBe(5)
-      expect(await prerenderPages(root, { routes, content }, (await readClient(root))!)).toBe(2)
+      expect(await prerenderPages(resolveProject(root, { routes, content }), (await readClient(root))!)).toBe(2)
       expect(await Bun.file(join(outputDir(root), 'pages/blog/hello.html')).text()).toContain('<h1 class="title">Hello world</h1>')
       expect(await Bun.file(join(outputDir(root), 'pages/blog/draft.html')).exists()).toBe(false)
     }

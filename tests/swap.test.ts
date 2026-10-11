@@ -4,6 +4,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t, ValidationError } from 'elysia'
 import { clientDir } from '../src/build/assets'
+import { resolveProject } from '../src/project'
 import { persisted, signal } from '../src/runtime'
 import { action } from '../src/runtime/action'
 import { hydrateIslands } from '../src/runtime/client'
@@ -26,7 +27,7 @@ const FIELD = /^\/([^/]*)/
 const shared = createSignal('default')
 const FORMS = /<script type="application\/json" data-kay-forms>(.*?)<\/script>/
 const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(process.cwd()), navigation: true }
-const app = await servePages(process.cwd(), { routes, security: false }, async () => client)
+const app = await servePages(resolveProject(process.cwd(), { routes, security: false }), async () => client)
 
 async function html(path: string): Promise<string> {
   return (await app.handle(new Request(`http://localhost${path}`))).text()
@@ -41,7 +42,7 @@ describe('page swap, on the server', () => {
     expect(second).toContain('<script type="module" src="/_kay/entry.js">')
     expect(JSON.parse(FORMS.exec(second)![1]!)).toEqual({ '/_kay/action/tests/fixtures/navigation/src/routes/second.kay/add': { properties: { title: { type: 'string', maxLength: 200, minLength: 3, error: 'Too short' } }, required: ['title'] } })
 
-    const bare = await servePages(process.cwd(), { routes: 'tests/fixtures/bare/src/routes', security: false }, async () => client)
+    const bare = await servePages(resolveProject(process.cwd(), { routes: 'tests/fixtures/bare/src/routes', security: false }), async () => client)
 
     expect(await (await bare.handle(new Request('http://localhost/'))).text()).not.toContain('<script type="module"')
   })
@@ -80,7 +81,7 @@ describe('page swap, on the server', () => {
   it('renders a try block\'s catch block when it throws, the error reported, marked for hydration to keep', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const caught: unknown[] = []
-    const reporting = await servePages(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }, async () => client)
+    const reporting = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }), async () => client)
     const page = await (await reporting.handle(new Request('http://localhost/fallback'))).text()
 
     logged.mockRestore()
@@ -93,7 +94,7 @@ describe('page swap, on the server', () => {
   it('hands what a browser reports to onError, refusing another site\'s, a malformed one and a flood', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const caught: unknown[] = []
-    const reporting = await servePages(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }, async () => client)
+    const reporting = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }), async () => client)
     const report = async (body: string, headers: Record<string, string> = {}) => (await reporting.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body }))).status
     const sent = JSON.stringify({ name: 'TypeError', message: 'x is undefined', stack: 'TypeError: x is undefined\n    at chunk.js:1:2', url: 'http://localhost/fallback' })
 

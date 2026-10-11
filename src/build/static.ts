@@ -1,4 +1,5 @@
 import type { KayConfig } from '../config'
+import type { Project } from '../project'
 import type { ClientBuild } from '../server/client'
 import type { Redirects } from '../server/redirects'
 import { existsSync } from 'node:fs'
@@ -8,7 +9,6 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { pageHooks } from '../config'
 import { feedPaths, projectCollections } from '../content/server'
-import { projectPaths } from '../project'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
@@ -26,7 +26,6 @@ import { publicFiles } from '../server/public'
 import { routeMounts, scanEndpoints } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
-import { outputDir } from './assets'
 
 // Left in the directory a static export writes, so a later export knows it may clear it, and never clears one it did not write.
 const MARKER = '.kay-static'
@@ -53,13 +52,14 @@ export function refuseStaticConfig(config: KayConfig): void {
 
 // Writes the whole site to `outdir`, as any static host serves it: every prerendered page, the browser build under `/_kay/`, the public files, the sitemap, feeds and favicons, `404.html`, and a page for each redirect.
 // Each page goes in as `about.html` and `about/index.html`, which every host finds for `/about` and `/about/` alike, beside the compressed copies a host may send as they are.
-export async function exportStatic(root: string, config: KayConfig, client: ClientBuild, outdir: string): Promise<StaticExport> {
+export async function exportStatic(project: Project, client: ClientBuild, outdir: string): Promise<StaticExport> {
+  const { root, config, paths: { public: publicDir, routes: routesDir, output } } = project
   const out = resolve(outdir)
 
   refuseStaticConfig(config)
   await clear(root, out)
 
-  const pagesDir = join(outputDir(root), PRERENDERED_DIR)
+  const pagesDir = join(output, PRERENDERED_DIR)
   const pages = [...client.pages]
   // What is written here rather than copied from the build, compressed once it is all in.
   const written: string[] = []
@@ -78,8 +78,6 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
       }
     }
   }
-
-  const { public: publicDir, routes: routesDir } = projectPaths(root, config)
 
   if (existsSync(publicDir)) {
     await cp(publicDir, out, { recursive: true })

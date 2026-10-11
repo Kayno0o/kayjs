@@ -6,6 +6,7 @@ import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
+import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
 import { enterPreview, pages, previewUrl } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
@@ -204,7 +205,7 @@ describe('preview mode', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      expect(await prerenderPages(root, options, (await readClient(root))!)).toBe(1)
+      expect(await prerenderPages(resolveProject(root, options), (await readClient(root))!)).toBe(1)
 
       const served = await pages({ ...options, prebuilt: true })
       const visit = async (cookie?: string) => {
