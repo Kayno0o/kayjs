@@ -166,8 +166,8 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
   return (await pagesApp(project, loadClient)).app
 }
 
-// The app, with every path it serves, each claimed as its feature registers it.
-export async function pagesApp(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>) {
+// The app, with every path it serves, each claimed as its feature registers it; `exported` when `kay build --static` reads the site from it, its check having reported a missing site.
+export async function pagesApp(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>, exported = false) {
   const { root, config: options, paths, mode } = project
   const setup = await setupPages(project, loadClient)
   const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards } = setup
@@ -274,7 +274,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   app.onStop(() => clearEditSite(editSite))
 
   // `kay build` leaves a server's site to `SITE_URL` at boot, so this is where one with none is told.
-  if (site === undefined && options.seo !== undefined && !mode.dev)
+  if (site === undefined && options.seo !== undefined && !mode.dev && !exported)
     kayLog('warn', '`seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt')
 
   if (site !== undefined)

@@ -47,7 +47,7 @@ export interface RewriteInput {
   code: string
   map: SourceMap
   sites: Sites
-  // Code only read by the type checker, where a row or an alias is its value rather than an accessor to it, so TypeScript narrows it; its reads stay as written, its assignments are still reported.
+  // Code only read by the type checker, where a row, an alias or a signal the template reads is its value rather than an accessor to it, so TypeScript narrows it; its assignments are still reported.
   values: boolean
   // Where the template begins in the source, past which a signal's name reads its value.
   templateStart: number
@@ -334,6 +334,19 @@ class RewriteFinder {
     return source
   }
 
+  // Whether a function the template writes, a handler or a `.map` callback, holds the read: it runs later, so no narrowing around it holds there.
+  private deferred(reference: NodePath): boolean {
+    for (let path = reference.getFunctionParent(); path !== null; path = path.parentPath?.getFunctionParent() ?? null) {
+      const start = path.node.start!
+      const source = this.input.map.isExact(start) ? this.input.map.toSource(start) : undefined
+
+      if (source !== undefined && source >= this.input.templateStart)
+        return true
+    }
+
+    return false
+  }
+
   // How type checking reads the signal `name`, whose value `access` spells: through `VALUES`, which TypeScript narrows.
   private valueRead(name: string, access: Rewrite = {}): Rewrite {
     this.values.set(name, `${access.before ?? ''}${access.replace ?? name}${access.after ?? ''}()`)
@@ -346,10 +359,11 @@ class RewriteFinder {
     this.known.add(binding)
 
     for (const reference of binding.referencePaths) {
-      const source = this.templateRead(reference) ? this.input.map.toSource(reference.node.start!) : this.templateCall(reference)
+      const values = this.input.values && !this.deferred(reference)
+      const source = this.templateRead(reference) ? this.input.map.toSource(reference.node.start!) : values ? this.templateCall(reference) : undefined
 
       if (source !== undefined)
-        this.rewrites.set(source, { ...withShorthand(reference, name, this.input.values ? this.valueRead(name) : { after: '()' }), end: source + name.length })
+        this.rewrites.set(source, { ...withShorthand(reference, name, values ? this.valueRead(name) : { after: '()' }), end: source + name.length })
     }
     for (const violation of binding.constantViolations)
       this.signalWrite(violation, name, kind, {})
@@ -439,10 +453,15 @@ class RewriteFinder {
 
     // A prop typed `Signal<T>` or `Memo<T>` reads its value by the name in the template, as the script's own signals do.
     const read = (reference: NodePath): Rewrite => {
-      if (signal && (this.templateRead(reference) || this.templateCall(reference) !== undefined))
-        return this.input.values ? this.valueRead(name, access) : { ...access, after: `${access.after ?? ''}()` }
+      if (!signal)
+        return access
 
-      return access
+      const values = this.input.values && !this.deferred(reference)
+
+      if (this.templateRead(reference))
+        return values ? this.valueRead(name, access) : { ...access, after: `${access.after ?? ''}()` }
+
+      return values && this.templateCall(reference) !== undefined ? this.valueRead(name, access) : access
     }
 
     this.visitBinding(path.scope, name, reference => withShorthand(reference, name, read(reference)), signal ? undefined : { message: `\`${name}\` is a prop, and props are read-only`, help: 'copy it into a signal to change it locally' }, propType(prop.binding))

@@ -677,7 +677,7 @@ describe('signal writes', () => {
     const code = tsx('---\nconst count = signal(0)\nconst open = signal(false)\nfunction f() {\n  count=count() + 1\n  count *= 2\n  --count\n}\n---\nbutton(onClick={() => { count++; open = !open }}) {count}')
 
     expect(code).toContain('count.set(count() + 1)\n  count.set((KayCurrent) => KayCurrent * (2))\n  count.set((KayCurrent) => KayCurrent - 1)')
-    expect(code).toContain('count.set((KayCurrent) => KayCurrent + 1); open.set(!(void open, __values.open))')
+    expect(code).toContain('count.set((KayCurrent) => KayCurrent + 1); open.set(!open())')
   })
 
   it('read and write by name a prop typed Signal, inline or through a type of the script, and a signal a module exports', () => {

@@ -112,7 +112,7 @@ Card(title="Todos")
 
 ## Signals
 
-`signal(value)` holds state. In the template it is read by its name, in the script by calling it, and written in both by assigning it, `count++`, or with `.set`. `kay check` narrows a signal the template reads as it narrows a `const`, so `{error && error.message}` checks with `error` a `signal<Error>()`. `memo(fn)` caches a derived value.
+`signal(value)` holds state. In the template it is read by its name, in the script by calling it, and written in both by assigning it, `count++`, or with `.set`. `kay check` narrows a signal within the template expression reading it, so `{error && error.message}` checks with `error` a `signal<Error>()`; a handler or a `.map` callback runs later, and is not narrowed. `memo(fn)` caches a derived value.
 
 ```kay
 ---

@@ -43,7 +43,7 @@ export function isPublicSite(config: SiteSeo, exported = false): boolean {
   return config.site !== undefined || config.seo !== undefined || exported
 }
 
-// What kay.config.ts leaves out of a public site's head; `sources` are the project's .kay files, any of which may set an `og:image`. A server may read its site from `SITE_URL` at boot, which it warns of lacking then, so only a static export is told it has none.
+// What kay.config.ts leaves out of a public site's head; `sources` are the project's .kay files, any of which may set an `og:image`. A missing site only counts for a static export, a server reading `SITE_URL` at boot.
 export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<string>, exported = false): CheckDiagnostic[] {
   const found: CheckDiagnostic[] = []
   const report = lintReporter(config, false, found)

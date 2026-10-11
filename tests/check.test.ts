@@ -215,7 +215,7 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('narrows a signal the template reads twice in one expression, by name or by call, as it narrows a const', async () => {
+  it('narrows a signal the template reads twice in one expression, by name or by call, but not in a function it writes, which runs later', async () => {
     const meter = [
       '---',
       'import type { Memo } from \'kay\'',
@@ -231,12 +231,14 @@ describe('kay check, edge cases', () => {
       'p {doubled !== undefined && doubled + 1}',
       'button(onClick={() => sent.set(1)}) {sent * 2}',
       'p {sent.toFixed(1)} {sent?.toFixed(1)}',
+      'button(onClick={() => { if (sent !== undefined) { sent = undefined; console.log(sent * 2) } }}) Reset',
+      'p {sent !== undefined && [1, 2].map(i => sent * i)}',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/components/meter.kay': meter })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.']])
+      expect((await check(root)).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 81, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 42, 'TS2532', 'Object is possibly \'undefined\'.']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -1512,6 +1514,25 @@ describe('kay check, unused code', () => {
       expect(await build('--static')).toContain('warning[missing-site]')
       expect((await runCheck(root, '--only', 'a11y')).output.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[missing-alt]'])
       expect(await runCheck(root, '--only', 'nope')).toEqual({ code: 1, output: 'kay check: --only takes a group of lints, `code`, `a11y`, `forms`, `islands`, `seo`, `security`, not `nope`\n', report: '' })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('tells a static export with no site so once, by the lint, not again from the server it exports', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default { seo: { name: \'Example\', description: \'What it is\', image: \'/og.png\' }, favicon: false }\n',
+      'src/routes/index.kay': 'p a\n',
+    })
+
+    try {
+      const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--static'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, SITE_URL: '' } })
+      const [stdout, stderr, code] = await Promise.all([new Response(build.stdout).text(), new Response(build.stderr).text(), build.exited])
+
+      expect(code).toBe(0)
+      expect(stderr).toContain('warning[missing-site]')
+      expect(stdout + stderr).not.toContain('kay: `seo` is set')
     }
     finally {
       await rm(root, { recursive: true, force: true })

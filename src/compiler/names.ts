@@ -4,7 +4,7 @@
 export const PROPS = '__props'
 // The value an updater gets, as `count += 1` writes `count.set((KayCurrent) => KayCurrent + 1)`.
 export const CURRENT = 'KayCurrent'
-// What type checking reads a template's signal through, `(void count, __values.count)`: a property TypeScript narrows, as it narrows no call, beside the signal's own name, which the editor renames and finds.
+// What type checking reads a template's signal through, `(void count, __values.count)`, a property TypeScript narrows where it narrows no call.
 export const VALUES = '__values'
 // A `case` block's subject, read once for every `when`.
 export const SUBJECT = 'KaySubject'
