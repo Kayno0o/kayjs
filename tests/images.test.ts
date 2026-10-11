@@ -7,7 +7,7 @@ import decodeAvif from '@jsquash/avif/decode.js'
 import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { testWorker } from '../src/build/assets'
-import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
+import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
 import { AVIF_SPEED } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
@@ -489,6 +489,11 @@ describe('AVIF', () => {
 
 describe('crops and share cards', () => {
   const hero = registerImage('/_kay/assets/crop-abc.png', 1000, 600)
+
+  // What the server installs to record the variants pages ask for, which `writeImageVariants` writes.
+  beforeAll(() => {
+    recordVariants()
+  })
   const heroSrc = () => `/_kay/assets/${heroUrl}`
   const route = async (query: string) => get(`/_kay/image?src=${encodeURIComponent(heroSrc())}&${query}`)
 

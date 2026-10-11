@@ -11,7 +11,6 @@ import { pageData } from './page-data'
 import { ownSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
-import { uploaded } from './upload'
 import { decodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
@@ -549,7 +548,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
     if (signal?.aborted !== true)
       onSent?.()
 
-    return body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? uploaded('POST', withBase(url), headers, body, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } })
+    return body instanceof FormData && typeof XMLHttpRequest !== 'undefined' ? (await import('./upload')).uploaded('POST', withBase(url), headers, body, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } })
   }
 
   // A page holding a challenge for the action solves it from the moment one of its forms takes focus.

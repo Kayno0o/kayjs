@@ -65,17 +65,16 @@ const sizes = new Map<string, { width: number, height: number }>()
 // The variant `src` falls back to for a browser that ignores `srcset`.
 const FALLBACK_WIDTH = 1280
 let maxDensity: number | undefined
-// `images.aspects` on the server, in lowest terms as `16x9`, and its check, set with it; the browser checks none.
-let aspects: ReadonlySet<string> | undefined
-let aspectCheck: typeof listedAspect | undefined
+// Refuses an aspect `images.aspects` does not list, set with it on the server; the browser checks none.
+let aspectCheck: ((aspect: Aspect, text: string) => void) | undefined
 // The variants of imported images that pages asked for beyond the ladder, by asset name, for `kay build` to write.
 const requested = new Map<string, Map<string, ImageVariant>>()
 // The variants of images on other hosts that a static export's pages link, by URL, for `kay build` to download and write.
 const requestedRemote = new Map<string, Map<string, ImageVariant>>()
 // Whether `images.remote` covers a URL, on the server; the browser checks none.
 let remoteListed: ((src: string) => boolean) | undefined
-// Its check of an image on another host, which warns of a host it leaves out, set with it: none reaches a browser's bundle.
-let unlistedCheck: typeof unlisted | undefined
+// Whether it leaves out the host of an image on another host, which then keeps its own URL, set with it.
+let unlistedCheck: ((src: string, caller: string) => boolean) | undefined
 // Set on the server, which records the variants pages ask for and links the files a static export wrote: the browser asks the route.
 let serverVariantUrl: typeof recordedVariantUrl | undefined
 // Whether `images.resolve` looks sources up, which the browser reads off the page.
@@ -90,35 +89,33 @@ export function setResolvedImages(on: boolean): void {
   resolved = on
 }
 
+// Hosts already warned about, once each per process.
+const warnedHosts = new Set<string>()
+
 export function setRemoteImages(listed: ((src: string) => boolean) | undefined): void {
   remoteListed = listed
-  unlistedCheck = listed && unlisted
+  // Content from a CMS may hold any URL: a host left out is warned of once.
+  unlistedCheck = listed && ((src, caller) => {
+    if (!REMOTE.test(src) || listed(src))
+      return false
+
+    const host = URL.parse(src)?.host ?? src
+
+    if (!warnedHosts.has(host)) {
+      warnedHosts.add(host)
+      kayLog('warn', `${caller} was given ${src}, on a host images.remote in kay.config.ts does not list, so it is not resized`)
+    }
+
+    return true
+  })
 }
 
 export function recordVariants(): void {
   serverVariantUrl = recordedVariantUrl
 }
 
-// Hosts already warned about, once each per process.
-const warnedHosts = new Set<string>()
-
-// An image on another host goes through the image route only from a host `images.remote` lists; any other keeps its own URL, which content from a CMS may hold, with a warning naming the host once.
-function unlisted(src: string, caller: string): boolean {
-  if (!remoteListed || !REMOTE.test(src) || remoteListed(src))
-    return false
-
-  const host = URL.parse(src)?.host ?? src
-
-  if (!warnedHosts.has(host)) {
-    warnedHosts.add(host)
-    kayLog('warn', `${caller} was given ${src}, on a host images.remote in kay.config.ts does not list, so it is not resized`)
-  }
-
-  return true
-}
-
 export function setAspects(allowed: readonly string[]): void {
-  aspects = new Set(allowed.map((text) => {
+  const aspects = new Set(allowed.map((text) => {
     const aspect = parseAspect(text)
 
     if (!aspect)
@@ -126,7 +123,11 @@ export function setAspects(allowed: readonly string[]): void {
 
     return aspectKey(aspect)
   }))
-  aspectCheck = listedAspect
+
+  aspectCheck = (aspect, text) => {
+    if (!aspects.has(aspectKey(aspect)))
+      throw new Error(`kay: image() was given aspect ${text}, which images.aspects in kay.config.ts does not list`)
+  }
 }
 
 // `16/9` or `16x9` in lowest terms, or nothing when it is no ratio of whole numbers from 1 to 100.
@@ -185,12 +186,12 @@ export function requestedRemoteVariants(): { src: string, name: string, variant:
   return [...requestedRemote].flatMap(([src, variants]) => [...variants.values()].map(variant => ({ src, name: remoteVariantName(src, variant), variant })))
 }
 
-// Named after a hash of the URL, which the browser computes as the build did.
+// Named after a hash of the URL.
 export function remoteVariantName(src: string, variant: ImageVariant): string {
   return `remote-${urlHash(src)}${variantSuffix(variant)}`
 }
 
-// cyrb53, 53 bits of a string's hash in base 36: Bun.hash is not in the browser.
+// cyrb53, 53 bits of a string's hash in base 36.
 function urlHash(text: string): string {
   let h1 = 0xDEADBEEF
   let h2 = 0x41C6CE57
@@ -287,11 +288,6 @@ function allowedAspect(text: string): Aspect {
   aspectCheck?.(aspect, text)
 
   return aspect
-}
-
-function listedAspect(aspect: Aspect, text: string): void {
-  if (!aspects!.has(aspectKey(aspect)))
-    throw new Error(`kay: image() was given aspect ${text}, which images.aspects in kay.config.ts does not list`)
 }
 
 // The URL of an imported image, or one from `images.dirs` or `images.remote`, cut to the 1200x630 share card social sites show, as a JPEG, for `og:image`: `meta(property="og:image" content={shareImage(hero)})` in a `head` block. Smaller images are enlarged to fill it.

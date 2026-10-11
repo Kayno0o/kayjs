@@ -1,6 +1,5 @@
 import { withBase } from './base'
 import { effect, onCleanup, onMount, ownSignal } from './reactive'
-import { uploaded } from './upload'
 import { decodeValue } from './wire'
 
 // Set by the server on every module it mounts under `/api`, and by the browser build on the stub standing in for one: where the module's routes are served.
@@ -711,7 +710,7 @@ export async function call<Module, const Path extends CallPath<Module>, const M 
 
   try {
     response = sent.body instanceof FormData && progress && typeof XMLHttpRequest !== 'undefined'
-      ? await uploaded(method.toUpperCase(), url, headers, sent.body, progress, signal)
+      ? await (await import('./upload')).uploaded(method.toUpperCase(), url, headers, sent.body, progress, signal)
       : await fetch(url, { method: method.toUpperCase(), headers, body: sent.body ?? null, ...signal && { signal } })
   }
   catch (failure) {
