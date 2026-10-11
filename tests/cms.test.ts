@@ -392,6 +392,25 @@ describe('the collections a CMS edits', () => {
     })
   })
 
+  it('refuses to create an entry the collection holds, and tells the loader\'s save it creates', async () => {
+    const saved: unknown[] = []
+    let held = [{ slug: 'en/hello', data: { title: 'Hello' }, html: '' }]
+    const tales = collection({ name: 'tales', load: () => held, save: (entry) => {
+      saved.push(entry)
+      held = [...held, { slug: `${entry.locale}/${entry.slug}`, data: entry.data as { title: string }, html: '' }]
+    } }, { schema: t.Object({ title: t.String() }), localized: true })
+
+    await exporting([['tales', tales]], async () => {
+      expect(await saveEntry('tales', { slug: 'hello', locale: 'en', data: { title: 'Hi' } }, { create: true })).toEqual({ issues: [{ collection: 'tales', slug: 'hello', locale: 'en', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
+      expect(await saveEntry('tales', { slug: 'hello', locale: 'fr', data: { title: 'Salut' } }, { create: true })).toEqual({})
+      expect(await saveEntry('tales', { slug: 'hello', locale: 'fr', data: { title: 'Bonjour' } })).toEqual({})
+      expect(saved).toEqual([{ slug: 'hello', locale: 'fr', data: { title: 'Salut' }, create: true }, { slug: 'hello', locale: 'fr', data: { title: 'Bonjour' } }])
+    })
+
+    expect(await entrySource('pages', 'about', { title: 'About', order: 2 }, { create: true })).toEqual({ issues: [{ collection: 'pages', slug: 'about', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
+    expect(await entrySource('pages', 'fresh', { title: 'Fresh', order: 9 }, { create: true })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/fresh.md' } })
+  })
+
   it('names the method a loader lacks to save or remove its entries', async () => {
     expect(await rejection(saveEntry('notes', { slug: 'hello', locale: 'en', data: { title: 'Hi' } }))).toMatchObject({ message: 'kay: notes\'s loader declares no save, which saveEntry() hands the entry to' })
     expect(await rejection(removeEntry('notes', 'hello', 'en'))).toMatchObject({ message: 'kay: notes\'s loader declares no remove, which removeEntry() hands the entry to' })

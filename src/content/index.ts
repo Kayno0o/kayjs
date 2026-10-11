@@ -68,8 +68,8 @@ export interface ContentLoader {
   ttl?: Duration | undefined
   // Keeps the entries across restarts and processes, as `cached` does.
   store?: CacheStore | undefined
-  // Writes an entry a CMS saved, new or changed, once its collection accepts it: what `saveEntry` from `kay/content` hands on.
-  save?: ((entry: { slug: string, locale?: string | undefined, data: unknown, body?: string | undefined }) => void | Promise<void>) | undefined
+  // Writes an entry a CMS saved, new or changed, once its collection accepts it: what `saveEntry` from `kay/content` hands on. `create` is set for an entry the CMS creates, which a save throwing for one written since keeps from being overwritten.
+  save?: ((entry: { slug: string, locale?: string | undefined, data: unknown, body?: string | undefined, create?: true }) => void | Promise<void>) | undefined
   // Deletes an entry, which `removeEntry` from `kay/content` asks.
   remove?: ((entry: { slug: string, locale?: string | undefined }) => void | Promise<void>) | undefined
 }

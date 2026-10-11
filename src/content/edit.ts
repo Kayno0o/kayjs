@@ -198,8 +198,8 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
 }
 
 // The file holding a folder collection's entry as the editor wrote it, for a CMS to commit, or where it fails the collection; kay writes nothing.
-// An entry the folder holds keeps its file and format, its body too when none is given; a new one is Markdown when it has a body or the folder holds Markdown, JSON otherwise.
-export async function entrySource(name: string, slug: string, data: unknown, options: { locale?: string | undefined, body?: string | undefined } = {}): Promise<{ file: EntryFile } | { issues: DraftIssue[] }> {
+// An entry the folder holds keeps its file and format, its body too when none is given; a new one is Markdown when it has a body or the folder holds Markdown, JSON otherwise. `create` refuses an entry the folder already holds.
+export async function entrySource(name: string, slug: string, data: unknown, options: { locale?: string | undefined, body?: string | undefined, create?: boolean | undefined } = {}): Promise<{ file: EntryFile } | { issues: DraftIssue[] }> {
   const collection = collectionNamed(name)
 
   if (collection.dir === undefined)
@@ -215,6 +215,9 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
   const files = await folderFiles(name, dir)
   const place = options.locale === undefined ? slug : `${options.locale}/${slug}`
   const existing = files.find(file => slugOf(file) === place)
+
+  if (existing !== undefined && options.create === true)
+    return { issues: [existingIssue(name, slug, options.locale)] }
 
   if (existing !== undefined && options.body !== undefined && !MARKDOWN.test(existing))
     return { issues: [{ collection: name, slug, ...options.locale !== undefined && { locale: options.locale }, path: '', body: true, message: `goes to ${existing}, a data file holding no body` }] }
@@ -232,15 +235,20 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
 }
 
 // Hands an entry the editor wrote to a loaded collection's `save`, then reads the collection afresh; or resolves where it fails the collection, saving nothing.
-export async function saveEntry(name: string, entry: WrittenEntry): Promise<{ issues?: DraftIssue[] }> {
+// `create` refuses an entry the loader already gives, and tells `save`, which can refuse one written since as it writes.
+export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined } = {}): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)
   const save = writer(name, collection, 'save')
   const { issues } = await entryIssues(name, collection, entry)
+  const place = entry.locale === undefined ? entry.slug : `${entry.locale}/${entry.slug}`
+
+  if (issues.length === 0 && options.create === true && (await loadedEntries(name, collection)).some(each => each.slug === place))
+    issues.push(existingIssue(name, entry.slug, entry.locale))
 
   if (issues.length > 0)
     return { issues }
 
-  await save(entry)
+  await save(options.create === true ? { ...entry, create: true } : entry)
   collection.invalidate()
 
   return {}
@@ -265,6 +273,10 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
   collection.invalidate()
 
   return {}
+}
+
+function existingIssue(collection: string, slug: string, locale: string | undefined): DraftIssue {
+  return { collection, slug, ...locale !== undefined && { locale }, path: '', key: 'slug', message: 'names an entry the collection already holds' }
 }
 
 // Where an entry's slug or locale points elsewhere: a part `.` or `..` by either slash, and in a folder an empty one or a hidden file; a locale missing, extra, or one the site does not serve.
