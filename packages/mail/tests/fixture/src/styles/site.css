@@ -1,0 +1,15 @@
+@theme {
+  /* The site's palette, which the mail settings read their accent from. */
+  --blue: #0047ff;
+  --color-brand: var(--blue);
+  --color-ink: oklch(20% 0 0);
+  --color-paper: var(--missing, white);
+  --color-shade: rgb(0 0 0 / 0.5);
+  --space: 12px;
+  --loop-a: var(--loop-b);
+  --loop-b: var(--loop-a);
+}
+
+[data-theme="dark"] {
+  --color-brand: #ffffff;
+}
