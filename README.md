@@ -28,7 +28,7 @@ The project depends on it as `"kay": "npm:@kaynooo/kayjs@~<version>"`, a tilde s
 bun run check   # kay check: types, templates included
 bun run test    # bun test, pages and actions served in-process by kay/test
 bun run build   # kay build: kay check beside the browser bundle, then prerendered pages, all into .kay/client
-bun run start   # NODE_ENV=production bun src/server.ts
+bun run start   # kay start: the last build, served as in production
 ```
 
 In production the server serves what `kay build` wrote and bundles nothing at boot. `kay build --compile server` goes one step further and writes `server`, one executable holding the server, its pages and the client build, which needs neither Bun nor the project installed where it runs.

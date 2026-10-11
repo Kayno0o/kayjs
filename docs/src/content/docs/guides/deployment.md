@@ -13,6 +13,8 @@ bun run build
 NODE_ENV=production bun src/server.ts
 ```
 
+`kay start` runs the last build that way on your machine, or the executable below when the build compiled one, to try it before deploying.
+
 ## One executable
 
 `--compile` writes a single executable holding the server, its pages and the client build. It needs neither Bun nor the project where it runs.

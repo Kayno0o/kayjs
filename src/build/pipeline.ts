@@ -18,7 +18,7 @@ import { linkVariantFiles } from '../runtime/image'
 import { setAvifThreads } from '../server/avif'
 import { basePath } from '../server/base'
 import { writeCards } from '../server/card'
-import { PRERENDERED_DIR } from '../server/client'
+import { EXECUTABLE_RECORD, PRERENDERED_DIR } from '../server/client'
 import { compressFiles } from '../server/compress'
 import { FAVICON_DIR, faviconSource, writeFavicons } from '../server/favicon'
 import { avifQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
@@ -139,6 +139,8 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
 
     try {
       const executable = await compileServer(project, { outfile: resolve(root, options.compile.outfile), entry: options.compile.entry === undefined ? undefined : resolve(root, options.compile.entry) })
+
+      await Bun.write(join(output, EXECUTABLE_RECORD), executable)
 
       result.compiled = { executable, ms: performance.now() - stage }
     }

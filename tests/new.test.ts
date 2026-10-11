@@ -5,6 +5,7 @@ import { basename, join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
+import { outputDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { check, configCheckOptions } from '../src/check'
 import { loadConfig } from '../src/config'
@@ -607,6 +608,8 @@ describe('kay build --compile', () => {
 
       expect(report).toContain('compiled server in ')
       expect(code).toBe(0)
+      // For `kay start` to run.
+      expect(await Bun.file(join(outputDir(dir), 'executable')).text()).toEndWith('/my-app/server')
       // Serving the build it embeds, it carries neither kay's compiler nor Babel, and loads zlib, crypto, http and SQLite only once a feature needs them.
       const executable = Buffer.from(await Bun.file(join(dir, 'server')).bytes())
 

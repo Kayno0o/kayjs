@@ -10,6 +10,7 @@ import { colors, createColors } from '@kaynooo/utils/tools/colors'
 import { formatCheckDiagnostic } from '../check'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
+const PORT = /^\d{1,5}$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const stderrColors = createColors({ stream: process.stderr })
 
@@ -100,6 +101,10 @@ export function warnOtherKay(command: string, root: string): void {
 // What a command did, on stdout so a terminal does not take it for an error: the verb in green, how long it took dimmed.
 export function done(verb: string, rest: string, ms?: number): void {
   console.log(`${colors.bold.green(verb)} ${rest}${ms === undefined ? '' : colors.dim(` in ${Math.round(ms)} ms`)}`)
+}
+
+export function isPort(value: string): boolean {
+  return PORT.test(value) && Number(value) <= 65_535
 }
 
 export function count(amount: number, noun: string): string {

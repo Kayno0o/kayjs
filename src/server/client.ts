@@ -67,6 +67,8 @@ const NOT_RELATIVE = /^(?:[a-z][\w+.-]*:|\/|#)/i
 const STYLE_END = /<\/style/gi
 
 export const MANIFEST = 'manifest.json'
+// Where `kay build --compile` wrote the executable, for `kay start` to run; a later build without it leaves none.
+export const EXECUTABLE_RECORD = 'executable'
 
 export const PRERENDERED_DIR = 'pages'
 

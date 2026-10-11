@@ -127,6 +127,20 @@ The build runs `kay check` first and keeps the last build when the check or the 
 
 The build prints the JavaScript a page with islands loads, gzip and minified: the entry, then what each island adds.
 
+## kay start
+
+```sh
+kay start              # the last build, as the deployed server runs it
+kay start --port 8080
+```
+
+It serves the last `kay build` with `NODE_ENV=production`: the executable `--compile` wrote when that build made one, the server entry otherwise, or kay's own server of the pages in a project without one. It refuses to start without a build, and warns when a source changed since, naming the latest. `.env` is read as the server reads it, `.env.production` included, not as the shell running `kay start` holds it.
+
+| Option | Effect |
+| --- | --- |
+| `--entry <file>` | Runs that server entry instead |
+| `--port <port>` | The port to listen on, `PORT` or 3000 otherwise |
+
 ## kay check
 
 ```sh

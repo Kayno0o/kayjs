@@ -5,11 +5,10 @@ import process from 'node:process'
 import { loadConfig } from '../config'
 import { dev as startDev } from '../dev'
 import { InspectorAddressInUse } from '../dev/inspector'
-import { warnOtherKay } from './command'
+import { isPort, warnOtherKay } from './command'
 
 const WS_SCHEME = /^ws:\/\//
 const PORT_FIRST = /^\d+(?:\/|$)/
-const PORT = /^\d{1,5}$/
 
 // Restarts the server on every change until interrupted.
 export const dev: Command = {
@@ -34,7 +33,7 @@ export const dev: Command = {
 
     const { port, inspect, open } = values
 
-    if (typeof port === 'string' && (!PORT.test(port) || Number(port) > 65_535))
+    if (typeof port === 'string' && !isPort(port))
       return refuse(`--port takes a port number, not ${port}`)
 
     const root = resolve(inDir ? path : '.')

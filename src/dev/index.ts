@@ -3,9 +3,9 @@ import type { FSWatcher } from 'node:fs'
 import type { KayConfig } from '../config'
 import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { IGNORED_DIRS } from '../build/files'
+import { findProjectFiles, IGNORED_DIRS } from '../build/files'
 import { configCheckOptions, writeShadowTypes } from '../check'
 import { projectPaths } from '../project'
 import { inspectorProxy } from './inspector'
@@ -30,7 +30,9 @@ export interface DevOptions {
 // Long enough to gather the few events one save makes.
 const DEBOUNCE_MS = 30
 const SPARE = join(import.meta.dir, 'spare.ts')
-const PAGES_ENTRY = join(import.meta.dir, 'pages.ts')
+
+// The server of a project with no entry of its own, as a static site is.
+export const PAGES_ENTRY = join(import.meta.dir, 'pages.ts')
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
 const STYLESHEET = /\.css$/
@@ -50,6 +52,7 @@ const MAX_CHANGED_FILES = 200
 const ROOT_PATH = /(?<=\/\/[^/]+)\/$/
 const STOP_SIGNALS = new Set(['SIGINT', 'SIGTERM', 'SIGHUP'])
 const WS_SCHEME = /^ws:\/\//
+const ANY_FILE = /^/
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
 // Resolves once watching, with a function stopping the watchers and the server.
@@ -263,7 +266,7 @@ async function regenerateTypes(root: string, { entry, config }: DevOptions) {
 
 // What Bun loaded from the `.env` files of the directory this process started in, as it read them then: the child loads them again, but never over a variable already set.
 // A variable the shell set to the very value its `.env` holds cannot be told from one the file set, and follows the file.
-async function environmentWithoutDotenv(): Promise<Record<string, string | undefined>> {
+export async function environmentWithoutDotenv(): Promise<Record<string, string | undefined>> {
   const probe = Bun.spawn([process.execPath, '-e', 'console.log(JSON.stringify(process.env))'], { cwd: process.cwd(), env: process.env.NODE_ENV === undefined ? {} : { NODE_ENV: process.env.NODE_ENV }, stdout: 'pipe', stderr: 'ignore' })
   const [output, code] = await Promise.all([new Response(probe.stdout).text(), probe.exited])
 
@@ -296,6 +299,21 @@ function gitIgnoredNames(root: string): Set<string> {
   }
 
   return names
+}
+
+// The files the server and its build read, as `kay dev` watches them; `.env` files are read as the server starts, not built.
+export async function serverSources(root: string): Promise<string[]> {
+  const ignored = gitIgnoredNames(root)
+
+  return (await findProjectFiles(root, ANY_FILE, { project: true })).filter((file) => {
+    const path = relative(root, file)
+    const [top = path] = path.split(sep)
+
+    if (top === path)
+      return SERVER_ROOT_FILE.test(path) && !path.startsWith('.env')
+
+    return watchedName(top) && !ignored.has(top) && !TEST_FILE.test(path)
+  })
 }
 
 // A directory or file at the project root worth reacting to; dependencies, build output, tests and hidden entries, `.env` files apart, are not.

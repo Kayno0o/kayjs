@@ -134,7 +134,7 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
   // An app's tests run each file in modules of its own, so each gets the database tests/database.ts copies for it.
   const scripts = {
     dev: 'kay dev',
-    ...has('server') ? { build: 'kay build', compile: 'kay build --compile server', start: 'NODE_ENV=production bun src/server.ts' } : { build: 'kay build --static' },
+    ...has('server') ? { build: 'kay build', compile: 'kay build --compile server', start: 'kay start' } : { build: 'kay build --static' },
     check: 'kay check --deny-warnings',
     ...has('eslint') && { 'lint': 'keslint --cache', 'lint:fix': 'keslint --fix --cache' },
     fmt: 'kay fmt',
