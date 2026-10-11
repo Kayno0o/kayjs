@@ -18,6 +18,7 @@ h1 {todo.title}
 - The page wins over its layouts: one `title`, and one `meta` per `name`, `property` or `http-equiv`. A `link` is one per `rel` and `href`.
 - Head elements hold text only. The default charset and viewport tags can be replaced the same way.
 - A `link(rel="canonical")` is one per page, the page's replacing its layouts'.
+- `html.dark(data-theme="light")` sets attributes on `<html>`, static or from server data: one per name, a layout's over the layouts around it and the page's over all, `false` or `null` taking one off. `lang` and `dir` are kay's, from `lang` in kay.config.ts or the locale. A page swap gives `<html>` the next page's and leaves one a script set, as a theme toggle does, unless a layout sets it too.
 - The head opens with the charset and viewport, then the stylesheets and `style` elements of `head` blocks and of `fonts`, then the stylesheets of the components, which win a tie with them, then everything else, so the first paint waits on no other tag.
 
 ## Site defaults and social cards

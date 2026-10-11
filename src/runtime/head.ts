@@ -1,4 +1,5 @@
 import { escape, escapeAttribute } from './escape'
+import { ROOT_ATTRIBUTES } from './markers'
 
 // A tag a template's `head` block sets, its text as `children`.
 export interface HeadTag {
@@ -32,12 +33,16 @@ export interface RenderedHead {
   // Its stylesheets and inline styles, ahead of the ones kay links for its components, so these still win a tie.
   styles: string
   html: string
+  // The attributes `<html>` takes from the `html` tags, each with a space before it.
+  root: string
   // Whether the page set its own charset or viewport, which then replace the defaults.
   charset: boolean
   viewport: boolean
 }
 
-const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
+const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
+// What kay sets on `<html>` from the page's locale.
+const OWN_ROOT_ATTRIBUTES = new Set(['lang', 'dir'])
 const ATTRIBUTE_NAME = /^[a-z_][\w:.-]*$/i
 const RESOURCE_RELS = new Set(['preload', 'modulepreload', 'prefetch', 'preconnect', 'dns-prefetch', 'stylesheet'])
 const VOID_TAGS = new Set(['meta', 'link', 'base'])
@@ -85,6 +90,8 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   let resourcesHtml = ''
   let styles = ''
   let titleGroup = -1
+  // An attribute a later group sets on `<html>` replaces an earlier one's, `false` or `null` taking it off.
+  const root: Record<string, unknown> = {}
 
   for (const [index, group] of collected.entries()) {
     const own = new Map<string, HeadTag[]>()
@@ -92,6 +99,15 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
     for (const tag of group) {
       if (tag == null || !HEAD_TAGS.has(tag.tag))
         continue
+
+      if (tag.tag === 'html') {
+        for (const [name, value] of Object.entries(tag.props)) {
+          if (!OWN_ROOT_ATTRIBUTES.has(name))
+            root[name] = value
+        }
+
+        continue
+      }
 
       if (isResource(tag)) {
         const identity = resourceIdentity(tag)
@@ -165,7 +181,13 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
     }
   }
 
-  return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
+  const rootAttributes = attributesOf(root)
+  const rootNames = Object.keys(rootAttributes).join(' ')
+
+  if (rootNames !== '')
+    metas += tagMarkup({ tag: 'meta', props: { name: ROOT_ATTRIBUTES, content: rootNames } })
+
+  return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, root: Object.values(rootAttributes).join(''), charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
 }
 
 // Open Graph and Twitter read their own tags only, so the title, description and canonical URL a page sets are repeated there unless it sets those too.
@@ -265,14 +287,7 @@ function replaceableIdentity({ tag, props }: HeadTag, unique: () => string): str
 }
 
 function tagMarkup(tag: HeadTag): string {
-  let attributes = ''
-
-  for (const [name, value] of Object.entries(tag.props)) {
-    if (name === 'children' || name === 'ref' || name.startsWith('on') || !ATTRIBUTE_NAME.test(name) || value == null || value === false)
-      continue
-
-    attributes += value === true ? ` ${name}` : ` ${name}="${escapeAttribute(String(value))}"`
-  }
+  const attributes = Object.values(attributesOf(tag.props)).join('')
 
   if (VOID_TAGS.has(tag.tag))
     return `<${tag.tag}${attributes}>`
@@ -280,6 +295,20 @@ function tagMarkup(tag: HeadTag): string {
   const content = tag.tag === 'script' ? scriptText(tag) : tag.tag === 'style' ? inlineText(tag) ?? '' : escape(text(tag))
 
   return `<${tag.tag}${attributes}>${content}</${tag.tag}>`
+}
+
+// Each attribute a tag renders, by its name, as ` name="value"`: `true` renders the name alone, `false` and `null` nothing.
+function attributesOf(props: Record<string, unknown>): Record<string, string> {
+  const attributes: Record<string, string> = {}
+
+  for (const [name, value] of Object.entries(props)) {
+    if (name === 'children' || name === 'ref' || name.startsWith('on') || !ATTRIBUTE_NAME.test(name) || value == null || value === false)
+      continue
+
+    attributes[name] = value === true ? ` ${name}` : ` ${name}="${escapeAttribute(String(value))}"`
+  }
+
+  return attributes
 }
 
 // A JSON script, such as JSON-LD, takes its data as an object or as text.

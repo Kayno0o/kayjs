@@ -25,6 +25,7 @@ import './second.css'
 ---
 head
   title Second
+  html.second(data-second)
 h1 Second
 form(action={add})
   input(name="title" value={failure?.values.title})

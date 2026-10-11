@@ -18,6 +18,21 @@ head
 h1 {post.title}
 ```
 
+## Attributes on `<html>`
+
+An `html` tag in the `head` block sets attributes on `<html>`, such as a theme, from the server data too. A layout's win over the layouts around it, and the page's over all, one attribute at a time; `false` or `null` takes one off.
+
+```kay
+--- server
+const section = ctx.url.pathname.split('/')[1] || 'home'
+---
+head
+  html.dark(data-theme="light" data-section={section})
+slot
+```
+
+`lang` and `dir` stay kay's, set from `lang` in kay.config.ts or from the page's locale. When a link swaps the page in, `<html>` takes the next page's attributes, and keeps one a script set, as a theme toggle does, unless a layout sets it too.
+
 ## Site defaults
 
 `site` and `seo` in `kay.config.ts` give every page a starting point, which any tag a layout or the page sets replaces:

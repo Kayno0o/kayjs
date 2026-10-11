@@ -1,6 +1,6 @@
 import type { FetchedPage, Intent, Swap } from './navigation'
 import { focusInvalid } from './focus'
-import { ISLAND } from './markers'
+import { ISLAND, ROOT_ATTRIBUTES } from './markers'
 import { historyState, leave, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
 import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
 import { decodeValue } from './wire'
@@ -206,6 +206,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
   applyStreamed(next)
 
+  const root = swapRoot(next)
   const head = mergeHead(next)
 
   await head.loaded
@@ -219,6 +220,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
       return
 
     document.title = next.title
+    root()
     head.commit()
     swapBody(next, policy)
     writeHistory(policy, target)
@@ -293,6 +295,28 @@ function applyStreamed(page: Document): void {
     if (SWAP_PATTERN.test(script.textContent ?? ''))
       script.remove()
   }
+}
+
+// Gives `<html>` the attributes the next page's layouts set in place of this one's, as the page is swapped: any other, as one a theme toggle sets, stays. Both lists are read before the heads merge, which moves the next one's.
+function swapRoot(next: Document): () => void {
+  const leaving = rootAttributes(document)
+  const wanted = rootAttributes(next)
+
+  return () => {
+    const root = document.documentElement
+
+    for (const name of leaving) {
+      if (!wanted.includes(name))
+        root.removeAttribute(name)
+    }
+
+    for (const name of wanted)
+      root.setAttribute(name, next.documentElement.getAttribute(name) ?? '')
+  }
+}
+
+function rootAttributes(page: Document): string[] {
+  return page.querySelector(`meta[name="${ROOT_ATTRIBUTES}"]`)?.getAttribute('content')?.split(' ') ?? []
 }
 
 // Adds what only the next head holds now, and drops what only this one holds as the page is swapped: the page keeps its own styles until the next one's loaded.

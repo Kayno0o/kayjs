@@ -93,6 +93,17 @@ describe('seo head', () => {
     expect((await headOf('/raw/off')).head).toContain('<title>Not raw | Kay site</title>')
   })
 
+  it('sets the attributes of <html> a layout gives, from its server data too, the page\'s winning and naming them for the page swap', async () => {
+    const themed = await (await app.handle(new Request('http://localhost/themed'))).text()
+    const dark = await (await app.handle(new Request('http://localhost/themed/dark'))).text()
+
+    expect(themed).toStartWith('<!doctype html><html lang="en" class="dark" data-theme="light" data-section="home" data-banner><head>')
+    expect(themed).toContain('<meta name="kay-html" content="class data-theme data-section data-banner">')
+    expect(dark).toStartWith('<!doctype html><html lang="en" class="dark" data-theme="dark" data-section="dark"><head>')
+    expect(dark).toContain('<meta name="kay-html" content="class data-theme data-section">')
+    expect((await headOf('/about')).head).not.toContain('kay-html')
+  })
+
   it('shows the site name for a title that comes out empty, not the template around nothing', async () => {
     expect((await headOf('/blank')).head).toContain('<title>Kay site</title>')
   })

@@ -27,7 +27,13 @@ The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc`. kay an
 }
 ```
 
-Colours are `--color-kui-<name>`, used as `bg-kui-<name>`, and hold `light-dark(light, dark)`. The theme is dark unless the visitor's system asks for light, and `data-theme="light"` or `"dark"` on `html` wins over both.
+Colours are `--color-kui-<name>`, used as `bg-kui-<name>`, and hold `light-dark(light, dark)`. The theme is dark unless the visitor's system asks for light, and `data-theme="light"` or `"dark"` on `html` wins over both. A site in one theme sets it in its root layout's `head` block:
+
+```kay
+head
+  html(data-theme="light")
+slot
+```
 
 Render one `Toaster` and one `TooltipHost` in the root layout, `src/routes/_layout.kay`:
 

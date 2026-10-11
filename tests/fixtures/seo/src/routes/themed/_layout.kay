@@ -1,0 +1,6 @@
+--- server
+const section = ctx.url.pathname.split('/')[2] || 'home'
+---
+head
+  html.dark(data-theme="light" data-section={section} data-banner)
+slot

@@ -12,8 +12,10 @@ const TRANSITION_PART = 'transition:'
 const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
-const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
-const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script` and `base` elements only'
+const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
+const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script`, `base` and `html` elements only'
+// What kay sets on `<html>` from the page's locale.
+const OWN_ROOT_ATTRIBUTES = new Set(['lang', 'dir'])
 const QUERY: PageSettingName = 'query'
 // What only a static parent passes an island.
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
@@ -54,6 +56,9 @@ export function sharedImports(script: ScriptAnalysis, server: ServerAnalysis): {
 export function headTagProblem(node: Node): [at: Span, message: string] | undefined {
   if (node.kind !== 'element' || node.component || !HEAD_TAGS.has(node.name))
     return [node, HEAD_CONTENT]
+
+  if (node.name === 'html' && node.children.length > 0)
+    return [node.children[0]!, '`html` holds nothing: it sets the attributes of `<html>`']
 
   const nested = node.children.find(child => child.kind !== 'text' || child.parts.some(part => part.kind === 'element'))
 
@@ -114,10 +119,23 @@ class Validator {
       return problem === undefined
     })
 
+    for (const tag of tags ?? []) {
+      if (tag.kind === 'element' && tag.name === 'html')
+        this.rootAttributes(tag)
+    }
+
     this.nodes(tags ?? [])
     this.nodes(this.file.template.filter(node => !isHead(node)))
 
     return this.diagnostics
+  }
+
+  // `lang` and `dir` follow the page's locale, which an `html` tag cannot set apart from its messages and dates.
+  private rootAttributes(tag: ElementNode): void {
+    for (const attribute of tag.attributes) {
+      if (attribute.kind !== 'spread' && OWN_ROOT_ATTRIBUTES.has(this.text(attribute.name)))
+        this.error(attribute.name, `kay sets \`${this.text(attribute.name)}\` on \`<html>\` from the page's locale`, { help: 'set `lang` in kay.config.ts, or the locales of `i18n`' })
+    }
   }
 
   // The template's one top-level `head` block.

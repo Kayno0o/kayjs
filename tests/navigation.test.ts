@@ -290,6 +290,25 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.locator('section.box:has(p.boxed-bumps) button.box-count', { hasText: 'Box 1' }).waitFor()
   })
 
+  it('gives <html> the attributes the next page sets in place of this one\'s, and keeps one a script set', async () => {
+    await page.goto(origin)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+      document.documentElement.dataset.toggle = 'on'
+    })
+    const root = async () => page.evaluate(() => Object.fromEntries([...document.documentElement.attributes].map(attribute => [attribute.name, attribute.value])))
+
+    expect(await root()).toEqual({ 'lang': 'en', 'data-page': '/', 'data-toggle': 'on' })
+    await page.click('a.second')
+    await page.locator('h1', { hasText: 'Second' }).waitFor()
+    expect(await sameDocument()).toBe(true)
+    expect(await root()).toEqual({ 'lang': 'en', 'data-page': '/second', 'class': 'second', 'data-second': '', 'data-toggle': 'on' })
+    await page.click('a.home')
+    await page.locator('h1', { hasText: 'Home' }).waitFor()
+    expect(await sameDocument()).toBe(true)
+    expect(await root()).toEqual({ 'lang': 'en', 'data-page': '/', 'data-toggle': 'on' })
+  })
+
   it('restores where the page was scrolled to when going back', async () => {
     await page.goto(origin)
     await page.evaluate(() => {

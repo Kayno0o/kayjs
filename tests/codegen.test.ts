@@ -371,6 +371,16 @@ describe('head', () => {
     expect(errors('head\n  title Read #[b this]')).toEqual(['`title` holds text only'])
   })
 
+  it('takes the attributes of <html> from an `html` tag, which holds nothing and leaves `lang` and `dir` to the locale', () => {
+    expect(errors('head\n  html.dark(data-theme="light" data-mode={mode})\np x')).toEqual([])
+    expect(compileKay('head\n  html(data-theme={theme})\np x', 'test.kay', { check: true }).tsx).toContain('void (<><html data-theme={theme} /></>);')
+    expect(errors('head\n  html x\np')).toEqual(['`html` holds nothing: it sets the attributes of `<html>`'])
+    expect(reports('head\n  html(lang="fr" dir="rtl")\np')).toEqual([
+      expect.objectContaining({ message: 'kay sets `lang` on `<html>` from the page\'s locale', at: 'lang' }),
+      expect.objectContaining({ message: 'kay sets `dir` on `<html>` from the page\'s locale', at: 'dir' }),
+    ])
+  })
+
   it('reports what a head tag\'s attributes get wrong in a build, as kay check does', () => {
     const source = 'head\n  meta(name="a" onclick={go})\n  link(rel="x" class="a" class="b")\np x'
 

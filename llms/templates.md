@@ -19,7 +19,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `slot name(a, b)` | The same for a block taking parameters, called with these arguments. |
 | `@name` | Directly under a component: passes the indented block as its `name` prop. |
 | `@name(a, b)` | The same, as a function of its parameters the component calls. |
-| `head` | At the top level: its `title`, `meta`, `link`, `style`, `script` and `base` children go in the document head. |
+| `head` | At the top level: its `title`, `meta`, `link`, `style`, `script` and `base` children go in the document head, and `html` sets the attributes of `<html>`. |
 | `await value` / `then name` / `catch error` | Renders the indented block under `await` until `value` settles; see [Streaming](rendering.md#streaming). |
 | `try` / `catch error` | Renders the `catch` block instead when the `try` block throws; see [Error fallbacks](islands.md#error-fallbacks). |
 | `error title` / `error` | Inside `form(action={add})`: `p.error` with the message a refused post gave `title`, or the form's own, which the field or the form is described by; nothing otherwise. See [Actions](actions.md). |

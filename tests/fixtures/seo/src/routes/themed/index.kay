@@ -1,0 +1,4 @@
+--- server
+export const page = { sitemap: false }
+---
+p Themed

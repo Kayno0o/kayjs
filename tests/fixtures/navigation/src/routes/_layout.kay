@@ -6,6 +6,8 @@ Tone.provide('layout')
 --- server
 const page = ctx.url.pathname
 ---
+head
+  html(data-page={page})
 nav
   a.home(href="/") Home
   a.second(href="/second") Second
