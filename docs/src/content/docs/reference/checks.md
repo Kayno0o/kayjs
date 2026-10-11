@@ -11,7 +11,7 @@ error[missing-alt]: An `img` needs `alt`
   = note: `alt=""` marks an image as decoration
 ```
 
-The name in brackets is a lint. `kay build` runs the same check and `kay dev` shows it in a panel in the browser. The editor shows each problem of an open file with the same message, note and help, and leaves out what `kay check` leaves out.
+The name in brackets is a lint. `kay build` runs the same check and `kay dev` shows it in a panel in the browser. The editor shows each problem of an open file with the same message, note and help, and leaves out what `kay check` leaves out. What `kay check` finds across the project, such as a content entry against its schema or a message a locale lacks, shows at its file after each save.
 
 ## What it verifies
 
@@ -122,5 +122,13 @@ export default defineConfig({ strict: true, kay: true })
 Type-aware rules read files that `kay check`, `kay dev` and the editor write, so run one of them before linting.
 
 </Callout>
+
+The kay extension does not run ESLint. In VS Code, the ESLint extension lints `.kay` files once `eslint.validate` lists the `kay` language. The setting replaces the languages it lints, so name those too, in `.vscode/settings.json`:
+
+```json
+{
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact", "kay"]
+}
+```
 
 <ReadMore href="/llms/checks">Every check in detail, what the editor adds and how the check cache works are in the full checks reference.</ReadMore>

@@ -134,6 +134,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const root = resolve(projectRoot)
   const files = new Map<string, ShadowFile>()
   const diagnostics: CheckDiagnostic[] = []
+  const problems: CheckDiagnostic[] = []
   const paths = projectPaths(root, options)
   const routesDir = paths.routes
   const shadowDir = paths.types
@@ -162,7 +163,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push(fromCompile(file, source, diagnostic))
   }
 
-  const [routes, found, apiModules, endpoints] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(paths.public), apiModulesOf(root, options, diagnostics), endpointsOf(routesDir, routeMounts(root, options.extensions))])
+  const [routes, found, apiModules, endpoints] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(paths.public), apiModulesOf(root, options, problems), endpointsOf(routesDir, routeMounts(root, options.extensions))])
   const publicPaths = [...found, ...htmlFallbacks(found, servedPaths(routes))]
 
   // A param a matcher kay ships checks is named after it, `:integer`, so a link filling it with a literal is checked as the matcher would; any other is `:`.
@@ -171,7 +172,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
     return matcher !== undefined && matcherSource(routesDir, matcher) === 'kay' ? `:${matcher}` : ':'
   }))
-  const settings = options.i18n && i18nSettings(root, options.i18n, diagnostics)
+  const settings = options.i18n && i18nSettings(root, options.i18n, problems)
   // A page is reached in every locale at the path the locale gives it, under its prefix where it has one; an unprefixed path still answers, sending the visitor on to theirs when every locale is prefixed.
   const prefixes = settings ? localePrefixes(settings) : []
   const localized = settings
@@ -204,7 +205,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const served = [...routes.flatMap(route => patternShapes(route.pattern)), ...publicPaths.map(file => file.url), ...KAY_PATHS, ...endpoints.filter(endpoint => endpoint.params.length === 0).map(endpoint => endpoint.pattern)]
 
   for (const message of redirectProblems(options.redirects ?? {}, served))
-    diagnostics.push({ file: join(root, CONFIG_FILE), line: 1, column: 1, message })
+    problems.push({ file: join(root, CONFIG_FILE), line: 1, column: 1, message })
   // A script rather than a module, which is what lets it declare a wildcard module.
   await writeIfChanged(assetsPath, ASSET_TYPES)
   await writeIfChanged(iconsPath, iconTypes(root))
@@ -238,7 +239,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await writeIfChanged(packagesPath, packageTypes(root, libraries))
 
-  const replaced = settingsCheck(root, options.settings ?? {}, diagnostics)
+  const replaced = settingsCheck(root, options.settings ?? {}, problems)
   const exported = exportsCheck(root, routesDir, routes, apiModules, endpoints)
 
   await writeIfChanged(settingsPath, replaced.code)
@@ -253,7 +254,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await Promise.all(stale.map(async path => rm(path)))
 
-  return { files, diagnostics, unreached, libraries, settings: replaced.lines, exports: exported.lines, islandOnly }
+  return { files, diagnostics, problems, unreached, libraries, settings: replaced.lines, exports: exported.lines, islandOnly }
 }
 
 // Whether a component renders as an island, through the build's cache of compiles.
@@ -291,7 +292,10 @@ async function compileShadowCached(cacheDir: string, root: string, routesDir: st
 
 export interface ShadowTypes {
   files: Map<string, ShadowFile>
+  // Each component's compile errors.
   diagnostics: CheckDiagnostic[]
+  // What the config, the API modules and the redirects get wrong.
+  problems: CheckDiagnostic[]
   // Library components the app never imports, whose errors are not its own.
   unreached: Set<string>
   libraries: KayLibrary[]
@@ -531,27 +535,23 @@ export function configCheckOptions(config: KayConfig): CheckOptions {
   return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, publicEnv }
 }
 
+// The collections as read, and the props their Markdown entries give components, written for tsgo to type with the rest.
+export interface ContentChecks {
+  problems: CheckDiagnostic[]
+  feeds: CollectionFeed[]
+  props: Map<number, ComponentUse>
+}
+
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
-  const { files, diagnostics, unreached, libraries, settings, exports } = await writeShadowTypes(root, options)
-
-  const seo = configSeoLints(options, join(root, CONFIG_FILE), [...files.values()].map(file => file.source))
-
-  diagnostics.push(...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code)))
-  const shadowDir = projectPaths(root).types
-  const settingsFile = join(shadowDir, SETTINGS_CHECK)
-  const exportsFile = join(shadowDir, EXPORTS_CHECK)
-  const contentFile = join(shadowDir, CONTENT_CHECK)
-  // The props Markdown entries give their components are typed with the rest, so the collections are read first.
-  const content = await checkContent(root, options.content, options.site !== undefined)
-  const props = contentPropsCheck(resolve(root), projectPaths(root, options).content, content.uses)
-
-  await writeIfChanged(contentFile, props.code)
-
+  const types = await writeShadowTypes(root, options)
+  const { files, diagnostics, unreached, libraries } = types
+  // The props entries give their components are typed with the rest, so the collections are read first.
+  const content = await contentChecks(root, options)
   const shown = await resolvedConfig(root, tsconfig)
   const projectUnused = unusedCodesOf(shown)
-  const [{ output, errors, code }, messages, boot] = await Promise.all([typecheck(root, tsconfig, shown), checkMessages(root, options.i18n, options.extensions), bootProblems(resolve(root), options, content.feeds)])
+  const [{ output, errors, code }, problems] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, types, content)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   const scope: TypeScope = { root, broken: new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file)), unreached, libraries }
@@ -577,27 +577,63 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
     const remapped: CheckDiagnostic = shadow && diagnosed
       ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help }
       : diagnostic
-    const setting = remapped.file === settingsFile ? settings.get(remapped.line) : undefined
-    const exported = remapped.file === exportsFile ? exports.get(remapped.line) : undefined
-    const used = remapped.file === contentFile ? props.lines.get(remapped.line) : undefined
+    const generated = generatedProblem(root, remapped, types, content)
 
-    if (setting)
-      diagnostics.push({ file: setting.file, line: 1, column: 1, code: remapped.code, message: `The settings for ${setting.library} do not match what it takes: ${remapped.message}` })
-    else if (exported)
-      diagnostics.push({ file: exported.file, line: 1, column: 1, code: remapped.code, message: `It must export ${exported.wanted}: ${remapped.message}` })
-    else if (used)
-      diagnostics.push({ file: resolve(root, used.file), line: used.line, column: 1, code: remapped.code, message: `<${used.component}> takes other props: ${remapped.message}` })
+    if (generated)
+      diagnostics.push(generated)
     else if (reportsTypeErrors(remapped.file, scope))
       diagnostics.push(remapped)
   }
 
-  diagnostics.push(...content.problems, ...messages, ...boot, ...await moduleLints(root, options.lints))
+  diagnostics.push(...problems)
 
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && reported.length === 0 && errors.trim() === '')
     diagnostics.push({ file: config, line: 1, column: 1, message: `tsgo exited with code ${code} and no diagnostics` })
 
   return diagnostics
+}
+
+// The collections read, in a process of their own, and the props their entries give components written to the module tsgo types them in.
+export async function contentChecks(root: string, options: CheckOptions): Promise<ContentChecks> {
+  const content = await checkContent(root, options.content, options.site !== undefined)
+  const props = contentPropsCheck(resolve(root), projectPaths(root, options).content, content.uses)
+
+  await writeIfChanged(join(projectPaths(root).types, CONTENT_CHECK), props.code)
+
+  return { problems: content.problems, feeds: content.feeds, props: props.lines }
+}
+
+// What `kay check` finds across the project beside each file's compile and type errors, which the editor reports on save: the config, the collections, the messages, what the server refuses when it boots and the lints of the project's scripts.
+export async function projectProblems(root: string, options: CheckOptions, types: ShadowTypes, content: ContentChecks): Promise<CheckDiagnostic[]> {
+  const seo = configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source))
+  const [messages, boot, modules] = await Promise.all([checkMessages(root, options.i18n, options.extensions), bootProblems(resolve(root), options, content.feeds), moduleLints(root, options.lints)])
+
+  return [...types.problems, ...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code)), ...content.problems, ...messages, ...boot, ...modules]
+}
+
+// The modules kay writes for tsgo to check what only types tell: the settings libraries take, what guards, API modules and matchers export, and the props entries give components.
+export function generatedChecks(root: string): string[] {
+  const shadowDir = projectPaths(root).types
+
+  return [SETTINGS_CHECK, EXPORTS_CHECK, CONTENT_CHECK].map(name => join(shadowDir, name))
+}
+
+// A type error in a module `generatedChecks` names, at the file and line the user wrote what it is about; undefined for any other.
+export function generatedProblem(root: string, diagnostic: CheckDiagnostic, types: ShadowTypes, content: ContentChecks): CheckDiagnostic | undefined {
+  const [settingsFile, exportsFile, contentFile] = generatedChecks(root)
+  const { file, line, code, message } = diagnostic
+  const setting = file === settingsFile ? types.settings.get(line) : undefined
+  const exported = file === exportsFile ? types.exports.get(line) : undefined
+  const used = file === contentFile ? content.props.get(line) : undefined
+
+  if (setting)
+    return { file: setting.file, line: 1, column: 1, code, message: `The settings for ${setting.library} do not match what it takes: ${message}` }
+
+  if (exported)
+    return { file: exported.file, line: 1, column: 1, code, message: `It must export ${exported.wanted}: ${message}` }
+
+  return used && { file: resolve(root, used.file), line: used.line, column: 1, code, message: `<${used.component}> takes other props: ${message}` }
 }
 
 // The lints the compiler finds in fences, in the project's own scripts: the schema builder imported as `t`, and a stylesheet imported for a value with no text attribute.

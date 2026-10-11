@@ -1,17 +1,18 @@
 import type { Subprocess } from 'bun'
 import type { KayLibrary } from '../build/libraries'
-import type { CheckOptions } from '../check'
+import type { CheckDiagnostic, CheckOptions, ShadowTypes } from '../check'
 import type { ShadowFile, SpanMode } from '../check/shadow'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
-import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
+import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
+import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { findKayFiles } from '../build/files'
 import { importedSignals } from '../build/signals'
-import { configCheckOptions, TSGO, writeShadowTypes } from '../check'
+import { configCheckOptions, contentChecks, generatedChecks, generatedProblem, projectProblems, TSGO, writeShadowTypes } from '../check'
 import { diagnoseShadow, reportsTypeErrors } from '../check/diagnose'
 import { compileShadow, generatedSpan, shadowPath, shadowSource, sourceSpan } from '../check/shadow'
 import { formatKay } from '../compiler/format'
@@ -41,6 +42,8 @@ interface Project {
   islandOnly: Set<string>
   unreached: Set<string>
   libraries: KayLibrary[]
+  // The last shadow write, which the project-wide checks read.
+  types?: ShadowTypes
   configured: boolean
 }
 
@@ -68,9 +71,11 @@ const UNNECESSARY = 1
 const CREATED = 1
 const CHANGED = 2
 const DELETED = 3
-// What the editor reports changing on disk: components, the modules they import, and the configs deciding how those resolve.
-const WATCHED = '**/*.{kay,ts,tsx,js,jsx,json}'
+// What the editor reports changing on disk: components, the modules they import, the configs deciding how those resolve, and the collections' entries.
+const WATCHED = '**/*.{kay,ts,tsx,js,jsx,json,md,yaml,yml}'
 const DIAGNOSTICS_DELAY = 150
+// How long the project-wide checks wait after a save for the next, as saving every file at once makes.
+const PROJECT_CHECKS_DELAY = 300
 const QUICK_FIX = 'quickfix'
 const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
 const DEFAULT_MEMBER = '.default'
@@ -90,6 +95,12 @@ export class KayLanguageServer {
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
   private diagnosticsTimer?: Timer
+  private projectChecksTimer?: Timer
+  // The run of the project-wide checks in flight, and whether a save came during it.
+  private projectChecks: Promise<void> | undefined
+  private projectChecksStale = false
+  // What the project-wide checks found, by file.
+  private problems = new Map<string, Diagnostic[]>()
 
   constructor(private readonly client: Connection) {
     client.onRequest<InitializeParams>('initialize', async params => this.initialize(params))
@@ -174,6 +185,8 @@ export class KayLanguageServer {
 
     if (this.watchesFiles)
       await this.client.request('client/registerCapability', { registrations: [{ id: 'kay-files', method: 'workspace/didChangeWatchedFiles', registerOptions: { watchers: [{ globPattern: WATCHED }] } }] })
+
+    this.scheduleProjectChecks()
   }
 
   // A .kay file changing on disk rewrites the shadow tree; any other file goes to tsgo as is. The shadow tree is this server's own to report.
@@ -187,6 +200,8 @@ export class KayLanguageServer {
       await this.saved()
     else if (others.length > 0)
       this.scheduleDiagnostics()
+
+    this.scheduleProjectChecks()
 
     // An open component reads by name the signals a changed module now exports, or stops.
     for (const previous of others.length > 0 ? this.documents.values() : []) {
@@ -226,7 +241,7 @@ export class KayLanguageServer {
 
     this.documents.delete(uri)
     this.server.notify('textDocument/didClose', { textDocument: { uri: document.shadowUri } })
-    this.client.notify('textDocument/publishDiagnostics', { uri, diagnostics: [] })
+    this.client.notify('textDocument/publishDiagnostics', { uri, diagnostics: this.problems.get(document.file) ?? [] })
   }
 
   // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code; tsgo hears which shadow files came and went, so imports of them resolve again.
@@ -240,6 +255,7 @@ export class KayLanguageServer {
         this.refresh(previous)
     }
     this.scheduleDiagnostics()
+    this.scheduleProjectChecks()
   }
 
   // Writes the shadow tree of every project holding a .kay file, and returns the shadow files that came, changed and went.
@@ -272,6 +288,7 @@ export class KayLanguageServer {
       project.islandOnly = types.islandOnly
       project.unreached = types.unreached
       project.libraries = types.libraries
+      project.types = types
     }))
 
     return changes
@@ -325,6 +342,86 @@ export class KayLanguageServer {
     this.diagnosticsTimer = setTimeout(() => void guard(this.publishAllDiagnostics()), DIAGNOSTICS_DELAY)
   }
 
+  // What `kay check` finds across the project, run after a save rather than on every keystroke, since it reads every collection, catalog and route.
+  private scheduleProjectChecks() {
+    clearTimeout(this.projectChecksTimer)
+    this.projectChecksTimer = setTimeout(() => void guard(this.runProjectChecks()), PROJECT_CHECKS_DELAY)
+  }
+
+  private async runProjectChecks() {
+    if (this.projectChecks) {
+      this.projectChecksStale = true
+
+      return
+    }
+
+    try {
+      this.projectChecks = this.publishProblems()
+      await this.projectChecks
+    }
+    finally {
+      this.projectChecks = undefined
+    }
+
+    if (this.projectChecksStale) {
+      this.projectChecksStale = false
+      await this.runProjectChecks()
+    }
+  }
+
+  // Each file's problems, an open component's along with its own diagnostics, and none any longer for a file that had some.
+  private async publishProblems() {
+    const found = new Map<string, Diagnostic[]>()
+
+    for (const problem of (await Promise.all([...this.projects.values()].map(async project => this.problemsOf(project)))).flat())
+      found.set(problem.file, [...found.get(problem.file) ?? [], problemDiagnostic(problem)])
+
+    const previous = this.problems
+
+    this.problems = found
+
+    await Promise.all([...new Set([...previous.keys(), ...found.keys()])].map(async (file) => {
+      const document = [...this.documents.values()].find(open => open.file === file)
+
+      if (document)
+        await this.publishDiagnostics(document)
+      else
+        this.client.notify('textDocument/publishDiagnostics', { uri: this.clientUri(file), diagnostics: found.get(file) ?? [] })
+    }))
+  }
+
+  private async problemsOf(project: Project): Promise<CheckDiagnostic[]> {
+    const { root, options, types } = project
+
+    if (!types)
+      return []
+
+    const content = await contentChecks(root, options)
+    const [problems, typeErrors] = await Promise.all([projectProblems(root, options, types, content), this.generatedTypeErrors(root)])
+
+    return [...problems, ...typeErrors.flatMap(diagnostic => generatedProblem(root, diagnostic, types, content) ?? [])]
+  }
+
+  // What tsgo finds in the modules kay writes for it to check what only types tell, each opened for the question.
+  private async generatedTypeErrors(root: string): Promise<CheckDiagnostic[]> {
+    const found = await Promise.all(generatedChecks(root).filter(file => existsSync(file)).map(async (file) => {
+      const uri = pathToFileURL(file).href
+
+      this.server.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'typescript', version: 1, text: await Bun.file(file).text() } })
+
+      try {
+        const report = await this.server.request<DocumentDiagnosticReport>('textDocument/diagnostic', { textDocument: { uri } })
+
+        return (report.items ?? []).map((diagnostic): CheckDiagnostic => ({ file, line: diagnostic.range.start.line + 1, column: diagnostic.range.start.character + 1, code: typeof diagnostic.code === 'number' ? `TS${diagnostic.code}` : undefined, message: diagnostic.message }))
+      }
+      finally {
+        this.server.notify('textDocument/didClose', { textDocument: { uri } })
+      }
+    }))
+
+    return found.flat()
+  }
+
   // Every open file is checked again on any change, since editing one component can break the files using it.
   private async publishAllDiagnostics() {
     await Promise.all([...this.documents.values()].map(async document => this.publishDiagnostics(document)))
@@ -371,7 +468,7 @@ export class KayLanguageServer {
       }]
     })
 
-    this.client.notify('textDocument/publishDiagnostics', { uri: document.uri, version: document.version, diagnostics: [...compileErrors, ...typeErrors] })
+    this.client.notify('textDocument/publishDiagnostics', { uri: document.uri, version: document.version, diagnostics: [...compileErrors, ...typeErrors, ...this.problems.get(document.file) ?? []] })
   }
 
   private async hover(params: TextDocumentPositionParams): Promise<Hover | null> {
@@ -902,6 +999,13 @@ function toSourceRange(document: ShadowFile, range: Range, mode: SpanMode = 'exa
 }
 
 // A diagnostic as an editor shows it, its label, note and help on their own lines.
+// A problem of the project, at the start of the line and column it names.
+function problemDiagnostic(problem: CheckDiagnostic): Diagnostic {
+  const position = { line: problem.line - 1, character: problem.column - 1 }
+
+  return { range: { start: position, end: position }, severity: problem.severity === 'warning' ? WARNING : ERROR, source: 'kay', ...problem.code !== undefined && { code: problem.code }, message: editorMessage(problem) }
+}
+
 function editorMessage({ message, label, note, help }: Pick<KayDiagnostic, 'message' | 'label' | 'note' | 'help'>): string {
   return [label !== undefined && label !== '' ? `${message} (${label})` : message, ...[['note', note], ['help', help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n')
 }

@@ -65,6 +65,11 @@ class Editor {
     return published
   }
 
+  // The diagnostics `path` gets next, open or not.
+  async published(path: string): Promise<Diagnostic[]> {
+    return this.diagnostics(this.uri(path))
+  }
+
   // What the editor's file watcher reports: `path` changed on disk; the diagnostics `open` gets next.
   async filesChanged(open: string, events: { path: string, type: 1 | 2 | 3 }[]): Promise<Diagnostic[]> {
     const published = this.diagnostics(this.uri(open))
@@ -500,6 +505,49 @@ describe('kay lsp following files on disk', () => {
 
     await Bun.write(join(dir, 'src/routes/plain.kay'), '---\nimport Wrapper from \'../components/wrapper.kay\'\n---\nWrapper(controls={{ pick: () => {} }})\n')
     expect(codes(await editor.filesChanged(wrapper, [{ path: 'src/routes/plain.kay', type: 1 }]))).toEqual([2345])
+  })
+})
+
+describe('kay lsp reporting what kay check finds across the project', () => {
+  let editor: Editor
+  let dir: string
+  const entry = 'src/content/notes/a.md'
+  let first: Record<string, Promise<Diagnostic[]>>
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'kay-project-'))
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lints: { \'no-such-lint\': \'deny\' }, i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } })\n'),
+      Bun.write(join(dir, 'src/messages/fr.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ hello: \'Bonjour\' })\n'),
+      Bun.write(join(dir, 'src/messages/en.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n'),
+      Bun.write(join(dir, 'src/content.config.ts'), 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({ title: t.String() }) })\n'),
+      Bun.write(join(dir, entry), '---\ndate: today\n---\nText\n'),
+      Bun.write(join(dir, 'src/routes/_guard.ts'), 'export default 42\n'),
+      Bun.write(join(dir, 'src/routes/index.kay'), 'h1 Home\n'),
+    ])
+    await mkdir(join(dir, 'node_modules'))
+    await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
+    editor = new Editor(dir)
+    first = Object.fromEntries(['kay.config.ts', 'src/messages/en.ts', entry, 'src/routes/_guard.ts'].map(path => [path, editor.published(path)]))
+    await editor.start()
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('reports the config, the messages, the collections and the exports kay check reads, at their files, once it started and after a change on disk', async () => {
+    const [config, messages, entries, guard] = await Promise.all(Object.values(first))
+
+    expect(config!.map(diagnostic => diagnostic.message)).toEqual(['`lints` names `no-such-lint`, which is no lint or group\nhelp: `kay explain` lists them'])
+    expect(messages!.map(diagnostic => diagnostic.message)).toEqual([expect.stringContaining('hello')])
+    expect(entries!.map(diagnostic => diagnostic.range.start.line)).toEqual([0])
+    expect(guard!.map(diagnostic => diagnostic.message)).toEqual([expect.stringMatching(/^It must export a guard by default: /)])
+
+    await Bun.write(join(dir, entry), '---\ntitle: A\n---\nText\n')
+    expect(await editor.filesChanged(entry, [{ path: entry, type: 2 }])).toEqual([])
   })
 })
 
