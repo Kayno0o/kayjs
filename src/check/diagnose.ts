@@ -2,7 +2,9 @@
 import type { KayLibrary } from '../build/libraries'
 import type { Span } from '../compiler/ast'
 import type { LintLevel, LintName } from '../compiler/lints'
+import type { RouteMount } from '../server/routes'
 import type { ShadowFile } from './shadow'
+import { existsSync, realpathSync } from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
 import { libraryOf } from '../build/libraries'
 import { typeLint } from '../compiler/lints'
@@ -18,6 +20,8 @@ const MISSING_PROPERTY = 2339
 const LEADING_NAME = /^[a-z_$][\w$]*/i
 const MEMBER_OF = /([a-z_$][\w$]*)\??\.$/i
 const KAY_FILE = /\.kay$/
+// The error `CheckedHref` gives a site-relative path nothing serves.
+const UNSERVED = /No page, public file or app route serves (\/[^"'`;\s]*)/
 
 // What tsgo reports, at offsets into the file it read.
 export interface TsgoDiagnostic {
@@ -87,6 +91,18 @@ export function unusedCodesOf(shown: string | undefined): Set<number> {
   const { compilerOptions } = JSON.parse(shown) as { compilerOptions?: { noUnusedLocals?: boolean, noUnusedParameters?: boolean } }
 
   return compilerOptions?.noUnusedLocals === true ? UNUSED_CODES : compilerOptions?.noUnusedParameters === true ? UNUSED_PARAMETER_CODES : new Set()
+}
+
+// A path an extension's routes name outside its own prefix, such as `/` to go back to the site, is the app's, which no extension can know: only a path into its own routes is checked.
+export function servedByTheApp(file: string, message: string, mounts: RouteMount[]): boolean {
+  const path = UNSERVED.exec(message)?.[1]
+
+  if (path === undefined)
+    return false
+
+  const mount = mounts.find(({ dir }) => [dir, existsSync(dir) ? realpathSync(dir) : dir].some(root => file.startsWith(root + sep)))
+
+  return mount !== undefined && (mount.prefix === '' || (path !== mount.prefix && !path.startsWith(`${mount.prefix}/`)))
 }
 
 // A library's own modules are its to check, as `skipLibCheck` leaves a declaration file's, a missing optional peer included: only its components compile as the app's. An app inside a linked library's repository keeps its own files.

@@ -12,7 +12,8 @@ import process from 'node:process'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
-import { diagnoseShadow, reportsTypeErrors, shownOutsideKay, unusedCodesOf } from './diagnose'
+import { routeMounts } from '../server/routes'
+import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { generatedProblem } from './generated'
 import { configProblems, contentChecks, lintConfigTypeError, projectProblems } from './project'
 import { writeShadowTypes } from './shadow-types'
@@ -99,6 +100,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   const scope: TypeScope = { root, broken: new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file)), unreached, libraries }
+  const mounts = routeMounts(root, options.extensions)
   const levels = new Map<ShadowFile, ReturnType<typeof lintLevels>>()
   const levelsOf = (shadow: ShadowFile) => {
     const levelAt = levels.get(shadow) ?? lintLevels(shadow.source, options.lints)
@@ -130,7 +132,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
     if (generated)
       diagnostics.push(generated)
-    else if (reportsTypeErrors(remapped.file, scope))
+    else if (reportsTypeErrors(remapped.file, scope) && !servedByTheApp(remapped.file, remapped.message, mounts))
       diagnostics.push(remapped)
   }
 

@@ -394,6 +394,8 @@ const LOCAL_CHECKED: Record<string, string> = {
   // Typed by its own path: `id` is no param of it.
   'lib/routes/[slug].kay': '--- server\nconst slug: string = ctx.params.slug\nconst id = ctx.params.id\n---\np {slug} {id}\n',
   'lib/routes/broken.kay': '---\nconst wrong: number = \'beside\'\n---\np {wrong}\n',
+  // Paths the app may serve or not, which only it knows, and one into the extension's own routes, still checked.
+  'lib/routes/out.kay': '--- server\nimport { localPath } from \'kay\'\n\nconst back = localPath(ctx.url.searchParams.get(\'next\'), \'/welcome\')\n\nif (back === \'/old\')\n  ctx.redirect(\'/gone\')\n---\na(href={back}) Back\na(href="/settings") Settings\na(href="/auth/no/such/page") Nope\n',
   // The app's matchers type an extension's params as they do its own.
   'lib/routes/codes/[id=code].kay': '--- server\nconst id: number = ctx.params.id\n---\np {id}\n',
   'lib/routes/codes/[id=code]/label.kay': '--- server\nconst label: string = ctx.params.id\n---\np {label}\n',
@@ -434,10 +436,11 @@ describe('an extension listed from beside the app', () => {
       expect(output.split('label.kay').length).toBe(2)
       expect(output).toContain('Type \'number\' is not assignable to type \'string\'.\n --> ../lib/routes/codes/[id=code]/label.kay:2:')
       expect(output).toContain('--> ../lib/routes/[slug].kay:3:')
+      expect([...output.matchAll(/serves (\S+?)"/g)].map(match => match[1])).toEqual(['/auth/no/such/page', '/auth/no/such/page'])
       // A name the compiled script does not get, as `onCleanup` now does.
       expect(output).toContain('Cannot find name \'nope\'.')
       expect(output).not.toContain('Cannot find name \'onCleanup\'')
-      expect(output).toContain('10 errors')
+      expect(output).toContain('11 errors')
       // What the ESLint processor types the pages by.
       expect(readShadowSettings(join(dir, 'app')).mounts).toContain(join(dir, 'lib/routes'))
     }

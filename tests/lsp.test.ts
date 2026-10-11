@@ -640,6 +640,7 @@ describe('kay lsp on an extension listed from beside the app', () => {
       Bun.write(join(dir, 'app/src/params/code.ts'), 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n'),
       Bun.write(join(dir, 'lib/package.json'), JSON.stringify({ name: 'lib' })),
       Bun.write(join(dir, 'lib/routes/codes/[id=code]/label.kay'), '--- server\nconst label: string = ctx.params.id\n---\np {label}\n'),
+      Bun.write(join(dir, 'lib/routes/out.kay'), 'a(href="/welcome") Back\na(href="/lib/no/such") Nope\n'),
     ])
     editor = new Editor(join(dir, 'app'))
     await editor.start()
@@ -652,6 +653,10 @@ describe('kay lsp on an extension listed from beside the app', () => {
 
   it('types a page\'s params from its path in the extension\'s routes, by the app\'s matchers, as kay check does', async () => {
     expect((await editor.open('../lib/routes/codes/[id=code]/label.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message])).toEqual([[1, 'Type \'number\' is not assignable to type \'string\'.']])
+  })
+
+  it('checks a path the extension\'s routes name only under its own prefix, as kay check does', async () => {
+    expect((await editor.open('../lib/routes/out.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.match(/serves (\S+?)"/)?.[1]])).toEqual([[1, '/lib/no/such']])
   })
 })
 
