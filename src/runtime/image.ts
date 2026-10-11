@@ -65,14 +65,19 @@ const sizes = new Map<string, { width: number, height: number }>()
 // The variant `src` falls back to for a browser that ignores `srcset`.
 const FALLBACK_WIDTH = 1280
 let maxDensity: number | undefined
-// `images.aspects` on the server, in lowest terms as `16x9`; the browser checks none.
+// `images.aspects` on the server, in lowest terms as `16x9`, and its check, set with it; the browser checks none.
 let aspects: ReadonlySet<string> | undefined
+let aspectCheck: typeof listedAspect | undefined
 // The variants of imported images that pages asked for beyond the ladder, by asset name, for `kay build` to write.
 const requested = new Map<string, Map<string, ImageVariant>>()
 // The variants of images on other hosts that a static export's pages link, by URL, for `kay build` to download and write.
 const requestedRemote = new Map<string, Map<string, ImageVariant>>()
 // Whether `images.remote` covers a URL, on the server; the browser checks none.
 let remoteListed: ((src: string) => boolean) | undefined
+// Its check of an image on another host, which warns of a host it leaves out, set with it: none reaches a browser's bundle.
+let unlistedCheck: typeof unlisted | undefined
+// Set on the server, which records the variants pages ask for and links the files a static export wrote: the browser asks the route.
+let serverVariantUrl: typeof recordedVariantUrl | undefined
 // Whether `images.resolve` looks sources up, which the browser reads off the page.
 let resolved: boolean | undefined
 
@@ -87,6 +92,11 @@ export function setResolvedImages(on: boolean): void {
 
 export function setRemoteImages(listed: ((src: string) => boolean) | undefined): void {
   remoteListed = listed
+  unlistedCheck = listed && unlisted
+}
+
+export function recordVariants(): void {
+  serverVariantUrl = recordedVariantUrl
 }
 
 // Hosts already warned about, once each per process.
@@ -116,6 +126,7 @@ export function setAspects(allowed: readonly string[]): void {
 
     return aspectKey(aspect)
   }))
+  aspectCheck = listedAspect
 }
 
 // `16/9` or `16x9` in lowest terms, or nothing when it is no ratio of whole numbers from 1 to 100.
@@ -237,7 +248,7 @@ export function storedSize(src: string): { width: number, height: number } | und
 export function image(src: string, options: ImageOptions = {}): ImageProps {
   const own = sizes.get(src) ?? storedSize(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
 
-  if (!own || !resizable(src) || unlisted(src, 'image()'))
+  if (!own || !resizable(src) || unlistedCheck?.(src, 'image()') === true)
     return Object.assign(options.sizes === undefined ? { src } : { src, sizes: options.sizes }, own)
 
   const aspect = options.aspect === undefined ? undefined : allowedAspect(options.aspect)
@@ -273,10 +284,14 @@ function allowedAspect(text: string): Aspect {
   if (!aspect)
     throw new Error(`kay: image() was given aspect ${text}: an aspect ratio is two whole numbers from 1 to 100, \`16/9\``)
 
-  if (aspects && !aspects.has(aspectKey(aspect)))
-    throw new Error(`kay: image() was given aspect ${text}, which images.aspects in kay.config.ts does not list`)
+  aspectCheck?.(aspect, text)
 
   return aspect
+}
+
+function listedAspect(aspect: Aspect, text: string): void {
+  if (!aspects!.has(aspectKey(aspect)))
+    throw new Error(`kay: image() was given aspect ${text}, which images.aspects in kay.config.ts does not list`)
 }
 
 // The URL of an imported image, or one from `images.dirs` or `images.remote`, cut to the 1200x630 share card social sites show, as a JPEG, for `og:image`: `meta(property="og:image" content={shareImage(hero)})` in a `head` block. Smaller images are enlarged to fill it.
@@ -284,7 +299,7 @@ export function shareImage(src: string): string {
   if (!RESIZABLE.test(src))
     throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG, WebP, GIF or AVIF`)
 
-  if (unlisted(src, 'shareImage()'))
+  if (unlistedCheck?.(src, 'shareImage()') === true)
     return src
 
   return variantUrl(src, 'card')
@@ -416,6 +431,13 @@ export function imageUrl(src: string, width: number, aspect?: Aspect): string {
 }
 
 function variantUrl(src: string, variant: ImageVariant): string {
+  const query = variant === 'card' ? 'card' : `w=${variant.width}${variant.aspect ? `&crop=${aspectKey(variant.aspect)}` : ''}`
+
+  return serverVariantUrl?.(src, variant) ?? `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&${query}`
+}
+
+// The file of a variant a static export wrote, recording the variants pages ask for beyond the ladder; nothing where the route serves it.
+function recordedVariantUrl(src: string, variant: ImageVariant): string | undefined {
   // A crop, a card or a width below the ladder, which only pages ask for.
   const asked = cutOrBelow(variant, IMAGE_WIDTHS[0])
 
@@ -436,7 +458,5 @@ function variantUrl(src: string, variant: ImageVariant): string {
       return `${VARIANTS}${encodeURIComponent(`${name.replace(EXTENSION, '')}${variantSuffix(variant)}`)}`
   }
 
-  const query = variant === 'card' ? 'card' : `w=${variant.width}${variant.aspect ? `&crop=${aspectKey(variant.aspect)}` : ''}`
-
-  return `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&${query}`
+  return undefined
 }

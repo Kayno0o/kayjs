@@ -14,6 +14,7 @@ import { coverImage } from '../src/server/crop'
 import { avifQuality, drawing, serveImages, variantName, writeImageVariants } from '../src/server/image'
 import { decodePng } from '../src/server/png'
 import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
+import { scratchDir } from './scratch'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 const uploads = await mkdtemp(join(tmpdir(), 'kay-uploads-'))
@@ -109,6 +110,21 @@ describe('image()', () => {
     finally {
       setMaxDensity(2)
     }
+  })
+
+  it('leaves what only the server checks and records out of an island\'s bundle', async () => {
+    const dir = await scratchDir('image-bundle-')
+    const entry = join(dir, 'entry.ts')
+
+    await Bun.write(entry, `import { image, imageSource } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/image.ts'))}\nconsole.log(image, imageSource)\n`)
+
+    const build = await Bun.build({ entrypoints: [entry], target: 'browser', minify: true })
+    const code = await build.outputs[0]!.text()
+
+    expect(code).toContain('/_kay/image')
+
+    for (const serverOnly of ['images.remote', 'images.aspects', 'remote-', '/_kay/images/'])
+      expect(code).not.toContain(serverOnly)
   })
 })
 
