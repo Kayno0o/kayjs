@@ -10,7 +10,7 @@ const PRERELEASE = /[-+].*$/
 interface Runtime {
   version?: string
   path?: string
-  // The project, whose own npm `bun`, installed by a plugin's peer dependency, package scripts run ahead of the system Bun.
+  // Where kay runs, standing for the project: a `bun` in its node_modules is the npm package a plugin's peer dependency installs.
   cwd?: string
   range?: string
 }
@@ -25,7 +25,7 @@ export function bunProblem({ version = Bun.version, path = process.execPath, cwd
   return `Bun ${version} at ${path} is under the ${range} kay needs: ${fix}`
 }
 
-// Whether `path` is in the node_modules of `cwd` or of a directory above it, as a workspace hoists it, rather than a global install's.
+// Whether `path` is in the node_modules of `cwd` or of a directory above it, as a workspace hoists it, rather than a global install's. `kay dev` run from outside the project, given its directory, gets `bun upgrade` instead.
 function projectBun(path: string, cwd: string): boolean {
   const match = NODE_MODULES.exec(path)
 

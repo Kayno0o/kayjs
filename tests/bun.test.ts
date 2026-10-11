@@ -16,16 +16,19 @@ describe('the Bun kay runs on', () => {
   })
 
   it('names the npm bun package of the project, or of a workspace above it, as the one to update, not a global one', () => {
+    const problem = (path: string, cwd: string) => bunProblem({ version: '1.4.2', path, cwd, range: '>=1.4.3' })
     const npmBun = 'a dependency installed the npm `bun` package, which package scripts run ahead of the system Bun; run `bun update bun`'
-    const fix = (path: string, cwd: string) => {
-      const problem = bunProblem({ version: '1.4.2', path, cwd, range: '>=1.4.3' })!
 
-      return problem.slice(problem.indexOf(' kay needs: ') + ' kay needs: '.length)
-    }
+    expect(problem('/app/node_modules/bun/bin/bun.exe', '/app')).toBe(`Bun 1.4.2 at /app/node_modules/bun/bin/bun.exe is under the >=1.4.3 kay needs: ${npmBun}`)
+    expect(problem('/repo/node_modules/bun/bin/bun.exe', '/repo/sites/blog')).toBe(`Bun 1.4.2 at /repo/node_modules/bun/bin/bun.exe is under the >=1.4.3 kay needs: ${npmBun}`)
+    expect(problem('/usr/lib/node_modules/bun/bin/bun.exe', '/app')).toBe('Bun 1.4.2 at /usr/lib/node_modules/bun/bin/bun.exe is under the >=1.4.3 kay needs: run `bun upgrade`')
+  })
 
-    expect(fix('/app/node_modules/bun/bin/bun.exe', '/app')).toBe(npmBun)
-    expect(fix('/repo/node_modules/bun/bin/bun.exe', '/repo/sites/blog')).toBe(npmBun)
-    expect(fix('/usr/lib/node_modules/bun/bin/bun.exe', '/app')).toBe('run `bun upgrade`')
+  it('is the floor the docs name', async () => {
+    const floor = `${engines.bun.replace('>=', '')} or later`
+
+    for (const doc of ['llms/project.md', 'docs/src/content/docs/getting-started/installation.md'])
+      expect(await Bun.file(join(import.meta.dir, '..', doc)).text()).toContain(floor)
   })
 
   it('is refused by the CLI and by pages() under the floor', async () => {
