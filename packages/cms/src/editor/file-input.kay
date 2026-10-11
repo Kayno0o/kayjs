@@ -46,7 +46,7 @@ async function upload([file]: File[]): Promise<void> {
     if image
       img.kcms-file-preview(src={value} alt="")
     else
-      a.kcms-file-link(href={value} target="_blank" rel="noopener") {value.split('/').at(-1)}
+      a.kcms-file-link(href={value}) {value.split('/').at(-1)}
   FileDrop.kcms-file-drop(accept={image ? 'image/*' : undefined} disabled={sent !== undefined} onFiles={upload})
     @content(zone)
       Button(label={label()} busy={sent !== undefined} onClick={zone.open})
