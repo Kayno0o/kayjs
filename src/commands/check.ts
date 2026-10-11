@@ -1,8 +1,9 @@
+import type { Subprocess } from 'bun'
 import type { CheckDiagnostic } from '../check'
 import type { LintGroup } from '../compiler/lints'
 import type { KayConfig } from '../config'
 import type { Command, ProblemFormat } from './command'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { applySafeFixes, check as checkTypes, configCheckOptions } from '../check'
@@ -12,6 +13,7 @@ import { watchProject } from '../dev'
 import { buildingWithoutEnv } from '../server/env'
 import { count, done, isProblemFormat, printFailure, printProblems, PROBLEM_FORMATS, projectRoot } from './command'
 
+const CLI = join(import.meta.dir, '../cli.ts')
 // What makes a directory given first the project rather than a path to report on.
 const PROJECT_FILES = [CONFIG_FILE, 'package.json', 'tsconfig.json']
 // Erases the screen and its scrollback, then moves to the top.
@@ -58,44 +60,54 @@ export const check: Command = {
     if (root === undefined)
       return 1
 
+    const scope = realScope(root, paths, format)
+
+    if (scope === undefined)
+      return 1
+
+    if (values.watch === true) {
+      const flags = [
+        ...typeof project === 'string' ? ['-p', project] : [],
+        ...typeof entry === 'string' ? ['--entry', entry] : [],
+        ...values['deny-warnings'] === true ? ['--deny-warnings'] : [],
+        ...values.fix === true ? ['--fix'] : [],
+        ...only === undefined ? [] : ['--only', only],
+      ]
+
+      // The text report goes to stderr; the other formats are left whole for what reads them.
+      await watchChecks(root, [CLI, 'check', ...positionals, ...flags, '--format', format], format === 'text' && process.stderr.isTTY)
+
+      return 0
+    }
+
     // The checking machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
     buildingWithoutEnv()
 
-    const scope = paths.map(path => resolve(path))
-    // A config that does not load, or a fix that cannot be written, fails this run alone: `--watch` checks again on the next change.
-    const run = async () => {
-      const started = performance.now()
+    const started = performance.now()
 
-      try {
-        const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true, only, launch: only === 'seo', format, scope })
+    try {
+      const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true, only, launch: only === 'seo', format, scope })
 
-        if (found === 0 && format !== 'json')
-          done('checked', 'with no problems', performance.now() - started)
+      if (found === 0 && format !== 'json')
+        done('checked', 'with no problems', performance.now() - started)
 
-        return failing > 0 ? 1 : 0
-      }
-      catch (error) {
-        printFailure('check', error, format)
-
-        return 1
-      }
+      return failing > 0 ? 1 : 0
     }
+    catch (error) {
+      printFailure('check', error, format)
 
-    if (values.watch !== true)
-      return run()
-
-    // The text report goes to stderr; the other formats are left whole for what reads them.
-    await watchChecks(root, run, format === 'text' && process.stderr.isTTY)
-
-    return 0
+      return 1
+    }
   },
 }
 
 // Checks now and again on every change to the project, its tests included, a change during a check bringing one more; until interrupted.
-async function watchChecks(root: string, run: () => Promise<unknown>, clear: boolean): Promise<never> {
+// Each check is a `kay check` of its own, so an edit to kay.config.ts or a module it imports is read again, which a process's import cache would not, and a check that throws leaves the watch going.
+async function watchChecks(root: string, args: string[], clear: boolean): Promise<never> {
   let changed = false
   let running: Promise<void> | undefined
   let timer: Timer | undefined
+  let child: Subprocess | undefined
   const checks = async () => {
     do {
       changed = false
@@ -103,10 +115,19 @@ async function watchChecks(root: string, run: () => Promise<unknown>, clear: boo
       if (clear)
         process.stderr.write(CLEAR_SCREEN)
 
-      await run()
+      child = Bun.spawn([process.execPath, ...args], { stdio: ['ignore', 'inherit', 'inherit'] })
+      await child.exited
     } while (changed)
 
+    child = undefined
     running = undefined
+  }
+
+  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]] as const) {
+    process.once(signal, () => {
+      child?.kill()
+      process.exit(code)
+    })
   }
 
   running = checks()
@@ -123,13 +144,45 @@ async function watchChecks(root: string, run: () => Promise<unknown>, clear: boo
 
 // A directory holding a project's files, or outside the current directory, where no path to report on lies.
 function isProjectDir(path: string): boolean {
-  const outside = relative(process.cwd(), resolve(path))
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory() === true && (PROJECT_FILES.some(file => existsSync(join(path, file))) || !within(process.cwd(), resolve(path)))
+}
 
-  return statSync(path, { throwIfNoEntry: false })?.isDirectory() === true && (PROJECT_FILES.some(file => existsSync(join(path, file))) || outside.startsWith('..') || isAbsolute(outside))
+// The paths to report on as their real paths, a symlink to the project's files read as those files; undefined, once said why, for one outside the project, which no problem the check finds could be in.
+function realScope(root: string, paths: string[], format: ProblemFormat): string[] | undefined {
+  const realRoot = realpathSync(root)
+  const scope = paths.map(path => realpathSync(resolve(path)))
+  const outside = paths.find((_path, index) => !within(realRoot, scope[index]!))
+
+  if (outside === undefined)
+    return scope
+
+  printFailure('check', `${outside} is outside the project at ${relative(process.cwd(), root) || '.'}, so kay check finds nothing in it`, format)
+
+  return undefined
+}
+
+function within(dir: string, path: string): boolean {
+  const outside = relative(dir, path)
+
+  return outside !== '..' && !outside.startsWith(`..${sep}`) && !isAbsolute(outside)
 }
 
 function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
-  return scope.length === 0 || scope.some(path => diagnostic.file === path || diagnostic.file.startsWith(path + sep))
+  if (scope.length === 0)
+    return true
+
+  const file = realPath(diagnostic.file)
+
+  return scope.some(path => file === path || file.startsWith(path + sep))
+}
+
+function realPath(file: string): string {
+  try {
+    return realpathSync(file)
+  }
+  catch {
+    return file
+  }
 }
 
 // Prints what `kay check` finds in the project and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.

@@ -1,5 +1,5 @@
 import type { CheckOptions } from '../src/check'
-import { chmod, mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -127,6 +127,8 @@ describe('kay check', () => {
 })
 
 const scratchRoot = join(import.meta.dir, '../node_modules/.cache')
+// What `kay check --watch` writes to a terminal before each check: the screen and its scrollback erased.
+const CLEAR = '\x1B[2J\x1B[3J\x1B[H'
 const tsconfig = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
   include: ['src', '.kay/types'],
@@ -144,6 +146,36 @@ async function runCheckIn(env: Record<string, string>, root: string, ...flags: s
   const [report, output, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { code, output, report }
+}
+
+// `kay check --watch` with JSON reports, the next of them at each `report()`, one document per line.
+function watchChecks(root: string, ...flags: string[]): { report: () => Promise<{ errors: number }>, stop: () => Promise<void> } {
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch', '--format', 'json', ...flags], { stdout: 'pipe', stderr: 'pipe' })
+  const reader = child.stdout.getReader()
+  let output = ''
+
+  return {
+    report: async () => {
+      while (!output.includes('\n')) {
+        const { value, done } = await reader.read()
+
+        if (done)
+          throw new Error('kay check --watch exited')
+
+        output += new TextDecoder().decode(value)
+      }
+
+      const line = output.slice(0, output.indexOf('\n'))
+
+      output = output.slice(line.length + 1)
+
+      return JSON.parse(line) as { errors: number }
+    },
+    stop: async () => {
+      child.kill()
+      await child.exited
+    },
+  }
 }
 
 async function scratchProject(files: Record<string, string>): Promise<string> {
@@ -1508,39 +1540,130 @@ describe('kay check, unused code', () => {
     }
   })
 
-  it('checks again on every change with --watch', async () => {
-    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch', '--format', 'json'], { stdout: 'pipe', stderr: 'pipe' })
-    const reader = child.stdout.getReader()
-    let output = ''
-    // The next report, one JSON document per line.
-    const report = async () => {
-      while (!output.includes('\n')) {
-        const { value, done } = await reader.read()
+  it('reads the paths named from the current directory, through symlinks, and refuses one outside the project', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'img(src="/a.png")\n', 'src/b.kay': 'img(src="/b.png")\n' })
+    const link = `${root}-link`
+    const files = async (result: Promise<{ report: string }>) => (JSON.parse((await result).report) as { problems: { file: string }[] }).problems.map(problem => basename(problem.file))
+    const inRoot = async (...args: string[]) => {
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', ...args, '--format', 'json'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
 
-        if (done)
-          throw new Error('kay check --watch exited')
-
-        output += new TextDecoder().decode(value)
-      }
-
-      const line = output.slice(0, output.indexOf('\n'))
-
-      output = output.slice(line.length + 1)
-
-      return JSON.parse(line) as { errors: number }
+      return { report: await new Response(child.stdout).text(), code: await child.exited }
     }
 
     try {
-      expect(await report()).toMatchObject({ errors: 0 })
+      await symlink(join(root, 'src'), join(root, 'src2'))
+      await symlink(root, link)
+
+      expect(await files(inRoot('src/a.kay'))).toEqual(['a.kay'])
+      expect(await files(inRoot('src2/b.kay'))).toEqual(['b.kay'])
+      expect(await files(runCheck(root, '--format', 'json', join(root, 'src2')))).toEqual(['a.kay', 'b.kay'])
+      expect(await files(runCheck(root, '--format', 'json', join(link, 'src/a.kay')))).toEqual(['a.kay'])
+      expect(await files(runCheck(link, '--format', 'json', join(root, 'src/b.kay')))).toEqual(['b.kay'])
+
+      const outside = join(import.meta.dir, '../package.json')
+
+      expect(await runCheck(root, outside)).toEqual({ code: 1, output: `kay check: ${outside} is outside the project at ${relative(process.cwd(), root)}, so kay check finds nothing in it\n`, report: '' })
+      expect((await inRoot('..')).code).toBe(1)
+    }
+    finally {
+      await rm(link, { force: true })
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('applies the safe fixes in the paths named alone with --fix', async () => {
+    const button = '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n'
+    const root = await scratchProject({ 'src/a.kay': button, 'src/b.kay': button })
+
+    try {
+      expect((await runCheck(root, '--fix', join(root, 'src/a.kay'))).report).toStartWith('fixed 1 problem\n')
+      expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe(button.replace('onclick', 'onClick'))
+      expect(await Bun.file(join(root, 'src/b.kay')).text()).toBe(button)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('checks again on every change with --watch', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
+    const watch = watchChecks(root)
+
+    try {
+      expect(await watch.report()).toMatchObject({ errors: 0 })
       await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
-      expect(await report()).toMatchObject({ errors: 1 })
+      expect(await watch.report()).toMatchObject({ errors: 1 })
       await Bun.write(join(root, 'src/a.kay'), 'p a\n')
-      expect(await report()).toMatchObject({ errors: 0 })
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+    }
+    finally {
+      await watch.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('reads kay.config.ts again on every check with --watch, an edit to it or a mistake in it included', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'export default { lints: { \'missing-alt\': \'allow\' } }\n', 'src/a.kay': 'img(src="/a.png")\n' })
+    const watch = watchChecks(root)
+
+    try {
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+      expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: 'missing-alt' }] })
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {\n')
+      expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null }] })
+      await Bun.write(join(root, 'kay.config.ts'), 'export default { lints: { \'missing-alt\': \'allow\' } }\n')
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+    }
+    finally {
+      await watch.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('keeps watching after a check that throws, as a fix it cannot write', async () => {
+    const root = await scratchProject({ 'src/a.kay': '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n' })
+    const file = join(root, 'src/a.kay')
+
+    await chmod(file, 0o444)
+    const watch = watchChecks(root, '--fix')
+
+    try {
+      expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null, message: expect.stringContaining('EACCES') }] })
+      await chmod(file, 0o644)
+      await Bun.write(file, 'p a\n')
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+    }
+    finally {
+      await watch.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('clears the terminal before each check with --watch', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
+    let output = ''
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch'], { terminal: { data: (_terminal, data) => {
+      output += new TextDecoder().decode(data)
+    } } })
+    const printed = async (times: number, text: string) => {
+      while (output.split(text).length <= times)
+        await Bun.sleep(20)
+    }
+
+    try {
+      await printed(1, 'with no problems')
+      expect(output.split(CLEAR).length).toBe(2)
+      expect(output.indexOf(CLEAR)).toBeLessThan(output.indexOf('with no problems'))
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
+      await printed(1, 'missing-alt')
+      expect(output.split(CLEAR).length).toBe(3)
+      expect(output.lastIndexOf(CLEAR)).toBeLessThan(output.indexOf('missing-alt'))
     }
     finally {
       child.kill()
       await child.exited
+      child.terminal?.close()
       await rm(root, { recursive: true, force: true })
     }
   }, 30_000)

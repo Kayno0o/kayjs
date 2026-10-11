@@ -154,12 +154,12 @@ kay check src/routes/blog src/lib/feed.ts   # only the problems in those
 kay check --watch
 ```
 
-The first path is the project when it is a directory holding a `kay.config.ts`, a `package.json` or a `tsconfig.json`, or outside the current directory; the other paths, relative to the current directory, narrow the report to the problems in those files and directories. The project is still type-checked as a whole.
+The first path is the project when it is a directory holding a `kay.config.ts`, a `package.json` or a `tsconfig.json`, or any directory outside the current directory, so a directory given first to narrow the report must be neither. The other paths, relative to the current directory, narrow the report, and `--fix`, to the problems in those files and directories, a symlink read as what it points to; a path outside the project fails the check. The project is still type-checked as a whole.
 
 | Option | Effect |
 | --- | --- |
 | `--deny-warnings` | Fails on warnings too, not only on errors |
-| `--watch` | Checks again on every change to the project, tests included, clearing the previous report in a terminal |
+| `--watch` | Checks again on every change to the project, tests included, clearing the previous report in a terminal. Each check is a `kay check` of its own, so an edit to `kay.config.ts` counts and a check that cannot run leaves the watch going |
 | `--fix` | Applies the fixes that change nothing else, then reports what is left |
 | `--only <group>` | Reports one group's lints alone, such as `seo`, as an audit |
 | `--format <format>` | `text` by default; `github` prints each problem as a workflow command, `::error file=src/a.kay,line=4,col=3,title=missing-alt::...`, which GitHub and Forgejo Actions show on the diff, its `file` relative to `GITHUB_WORKSPACE`, the repository's root, when set, else to the current directory; `json` prints them as one document on stdout, `{ errors, warnings, problems }`, each problem with its `file` relative to the current directory, `line`, `column`, `endLine` and `endColumn` past the span, `severity`, `code`, `message`, and `label`, `note`, `help` and `related` when it has them. A check that cannot run, on a path that does not exist or a `kay.config.ts` that does not load, prints one error in the format too, `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`, with the config's `file`, `line` and `column` when it does not parse. The exit code is the same in every format |
