@@ -1,15 +1,10 @@
-import type { Mode } from '../project'
 import type { PagesOptions } from './app'
-import type { ClientBuild } from './client'
-import { resolve } from 'node:path'
 import process from 'node:process'
-import { mergeConfig, withConfig } from '../config'
-import { clientOptionsOf, modeOf, PRODUCTION, resolveProject } from '../project'
+import { resolveProject } from '../project'
 import { kayLog } from '../runtime/log'
 import { servePages } from './app'
-import { bundled } from './bundle'
-import { readClient } from './client'
 import { bootFailure } from './dev'
+import { projectSource } from './source'
 
 export type { KayConfig, KayExtension } from '../config'
 export { defineConfig } from '../config'
@@ -49,27 +44,11 @@ export { CspViolation } from './violations'
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
 export async function pages(options: PagesOptions = {}) {
-  const bundle = bundled()
-  const mode = bundle ? PRODUCTION : modeOf(options)
-
-  // An executable serves what `kay build --compile` embedded, as production does: the root, routes and public files it was built with win over the options.
-  if (bundle) {
-    const config = { ...mergeConfig(bundle.config, options), root: bundle.root, dev: mode.dev, prebuilt: mode.prebuilt, publicDir: bundle.publicDir }
-
-    return servePages(resolveProject(bundle.root, config, mode), async () => {
-      const client = await readClient(bundle.root, bundle.clientDir)
-
-      if (!client)
-        throw new Error(`kay: this executable holds no client build at ${bundle.clientDir}`)
-
-      return client
-    })
-  }
-
-  const root = resolve(options.root ?? process.cwd())
-  const config = { ...await withConfig(root, options), dev: mode.dev, prebuilt: mode.prebuilt }
-  const project = resolveProject(root, config, mode)
-  const loadClient = async () => clientFor(root, config, mode)
+  const source = projectSource()
+  const mode = source.mode(options)
+  const root = source.root(options.root ?? process.cwd())
+  const project = resolveProject(root, { ...await source.config(root, options), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
+  const loadClient = async () => source.client(project)
 
   if (!mode.dev)
     return servePages(project, loadClient)
@@ -82,20 +61,4 @@ export async function pages(options: PagesOptions = {}) {
 
     return bootFailure(error, root)
   }
-}
-
-async function clientFor(root: string, options: PagesOptions, mode: Mode): Promise<ClientBuild> {
-  if (mode.prebuilt) {
-    const built = await readClient(root)
-
-    if (built)
-      return built
-
-    kayLog('warn', 'no client build in .kay/client, bundling now; run `kay build` before starting in production')
-  }
-
-  // Imported only to bundle, as it brings the compiler, which a server reading a build never needs.
-  const { buildClient } = await import('../build/client')
-
-  return buildClient(root, clientOptionsOf(options, mode))
 }

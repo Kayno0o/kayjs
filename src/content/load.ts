@@ -3,9 +3,8 @@ import type { ContentProblem } from './validate'
 import { mkdir, rename } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { outputDir } from '../build/assets'
 import { cacheDir as projectCache } from '../project'
-import { bundled } from '../server/bundle'
+import { projectSource } from '../server/source'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { ContentError } from './validate'
 
@@ -64,8 +63,8 @@ export function manifestFile(base: string, dir: string): string {
 }
 
 async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
-  const bundle = bundled()
-  const base = bundle?.clientDir ?? (process.env.NODE_ENV === 'production' ? outputDir(rootOf()) : undefined)
+  const source = projectSource()
+  const base = source.contentBuild(rootOf())
 
   if (base === undefined)
     return undefined
@@ -75,7 +74,7 @@ async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
   if (await file.exists())
     return await file.json() as RawEntry[]
 
-  if (bundle)
+  if (source.embedded)
     throw new Error(`kay: this executable holds no build of the collection ${dir}; run \`kay build --compile\` again`)
 
   return undefined

@@ -4,19 +4,20 @@ import type { I18n } from './i18n'
 import type { Matcher } from './params'
 import type { RenderOptions } from './render'
 import type { Route, RouteMount } from './routes'
+import type { ProjectSource } from './source'
 import { renderOptionsOf } from '../project'
 import { setSite } from '../runtime/site'
 import { basePath } from './base'
-import { bundled } from './bundle'
 import { readInlineStyles } from './client'
 import { implicitI18n, loadI18n, routedSettings } from './i18n'
 import { applyImageConfig } from './image'
-import { registerLoader } from './loader'
 import { loadMatchers } from './params'
-import { refuseClashes, routeMounts, scanRoutes } from './routes'
+import { refuseClashes, routeMounts } from './routes'
 import { configHead, siteOrigin } from './seo'
+import { projectSource } from './source'
 
 export interface PageSetup {
+  source: ProjectSource
   client: ClientBuild
   mounts: RouteMount[]
   routes: Route[]
@@ -35,13 +36,10 @@ export interface PageSetup {
 export async function setupPages(project: Project, loadClient: () => Promise<ClientBuild>, prerendering = false): Promise<PageSetup> {
   const { root, config, paths, mode } = project
   const mounts = routeMounts(root, config.extensions)
-  // An executable carries its routes and modules compiled; anything else finds them on disk and compiles them as they load.
-  const bundle = bundled()
+  const source = projectSource()
 
-  if (!bundle)
-    await registerLoader(root, config.settings)
-
-  const [routes, client] = await Promise.all([bundle?.routes ?? scanRoutes(paths.routes, mounts), loadClient()])
+  await source.prepare(root, config.settings)
+  const [routes, client] = await Promise.all([source.routes(paths.routes, mounts), loadClient()])
 
   refuseClashes(paths.routes, routes)
   const [matchers, i18n] = await Promise.all([loadMatchers(paths.routes, routes), config.i18n && loadI18n(root, config.i18n, config.extensions)])
@@ -60,7 +58,7 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
   if (config.inlineStyles === true && !mode.dev)
     client.inlineStyles = await readInlineStyles(client, base)
 
-  const { head, scripts, styles } = await configHead(root, config, client.dir, bundle !== undefined)
+  const { head, scripts, styles } = await configHead(root, config, client.dir, source.embedded)
 
-  return { client, mounts, routes, matchers, i18n, locales, base, site, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity }) }
+  return { source, client, mounts, routes, matchers, i18n, locales, base, site, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity }) }
 }

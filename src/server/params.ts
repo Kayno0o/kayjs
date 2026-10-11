@@ -1,9 +1,9 @@
 import type { Route } from './routes'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import * as builtIn from '../runtime/params'
-import { bundled, importModule } from './bundle'
+import { importModule } from './bundle'
 import { decodePath, patternShapes, withoutSlash } from './routes'
+import { projectSource } from './source'
 
 // Gives the param's value, or undefined to refuse the URL, which then falls through to the next page serving its path.
 export type Matcher = (value: string) => unknown
@@ -23,7 +23,7 @@ export function matcherFile(routesDir: string, name: string): string {
 // Every matcher the routes name: the project's own file, else the one kay ships of that name.
 export async function loadMatchers(routesDir: string, routes: Route[]): Promise<Map<string, Matcher>> {
   const matchers = new Map<string, Matcher>()
-  const bundle = bundled()
+  const source = projectSource()
 
   for (const route of routes) {
     for (const name of Object.values(route.matchers ?? {})) {
@@ -32,7 +32,7 @@ export async function loadMatchers(routesDir: string, routes: Route[]): Promise<
 
       const file = matcherFile(routesDir, name)
 
-      if (bundle ? file in bundle.modules : existsSync(file)) {
+      if (source.has(file)) {
         const matcher = (await importModule<{ default?: unknown }>(file)).default
 
         if (typeof matcher !== 'function')

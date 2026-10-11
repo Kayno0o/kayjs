@@ -4,14 +4,13 @@ import type { I18n } from '../server/i18n'
 import type { Collection } from './index'
 import type { Segment } from './markdown'
 import type { ContentProblem } from './validate'
-import { existsSync } from 'node:fs'
 import { dirname, relative } from 'node:path'
 import { projectPaths } from '../project'
 import { localePath } from '../runtime/i18n'
 import { runInLocale } from '../runtime/locale-state'
-import { bundled, importModule } from '../server/bundle'
+import { importModule } from '../server/bundle'
 import { hostLocale, stateFor } from '../server/i18n'
-import { registerLoader } from '../server/loader'
+import { projectSource } from '../server/source'
 import { feedXml } from './feed'
 import { isCollection } from './index'
 import { loadEntries, manifestFile, setContentPlace } from './load'
@@ -48,18 +47,17 @@ async function namedCollections(root: string, config?: string): Promise<[string,
 
   setContentPlace(root, dirname(file))
 
-  const bundle = bundled()
+  const source = projectSource()
 
-  if (bundle ? !(file in bundle.modules) : !existsSync(file)) {
-    if (config !== undefined && !bundle)
+  if (!source.has(file)) {
+    if (config !== undefined && !source.embedded)
       throw new Error(`kay: kay.config.ts names ${config} as the content config, and there is no such file`)
 
     return []
   }
 
   // Its components are `.kay` files.
-  if (!bundle)
-    await registerLoader(root)
+  await source.prepare(root)
 
   const module = await importModule<Record<string, unknown>>(file)
 

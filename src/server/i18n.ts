@@ -2,15 +2,14 @@ import type { I18nConfig, KayExtension } from '../config'
 import type { LocaleSettings, Message, MessageTree, Translations } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
 import type { Route } from './routes'
-import { existsSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { throughLinks } from '../build/links'
-import { loadConfig, mergeConfig } from '../config'
 import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
-import { bundled, importModule } from './bundle'
+import { importModule } from './bundle'
 import { patternShapes } from './routes'
+import { projectSource } from './source'
 
 // Where a visitor's choice of locale is kept, read before their browser's languages.
 export const LOCALE_COOKIE = 'kay-locale'
@@ -209,15 +208,11 @@ export async function implicitI18n(root: string, lang: string | undefined, exten
 }
 
 function fileExists(file: string): boolean {
-  const bundle = bundled()
-
-  return bundle ? file in bundle.modules : existsSync(file)
+  return projectSource().has(file)
 }
 
 function libraryCatalogs(root: string, extensions: KayExtension[] | undefined, locale: string): string[] {
-  const bundle = bundled()
-
-  return bundle ? bundle.extensionMessages?.[locale] ?? [] : extensionMessageFiles(root, extensions, locale).filter(fileExists)
+  return projectSource().extensionCatalogs(locale, extensionMessageFiles(root, extensions, locale))
 }
 
 // The catalogs' messages, each laid over the ones before it key by key.
@@ -257,13 +252,13 @@ export async function renderState(locale: string | undefined): Promise<LocaleSta
 }
 
 async function projectI18n(): Promise<I18n> {
-  const bundle = bundled()
-  const root = bundle?.root ?? resolve(process.env.KAY_ROOT ?? process.cwd())
+  const source = projectSource()
+  const root = source.root(process.env.KAY_ROOT ?? process.cwd())
   let loading = projects.get(root)
 
   if (!loading) {
     loading = (async () => {
-      const config = bundle ? mergeConfig(bundle.config, {}) : await loadConfig(root)
+      const config = await source.config(root, {})
 
       return config.i18n ? loadI18n(root, config.i18n, config.extensions) : implicitI18n(root, config.lang, config.extensions)
     })()

@@ -7,24 +7,22 @@ import type { ClientBuild } from './client'
 import type { ServedRoute } from './guards'
 import type { Matcher, RouterShape } from './params'
 import type { RequestContext, ServedPage } from './render'
-import { tmpdir } from 'node:os'
 import { join, normalize, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import { ASSET_PREFIX, testWorker } from '../build/assets'
+import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { extensionServers, pageHooks } from '../config'
 import { projectCollections, serveFeeds } from '../content/server'
-import { cacheDir, offlineOf } from '../project'
+import { offlineOf } from '../project'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { overHttps, registerActionRoutes } from './actions'
-import { projectApi, serveApi, sharedGuards } from './api'
+import { serveApi, sharedGuards } from './api'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
-import { bundled } from './bundle'
 import { serveCards, setupCards } from './card'
 import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, filesUnder, fixedTexts, preferredEncoding } from './compress'
@@ -52,7 +50,7 @@ import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './rende
 import { reportServerError } from './report'
 import { revalidateStale, trackPrerendered } from './revalidate'
 import { rewriteRequests } from './rewrite'
-import { decodePath, refuseEndpointClashes, routeTrees, scanEndpoints, servedPaths, specialPagesOf, withoutSlash } from './routes'
+import { decodePath, refuseEndpointClashes, servedPaths, withoutSlash } from './routes'
 import { headerCopies, ownHeaders, securityHeaders, setSecurityHeaders } from './security'
 import { serveServerIslands } from './server-islands'
 import { setupPages } from './setup'
@@ -188,8 +186,7 @@ function remembered(response: Response, request: Request, locale: string): Respo
 export async function servePages(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>) {
   const { root, config: options, paths, mode } = project
   const routesDir = paths.routes
-  const bundle = bundled()
-  const { client, mounts, routes: scanned, matchers, i18n, locales, base, site, scripts, styles, renderOptions } = await setupPages(project, loadClient)
+  const { source, client, mounts, routes: scanned, matchers, i18n, locales, base, site, scripts, styles, renderOptions } = await setupPages(project, loadClient)
   const routes = await Promise.all(scanned.map(loadGuards))
   const collections = await projectCollections(root, options.content)
 
@@ -339,10 +336,10 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
   })
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base }
-  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, paths.public, routes), bundle?.api ?? projectApi(root, options)])
+  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, paths.public, routes), source.api(root, options)])
 
   const api = await serveApi(app, apiModules, actionOptions)
-  const endpoints = bundle?.endpoints ?? await scanEndpoints(routesDir, mounts)
+  const endpoints = await source.endpoints(routesDir, mounts)
 
   refuseEndpointClashes(endpoints, routes, publicUrls)
   await serveEndpoints(app, endpoints, actionOptions)
@@ -371,13 +368,12 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
   if (options.preview)
     servePreview(app)
 
-  // An executable runs from wherever it was copied, away from the project it was built in.
   const lookup = options.images?.resolve
-  const imageCache = bundle ? join(tmpdir(), 'kay-images') : cacheDir(root, `images${testWorker()}`)
+  const imageCache = source.imageCache(root)
   const imageRoute = {
     clientDir: client.dir,
     cacheDir: imageCache,
-    dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(bundle ? process.cwd() : root, dir)])),
+    dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(source.runtimeRoot(root), dir)])),
     quality: options.images?.quality,
     // Development serves WebP, so a page's first load does not wait on AVIF encoding.
     avif: mode.dev ? undefined : avifQuality(options.images),
@@ -387,14 +383,14 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
     resolve: lookup && { find: async (src: string, ctx: GuardContext) => {
       const path = await lookup(src, ctx)
 
-      return path === undefined ? undefined : resolve(bundle ? process.cwd() : root, path)
+      return path === undefined ? undefined : resolve(source.runtimeRoot(root), path)
     }, guard: options.images?.guard, actions: actionOptions },
   }
 
   setupStorage(options.storage, join(imageCache, 'stored'))
   serveFiles(app)
   serveImages(app, imageRoute)
-  const cards = await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (options.fonts?.length ?? 0) > 0, config: options.images?.card, name: options.seo?.name, quality: options.images?.quality, bundled: bundle !== undefined })
+  const cards = await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (options.fonts?.length ?? 0) > 0, config: options.images?.card, name: options.seo?.name, quality: options.images?.quality, bundled: source.embedded })
 
   serveCards(app, cards, imageRoute)
 
@@ -575,7 +571,7 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
     })
   }
 
-  const fallback = bundle?.fallback ?? specialPagesOf(routeTrees(routesDir, mounts), '')
+  const fallback = source.fallback(routesDir, mounts)
 
   // Every route above wins over this one, so it only answers what no page serves, in the locale its prefix or its host names.
   if (fallback.notFound ?? fallback.error) {
