@@ -80,6 +80,21 @@ describe('createDrafts', () => {
     expect(drafts.issues(post)).toHaveLength(1)
   })
 
+  it('tells the body\'s issues from a data field named body and from the entry\'s own', async () => {
+    const { drafts } = setup(async () => ({ issues: [
+      { collection: 'posts', slug: 'hello', path: '', body: true, message: 'Unknown component Chart' },
+      { collection: 'posts', slug: 'hello', path: 'body', message: 'Data field' },
+      { collection: 'posts', slug: 'hello', path: '', message: 'Needs a locale' },
+    ] }))
+
+    drafts.set(post, BODY, '<Chart />')
+    await settled()
+
+    expect(drafts.issues(post, BODY).map(issue => issue.message)).toEqual(['Unknown component Chart'])
+    expect(drafts.issues(post, 'body').map(issue => issue.message)).toEqual(['Data field'])
+    expect(drafts.issues(post, '').map(issue => issue.message)).toEqual(['Needs a locale'])
+  })
+
   it('keeps only the answer of the latest render, ignoring an aborted one', async () => {
     const answers: ((result: DraftResult) => void)[] = []
     const failures: ((error: unknown) => void)[] = []

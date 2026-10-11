@@ -7,7 +7,9 @@ export interface EntryRef {
 }
 
 export interface Issue extends EntryRef {
+  // Dotted, relative to the data; `''` for the entry as a whole, or its body when `body` is set.
   path: string
+  body?: true | undefined
   message: string
 }
 

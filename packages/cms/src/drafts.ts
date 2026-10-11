@@ -121,7 +121,7 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
     issues(ref: EntryRef, path?: FieldPath): Issue[] {
       const key = entryKey(ref)
 
-      return issues().filter(issue => entryKey(issue) === key && (path === undefined || issue.path === path))
+      return issues().filter(issue => entryKey(issue) === key && (path === undefined || (path === BODY ? issue.body === true : issue.body !== true && issue.path === path)))
     },
     // Why the last render failed, other than the schema refusing it.
     failure: () => failure(),

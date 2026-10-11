@@ -18,5 +18,5 @@ for field of fields() key={field.key}
   FieldInput(drafts={drafts} entry={entry} field={field} path={String(field.key)})
 if collection.body
   .kcms-field(data-kcms-body)
-    FormField(label="Body")
+    FormField(label="Body" issue={drafts.issues(entry, BODY)[0]?.message})
       MarkdownEditor(value={String(drafts.value(entry, BODY) ?? '')} onInput={text => drafts.set(entry, BODY, text)})
