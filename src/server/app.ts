@@ -14,7 +14,7 @@ import { ASSET_PREFIX, testWorker, underKayDev } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { extensionServers, pageHooks } from '../config'
 import { projectCollections, serveFeeds } from '../content/server'
-import { cacheDir, projectPaths } from '../project'
+import { cacheDir, offlineOf, projectPaths, renderOptionsOf } from '../project'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
@@ -188,6 +188,7 @@ function remembered(response: Response, request: Request, locale: string): Respo
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(root: string, options: PagesOptions, loadClient: () => Promise<ClientBuild>) {
   const paths = projectPaths(root, options)
+  const mode = { dev: options.dev === true }
   const routesDir = paths.routes
   const mounts = routeMounts(root, options.extensions)
 
@@ -231,7 +232,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     client.inlineStyles = await readInlineStyles(client, base)
 
   const { head, scripts, styles } = await configHead(root, options, client.dir, bundle !== undefined)
-  const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head, base, maxDensity, resolvedImages: options.images?.resolve !== undefined, offline: options.offline !== undefined && !options.dev }
+  const renderOptions = renderOptionsOf(options, mode, { head, maxDensity })
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
@@ -439,7 +440,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, new Set([...taken, ...servedPaths(routes)]), { client, offline: options.dev ? undefined : options.offline, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
+  await serveServiceWorker(app, new Set([...taken, ...servedPaths(routes)]), { client, offline: offlineOf(options, mode) ? options.offline : undefined, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
 
   // Their canonical links, social URLs and anything built with `siteUrl()` name the site the build ran for.
   const moved = client.pages.size > 0 && client.site !== site

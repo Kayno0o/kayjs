@@ -2,6 +2,7 @@ import type { Context } from 'elysia'
 import type { KayConfig, SecurityConfig } from '../config'
 import type { Prefetch } from './speculation'
 import { isNotEmpty } from 'elysia/utils'
+import { offlineOf } from '../project'
 import { basePath } from './base'
 import { inlineScriptHashes, sourceHash } from './csp'
 import { CSP_ENDPOINT, CSP_REPORTS } from './violations'
@@ -60,7 +61,7 @@ export function securityHeaders(options: SecurityOptions): Record<string, string
   const headers: Record<string, string> = { ...HEADERS }
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
-  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base, offline: options.offline !== undefined && !options.dev }), ...(options.scripts ?? []).map(sourceHash)]
+  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base, offline: offlineOf(options, { dev: options.dev === true }) }), ...(options.scripts ?? []).map(sourceHash)]
   const styles = (options.styles ?? []).map(sourceHash)
   const reportTo = reports === true ? `${base}${CSP_REPORTS}` : reports
 

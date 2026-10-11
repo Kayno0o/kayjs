@@ -8,7 +8,7 @@ import { outputDir } from '../build/assets'
 import { elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
-import { projectPaths } from '../project'
+import { PRODUCTION, projectPaths, renderOptionsOf } from '../project'
 import { isAction } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
@@ -112,7 +112,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()
-        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { lang: config.lang, prefetch: config.prefetch, prerendering: true, head, base: basePath(config.base), maxDensity, offline: config.offline !== undefined })
+        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptionsOf(config, PRODUCTION, { head, maxDensity }), prerendering: true })
         const response = await runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
 
         if (response.status >= 500)

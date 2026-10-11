@@ -1,10 +1,10 @@
+import type { Mode } from '../project'
 import type { PagesOptions } from './app'
 import type { ClientBuild } from './client'
 import { resolve } from 'node:path'
 import process from 'node:process'
-import { underKayDev } from '../build/assets'
 import { mergeConfig, withConfig } from '../config'
-import { clientOptionsOf } from '../project'
+import { clientOptionsOf, modeOf, PRODUCTION } from '../project'
 import { kayLog } from '../runtime/log'
 import { servePages } from './app'
 import { bundled } from './bundle'
@@ -50,10 +50,11 @@ export { CspViolation } from './violations'
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
 export async function pages(options: PagesOptions = {}) {
   const bundle = bundled()
+  const mode = bundle ? PRODUCTION : modeOf(options)
 
   // An executable serves what `kay build --compile` embedded, as production does: the root, routes and public files it was built with win over the options.
   if (bundle) {
-    const config = { ...mergeConfig(bundle.config, options), root: bundle.root, dev: false, prebuilt: true, publicDir: bundle.publicDir }
+    const config = { ...mergeConfig(bundle.config, options), root: bundle.root, dev: mode.dev, prebuilt: mode.prebuilt, publicDir: bundle.publicDir }
 
     return servePages(bundle.root, config, async () => {
       const client = await readClient(bundle.root, bundle.clientDir)
@@ -66,12 +67,10 @@ export async function pages(options: PagesOptions = {}) {
   }
 
   const root = resolve(options.root ?? process.cwd())
-  const dev = options.dev ?? process.env.NODE_ENV === 'development'
+  const config = { ...await withConfig(root, options), dev: mode.dev, prebuilt: mode.prebuilt }
+  const loadClient = async () => clientFor(root, config, mode)
 
-  const config = { ...await withConfig(root, options), dev }
-  const loadClient = async () => clientFor(root, config)
-
-  if (!dev)
+  if (!mode.dev)
     return servePages(root, config, loadClient)
 
   try {
@@ -84,8 +83,8 @@ export async function pages(options: PagesOptions = {}) {
   }
 }
 
-async function clientFor(root: string, options: PagesOptions): Promise<ClientBuild> {
-  if (options.prebuilt ?? process.env.NODE_ENV === 'production') {
+async function clientFor(root: string, options: PagesOptions, mode: Mode): Promise<ClientBuild> {
+  if (mode.prebuilt) {
     const built = await readClient(root)
 
     if (built)
@@ -97,5 +96,5 @@ async function clientFor(root: string, options: PagesOptions): Promise<ClientBui
   // Imported only to bundle, as it brings the compiler, which a server reading a build never needs.
   const { buildClient } = await import('../build/client')
 
-  return buildClient(root, clientOptionsOf(options, { dev: options.dev === true, underKayDev: underKayDev() }))
+  return buildClient(root, clientOptionsOf(options, mode))
 }
