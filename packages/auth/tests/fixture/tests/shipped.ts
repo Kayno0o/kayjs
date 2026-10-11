@@ -1,12 +1,12 @@
 import { join } from 'node:path'
 import { testSite } from 'kay/test'
-import { auth, mails } from '../src/auth'
+import { mails } from '../src/auth'
 
 // Run in a process of its own, one process serving one project: a second site, guarded as the fixture is but replacing none of kayjs-auth's pages, spends a magic link through kayjs-auth's own page and prints each step's page.
 const ROOT = join(import.meta.dir, '..', 'shipped')
 const PAGES = join(ROOT, '..', '..', '..', 'src', 'pages', 'routes')
 
-const browser = () => testSite({ root: ROOT, use: [auth.plugin] })
+const browser = () => testSite({ root: ROOT })
 
 await browser()
 const { magicLink } = await import(join(PAGES, 'sign-in.kay'))

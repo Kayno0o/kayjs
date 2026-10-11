@@ -1,3 +1,4 @@
+import type { AnyElysia } from 'elysia'
 import type { KayExtension } from 'kay/server'
 import type { CaptchaWidget } from '../captcha'
 import type { Core } from '../core'
@@ -11,7 +12,7 @@ export interface AuthPagesOptions {
   home?: string | undefined
 }
 
-export interface AuthPages extends KayExtension {
+export interface AuthPages<Server extends AnyElysia = AnyElysia> extends KayExtension<Server> {
   prefix: string
   home: string
 }
@@ -71,10 +72,12 @@ export function pagePaths(prefix: string) {
   }
 }
 
-// The sign-in, register, mailed-link and account pages, for `extensions` in kay.config.ts. Give `createAuth` the same value as `pages`, or `pages: true` for the defaults.
-export function authPages(options: AuthPagesOptions = {}): AuthPages {
+// The sign-in, register, mailed-link and account pages, for `extensions` in kay.config.ts. Give `createAuth` the same `prefix` and `home` as `pages`, or `pages: true` for the defaults.
+// `server` hands `pages()` the app's `auth.plugin`, so the app mounts nothing else and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes: a function importing it, called only when `pages()` builds the app, so kay.config.ts never loads the app's database.
+export function authPages<Server extends AnyElysia = AnyElysia>(options: AuthPagesOptions & { server?: (() => Server | Promise<Server>) | undefined } = {}): AuthPages<Server> {
   return {
     name: '@kaynooo/kayjs-auth',
+    server: options.server,
     routes: { dir: `${import.meta.dir}/routes`, prefix: options.prefix ?? DEFAULT_PREFIX },
     messages: `${import.meta.dir}/messages`,
     prefix: options.prefix ?? DEFAULT_PREFIX,

@@ -1,4 +1,3 @@
-import type { LocalsOf } from 'kay'
 import type { AuthSessionData } from '../../../src/auth'
 import type { Mail } from '../../../src/mail'
 import { session } from 'kay/server'
@@ -30,11 +29,3 @@ export const auth = createAuth({
   },
   organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' },
 })
-
-// The routes the app serves besides its pages are kayjs-auth's, so `kay check` checks links to them.
-declare module 'kay' {
-  interface Register {
-    locals: LocalsOf<typeof auth.plugin>
-    app: typeof auth.plugin
-  }
-}

@@ -15,14 +15,13 @@ kayjs-auth is published to the Forgejo registry at git.kaynooo.fr, beside kay. T
 bun add @kaynooo/kayjs-auth
 ```
 
-kay 0.8.1 or later and Elysia are peers, and `@kaynooo/pg-orm` too for the Postgres store.
+kay 1.37 or later and Elysia are peers, and `@kaynooo/pg-orm` too for the Postgres store.
 
 ## Set up
 
 ```ts
 // src/auth.ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import type { LocalsOf } from 'kay'
 import { createAuth, memoryStore } from '@kaynooo/kayjs-auth'
 import { session } from 'kay/server'
 
@@ -34,25 +33,21 @@ export const auth = createAuth({
   store: memoryStore(),
   signInPage: '/login',
 })
-
-declare module 'kay' {
-  interface Register {
-    locals: LocalsOf<typeof auth.plugin>
-    app: typeof auth.plugin
-  }
-}
 ```
 
-The server uses the plugin before the pages:
+kay.config.ts hands kay the plugin, imported only when the server builds the app, so the config never loads the app's database. kay uses it before the pages and types `ctx.locals.auth` from it, with no other line in the app:
 
 ```ts
-// src/server.ts
-import { Elysia } from 'elysia'
-import { pages } from 'kay/server'
-import { auth } from './auth'
+// kay.config.ts
+import { authPages } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
 
-new Elysia().use(auth.plugin).use(await pages()).listen(3000)
+export default defineConfig({
+  extensions: [authPages({ server: async () => (await import('./src/auth')).auth.plugin })],
+})
 ```
+
+`authPages` also serves the prebuilt pages below; an app keeping its own lists `{ name: 'auth', server: async () => (await import('./src/auth')).auth.plugin }` instead. A plain Elysia server uses the plugin before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers its types in kay's `Register`, as llms.txt shows.
 
 ## A first page
 
@@ -78,15 +73,7 @@ export default auth.guard({ redirect: '/login' })
 
 ## Prebuilt pages
 
-```ts
-// kay.config.ts
-import { authPages } from '@kaynooo/kayjs-auth'
-import { defineConfig } from 'kay/server'
-
-export default defineConfig({ extensions: [authPages()] })
-```
-
-With `pages: true` in `createAuth`, kayjs-auth sends users to `/auth/sign-in`, `/auth/account` and the rest. A file of the app's at one of those paths replaces that page, and a key under `auth` in its messages replaces that text.
+`authPages()` in kay.config.ts serves them. With `pages: true` in `createAuth`, kayjs-auth sends users to `/auth/sign-in`, `/auth/account` and the rest. A file of the app's at one of those paths replaces that page, and a key under `auth` in its messages replaces that text.
 
 ## Develop
 

@@ -19,7 +19,6 @@ kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/
 ```ts
 // src/auth.ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import type { LocalsOf } from 'kay'
 import { createAuth, discordProvider } from '@kaynooo/kayjs-auth'
 import { authTables, pgStore } from '@kaynooo/kayjs-auth/pg'
 import { Database } from '@kaynooo/pg-orm'
@@ -40,17 +39,21 @@ export const auth = createAuth({
   email: { mailer: { send: mail.enqueue }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } },
   roles: { admin: ['editor'], editor: [] },
 })
-
-declare module 'kay' {
-  interface Register {
-    locals: LocalsOf<typeof auth.plugin>
-    // Or the app's own Elysia instance, when it serves more routes than kayjs-auth's.
-    app: typeof auth.plugin
-  }
-}
 ```
 
-The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(await pages())`. It may also sit inside a plugin of the app's own, at any depth: `auth` reaches every route declared after it. The session plugin then goes on the app itself, or is left to `auth.plugin`: used first inside that plugin, it stays there, and every route outside it answers 500 with an error saying so. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. Registering `app` lets `kay check` check links to those routes. `db.sync()` creates kayjs-auth's tables with the app's. What it logs, a mailer, a hook or a check that failed, goes where the app's `log` setting sends kay's messages, headed `kayjs-auth:`, as text, as JSON or to the app's function, under the request being answered.
+```ts
+// kay.config.ts
+import { authPages } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  extensions: [authPages({ server: async () => (await import('./src/auth')).auth.plugin })],
+})
+```
+
+The extension hands `pages()` the plugin, used before the pages: the app mounts nothing else and declares no `Register`, `kay check` typing `ctx.locals.auth` and checking links to kayjs-auth's routes off it. `server` is a function so that kay.config.ts never loads the app's database: kay calls it only when `pages()` builds the app, never for `kay check`, the editor or `kay build`. `authPages` also brings the prebuilt pages (see Prebuilt pages); an app keeping its own lists the plugin alone, `{ name: 'auth', server: async () => (await import('./src/auth')).auth.plugin }`.
+
+A plain Elysia app, or one mounting the plugin by hand, uses it before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers `locals: LocalsOf<typeof auth.plugin>` and `app: typeof auth.plugin` (or its own Elysia instance) in kay's `Register` for `kay check`. The plugin may also sit inside a plugin of the app's own, at any depth: `auth` reaches every route declared after it. The session plugin then goes on the app itself, or is left to `auth.plugin`: used first inside that plugin, it stays there, and every route outside it answers 500 with an error saying so. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. `db.sync()` creates kayjs-auth's tables with the app's. What it logs, a mailer, a hook or a check that failed, goes where the app's `log` setting sends kay's messages, headed `kayjs-auth:`, as text, as JSON or to the app's function, under the request being answered.
 
 `createAuth` options:
 
@@ -64,22 +67,14 @@ The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(
 
 ## Prebuilt pages
 
-kayjs-auth ships every sign-in and account page as a kay extension, styled with kayjs-ui, in English and French. An app turns them on in two places:
-
-```ts
-// kay.config.ts
-import { authPages } from '@kaynooo/kayjs-auth'
-import { defineConfig } from 'kay/server'
-
-export default defineConfig({ extensions: [authPages()] })
-```
+kayjs-auth ships every sign-in and account page as a kay extension, styled with kayjs-ui, in English and French. `authPages()` in kay.config.ts, as in Setup, serves them, and `createAuth` sends users to them:
 
 ```ts
 // src/auth.ts
 export const auth = createAuth({ /* ... */ pages: true })
 ```
 
-- `authPages({ prefix, home })` and `createAuth({ pages: { prefix, home } })` take the same options: `prefix` where the pages live, `/auth` by default, and `home` where a sign-in goes when nothing asked for another page and where a sign-out goes, `/` by default. `pages: true` takes the defaults.
+- `authPages({ prefix, home, server })` and `createAuth({ pages: { prefix, home } })` take the same `prefix` and `home`: `prefix` where the pages live, `/auth` by default, and `home` where a sign-in goes when nothing asked for another page and where a sign-out goes, `/` by default. `pages: true` takes the defaults.
 - The pages: `sign-in` (providers, password, magic link or code, passkey, remember me), `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link`, `confirm-email`, and under `account`: the profile (address, username, verification), `security` (password, two-factor with its QR code and recovery codes, passkeys), `sessions`, `connections` (shown with providers), `tokens` and `data` (download, deletion). Each works without JavaScript but passkeys, and shows only what the config enables.
 - With `pages`, `signInPage`, `twoFactorPage`, `sessionsPage` and every `email.links` default to those pages, and `auth.guard()` without `redirect` sends an anonymous visitor to the sign-in page, `?redirect=` back. Without `pages`, `email.links` names a page for each kind, or `createAuth` throws.
 - An app file at a page's path replaces that page alone: `src/routes/auth/magic-link.kay` is the app's own magic-link page. Its texts live under `auth` in kay's messages: a key in the app's `src/messages/en.ts`, such as `auth: { signIn: { title: 'Welcome back' } }`, replaces that text and keeps the rest.
@@ -416,14 +411,13 @@ Attempts are counted in the store, so every process shares them, per client addr
 
 ## Testing
 
-kay's `testSite` mounts the plugin before the pages, so a test signs in through the site's own forms and stays signed in:
+kay's `testSite` builds the site as `pages()` does, the plugin mounted by the extension before the pages, so a test signs in through the site's own forms and stays signed in. An app mounting the plugin by hand passes it as `testSite({ use: [auth.plugin] })`.
 
 ```ts
 import { testSite } from 'kay/test'
-import { auth } from '../src/auth'
 import { signIn } from '../src/routes/login.kay'
 
-const site = await testSite({ use: [auth.plugin] })
+const site = await testSite()
 const page = await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct horse battery' }, { from: '/login' })
 ```
 

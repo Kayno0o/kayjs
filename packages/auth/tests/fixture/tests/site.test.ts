@@ -2,9 +2,9 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { totpCode, totpStep } from '../../../src/totp'
-import { auth, mails, store } from '../src/auth'
+import { mails, store } from '../src/auth'
 
-// The fixture is served the way an app serves itself: kayjs-auth's plugin, then kay's pages, kayjs-auth's prebuilt ones among them.
+// The fixture is served the way an app serves itself: kay's pages, kayjs-auth's plugin handed over by its extension and its prebuilt pages among them.
 const ROOT = join(import.meta.dir, '..')
 const PAGES = join(ROOT, '..', '..', 'src', 'pages', 'routes')
 // kay check prints this line on success since kay 1.18, nothing before.
@@ -13,7 +13,7 @@ const PASSWORD = 'correct horse battery'
 const realFetch = globalThis.fetch
 
 // A browser without JavaScript, keeping its own cookies.
-const browser = () => testSite({ root: ROOT, use: [auth.plugin] })
+const browser = () => testSite({ root: ROOT })
 
 // Imported once a site has registered the .kay loader for the fixture, a project of its own beside kayjs-auth.
 await browser()
