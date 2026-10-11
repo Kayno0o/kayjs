@@ -486,6 +486,21 @@ describe('the collections a CMS edits', () => {
     })
   })
 
+  it('runs a collection\'s saves in the order they are called, keeping the later of two saves of one entry', async () => {
+    let held: { slug: string, data: unknown, body?: string | undefined }[] = []
+    const autosaved = collection({ name: 'autosaved', load: () => held.map(entry => ({ ...entry, body: entry.body ?? '' })), save: (entry) => {
+      held = [...held.filter(each => each.slug !== entry.slug), entry]
+    } }, { schema: t.Object({ title: t.String() }) })
+
+    await exporting([['autosaved', autosaved]], async () => {
+      // The first takes longer to check, its body compiled.
+      const saves = [saveEntry('autosaved', { slug: 'draft', data: { title: 'First' }, body: '# First\n\nWith a body.' }), saveEntry('autosaved', { slug: 'draft', data: { title: 'Second' } })]
+
+      expect(await Promise.all(saves)).toEqual([{}, {}])
+      expect(held).toEqual([{ slug: 'draft', data: { title: 'Second' } }])
+    })
+  })
+
   it('refuses to give the file of a new entry the folder holds, in any format, locale or index file', async () => {
     const taken = (collection: string, slug: string, locale?: string) => ({ issues: [{ collection, slug, ...locale !== undefined && { locale }, path: '', key: 'slug' as const, message: 'names an entry the collection already holds' }] })
 

@@ -13,8 +13,8 @@ import { dataIssues, decodeEntries, unknownComponents } from './validate'
 // What a CMS reads of the collections the content config exports, to edit their entries: kay's server API, kay writing nothing itself.
 // It gives drafts and files to whoever calls it: a CMS serves it from routes only an editor reaches.
 
-// The save or remove each collection runs now, which the next waits for.
-const saving = new Map<string, Promise<unknown>>()
+// The last turn each collection's saves and removes took, which settles once it and every one before it are done.
+const saving = new Map<string, Promise<void>>()
 
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says.
 export type FieldKind = 'image' | 'file' | 'markdown' | 'reference'
@@ -300,12 +300,15 @@ function fileIn(name: string, dir: string, file: string): EntryPath {
 export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined } = {}): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)
   const save = writer(name, collection, 'save')
-  const { issues } = await entryIssues(name, collection, entry)
+  const turn = takeTurn(name)
 
-  if (issues.length > 0)
-    return { issues }
+  try {
+    const { issues } = await entryIssues(name, collection, entry)
 
-  return inTurn(name, async () => {
+    if (issues.length > 0)
+      return { issues }
+
+    await turn.ready
     const place = entry.locale === undefined ? entry.slug : `${entry.locale}/${entry.slug}`
 
     if (options.create === true && (await loadedEntries(name, collection)).some(each => each.slug === place))
@@ -315,28 +318,29 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
     collection.invalidate()
 
     return {}
-  })
+  }
+  finally {
+    turn.done()
+  }
 }
 
-// Runs once the collection's previous save or remove has settled, however it ended.
-async function inTurn<T>(name: string, run: () => Promise<T>): Promise<T> {
-  const before = saving.get(name)
+// Takes the collection's next turn as the call is made, so saves and removes run in the order they were called: `ready` once every earlier one settled, however it ended, `done` passing the turn on.
+function takeTurn(name: string): { ready: Promise<void>, done: () => void } {
+  const ready = saving.get(name) ?? Promise.resolve()
+  const finished = Promise.withResolvers<void>()
   const turn = (async () => {
-    if (before !== undefined)
-      await Promise.allSettled([before])
-
-    return run()
+    await ready
+    await finished.promise
   })()
 
   saving.set(name, turn)
 
-  try {
-    return await turn
-  }
-  finally {
+  return { ready, done: () => {
+    finished.resolve()
+
     if (saving.get(name) === turn)
       saving.delete(name)
-  }
+  } }
 }
 
 // Has a loaded collection's `remove` delete one of its entries, then reads the collection afresh; or resolves why it names none, deleting nothing.
@@ -349,7 +353,10 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
   if (issues.length > 0)
     return { issues }
 
-  return inTurn(name, async () => {
+  const turn = takeTurn(name)
+
+  try {
+    await turn.ready
     const place = locale === undefined ? slug : `${locale}/${slug}`
 
     if (!(await loadedEntries(name, collection)).some(entry => entry.slug === place))
@@ -359,7 +366,10 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
     collection.invalidate()
 
     return {}
-  })
+  }
+  finally {
+    turn.done()
+  }
 }
 
 function existingIssue(collection: string, slug: string, locale: string | undefined): DraftIssue {
