@@ -37,6 +37,10 @@ const FIXTURES: Record<string, Record<string, string>> = {
     'main.kay': '---\nimport Box from \'./box.kay\'\n\nconst active = signal(true)\nconst rest = { class: \'from-spread\', id: \'spread\' }\n---\ndiv.a(class={{ on: active(), off: !active() }})\ndiv.a(class="b" {...rest})\nBox.shorthand(class={active() ? \'yes\' : \'no\'})\nBox.shorthand({...rest})\n',
     'box.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv(class={className}) box\n',
   },
+  'handlers and forms': {
+    'main.kay': '---\nimport Box from \'./box.kay\'\n\nconst count = signal(0)\nconst rest = { id: \'spread\', title: \'from spread\' }\nconst extra = signal(\'wide\')\n---\ndiv(onClick={() => count.set(count() + 1)} {...rest}) clicks {count}\nform(action={\'/save\'} {...rest})\n  input(name="q")\nform(action={\'/save\'} method="get" {...rest})\n  input(name="q")\nBox.tag(class={extra()} {...rest})\n',
+    'box.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv(class={className}) box\n',
+  },
   'consts': {
     'main.kay': '---\nconst cents = signal(1250)\n---\nconst price = cents() / 100\np Price {price}\nconst { a, b } = { a: 1, b: 2 }\np {a} and {b}\n',
   },

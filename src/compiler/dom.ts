@@ -675,6 +675,15 @@ export class DomTemplate extends TemplateWriter {
     return marksServerIsland(element, name, this.src)
   }
 
+  private staticAttribute(element: ElementNode, name: string): string | undefined {
+    for (const attribute of element.attributes) {
+      if (attribute.kind === 'static' && this.source(attribute.name) === name)
+        return attribute.text
+    }
+
+    return undefined
+  }
+
   // A link's href kept as written, the link carrying `hreflang`, where any other goes to the page's locale's copy.
   private writtenLink(element: ElementNode, attribute: string): boolean {
     return element.name === 'a' && attribute === 'href' && this.named(element, 'hreflang')
