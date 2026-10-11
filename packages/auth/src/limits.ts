@@ -33,6 +33,8 @@ export const DEFAULT_LIMITS = {
   emailCodeAccount: { max: 10, window: 15 * MINUTE },
   // Each invitation mails an inbox someone else owns, so a manager may not flood one.
   invite: { max: 30, window: HOUR },
+  // An export walks every table the app's onExport reads, so asking for one again and again is not free.
+  export: { max: 6, window: HOUR },
   // Guessing a token is hopeless; this keeps trying from being free.
   link: { max: 40, window: HOUR },
 } satisfies Record<string, Limit>

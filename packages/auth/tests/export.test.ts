@@ -38,4 +38,16 @@ describe('exporting a user\'s data', () => {
 
     expect(await browser().call('exportData')).toEqual({ ok: false, error: 'signed-out' })
   })
+
+  test('counts each export, the download included, against the account\'s limit', async () => {
+    const { browser } = testApp({ limits: { export: { max: 2, window: 3600 } } })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    expect((await ada.call('exportData')).ok).toBe(true)
+    expect((await ada.fetch('/auth/export')).status).toBe(200)
+    expect(await ada.call('exportData')).toEqual({ ok: false, error: 'limited' })
+    expect((await ada.fetch('/auth/export')).status).toBe(429)
+  })
 })

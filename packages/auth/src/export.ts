@@ -7,6 +7,7 @@ import type { UserSession } from './sessions'
 import type { RequestState } from './state'
 import { listTokens } from './bearer'
 import { publicUser } from './core'
+import { spend } from './limits'
 import { listMemberships } from './organizations'
 import { listPasskeys } from './passkeys'
 import { listSessions } from './sessions'
@@ -30,12 +31,15 @@ export interface DataExport {
   app: unknown
 }
 
-export async function exportData(state: RequestState): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' }> {
+export async function exportData(state: RequestState): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' }> {
   const { core } = state
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
+
+  if (await spend(core.store, `export:${record.id}`, core.limits.export))
+    return { ok: false, error: 'limited' }
 
   const user = publicUser(record)
 

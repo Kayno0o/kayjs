@@ -302,7 +302,7 @@ Changing what protects the account takes a `proof`: `changePassword`, `changeEma
 
 - `changePassword(proof, password)` sets the password, or a first one (`errors.password` as `register`'s), ends the user's other sessions and bearer tokens, and voids the links mailed before.
 - `changeUsername(username)` names the signed-in user, or renames them, normalised and checked as `register` does: `{ ok: true, user }`, `errors: { username }` with `'length'`, `'characters'`, `'mixed-scripts'`, `'taken'` or `'unchanged'`, or `'signed-out'`. Recasing one's own name is allowed. It takes no proof and sends no mail, a name being no credential, but needs a session: a bearer token answers `'signed-out'`. Renames are not limited, a name being public anyway. A page asks a user without one for it, as after an OAuth sign-up whose name was taken.
-- `exportData()` gives the signed-in user everything kayjs-auth keeps about them, for a download of their data: `{ ok: true, data: { exportedAt, user, identities, sessions, passkeys, tokens, recoveryCodesLeft, organizations, audit, app } }`, `user` with `createdAt`, `emailVerifiedAt` and `twoFactorEnabledAt`, no hash, secret or token among it. `onExport(user)` gives `app`, what the app keeps about them. It needs a session: a bearer token answers `'signed-out'`. `GET <prefix>/export` downloads it as `<site>-data.json`, 401 to anyone signed out.
+- `exportData()` gives the signed-in user everything kayjs-auth keeps about them, for a download of their data: `{ ok: true, data: { exportedAt, user, identities, sessions, passkeys, tokens, recoveryCodesLeft, organizations, audit, app } }`, `user` with `createdAt`, `emailVerifiedAt` and `twoFactorEnabledAt`, no hash, secret or token among it. `onExport(user)` gives `app`, what the app keeps about them. It needs a session: a bearer token answers `'signed-out'`. Each call counts against the `export` limit, 6 per account per hour, past which it answers `'limited'`. `GET <prefix>/export` downloads it as `<site>-data.json`, 401 to anyone signed out and 429 past the limit.
 - `unlink(provider, proof)` unlinks a provider: `'not-linked'` when it is not, `'last-way-in'` when the user would have no password, no other provider and no verified address to get a magic link at.
 - `deleteAccount(proof)` deletes the user with everything kayjs-auth keeps for them, calls `onDelete(user)` for the app's own records, and signs out. Asking the user to type their name first is the page's job.
 
@@ -399,6 +399,7 @@ Attempts are counted in the store, so every process shares them, per client addr
 - `register` 6 per hour.
 - `resend`, `forgot` and `magicLink` 12 per client and 3 per account per hour (`resendAccount`, `forgotAccount` and `magicLinkAccount`, the last two counted per address); `emailChange` 12 and `emailChangeAccount` 5.
 - `invite` 30 per manager per hour.
+- `export` 6 per account per hour, for `exportData()` and `GET <prefix>/export`.
 - `twoFactor` 30 and `twoFactorAccount` 8 per 15 minutes, for signing in and for turning the factor on; `reprove` 6 per 15 minutes; `link` 40 per hour; `emailCode` 30 per client and `emailCodeAccount` 10 per address per 15 minutes.
 
 ## Stores
