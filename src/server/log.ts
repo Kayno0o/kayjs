@@ -23,11 +23,13 @@ export interface RequestEntry {
   id: string
 }
 
-// One of kay's own messages: an error it caught, a warning about the app, a notice such as a shutdown.
+// One of kay's own messages, an error it caught, a warning about the app, a notice such as a shutdown, or a library's, logged through `logFrom`.
 export interface MessageEntry {
   type: 'message'
   time: string
   level: LogLevel
+  // Who logged it: `'kay'`, or the name a library gave `logFrom`.
+  from: string
   message: string
   // The request being answered when it was logged.
   request?: { method: string, path: string, id: string }
@@ -74,7 +76,7 @@ function formatted(entry: LogEntry): string {
   const about = entry.request && `${entry.request.method} ${entry.request.path}, request ${entry.request.id}`
   // The stack's first line says an error's message already.
   const message = entry.message === entry.error?.message ? undefined : entry.message
-  const heading = `kay: ${[about, message].filter(part => part !== undefined && part !== '').join(': ')}`
+  const heading = `${entry.from}: ${[about, message].filter(part => part !== undefined && part !== '').join(': ')}`
 
   return entry.error ? `${heading}\n${entry.error.stack ?? `${entry.error.name}: ${entry.error.message}`}` : heading
 }
@@ -86,18 +88,19 @@ export function useLogger(logger: Logger): void {
   write = writerFor(logger)
 }
 
-setLogSink((level, message, error, request) => logMessage(level, message, error, request))
+setLogSink((level, message, error, request, from) => logMessage(level, message, error, request, from))
 
-// Logs one of kay's messages under `request`, or the request being answered; `message` may be empty for an error that says it all.
-export function logMessage(level: LogLevel, message: string, error?: unknown, request = currentRequest()): void {
-  write(messageEntry(level, message, error, request))
+// Logs one of kay's messages, or one of the library `from` names, under `request`, or the request being answered; `message` may be empty for an error that says it all.
+export function logMessage(level: LogLevel, message: string, error?: unknown, request = currentRequest(), from = 'kay'): void {
+  write(messageEntry(level, message, error, request, from))
 }
 
-function messageEntry(level: LogLevel, message: string, error?: unknown, request?: Request): MessageEntry {
+function messageEntry(level: LogLevel, message: string, error?: unknown, request?: Request, from = 'kay'): MessageEntry {
   return {
     type: 'message',
     time: new Date().toISOString(),
     level,
+    from,
     message: message === '' && error instanceof Error ? error.message : message,
     ...request && { request: { method: request.method, path: pathOf(request.url), id: requestId(request) } },
     ...error !== undefined && { error: thrown(error) },

@@ -7,7 +7,9 @@ With NODE_ENV=production, a server's first line, once `.listen()` started it, sa
 kay's own messages, an error it caught, a warning about the app, a shutdown notice, go out in any mode, as `kay: ` and the message, an error's source-mapped stack on the lines below. `log` sets the format of both: `'json'` writes one JSON object per line for a log collector, on stdout for info and on stderr for warnings and errors, and a function receives each entry instead, typed `LogEntry` from `kay/server`:
 
 - a request, `{ type: 'request', time, level: 'info', method, path, status, duration, id }`;
-- a message, `{ type: 'message', time, level: 'info' | 'warn' | 'error', message, request?: { method, path, id }, error?: { name, message, stack } }`, `request` when it was logged while answering one.
+- a message, `{ type: 'message', time, level: 'info' | 'warn' | 'error', from, message, request?: { method, path, id }, error?: { name, message, stack } }`, `from` being `'kay'` or a library's name, `request` when it was logged while answering one.
+
+A library logs through the same setting with `logFrom` from `kay`: `const log = logFrom('kayjs-mail')`, then `log.info(message)`, `log.warn(message)` or `log.error(message, error)`. Its lines read `kayjs-mail: ` and the message, headed by the request being answered as kay's are, and carry `from: 'kayjs-mail'` as JSON or in the entry a log function receives. Outside a server, in the browser or a script, they go to the console as `[kayjs-mail] message`.
 
 Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header. An error logged while answering a request is headed by the request, `kay: GET /blog/hello, request AZnLe0vUe9qD0uXq9vLwZw`, then its stack, so a line from a user or a log search finds both. `requestId(request)` from `kay/server` gives it, in `onError` or a route, and a server span carries it as `kay.request.id`.
 

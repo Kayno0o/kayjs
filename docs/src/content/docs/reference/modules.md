@@ -33,6 +33,7 @@ import { collection } from 'kay/content'
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, or mark HTML as safe to render |
 | `uid` | A unique id that matches between server and browser |
 | `previewing` | Whether the visitor is in preview mode |
+| `logFrom` | A library's log, `logFrom('my-library').warn(message)`, written where the app's `log` setting sends kay's messages |
 
 Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `EndpointContext`, `EndpointBody` and `Locals`.
 

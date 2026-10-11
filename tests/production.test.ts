@@ -15,7 +15,7 @@ import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { resolveProject } from '../src/project'
-import { action } from '../src/runtime'
+import { action, logFrom } from '../src/runtime'
 import { sqliteCache } from '../src/runtime/cache.server'
 import { solveWork } from '../src/runtime/work'
 import { inlineScriptHashes, invalidatePage, pages, requestId, shutdown, sqliteJobs, sqliteStore } from '../src/server'
@@ -23,7 +23,7 @@ import { servePages } from '../src/server/app'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
-import { useLogger } from '../src/server/log'
+import { answeringRequest, useLogger } from '../src/server/log'
 import { hookPrerendered } from '../src/server/page-hook'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
@@ -1614,13 +1614,33 @@ describe('request logging', () => {
       const json = await pages({ routes, prebuilt: false, log: 'json', health })
 
       await json.handle(new Request('http://localhost/_kay/health?token=secret'))
-      expect(JSON.parse(String(logged.mock.calls[0]![0]))).toEqual({ type: 'message', time: expect.any(String), level: 'error', message: 'the health check failed', request: { method: 'GET', path: '/_kay/health', id: expect.any(String) }, error: { name: 'Error', message: 'Database down', stack: expect.stringMatching(/^Error: Database down\n\s+at check \(\S+production\.test\.ts:\d+:\d+\)/) } })
+      expect(JSON.parse(String(logged.mock.calls[0]![0]))).toEqual({ type: 'message', time: expect.any(String), level: 'error', from: 'kay', message: 'the health check failed', request: { method: 'GET', path: '/_kay/health', id: expect.any(String) }, error: { name: 'Error', message: 'Database down', stack: expect.stringMatching(/^Error: Database down\n\s+at check \(\S+production\.test\.ts:\d+:\d+\)/) } })
 
       const custom = await pages({ routes, prebuilt: false, log: entry => void entries.push(entry), health })
 
       await custom.handle(new Request('http://localhost/_kay/health'))
       expect(logged).toHaveBeenCalledTimes(1)
-      expect(entries).toEqual([{ type: 'message', time: expect.any(String), level: 'error', message: 'the health check failed', request: { method: 'GET', path: '/_kay/health', id: expect.any(String) }, error: { name: 'Error', message: 'Database down', stack: expect.any(String) } }])
+      expect(entries).toEqual([{ type: 'message', time: expect.any(String), level: 'error', from: 'kay', message: 'the health check failed', request: { method: 'GET', path: '/_kay/health', id: expect.any(String) }, error: { name: 'Error', message: 'Database down', stack: expect.any(String) } }])
+    }
+    finally {
+      logged.mockRestore()
+      useLogger(true)
+    }
+  })
+
+  it('writes a library\'s messages the same way, headed by its name and the request they were logged under', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const entries: LogEntry[] = []
+    const mail = logFrom('kayjs-mail')
+
+    try {
+      useLogger(entry => void entries.push(entry))
+      await answeringRequest(new Request('http://localhost/signup?token=secret', { method: 'POST' }), async () => mail.warn('a mail was refused'))
+      expect(entries).toEqual([{ type: 'message', time: expect.any(String), level: 'warn', from: 'kayjs-mail', message: 'a mail was refused', request: { method: 'POST', path: '/signup', id: expect.any(String) } }])
+
+      useLogger(true)
+      mail.error('the outbox is full', new Error('Disk full'))
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kayjs-mail: the outbox is full\nError: Disk full\n/))
     }
     finally {
       logged.mockRestore()
@@ -1644,7 +1664,7 @@ describe('request logging', () => {
         await written(() => lines.mock.calls.length + entries.length, expected)
       }
 
-      const started = { type: 'message', time: expect.any(String), level: 'info', message: expect.stringMatching(/^listening on http:\/\/localhost:\d+, kay /) }
+      const started = { type: 'message', time: expect.any(String), level: 'info', from: 'kay', message: expect.stringMatching(/^listening on http:\/\/localhost:\d+, kay /) }
 
       expect(lines.mock.calls.map(call => JSON.parse(String(call[0])) as unknown)).toEqual([started, { type: 'request', time: expect.any(String), level: 'info', method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) }])
       expect(entries).toEqual([started, { type: 'request', time: expect.any(String), level: 'info', method: 'GET', path: '/contact', status: 200, duration: expect.any(Number), id: expect.any(String) }])
