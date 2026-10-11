@@ -66,6 +66,12 @@
   --color-kui-stamp-fill: var(--color-kui-canvas);
   --color-kui-stamp-fill-hover: var(--color-kui-fill-hover);
   --kui-border-stamp: 1px;
+
+  /* A text field's inset, and its look while focused. */
+  --spacing-kui-field-x: 0.5625rem;
+  --spacing-kui-field-y: 0.25rem;
+  --color-kui-field-focus: var(--color-kui-accent);
+  --kui-field-focus-shadow: none;
 }
 
 /* Dark unless the visitor's system asks for light; `data-theme="light"` or `"dark"`, on the root or on any element, wins over both for what it holds. */
@@ -176,7 +182,7 @@
       select,
       textarea
     ) {
-    @apply rounded-kui-card bg-kui-surface0 px-2.25 py-1 text-sm text-kui-text outline-none;
+    @apply rounded-kui-card bg-kui-surface0 px-kui-field-x py-kui-field-y text-sm text-kui-text outline-none;
     border: var(--kui-border-input) solid var(--color-kui-overlay0);
 
     &::placeholder {
@@ -184,7 +190,8 @@
     }
 
     &:focus {
-      @apply border-kui-accent;
+      @apply border-kui-field-focus;
+      box-shadow: var(--kui-field-focus-shadow);
     }
 
     &:disabled {

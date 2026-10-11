@@ -42,12 +42,14 @@ The theme's tokens are `@theme default`, so the app's `@theme` overrides any of 
 - Text: `text`, `overlay1` (the faintest), `subtext0` and `muted`.
 - State: `accent`, `accent-hi` (its hover), `on-accent` (text on it), `success`, `warning`, `info` and `error`.
 - Fills: `fill-hover`, `fill-danger` and `row-hover`.
+- Fields: `field-focus`, the border of a focused text field, `accent` unless set.
 - Stamps (`Badge(stamp)`): `stamp` (its ink and hairline), `stamp-fill` and `stamp-fill-hover` (its ground while a `.group` holding it is hovered).
 - Chart series: `chart-1` to `chart-6`.
 
 A few components take tokens for their box and type, for a skin restyling them without redeclaring their selector:
 
 - Badge: `--kui-border-badge`, `--spacing-kui-badge-x`, `--spacing-kui-badge-y`, `--text-kui-badge`, `--tracking-kui-badge`, `--kui-badge-case` (`none` or `uppercase`) and `--kui-badge-font`, the text's own unless set, such as to `var(--font-mono)`; `--kui-border-stamp` for a stamp.
+- Text fields, `kui-field-input` and a FormField's controls: `--spacing-kui-field-x` and `--spacing-kui-field-y` for the inset, `--kui-field-focus-shadow` for a shadow while focused, `none` by default, such as `3px 3px 0 var(--color-kui-accent)`.
 
 The theme is dark unless the visitor's system asks for light. `data-theme="light"` or `data-theme="dark"` on `html` wins over both, for a site with its own switch, and on any element it themes what that element holds. A colour the app overrides with a single value stays that value in both.
 
