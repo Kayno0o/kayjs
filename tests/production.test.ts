@@ -622,7 +622,7 @@ describe('API routes', () => {
     expect(await created.json()).toEqual(['3'])
   })
 
-  it('answer 500 to a class instance or a Map, logging the route and what it answered, where Elysia would send 200 [object Object]', async () => {
+  it('answer 500 to a class instance or a Map, a status() body included, logging the route and what it answered, where Elysia would send [object Object]', async () => {
     const copy = await fixtureCopy('production')
     const entries: LogEntry[] = []
 
@@ -638,20 +638,48 @@ export default api()
   .get('/map', () => new Map([['a', 1]]))
   .get('/blob', () => new Blob(['raw']))
   .get('/nested', () => ({ at: new Row() }))
+  .get('/teapot', ({ status }) => status(418, new Row()))
+  .get('/date', () => new Date(0))
+  .get('/response', () => new Response('made'))
+  .get('/generator', function* () {
+    yield 'a'
+    yield 'b'
+  })
+  .get('/bytes', () => new Uint8Array([104, 105]))
+  .get('/shared', () => new SharedArrayBuffer(2))
+  .get('/bare', () => Object.assign(Object.create(null) as object, { a: 1 }))
+  .get('/status', ({ status }) => status(201, { ok: true }))
+  .get('/redirect', ({ redirect }) => redirect('/elsewhere'))
 `)
 
       const app = await pages({ routes: join(copy, 'src/routes'), api: join(copy, 'src/api'), prebuilt: false, log: entry => entries.push(entry) })
-      const row = await app.handle(new Request('http://localhost/api/rows'))
-      const map = await app.handle(new Request('http://localhost/api/rows/map'))
+      const answer = async (path: string) => app.handle(new Request(`http://localhost/api/rows${path}`))
+      const row = await answer('')
 
       expect([row.status, await row.text()]).toEqual([500, 'Internal Server Error'])
-      expect(map.status).toBe(500)
+      expect((await answer('/map')).status).toBe(500)
+      expect((await answer('/teapot')).status).toBe(500)
       expect(entries.map(entry => [entry.level, 'request' in entry && entry.request?.path, 'error' in entry && entry.error?.message])).toEqual([
         ['error', '/api/rows', expect.stringContaining('answered a Row')],
         ['error', '/api/rows/map', expect.stringContaining('answered a Map')],
+        ['error', '/api/rows/teapot', expect.stringContaining('answered a Row')],
       ])
-      expect(await (await app.handle(new Request('http://localhost/api/rows/blob'))).text()).toBe('raw')
-      expect(await (await app.handle(new Request('http://localhost/api/rows/nested'))).json()).toEqual({ at: { id: '1' } })
+      expect(await (await answer('/blob')).text()).toBe('raw')
+      expect(await (await answer('/nested')).json()).toEqual({ at: { id: '1' } })
+      expect(await (await answer('/date')).text()).toBe(String(new Date(0)))
+      expect(await (await answer('/response')).text()).toBe('made')
+      expect(await (await answer('/generator')).text()).toBe('ab')
+      expect(await (await answer('/bytes')).text()).toBe('hi')
+      expect((await (await answer('/shared')).arrayBuffer()).byteLength).toBe(2)
+      expect(await (await answer('/bare')).json()).toEqual({ a: 1 })
+
+      const status = await answer('/status')
+
+      expect([status.status, await status.json()]).toEqual([201, { ok: true }])
+
+      const redirect = await answer('/redirect')
+
+      expect([redirect.status, redirect.headers.get('location')]).toEqual([302, '/elsewhere'])
     }
     finally {
       await rm(copy, { recursive: true, force: true })

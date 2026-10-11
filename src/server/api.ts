@@ -242,8 +242,14 @@ function reportThrown({ request, error, code, set }: { request: Request, error: 
   return 'Internal Server Error'
 }
 
-// A class instance or a Map, which Elysia would answer as `200 [object Object]`, is a mistake in the route: thrown, so it is logged and answers 500.
+// A class instance or a Map, which Elysia would answer as `200 [object Object]`, is a mistake in the route: thrown, so it is logged and answers 500. A `status()` answer's body is checked the same way.
 function sendable(value: unknown): unknown {
+  if (value instanceof ElysiaCustomStatusResponse) {
+    sendable(value.response)
+
+    return value
+  }
+
   if (typeof value !== 'object' || value === null || Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype || (value).toString !== Object.prototype.toString || sentAsIs(value))
     return value
 
@@ -252,10 +258,10 @@ function sendable(value: unknown): unknown {
 
 // Bodies Elysia or `Response` send as they are, though they write as `[object ...]`.
 function sentAsIs(value: object): boolean {
-  if (value instanceof Response || value instanceof Blob || value instanceof FormData || value instanceof ReadableStream || value instanceof ArrayBuffer || ArrayBuffer.isView(value))
+  if (value instanceof Response || value instanceof Blob || value instanceof FormData || value instanceof ReadableStream || value instanceof ArrayBuffer || value instanceof SharedArrayBuffer || ArrayBuffer.isView(value))
     return true
 
-  if (value instanceof ElysiaFile || value instanceof ElysiaCustomStatusResponse || value instanceof Cookie)
+  if (value instanceof ElysiaFile || value instanceof Cookie)
     return true
 
   return STREAMED.some(method => typeof (value as Record<string, unknown>)[method] === 'function')
