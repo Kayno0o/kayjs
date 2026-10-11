@@ -31,7 +31,7 @@
     "types"
   ],
   "engines": {
-    "bun": ">=1.4.2"
+    "bun": ">=1.4.3"
   },
   "scripts": {
     "prepare": "bun scripts/link-fixture.ts",
@@ -46,7 +46,7 @@
   },
   "peerDependencies": {
     "@kaynooo/kayjs-ui": "^0.6.0",
-    "kay": "~1.37.6"
+    "kay": "~1.37.7"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
@@ -55,7 +55,7 @@
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "bun-plugin-tailwind": "^0.1.2",
-    "kay": "npm:@kaynooo/kayjs@~1.37.6",
+    "kay": "npm:@kaynooo/kayjs@~1.37.7",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }

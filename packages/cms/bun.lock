@@ -11,13 +11,13 @@
         "@types/bun": "^1.4.2",
         "@typescript/native-preview": "^7.0.0-dev.20260707.2",
         "bun-plugin-tailwind": "^0.1.2",
-        "kay": "npm:@kaynooo/kayjs@~1.37.6",
+        "kay": "npm:@kaynooo/kayjs@~1.37.7",
         "tailwindcss": "^4.3.3",
         "typescript": "^6.0.3",
       },
       "peerDependencies": {
         "@kaynooo/kayjs-ui": "^0.6.0",
-        "kay": "~1.37.6",
+        "kay": "~1.37.7",
       },
     },
   },
@@ -716,7 +716,7 @@
 
     "katex": ["katex@0.16.47", "", { "dependencies": { "commander": "^8.3.0" }, "bin": { "katex": "cli.js" } }, "sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg=="],
 
-    "kay": ["@kaynooo/kayjs@1.37.6", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fkayjs/-/1.37.6/kayjs-1.37.6.tgz", { "dependencies": { "@babel/parser": "^7.29.7", "@babel/traverse": "^7.29.7", "@babel/types": "^7.29.7", "@jsquash/avif": "2.1.1", "@kaynooo/utils": "^2.29.0", "@resvg/resvg-js": "^2.6.2", "@typescript/native-preview": "^7.0.0-dev.20260707.2", "axe-core": "^4.14.0", "devalue": "^6.0.2", "elysia": "^1.4.30", "marked": "~18.1.0" }, "peerDependencies": { "@types/bun": "^1.4.2" }, "bin": { "kay": "src/cli.ts" } }, "sha512-zNdPpOfsP9TzPQlakH7ghrRQYUMTu404goncIFRTvOVnV5dSAEWHiPfz6j4OTrLdF0Nv2Xee4XfiJIyrzHecQw=="],
+    "kay": ["@kaynooo/kayjs@1.37.7", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fkayjs/-/1.37.7/kayjs-1.37.7.tgz", { "dependencies": { "@babel/parser": "^7.29.7", "@babel/traverse": "^7.29.7", "@babel/types": "^7.29.7", "@jsquash/avif": "2.1.1", "@kaynooo/utils": "^2.29.0", "@resvg/resvg-js": "^2.6.2", "@typescript/native-preview": "^7.0.0-dev.20260707.2", "axe-core": "^4.14.0", "devalue": "^6.0.2", "elysia": "^1.4.30", "marked": "~18.1.0" }, "peerDependencies": { "@types/bun": "^1.4.2" }, "bin": { "kay": "src/cli.ts" } }, "sha512-RkCD4zDVDGaFTfz3rIhqyev3kB0kYBS3HdKeKTGNQ0Yywru9TksL0W1G2znkLHjjyCtCOgDhjEXlMCw3nqo99A=="],
 
     "kebab-case": ["kebab-case@1.0.2", "", {}, "sha512-7n6wXq4gNgBELfDCpzKc+mRrZFs7D+wgfF5WRFLNAr4DA/qtr9Js8uOAVAfHhuLMfAcQ0pRKqbpjx+TcJVdE1Q=="],
 
