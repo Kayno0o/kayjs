@@ -497,11 +497,12 @@ describe('kay build without the server environment', () => {
   }, 60_000)
 })
 
+const tsconfig = JSON.stringify({
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  include: ['src', '.kay/types'],
+})
+
 describe('kay build checks the project first', () => {
-  const tsconfig = JSON.stringify({
-    compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
-    include: ['src', '.kay/types'],
-  })
   const build = async (root: string, ...args: string[]) => {
     const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe' })
     const [report, code] = await printed(child)
@@ -852,4 +853,44 @@ describe('the files a build writes', () => {
     bare.stack = 'Error\n    at x (/a.ts:1:1)'
     expect(describeThrown(bare)).toBe('Error\n    at x (/a.ts:1:1)')
   })
+})
+
+describe('a stylesheet imported as text', () => {
+  it('reads the file under Bun and in the executable, types as a string in kay check, and stays out of the page\'s stylesheets', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/theme.css': ':root { --brand: #123456 }\n.themed { color: red }\n',
+      'src/app.css': '.app { color: blue }\n',
+      'src/routes/index.kay': '---\nimport \'../app.css\'\n---\n--- server\nimport theme from \'../theme.css\' with { type: \'text\' }\n\nconst size: number = theme.length\n---\np.size {size}\n',
+      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\nimport theme from \'./theme.css\' with { type: \'text\' }\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\n\nconsole.log(JSON.stringify({ theme, page: /<p class="size">(\\d+)<\\/p>/.exec(page)?.[1] }))\nprocess.exit(0)\n',
+    })
+    const theme = await Bun.file(join(root, 'src/theme.css')).text()
+    const read = async (command: string[]) => {
+      const child = Bun.spawn(command, { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect({ code, errors }).toEqual({ code: 0, errors: expect.any(String) })
+
+      return JSON.parse(output.trim().split('\n').at(-1)!) as { theme: string, page: string }
+    }
+
+    try {
+      const built = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' })
+      const [report, code] = await printed(built)
+
+      expect(report).not.toContain('error')
+      expect(code).toBe(0)
+      expect(await read([join(root, 'server')])).toEqual({ theme, page: String(theme.length) })
+      expect(await read([process.execPath, 'src/server.ts'])).toEqual({ theme, page: String(theme.length) })
+
+      const styles = await Promise.all((await readdir(clientDir(root), { recursive: true })).filter(name => name.endsWith('.css')).map(async name => Bun.file(join(clientDir(root), name)).text()))
+
+      expect(styles.join('')).toContain('.app')
+      expect(styles.join('')).not.toContain('themed')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
 })

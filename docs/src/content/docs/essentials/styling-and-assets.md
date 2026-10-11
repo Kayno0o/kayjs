@@ -20,6 +20,12 @@ article.card
 
 `@import`, nesting and relative `url()` assets work in the stylesheet.
 
+Imported `with { type: 'text' }`, a stylesheet is its text instead, a string in server code and in the executable `kay build --compile` writes, for a mail or a generated page to inline; it joins no page stylesheet.
+
+```ts
+import theme from './theme.css' with { type: 'text' }
+```
+
 ## Tailwind
 
 Tailwind runs as a build plugin. Install it with `bun add -d tailwindcss bun-plugin-tailwind`, then register it in `kay.config.ts`:
