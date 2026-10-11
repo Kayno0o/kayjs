@@ -12,7 +12,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { extensionServers, pageHooks } from '../config'
-import { registerEditSite } from '../content/edit'
+import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
 import { offlineOf } from '../project'
@@ -268,7 +268,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   serveImages(app, imageRoute)
   serveCards(app, cards, imageRoute)
   serveFeeds(app, served, collections, site, mode.dev, i18n)
-  registerEditSite({ urls: entryUrls(routes, base, options.trailingSlash, i18n?.settings), locales: i18n?.settings.locales })
+  const editSite = { urls: entryUrls(routes, base, options.trailingSlash, i18n?.settings), locales: i18n?.settings.locales }
+
+  registerEditSite(editSite)
+  app.onStop(() => clearEditSite(editSite))
 
   if (site !== undefined)
     serveSitemap(app, served, routes, site, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })

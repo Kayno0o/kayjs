@@ -1,5 +1,6 @@
 import type { ServedRoute } from '../src/server/guards'
-import { rm } from 'node:fs/promises'
+import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
@@ -7,7 +8,7 @@ import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { collection, collections, entries, entrySource, removeEntry, saveEntry } from '../src/content'
 import { registerEditSite } from '../src/content/edit'
-import { parseEntry } from '../src/content/load'
+import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
 import { ContentError } from '../src/content/validate'
 import { resolveProject } from '../src/project'
@@ -24,6 +25,7 @@ import { prerenderPages } from '../src/server/prerender'
 import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
 import { cms, resetCms } from './fixtures/cms/src/cms'
 import { articles, news } from './fixtures/cms/src/content.config'
+import { scratchDir } from './scratch'
 
 const FIXTURE = 'tests/fixtures/cms'
 const SECRET = 'a-preview-secret-long-enough-for-kay-0123456789'
@@ -44,6 +46,23 @@ async function previewCookie(link: string): Promise<string> {
   expect(response.status).toBe(307)
 
   return `kay_preview=${COOKIE.exec(response.headers.get('set-cookie') ?? '')![1]}`
+}
+
+// Runs with the collections' folders read from `base`, a copy of the fixture's `src` holding `folders` there, as a project whose folders are elsewhere.
+async function readingFrom<T>(base: string, folders: string[], run: () => Promise<T>): Promise<T> {
+  const before = contentPlace()
+
+  for (const folder of folders)
+    await cp(`${FIXTURE}/src/${folder}`, join(base, folder), { recursive: true })
+
+  setContentPlace(before.root, base)
+
+  try {
+    return await run()
+  }
+  finally {
+    setContentPlace(before.root, before.base)
+  }
 }
 
 // What a promise rejected with, or undefined once it resolved.
@@ -156,8 +175,9 @@ describe('the collections a CMS edits', () => {
     const found = await collections()
     const articles = found.find(each => each.name === 'articles')!
 
-    expect(found.map(each => each.name)).toEqual(['articles', 'news'])
+    expect(found.map(each => each.name)).toEqual(['articles', 'news', 'notes', 'pages'])
     expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, components: [], localized: false })
+    expect(found[2]).toEqual({ name: 'notes', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: true })
     expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, components: [], localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden' })
     expect(articles).not.toHaveProperty('repoRoot')
     expect(articles.schema.properties).toMatchObject({ author: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'news' } }, cover: { 'type': 'string', 'x-kay': { kind: 'image' } } })
@@ -173,7 +193,8 @@ describe('the collections a CMS edits', () => {
     expect(await entries('articles', { locale: 'fr' })).toEqual([{ slug: 'hello', locale: 'fr', path: 'tests/fixtures/cms/src/content/articles/fr/hello.md', data: { title: 'Bonjour' }, body: '\nSalut.\n', draft: false, url: '/articles/hello' }])
     expect((await entries('articles')).map(entry => [entry.locale, entry.draft])).toEqual([['en', true], ['fr', false]])
     expect(await articles.all('en')).toEqual([])
-    expect(await rejection(entries('posts'))).toMatchObject({ message: 'kay: no collection is exported from the content config as posts; it exports articles, news' })
+    expect(await entries('notes', { locale: 'fr' })).toEqual([{ slug: 'hello', locale: 'fr', data: { title: 'Salut' }, draft: false }])
+    expect(await rejection(entries('posts'))).toMatchObject({ message: 'kay: no collection is exported from the content config as posts; it exports articles, news, notes, pages' })
     expect(await rejection(entries('news', { locale: 'fr' }))).toMatchObject({ message: 'kay: entries() was asked for the fr entries of news, which is not localized' })
     expect(() => parseEntry('broken.json', '{')).toThrow(MarkdownError)
   })
@@ -213,11 +234,59 @@ describe('the collections a CMS edits', () => {
     expect(await entrySource('articles', 'hello', { title: 'Salut', published: '2026-01-01T00:00:00.000Z' }, { locale: 'fr' })).toEqual({ file: { path: hello, absolute: join(process.cwd(), hello), repoPath: hello, text: '---\ntitle: Salut\npublished: 2026-01-01T00:00:00.000Z\n---\n\nSalut.\n' } })
     expect(await entrySource('articles', 'new-one', { title: 'New' }, { locale: 'en', body: '# Hi' })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/articles/en/new-one.md', text: '---\ntitle: New\n---\n\n# Hi\n' } })
     expect(await entrySource('articles', '../escape', { title: 3 })).toEqual({ issues: [
-      { collection: 'articles', slug: '../escape', path: '', key: 'slug', message: 'has a slug naming no file of the collection: its parts are neither empty, . nor ..' },
+      { collection: 'articles', slug: '../escape', path: '', key: 'slug', message: 'has a slug naming another file than its own: its parts are not empty, ., .., hidden, nor a last index' },
       { collection: 'articles', slug: '../escape', path: '', key: 'locale', message: 'names no locale, which each entry of a localized collection has' },
       { collection: 'articles', slug: '../escape', path: 'title', message: expect.any(String) },
     ] })
     expect(await rejection(entrySource('news', 'launch', {}))).toMatchObject({ message: expect.stringContaining('saveEntry()') })
+  })
+
+  it('refuses a slug naming another file in a folder: hidden, a last index, a control character, an empty part', async () => {
+    for (const slug of ['.hidden', 'guide/index', 'a\u0000b', 'a//b', ''])
+      expect(await entrySource('pages', slug, { title: 'T', order: 1 })).toMatchObject({ issues: [{ key: 'slug' }] })
+
+    expect(await entrySource('pages', 'index', { title: 'T', order: 1 })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/index.md' } })
+  })
+
+  it('writes each entry back as it read it, in its own format, byte for byte', async () => {
+    const dir = `${FIXTURE}/src/content/pages`
+
+    for (const entry of await entries('pages')) {
+      const written = await entrySource('pages', entry.slug, entry.data, entry.body === undefined ? {} : { body: entry.body })
+
+      expect(written).toMatchObject({ file: { path: entry.path } })
+      expect('file' in written && written.file.text).toBe(await Bun.file(entry.path!).text())
+    }
+
+    expect((await entries('pages')).map(entry => entry.path)).toEqual([`${dir}/about.json`, `${dir}/contact.yaml`, `${dir}/home.md`])
+    expect(await entrySource('pages', 'home', { title: 'Home', order: 1 }, { body: '\r\n  Indented.\r\n\r\n' })).toMatchObject({ file: { text: '---\ntitle: Home\norder: 1\n---\n\n  Indented.\n' } })
+    expect(await entrySource('pages', 'about', { title: 'About', order: 2 }, { body: 'Dropped.' })).toEqual({ issues: [{ collection: 'pages', slug: 'about', path: '', body: true, message: 'goes to about.json, a data file holding no body' }] })
+  })
+
+  it('lists a file that does not parse with its problem, and throws for a folder missing, as from a build alone', async () => {
+    const base = await scratchDir('cms-')
+
+    await readingFrom(base, ['content/pages'], async () => {
+      await writeFile(join(base, 'content/pages/broken.json'), '{')
+
+      expect((await entries('pages')).find(entry => entry.slug === 'broken')).toEqual({ slug: 'broken', path: expect.stringMatching(/content\/pages\/broken\.json$/), data: undefined, draft: false, problem: expect.stringContaining('content/pages/broken.json:1 the JSON does not parse') })
+      expect(await rejection(entries('articles'))).toMatchObject({ message: expect.stringMatching(/^kay: articles's folder .*content\/articles is missing/) })
+      expect((await collections()).find(each => each.name === 'articles')).toMatchObject({ body: { kind: 'markdown' } })
+    })
+    await rm(base, { recursive: true, force: true })
+  })
+
+  it('leaves out the folder and paths of a collection outside the repository, and writes none of its files', async () => {
+    const base = await mkdtemp(join(tmpdir(), 'kay-cms-'))
+
+    await readingFrom(base, ['content/pages'], async () => {
+      const pages = (await collections()).find(each => each.name === 'pages')
+
+      expect(pages).not.toHaveProperty('dir')
+      expect((await entries('pages'))[0]).not.toHaveProperty('path')
+      expect(await rejection(entrySource('pages', 'about', { title: 'About', order: 2 }))).toMatchObject({ message: expect.stringContaining('outside the repository') })
+    })
+    await rm(base, { recursive: true, force: true })
   })
 
   it('hands a loaded entry to its loader\'s save and remove, then reads the collection afresh', async () => {
@@ -227,6 +296,21 @@ describe('the collections a CMS edits', () => {
     expect(await removeEntry('news', 'later')).toEqual({})
     expect(await news.get('later')).toBeUndefined()
     expect(await rejection(saveEntry('articles', { slug: 'hello', locale: 'fr', data: { title: 'T' } }))).toMatchObject({ message: expect.stringContaining('entrySource()') })
+  })
+
+  it('takes a loaded slug as its loader does, refusing one climbing out, and removes only an entry it has', async () => {
+    expect(await saveEntry('news', { slug: '/about', data: { title: 'About', published: true, tags: [] } })).toEqual({})
+    expect(await removeEntry('news', '/about')).toEqual({})
+    expect(await removeEntry('news', '/about')).toEqual({ issues: [{ collection: 'news', slug: '/about', path: '', key: 'slug', message: 'names no entry of the collection' }] })
+    expect(await removeEntry('news', '../launch')).toMatchObject({ issues: [{ key: 'slug', message: expect.stringContaining('. or ..') }] })
+    expect(await removeEntry('news', 'launch', 'fr')).toMatchObject({ issues: [{ key: 'locale' }] })
+    expect(await saveEntry('news', { slug: 'a/../b', data: { title: 'T', published: true, tags: [] } })).toMatchObject({ issues: [{ key: 'slug' }] })
+    expect(cms.entries.map(entry => entry.slug)).toEqual(['launch', 'roadmap'])
+  })
+
+  it('names the method a loader lacks to save or remove its entries', async () => {
+    expect(await rejection(saveEntry('notes', { slug: 'hello', locale: 'en', data: { title: 'Hi' } }))).toMatchObject({ message: expect.stringContaining('save') })
+    expect(await rejection(removeEntry('notes', 'hello', 'en'))).toMatchObject({ message: expect.stringContaining('remove') })
   })
 })
 
@@ -547,6 +631,7 @@ describe('showDraft', () => {
 
   // Answers the draft with `status`, a navigation starting while it is in flight when `overtaken`.
   async function drafted(status: number, overtaken: boolean): Promise<unknown> {
+    const current = navigation.current
     const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => {
       if (overtaken)
         navigation.current++
@@ -565,6 +650,7 @@ describe('showDraft', () => {
     }
     finally {
       fetched.mockRestore()
+      navigation.current = current
       delete globals.document
       delete globals.location
     }

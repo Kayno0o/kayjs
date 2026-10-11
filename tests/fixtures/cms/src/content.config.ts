@@ -24,3 +24,17 @@ export const articles = collection('content/articles', {
   draft: 'hidden',
   url: entry => `/articles/${entry.slug}`,
 })
+
+// One entry in each format a folder holds, which a CMS writes back as it read them.
+export const pages = collection('content/pages', {
+  schema: t.Object({ title: t.String(), order: t.Number(), tags: t.Optional(t.Array(t.String())) }),
+})
+
+// A localized loader declaring neither save nor remove.
+export const notes = collection({
+  name: 'notes',
+  load: () => [{ slug: 'en/hello', data: { title: 'Hello' }, html: '<p>Hi</p>' }, { slug: 'fr/hello', data: { title: 'Salut' }, html: '<p>Salut</p>' }],
+}, {
+  schema: t.Object({ title: t.String() }),
+  localized: true,
+})
