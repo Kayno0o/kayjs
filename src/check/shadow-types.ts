@@ -9,8 +9,9 @@ import type { ApiModule } from '../server/api'
 import type { PublicFile } from '../server/public'
 import type { Endpoint, Route, RouteMount } from '../server/routes'
 import type { ShadowFile } from './shadow'
+import { existsSync, realpathSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
-import { join, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
@@ -26,11 +27,15 @@ import { localeSettings } from '../server/i18n'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { patternShapes, routeMounts, routeOf, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
+import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, KAY_PATHS, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes } from './guards'
 import { islandOnlyComponents } from './island-only'
 import { compileShadow, matcherSource, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
+
+// Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
+const EXTENSION_PAGES = 'kay-extension-pages.ts'
 
 export interface ShadowTypes {
   files: Map<string, ShadowFile>
@@ -74,9 +79,10 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const routesDir = projectPaths(root, options).routes
   const tree = shadowTree(projectPaths(root).types)
   const problems: CheckDiagnostic[] = []
-  const own = await ownShadows(root, options, tree)
+  const mounts = routeMounts(root, options.extensions)
+  const own = await ownShadows(root, options, tree, mounts)
   const served = await servedProject(root, options, problems)
-  const libraries = await libraryShadows(root, options, own.files, tree)
+  const libraries = await libraryShadows(root, options, own.files, tree, mounts)
 
   await tree.write('kay-env.d.ts', await environmentTypes(root, options, served))
   problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served))
@@ -90,6 +96,8 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await tree.write(SETTINGS_CHECK, replaced.code)
   await tree.write(EXPORTS_CHECK, exported.code)
+  // TypeScript leaves out what an `include` reaches through a `node_modules`, as a linked library's pages are shadowed: nothing else imports them.
+  await tree.write(EXTENSION_PAGES, libraries.pages.map(file => `import ${JSON.stringify(`./${relative(projectPaths(root).types, shadowPath(root, file)).slice(0, -'.tsx'.length)}`)}\n`).join(''))
   await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, { routesDir, islandOnly: own.islandOnly, lints: options.lints }))
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
@@ -126,7 +134,7 @@ function shadowTree(dir: string): ShadowTree {
 }
 
 // The project's own components, each compiled with the lints its source sets.
-async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree): Promise<{ files: string[], diagnostics: CheckDiagnostic[], islandOnly: Set<string> }> {
+async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree, mounts: RouteMount[]): Promise<{ files: string[], diagnostics: CheckDiagnostic[], islandOnly: Set<string> }> {
   const { routes: routesDir, cache: cacheDir } = projectPaths(root, options)
   const files = await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true })
   const sources = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
@@ -136,7 +144,7 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree)
 
   for (const file of files) {
     const source = sources.get(file)!
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDir, file, source, islandOnly.has(file), options.lints)
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDirOf(file, routesDir, mounts), file, source, islandOnly.has(file), options.lints)
 
     await tree.shadow(shadow, shadowPath(root, file))
     for (const diagnostic of compileDiagnostics)
@@ -147,20 +155,25 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree)
 }
 
 // A library's components compile against the app's types, and the ones it reaches are reported as its own: `kay build` compiles those.
-async function libraryShadows(root: string, options: CheckOptions, own: string[], tree: ShadowTree): Promise<{ libraries: KayLibrary[], diagnostics: CheckDiagnostic[], unreached: Set<string> }> {
+// So are the pages of an extension not installed from the registry, as a library's own example or fixture app lists it, and what they reach of its package.
+async function libraryShadows(root: string, options: CheckOptions, own: string[], tree: ShadowTree, mounts: RouteMount[]): Promise<{ libraries: KayLibrary[], pages: string[], diagnostics: CheckDiagnostic[], unreached: Set<string> }> {
   const { routes: routesDir, cache: cacheDir } = projectPaths(root, options)
   const libraries = await findKayLibraries(root)
-  const reached = new Set((await reachableLibraryFiles(root, libraries, own)).components.map((file) => {
-    const library = libraryOf(libraries, file)
+  // The app's own directories are checked already; a linked library has its real path outside any `node_modules`, an installed one inside.
+  const local = mounts.filter(mount => !ownFile(root, mount.dir) && existsSync(mount.dir) && !realpathSync(mount.dir).split(sep).includes('node_modules'))
+  const followed = [...libraries, ...await extensionPackages(root, libraries, local)]
+  const pages = followed.flatMap(library => library.files).filter(file => local.some(mount => file.startsWith(mount.dir + sep)))
+  const reached = new Set([...pages, ...(await reachableLibraryFiles(root, followed, [...own, ...pages])).components.map((file) => {
+    const library = libraryOf(followed, file)
 
     return library ? throughNodeModules(library, file) : file
-  }))
+  })])
   const diagnostics: CheckDiagnostic[] = []
   const unreached = new Set<string>()
 
-  await Promise.all(libraries.flatMap(library => library.files).map(async (file) => {
+  await Promise.all(followed.flatMap(library => library.files).map(async (file) => {
     const source = await Bun.file(file).text()
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDir, file, source, false, options.lints)
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDirOf(file, routesDir, mounts), file, source, false, options.lints)
 
     await tree.shadow(shadow, shadowPath(root, file))
 
@@ -174,7 +187,34 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
       diagnostics.push(fromCompile(file, source, diagnostic))
   }))
 
-  return { libraries, diagnostics, unreached }
+  return { libraries, pages, diagnostics, unreached }
+}
+
+// The package holding each extension's routes that no kay library holds, the nearest directory above them with a package.json, as a library: its components are shadowed and reached as one's are.
+async function extensionPackages(root: string, libraries: KayLibrary[], mounts: RouteMount[]): Promise<KayLibrary[]> {
+  const dirs = new Set(mounts.filter(mount => libraryOf(libraries, join(mount.dir, 'page.kay')) === undefined).map(mount => packageRoot(mount.dir)))
+
+  return Promise.all([...dirs].map(async (dir) => {
+    // The app itself, when the package holds it as a fixture, and the other projects inside it are left to their own checks.
+    const files = (await findKayFiles(dir, { project: true, ownOnly: true, ownKayOnly: true })).filter(file => !file.startsWith(root + sep))
+
+    return { name: basename(dir), dir, realDir: dir, files, specifiers: new Map<string, string>() }
+  }))
+}
+
+function packageRoot(dir: string): string {
+  for (let at = dir; ; at = dirname(at)) {
+    if (existsSync(join(at, 'package.json')))
+      return at
+
+    if (at === dirname(at))
+      return dir
+  }
+}
+
+// The routes directory a page compiles under, for its params: the app's, or that of the extension mounting it.
+function routesDirOf(file: string, routesDir: string, mounts: RouteMount[]): string {
+  return mounts.find(mount => file.startsWith(mount.dir + sep))?.dir ?? routesDir
 }
 
 // The pages, public files, API modules and endpoints, with the locale settings, each with the reason the server would refuse it reported.
