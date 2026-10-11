@@ -1,0 +1,7 @@
+---
+import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
+---
+.flex.items-center.gap-3
+  Avatar(src="/icon-192.png" name="kay" label="kay")
+  Avatar(name="Ada Lovelace" label="Ada Lovelace")
+  Avatar(src="/missing-avatar.png" name="Grace Hopper" label="Grace Hopper")

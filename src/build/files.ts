@@ -11,6 +11,8 @@ const ROOT_IGNORED = new Set(['dist'])
 export const TSCONFIG = 'tsconfig.json'
 // What marks a directory as a kay project of its own, which kay reads at its root only.
 const KAY_CONFIG = 'kay.config.ts'
+// What marks a directory as a package of its own, such as a workspace's, which the project reaches through node_modules if at all.
+const PACKAGE = 'package.json'
 
 const TYPESCRIPT = /\.[cm]?ts$/
 const TSX = /\.tsx$/
@@ -47,7 +49,7 @@ export interface FindOptions {
   project?: boolean
   // Whether a directory holding its own tsconfig.json, another project, is left out.
   ownOnly?: boolean
-  // Whether a directory holding its own kay.config.ts, another kay project, is left out.
+  // Whether a directory holding its own kay.config.ts or package.json, another kay project or another package, is left out.
   ownKayOnly?: boolean
 }
 
@@ -62,7 +64,7 @@ export async function findProjectFiles(root: string, matches: RegExp, { project 
   const walk = async (dir: string) => {
     const entries = await readable(dir)
 
-    if (dir !== root && (entries.some(entry => entry.isFile() && ((ownOnly && entry.name === TSCONFIG) || (ownKayOnly && entry.name === KAY_CONFIG))) || await isWorktree(dir, entries)))
+    if (dir !== root && (entries.some(entry => entry.isFile() && ((ownOnly && entry.name === TSCONFIG) || (ownKayOnly && (entry.name === KAY_CONFIG || entry.name === PACKAGE)))) || await isWorktree(dir, entries)))
       return
 
     await Promise.all(entries.map(async (entry) => {

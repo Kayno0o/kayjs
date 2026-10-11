@@ -1,0 +1,8 @@
+---
+import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
+---
+.flex.items-center.gap-3
+  Avatar(name="Ada" size="xs")
+  Avatar(name="Ada" size="sm")
+  Avatar(name="Ada")
+  Avatar(name="Ada" size="lg")

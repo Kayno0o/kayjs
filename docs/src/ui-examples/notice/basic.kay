@@ -1,0 +1,8 @@
+---
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+---
+.flex.max-w-md.flex-col.gap-2
+  Notice(label="Your changes are saved.")
+  Notice(tone="success" label="The invitation is on its way.")
+  Notice(tone="warning" label="This link expires in an hour.")
+  Notice(tone="error" label="This email is already taken.")

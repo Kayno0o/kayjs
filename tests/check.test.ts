@@ -1055,6 +1055,24 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('leaves out another kay project or another package, such as a workspace\'s, when it reads its own files only', async () => {
+    const root = await scratchProject({
+      'src/a.kay': 'p hi\n',
+      'packages/ui/package.json': '{}\n',
+      'packages/ui/src/b.kay': 'p ui\n',
+      'docs/kay.config.ts': 'export default {}\n',
+      'docs/src/c.kay': 'p docs\n',
+    })
+
+    try {
+      expect((await findKayFiles(root, { project: true, ownKayOnly: true })).map(file => file.slice(root.length + 1))).toEqual(['src/a.kay'])
+      expect((await findKayFiles(root, { project: true })).map(file => file.slice(root.length + 1))).toEqual(['docs/src/c.kay', 'packages/ui/src/b.kay', 'src/a.kay'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('walks past a directory it cannot read, as a container-owned data directory bind-mounted into the project is', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'data-dev/postgres/keep': '' })
 
