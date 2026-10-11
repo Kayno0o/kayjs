@@ -120,3 +120,24 @@ describe('createDrafts', () => {
     expect(() => drafts.set({ collection: 'posts', slug: 'nope' }, 'title', 'X')).toThrow('posts:nope was never opened')
   })
 })
+
+describe('saving', () => {
+  it('takes the saved entry as the new baseline', () => {
+    const { drafts } = setup()
+
+    drafts.set(post, 'title', 'Saved title')
+    drafts.markSaved(post)
+
+    expect(drafts.changed(post)).toBe(false)
+    drafts.reset(post)
+    expect(drafts.value(post, 'title')).toBe('Saved title')
+  })
+
+  it('shows the issues a save was refused with', () => {
+    const { drafts } = setup()
+
+    drafts.report([{ collection: 'posts', slug: 'hello', path: '', message: 'hello already exists' }])
+
+    expect(drafts.issues(post, '').map(issue => issue.message)).toEqual(['hello already exists'])
+  })
+})

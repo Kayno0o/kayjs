@@ -1,6 +1,6 @@
 # kayjs-cms
 
-A CMS for kay sites, in the spirit of TinaCMS: open the real page in edit mode, click a title, edit it in a sidebar, and the page updates as you type. The same package will hold the collection screens (list, add, delete, publish), saving file content as a Forgejo commit and loader content through the collection's loader.
+A CMS for kay sites, in the spirit of TinaCMS: open the real page in edit mode, click a title, edit it in a sidebar, and the page updates as you type. The same package holds collection screens, generated from each collection's schema, to list, search, add, edit, publish and delete entries. Both save the same way: a file entry as a Forgejo commit, or in the working tree under `kay dev`, and a loaded entry through its collection's loader.
 
 Work in progress: kay's side of the on-page editing (field markers, edit mode, draft rendering, the schema and write API) is kaynooo/kayjs#262. Until it ships, `src/kay/` stubs that contract, so the editor is built and tested against it; the plan is kaynooo/kayjs-cms#1.
 
@@ -23,13 +23,25 @@ kay is a peer. The editor is drawn with kayjs-ui, so the app imports its theme a
 
 ```ts
 // kay.config.ts
-import { cms } from '@kaynooo/kayjs-cms'
+import { auth } from './src/auth'
+import { cms, forgejo } from '@kaynooo/kayjs-cms'
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ extensions: [cms()] })
+export default defineConfig({
+  extensions: [cms({
+    // Who may use the screens, and the API outside edit mode.
+    guard: auth.guard({ require: 'editor' }),
+    // Left out, a file entry is written in the working tree, for `kay dev`.
+    files: process.env.FORGEJO_TOKEN ? forgejo({ url: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
+  })],
+})
 ```
 
-In edit mode, kay renders the editor at the end of every page, with the entries the page read. The CMS's API answers only requests kay let into edit mode.
+The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. In edit mode, kay renders the editor at the end of every page, with the entries the page read. The CMS's API answers requests kay let into edit mode, and those the guard admits.
+
+A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents; the commit is the token's user's.
+
+An app replaces a screen by writing a page at its path, `src/routes/admin/new/[collection].kay` say, and can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay` in it.
 
 ## Develop
 

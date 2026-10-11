@@ -20,7 +20,9 @@
       "types": "./types/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./editor.kay": "./src/editor/editor.kay"
+    "./editor.kay": "./src/editor/editor.kay",
+    "./entry-editor.kay": "./src/components/entry-editor.kay",
+    "./entry-table.kay": "./src/components/entry-table.kay"
   },
   "files": [
     "LICENSE",

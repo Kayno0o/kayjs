@@ -1,0 +1,22 @@
+---
+import type { Drafts } from '../drafts'
+import type { CollectionInfo, EntryRef } from '../kay/contract'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import { fieldsOf } from '../fields'
+import { BODY } from '../markers'
+import FieldInput from './field-input.kay'
+
+// An entry's form: a control per field of its collection's schema, then its Markdown body.
+const { drafts, entry, collection } = props<{ drafts: Drafts, entry: EntryRef, collection: CollectionInfo }>()
+
+const fields = memo(() => fieldsOf(collection.schema))
+---
+for issue of drafts.issues(entry, '') key={issue.message}
+  p.kcms-entry-failure(role="alert") {issue.message}
+for field of fields() key={field.key}
+  FieldInput(drafts={drafts} entry={entry} field={field} path={String(field.key)})
+if collection.body
+  .kcms-field(data-kcms-body)
+    FormField(label="Body")
+      MarkdownEditor(value={String(drafts.value(entry, BODY) ?? '')} onInput={text => drafts.set(entry, BODY, text)})

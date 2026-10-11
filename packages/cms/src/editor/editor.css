@@ -131,3 +131,8 @@ html.kcms-editing [data-kay-body]:hover {
   outline-offset: 2px;
   cursor: pointer;
 }
+
+.kcms-entry-actions {
+  display: flex;
+  gap: 0.5rem;
+}

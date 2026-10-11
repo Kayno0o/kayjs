@@ -1,0 +1,56 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import type { CollectionInfo } from '../kay/contract'
+import type { EntryRow } from '../listing'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import { refresh } from 'kay'
+import { deleteSaved, publishSaved } from '../editor/save'
+import { entryPath, onPagePath } from '../listing'
+
+const { prefix, collection, rows, searched } = props<{ prefix: string, collection: CollectionInfo, rows: EntryRow[], searched: boolean }>()
+
+const columns: Column<EntryRow>[] = [
+  { key: 'title', header: 'Title', sortValue: true, defaultDirection: 'asc', cell: true },
+  ...(collection.localized ? [{ key: 'locale', header: 'Locale', sortValue: true } satisfies Column<EntryRow>] : []),
+  ...(collection.draftField === undefined ? [] : [{ key: 'draft', header: 'Status', sortValue: true, cell: true } satisfies Column<EntryRow>]),
+  { key: 'actions', header: 'Actions', align: 'end', cell: true },
+]
+
+const ref = (row: EntryRow) => ({ collection: collection.name, slug: row.slug, locale: row.locale })
+const keyOf = (row: EntryRow) => row.locale === undefined ? row.slug : `${row.slug}@${row.locale}`
+
+async function publish(row: EntryRow): Promise<void> {
+  if (await publishSaved(ref(row)))
+    await refresh()
+}
+
+async function remove(row: EntryRow): Promise<void> {
+  if (await deleteSaved(ref(row)))
+    await refresh()
+}
+---
+Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
+  @cell(row, column)
+    if column.key === 'title'
+      a(href={entryPath(prefix, ref(row))}) {row.title}
+    else if column.key === 'draft'
+      if row.draft
+        Badge(tone="warning" label="Draft")
+      else
+        Badge(tone="success" label="Published")
+    else
+      .kcms-row-actions
+        if row.draft && collection.draftField !== undefined
+          Button(label="Publish" onClick={() => publish(row)})
+        if row.url as url
+          Button(href={onPagePath(prefix, url)} label="Edit on page")
+        ConfirmDelete(message={`Delete ${row.title}? This cannot be undone.`} failure="Could not delete" size="sm" variant="ghost" onConfirm={() => remove(row)})
+  @empty
+    if searched
+      EmptyState(title="No match" description="No entry's title or slug holds every word searched.")
+    else
+      EmptyState(title="No entries yet")

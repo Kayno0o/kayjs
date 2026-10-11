@@ -30,3 +30,44 @@ test('the editor says when nothing on the page comes from a collection', async (
 
   expect(page.find('.kcms-editor-empty')[0]?.text).toBe('Nothing on this page comes from a collection.')
 })
+
+test('the screens list each collection with its entry count', async () => {
+  const page = await site.visit('/admin')
+
+  expect(page.find('.kui-card-row a').map(link => [link.text, link.attributes.href])).toEqual([['Posts', '/admin/collections/posts'], ['Pages', '/admin/collections/pages']])
+  expect(page.text('main')).toContain('2 entries')
+})
+
+test('a collection lists its entries, with a draft to publish, and searches them', async () => {
+  const page = await site.visit('/admin/collections/posts')
+
+  expect(page.find('.kcms-entries a').map(link => [link.text, link.attributes.href])).toEqual([
+    ['Hello world', '/admin/collections/posts/hello'],
+    ['Edit on page', '/admin/page?path=%2Fblog%2Fhello'],
+    ['Spring garden', '/admin/collections/posts/notes/garden'],
+  ])
+  expect(page.find('.kcms-entries button').map(button => button.text)).toContain('Publish')
+
+  const searched = await site.visit('/admin/collections/posts?q=garden')
+
+  expect(searched.find('.kcms-entries a').map(link => link.text)).toEqual(['Spring garden'])
+})
+
+test('an entry opens in a form of its collection\'s fields, nested slugs included', async () => {
+  const page = await site.visit('/admin/collections/posts/notes/garden')
+
+  expect(page.title()).toBe('notes/garden - Posts')
+  expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['title', 'draft'])
+  expect(page.find('[data-kcms-body]')).toHaveLength(1)
+})
+
+test('a new entry asks for its slug, and a locale in a localized collection', async () => {
+  expect((await site.visit('/admin/new/posts')).find('.kui-label-text').map(label => label.text)).not.toContain('Locale')
+  expect((await site.visit('/admin/new/pages')).find('.kui-label-text').map(label => label.text)).toContain('Locale')
+})
+
+test('an unknown collection or entry is a 404', async () => {
+  expect((await site.fetch('/admin/collections/nope')).status).toBe(404)
+  expect((await site.fetch('/admin/collections/posts/nope')).status).toBe(404)
+  expect((await site.fetch('/admin/new/nope')).status).toBe(404)
+})

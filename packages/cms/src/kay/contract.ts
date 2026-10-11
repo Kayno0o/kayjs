@@ -16,6 +16,9 @@ export interface DraftEntry extends EntryRef {
   body?: string | undefined
 }
 
+// What an entry's data holds, as kay's schemas give it: all of it crosses to an island as its props.
+export type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
+
 export type FieldKindHint = 'image' | 'file' | 'markdown' | 'reference'
 
 export interface JsonSchema {
@@ -25,11 +28,11 @@ export interface JsonSchema {
   'properties'?: Record<string, JsonSchema> | undefined
   'required'?: string[] | undefined
   'items'?: JsonSchema | undefined
-  'enum'?: unknown[] | undefined
-  'const'?: unknown
+  'enum'?: DataValue[] | undefined
+  'const'?: DataValue
   'anyOf'?: JsonSchema[] | undefined
   'format'?: string | undefined
-  'default'?: unknown
+  'default'?: DataValue
   'maxLength'?: number | undefined
   'minimum'?: number | undefined
   'maximum'?: number | undefined
@@ -52,14 +55,18 @@ export interface SourceEntry {
   slug: string
   locale?: string | undefined
   path?: string | undefined
-  data: Record<string, unknown>
+  // The page rendering the entry, when kay knows it.
+  url?: string | undefined
+  data: Record<string, DataValue>
   body?: string | undefined
   draft: boolean
 }
 
 export interface EntryFile {
+  // Relative to the project root.
   path: string
   absolute: string
+  // Relative to the git root, for a site in a subfolder of its repo.
   repoPath: string
   text: string
 }

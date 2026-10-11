@@ -1,0 +1,22 @@
+--- server
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import { humanize } from '../fields'
+import { collections, entries } from '../kay/content'
+import { collectionPath } from '../listing'
+import { settings } from '../settings'
+
+const { prefix } = settings()
+const listed = await Promise.all((await collections()).map(async collection => ({ collection, count: (await entries(collection.name)).length })))
+---
+head
+  title Content
+PageSection(title="Content")
+  for item of listed key={item.collection.name}
+    CardRow
+      @right
+        span {item.count === 1 ? '1 entry' : `${item.count} entries`}
+      a(href={collectionPath(prefix, item.collection.name)}) {humanize(item.collection.name)}
+  else
+    EmptyState(title="No collections" description="This site declares no content collection in its content config.")

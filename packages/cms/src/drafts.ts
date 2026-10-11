@@ -103,7 +103,21 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
     reset(ref: EntryRef): void {
       update(ref, () => undefined)
     },
-    // The schema's refusals of the last render, of the entry or of one of its fields.
+    // Takes the entry as it stands for its saved state, once a save went through.
+    markSaved(ref: EntryRef): void {
+      const key = entryKey(ref)
+      const entry = current().get(key)
+
+      if (entry)
+        saved.set(key, entry)
+
+      current.set(new Map(current()))
+    },
+    // Shows the issues a save was refused with, as a render's are shown.
+    report(refusals: readonly Issue[]): void {
+      issues.set(refusals)
+    },
+    // The schema's refusals of the last render or save, of the entry or of one of its fields.
     issues(ref: EntryRef, path?: FieldPath): Issue[] {
       const key = entryKey(ref)
 

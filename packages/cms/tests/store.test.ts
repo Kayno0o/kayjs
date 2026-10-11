@@ -1,0 +1,99 @@
+import type { FileChange } from '../src/files'
+import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
+import { beforeEach, describe, expect, test } from 'bun:test'
+import { stubContent } from '../src/kay/content'
+import { configure } from '../src/settings'
+import { deleteEntry, publishEntry, saveEntry, UnknownCollection } from '../src/store'
+
+const posts: CollectionInfo = { name: 'posts', kind: 'folder', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, localized: false, draftField: 'draft' }
+const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { type: 'object', properties: { name: { type: 'string' } } }, localized: false }
+
+let saved: FileChange[]
+let loaded: { slug: string, data: Record<string, unknown> }[]
+let removed: string[]
+let stored: Record<string, SourceEntry[]>
+
+beforeEach(() => {
+  saved = []
+  loaded = []
+  removed = []
+  stored = { posts: [{ slug: 'hello', data: { title: 'Hello', draft: true }, body: 'Hi', draft: true }], products: [{ slug: 'mug', data: { name: 'Mug' }, draft: false }] }
+  configure({ files: { save: async (change) => {
+    saved.push(change)
+
+    return { sha: 'abc' }
+  } } })
+  stubContent({
+    collections: async () => [posts, products],
+    entries: async collection => stored[collection] ?? [],
+    entrySource: async (collection, slug, data, options) => data.title === ''
+      ? { issues: [{ collection, slug, path: 'title', message: 'Required' }] }
+      : { file: { path: `${slug}.md`, absolute: `/site/content/${collection}/${slug}.md`, repoPath: `content/${collection}/${slug}.md`, text: `${JSON.stringify(data)}\n${options?.body ?? ''}` } },
+    saveEntry: async (_collection, entry) => {
+      loaded.push(entry)
+
+      return {}
+    },
+    removeEntry: async (_collection, slug) => {
+      removed.push(slug)
+
+      return {}
+    },
+  })
+})
+
+describe('saveEntry', () => {
+  test('commits a folder entry\'s file, named by what kay wrote', async () => {
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi there' }, body: 'Body' })).toEqual({ saved: true, commit: { sha: 'abc' } })
+    expect(saved).toEqual([{ repoPath: 'content/posts/hello.md', absolute: '/site/content/posts/hello.md', text: '{"title":"Hi there"}\nBody', message: 'content(posts): update hello' }])
+  })
+
+  test('passes on the schema\'s issues and writes nothing', async () => {
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: '' } })).toEqual({ issues: [{ collection: 'posts', slug: 'hello', path: 'title', message: 'Required' }] })
+    expect(saved).toEqual([])
+  })
+
+  test('refuses a slug that is no path, and a new entry under a slug taken', async () => {
+    expect(await saveEntry({ collection: 'posts', slug: '../escape', data: {} }, { create: true })).toHaveProperty('issues.0.path', '')
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Again' } }, { create: true })).toHaveProperty('issues.0.message', 'hello already exists')
+    expect(await saveEntry({ collection: 'posts', slug: 'notes/new', data: { title: 'New' } }, { create: true })).toHaveProperty('saved', true)
+    expect(saved.map(change => change.message)).toEqual(['content(posts): add notes/new'])
+  })
+
+  test('hands a loaded entry to its collection\'s loader', async () => {
+    expect(await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Big mug' } })).toEqual({ saved: true })
+    expect(loaded).toEqual([{ slug: 'mug', data: { name: 'Big mug' } }])
+    expect(saved).toEqual([])
+  })
+
+  test('throws for a collection kay does not list', async () => {
+    await expect(saveEntry({ collection: 'nope', slug: 'a', data: {} })).rejects.toBeInstanceOf(UnknownCollection)
+  })
+})
+
+describe('deleteEntry', () => {
+  test('commits a folder entry\'s file away', async () => {
+    expect(await deleteEntry({ collection: 'posts', slug: 'hello' })).toEqual({ saved: true, commit: { sha: 'abc' } })
+    expect(saved).toEqual([{ repoPath: 'content/posts/hello.md', absolute: '/site/content/posts/hello.md', text: undefined, message: 'content(posts): delete hello' }])
+  })
+
+  test('says so for an entry that does not exist', async () => {
+    expect(await deleteEntry({ collection: 'posts', slug: 'nope' })).toHaveProperty('issues.0.message', 'nope does not exist')
+  })
+
+  test('removes a loaded entry through its loader', async () => {
+    expect(await deleteEntry({ collection: 'products', slug: 'mug' })).toEqual({ saved: true })
+    expect(removed).toEqual(['mug'])
+  })
+})
+
+describe('publishEntry', () => {
+  test('saves the entry as it was with its draft field off', async () => {
+    expect(await publishEntry({ collection: 'posts', slug: 'hello' })).toHaveProperty('saved', true)
+    expect(saved.map(change => [change.text, change.message])).toEqual([['{"title":"Hello","draft":false}\nHi', 'content(posts): publish hello']])
+  })
+
+  test('refuses a collection without a draft field', async () => {
+    expect(await publishEntry({ collection: 'products', slug: 'mug' })).toHaveProperty('issues.0.message', 'products names no draft field to publish by')
+  })
+})

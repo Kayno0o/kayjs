@@ -1,0 +1,10 @@
+---
+import type { CollectionInfo } from '@kaynooo/kayjs-cms'
+import EntryEditor from '@kaynooo/kayjs-cms/entry-editor.kay'
+import EntryTable from '@kaynooo/kayjs-cms/entry-table.kay'
+
+// kay check skips an extension's routes, so this page has it check the components they render.
+const posts: CollectionInfo = { name: 'posts', kind: 'folder', schema: { type: 'object', properties: { title: { type: 'string' } } }, localized: false, draftField: 'draft' }
+---
+EntryTable(prefix="/admin" collection={posts} rows={[{ slug: 'hello', title: 'Hello', draft: true }]} searched={false})
+EntryEditor(prefix="/admin" collection={posts})

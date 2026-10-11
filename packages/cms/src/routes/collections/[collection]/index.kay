@@ -1,0 +1,29 @@
+--- server
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import { s } from 'kay'
+import EntryTable from '../../../components/entry-table.kay'
+import { humanize } from '../../../fields'
+import { entries } from '../../../kay/content'
+import { newEntryPath, pageOf, rowsOf, searchRows } from '../../../listing'
+import { settings } from '../../../settings'
+import { findCollection } from '../../../store'
+
+export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()) }) }
+
+const { prefix } = settings()
+const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
+const search = ctx.query.q ?? ''
+const listed = pageOf(searchRows(rowsOf(collection, await entries(collection.name)), search), ctx.query.page ?? 1)
+const url = ctx.url
+---
+head
+  title {humanize(collection.name)}
+PageSection(title={humanize(collection.name)})
+  @actions
+    Button(href={newEntryPath(prefix, collection.name)} label="New entry" icon="plus" variant="accent")
+  form.kcms-search(method="get" role="search")
+    input.kui-field-input(type="search" name="q" value={search} placeholder="Search" aria-label="Search entries")
+  EntryTable(prefix={prefix} collection={collection} rows={listed.rows} searched={search !== ""})
+  Pagination(page={listed.page} pages={listed.pages} url={url})

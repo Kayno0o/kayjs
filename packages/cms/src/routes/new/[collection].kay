@@ -1,0 +1,21 @@
+--- server
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import { s } from 'kay'
+import EntryEditor from '../../components/entry-editor.kay'
+import { humanize } from '../../fields'
+import { collectionPath } from '../../listing'
+import { settings } from '../../settings'
+import { findCollection } from '../../store'
+
+export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
+
+const { prefix } = settings()
+const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
+const locale = ctx.query.locale
+---
+head
+  title New entry - {humanize(collection.name)}
+PageSection(title="New entry")
+  @actions
+    a(href={collectionPath(prefix, collection.name)}) {humanize(collection.name)}
+  EntryEditor(prefix={prefix} collection={collection} locale={locale})

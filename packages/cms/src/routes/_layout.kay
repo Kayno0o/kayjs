@@ -1,0 +1,11 @@
+--- server
+import { settings } from '../settings'
+import './admin.css'
+
+const { prefix } = settings()
+---
+.kcms-admin
+  header.kcms-admin-head
+    a.kcms-admin-home(href={prefix}) Content
+  main.kcms-admin-main
+    slot
