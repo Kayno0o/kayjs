@@ -469,7 +469,8 @@ describe.skipIf(!existsSync('/proc'))('a killed Chrome\'s leftovers', () => {
   }
 
   it('kills the processes of a Chrome naming the profile it was given, what it started included, and no other process', async () => {
-    const profile = join(await scratchDir('tree-'), 'profile')
+    const scratch = await scratchDir('tree-')
+    const profile = join(scratch, 'profile')
     const chrome = Bun.spawn(['sh', '-c', 'sleep 30 & wait', 'sh', `--user-data-dir=${profile}`])
     const other = Bun.spawn(['sleep', '30'])
 
@@ -488,8 +489,11 @@ describe.skipIf(!existsSync('/proc'))('a killed Chrome\'s leftovers', () => {
       expect(alive(other.pid)).toBe(true)
     }
     finally {
+      // A failed assertion leaves the tree running, sleep included.
+      killAll(chromeTree(chrome.pid, profile))
       chrome.kill('SIGKILL')
       other.kill('SIGKILL')
+      await rm(scratch, { recursive: true, force: true })
     }
   })
 
@@ -516,9 +520,14 @@ describe.skipIf(!existsSync('/proc'))('a killed Chrome\'s leftovers', () => {
       expect(existsSync(fetcher)).toBe(false)
     }
     finally {
-      process.env.TMPDIR = saved
+      // Bun sets undefined as the string "undefined".
+      if (saved === undefined)
+        delete process.env.TMPDIR
+      else
+        process.env.TMPDIR = saved
+
       chrome.kill('SIGKILL')
-      await rm(temp, { recursive: true, force: true })
+      await Promise.all([rm(temp, { recursive: true, force: true }), rm(bin, { recursive: true, force: true })])
     }
   })
 })
