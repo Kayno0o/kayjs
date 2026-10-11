@@ -330,6 +330,8 @@ export interface PageSettings {
   security?: PageSecurity
   // `true` loads the page fully from any link or form of the site, past the page swap: a page whose scripts expect a fresh document.
   reload?: true
+  // With `search` on in kay.config.ts, `false` leaves the page out of the index, and `weight` multiplies what its words count, 1 by default.
+  search?: false | { weight?: number }
 }
 
 export interface PageSecurity {
@@ -368,5 +370,7 @@ export { previewing } from './preview'
 export type { SignalOptions } from './reactive'
 export { batch, effect, flush, memo, onCleanup, onMount, root, untrack } from './reactive'
 export { sanitizeHtml, trustHtml } from './sanitize'
+export type { SearchHit, SearchOptions, SearchResults } from './search'
+export { searchResults, searchSite } from './search'
 export type { TransitionClasses } from './transition'
 export { uid } from './uid'

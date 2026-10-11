@@ -124,6 +124,40 @@ export default defineConfig({
 - The worker's cache is named after the build and the prerendered pages, so a deploy changes `/sw.js`, which the browser checks as a page loads; the new worker takes over at once, drops the old cache, and the page swap goes on fetching through it. Nothing has to be cleared by hand.
 - `kay dev` adds no script, and its `/sw.js` removes a worker a production run left on the same origin. Turning `offline` off does the same for visitors who had it. A public file or a page at `/sw.js` wins over kay's.
 
+## Site search
+
+`search: true` in `kay.config.ts` has `kay build` index the text of every page it renders, `kay build --static` included, and an island searches it in the browser, with no service: `searchResults(query)` from `kay` follows a signal holding the query, its `hits()` those of the latest query, whichever answers first, with `loading()` and `error()` beside them.
+
+```kay
+---
+import { searchResults, signal } from 'kay'
+
+const query = signal('')
+const { hits, error } = searchResults(query)
+---
+input(type="search" aria-label="Search" bind:value={query})
+if error() !== undefined
+  p The search could not load.
+ul
+  for hit of hits() key={hit.href}
+    li
+      a(href={hit.href}) {hit.page}
+      if hit.heading as heading
+        |  · {heading}
+      p
+        for part, i of hit.snippet key={i}
+          if part.hit
+            mark {part.text}
+          else
+            | {part.text}
+```
+
+- The index holds the pages the build renders, those with `prerender`, a content collection's pages among them; a page rendered per request is not in it. A page a guard covers, one with `noindex`, and one setting `search: false` in its `page` are left out; `search: { weight: 0.5 }` makes a page's words count half as much, its hits after the others'.
+- Each page is read from its `main`, or its `body` without one, leaving out `nav`, `footer`, `script`, `style`, `svg` and any element marked `data-search="false"`. It is split into sections: the text above its first `h2` to `h4`, then each of those with the text under it, linked by the heading's `id`. A section is titled by the page's `h1`, or its `title` without one.
+- A query needs every word it holds, found as a word or the start of one, with case and accents ignored and words of one letter dropped. A word in the page's title counts most, then in a heading, then in the text. Each hit has `page`, `heading` (undefined above the first heading), `href`, the page's path with the heading's anchor, `snippet`, a line of text around the first word found split into parts marking each word searched for, and `score`. `{ limit }` returns at most that many hits, 20 by default. `searchSite(query, options)` from `kay` is the same search as a promise, for a script of its own.
+- With `i18n`, each locale gets its own index, and the search reads the one matching the page's `lang`; `{ lang }` picks another.
+- The index is split by the first letters of its words, so a query loads only the files of the words it starts, then the texts of its best hits; it is written under `/_kay/search/`, in a directory named by its content, and `/_kay/search.json`, which names it, is revalidated on every load. Both return no hits on the server, and fail when the index cannot load, as under `kay dev`, which writes none: `kay build` then `kay start` serves it.
+
 ## Fonts
 
 `fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by `@font-face` rules in a `<style>` of every page's head, which spares the first paint a request of their own at the cost of a few hundred bytes per face in every page, and preloaded only with `preload: true`.

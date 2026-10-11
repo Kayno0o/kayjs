@@ -19,6 +19,7 @@ export default defineConfig({
   // Only the share cards draw with it: no stylesheet names Inter, so pages never fetch it.
   fonts: [{ fontsource: '@fontsource/inter', weights: [700] }],
   images: { card: { background: '#17202e', color: '#eef2f7' } },
+  search: true,
   // kay's own docs wear kay's mark.
   lints: { 'default-favicon': 'allow' },
   redirects: Object.fromEntries(moved.map(topic => [`/reference/${topic}`, `/llms/${topic}`])),

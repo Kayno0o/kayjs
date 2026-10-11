@@ -22,7 +22,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Build a site](llms/site.md): one walkthrough of a small site: config and page titles, the layout and its nav, a Markdown collection and its pages, the 404 page, islands and shared state, a form checked on the server and in the browser
 - [Components](llms/components.md): the fences of a `.kay` file, props, signals, memos, effects, generic components, `import.meta.glob`, and shipping components in a package
 - [Template lines](llms/templates.md): the indented template syntax: elements, classes, attributes, events, bindings, `if`/`for`/`await`/`try` blocks, slots
-- [Head and site metadata](llms/head.md): `head` in templates, site-wide SEO defaults and social cards, sitemap and robots.txt, favicon and web manifest, offline service worker, self-hosted fonts
+- [Head and site metadata](llms/head.md): `head` in templates, site-wide SEO defaults and social cards, sitemap and robots.txt, favicon and web manifest, offline service worker, site search, self-hosted fonts
 - [Styles and assets](llms/styles-and-assets.md): component styles and Tailwind, `public/`, imported images, fonts and files, wasm and workers, responsive images, Iconify icons
 - [Islands and navigation](llms/islands.md): what runs in the browser: islands, shared and persisted state, transitions, error fallbacks, context, unique ids, browser-only components, and in-place page navigation
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, the server fence and `ctx`, endpoint files (`llms.txt.ts` exporting `GET`), prerendering and server islands, redirects, rewrites, base path, static export

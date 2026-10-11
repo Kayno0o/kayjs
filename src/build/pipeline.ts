@@ -28,6 +28,7 @@ import { remoteImages, remotePatterns } from '../server/remote'
 import { linkStoredFiles } from '../server/storage'
 import { buildClient } from './client'
 import { compileServer } from './compile'
+import { writeSearchIndex } from './search'
 import { exportStatic, refuseStaticConfig } from './static'
 
 export type BuildStage = 'check' | 'bundle' | 'output' | 'export' | 'compile'
@@ -239,6 +240,10 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
 
   const rendered: RenderedPage[] = []
   const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered })
+
+  if (config.search === true)
+    await writeSearchIndex(client.dir, rendered.flatMap(page => page.search === false ? [] : [{ path: page.path, html: page.html, weight: page.search }]))
+
   // The heads are the check's to read, so a build without checking skips them with it.
   const linted = checking ? pageSeoLints(config, rendered, exported) : []
 

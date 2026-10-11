@@ -26,6 +26,8 @@ export interface RenderedPage {
   // Whether its module exports `noindex = true`, or a `sitemap` deciding whether the sitemap lists it.
   noindex: boolean
   sitemap: boolean
+  // What its words weigh in the search index; false when it is left out, by a guard covering it, `noindex` or `search: false`.
+  search: number | false
 }
 
 interface Head {

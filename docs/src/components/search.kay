@@ -1,118 +1,38 @@
 ---
-import type { SearchSection } from '../../search-index'
-import { effect, memo, navigate, onCleanup, onMount, signal } from 'kay'
+import type { SearchHit } from 'kay'
+import { effect, navigate, onCleanup, onMount, searchResults, signal } from 'kay'
 import ArrowDown from '~icons/tabler/arrow-down'
 import ArrowUp from '~icons/tabler/arrow-up'
 import ChevronRight from '~icons/tabler/chevron-right'
 import CornerDownLeft from '~icons/tabler/corner-down-left'
 import SearchIcon from '~icons/tabler/search'
 
-interface Match {
-  section: SearchSection
-  score: number
-  snippet: { text: string, hit: boolean }[]
-}
-
-const SPECIAL = /[.*+?^${}()|[\]\\]/g
-const WORDS = /\s+/
-
-const sections = signal<SearchSection[]>()
-const failed = signal(false)
 const query = signal('')
+const { hits, error } = searchResults(query, { limit: 40 })
 const active = signal(0)
 const shortcut = signal('Ctrl K')
 let dialog: HTMLDialogElement | undefined
 let input: HTMLInputElement | undefined
 
-const words = memo(() => query().trim().toLowerCase().split(WORDS).filter(word => word !== ''))
-
-// Every word has to appear in the section. A page titled as searched comes first, then headings, then page titles holding the word, then the text; the full reference, written for agents, after every page for people.
-const matches = memo((): Match[] => {
-  const all = sections() ?? []
-  const terms = words()
-
-  if (terms.length === 0)
-    return all.filter(section => section.heading === undefined).map(section => ({ section, score: 0, snippet: [] }))
-
-  const found: Match[] = []
-
-  for (const section of all) {
-    const heading = section.heading?.toLowerCase() ?? ''
-    const page = section.page.toLowerCase()
-    const title = section.title.toLowerCase()
-    const text = section.text.toLowerCase()
-    const top = section.heading === undefined
-    let score = top ? 1 : 0
-
-    if (top && title === terms.join(' '))
-      score += 30
-
-    for (const term of terms) {
-      if (top && title.includes(term))
-        score += 12
-      else if (heading.includes(term))
-        score += heading.startsWith(term) ? 14 : 10
-      else if (page.includes(term))
-        score += 6
-      else if (text.includes(term))
-        score += 2
-      else {
-        score = -1
-        break
-      }
-    }
-
-    if (score >= 0)
-      found.push({ section, score, snippet: snippet(section.text, terms) })
-  }
-
-  return found.sort((a, b) => Number(a.section.reference ?? false) - Number(b.section.reference ?? false) || b.score - a.score).slice(0, 40)
-})
-
-// About a line of text around the first word found, each word in it marked.
-function snippet(text: string, terms: string[]): Match['snippet'] {
-  const lower = text.toLowerCase()
-  const first = Math.min(...terms.map(term => lower.indexOf(term)).filter(index => index >= 0))
-  const start = Number.isFinite(first) ? Math.max(0, first - 50) : 0
-  const excerpt = (start > 0 ? '…' : '') + text.slice(start, start + 160) + (start + 160 < text.length ? '…' : '')
-  const marked = new RegExp(`(${terms.map(term => term.replace(SPECIAL, '\\$&')).join('|')})`, 'gi')
-
-  return excerpt.split(marked).filter(part => part !== '').map((part, index) => ({ text: part, hit: index % 2 === 1 || terms.includes(part.toLowerCase()) }))
-}
-
-async function load() {
-  if (sections() !== undefined)
-    return
-
-  try {
-    const response = await fetch('/search.json')
-    sections.set(await response.json() as SearchSection[])
-  }
-  catch {
-    failed.set(true)
-  }
-}
-
 function open() {
   dialog?.showModal()
   input?.select()
-  void load()
 }
 
 function close() {
   dialog?.close()
 }
 
-function go(match: Match | undefined) {
-  if (match === undefined)
+function go(hit: SearchHit | undefined) {
+  if (hit === undefined)
     return
 
   close()
-  void navigate(match.section.href)
+  void navigate(hit.href)
 }
 
 function move(by: number) {
-  const count = matches().length
+  const count = hits().length
 
   if (count === 0)
     return
@@ -128,12 +48,11 @@ function onKeyDown(event: KeyboardEvent) {
   }
   else if (event.key === 'Enter') {
     event.preventDefault()
-    go(matches()[active()])
+    go(hits()[active()])
   }
 }
 
-const loading = () => sections() === undefined
-const activeId = () => matches().length > 0 ? `search-${active()}` : undefined
+const activeId = () => hits().length > 0 ? `search-${active()}` : undefined
 
 const typing = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
@@ -144,7 +63,7 @@ function onShortcut(event: KeyboardEvent) {
   }
 }
 
-// A new query starts again from its best match.
+// A new query starts again from its best hit.
 effect(() => {
   query()
   active.set(0)
@@ -167,22 +86,22 @@ dialog.palette(aria-label="Search the documentation" closedby="any" ref={el => d
     .palette-field
       SearchIcon
       input.palette-input(type="search" placeholder="Search the docs" aria-controls="search-results" aria-activedescendant={activeId()} ref={el => input = el} bind:value={query} onKeyDown={onKeyDown})
-    if failed
+    if error() !== undefined
       p.palette-empty The search index could not load.
-    else if loading()
-      p.palette-empty Loading…
+    else if query().trim() === ''
+      p.palette-empty Type a word to search
     else
       ul#search-results.palette-results(role="listbox")
-        for match, i of matches key={i}
-          li(id={`search-${i}`} role="option" aria-selected={i === active} onMouseMove={() => active.set(i)} onClick={() => go(match)})
+        for hit, i of hits() key={i}
+          li(id={`search-${i}`} role="option" aria-selected={i === active} onMouseMove={() => active.set(i)} onClick={() => go(hit)})
             span.palette-where
-              span {match.section.page}
-              if match.section.heading as heading
+              span {hit.page}
+              if hit.heading as heading
                 ChevronRight
                 span.palette-heading {heading}
-            if match.snippet.length > 0
+            if hit.snippet.length > 0
               span.palette-snippet
-                for part, j of match.snippet key={j}
+                for part, j of hit.snippet key={j}
                   if part.hit
                     mark {part.text}
                   else

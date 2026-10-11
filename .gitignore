@@ -7,7 +7,6 @@ dist
 *.vsix
 /types
 .claude/scheduled_tasks.lock
-docs/public/search.json
 
 bench/sites/sites.config.ts
 bench/sites/results*.md

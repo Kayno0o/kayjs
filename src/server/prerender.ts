@@ -1,5 +1,6 @@
 import type { RenderedPage } from '../check/seo'
 import type { Project } from '../project'
+import type { PageSettings } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
@@ -126,8 +127,12 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         await mkdir(join(dir, name, '..'), { recursive: true })
         await Bun.write(join(dir, name), html)
 
-        if (response.status === 200)
-          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex: pageSetting(module, 'noindex') === true, sitemap: pageSetting(module, 'sitemap') !== undefined })
+        if (response.status === 200) {
+          const noindex = pageSetting(module, 'noindex') === true
+          const search = pageSetting(module, 'search') as PageSettings['search']
+
+          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: noindex || search === false || route.guards.length > 0 ? false : search?.weight ?? 1 })
+        }
 
         pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {} }
       }

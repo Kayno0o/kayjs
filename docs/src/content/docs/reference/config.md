@@ -39,6 +39,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `favicon` | A square image of 512 px or more, served as the favicon and the manifest icons. `false` serves none |
 | `manifest` | The web manifest: `shortName`, `themeColor`, `backgroundColor`, `display`, `orientation`, `startUrl`, `scope`, `shortcuts`, and a `maskable` image served as its maskable icons |
 | `offline` | A service worker keeping the build's files and some pages for offline visitors |
+| `search` | `true` indexes the pages `kay build` renders, for `searchResults` to search in the browser. See [Site search](/guides/search) |
 | `lang` | The `lang` of the `html` element |
 
 ## Routing
