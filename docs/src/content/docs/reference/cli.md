@@ -71,7 +71,7 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 | --- | --- |
 | `--entry <file>` | The server entry, when it is not `src/server.ts` |
 | `--port <port>` | Sets `PORT` for the server, over the shell's and the `.env`'s |
-| `--inspect[=<address>]` | Opens Bun's debugger in the server, at `ws://localhost:6499/kay` or the port, host and port, or address given, port 0 taking a free one, the same address after every restart: `kay dev` listens there and passes each connection on to the server running, and a debugger's connection closes when the server restarts, for it to connect again; an address another process holds stops `kay dev` |
+| `--inspect[=<address>]` | Opens Bun's debugger in the server, at `ws://localhost:6499/kay` or the port, host and port, or address given, port 0 taking a free one, the same address after every restart: `kay dev` listens there and passes each connection on to the server running, and a debugger's connection closes when the server restarts, for it to connect again; an address another process holds, at `localhost` on either loopback address, stops `kay dev` |
 | `--open` | Opens the address in the browser (the command `BROWSER` names, else the system's) once the server is ready |
 
 When another process holds the port, the server moves to the next free one, and the ready line names the port it found in use: `kay dev: http://localhost:3001 (ready in 412 ms, 3000 was in use)`. It works however the server picks its port, and restarts keep the port it moved to, so open pages stay connected.

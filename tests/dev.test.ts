@@ -10,7 +10,7 @@ import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
 import { readShadowSettings } from '../src/check/shadow'
 import { dev, watchProject } from '../src/dev'
-import { inspectorProxy } from '../src/dev/inspector'
+import { InspectorAddressInUse, inspectorProxy } from '../src/dev/inspector'
 import { bootFailure, hotSwap } from '../src/server/dev'
 import { editorCommand } from '../src/server/editor'
 
@@ -27,6 +27,11 @@ function clientBuilders(real: string): string[] {
       return false
     }
   })
+}
+
+// Written by a server, which creates the file before it writes it: read as soon as it exists, it may still be empty.
+function filled(path: string): boolean {
+  return (statSync(path, { throwIfNoEntry: false })?.size ?? 0) > 0
 }
 
 async function until(condition: () => boolean, timeout = 5000) {
@@ -178,12 +183,12 @@ describe('the dev watcher', () => {
     const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev'], { cwd: root, env: { ...process.env, KAY_FROM_SHELL: 'shell' }, stdout: 'ignore', stderr: 'ignore' })
 
     try {
-      await until(() => existsSync(seen), 10_000)
+      await until(() => filled(seen), 10_000)
       expect(await Bun.file(seen).text()).toBe('hello|shell')
 
       await rm(seen)
       await Bun.write(join(root, '.env'), 'KAY_GREETING=changed\nKAY_FROM_SHELL=file\n')
-      await until(() => existsSync(seen), 10_000)
+      await until(() => filled(seen), 10_000)
       expect(await Bun.file(seen).text()).toBe('changed|shell')
     }
     finally {
@@ -237,7 +242,7 @@ describe('kay dev', () => {
     const stop = await dev(root)
 
     try {
-      await until(() => existsSync(seen), 15_000)
+      await until(() => filled(seen), 15_000)
       expect(readFileSync(seen, 'utf8')).toBe('Welcome: function, ./mails/welcome.kay: function')
     }
     finally {
@@ -284,7 +289,7 @@ describe('kay dev', () => {
       for (const [args, expected, cwd] of [[[root], `server|${root}|${port}`, undefined], [[root, '--entry', join(root, 'src/other.ts')], `other|${root}|${port}`, undefined], [['src/other.ts'], `other|${root}|${port}`, root], [[root, '--port', '4123'], `server|${root}|4123`, undefined]] as const) {
         const child = Bun.spawn(['bun', cli, 'dev', ...args], { cwd: cwd ?? process.cwd(), stdout: 'ignore', stderr: 'pipe' })
 
-        await until(() => existsSync(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
+        await until(() => filled(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
         child.kill('SIGTERM')
         expect(await child.exited).toBe(0)
         await rm(seen, { force: true })
@@ -320,7 +325,7 @@ describe('kay dev', () => {
     const stop = await dev(root, { onRestart: child => children.push(child) })
 
     try {
-      await until(() => existsSync(seen))
+      await until(() => filled(seen))
       expect(await Bun.file(seen).text()).toBe('hello|true')
 
       await Bun.write(join(root, '.env'), 'KAY_GREETING=changed\n')
@@ -348,7 +353,7 @@ describe('kay dev', () => {
       expect(children[0]!.exitCode).toBeNull()
 
       await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(seen)}, 'server')\nsetInterval(() => undefined, 1000)\n`)
-      await until(() => existsSync(seen), 10_000)
+      await until(() => filled(seen), 10_000)
       expect(children).toHaveLength(2)
     }
     finally {
@@ -371,16 +376,16 @@ describe('kay dev', () => {
 
       await rm(seen, { force: true })
       await Bun.write(join(root, file), content)
-      await until(() => children.length > count && existsSync(seen))
+      await until(() => children.length > count && filled(seen))
       // A save can come as several events, each restarting once their debounce settles.
       await Bun.sleep(200)
-      await until(() => existsSync(seen))
+      await until(() => filled(seen))
 
       return Bun.file(seen).text()
     }
 
     try {
-      await until(() => existsSync(seen))
+      await until(() => filled(seen))
       const first = await Bun.file(seen).text()
 
       expect(await restartAfter('src/app.css', 'p { color: blue }\n')).toBe(first)
@@ -392,7 +397,7 @@ describe('kay dev', () => {
       await stop()
       await rm(seen, { force: true })
       stop = await dev(root, { onRestart: child => children.push(child) })
-      await until(() => existsSync(seen))
+      await until(() => filled(seen))
       expect(Number(await Bun.file(seen).text())).toBeGreaterThan(edited)
     }
     finally {
@@ -602,6 +607,17 @@ describe('kay dev', () => {
     }
   })
 
+  it('takes localhost\'s port as in use when either loopback address holds it, as Bun would bind the other', () => {
+    const held = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data: () => undefined } })
+
+    try {
+      expect(() => inspectorProxy(`ws://localhost:${held.port}/kay`, () => undefined)).toThrow(InspectorAddressInUse)
+    }
+    finally {
+      held.stop(true)
+    }
+  })
+
   it('drops the line an entry prints once it listens, which kay dev prints itself', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const messages: unknown[] = []
@@ -665,7 +681,7 @@ describe('kay dev', () => {
       expect((await open('../outside.kay:1:1')).status).toBe(404)
       expect((await open('record.ts:1:1')).status).toBe(404)
       expect(await (await open('src/routes/index.kay:2:3')).json()).toEqual({ opened: true })
-      await until(() => existsSync(seen))
+      await until(() => filled(seen))
       expect(JSON.parse(readFileSync(seen, 'utf8'))).toEqual([join(root, 'src/routes/index.kay')])
       expect(await (await open('src/routes/index.kay:2:3')).json()).toEqual({ opened: false, failed: true })
     }
@@ -980,14 +996,14 @@ describe('hot swap', () => {
     const stop = await dev(root, { onRestart: child => children.push(child) })
 
     try {
-      await until(() => existsSync(seen))
+      await until(() => filled(seen))
       const [first, none] = (await Bun.file(seen).text()).split(' ')
 
       expect(none).toBe('[]')
 
       await rm(seen)
       await Bun.write(join(root, 'src/island.kay'), 'p x\n')
-      await until(() => existsSync(seen))
+      await until(() => filled(seen))
 
       const [from, changed] = (await Bun.file(seen).text()).split(' ')
 

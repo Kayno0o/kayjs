@@ -22,6 +22,7 @@ const LOOPBACK_V4 = /^127(?:\.\d{1,3}){3}$/
 const SOCKET_PATH_MAX = 103
 // As Bun's inspector takes them: a heap snapshot comes back in one message.
 const MAX_PAYLOAD = 2 ** 31 - 1
+const LOOPBACKS = ['127.0.0.1', '::1']
 
 // A second `kay dev` asking for the address the first listens on.
 export class InspectorAddressInUse extends Error {}
@@ -48,6 +49,9 @@ export function inspectorProxy(address: string, current: () => string | undefine
   let server: Server<Link>
 
   try {
+    if (url.hostname === 'localhost' && loopbackTaken(Number(url.port)))
+      throw Object.assign(new Error(`${url.host} is in use`), { code: 'EADDRINUSE' })
+
     server = serve(url, current)
   }
   catch (error) {
@@ -124,6 +128,24 @@ function serve(url: URL, current: () => string | undefined): Server<Link> {
       },
     },
   })
+}
+
+// `localhost` names both loopback addresses, and Bun binds the other one when the first is taken: a debugger would then reach either `kay dev`.
+function loopbackTaken(port: number): boolean {
+  if (port === 0)
+    return false
+
+  for (const hostname of LOOPBACKS) {
+    try {
+      Bun.listen({ hostname, port, socket: { data: () => undefined } }).stop(true)
+    }
+    catch (error) {
+      if ((error as { code?: unknown }).code === 'EADDRINUSE')
+        return true
+    }
+  }
+
+  return false
 }
 
 // Joins a client to the inspector of the server running; a server still starting has no socket yet, and is tried again.
