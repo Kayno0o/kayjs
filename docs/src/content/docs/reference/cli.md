@@ -154,6 +154,7 @@ kay check --deny-warnings --fix
 | `--deny-warnings` | Fails on warnings too, not only on errors |
 | `--fix` | Applies the fixes that change nothing else, then reports what is left |
 | `--only <group>` | Reports one group's lints alone, such as `seo`, as an audit |
+| `--format <format>` | `text` by default; `github` prints each problem as a workflow command, `::error file=src/a.kay,line=4,col=3,title=missing-alt::...`, which GitHub and Forgejo Actions show on the diff; `json` prints them as one document on stdout, `{ errors, warnings, problems }`, each problem with its `file` relative to the current directory, `line`, `column`, `endLine` and `endColumn` past the span, `severity`, `code`, `message`, and `label`, `note`, `help` and `related` when it has them. The exit code is the same in every format |
 | `-p <tsconfig>` | Names another tsconfig, relative to the directory |
 | `--entry <file>` | The server entry whose `app` types `ctx.locals`, `src/server.ts` by default |
 

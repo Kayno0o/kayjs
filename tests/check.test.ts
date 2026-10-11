@@ -1428,6 +1428,37 @@ describe('kay check, unused code', () => {
     }
   })
 
+  it('prints the problems as workflow commands a CI annotates the diff with, or as one JSON document, failing alike', async () => {
+    const root = await scratchProject({
+      'src/list.kay': '---\nconst { todos } = props<{ todos: { id: number, title: string }[] }>()\n---\nfor todo, i of todos key={i}\n  a(href={`/todos/${todo.id}`}) {todo.title}\nimg(src="/a.png")\n',
+    })
+    const file = relative(process.cwd(), join(root, 'src/list.kay'))
+
+    try {
+      const github = await runCheck(root, '--format', 'github')
+
+      expect(github.code).toBe(1)
+      const [warning, error, ...rest] = github.report.trim().split('\n')
+
+      expect(rest).toEqual([])
+      expect(warning).toStartWith(`::warning file=${file.replaceAll(':', '%3A').replaceAll(',', '%2C')},line=4,col=`)
+      expect(warning).toMatch(/,endLine=4,endColumn=\d+,title=positional-key::These rows are keyed by their position, though each has an `id`%0Anote: .+%0Ahelp: drop the key/)
+      expect(error).toMatch(/^::error file=[^,]+,line=6,col=1,endLine=6,endColumn=\d+,title=missing-alt::/)
+      expect(github.output).toContain('1 error, 1 warning')
+
+      const json = await runCheck(root, '--format', 'json')
+      const document = JSON.parse(json.report) as { errors: number, warnings: number, problems: { file: string, line: number, severity: string, code: string }[] }
+
+      expect(json.code).toBe(1)
+      expect(document).toMatchObject({ errors: 1, warnings: 1 })
+      expect(document.problems.map(problem => [problem.file, problem.line, problem.severity, problem.code])).toEqual([[file, 4, 'warning', 'positional-key'], [file, 6, 'error', 'missing-alt']])
+      expect(await runCheck(root, '--format', 'xml')).toEqual({ code: 1, output: 'kay check: --format takes `text`, `github`, `json`, not `xml`\n', report: '' })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves a file outside the project alone when applying safe fixes', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })
     const outside = await scratchProject({ 'lib/b.kay': 'button(onclick={go}) x\n' })

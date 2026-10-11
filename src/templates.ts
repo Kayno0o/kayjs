@@ -321,8 +321,9 @@ jobs:
       : ''}
     steps:
 ${WORKFLOW_SETUP}`,
-    `      - name: Check
-        run: bun run check`,
+    `      # Each problem shows on the diff.
+      - name: Check
+        run: bun run check --format github`,
     has('eslint') && `      # After the check, which writes the types the lint of .kay files reads.
       - name: Lint
         run: bun run lint`,
