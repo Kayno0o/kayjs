@@ -4,8 +4,8 @@ import { compileKay } from 'kay/compiler'
 const ROOT = new URL('..', import.meta.url).pathname
 
 // These list today's families of token names, every one under `kui-` so no app's own token meets them: a class reaching for a new family needs it added here too.
-const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret|accent)-(kui-(?:text|muted|mantle|canvas|surface\d|overlay\d|subtext\d|accent(?:-hi)?|on-accent|error|success|warning|info|row-hover|fill-hover|fill-danger|chart-\d))\b/g
-const SCALE = /\b(gap|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|text|font|tracking|rounded)-(kui-(?:section|inline|micro|2xs|heading|label|action|card))\b/g
+const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret|accent)-(kui-(?:text|muted|mantle|canvas|surface\d|overlay\d|subtext\d|accent(?:-hi)?|on-accent|error|success|warning|info|row-hover|fill-hover|fill-danger|chart-\d|stamp(?:-fill(?:-hover)?)?))\b/g
+const SCALE = /\b(gap|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|text|font|tracking|rounded)-(kui-(?:section|inline|micro|2xs|heading|label|action|card|badge-[xy]|badge))\b/g
 const DEFINED_TOKEN = /(--[\w-]+):/g
 const DEFINED_CLASS = /\.([a-z][\w-]*)/g
 // A `class` attribute: a quoted string, or an expression of strings, arrays and `{ name: condition }` objects.
@@ -21,8 +21,8 @@ const PAIRED = /^light-dark\([^,]+, [^,]+\)$|^var\(--color-kui-[\w-]+\)$/
 const SCHEME = /([^{}\n]*[^{}\s])\s*\{\s*color-scheme: (\w+);/g
 // A quoted class name, as a script or a component's own script writes one: `classList.add('x')`, `{ 'x': on }`.
 const QUOTED = /'([a-z][\w-]*)'/g
-// What chartist draws itself, styled here but written by no source of the library.
-const THIRD_PARTY = /^ct-/
+// What chartist draws itself, styled here but written by no source of the library, and Tailwind's `group`, which the app writes on what holds a stamp.
+const THIRD_PARTY = /^(?:ct-|group$)/
 
 // The theme namespace a scale utility reads, by its prefix.
 const NAMESPACE: Record<string, string> = { text: 'text', font: 'font-weight', tracking: 'tracking', rounded: 'radius' }

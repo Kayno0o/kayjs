@@ -135,8 +135,9 @@ describe('content', () => {
     expect(lone).not.toContain('kui-carousel-controls')
   })
 
-  test('Badge is neutral unless toned, and EmptyState says why there is nothing', async () => {
+  test('Badge is neutral unless toned, drawn as a stamp when asked, and EmptyState says why there is nothing', async () => {
     expect(await page('badge')).toBe('<span id="badge" data-tone="neutral" class="kui-badge">Draft</span>')
+    expect(await page('stamped')).toBe('<a id="stamped" class="group" href="/data"><span data-tone="neutral" data-stamp class="kui-badge">Winner</span></a>')
     expect(await page('empty')).toBe('<div id="empty" class="kui-empty-state"><p class="kui-empty-state-title">No moons</p><p class="kui-empty-state-description">Add one to start</p></div>')
   })
 
