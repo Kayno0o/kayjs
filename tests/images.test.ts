@@ -301,6 +301,28 @@ describe('image route', () => {
 
     expect((await get(`/_kay/image?src=${encodeURIComponent('/uploads/broken.png')}&w=320`)).status).toBe(415)
   })
+
+  it('fails as the server, not the image, where the variant cannot be written, leaving no part of it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-unwritable-'))
+    // A file where the cache directory should be, as a full disk refuses the write.
+    const cache = join(dir, 'cache')
+
+    try {
+      await Bun.write(cache, '')
+
+      const app = new Elysia()
+
+      serveImages(app, { clientDir: join(dir, 'client'), cacheDir: cache, dirs: { '/uploads/': uploads } })
+
+      const response = await app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/formats.png')}&w=320`, { headers: { accept: 'image/webp' } }))
+
+      expect(response.status).toBe(500)
+      expect(await readdir(dir)).toEqual(['cache'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('build variants', () => {

@@ -96,16 +96,23 @@ export async function writeVariant(source: string | Blob | Uint8Array, variant: 
   const file = typeof source === 'string' ? await decodable(Bun.file(source)) : source
   const shape = typeof variant === 'number' ? { width: variant } : variant
 
-  if (shape === 'card') {
-    await new Bun.Image(await coverImage(file, CARD.width, CARD.height)).jpeg({ quality }).write(partial)
-  }
-  else {
-    const image = shape.aspect ? new Bun.Image(await coverImage(file, shape.width, variantHeight(shape.width, shape.aspect))) : new Bun.Image(file).resize(shape.width, undefined, { withoutEnlargement: true })
+  try {
+    if (shape === 'card') {
+      await new Bun.Image(await coverImage(file, CARD.width, CARD.height)).jpeg({ quality }).write(partial)
+    }
+    else {
+      const image = shape.aspect ? new Bun.Image(await coverImage(file, shape.width, variantHeight(shape.width, shape.aspect))) : new Bun.Image(file).resize(shape.width, undefined, { withoutEnlargement: true })
 
-    await (format === 'avif' ? Bun.write(partial, await encodeAvif(image, quality)) : image.webp({ quality }).write(partial))
-  }
+      await (format === 'avif' ? Bun.write(partial, await encodeAvif(image, quality)) : image.webp({ quality }).write(partial))
+    }
 
-  await rename(partial, target)
+    await rename(partial, target)
+  }
+  catch (error) {
+    await rm(partial, { force: true })
+
+    throw error
+  }
 }
 
 // Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files, with the crops and share cards pages asked for, each in AVIF too given its quality; returns how many were encoded.
@@ -330,7 +337,11 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       try {
         await writing
       }
-      catch {
+      catch (error) {
+        // A full or unwritable cache directory is the server's failure, which its error log reports, not the image's.
+        if (typeof (error as { syscall?: unknown }).syscall === 'string')
+          throw error
+
         return fail('Not an image kay can resize', 415)
       }
 
