@@ -1,13 +1,11 @@
 import type { Elysia } from 'elysia'
-import type { Route } from './routes'
-import { routerKey, servedPaths } from './routes'
+import type { ServedPaths } from './served-paths'
 
 // A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise.
 export type Redirects = Record<string, string | { to: string, permanent?: boolean }>
 
 const PARAM = /^:([A-Z_$][\w$]*)$/i
 const QUERY_OR_HASH = /[?#].*$/
-const POSITIONAL = /:p\d+/g
 // A target on the site whose `*` starts with a slash would read as another host: `//evil.example`.
 const LEADING_SLASHES = /^\/{2,}/
 // What the target names from the old path: a `:name`, or the `*`.
@@ -93,13 +91,10 @@ function reaches(target: string[], slash: boolean, path: string[]): boolean {
   return target.length === path.length || (slash && target.length === path.length - 1 && path.at(-1) === '*')
 }
 
-// A redirect registered before the pages would hide the page serving its old path.
-export function refuseRedirectClashes(redirects: Redirect[], routes: Route[]): void {
-  const pagePaths = new Set([...servedPaths(routes)].map(routerKey))
-
-  for (const redirect of redirects) {
-    if (pagePaths.has(redirect.path.replaceAll(POSITIONAL, ':')))
-      throw new Error(`kay: the redirect from ${redirect.path} takes a path a page serves; remove the redirect or the page`)
+// A redirect registered before the pages would hide the page serving its old path, or anything else serving it.
+export function claimRedirects(served: ServedPaths, redirects: Redirect[]): void {
+  for (const { path } of redirects) {
+    served.claim({ path, owner: `the redirect from ${path}`, kind: 'redirect' }, taken => taken.kind === 'page' ? `kay: the redirect from ${path} takes a path a page serves; remove the redirect or the page` : `kay: ${taken.owner} and the redirect from ${path} both serve ${path}; remove one`)
   }
 }
 

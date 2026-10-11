@@ -10,6 +10,7 @@ import { Elysia } from 'elysia'
 import { chromium } from 'playwright-core'
 import { inlineScriptHashes, pages } from '../src/server'
 import { registerScript, serveServiceWorker } from '../src/server/offline'
+import { ServedPaths } from '../src/server/served-paths'
 
 const ROUTES = 'tests/fixtures/static/src/routes'
 const LISTENING = /port (\d+)/
@@ -87,7 +88,7 @@ describe('service worker', () => {
       const app = new Elysia()
       const client = { dir, pages: new Map([['/', { pattern: '/', file: 'index.html', status: 200, headers: {}, etag, renderedAt: 0 }]]) } as unknown as ClientBuild
 
-      await serveServiceWorker(app, new Set(), { client, offline: true, base: '', publicPages: ['/'] })
+      await serveServiceWorker(app, new ServedPaths(), { client, offline: true, base: '', publicPages: ['/'] })
 
       return (await worker(app)).settings!
     }

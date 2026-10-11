@@ -4,8 +4,11 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { pages } from '../src/server'
-import { exportedEndpoints } from '../src/server/endpoints'
-import { refuseEndpointClashes, scanEndpoints, scanRoutes } from '../src/server/routes'
+import { claimEndpoints, exportedEndpoints } from '../src/server/endpoints'
+import { claimPublic } from '../src/server/public'
+import { refuseClashes } from '../src/server/route-table'
+import { scanEndpoints, scanRoutes } from '../src/server/routes'
+import { ServedPaths } from '../src/server/served-paths'
 
 const FIXTURE = 'tests/fixtures/endpoints'
 const routes = resolve(FIXTURE, 'src/routes')
@@ -69,9 +72,17 @@ describe('endpoint files', () => {
 
     const endpoints = await scanEndpoints(routes)
     const pages = await scanRoutes(routes)
+    // Claimed as the server claims them: the pages, the public files, then the endpoints.
+    const claimed = (claims: typeof endpoints, pageClaims: typeof pages, urls: string[]) => () => {
+      const paths = new ServedPaths()
 
-    expect(() => refuseEndpointClashes(endpoints, pages, ['/llms.txt'])).toThrow('llms.txt.ts and the public file /llms.txt both serve /llms.txt; drop one')
-    expect(() => refuseEndpointClashes(endpoints, [...pages, { ...pages[0]!, pattern: '/feeds/:id', file: 'feeds/[id].kay' }], [])).toThrow('feeds/[id].kay and ')
-    expect(() => refuseEndpointClashes([...endpoints, { ...endpoints.find(endpoint => endpoint.suffix === '.json')!, file: 'other.json.ts' }], pages, [])).toThrow('both serve /feeds/:slug.json')
+      refuseClashes(routes, pageClaims, paths)
+      claimPublic(paths, urls.map(url => ({ path: url.slice(1), url })))
+      claimEndpoints(paths, claims, process.cwd())
+    }
+
+    expect(claimed(endpoints, pages, ['/llms.txt'])).toThrow('llms.txt.ts and the public file /llms.txt both serve /llms.txt; drop one')
+    expect(claimed(endpoints, [...pages, { ...pages[0]!, pattern: '/feeds/:id', file: 'feeds/[id].kay' }], [])).toThrow('feeds/[id].kay and ')
+    expect(claimed([...endpoints, { ...endpoints.find(endpoint => endpoint.suffix === '.json')!, file: 'other.json.ts' }], pages, [])).toThrow('both serve /feeds/:slug.json')
   })
 })

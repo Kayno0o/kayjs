@@ -2,6 +2,7 @@ import type { Elysia } from 'elysia'
 import type { ActionOptions } from './actions'
 import type { ApiGuard } from './api'
 import type { LoadedGuard } from './guards'
+import type { ServedPaths } from './served-paths'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
 import { API_PREFIX } from './api'
@@ -63,25 +64,35 @@ const BINARY = { type: 'string', format: 'binary' }
 
 type Route = MountedApi['instance']['routes'][number]
 
-// The paths a route answers, as the document writes them: one without each optional param and one with it, a wildcard named `wildcard`.
-function routePaths(module: MountedApi, route: Route): string[] {
+// The paths a route answers, as the router reads them: one without each optional param and one with it.
+function routerPaths(module: MountedApi, route: Route): string[] {
   const path = `${module.mount}${route.path === '/' ? '' : route.path}`.replace(TRAILING_SLASH, '')
   const bare = path.replace(OPTIONAL_SEGMENT, '')
-  const variants = bare === path ? [path] : [bare || API_PREFIX, path]
 
-  return variants.map(variant => variant.replace(PATH_PARAM, '{$1}').replace(WILDCARD, '{wildcard}'))
+  return bare === path ? [path] : [bare || API_PREFIX, path.replaceAll('?', '')]
 }
 
-// A module serving the path the document or the reference page is served at would hide it without a word, so the server refuses to start.
-export function refuseOpenApiClashes(modules: MountedApi[], config: OpenApiConfig): void {
-  const taken = new Set([OPENAPI_PATH, ...config.reference === true ? [REFERENCE_PATH] : []])
+// The paths a route answers, as the document writes them, a wildcard named `wildcard`.
+function routePaths(module: MountedApi, route: Route): string[] {
+  return routerPaths(module, route).map(variant => variant.replace(PATH_PARAM, '{$1}').replace(WILDCARD, '{wildcard}'))
+}
+
+// Each module's routes claim their paths, after the document and the reference page when `config` serves them, which a module would hide without a word.
+export function claimApi(served: ServedPaths, modules: MountedApi[], config: OpenApiConfig | undefined): void {
+  const own = new Map<string, string>(config ? [[OPENAPI_PATH, 'its document'], ...config.reference === true ? [[REFERENCE_PATH, 'its reference page'] as const] : []] : [])
+
+  for (const path of own.keys())
+    served.claim({ path, owner: '`openapi`', kind: 'kay' })
 
   for (const module of modules) {
     for (const route of module.instance.routes) {
-      const clash = routePaths(module, route).find(path => taken.has(path))
+      for (const path of routerPaths(module, route)) {
+        served.claim({ path, owner: module.file, kind: 'api', method: route.method.toUpperCase() }, (taken) => {
+          const what = taken.kind === 'kay' ? own.get(taken.path) : undefined
 
-      if (clash !== undefined)
-        throw new Error(`kay: ${module.file} serves ${clash}, where \`openapi\` serves ${clash === OPENAPI_PATH ? 'its document' : 'its reference page'}; move the route, or turn ${clash === OPENAPI_PATH ? '`openapi` off' : 'the reference page off'}`)
+          return what === undefined ? `kay: ${taken.owner} and ${module.file} both serve ${path}` : `kay: ${module.file} serves ${path}, where \`openapi\` serves ${what}; move the route, or turn ${path === OPENAPI_PATH ? '`openapi` off' : 'the reference page off'}`
+        })
+      }
     }
   }
 }

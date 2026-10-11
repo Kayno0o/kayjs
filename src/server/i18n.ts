@@ -8,7 +8,6 @@ import { throughLinks } from '../build/links'
 import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { importModule } from './bundle'
-import { patternShapes } from './routes'
 import { projectSource } from './source'
 
 // Where a visitor's choice of locale is kept, read before their browser's languages.
@@ -21,7 +20,6 @@ export const DEFAULT_LANG = 'en'
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 const LOCALE_TAG = /^[a-z]{2,3}(?:-[a-z\d]{2,8})*$/i
 const QUALITY = /;\s*q=([\d.]+)/
-const PARAM_NAME = /^:[^/]+$/
 
 // The project's locales, read and checked once at boot.
 export interface I18n {
@@ -111,7 +109,7 @@ export function localePrefixes(settings: LocaleSettings): string[] {
   return settings.hosts ? [] : settings.locales.filter(locale => locale !== settings.defaultLocale || settings.prefixDefault)
 }
 
-// A page whose first segment is a locale's prefix would be served twice at one path; so would a translated path another page of that locale serves.
+// A page whose first segment is a locale's prefix would be served twice at one path, as would a path translated under another locale's prefix; `routeTable` claims each locale's paths, a translated one another page of that locale serves among them.
 export function refuseLocaleClashes(settings: LocaleSettings, routes: Pick<Route, 'file' | 'pattern'>[]): void {
   const prefixes = new Set(localePrefixes(settings))
   const clash = routes.find(route => prefixes.has(firstSegment(route.pattern)))
@@ -125,25 +123,12 @@ export function refuseLocaleClashes(settings: LocaleSettings, routes: Pick<Route
   if (unknown !== undefined)
     throw new Error(`kay: i18n.paths translates ${unknown}, which no page serves; name a page by the pattern it is served under, /blog/:slug for src/routes/blog/[slug].kay`)
 
-  for (const locale of settings.locales) {
-    const served = new Map<string, { file: string, translated: boolean }>()
-    const unprefixed = !settings.hosts && !prefixes.has(locale)
-
+  for (const locale of settings.locales.filter(locale => !settings.hosts && !prefixes.has(locale))) {
     for (const route of routes) {
       const pattern = localePattern(settings, route.pattern, locale)
-      const translated = pattern !== route.pattern
 
-      if (translated && unprefixed && prefixes.has(firstSegment(pattern)))
+      if (pattern !== route.pattern && prefixes.has(firstSegment(pattern)))
         throw new Error(`kay: i18n.paths translates ${route.pattern} for ${locale} as ${pattern}, under the prefix of the locale ${firstSegment(pattern)}`)
-
-      for (const shape of patternShapes(pattern).map(shape => shape.split('/').map(segment => PARAM_NAME.test(segment) ? ':' : segment).join('/'))) {
-        const other = served.get(shape)
-
-        if (other !== undefined && (translated || other.translated))
-          throw new Error(`kay: ${route.file} and ${other.file} are both served at ${pattern} in ${locale}, once i18n.paths translates them`)
-
-        served.set(shape, { file: route.file, translated })
-      }
     }
   }
 }

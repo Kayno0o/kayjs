@@ -229,52 +229,11 @@ export function endpointKey(endpoint: Pick<Endpoint, 'pattern' | 'suffix'>): str
   return `${routerKey(endpoint.pattern)}${endpoint.suffix ?? ''}`
 }
 
-// Two endpoints serving the same paths, or one taking a path a page or a public file serves, stop the server, as two pages do.
-export function refuseEndpointClashes(endpoints: Endpoint[], routes: Route[], publicUrls: Iterable<string>): void {
-  const pages = new Map(routes.flatMap(route => patternShapes(route.pattern).map(shape => [routerKey(shape), route.file] as const)))
-  const files = new Set(publicUrls)
-  const seen = new Map<string, string>()
-
-  for (const endpoint of endpoints) {
-    const key = endpointKey(endpoint)
-    const page = pages.get(routerKey(endpoint.pattern))
-    const path = `${endpoint.pattern}${endpoint.suffix ?? ''}`
-
-    if (seen.has(key))
-      throw new Error(`kay: ${seen.get(key)} and ${endpoint.file} both serve ${path}`)
-
-    if (page !== undefined)
-      throw new Error(`kay: ${page} and ${endpoint.file} both serve ${endpoint.pattern}${endpoint.suffix === undefined ? '' : `, which ${endpoint.file} takes for its paths ending in ${endpoint.suffix}`}; move one`)
-
-    if (files.has(path))
-      throw new Error(`kay: ${endpoint.file} and the public file ${path} both serve ${path}; drop one`)
-
-    seen.set(key, endpoint.file)
-  }
-}
-
-// Two pages serving the same path stop the server, unless all but one check a param with a matcher, which a refused URL falls through; so does a name the router misreads.
-// The server, the build and `kay check` call it; the editor, reading routes mid-edit, does not.
-export function refuseClashes(routesDir: string, routes: Route[]): void {
-  const plainAt = new Map<string, Route>()
-
+// A page whose file name holds what the router reads as syntax stops the server.
+export function refuseRouteNames(routesDir: string, routes: Route[]): void {
   for (const route of routes) {
     if (relative(routesDir, route.file).replace(KAY_EXTENSION, '').split(sep).some(segment => !DYNAMIC_SEGMENT.test(segment) && !OPTIONAL_SEGMENT.test(segment) && !GROUP_SEGMENT.test(segment) && ROUTER_SYNTAX.test(segment)))
       throw new Error(`kay: ${route.file} has a :, * or ' in its name, which the router cannot serve; rename it`)
-
-    for (const shape of patternShapes(route.pattern)) {
-      // A shape with a matcher on one of its params refuses what it does not match; `/blog` from `[[page=integer]]` has none to.
-      if (paramsIn(shape, route).some(name => route.matchers?.[name] !== undefined))
-        continue
-
-      const path = routerKey(shape)
-      const same = plainAt.get(path)
-
-      if (same)
-        throw new Error(`kay: ${same.file} and ${route.file} both serve ${shape}; give one a matcher, [id=integer], for the other to take what it refuses`)
-
-      plainAt.set(path, route)
-    }
   }
 }
 

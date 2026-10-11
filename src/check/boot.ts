@@ -9,12 +9,15 @@ import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { actionClash } from '../server/actions'
 import { basePath } from '../server/base'
+import { claimEndpoints } from '../server/endpoints'
 import { localeSettings, refuseLocaleClashes } from '../server/i18n'
 import { shutdownSeconds } from '../server/lifecycle'
-import { publicFiles, refusePublicClashes } from '../server/public'
-import { readRedirects, refuseRedirectClashes } from '../server/redirects'
-import { refuseClashes, refuseEndpointClashes, routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
+import { claimPublic, publicFiles } from '../server/public'
+import { claimRedirects, readRedirects } from '../server/redirects'
+import { refuseClashes } from '../server/route-table'
+import { routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { siteOrigin } from '../server/seo'
+import { ServedPaths } from '../server/served-paths'
 
 // What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree.
 // Only `kay check` and `kay build` look for them: the editor reads routes mid-edit, two pages serving one path among them.
@@ -43,17 +46,6 @@ export async function bootProblems(root: string, options: CheckOptions): Promise
   if (shutdownTimeout !== undefined)
     refused(config, () => shutdownSeconds(shutdownTimeout))
 
-  refused(config, () => refuseRedirectClashes(readRedirects(options.redirects ?? {}), routes))
-  refused(routesDir, () => refuseClashes(routesDir, routes))
-  refused(publicDir, () => refusePublicClashes(files, routes))
-
-  try {
-    refuseEndpointClashes(await scanEndpoints(routesDir, routeMounts(root, options.extensions)), routes, files.map(file => file.url))
-  }
-  catch (error) {
-    diagnostics.push({ file: routesDir, line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
-  }
-
   let settings: LocaleSettings | undefined
 
   // Settings the server would refuse are reported with the shadow types already.
@@ -64,6 +56,21 @@ export async function bootProblems(root: string, options: CheckOptions): Promise
 
   if (settings)
     refused(config, () => refuseLocaleClashes(settings, routes))
+
+  // Claimed in the order the server claims them.
+  const served = new ServedPaths()
+
+  refused(routesDir, () => refuseClashes(routesDir, routes, served, settings))
+  refused(publicDir, () => claimPublic(served, files))
+
+  try {
+    claimEndpoints(served, await scanEndpoints(routesDir, routeMounts(root, options.extensions)), root)
+  }
+  catch (error) {
+    diagnostics.push({ file: routesDir, line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
+  }
+
+  refused(config, () => claimRedirects(served, readRedirects(options.redirects ?? {})))
 
   diagnostics.push(...await actionClashes(root, [...new Set(routes.flatMap(route => [...route.layouts, route.file]))]))
 

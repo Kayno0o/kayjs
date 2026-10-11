@@ -3,6 +3,7 @@ import type { KayConfig, TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ServedRoute } from './guards'
 import type { LocaleCopy } from './i18n'
+import type { ServedPaths } from './served-paths'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { escape } from '../runtime/escape'
@@ -11,7 +12,7 @@ import { hostLocale, localeCopies } from './i18n'
 import { pageSetting } from './page-settings'
 import { listedIn, listedParams, pathOf } from './prerendered'
 import { reportServerError } from './report'
-import { servedPaths, slashedPath } from './routes'
+import { slashedPath } from './routes'
 
 export const SITEMAP = '/sitemap.xml'
 export const ROBOTS = '/robots.txt'
@@ -25,15 +26,14 @@ export interface SitemapOptions {
   locales?: LocaleSettings | undefined
 }
 
-// `/sitemap.xml` and `/robots.txt` for a project with a `site`, unless a public file or a page already serves that path.
-export function serveSitemap(app: Elysia, routes: ServedRoute[], origin: string, taken: Set<string>, options: SitemapOptions = {}): void {
-  const served = new Set([...taken, ...servedPaths(routes)])
+// `/sitemap.xml` and `/robots.txt` for a project with a `site`, unless something the app serves already takes that path.
+export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRoute[], origin: string, options: SitemapOptions = {}): void {
   // With locales by domain, each host lists its own pages: a sitemap may only name URLs of the host it is on.
   const cached = new Map<string | undefined, { xml: Promise<string>, at: number }>()
   const settings = options.locales
   const hostOf = (request: Request) => settings?.hosts ? hostLocale(settings, request) : undefined
 
-  if (!served.has(SITEMAP)) {
+  if (served.offer({ path: SITEMAP, owner: 'the sitemap', kind: 'kay', exported: true })) {
     app.get(SITEMAP, async ({ request }) => {
       const locale = hostOf(request)
       let sitemap = cached.get(locale)
@@ -53,7 +53,7 @@ export function serveSitemap(app: Elysia, routes: ServedRoute[], origin: string,
     })
   }
 
-  if (!served.has(ROBOTS))
+  if (served.offer({ path: ROBOTS, owner: 'robots.txt', kind: 'kay', exported: true }))
     app.get(ROBOTS, ({ request }) => new Response(`User-agent: *\nAllow: /\n\nSitemap: ${settings?.hosts ? `https://${settings.hosts[hostOf(request)!]}` : origin}${SITEMAP}\n`, { headers: { 'content-type': 'text/plain; charset=utf-8' } }))
 }
 

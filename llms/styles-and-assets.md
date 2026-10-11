@@ -19,7 +19,7 @@ export default defineConfig({ plugins: [tailwind] })
 
 ## Public files
 
-Files in `public/` (the `publicDir` option) are served at their path as they are: `public/robots.txt` at `/robots.txt`, `public/logo@2x.png` at `/logo@2x.png`. A `:`, `*` or `'` in a name is served percent-encoded only, as `%3A`, `%2A` or `%27`. A file sharing its path with a page stops the server at boot, as do two pages serving one path. As a static host's `try_files $uri $uri.html $uri/index.html` does, an HTML file is also served without its `.html`, and an `index.html` at its directory: `public/shelf/books.html` at `/shelf/books`, `public/shelf/index.html` at `/shelf`, so a site exported into `public/` keeps its links; `x.html` wins over `x/index.html`, and a file or a page at that path over both. `kay check` accepts links to these paths.
+Files in `public/` (the `publicDir` option) are served at their path as they are: `public/robots.txt` at `/robots.txt`, `public/logo@2x.png` at `/logo@2x.png`. A `:`, `*` or `'` in a name is served percent-encoded only, as `%3A`, `%2A` or `%27`. A file sharing its path with a page, under any locale's path too, an endpoint, a redirect, an API route or a feed stops the server at boot, as do two pages serving one path; kay's own sitemap, `robots.txt`, favicons, manifest and `/sw.js` give way to it. As a static host's `try_files $uri $uri.html $uri/index.html` does, an HTML file is also served without its `.html`, and an `index.html` at its directory: `public/shelf/books.html` at `/shelf/books`, `public/shelf/index.html` at `/shelf`, so a site exported into `public/` keeps its links; `x.html` wins over `x/index.html`, and a file or a page at that path over both. `kay check` accepts links to these paths.
 
 ## Imported files
 

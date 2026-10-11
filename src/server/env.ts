@@ -1,4 +1,5 @@
 import type { Elysia, Static, TSchema } from 'elysia'
+import type { ServedPaths } from './served-paths'
 import process from 'node:process'
 import { t } from 'elysia'
 import { PUBLIC_ENV } from '../runtime/env'
@@ -63,7 +64,9 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
 export const PUBLIC_ENV_PATH = '/_kay/env.js'
 
 // Reads the public variables as `defineEnv` reads the server's, for `publicEnv` on the server and the module the browser loads.
-export function servePublicEnv(app: Elysia, schema: EnvSchema): void {
+export function servePublicEnv(app: Elysia, served: ServedPaths, schema: EnvSchema): void {
+  served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay', exported: true })
+
   const values = defineEnv(schema) as Record<string, unknown>
 
   ;(globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV] = values

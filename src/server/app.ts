@@ -25,7 +25,7 @@ import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, devA11y, devAxe, devEvents, devInspector, devPatch, hotSwap, openInEditor } from './dev'
-import { serveEndpoints } from './endpoints'
+import { claimEndpoints, serveEndpoints } from './endpoints'
 import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
@@ -35,19 +35,19 @@ import { avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
 import { serveServiceWorker } from './offline'
-import { openApiDocument, openApiSettings, refuseOpenApiClashes, serveOpenApi } from './openapi'
+import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
 import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { servePreview } from './preview'
 import { requestId, trustProxy } from './protection'
 import { servePublic } from './public'
-import { readRedirects, refuseRedirectClashes, serveRedirects } from './redirects'
+import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
 import { trackPrerendered } from './revalidate'
 import { rewriteRequests } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
-import { refuseEndpointClashes, servedPaths } from './routes'
 import { securityHeaders, setSecurityHeaders } from './security'
+import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
 import { serveSitemap } from './sitemap'
 import { serveFiles } from './storage'
@@ -158,11 +158,17 @@ function trackWhileRunning(app: App, prerendered: Map<string, Map<string, Served
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>) {
+  return (await pagesApp(project, loadClient)).app
+}
+
+// The app, with every path it serves, each claimed as its feature registers it.
+export async function pagesApp(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>) {
   const { root, config: options, paths, mode } = project
   const setup = await setupPages(project, loadClient)
   const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards } = setup
   const routes = await servedRoutes(setup)
-  const table = routeTable(routes, i18n?.settings)
+  const served = new ServedPaths()
+  const table = routeTable(routes, i18n?.settings, served)
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
   const security = securityHeaders({ ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) })
@@ -200,7 +206,7 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
     serveHealth(app, lifecycle, options.health)
 
   if (options.publicEnv)
-    servePublicEnv(app, options.publicEnv)
+    servePublicEnv(app, served, options.publicEnv)
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
   if (mode.dev)
@@ -216,23 +222,25 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
     filePaths.add(path)
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base }
-  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers), actionOptions), servePublic(app, paths.public, routes), source.api(root, options)])
+  const [actionLimits, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers), actionOptions), source.api(root, options), servePublic(app, served, paths.public)])
   const api = await serveApi(app, apiModules, actionOptions)
   const endpoints = await source.endpoints(paths.routes, mounts)
 
-  refuseEndpointClashes(endpoints, routes, publicUrls)
+  claimEndpoints(served, endpoints, root)
   await serveEndpoints(app, endpoints, actionOptions)
 
-  // What a public file or an endpoint serves, which kay's own files, the sitemap or a favicon, give way to.
-  const taken = new Set([...publicUrls, ...endpoints.filter(endpoint => endpoint.params.length === 0).map(endpoint => endpoint.pattern)])
+  // Claimed before kay's own files, which give way to them; registered last, before the pages.
+  const redirects = readRedirects(options.redirects ?? {})
   const openapi = openApiSettings(options.openapi)
+  const servesOpenApi = openapi !== undefined && (openapi.dev !== true || mode.dev)
 
+  claimRedirects(served, redirects)
+  claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, api.limits)
 
-  if (openapi && (openapi.dev !== true || mode.dev)) {
+  if (servesOpenApi) {
     const guards = await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} })))
 
-    refuseOpenApiClashes(api.mounted, openapi)
     serveOpenApi(app, openApiDocument(api.mounted, { title: openapi.title ?? options.seo?.name ?? 'API', version: openapi.version ?? '1.0.0', base }), openapi, guards, actionOptions)
   }
 
@@ -249,35 +257,31 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
   serveFiles(app)
   serveImages(app, imageRoute)
   serveCards(app, cards, imageRoute)
-  serveFeeds(app, collections, site, mode.dev, i18n)
+  serveFeeds(app, served, collections, site, mode.dev, i18n)
 
   if (site !== undefined)
-    serveSitemap(app, routes, site, taken, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
+    serveSitemap(app, served, routes, site, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
 
   const favicon = faviconSource(root, options.favicon, options.manifest)
-  const pagePaths = new Set([...taken, ...servedPaths(routes)])
 
   if (favicon !== undefined)
-    serveFavicons(app, pagePaths, { source: favicon, builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
+    serveFavicons(app, served, { source: favicon, builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, pagePaths, { client, offline: offlineOf(options, mode) ? options.offline : undefined, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
+  await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) ? options.offline : undefined, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
   trackWhileRunning(app, prerendered, client, site, mode)
 
   // `kay dev` prints its own.
   if (log !== false && !mode.dev)
     announceStart(app, log, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
 
-  const redirects = readRedirects(options.redirects ?? {})
-
-  refuseRedirectClashes(redirects, routes)
   serveRedirects(app, redirects)
 
   const respond = pageResponder({ client, renderOptions, prerendered, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) })
 
   servePageRoutes(app, { table, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback: source.fallback(paths.routes, mounts), respond })
 
-  return app
+  return { app, served }
 }

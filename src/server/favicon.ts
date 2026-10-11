@@ -1,6 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { FaviconConfig, ManifestConfig } from '../config'
 import type { HeadTag } from '../runtime/head'
+import type { ServedPaths } from './served-paths'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { kayLog } from '../runtime/log'
@@ -182,8 +183,8 @@ function sitePath(path: string, what: string): string {
   return path
 }
 
-// Serves the favicon files and the manifest at their paths, except one a public file or a page already serves; made from the source on first request unless `kay build` wrote them.
-export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconOptions): void {
+// Serves the favicon files and the manifest at their paths, except one the app already serves; made from the source on first request unless `kay build` wrote them.
+export function serveFavicons(app: Elysia, served: ServedPaths, options: FaviconOptions): void {
   let files: Promise<Map<string, Uint8Array<ArrayBuffer>>> | undefined
   const paths = [...Object.keys(PNG_FILES), ICO, ...options.source.svg === undefined ? [] : [SVG], ...options.source.maskable === undefined ? [] : Object.keys(MASKABLE_FILES)]
   const read = async () => {
@@ -204,7 +205,7 @@ export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconO
   const respond = (request: Request, body: Uint8Array<ArrayBuffer> | string, type: string) => revalidated(request, `"${Bun.hash(body).toString(36)}"`, () => body, { 'content-type': type })
 
   for (const path of paths) {
-    if (taken.has(path))
+    if (!served.offer({ path, owner: 'the favicon', kind: 'kay', exported: true }))
       continue
 
     app.get(path, async ({ request }) => {
@@ -222,7 +223,7 @@ export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconO
     })
   }
 
-  if (!taken.has(MANIFEST)) {
+  if (served.offer({ path: MANIFEST, owner: 'the web app manifest', kind: 'kay', exported: true })) {
     const manifest = manifestJson(options.name, options.description, options.manifest, options.base)
 
     app.get(MANIFEST, ({ request }) => respond(request, manifest, 'application/manifest+json'))

@@ -1,6 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { OfflineConfig } from '../config'
 import type { ClientBuild } from './client'
+import type { ServedPaths } from './served-paths'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
@@ -164,9 +165,9 @@ export function registerScript(base: string): string {
   return `<script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register(${JSON.stringify(`${base}${SERVICE_WORKER}`)})})</script>`
 }
 
-// Serves the worker at `/sw.js` under the base, unless a public file or a page already does. Without `offline`, and in `kay dev`, the worker served removes itself, so one a production run or an earlier deploy left never serves a stale page.
-export async function serveServiceWorker(app: Elysia, taken: ReadonlySet<string>, options: ServiceWorkerOptions): Promise<void> {
-  if (taken.has(SERVICE_WORKER))
+// Serves the worker at `/sw.js` under the base, unless the app already serves that path. Without `offline`, and in `kay dev`, the worker served removes itself, so one a production run or an earlier deploy left never serves a stale page.
+export async function serveServiceWorker(app: Elysia, served: ServedPaths, options: ServiceWorkerOptions): Promise<void> {
+  if (!served.offer({ path: SERVICE_WORKER, owner: 'the service worker', kind: 'kay', exported: true }))
     return
 
   const script = options.offline !== undefined ? await workerScript(options, options.offline) : UNREGISTER

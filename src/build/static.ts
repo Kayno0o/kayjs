@@ -8,25 +8,18 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { pageHooks } from '../config'
-import { feedPaths, projectCollections } from '../content/server'
 import { resolveProject } from '../project'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
-import { servePages } from '../server/app'
+import { pagesApp } from '../server/app'
 import { basePath } from '../server/base'
 import { PRERENDERED_DIR } from '../server/client'
 import { compressPaths } from '../server/compress'
-import { exportedEndpoints } from '../server/endpoints'
-import { PUBLIC_ENV_PATH } from '../server/env'
-import { faviconPaths } from '../server/favicon'
 import { localeSettings } from '../server/i18n'
-import { SERVICE_WORKER } from '../server/offline'
 import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles } from '../server/public'
-import { routeMounts, scanEndpoints } from '../server/routes'
 import { siteOrigin } from '../server/seo'
-import { ROBOTS, SITEMAP } from '../server/sitemap'
 
 // Left in the directory a static export writes, so a later export knows it may clear it, and never clears one it did not write.
 const MARKER = '.kay-static'
@@ -54,20 +47,20 @@ export function refuseStaticConfig(config: KayConfig): void {
 // Writes the whole site to `outdir`, as any static host serves it: every prerendered page, the browser build under `/_kay/`, the public files, the sitemap, feeds and favicons, `404.html`, and a page for each redirect.
 // Each page goes in as `about.html` and `about/index.html`, which every host finds for `/about` and `/about/` alike, beside the compressed copies a host may send as they are.
 export async function exportStatic(project: Project, client: ClientBuild, outdir: string): Promise<StaticExport> {
-  const { root, config, paths: { public: publicDir, routes: routesDir, output } } = project
+  const { root, config, paths: { public: publicDir, output } } = project
   const out = resolve(outdir)
 
   refuseStaticConfig(config)
   await clear(root, out)
 
   const pagesDir = join(output, PRERENDERED_DIR)
-  const pages = [...client.pages]
+  const built = [...client.pages]
   // What is written here rather than copied from the build, compressed once it is all in.
   const written: string[] = []
 
   await cp(client.dir, join(out, '_kay'), { recursive: true, filter: source => !SOURCE_MAP.test(source) })
 
-  for (const [path, page] of pages) {
+  for (const [path, page] of built) {
     for (const target of pageFiles(path)) {
       for (const copy of ['', ...COPIES]) {
         const source = join(pagesDir, `${page.file}${copy}`)
@@ -88,10 +81,10 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   // What kay serves itself comes from the app, as a server would answer it.
   // The extensions' server plugins are left out, since nothing a static site serves runs them and one may open a database.
   const extensions = config.extensions?.map(({ server: _, ...extension }) => extension)
-  const app = new Elysia().use(await servePages(resolveProject(root, { ...config, extensions, log: false, health: false, security: false, compress: false }, project.mode), async () => client))
-  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...faviconPaths(config.favicon, config.manifest), ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => feedPaths(collection, config.i18n && localeSettings(config.i18n)).map(({ path }) => path)), ...(await exportedEndpoints(root, await scanEndpoints(routesDir, routeMounts(root, config.extensions)))).paths]
+  const pages = await pagesApp(resolveProject(root, { ...config, extensions, log: false, health: false, security: false, compress: false }, project.mode), async () => client)
+  const app = new Elysia().use(pages.app)
 
-  for (const path of fetched) {
+  for (const path of await pages.served.exported()) {
     const response = await app.handle(new Request(`http://localhost${path}`))
 
     if (!response.ok)
@@ -118,31 +111,48 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   written.push(...await writeRedirects(out, config.redirects ?? {}, base, origin))
 
-  const settings = config.i18n && localeSettings(config.i18n)
-
-  // With every locale prefixed, a path without one has no file of its own: it goes to the default locale's.
-  // A page a locale translates has none at its untranslated path either, which goes to the translated one.
-  if (settings && !settings.hosts) {
-    for (const [path] of pages) {
-      const { locale, path: own } = splitLocale(settings, path)
-
-      if (locale === undefined)
-        continue
-
-      const page = untranslatedPath(settings, own, locale)
-
-      if (page !== own)
-        written.push(...await writeRefresh(out, localePath({ ...settings, paths: undefined }, page, locale), joinBase(base, path), origin))
-
-      if (settings.prefixDefault && locale === settings.defaultLocale)
-        written.push(...await writeRefresh(out, page, joinBase(base, path), origin))
-    }
-  }
+  written.push(...await writeLocaleRedirects(app, out, config, built.map(([path]) => path), origin))
 
   await compressPaths(written)
   await Bun.write(join(out, MARKER), '')
 
-  return { pages: pages.length, files: written.length }
+  return { pages: built.length, files: written.length }
+}
+
+// The paths the server sends to a page in its locale, each written as a page sending there: with every locale prefixed, the page's path without its prefix, and the path a locale translates, untranslated.
+async function writeLocaleRedirects(app: { handle: (request: Request) => Promise<Response> }, out: string, config: KayConfig, paths: string[], origin: string): Promise<string[]> {
+  const settings = config.i18n && localeSettings(config.i18n)
+
+  if (!settings || settings.hosts)
+    return []
+
+  const sources = new Set<string>()
+  const written: string[] = []
+
+  for (const path of paths) {
+    const { locale, path: own } = splitLocale(settings, path)
+
+    if (locale === undefined)
+      continue
+
+    const page = untranslatedPath(settings, own, locale)
+
+    for (const source of [localePath({ ...settings, paths: undefined }, page, locale), page]) {
+      if (source !== path)
+        sources.add(source)
+    }
+  }
+
+  // Asked as a first visit asks, which goes to the default locale.
+  for (const source of sources) {
+    const response = await app.handle(new Request(`http://localhost${source}`))
+    const location = response.headers.get('location')
+
+    if (response.status >= 300 && response.status < 400 && location !== null)
+      written.push(...await writeRefresh(out, source, location, origin))
+  }
+
+  return written
 }
 
 // A directory kay may write to: never the project or what holds it, and one with files in it only when an export wrote them.

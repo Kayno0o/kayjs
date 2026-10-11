@@ -1,10 +1,9 @@
 import type { Elysia } from 'elysia'
-import type { Route } from './routes'
+import type { ServedPaths } from './served-paths'
 import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
-import { servedPaths } from './routes'
 
 // For a file served under a name that stays when its content changes.
 export const REVALIDATE = 'public, max-age=0, must-revalidate'
@@ -39,12 +38,15 @@ function urlSegment(name: string): string {
   return encodeURIComponent(name).replace(SENT_AS_IS, decodeURIComponent).replace(ROUTER_SYNTAX, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
 }
 
-export function refusePublicClashes(files: PublicFile[], routes: Route[]): void {
-  const pages = servedPaths(routes)
-  const clash = files.find(file => pages.has(file.url))
+// Each file takes its path, which a page serving it already refuses; the paths an HTML file is also served at give way to anything else.
+export function claimPublic(served: ServedPaths, files: PublicFile[]): PublicFile[] {
+  for (const { path, url } of files) {
+    const owner = relative(process.cwd(), path)
 
-  if (clash)
-    throw new Error(`kay: ${relative(process.cwd(), clash.path)} and a page both serve ${clash.url}`)
+    served.claim({ path: url, owner, kind: 'public' }, taken => taken.kind === 'page' ? `kay: ${owner} and a page both serve ${url}` : `kay: ${taken.owner} and ${owner} both serve ${url}`)
+  }
+
+  return [...files, ...htmlFallbacks(files, new Set()).filter(({ path, url }) => served.offer({ path: url, owner: relative(process.cwd(), path), kind: 'public' }))]
 }
 
 // The paths a static host's `try_files $uri $uri.html $uri/index.html` serves an HTML file at besides its own: `/x` for `x.html`, else for `x/index.html`, so a site exported under the directory keeps its links without `.html`.
@@ -81,19 +83,11 @@ export function revalidated(request: Request, etag: string, body: () => BodyInit
   return new Response(body(), { headers: { ...headers, etag, 'cache-control': REVALIDATE } })
 }
 
-export async function servePublic(app: Elysia, dir: string, routes: Route[]): Promise<Set<string>> {
-  const files = await publicFiles(dir)
-
-  refusePublicClashes(files, routes)
-
-  const served = [...files, ...htmlFallbacks(files, servedPaths(routes))]
-
-  for (const { path, url } of served) {
+export async function servePublic(app: Elysia, served: ServedPaths, dir: string): Promise<void> {
+  for (const { path, url } of claimPublic(served, await publicFiles(dir))) {
     const { size, mtimeMs } = await stat(path)
     const etag = `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
 
     app.get(url, ({ request }) => revalidated(request, etag, () => Bun.file(path)))
   }
-
-  return new Set(served.map(file => file.url))
 }

@@ -6,6 +6,7 @@ import { readParam } from '../src/runtime/query-param'
 import { defineEnv } from '../src/server'
 import { buildingWithoutEnv, publicEnvModule, servePublicEnv } from '../src/server/env'
 import { queryRules, queryScript, readQuery } from '../src/server/query'
+import { ServedPaths } from '../src/server/served-paths'
 import { Denied } from '../src/server/signals'
 
 const schema = t.Object({
@@ -88,7 +89,7 @@ describe('defineEnv', () => {
 
 describe('servePublicEnv', () => {
   it('stops the boot naming a public variable missing, and serves only the declared ones', async () => {
-    expect(() => servePublicEnv(new Elysia(), t.Object({ KAY_TEST_MISSING: t.String() }))).toThrow('KAY_TEST_MISSING')
+    expect(() => servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MISSING: t.String() }))).toThrow('KAY_TEST_MISSING')
     expect(publicEnvModule({ MAP_KEY: 'a</script>', ZOOM: 3 })).toBe('export default {"MAP_KEY":"a\\u003c/script>","ZOOM":3}\n')
   })
 })

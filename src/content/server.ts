@@ -1,6 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { I18n } from '../server/i18n'
+import type { ServedPaths } from '../server/served-paths'
 import type { Collection } from './index'
 import type { Segment } from './markdown'
 import type { ContentProblem } from './validate'
@@ -141,7 +142,7 @@ export function feedPaths(collection: Collection<unknown>, settings: LocaleSetti
 
 // Serves each collection's feed at its path; one stays cached for an hour in production.
 // A localized collection's feed lists only the entries written in its locale, linking each at its path there.
-export function serveFeeds(app: Elysia, collections: Collection<unknown>[], origin: string | undefined, dev = false, i18n?: I18n): void {
+export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collection<unknown>[], origin: string | undefined, dev = false, i18n?: I18n): void {
   for (const collection of collections) {
     const { feed } = collection.options
 
@@ -154,6 +155,7 @@ export function serveFeeds(app: Elysia, collections: Collection<unknown>[], orig
     const headers = { 'content-type': `${feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'}; charset=utf-8`, 'cache-control': dev ? 'no-cache' : 'public, max-age=3600' }
 
     for (const { path, locale } of feedPaths(collection, i18n?.settings)) {
+      served.claim({ path, owner: `the feed of the collection ${collection.name}`, kind: 'kay', exported: true })
       app.get(path, async ({ request }) => {
         if (!i18n || collection.options.localized !== true)
           return new Response(feedXml(await collection.all(), feed, origin), { headers })
