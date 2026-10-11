@@ -2,6 +2,7 @@ import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue
 import { withBase, withoutBase } from './base'
 import { fragment, insert, localizeLinks, markers } from './dom'
 import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { pageData } from './page-data'
 import { createSignal, effect, memo, onCleanup, onMount } from './reactive'
 
 export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions, RichText } from './i18n'
@@ -17,7 +18,7 @@ interface Payload {
 }
 
 const PAYLOAD = 'script[data-kay-i18n]'
-const read = new WeakSet<Element>()
+const read = new WeakSet<Payload>()
 const messages = new Map<string, Message>()
 let settings: LocaleSettings | undefined
 let pageLocale = ''
@@ -25,14 +26,11 @@ let renderedAt: number | undefined
 
 // Reads the scripts not read yet, so messages a streamed part brought are found too.
 function load(): void {
-  for (const script of document.querySelectorAll(PAYLOAD)) {
-    if (read.has(script))
+  for (const payload of pageData<Payload>(PAYLOAD)) {
+    if (read.has(payload))
       continue
 
-    read.add(script)
-
-    const payload = JSON.parse(script.textContent ?? '{}') as Payload
-
+    read.add(payload)
     settings ??= payload.settings
     pageLocale ||= payload.locale ?? ''
     renderedAt ??= payload.now

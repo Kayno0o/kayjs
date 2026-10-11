@@ -7,6 +7,7 @@ import { withBase } from './base'
 import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
 import { leave, mayLeave, navigation, prefetched } from './navigation'
+import { pageData } from './page-data'
 import { createSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
@@ -444,18 +445,8 @@ export function formError(target: unknown, field: string): string | undefined {
 // The action URL each refused call was made to, which `refused` matches.
 const refusedAt = new WeakMap<ActionError, string>()
 
-let pageRead: [Element | null, Outcome | undefined] | undefined
-
 function pageOutcome(): Outcome | undefined {
-  if (typeof document === 'undefined')
-    return undefined
-
-  const script = document.querySelector(`script[${OUTCOME_SCRIPT}]`)
-
-  if (pageRead?.[0] !== script)
-    pageRead = [script, script ? decodeValue(script.textContent ?? '') as Outcome : undefined]
-
-  return pageRead[1]
+  return typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeValue)[0]
 }
 
 // Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes.

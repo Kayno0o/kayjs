@@ -25,7 +25,7 @@ export type Memo<T> = () => T
 type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
 export interface PersistedOptions<T> extends SignalOptions<T> {
-  // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated; `query` keeps a string in the page's URL, the server reading it too.
+  // `cookie`, the default, is read by the server too, so pages render with the value; `local` keeps it in localStorage, applied once the page has hydrated; `query` is `queryParam(name)`, the value given standing for the param left out.
   storage?: PersistStorage | undefined
 }
 
@@ -43,7 +43,9 @@ export function persisted<T extends string = string>(name: string, value: NoInfe
 export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T> & { storage?: 'cookie' | 'local' | undefined }): Signal<T>
 export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T>): Signal<T> {
   const [own, write] = createSignal<T>(value, options)
-  const kept = keepValue(name, options?.storage ?? 'cookie', own, write, value as T)
+  const storage = options?.storage ?? 'cookie'
+  // The same as `queryParam(name)`, `value` standing for the param left out.
+  const kept = storage === 'query' ? keepParam(name, own, write, value as T) : keepValue(name, storage, own, write)
 
   return withSetter(kept.read, (next) => {
     write(next)

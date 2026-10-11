@@ -26,7 +26,7 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
 
   const url = new URL(request.url)
 
-  return store.run({ values: new WeakMap(), cookie, query: name => url.searchParams.get(name) ?? undefined, param: name => readParam(rules, name, url.searchParams), report, path: url.pathname }, run)
+  return store.run({ values: new WeakMap(), cookie, param: name => readParam(rules, name, url.searchParams), report, path: url.pathname }, run)
 }
 
 const outcomes = new AsyncLocalStorage<() => Outcome | null>()

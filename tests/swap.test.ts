@@ -135,6 +135,14 @@ describe('page swap, on the server', () => {
     expect(shared[0]()).toBe('default')
   })
 
+  it('renders a persisted query param as queryParam does, by the page\'s schema, its value standing for the param left out', () => {
+    const report = () => undefined
+    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [persisted('q', 'all', { storage: 'query' })(), persisted('page', '1', { storage: 'query' })()], undefined, { page: { type: 'integer', default: 1 } })
+
+    expect(read('http://localhost/?q=kay&page=3')).toEqual(['kay', 3])
+    expect(read('http://localhost/?page=x')).toEqual(['all', 1])
+  })
+
   it('marks an island kept across navigations, under its component or a key of its own', () => {
     const Player = island('player.kay', () => ({ t: '<button>Play</button>' }))
 
@@ -249,6 +257,31 @@ describe('page swap, checking a form in the browser', () => {
     expect(signal('x', { persist: 'a' })()).toBe('x')
     // @ts-expect-error -- persisted('a', 'x', { storage: 'local' }) does
     expect(signal('x', { storage: 'local' })()).toBe('x')
+  })
+
+  it('keeps a persisted query param as queryParam does, leaving out its value and the schema\'s default', () => {
+    document.head.innerHTML = '<script type="application/json" data-kay-query>{"page":{"type":"integer","default":1}}</script>'
+    ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/list?q=kay&page=3')
+
+    const query = persisted('q', 'all', { storage: 'query' })
+    const page = persisted('page', '2', { storage: 'query' })
+
+    expect<unknown[]>([query(), page()]).toEqual(['kay', 3])
+
+    query.set('all')
+    page.set('5')
+    expect(location.search).toBe('?page=5')
+
+    page.set(1 as unknown as string)
+    expect(location.search).toBe('')
+
+    page.set('5')
+    page.set('2')
+    expect(location.search).toBe('')
+
+    query.set('bun')
+    expect(location.search).toBe('?q=bun')
+    document.head.innerHTML = ''
   })
 
   it('keeps only a string in the query, which the URL holds', () => {

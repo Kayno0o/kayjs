@@ -13,62 +13,72 @@ export interface Persisted<T> {
   save: (value: T) => void
 }
 
+export type Stored<T> = { found: true, value: T } | { found: false }
+
+// Where a kept signal's value lives: what the request being rendered holds, which the server renders with, none for a store only the browser sees; what the browser holds, and how it keeps a new value.
+export interface Store<T> {
+  request?: ((scope: ServerScope) => Stored<T>) | undefined
+  stored: () => Stored<T>
+  save: (value: T) => void
+  // Read once the page has hydrated, as the server rendered without it.
+  afterHydration?: boolean | undefined
+}
+
 const YEAR_SECONDS = 365 * 24 * 60 * 60
 // Browsers drop a cookie past about 4 KB, its name and attributes included.
 const MAX_COOKIE_BYTES = 3800
 const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 const TRAILING_SLASH = /\/$/
 
-// What a persisted signal reads and keeps, around the signal's own `read`: a cookie or a query param the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
-// A query param holding `fallback` is dropped from the URL, so a page left as it was keeps its plain address.
-export function keepValue<T>(key: string, storage: PersistStorage, read: () => T, write: (value: T) => void, fallback: T): Persisted<T> {
+// What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
+// `query` is `queryParam`'s store, which `keepParam` keeps.
+export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
     throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted() a name of letters, digits and - _ . only`)
 
-  if (typeof document === 'undefined')
-    return serverSide(key, storage, read)
+  const store: Store<T> = storage === 'cookie'
+    ? { request: scope => decoded(scope.cookie(key)), stored: () => decoded(cookie(key)), save: value => saveCookie(key, value) }
+    : { stored: () => decoded(readLocal(key)), save: value => saveLocal(key, value), afterHydration: true }
 
-  if (storage === 'cookie') {
-    const stored = decoded<T>(cookie(key))
+  return keep(store, read, write)
+}
+
+// A signal kept in `store`, around its own `read` and `write`: the browser writes what the store holds into it as it starts, or on its first read once hydrated, then keeps each value written.
+export function keep<T>(store: Store<T>, read: () => T, write: (value: T) => void): Persisted<T> {
+  if (typeof document === 'undefined')
+    return serverSide(store.request, read)
+
+  const load = () => {
+    const stored = store.stored()
 
     if (stored.found)
       write(stored.value)
-
-    return { read, save: value => saveCookie(key, value) }
   }
 
-  if (storage === 'query') {
-    const given = new URL(location.href).searchParams.get(key)
+  if (store.afterHydration !== true) {
+    load()
 
-    if (given !== null)
-      write(given as T)
-
-    return { read, save: value => saveQuery(key, value === fallback ? '' : String(value)) }
+    return { read, save: store.save }
   }
 
   let loaded = false
 
   return {
-    // The first read loads it, after hydration when an island reads it while claiming markup the server rendered without it.
+    // After hydration when an island reads it while claiming markup the server rendered without it.
     read: () => {
       if (!loaded) {
         loaded = true
-        whenHydrated(() => {
-          const stored = decoded<T>(readLocal(key))
-
-          if (stored.found)
-            write(stored.value)
-        })
+        whenHydrated(load)
       }
 
       return read()
     },
-    save: value => saveLocal(key, value),
+    save: store.save,
   }
 }
 
-// The server reads the cookie or the query param of the request being rendered, once per request, until a render of it writes the signal; localStorage it never sees.
-function serverSide<T>(key: string, storage: PersistStorage, read: () => T): Persisted<T> {
+// The server reads the request being rendered once per request, until a render of it writes the signal.
+function serverSide<T>(request: Store<T>['request'], read: () => T): Persisted<T> {
   const fromRequest = new WeakMap<ServerScope, Stored<T>>()
   const written = new WeakSet<ServerScope>()
 
@@ -76,13 +86,13 @@ function serverSide<T>(key: string, storage: PersistStorage, read: () => T): Per
     read: () => {
       const scope = currentServerScope()
 
-      if (!scope || storage === 'local' || written.has(scope))
+      if (!scope || !request || written.has(scope))
         return read()
 
       let stored = fromRequest.get(scope)
 
       if (!stored) {
-        stored = storage === 'query' ? queried<T>(scope.query(key)) : decoded<T>(scope.cookie(key))
+        stored = request(scope)
         fromRequest.set(scope, stored)
       }
 
@@ -95,13 +105,6 @@ function serverSide<T>(key: string, storage: PersistStorage, read: () => T): Per
         written.add(scope)
     },
   }
-}
-
-type Stored<T> = { found: true, value: T } | { found: false }
-
-// A query param is kept as written, a string.
-function queried<T>(text: string | undefined): Stored<T> {
-  return text === undefined ? { found: false } : { found: true, value: text as T }
 }
 
 function decoded<T>(text: string | null | undefined): Stored<T> {
@@ -167,16 +170,4 @@ function saveLocal(key: string, value: unknown): void {
   catch (error) {
     kayLog('warn', `the persisted signal ${key} could not be kept in localStorage: ${error instanceof Error ? error.message : String(error)}`)
   }
-}
-
-// Takes the current history entry's place, keeping its state, which holds kay's place in history: writing as the visitor types adds no entry to go back through.
-function saveQuery(key: string, text: string): void {
-  const url = new URL(location.href)
-
-  if (text === '')
-    url.searchParams.delete(key)
-  else
-    url.searchParams.set(key, text)
-
-  history.replaceState(history.state, '', url)
 }

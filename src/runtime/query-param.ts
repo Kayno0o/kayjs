@@ -1,6 +1,6 @@
-import type { Persisted } from './persist'
-import type { ServerScope } from './reactive'
-import { currentServerScope } from './reactive'
+import type { Persisted, Stored } from './persist'
+import { pageData } from './page-data'
+import { keep } from './persist'
 
 // What the server sends of one param of the page's `query` schema, enough to read its text as the schema does without the schema itself.
 export interface ParamRule {
@@ -21,8 +21,6 @@ const QUERY_SCRIPT = 'script[data-kay-query]'
 const DECIMAL = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i
 const BOOLEAN_TEXT = new Map([['true', true], ['on', true], ['false', false]])
 const REFUSED = Symbol('refused')
-// The script the rules were last read from: a page swap replaces it with the next page's.
-let pageRead: [Element | null, QueryRules | undefined] | undefined
 
 // A query param as the page's `query` schema reads it: its text read as the type the schema asks for, its default when left out or refused; without a rule for it, its text.
 // The server renders with it and the browser hydrates with it, so both read the same value from the same rules.
@@ -76,59 +74,33 @@ function fromText(rule: ParamRule, text: string): unknown {
 }
 
 // What `queryParam` reads and keeps, around the signal's own `read`: the server reads the request's param, the browser the page's address once, then each write takes the current history entry's place.
-export function keepParam<T>(name: string, read: () => T, write: (value: T) => void): Persisted<T> {
-  if (typeof document === 'undefined')
-    return serverSide(name, read)
-
-  write(readParam(pageRules(), name, new URL(location.href).searchParams) as T)
-
-  return { read, save: value => saveParam(name, value) }
+// A param left out reads as the signal's own value, `fallback` for `persisted(name, fallback, { storage: 'query' })`, which writing it leaves out too.
+export function keepParam<T>(name: string, read: () => T, write: (value: T) => void, fallback?: T): Persisted<T> {
+  return keep<T>({
+    request: scope => found(scope.param(name)),
+    stored: () => found(readParam(pageRules(), name, new URL(location.href).searchParams)),
+    save: value => saveParam(name, value, fallback),
+  }, read, write)
 }
 
-// Read once per request, until a render of it writes the signal.
-function serverSide<T>(name: string, read: () => T): Persisted<T> {
-  const fromRequest = new WeakMap<ServerScope, T>()
-  const written = new WeakSet<ServerScope>()
-
-  return {
-    read: () => {
-      const scope = currentServerScope()
-
-      if (!scope || written.has(scope))
-        return read()
-
-      if (!fromRequest.has(scope))
-        fromRequest.set(scope, scope.param(name) as T)
-
-      return fromRequest.get(scope)!
-    },
-    save: () => {
-      const scope = currentServerScope()
-
-      if (scope)
-        written.add(scope)
-    },
-  }
+function found<T>(value: unknown): Stored<T> {
+  return value === undefined ? { found: false } : { found: true, value: value as T }
 }
 
 function pageRules(): QueryRules | undefined {
-  const script = document.querySelector(QUERY_SCRIPT)
-
-  if (pageRead?.[0] !== script)
-    pageRead = [script, script ? JSON.parse(script.textContent ?? '') as QueryRules : undefined]
-
-  return pageRead[1]
+  return pageData<QueryRules>(QUERY_SCRIPT)[0]
 }
 
-// A list as the param repeated; nothing, blank text or the schema's default leaves it out, so a page left as it was keeps its plain address.
-function saveParam(name: string, value: unknown): void {
+// Takes the current history entry's place, keeping its state, which holds kay's place in history: writing as the visitor types adds no entry to go back through.
+// A list as the param repeated; nothing, blank text or the default leaves it out, so a page left as it was keeps its plain address.
+function saveParam(name: string, value: unknown, fallback: unknown): void {
   const url = new URL(location.href)
   const rules = pageRules()
-  const fallback = rules && Object.hasOwn(rules, name) ? rules[name]!.default : undefined
+  const defaults = [rules && Object.hasOwn(rules, name) ? rules[name]!.default : undefined, fallback].filter(given => given !== undefined).map(given => JSON.stringify(given))
 
   url.searchParams.delete(name)
 
-  if (value != null && value !== '' && JSON.stringify(value) !== JSON.stringify(fallback)) {
+  if (value != null && value !== '' && !defaults.includes(JSON.stringify(value))) {
     for (const item of Array.isArray(value) ? value as unknown[] : [value])
       url.searchParams.append(name, String(item))
   }
