@@ -1,5 +1,3 @@
-import type { TemplateFacts } from './codegen'
-
 // Offsets index into the whole .kay source, so every node maps back to the file the user wrote.
 export interface Span {
   start: number
@@ -396,6 +394,25 @@ export function isSlot(node: Node): boolean {
 
 export function isChildrenSlot(node: Node): boolean {
   return isSlot(node) && (node as ElementNode).outlet === undefined
+}
+
+export type TemplateHelper = 'For' | 'Show' | 'componentClass'
+
+// What the template holds that decides the code generated around it, found in one pass and kept on the file, which compiles several times.
+export interface TemplateFacts {
+  // An element handles events, binds an input or takes a ref.
+  interactive: boolean
+  // A form posts to an action.
+  actionForm: boolean
+  helpers: Set<TemplateHelper>
+  // The names `await` blocks render as they are, `await comments`.
+  awaited: Set<string>
+  slot: boolean
+  childrenSlot: boolean
+  await: boolean
+  try: boolean
+  // The shorthand classes of elements and `error` lines, `.card`, as written.
+  classes: string[]
 }
 
 export interface KayFile {

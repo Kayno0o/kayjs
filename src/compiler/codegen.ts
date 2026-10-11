@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TemplateFacts, TemplateHelper, TextNode, TryNode } from './ast'
 import type { LintName } from './lints'
 import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
@@ -1620,25 +1620,6 @@ export function mayPromote(file: KayFile, script: ScriptAnalysis): boolean {
   const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly).map(binding => binding.local)])
 
   return someNode(file.template, node => node.kind === 'element' && node.component && (node.attributes.some(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names)) || node.children.some(child => child.kind === 'slot' && child.params !== undefined)))
-}
-
-type TemplateHelper = 'For' | 'Show' | 'componentClass'
-
-// What the template holds that decides the code generated around it, found in one pass and kept on the file, which compiles several times.
-export interface TemplateFacts {
-  // An element handles events, binds an input or takes a ref.
-  interactive: boolean
-  // A form posts to an action.
-  actionForm: boolean
-  helpers: Set<TemplateHelper>
-  // The names `await` blocks render as they are, `await comments`.
-  awaited: Set<string>
-  slot: boolean
-  childrenSlot: boolean
-  await: boolean
-  try: boolean
-  // The shorthand classes of elements and `error` lines, `.card`, as written.
-  classes: string[]
 }
 
 export function templateFacts(file: KayFile): TemplateFacts {

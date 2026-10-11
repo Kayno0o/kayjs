@@ -126,6 +126,13 @@ describe('the messages a refused form is described by', () => {
     expect(tsx).toContain('<p class=\\"other\\">')
   })
 
+  it('names an element inline in text holding the error', () => {
+    const { tsx } = compileKay('form(action={add})\n  input(name="tag")\n  p Problem: #[span {add.error(\'tag\')}]\n', 'page.kay', { output: 'html' })
+
+    expect(tsx).toContain('KayAttribute("aria-describedby", KayFormInvalid((add), "tag") ? "add-tag-error" : undefined)')
+    expect(tsx).toContain('<span id=\\"add-tag-error\\">')
+  })
+
   it('describes the fields and the form of an island alike', () => {
     const { tsx } = compileKay(FORM, 'page.kay', { output: 'dom' })
 
