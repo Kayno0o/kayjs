@@ -110,6 +110,16 @@ describe('content', () => {
     expect(await page('bare')).toBe('<section id="bare" class="kui-card"><p>Edge to edge</p></section>')
   })
 
+  test('Notice is a status, or an alert for an error, drawn as a box or as a bare line', async () => {
+    expect(await page('notice')).toBe('<article id="notice"><div role="status" data-tone="info" class="kui-notice">Saved</div></article>')
+    expect(await page('notice-error')).toBe('<article id="notice-error"><div role="alert" data-tone="error" data-compact class="kui-notice">Could not save. <a href="/data">Retry</a></div></article>')
+  })
+
+  test('Avatar shows its picture as decoration, or the initial on a seeded colour, named when given a label', async () => {
+    expect((await page('avatar')).replaceAll(/<\/?slot[^>]*>/g, '')).toBe('<article id="avatar"><span data-size="sm" class="kui-avatar"><img class="kui-avatar-image" src="/ada.png" alt></span></article>')
+    expect((await page('avatar-initial')).replaceAll(/<\/?slot[^>]*>/g, '')).toMatch(/^<article id="avatar-initial"><span data-size="md" role="img" aria-label="Grace" class="kui-avatar"><span class="kui-avatar-initial" aria-hidden="true" style="background-color: #[\dA-F]{6}; color: #(?:000|fff)">g<\/span><\/span><\/article>$/)
+  })
+
   test('Carousel shows its slide, hides the rest from the focus and screen readers, and names each in the app\'s words', async () => {
     const carousel = (await page('carousel')).replaceAll(/<\/?slot[^>]*>/g, '')
 

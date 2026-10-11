@@ -1,8 +1,10 @@
 ---
+import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
 import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 ---
 main
@@ -17,6 +19,15 @@ main
   EmptyState#empty-action(title="No rockets")
     @actions
       a.go(href="/paging") Build one
+  article#notice
+    Notice(label="Saved")
+  article#notice-error
+    Notice(tone="error" compact)
+      | Could not save. #[a(href="/data") Retry]
+  article#avatar
+    Avatar(src="/ada.png" name="Ada" size="sm")
+  article#avatar-initial
+    Avatar(name=" grace" label="Grace")
   form#form
     Select(name="planet" value="earth" emptyOption="Any" options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]})
   article#carousel

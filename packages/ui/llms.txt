@@ -1,6 +1,6 @@
 # kayjs-ui
 
-> kay components ported from @kaynooo/svelte and @kaynooo/solidjs. They ship as `.kay` sources that the app compiles as its own, and they are styled by the classes of one `theme.css`, which the app restyles from its own stylesheet. The set: buttons and icons, toasts, dialogs and a form dialog that calls a page's action, a sortable table, switches, tabs and segmented controls, inputs, selects and pickers, cards, badges, popovers and tooltips, page layouts and panels, a command palette, charts, drag and drop, a markdown editor, media galleries, a cropper, pagination, QR codes, and a carousel, a star rating and a site menu for marketing pages.
+> kay components ported from @kaynooo/svelte and @kaynooo/solidjs. They ship as `.kay` sources that the app compiles as its own, and they are styled by the classes of one `theme.css`, which the app restyles from its own stylesheet. The set: buttons and icons, toasts, dialogs and a form dialog that calls a page's action, a sortable table, switches, tabs and segmented controls, inputs, selects and pickers, cards, badges, notices, avatars, popovers and tooltips, page layouts and panels, a command palette, charts, drag and drop, a markdown editor, media galleries, a cropper, pagination, QR codes, and a carousel, a star rating and a site menu for marketing pages.
 
 ## Rules that are easy to get wrong
 
@@ -212,11 +212,13 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
   - `loading` shows a disabled row saying `loadingLabel` while the options are on their way.
   - The right option stays chosen when the options arrive after the value.
 
-### Card, Badge, EmptyState
+### Card, Badge, EmptyState, Notice, Avatar
 
 - `Card(title="Traffic")`: a `section.kui-card` that frames its children in `.kui-card-body`. `head` sits at the far end of the title's line, for a count or a link. `bare` drops the body's inset, for content that runs to the edge, such as a table.
 - `Badge(label="Draft" tone="warning" icon="info")`: `tone` is `neutral`, `accent`, `success`, `warning`, `danger` or `info`. Children render after `label`.
 - `EmptyState(title="No posts yet" description="Write the first one.")`: what a list shows when it holds nothing. An `@actions` block sits below the description, for the button that adds the first item: `EmptyState(title="No posts yet")` then `@actions` holding `Button(href="/new" label="New post")`.
+- `Notice(tone="error" label={failure})`: a form's outcome or a refusal, in place. `tone` is `info`, `success`, `warning` or `error`; an error is `role="alert"`, read out at once, the others `role="status"`. Children render after `label`, for a link to follow up. It is a bordered box, for a page section; `compact` drops the box, for a line under a form.
+- `Avatar(src={user.avatar} name={user.name} size="sm")`: the picture, or the name's first letter on a colour seeded by the name when `src` is empty or fails to load; a new `src` is tried again. `size` is `xs`, `sm`, `md` (the default) or `lg`. It is decorative, the name being written beside it, unless `label` names it for screen readers.
 
 ### Popover, TooltipHost
 
