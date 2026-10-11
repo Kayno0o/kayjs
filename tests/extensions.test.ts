@@ -387,8 +387,8 @@ describe('a library\'s routes', () => {
 const LOCAL_CHECKED: Record<string, string> = {
   'app/package.json': JSON.stringify({ name: 'app', dependencies: { 'linked-lib': 'link:../linked' } }),
   'app/tsconfig.json': TSCONFIG,
-  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { linkedPages } from \'linked-lib\'\n\nexport default defineConfig({ extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/auth\' } }, linkedPages(), { name: \'abs\', routes: { dir: `${import.meta.dir}/../abs/routes`, prefix: \'/abs\' } }, { name: \'sub\', routes: { dir: \'../abs/sub/routes\', prefix: \'/sub\' } }, { name: \'edit\', editor: \'../edit/editor.kay\' }] })\n',
-  'app/src/routes/index.kay': 'p.home home\n',
+  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { linkedPages } from \'linked-lib\'\n\nexport default defineConfig({ extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/auth\' } }, linkedPages(), { name: \'abs\', routes: { dir: `${import.meta.dir}/../abs/routes`, prefix: \'/abs\' } }, { name: \'sub\', routes: { dir: \'../abs/sub/routes\', prefix: \'/sub\' } }, { name: \'edit\', editor: \'../edit/editor.kay\' }, { name: \'ws\', routes: { dir: \'node_modules/ws-lib/routes\', prefix: \'/ws\' } }, { name: \'mono\', routes: { dir: \'../mono/ext/routes\', prefix: \'/mono\' } }] })\n',
+  'app/src/routes/index.kay': '---\nimport { shared } from \'../../../mono/shared/util\'\n---\np.home home {shared}\n',
   'app/src/params/code.ts': 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n',
   'lib/package.json': JSON.stringify({ name: 'lib' }),
   'lib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\np.card {title}\n',
@@ -411,13 +411,24 @@ const LOCAL_CHECKED: Record<string, string> = {
   'linked/package.json': JSON.stringify({ name: 'linked-lib', type: 'module', exports: { '.': './index.ts' }, peerDependencies: { kay: '*' } }),
   'linked/index.ts': 'import type { KayExtension } from \'kay/server\'\n\nexport const linkedPages = (): KayExtension => ({ name: \'linked-lib\', routes: { dir: `${import.meta.dir}/routes`, prefix: \'/linked\' } })\n',
   'linked/routes/broken.kay': '---\nconst wrong: number = \'linked\'\n---\np {wrong}\n',
-  'linked/routes/fine.kay': '---\nimport Badge from \'../badge.kay\'\n---\nBadge\n',
-  'linked/badge.kay': '---\nconst wrong: number = \'reached\'\n---\nspan {wrong}\n',
+  'linked/routes/fine.kay': '---\nimport Badge from \'../badge.kay\'\nimport { title } from \'../titles\'\n---\nBadge(title={title})\n',
+  'linked/titles.ts': 'const wrong: number = \'linkedmodule\'\n\nexport const title = `${wrong}`\n',
+  'linked/badge.kay': '---\nconst { title } = props<{ title: string }>()\nconst wrong: number = \'reached\'\n---\nspan {wrong} {title}\n',
   'linked/unused.kay': '---\nconst wrong: number = \'unreached\'\n---\nspan {wrong}\n',
   // An editor alone, no routes beside it, and what it reaches.
   'edit/package.json': JSON.stringify({ name: 'edit' }),
   'edit/editor.kay': '---\nimport Part from \'./part.kay\'\n\nconst wrong: number = \'editor\'\nonCleanup(() => undefined)\nnope()\n---\nPart\np {wrong}\n',
-  'edit/part.kay': '---\nconst wrong: number = \'edited\'\n---\nspan {wrong}\n',
+  'edit/part.kay': '---\nimport { label } from \'./labels\'\n\nconst wrong: number = \'edited\'\n---\nspan {wrong} {label}\n',
+  'edit/labels.ts': 'const wrong: number = \'editmodule\'\n\nexport const label = `${wrong}`\n',
+  // Listed through the link a workspace gives, its routes under `node_modules` by path but not for real.
+  'ws/package.json': JSON.stringify({ name: 'ws-lib' }),
+  'ws/routes/broken.kay': '---\nimport { label } from \'../labels\'\n\nconst wrong: number = \'workspace\'\n---\np {wrong} {label}\n',
+  'ws/labels.ts': 'const wrong: number = \'wsmodule\'\n\nexport const label = `${wrong}`\n',
+  // Routes in no package of their own, inside a repository whose other packages stay the app's to check when it imports them.
+  'mono/package.json': JSON.stringify({ name: 'mono', private: true }),
+  'mono/ext/routes/page.kay': 'p mono\n',
+  'mono/shared/package.json': JSON.stringify({ name: 'shared' }),
+  'mono/shared/util.ts': 'const wrong: number = \'sibling\'\n\nexport const shared = `${wrong}`\n',
 }
 
 describe('an extension listed from beside the app', () => {
@@ -428,13 +439,14 @@ describe('an extension listed from beside the app', () => {
       await Promise.all(Object.entries(LOCAL_CHECKED).map(async ([path, content]) => Bun.write(join(dir, path), content)))
       await mkdir(join(dir, 'app/node_modules'))
       await symlink('../../linked', join(dir, 'app/node_modules/linked-lib'))
+      await symlink('../../ws', join(dir, 'app/node_modules/ws-lib'))
 
       const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
       const output = `${stdout}${stderr}`
 
       expect(code).toBe(1)
       // A frame shows the lines before its own, so the editor's `nope()` shows its `wrong` again.
-      expect([...new Set(output.matchAll(/\| const wrong: number = '(\w+)'/g).map(match => match[1]))].sort()).toEqual(['absolute', 'beside', 'edited', 'editor', 'linked', 'reached'])
+      expect([...new Set(output.matchAll(/\| const wrong: number = '(\w+)'/g).map(match => match[1]))].sort()).toEqual(['absolute', 'beside', 'edited', 'editor', 'linked', 'reached', 'sibling', 'workspace'])
       expect(output.split('error[missing-alt]').length).toBe(2)
       expect(output).not.toContain('codes/[id=code].kay')
       expect(output.split('label.kay').length).toBe(2)
@@ -444,7 +456,7 @@ describe('an extension listed from beside the app', () => {
       // A name the compiled script does not get, as `onCleanup` now does.
       expect(output).toContain('Cannot find name \'nope\'.')
       expect(output).not.toContain('Cannot find name \'onCleanup\'')
-      expect(output).toContain('11 errors')
+      expect(output).toContain('13 errors')
       // What the ESLint processor types the pages by.
       expect(readShadowSettings(join(dir, 'app')).mounts).toContain(join(dir, 'lib/routes'))
     }

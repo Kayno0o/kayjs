@@ -14,7 +14,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { findKayFiles, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
-import { findKayLibraries, libraryOf, reachableLibraryFiles, throughNodeModules } from '../build/libraries'
+import { findKayLibraries, libraryOf, packageRoot, reachableLibraryFiles, throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
 import { cacheEntry } from '../build/transform'
 import { rendersAsIsland, SourceMap } from '../compiler'
@@ -204,22 +204,14 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
 async function extensionPackages(root: string, libraries: KayLibrary[], extensionDirs: string[]): Promise<KayLibrary[]> {
   const dirs = new Set(extensionDirs.filter(dir => libraryOf(libraries, join(dir, 'page.kay')) === undefined).map(packageRoot))
 
+  const realRoot = realpathSync(root)
+
   return Promise.all([...dirs].map(async (dir) => {
-    // Left out: the app itself, when the package holds it as a fixture; the other projects inside it, to their own checks; a kay library's files, to the library.
-    const files = (await findKayFiles(dir, { project: true, ownOnly: true, ownKayOnly: true })).filter(file => !file.startsWith(root + sep) && libraryOf(libraries, file) === undefined)
+    // Left out: the app itself, when the package holds it as a fixture; the other projects inside it, to their own checks; a kay library's files, to the library. A package linked into `node_modules` goes by that path, as the app imports it.
+    const files = (await findKayFiles(dir, { project: true, ownOnly: true, ownKayOnly: true })).filter(file => !realpathSync(file).startsWith(realRoot + sep) && libraryOf(libraries, file) === undefined)
 
-    return { name: basename(dir), dir, realDir: dir, files, specifiers: new Map<string, string>() }
+    return { name: basename(dir), dir, realDir: realpathSync(dir), files, specifiers: new Map<string, string>(), extension: true as const }
   }))
-}
-
-function packageRoot(dir: string): string {
-  for (let at = dir; ; at = dirname(at)) {
-    if (existsSync(join(at, 'package.json')))
-      return at
-
-    if (at === dirname(at))
-      return dir
-  }
 }
 
 // The pages, public files, API modules and endpoints, with the locale settings, each with the reason the server would refuse it reported.

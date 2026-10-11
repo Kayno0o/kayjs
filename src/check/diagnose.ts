@@ -6,8 +6,8 @@ import type { I18nConfig } from '../config'
 import type { RouteMount } from '../server/routes'
 import type { ShadowFile } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
-import { relative, resolve, sep } from 'node:path'
-import { libraryOf } from '../build/libraries'
+import { dirname, relative, resolve, sep } from 'node:path'
+import { libraryOf, packageRoot } from '../build/libraries'
 import { typeLint } from '../compiler/lints'
 import { UNSERVED_MESSAGE } from '../runtime/checks'
 import { localePrefixes, localeSettings } from '../server/i18n'
@@ -121,9 +121,10 @@ export function servedLocales(config: I18nConfig | undefined): string[] {
   }
 }
 
-// A library's own modules are its to check, as `skipLibCheck` leaves a declaration file's, a missing optional peer included: only its components compile as the app's. An app inside a linked library's repository keeps its own files.
+// A library's own modules are its to check, as `skipLibCheck` leaves a declaration file's, a missing optional peer included: only its components compile as the app's. An app inside a linked library's repository keeps its own files, and a linked extension's package only holds the modules its own package.json is nearest to.
 export function reportsTypeErrors(file: string, scope: TypeScope): boolean {
-  const libraryModule = !KAY_FILE.test(file) && libraryOf(scope.libraries, file) !== undefined && !ownFile(scope.root, file)
+  const library = KAY_FILE.test(file) || ownFile(scope.root, file) ? undefined : libraryOf(scope.libraries, file)
+  const libraryModule = library !== undefined && (library.extension !== true || [library.dir, library.realDir].includes(packageRoot(dirname(file))))
 
   return !scope.broken.has(file) && !scope.unreached.has(file) && !libraryModule
 }

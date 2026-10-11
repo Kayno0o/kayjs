@@ -13,6 +13,8 @@ export interface KayLibrary {
   files: string[]
   // The `.kay` files by the specifiers its exports map gives them, `kayjs-ui/button.kay`.
   specifiers: Map<string, string>
+  // A linked extension's package, which holds only the modules nearest to its own package.json: a workspace package inside it is another.
+  extension?: true
 }
 
 interface Manifest {
@@ -102,6 +104,17 @@ export interface SettingsReplacement {
 }
 
 // The library holding `file`, by its path under `node_modules` or its real one: the deepest, for a library installed inside another's `node_modules`.
+// The nearest directory from `dir` up with a package.json, `dir` itself when none has one.
+export function packageRoot(dir: string): string {
+  for (let at = dir; ; at = dirname(at)) {
+    if (existsSync(join(at, 'package.json')))
+      return at
+
+    if (at === dirname(at))
+      return dir
+  }
+}
+
 export function libraryOf(libraries: KayLibrary[], file: string): KayLibrary | undefined {
   const holding = (dir: string) => file.startsWith(dir + sep) ? dir.length : 0
 
