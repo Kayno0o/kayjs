@@ -17,6 +17,7 @@ import { compileKay } from '../src/compiler'
 import { resolveProject } from '../src/project'
 import { action, logFrom } from '../src/runtime'
 import { sqliteCache } from '../src/runtime/cache.server'
+import { logSink, setLogSink } from '../src/runtime/log'
 import { solveWork } from '../src/runtime/work'
 import { inlineScriptHashes, invalidatePage, pages, requestId, shutdown, sqliteJobs, sqliteStore } from '../src/server'
 import { servePages } from '../src/server/app'
@@ -1684,10 +1685,61 @@ describe('request logging', () => {
       useLogger(true)
       mail.error('the outbox is full', new Error('Disk full'))
       expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kayjs-mail: the outbox is full\nError: Disk full\n/))
+
+      useLogger('json')
+      mail.error('a mail bounced')
+      expect(JSON.parse(String(logged.mock.calls.at(-1)![0]))).toEqual({ type: 'message', time: expect.any(String), level: 'error', from: 'kayjs-mail', message: 'a mail bounced' })
+      expect(() => logFrom('')).toThrow('kay: logFrom takes the name heading the library\'s messages')
     }
     finally {
       logged.mockRestore()
       useLogger(true)
+    }
+  })
+
+  it('writes a library\'s messages to the console without a server, and to a sink set by a kay that predates `from`', () => {
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const sink = logSink()!
+    const calls: unknown[][] = []
+
+    try {
+      ;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.log')] = undefined
+      logFrom('kayjs-mail').warn('no server yet', 'why')
+      expect(warned.mock.calls).toEqual([['[kayjs-mail] no server yet', 'why']])
+
+      setLogSink((level, message, error, request) => void calls.push([level, message, error, request]))
+      logFrom('kayjs-mail').error('the outbox is full', 'Disk full')
+      expect(calls).toEqual([['error', 'the outbox is full', 'Disk full', undefined]])
+    }
+    finally {
+      setLogSink(sink)
+      warned.mockRestore()
+    }
+  })
+
+  it('heads what an endpoint and an API module\'s guard log with the request they answer', async () => {
+    const dir = await scratchDir('library-log-')
+    const entries: LogEntry[] = []
+    const logging = 'import { logFrom } from \'kay\'\n\nconst log = logFrom(\'kayjs-feed\')\n\n'
+
+    try {
+      await Promise.all([
+        Bun.write(join(dir, 'routes/feed.txt.ts'), `${logging}export function GET() {\n  log.info('feed read')\n\n  return 'items'\n}\n`),
+        Bun.write(join(dir, 'api/_guard.ts'), `import { guard } from 'kay'\n\n${logging}export default guard(() => {\n  log.info('api guarded')\n})\n`),
+        Bun.write(join(dir, 'api/notes.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => [])\n'),
+      ])
+      const app = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: false, log: entry => void entries.push(entry) })
+
+      await app.handle(new Request('http://localhost/feed.txt'))
+      await app.handle(new Request('http://localhost/api/notes'))
+      expect(entries.filter(entry => entry.type === 'message')).toEqual([
+        { type: 'message', time: expect.any(String), level: 'info', from: 'kayjs-feed', message: 'feed read', request: { method: 'GET', path: '/feed.txt', id: expect.any(String) } },
+        { type: 'message', time: expect.any(String), level: 'info', from: 'kayjs-feed', message: 'api guarded', request: { method: 'GET', path: '/api/notes', id: expect.any(String) } },
+      ])
+    }
+    finally {
+      useLogger(true)
+      await rm(dir, { recursive: true, force: true })
     }
   })
 
