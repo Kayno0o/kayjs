@@ -1,3 +1,4 @@
+// kay against Solid and Svelte, `bun run bench`, written to bench/results.md: it drives Chromium, the one BUN_CHROME_PATH names or the one `bunx playwright-core install chromium` downloads.
 import type { Browser } from 'playwright-core'
 import type { LoadResult, OperationResult } from './browser'
 import { existsSync } from 'node:fs'

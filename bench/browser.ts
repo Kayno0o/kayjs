@@ -1,6 +1,8 @@
 import type { Browser, CDPSession, Page } from 'playwright-core'
 import type { AppName } from './apps'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import process from 'node:process'
 import { chromium } from 'playwright-core'
 import { median } from './format'
 import { visibleRows } from './markup'
@@ -72,8 +74,14 @@ export async function serve(app: AppName, env: Record<string, string> = {}): Pro
   return { url: `http://localhost:${output.trim().slice('ready '.length)}`, stop: () => child.kill() }
 }
 
+// The Chromium BUN_CHROME_PATH names, as kay's browser tests read it, else the one `bunx playwright-core install chromium` downloads.
 export async function launch(): Promise<Browser> {
-  return chromium.launch({ headless: true })
+  const executablePath = process.env.BUN_CHROME_PATH !== undefined && process.env.BUN_CHROME_PATH !== '' ? process.env.BUN_CHROME_PATH : chromium.executablePath()
+
+  if (!existsSync(executablePath))
+    throw new Error(`the benches drive Chromium, and there is none at ${executablePath}: name one in BUN_CHROME_PATH, or run \`bunx playwright-core install chromium\``)
+
+  return chromium.launch({ headless: true, executablePath })
 }
 
 async function responseBody(type: string, body: Promise<Buffer>): Promise<{ type: string, body: Uint8Array<ArrayBuffer> }> {

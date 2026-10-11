@@ -1,3 +1,4 @@
+// What each origin costs kay's client in bytes and main-thread time, `bun run bench:origins`, written to bench/origins.md: it drives Chromium, the one BUN_CHROME_PATH names or the one `bunx playwright-core install chromium` downloads.
 import type { Browser, CDPSession } from 'playwright-core'
 import type { Chunk, CpuProfile, FrameOrigin, OriginBytes, SourceMapFile } from './attribution'
 import { readdirSync } from 'node:fs'

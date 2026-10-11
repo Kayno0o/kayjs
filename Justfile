@@ -1,4 +1,4 @@
-lint-actions:
+lint-actions: # needs actionlint on the PATH
 	actionlint -config-file actionlint.yaml .forgejo/workflows/*.yml
 
 patch: (release "patch") # v0.0.X
@@ -22,6 +22,6 @@ release level:
 worktree name: # a worktree at HEAD in .claude/worktrees/<name>, its dependencies installed, as Claude Code's own are made
 	bun .claude/hooks/worktree.ts create {{name}}
 
-extension: # build kay.vsix and install it in code-server
+extension: # build kay.vsix and install it in code-server, which has to be on the PATH
 	cd editors/vscode && bun run package
 	code-server --install-extension editors/vscode/kay.vsix

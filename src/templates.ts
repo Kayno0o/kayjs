@@ -359,8 +359,8 @@ ${WORKFLOW_SETUP}`,
         run: bun run test`,
     `${has('tests') ? '' : '      # The build checks the project itself.\n'}      - name: Build the site
         env:
-          # The host your Forgejo instance publishes Pages on.
-          SITE_URL: https://pages.kaynooo.fr
+          # The host your Forgejo instance publishes Pages on: replace it with yours.
+          SITE_URL: https://pages.example.com
           SITE_BASE: /\${{ github.repository }}
         run: bun run build`,
     has('eslint') && `      # After the build's check, which writes the types the lint of .kay files reads.

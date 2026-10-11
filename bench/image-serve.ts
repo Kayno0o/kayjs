@@ -2,7 +2,7 @@ import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 import { heroPaths, imageFixture } from './image-fixture'
 
-// Serves the image fixture on a loopback port the way an app does, for a load generator, printing the image route and build file URLs of its imported image. `bun bench/image-serve.ts <port> [variant]`
+// Serves the image fixture on a loopback port the way an app does, for a load generator such as oha or wrk, printing the image route and build file URLs of its imported image. `bun bench/image-serve.ts <port> [variant]`
 const VARIANTS: Record<string, object> = {
   stock: {},
   nosecurity: { security: false },
