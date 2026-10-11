@@ -98,18 +98,22 @@ describe('pageResponder', () => {
 })
 
 describe('over a listening server', () => {
-  it('serves kay\'s files and a catch-all page where a page of params would take them from Bun\'s router, as app.handle() does', async () => {
+  it('serves kay\'s files, catch-all pages, redirects and API routes ending in * where a page of params would take them from Bun\'s router, as app.handle() does', async () => {
     const dir = await scratchDir('wildcards-')
     const storage = memoryFiles()
+    const routes = join(dir, 'routes')
 
     await Promise.all([
-      Bun.write(join(dir, '[section]/[page].kay'), '--- server\nconst { section, page } = ctx.params\n---\np.page {section} {page}\n'),
-      Bun.write(join(dir, '[a]/[b]/[c].kay'), 'p.deep Deep\n'),
-      Bun.write(join(dir, 'docs/[...rest].kay'), '--- server\nconst rest = ctx.params.rest\n---\np.docs {rest}\n'),
-      Bun.write(join(dir, 'counter.kay'), '--- script\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) Clicked {count()}\n'),
+      Bun.write(join(routes, '[section]/[page].kay'), '--- server\nconst { section, page } = ctx.params\n---\np.page {section} {page}\n'),
+      Bun.write(join(routes, '[a]/[b]/[c].kay'), 'p.deep Deep\n'),
+      Bun.write(join(routes, 'docs/[...rest].kay'), '--- server\nconst rest = ctx.params.rest\n---\np.docs {rest}\n'),
+      Bun.write(join(routes, '[z]/files/[...q].kay'), '--- server\nconst q = ctx.params.q\n---\np.files {q}\n'),
+      Bun.write(join(routes, 'counter.kay'), '--- script\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) Clicked {count()}\n'),
+      Bun.write(join(dir, 'api/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(401, \'Admins only\')\n})\n'),
+      Bun.write(join(dir, 'api/files.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/*\', ({ params }) => \'<p class="api">\' + params[\'*\'])\n'),
     ])
 
-    const app = new Elysia().use(await pages({ routes: dir, prebuilt: false, storage }))
+    const app = new Elysia().use(await pages({ routes, api: join(dir, 'api'), redirects: { '/old/*': '/new/*' }, prebuilt: false, storage }))
     const client = (await readClient(process.cwd()))!
     const asset = (await readdir(client.dir)).find(file => file.endsWith('.js'))!
     const key = await files.put(new File(['hello'], 'hello.txt'))
@@ -117,23 +121,29 @@ describe('over a listening server', () => {
     app.listen({ port: 0, hostname: 'localhost' })
 
     try {
-      const paths = [`/_kay/${asset}`, `/_kay/files/${key}`, '/docs/intro', '/docs/a/b', '/guide/start', '/x/y/z']
-      const answers = async (get: (path: string) => Promise<Response>) => Promise.all(paths.map(async (path) => {
-        const response = await get(path)
+      const admin = { headers: { 'x-admin': '1' } }
+      const requests: [string, RequestInit?][] = [[`/_kay/${asset}`], [`/_kay/files/${key}`], ['/docs/intro'], ['/docs/a/b'], ['/guide/start'], ['/x/y/z'], ['/blog/files/a/b'], ['/old/x/y'], ['/old/x/y', { method: 'HEAD' }], ['/api/files/x/y'], ['/api/files/x/y', admin]]
+      const answers = async (get: (path: string, init?: RequestInit) => Promise<Response>) => Promise.all(requests.map(async ([path, init]) => {
+        const response = await get(path, init)
         const text = await response.text()
 
-        return [path, response.status, text.match(/<p class="(\w+)">([^<]*)/)?.slice(1).join(' ') ?? text.slice(0, 5)]
+        return [`${init?.method ?? 'GET'} ${path}`, response.status, response.headers.get('location') ?? text.match(/<p class="(\w+)">([^<]*)/)?.slice(1).join(' ') ?? text.slice(0, 12)]
       }))
-      const served = await answers(async path => fetch(`http://localhost:${app.server!.port}${path}`))
+      const served = await answers(async (path, init) => fetch(`http://localhost:${app.server!.port}${path}`, { ...init, redirect: 'manual' }))
 
-      expect(served).toEqual(await answers(async path => app.handle(new Request(`http://localhost${path}`))))
-      expect(served.map(([path, status, text]) => [path, status, String(text).replace(/^[^ ]*$/, 'file')])).toEqual([
-        [`/_kay/${asset}`, 200, 'file'],
-        [`/_kay/files/${key}`, 200, 'file'],
-        ['/docs/intro', 200, 'docs intro'],
-        ['/docs/a/b', 200, 'docs a/b'],
-        ['/guide/start', 200, 'page guide start'],
-        ['/x/y/z', 200, 'deep Deep'],
+      expect(served).toEqual(await answers(async (path, init) => app.handle(new Request(`http://localhost${path}`, init))))
+      expect(served.map(([path, status, text]) => [path, status, String(path).startsWith('GET /_kay/') ? 'file' : text])).toEqual([
+        [`GET /_kay/${asset}`, 200, 'file'],
+        [`GET /_kay/files/${key}`, 200, 'file'],
+        ['GET /docs/intro', 200, 'docs intro'],
+        ['GET /docs/a/b', 200, 'docs a/b'],
+        ['GET /guide/start', 200, 'page guide start'],
+        ['GET /x/y/z', 200, 'deep Deep'],
+        ['GET /blog/files/a/b', 200, 'files a/b'],
+        ['GET /old/x/y', 308, '/new/x/y'],
+        ['HEAD /old/x/y', 308, '/new/x/y'],
+        ['GET /api/files/x/y', 401, 'Admins only'],
+        ['GET /api/files/x/y', 200, 'api x/y'],
       ])
     }
     finally {

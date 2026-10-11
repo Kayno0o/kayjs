@@ -6,7 +6,6 @@ import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
 import { imageHeader } from './image-format'
 import { signedText, signText } from './stamp'
-import { wildcardRoute } from './wildcards'
 
 // Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, so a store needs no locking.
 export interface FileStore {
@@ -204,7 +203,6 @@ export const files = {
 
 // `/_kay/files/<key>` serves a public file to anyone, cached for good since a key never changes, and a private one to a link `files.url` signed.
 export function serveFiles(app: Elysia): void {
-  wildcardRoute(app, `${FILES_ROUTE}*`)
   app.get(`${FILES_ROUTE}*`, async ({ params, request }) => {
     const key = params['*']
 

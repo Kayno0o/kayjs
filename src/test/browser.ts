@@ -88,10 +88,10 @@ const TIMEOUT_MS = 5000
 const POLL_MS = 25
 // What `within` resolves with when the page did not answer in time.
 const TIMED_OUT = Symbol('timed out')
-// Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
-// The files the page failed to load, such as the scripts that would hydrate its islands.
-const FAILED_FILES = `performance.getEntriesByType('resource').filter(entry => entry.responseStatus >= 400).map(entry => new URL(entry.name).pathname + ' answered ' + entry.responseStatus)`
+// The files the page failed to load, such as the scripts that would hydrate its islands: refused, or a script answered as another type, which the browser does not run.
+const FAILED_FILES = `performance.getEntriesByType('resource').flatMap(entry => { const path = new URL(entry.name).pathname; return entry.responseStatus >= 400 ? [path + ' answered ' + entry.responseStatus] : (path.endsWith('.js') || path.endsWith('.mjs')) && entry.contentType && !entry.contentType.includes('javascript') ? [path + ' answered as ' + entry.contentType] : [] })`
 const FAILED_WAIT_MS = 1000
+// Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
 const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle])')].every(island => island._$k)`
 
 // What kay makes for the Chrome of a process, named after it so a later run removes what a killed one left.
