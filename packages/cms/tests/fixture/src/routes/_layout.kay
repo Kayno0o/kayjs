@@ -1,0 +1,7 @@
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+---
+slot
+Toaster
+TooltipHost

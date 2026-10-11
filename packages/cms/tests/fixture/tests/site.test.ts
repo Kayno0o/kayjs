@@ -48,6 +48,10 @@ test('the screens list each collection with its entry count', async () => {
   expect(page.text('main')).toContain('2 entries')
 })
 
+test('the app\'s root layout wraps the screens, its toaster showing their saves', async () => {
+  expect((await site.visit('/admin/collections/posts')).find('.kui-toaster')).toHaveLength(1)
+})
+
 test('a collection lists its entries, with a draft to publish, and searches them', async () => {
   const page = await site.visit('/admin/collections/posts')
 
