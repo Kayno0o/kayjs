@@ -4,7 +4,7 @@ import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, errorMessages, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isChildrenSlot, isHead, isSlot, keyedByPosition, serverIslandOf, someNode, visitNodes } from './ast'
+import { actionOf, errorMessages, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formTargets, isChildrenSlot, isHead, isSlot, keyedByPosition, serverIslandOf, someNode, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression, mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -118,14 +118,15 @@ class Generator {
   private readonly constSites = new Set<number>()
   private readonly diagnostics: Diagnostic[] = []
   private readonly src: string
-  // The action expression of the form being emitted, so its fields' names are checked against the action's input.
-  private formTarget: Span | undefined
+  // The action of the form each node sits in, so its fields' names are checked against the action's input.
+  private readonly forms: Map<Node, Span>
   // Server values an `await` block renders by name, which `load` defers once they are declared.
   private deferred = new Set<string>()
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
     this.src = file.source
     this.b = new CodeBuilder(file.source, options.rewrites)
+    this.forms = formTargets(file.template, file.source)
   }
 
   run(): Generated {
@@ -293,10 +294,10 @@ class Generator {
 
     const errors = html || dom ? errorMessages(template, this.src) : undefined
     const located = this.options.inspect === true ? sourceLocator(this.src, this.options.moduleId) : undefined
-    const domTemplate = dom ? new DomTemplate(b, this.src, errors, located) : undefined
+    const domTemplate = dom ? new DomTemplate(b, this.src, this.forms, errors, located) : undefined
 
     if (html)
-      new HtmlTemplate(b, this.src, { hydratable: this.options.hydratable, accessorLoops: !staticLoops, errors, located }).value(this.withoutSlots(template))
+      new HtmlTemplate(b, this.src, this.forms, { hydratable: this.options.hydratable, accessorLoops: !staticLoops, errors, located }).value(this.withoutSlots(template))
     else if (domTemplate)
       domTemplate.block(this.withoutSlots(template))
     else
@@ -783,8 +784,9 @@ class Generator {
   // The field's name is typed as a `name` is: one of the action's input.
   private emitError(node: ErrorNode) {
     const { b } = this
+    const target = this.forms.get(node)
 
-    if (!this.formTarget) {
+    if (!target) {
       this.error(node, '`error` shows the message of a form posting to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
 
       return
@@ -794,7 +796,7 @@ class Generator {
       return
 
     b.wrap(node, () => {
-      b.add('{KayFormError((').addSource(this.formTarget!).add(')')
+      b.add('{KayFormError((').addSource(target).add(')')
 
       if (node.field) {
         b.add(', ')
@@ -1108,14 +1110,7 @@ class Generator {
       }
 
       b.add('>')
-      const outerForm = this.formTarget
-      const action = actionOf(element, this.src)
-
-      if (action)
-        this.formTarget = action.expression
-
       this.emitChildren(children)
-      this.formTarget = outerForm
       b.add('</')
 
       // The closing tag reads the name the way the opening one did: a prop, a loop item or a server value may be the component.
@@ -1220,6 +1215,7 @@ class Generator {
       return false
 
     const name = this.text(attribute.name)
+    const target = this.forms.get(element)
 
     if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !FORM_FIELDS.has(element.name))
       return false
@@ -1228,7 +1224,7 @@ class Generator {
     if (name === FIELD_ATTRIBUTE) {
       const named = element.attributes.find((other): other is NamedAttribute => other.kind !== 'spread' && this.text(other.name) === 'name')
 
-      if (!this.formTarget)
+      if (!target)
         this.error(attribute.name, '`field` names a field of a form posting to an action, so it sits inside one', { help: 'write `name` for a form posting elsewhere' })
       else if (attribute.kind !== 'static')
         this.error(attribute.name, '`field` takes the field\'s name as written text', { note: 'its constraints are read off the action\'s schema by that name', help: 'write `field="title"`, or `name={...}` for a name computed at render' })
@@ -1242,7 +1238,7 @@ class Generator {
       }
     }
 
-    if (!this.options.check || !this.formTarget || attribute.kind !== 'static') {
+    if (!this.options.check || !target || attribute.kind !== 'static') {
       if (name !== FIELD_ATTRIBUTE)
         return false
 
@@ -1251,7 +1247,7 @@ class Generator {
       return true
     }
 
-    b.wrap(attribute.name, () => b.add('name')).add('={KayField((').addSource(this.formTarget).add('), ')
+    b.wrap(attribute.name, () => b.add('name')).add('={KayField((').addSource(target).add('), ')
     b.wrap(attribute.value, () => b.add(JSON.stringify(attribute.text)))
     b.add(')}')
 

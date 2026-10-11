@@ -65,11 +65,8 @@ class Markup {
 
 // A template as code building its markup: what pages, layouts and static components render to outside islands, with no reactive runtime.
 export class HtmlTemplate extends TemplateWriter {
-  // The action the form being emitted posts to, whose refused post its fields show again.
-  private formTarget: Span | undefined
-
-  constructor(b: CodeBuilder, src: string, private readonly options: HtmlOptions = {}) {
-    super(b, src)
+  constructor(b: CodeBuilder, src: string, forms: ReadonlyMap<Node, Span>, private readonly options: HtmlOptions = {}) {
+    super(b, src, forms)
   }
 
   // The nodes' markup as one string expression; an element's content lets a lone dynamic part go without markers.
@@ -196,15 +193,16 @@ export class HtmlTemplate extends TemplateWriter {
   // Outside a form posting to an action, which `kay check` reports, it renders nothing.
   private error(node: ErrorNode): void {
     const { b } = this
+    const target = this.forms.get(node)
 
-    if (!this.formTarget) {
+    if (!target) {
       b.add('""')
 
       return
     }
 
     b.wrap(node, () => {
-      b.add(`${helperName('errorParagraph')}(KayFormError((`).addSource(this.formTarget!).add(`), ${JSON.stringify(node.name)}), ${errorParagraphArguments(node, this.src, this.options.errors?.lines.get(node))})`)
+      b.add(`${helperName('errorParagraph')}(KayFormError((`).addSource(target).add(`), ${JSON.stringify(node.name)}), ${errorParagraphArguments(node, this.src, this.options.errors?.lines.get(node))})`)
     })
   }
 
@@ -365,9 +363,8 @@ export class HtmlTemplate extends TemplateWriter {
     const name = element.name
     const children = element.children.filter(child => child.kind !== 'slot')
     const read = (expression: Span, call: boolean) => () => void b.add('(').addSource(expression).add(call ? ')()' : ')')
-    const target = this.formTarget
-    const plan = this.plan(element, target, this.options.errors)
-    const { field, action, described } = plan
+    const plan = this.plan(element, this.options.errors)
+    const { target, field, action, described } = plan
     // What writes the content or the selected value: a bound one reads its signal.
     let content = plan.content && read(plan.content.expression, plan.content.bound)
     const selected = plan.selected && read(plan.selected.expression, plan.selected.bound)
@@ -556,9 +553,6 @@ export class HtmlTemplate extends TemplateWriter {
     if (VOID_ELEMENTS.has(name))
       return
 
-    const outerTarget = this.formTarget
-
-    this.formTarget = action?.expression ?? outerTarget
     this.honeypot(element, () => markup.dynamic(() => this.honeypotField(element)))
 
     // A refused post's text takes the place of the textarea's static value.
@@ -609,7 +603,6 @@ export class HtmlTemplate extends TemplateWriter {
       })
     }
 
-    this.formTarget = outerTarget
     markup.text(`</${name}>`)
   }
 
@@ -655,16 +648,12 @@ export class HtmlTemplate extends TemplateWriter {
     b.add(']')
 
     if (children.length > 0) {
-      const outerTarget = this.formTarget
-
-      this.formTarget = actionOf(element, this.src)?.expression ?? outerTarget
       b.add(', () => ')
       this.honeypot(element, () => {
         this.honeypotField(element)
         b.add(' + ')
       })
       this.markup(children, true)
-      this.formTarget = outerTarget
     }
 
     b.add(').t')

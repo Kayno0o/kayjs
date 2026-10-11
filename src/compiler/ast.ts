@@ -488,6 +488,20 @@ export function walkNodes<C>(nodes: readonly Node[], context: C, each: (node: No
   }
 }
 
+// The action of the innermost `form(action={...})` each node sits in; a node outside every such form has none.
+export function formTargets(nodes: readonly Node[], source: string): Map<Node, Span> {
+  const targets = new Map<Node, Span>()
+
+  walkNodes<Span | undefined>(nodes, undefined, (node, target) => {
+    if (target)
+      targets.set(node, target)
+
+    return node.kind === 'element' ? actionOf(node, source)?.expression ?? target : target
+  })
+
+  return targets
+}
+
 // Whether `found` holds for a node of the template, nested ones included.
 export function someNode(nodes: readonly Node[], found: (node: Node) => boolean): boolean {
   return nodes.some(node => found(node) || childBlocks(node).some(block => someNode(block, found)))

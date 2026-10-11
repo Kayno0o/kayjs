@@ -72,6 +72,8 @@ export interface ElementPlan {
   content: { expression: Span, property: string, raw: boolean, bound: boolean } | undefined
   selected: { expression: Span, bound: boolean } | undefined
   action: { expression: Span, method: boolean, enctype: boolean } | undefined
+  // The action of the form the element sits in, and the field it is of that form.
+  target: Span | undefined
   field: FormField | undefined
   // The `aria-describedby` a refused field or form takes.
   described: { refused: string, own?: string } | undefined
@@ -79,7 +81,8 @@ export interface ElementPlan {
 
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
 export abstract class TemplateWriter {
-  constructor(protected readonly b: CodeBuilder, protected readonly src: string) {}
+  // `forms`: the action of the form each node sits in, from `formTargets`.
+  constructor(protected readonly b: CodeBuilder, protected readonly src: string, protected readonly forms: ReadonlyMap<Node, Span>) {}
 
   // Children rendered as the template renders them: markup on the server, a block in the browser.
   protected abstract rendered(nodes: Node[]): void
@@ -87,9 +90,9 @@ export abstract class TemplateWriter {
   // An attribute the props leave out.
   protected abstract skips(element: ElementNode, name: string): boolean
 
-  // An element's plan, `target` the action of the form it sits in.
-  protected plan(element: ElementNode, target: Span | undefined, errors: ErrorMessages | undefined): ElementPlan {
+  protected plan(element: ElementNode, errors: ErrorMessages | undefined): ElementPlan {
     const name = element.name
+    const target = this.forms.get(element)
     const classAttribute = this.classAttribute(element)
     const sizes = this.imageSizes(element)
     const field = target && formFieldOf(element, this.src)
@@ -105,6 +108,7 @@ export abstract class TemplateWriter {
       content: undefined,
       selected: undefined,
       action: action && { expression: action.expression, method: !this.named(element, 'method'), enctype: !this.named(element, 'enctype') },
+      target,
       field,
       described,
     }

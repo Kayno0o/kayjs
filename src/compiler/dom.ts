@@ -2,7 +2,7 @@ import type { AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNode, IfNode,
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import type { PlannedAttribute } from './markup'
-import { actionOf, keyedByPosition, marksServerIsland } from './ast'
+import { keyedByPosition, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
 import { describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
@@ -32,15 +32,13 @@ type Binding = (variable: (node: TemplateNode) => string) => void
 export class DomTemplate extends TemplateWriter {
   private readonly templates: string[] = []
   private counter = 0
-  // The action the form being emitted posts to, whose refusal marks its fields invalid.
-  private formTarget: Span | undefined
   // How many blocks of template `const`s the binding being emitted sits in: a node first reached there is declared with `var`, so the bindings after the block reach it too.
   private constBlocks = 0
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
-  constructor(b: CodeBuilder, src: string, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined) {
-    super(b, src)
+  constructor(b: CodeBuilder, src: string, forms: ReadonlyMap<Node, Span>, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined) {
+    super(b, src, forms)
   }
 
   // A block: one element, or a fragment of its items, or `null` when empty.
@@ -142,8 +140,8 @@ export class DomTemplate extends TemplateWriter {
 
         break
       case 'error':
-        if (this.formTarget) {
-          const target = this.formTarget
+        if (this.forms.has(item.node)) {
+          const target = this.forms.get(item.node)!
 
           b.wrap(item.node, () => {
             b.add(`KayInsert(${at}, () => ${helperName('errorParagraph')}(KayFormError((`).addSource(target).add(`), ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, this.errors?.lines.get(item.node))}));`)
@@ -361,8 +359,8 @@ export class DomTemplate extends TemplateWriter {
       own.push(variable => this.spreadBinding(element, variable(node), children.length === 0))
     }
     else {
-      const plan = this.plan(element, this.formTarget, this.errors)
-      const { field, action, described } = plan
+      const plan = this.plan(element, this.errors)
+      const { target, field, action, described } = plan
 
       if (plan.id !== undefined)
         html += ` id="${escapeStaticAttribute(plan.id)}"`
@@ -453,9 +451,7 @@ export class DomTemplate extends TemplateWriter {
           own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), ""${describedValue(described)}));`))
       }
 
-      if (field?.invalid) {
-        const target = this.formTarget!
-
+      if (field?.invalid && target) {
         own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-invalid", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)})));`))
 
         if (described)
@@ -475,12 +471,6 @@ export class DomTemplate extends TemplateWriter {
 
       return html
     }
-
-    const outerTarget = this.formTarget
-
-    this.formTarget = actionOf(element, this.src)?.expression ?? outerTarget
-
-    const target = this.formTarget
 
     if (children.length > 0) {
       const items = childItems(children)
@@ -505,14 +495,14 @@ export class DomTemplate extends TemplateWriter {
           html += this.templateOf(item.node, this.child(node, 'element'), bindings)
         }
         else if (sole) {
-          bindings.push(variable => this.inForm(target, () => this.dynamic(item, variable(node), 'null', 'null')))
+          bindings.push(variable => this.dynamic(item, variable(node), 'null', 'null'))
         }
         else {
           const start = this.child(node, 'start')
           const end = this.child(node, 'end')
 
           html += START_MARKER + END_MARKER
-          bindings.push(variable => this.inForm(target, () => this.dynamic(item, 'null', variable(start), variable(end))))
+          bindings.push(variable => this.dynamic(item, 'null', variable(start), variable(end)))
         }
       }
 
@@ -530,8 +520,6 @@ export class DomTemplate extends TemplateWriter {
       own.push(contentBinding)
     }
 
-    this.formTarget = outerTarget
-
     if (selected) {
       const value = selected
 
@@ -541,15 +529,6 @@ export class DomTemplate extends TemplateWriter {
     bindings.push(...own)
 
     return `${html}</${name}>`
-  }
-
-  // Emits what a binding builds with the form it sits in, which was left by the time bindings are written.
-  private inForm(target: Span | undefined, emit: () => void): void {
-    const outer = this.formTarget
-
-    this.formTarget = target
-    emit()
-    this.formTarget = outer
   }
 
   // A handler, a ref, a binding or a transition: what only the browser attaches.
