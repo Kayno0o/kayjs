@@ -24,6 +24,8 @@ export interface Route {
   guards: GuardFile[]
   // No guard is asked of it on a site with `requireGuards`: it sets `guards: false`, or a library serves it.
   open?: true | undefined
+  // An extension's routes serve it, which renders no editor in edit mode over its own screens.
+  mounted?: true | undefined
 }
 
 // What a layout's actions run: the guards of its own directory and above, none when it sets `guards: false`, and `open` when it does or a library serves it.
@@ -53,6 +55,8 @@ export interface GuardFile {
 export interface SpecialPage {
   file: string
   layouts: string[]
+  // An extension's routes hold it, as `Route`'s.
+  mounted?: true | undefined
 }
 
 // A library's pages laid over the app's routes under `prefix`, `/auth` or `''` for the root, as an extension in `extensions` mounts them.
@@ -186,7 +190,7 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
 
         const layouts = layoutsOf(trees, at, file, read)
 
-        own.push({ ...route, layouts, layoutAccess: layouts.map(accessOf), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || tree !== trees[0]) && { open: true } })
+        own.push({ ...route, layouts, layoutAccess: layouts.map(accessOf), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || tree !== trees[0]) && { open: true }, ...tree !== trees[0] && { mounted: true } })
       }
     }
 
@@ -481,7 +485,7 @@ export function specialPagesOf(trees: RouteMount[], at: string, read: LayoutsRea
   const nearest = (name: string): SpecialPage | undefined => {
     const file = directoriesUp(at).map(dir => fileAt(trees, dir, name)).find(path => path !== undefined)
 
-    return file !== undefined ? { file, layouts: layoutsOf(trees, virtualDir(trees, dirname(file)), file, read) } : undefined
+    return file !== undefined ? { file, layouts: layoutsOf(trees, virtualDir(trees, dirname(file)), file, read), ...!file.startsWith(trees[0]!.dir + sep) && { mounted: true } } : undefined
   }
 
   return { notFound: nearest(NOT_FOUND), error: nearest(ERROR) }

@@ -162,7 +162,7 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
 
   try {
     const started = performance.now()
-    const body = traced(`kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options))
+    const body = traced(`kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, withEditor(route, options)))
 
     timed(page, rendering, started)
 
@@ -550,7 +550,7 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
     try {
       const modules = await importAll(files, options)
 
-      return renderDocument(files, modules, await runLoads(files, modules, rendering.ctx, loaded), client, rendering, options)
+      return renderDocument(files, modules, await runLoads(files, modules, rendering.ctx, loaded), client, rendering, withEditor(page, options))
     }
     catch (error) {
       reportServerError(error, rendering.ctx.request, options.onError)
@@ -576,6 +576,11 @@ async function importAll(files: string[], options: RenderOptions): Promise<PageM
 }
 
 // The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
+// An extension's own pages, its admin screens say, render no editor over them.
+function withEditor(page: { mounted?: true | undefined }, options: RenderOptions): RenderOptions {
+  return page.mounted === true && options.editor !== undefined ? { ...options, editor: undefined } : options
+}
+
 function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
   const rules = queryRules(pageSetting(modules.at(-1)!, 'query'))
 

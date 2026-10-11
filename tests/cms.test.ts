@@ -32,7 +32,8 @@ import { scratchDir } from './scratch'
 
 const FIXTURE = 'tests/fixtures/cms'
 const SECRET = 'a-preview-secret-long-enough-for-kay-0123456789'
-const EDITOR = { name: 'editor', editor: `${FIXTURE}/src/components/draft-editor.kay` }
+// A CMS's extension: its editor, and its admin screens under `/admin`.
+const EDITOR = { name: 'editor', editor: `${FIXTURE}/src/components/draft-editor.kay`, routes: { dir: `${FIXTURE}/admin`, prefix: '/admin' } }
 const options = { routes: `${FIXTURE}/src/routes`, content: `${FIXTURE}/src/content.config.ts`, api: `${FIXTURE}/src/api`, site: 'https://news.example', security: false as const, preview: { secret: SECRET }, extensions: [EDITOR] }
 const app = await pages({ ...options, prebuilt: false })
 const COOKIE = /^kay_preview=([^;]+);/
@@ -676,6 +677,11 @@ describe('preview mode', () => {
     expect(await edited('/news')).toBe('<li>news:launch</li><li>news:roadmap</li>')
     expect(await edited('/articles/hello')).toBe('<li>articles:hello@fr</li>')
     expect((await get('/marks/launch', preview)).html).not.toContain('draft-editor')
+    // The extension's own screens, its error page included, render none.
+    expect((await get('/admin', edit)).html).toContain('<h1>Admin</h1>')
+    expect((await get('/admin', edit)).html).not.toContain('draft-editor')
+    expect((await get('/admin/broken', edit)).html).toContain('Screen failed')
+    expect((await get('/admin/broken', edit)).html).not.toContain('draft-editor')
     // Its stylesheet comes with it, after the page's.
     const sheets = (html: string) => [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(link => link[1]!)
     const linked = sheets((await get('/marks/launch', edit)).html)
