@@ -52,7 +52,7 @@ export async function contentChecks(root: string, options: CheckOptions): Promis
 
 // What the shadow tree's write and the config tell, reported ahead of the type errors.
 export function configProblems(root: string, options: CheckOptions, types: ShadowTypes): CheckDiagnostic[] {
-  const seo = configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source))
+  const seo = configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source), options.exported === true)
 
   return [...types.problems, ...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code))]
 }

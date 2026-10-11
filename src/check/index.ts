@@ -64,6 +64,8 @@ export interface CheckOptions {
   requireGuards?: boolean | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
   launch?: boolean | undefined
+  // Whether `kay build --static` checks it, for a host that reads no `SITE_URL` once built.
+  exported?: boolean | undefined
 }
 
 export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity' | 'fixes'> {

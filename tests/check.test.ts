@@ -1445,7 +1445,7 @@ describe('kay check, unused code', () => {
     }
   })
 
-  it('reports what a public site leaves out of kay.config.ts, and nothing on a site that is not public; what it lacks to go public only when asked, as kay build does', async () => {
+  it('reports what a public site leaves out of kay.config.ts, and nothing on a site that is not public; what it lacks to go public only when asked, as kay build does, and a missing site only for a static export, as a server reads SITE_URL when it boots', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'p a\n' })
     const seoLints = async (options: CheckOptions) => (await check(root, options)).map(d => [basename(d.file), d.code, d.severity])
 
@@ -1454,11 +1454,11 @@ describe('kay check, unused code', () => {
       // A scaffold has no domain, share image or favicon yet, which fails no check of its code.
       expect(await seoLints({ seo: { name: 'Example' } })).toEqual([['kay.config.ts', 'missing-description', 'warning']])
       expect(await seoLints({ seo: { name: 'Example' }, launch: true })).toEqual([
-        ['kay.config.ts', 'missing-site', 'warning'],
         ['kay.config.ts', 'missing-description', 'warning'],
         ['kay.config.ts', 'missing-share-image', 'warning'],
         ['kay.config.ts', 'default-favicon', 'warning'],
       ])
+      expect(await seoLints({ seo: { name: 'Example', description: 'What it is', image: '/og.png' }, favicon: false, launch: true, exported: true })).toEqual([['kay.config.ts', 'missing-site', 'warning']])
       expect(await seoLints({ site: 'https://example.com', seo: { description: 'What it is', image: '/og.png' }, favicon: false })).toEqual([])
       // A group's level reaches its lints, a lint's own wins, and a site that is not public gets the ones `lints` sets.
       expect(await seoLints({ site: 'https://example.com', favicon: false, lints: { 'seo': 'deny', 'missing-share-image': 'allow' }, launch: true })).toEqual([['kay.config.ts', 'missing-description', 'error']])
@@ -1489,7 +1489,7 @@ describe('kay check, unused code', () => {
     try {
       const seo = await runCheck(root, '--only', 'seo')
 
-      expect(seo.output.match(/^\w+\[[\w-]+\]/gm)).toEqual(['warning[missing-site]', 'warning[missing-description]', 'warning[missing-share-image]'])
+      expect(seo.output.match(/^\w+\[[\w-]+\]/gm)).toEqual(['warning[missing-description]', 'warning[missing-share-image]'])
       expect(seo.code).toBe(0)
       // A plain check leaves out what the site lacks to go public.
       const plain = (await runCheck(root)).output
@@ -1498,12 +1498,18 @@ describe('kay check, unused code', () => {
       expect(plain).not.toContain('missing-site')
       expect(plain).not.toContain('missing-share-image')
 
-      // kay build, the site about to go public, reports them.
-      const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root], { stdout: 'pipe', stderr: 'pipe' })
-      const [built] = await Promise.all([new Response(build.stderr).text(), build.exited])
+      // kay build, the site about to go public, reports them, but a missing site only for a static export: a server reads SITE_URL when it boots.
+      const build = async (...args: string[]) => {
+        const built = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, SITE_URL: '' } })
+        const [output] = await Promise.all([new Response(built.stderr).text(), built.exited])
 
-      expect(built).toContain('warning[missing-site]')
-      expect(built).toContain('warning[missing-share-image]')
+        return output
+      }
+      const served = await build()
+
+      expect(served).toContain('warning[missing-share-image]')
+      expect(served).not.toContain('missing-site')
+      expect(await build('--static')).toContain('warning[missing-site]')
       expect((await runCheck(root, '--only', 'a11y')).output.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[missing-alt]'])
       expect(await runCheck(root, '--only', 'nope')).toEqual({ code: 1, output: 'kay check: --only takes a group of lints, `code`, `a11y`, `forms`, `islands`, `seo`, `security`, not `nope`\n', report: '' })
     }

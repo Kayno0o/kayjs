@@ -273,6 +273,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   registerEditSite(editSite)
   app.onStop(() => clearEditSite(editSite))
 
+  // `kay build` leaves a server's site to `SITE_URL` at boot, so this is where one with none is told.
+  if (site === undefined && options.seo !== undefined && !mode.dev)
+    kayLog('warn', '`seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt')
+
   if (site !== undefined)
     serveSitemap(app, served, routes, site, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
 

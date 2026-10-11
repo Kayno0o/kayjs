@@ -1082,6 +1082,26 @@ describe('revalidation', () => {
     }
   }, UNTIL_TEST_MS)
 
+  it('warns once at boot of a server with seo set and no site, which kay build leaves to SITE_URL', async () => {
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const missing = 'kay: `seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt'
+
+    try {
+      await pages({ routes, prebuilt: true, security: false, seo: { name: 'Example' } })
+
+      expect(warned.mock.calls.filter(([message]) => message === missing)).toHaveLength(1)
+
+      warned.mockClear()
+      await pages({ routes, prebuilt: true, security: false, seo: { name: 'Example' }, site: 'https://example.com' })
+      await pages({ routes, prebuilt: true, security: false })
+
+      expect(warned.mock.calls.filter(([message]) => message === missing)).toEqual([])
+    }
+    finally {
+      warned.mockRestore()
+    }
+  })
+
   it('builds a page reading the site with none set, and renders it again for the site the server runs for', async () => {
     const root = process.cwd()
     const manifest = (await readManifest(root))!

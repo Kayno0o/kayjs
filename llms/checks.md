@@ -61,7 +61,7 @@ What the markup alone cannot tell, such as text too faint on its background, con
 | `literal-tag` | warn | code | Template text holding an HTML tag, `p Press <kbd>Ctrl</kbd>`: text is escaped, so readers see the tag as written. Text inside `code`, `pre`, `kbd` and `samp`, an entity such as `&lt;kbd&gt;` and a name that is no element, as in `Array<string>`, are left alone. The quick fix writes a pair around plain text, or a void element, as `#[kbd Ctrl]`. |
 | `uncaught-await` | warn | code | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
 | `unguarded-route` | deny | security | With `requireGuards`, a page, a layout with actions, an endpoint or an API module of the app no guard covers and not setting `guards: false`, which the server refuses. |
-| `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts or `SITE_URL`: no canonical links, `og:url`, sitemap or robots.txt. |
+| `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts or `SITE_URL`, on a `kay build --static` export: no canonical links, `og:url`, sitemap or robots.txt. A server warns at boot instead. |
 | `missing-description` | warn | seo | A public site with no `seo.description`. |
 | `missing-share-image` | warn | seo | A public site with no `seo.image`, and no `.kay` file of the project setting an `og:image`. |
 | `default-favicon` | warn | seo | A public site with no `favicon`, showing kay's mark. |
@@ -76,7 +76,7 @@ What the markup alone cannot tell, such as text too faint on its background, con
 
 The `seo` group reads what search engines and social networks see of a public site: one with `site` or `seo` set, or exported with `kay build --static`. On any other site they are allowed unless `lints` sets them or `seo`. No `// kay-allow` comment reaches them, as no template reports them.
 
-- `kay check` reads kay.config.ts: `missing-site`, `missing-description`, `missing-share-image`, `default-favicon`. They point at kay.config.ts. `missing-site`, `missing-share-image` and `default-favicon` name what a site lacks until it goes public, as a fresh project from `kay new` does, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`, whose `--deny-warnings` they would fail.
+- `kay check` reads kay.config.ts: `missing-site`, `missing-description`, `missing-share-image`, `default-favicon`. They point at kay.config.ts. `missing-share-image` and `default-favicon` name what a site lacks until it goes public, as a fresh project from `kay new` does, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`, whose `--deny-warnings` they would fail. `missing-site` is reported by `kay build --static` alone: a server may read `SITE_URL` when it boots, and one with `seo` set and no site warns then.
 - `kay build` reads the head of every page it prerenders once the check passed: `untitled-page`, `undescribed-page`, `duplicate-title`, `long-description`, `unsized-share-image`, `noindex-in-sitemap`. They point at the page's module and name the path; a page rendered per request is not read. One at `deny` fails the build and leaves the last one in place, as a failing check does; `--no-check` reads none.
 
 ## Linting

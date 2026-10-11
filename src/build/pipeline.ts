@@ -89,7 +89,7 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
     await rm(previous, { recursive: true, force: true })
 
   const started = performance.now()
-  const [checked, bundled] = await Promise.allSettled([checkWith ? checkStage(project, checkWith) : [], bundleStage(project, exported, options.analyze === true)])
+  const [checked, bundled] = await Promise.allSettled([checkWith ? checkStage(project, checkWith, exported) : [], bundleStage(project, exported, options.analyze === true)])
 
   if (checked.status === 'rejected') {
     await putBack(output, previous)
@@ -188,8 +188,8 @@ function failing(diagnostics: CheckDiagnostic[]): boolean {
   return diagnostics.some(diagnostic => diagnostic.severity !== 'warning')
 }
 
-async function checkStage(project: Project, { tsconfig = 'tsconfig.json', entry }: { tsconfig?: string | undefined, entry?: string | undefined }): Promise<CheckDiagnostic[]> {
-  return check(project.root, { ...configCheckOptions(project.config), tsconfig, entry: entry === undefined ? undefined : relative(project.root, resolve(project.root, entry)), launch: true })
+async function checkStage(project: Project, { tsconfig = 'tsconfig.json', entry }: { tsconfig?: string | undefined, entry?: string | undefined }, exported: boolean): Promise<CheckDiagnostic[]> {
+  return check(project.root, { ...configCheckOptions(project.config), tsconfig, entry: entry === undefined ? undefined : relative(project.root, resolve(project.root, entry)), launch: true, exported })
 }
 
 // An output set aside earlier is the last good build of a run that was interrupted, and what is in its place now is that run's partial one.

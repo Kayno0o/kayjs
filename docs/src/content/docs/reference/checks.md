@@ -60,7 +60,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `uncaught-await` | warn | code | An `await` block with no `catch` |
 | `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
-| `missing-site` | warn | seo | `seo` with no `site` |
+| `missing-site` | warn | seo | `seo` with no `site`, on a static export |
 | `missing-description` | warn | seo | No `seo.description` |
 | `missing-share-image` | warn | seo | No share image on any page |
 | `default-favicon` | warn | seo | kay's mark as the favicon |
@@ -101,7 +101,7 @@ export default defineConfig({
 })
 ```
 
-The `seo` lints warn on a site with `site` or `seo` set, or exported with `--static`, and stay quiet on any other unless `lints` turns them on. The ones about pages are found by `kay build`, in the pages it prerenders. `missing-site`, `missing-share-image` and `default-favicon` name what a site lacks until it goes public, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`.
+The `seo` lints warn on a site with `site` or `seo` set, or exported with `--static`, and stay quiet on any other unless `lints` turns them on. The ones about pages are found by `kay build`, in the pages it prerenders. `missing-share-image` and `default-favicon` name what a site lacks until it goes public, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`. `missing-site` is reported by `kay build --static` alone: a server may read `SITE_URL` when it boots, and one with `seo` set and no site warns then.
 
 For one place, with a comment on the line, or alone on the line before:
 
