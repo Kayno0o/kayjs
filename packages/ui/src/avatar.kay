@@ -1,0 +1,31 @@
+---
+import type { JSX } from 'kay'
+import { isDark, stringToHexColor } from '@kaynooo/utils/colors'
+import { effect, signal } from 'kay'
+
+const { src, name, size = 'md', label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
+  src?: string | null | undefined
+  // Seeds the fallback's colour and gives its initial.
+  name: string
+  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
+  // Names the picture for screen readers; without it the avatar is decorative, the name being written beside it.
+  label?: string | undefined
+  class?: string | undefined
+}>()
+
+const failed = signal(false)
+
+// A new src is a new load: a failure recorded for the one before it no longer applies.
+effect(() => {
+  void src
+  failed.set(false)
+})
+
+const ground = () => stringToHexColor(name)
+---
+// The picture, or the name's initial on a colour seeded by the name when there is none or it fails to load.
+span.kui-avatar({...rest} data-size={size} role={label ? 'img' : undefined} aria-label={label} class={className})
+  if src && !failed()
+    img.kui-avatar-image(src={src} alt="" onError={() => failed.set(true)})
+  else
+    span.kui-avatar-initial(aria-hidden="true" style={`background-color: ${ground()}; color: ${isDark(ground()) ? '#fff' : '#000'}`}) {[...name.trim()][0]}

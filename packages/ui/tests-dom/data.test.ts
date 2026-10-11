@@ -42,6 +42,24 @@ describe('SiteFavicon', () => {
   })
 })
 
+describe('Avatar', () => {
+  test('falls back to the initial on a seeded colour once the picture fails, and tries a new picture again', async () => {
+    const root = await data()
+
+    root.querySelector('#avatar img')!.dispatchEvent(new Event('error'))
+    await settle()
+
+    expect(root.querySelector('#avatar img')).toBeNull()
+    expect(root.querySelector('#avatar .kui-avatar-initial')?.textContent).toBe('A')
+    expect(root.querySelector<HTMLElement>('#avatar .kui-avatar-initial')?.style.backgroundColor).not.toBe('')
+
+    click(root.querySelector('#swap'))
+    await settle()
+
+    expect(root.querySelector('#avatar img')?.getAttribute('src')).toBe('/grace.png')
+  })
+})
+
 describe('CopyButton', () => {
   const { clipboard } = navigator
   const { ClipboardItem } = globalThis
