@@ -1,6 +1,6 @@
 # kayjs-cms
 
-> A CMS for kay sites: content edited on the page it renders, and collection screens. Work in progress: what it needs from kay is kaynooo/kayjs#262, stubbed in `src/kay/` until kay ships it.
+> A CMS for kay sites: content edited on the page it renders, and collection screens. Work in progress: what it needs from kay is kaynooo/kayjs#262, its schema and write API stubbed in `src/kay/` until kay ships it.
 
 ## Rules that are easy to get wrong
 
