@@ -130,7 +130,8 @@ function kayPackage(): { specifier: string, source: string } | undefined {
 
   if (KAY_PACKAGE === 'checkout') {
     const commit = run(['git', 'rev-parse', '--short', 'HEAD'], CHECKOUT).trim()
-    const changed = run(['git', 'status', '--porcelain', '--untracked-files=no'], CHECKOUT).trim() !== ''
+    // Untracked files included, which the pack takes when its `files` cover them.
+    const changed = run(['git', 'status', '--porcelain'], CHECKOUT).trim() !== ''
 
     run([process.execPath, 'pm', 'pack', '--filename', join(WORK, 'kay-checkout.tgz'), '--quiet'], CHECKOUT)
 
@@ -143,7 +144,7 @@ function kayPackage(): { specifier: string, source: string } | undefined {
 // Exports each site at its Astro commit and at its kay ref and installs them, once for the production builds, which build.ts then builds as they deploy, and once for the dev servers.
 export async function prepare() {
   mkdirSync(WORK, { recursive: true })
-  const kay = PHASE === 'prod' ? undefined : kayPackage()
+  const kay = PHASE === 'prod' || KIND === 'astro' ? undefined : kayPackage()
 
   for (const variant of VARIANTS) {
     if (variant.kind === 'astro')

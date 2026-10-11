@@ -2,7 +2,7 @@ import type { Subprocess } from 'bun'
 import type { Variant } from './sites'
 import { readFileSync } from 'node:fs'
 import { median } from '../format'
-import { memory, startServer, waitReady } from './serve'
+import { CLOCK_TICKS, cpuTicks, memory, startServer, waitReady } from './serve'
 
 export interface ColdStart {
   ms: number
@@ -23,8 +23,6 @@ const COLD_STARTS = 7
 const CONCURRENCY = 32
 const WARMUP_MS = 1000
 const LOAD_MS = 5000
-// What /proc counts CPU time in, per second.
-const CLOCK_TICKS = 100
 const WHITESPACE = /\s+/
 
 // From spawning the server to its first 200 on the home page, and its memory then: median of `COLD_STARTS`.
@@ -43,11 +41,7 @@ export async function coldStart(variant: Variant): Promise<ColdStart> {
 }
 
 function cpuSeconds(pid: number): number {
-  const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
-  // The fields after the command name, which is in parentheses and may hold spaces.
-  const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
-
-  return (Number(fields[11]) + Number(fields[12])) / CLOCK_TICKS
+  return cpuTicks(readFileSync(`/proc/${pid}/stat`, 'utf8')) / CLOCK_TICKS
 }
 
 function nginxCpuSeconds(nginx: Subprocess): number {

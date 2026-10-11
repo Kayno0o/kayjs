@@ -29,6 +29,7 @@ interface Result {
 
 const STYLESHEET = /<link rel="stylesheet" href="([^"]+)"/g
 const MB = 1024 * 1024
+const BROWSER_CLOSE_MS = 5000
 
 const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
 const megabytes = (bytes: number) => `${(bytes / MB).toFixed(0)} MB`
@@ -45,13 +46,18 @@ if (VARIANTS.length === 0)
   throw new Error(SITES.length === 0 ? NO_SITES : 'PHASE=dev: no site in the config names what its dev phase edits, `dev`')
 
 let browser: Browser | undefined
+let stopping = false
 
-// An interrupted run stops what it started, so no server it leaves holds a port the next run would be timed against.
+// An interrupted run stops what it started, so no server it leaves holds a port the next run would be timed against; a second signal meanwhile changes nothing, and a browser slow to close is left behind.
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   process.on(signal, () => {
+    if (stopping)
+      return
+
+    stopping = true
     void (async () => {
       await stopEverything(VARIANTS.map(variant => variant.devDir))
-      await browser?.close()
+      await Promise.race([browser?.close(), Bun.sleep(BROWSER_CLOSE_MS)])
       process.exit(128 + constants.signals[signal])
     })()
   })

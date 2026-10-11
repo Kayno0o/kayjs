@@ -1,6 +1,6 @@
 import type { Subprocess } from 'bun'
 import type { Variant } from './sites'
-import { existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { run, VARIANTS, WORK } from './sites'
 
@@ -12,8 +12,12 @@ const PSS = /^Pss:\s+(\d+)/m
 // A process's parent, after the name in parentheses, which may hold spaces and parentheses of its own.
 const STAT_PARENT = /^\) \S (\d+)/
 const DIGITS = /^\d+$/
+
 // What /proc counts CPU time in, per second.
-const CLOCK_TICKS = 100
+export const CLOCK_TICKS = Number(Bun.spawnSync(['getconf', 'CLK_TCK'], { stdout: 'pipe' }).stdout.toString().trim()) || 100
+// How long a killed process may take to be gone.
+const GONE_TIMEOUT_MS = 5000
+const STAT_STATE = /^\) (\S)/
 // Where nginx keeps its dynamic modules: Arch's and Debian's path unless `NGINX_MODULES` says otherwise.
 const MODULES = process.env.NGINX_MODULES ?? '/usr/lib/nginx/modules'
 const NOT_WORD = /\W/g
@@ -40,16 +44,47 @@ export function tracked<Process extends Subprocess>(process: Process): Process {
 export async function stopEverything(dirs: string[]): Promise<void> {
   const pids = [...running].flatMap(process => processTree(process.pid))
 
-  killAll([...pids, ...dirs.flatMap(processesIn)])
+  await killAll([...pids, ...dirs.flatMap(processesIn)])
   await Promise.all([...running].map(async process => process.exited))
 }
 
-export function killAll(pids: number[]) {
-  for (const pid of new Set(pids)) {
+// Kills the processes, then waits for each to be gone, so none still holds a port or eats CPU as the next measure starts.
+export async function killAll(pids: number[]): Promise<void> {
+  const killed = [...new Set(pids)]
+
+  for (const pid of killed) {
     try {
       process.kill(pid, 'SIGKILL')
     }
     catch {}
+  }
+
+  await untilGone(killed)
+}
+
+// Waits for every process to be gone, an exited one waiting to be reaped included.
+export async function untilGone(pids: number[]): Promise<void> {
+  const started = performance.now()
+  let alive = pids
+
+  while (alive.length > 0) {
+    if (performance.now() - started > GONE_TIMEOUT_MS)
+      throw new Error(`processes ${alive.join(', ')} still run ${GONE_TIMEOUT_MS / 1000} s after being killed`)
+
+    await Bun.sleep(5)
+    alive = alive.filter(isRunning)
+  }
+}
+
+// Whether the process still runs: an exited one its parent has yet to reap does not.
+export function isRunning(pid: number): boolean {
+  try {
+    const stat = statLine(pid)
+
+    return STAT_STATE.exec(stat.slice(stat.lastIndexOf(')')))?.[1] !== 'Z'
+  }
+  catch {
+    return false
   }
 }
 
@@ -70,6 +105,8 @@ export async function ensureFree(port: number, what: string): Promise<void> {
 // A variant's server as production runs it: Astro's standalone entry under Bun (its image aliases node to bun), kay's compiled executable.
 export async function startServer(variant: Variant): Promise<Subprocess> {
   await ensureFree(variant.ports.backend, variant.dir)
+  // Written over from its start, the log would keep the end of a longer one before it.
+  rmSync(serverLog(variant), { force: true })
 
   return tracked(Bun.spawn(variant.kind === 'astro' ? [process.execPath, 'dist/server/entry.mjs'] : ['./server'], {
     cwd: variant.dir,
@@ -111,26 +148,35 @@ export function memory(pid: number): { rss: number, peak: number } {
   return { rss: read(VM_RSS), peak: read(VM_HWM) }
 }
 
-// A process and every process it started, still running.
-export function processTree(pid: number): number[] {
-  const children = new Map<number, number[]>()
+function statLine(pid: number): string {
+  return readFileSync(`/proc/${pid}/stat`, 'utf8')
+}
+
+// The `/proc/<pid>/stat` line of every process, read in one pass.
+export function processStats(): Map<number, string> {
+  const stats = new Map<number, string>()
 
   for (const name of readdirSync('/proc')) {
     if (!DIGITS.test(name))
       continue
 
-    let stat: string
-
     try {
-      stat = readFileSync(`/proc/${name}/stat`, 'utf8')
+      stats.set(Number(name), statLine(Number(name)))
     }
-    catch {
-      continue
-    }
+    catch {}
+  }
 
+  return stats
+}
+
+// A process and every process it started, still running.
+export function processTree(pid: number, stats = processStats()): number[] {
+  const children = new Map<number, number[]>()
+
+  for (const [member, stat] of stats) {
     const parent = parentOf(stat)
 
-    children.set(parent, [...children.get(parent) ?? [], Number(name)])
+    children.set(parent, [...children.get(parent) ?? [], member])
   }
 
   const tree = [pid]
@@ -160,20 +206,13 @@ export function processesIn(dir: string): number[] {
   })
 }
 
-// The CPU time a process tree spent, in ms: each process's own and that of the children it reaped, so a server a restart stopped still counts.
-export function treeCpu(pid: number): number {
-  let ticks = 0
+// The CPU time a process tree spent, in ms: each process's own and that of the children it reaped, so a server a restart stopped still counts, and of what runs in `dir` having left the tree. One read of every process, so a process exiting meanwhile is counted once, in its own time or its parent's.
+// A process that left the tree and exited takes its time with it, so the difference of two readings is clamped at 0.
+export function treeCpu(pid: number, dir?: string): number {
+  const stats = processStats()
+  const members = new Set([...processTree(pid, stats), ...dir === undefined ? [] : processesIn(dir)])
 
-  for (const member of processTree(pid)) {
-    try {
-      const stat = readFileSync(`/proc/${member}/stat`, 'utf8')
-
-      ticks += cpuTicks(stat)
-    }
-    catch {}
-  }
-
-  return ticks * 1000 / CLOCK_TICKS
+  return [...members].reduce((sum, member) => sum + (stats.has(member) ? cpuTicks(stats.get(member)!) : 0), 0) * 1000 / CLOCK_TICKS
 }
 
 // User and system time of a process and of its reaped children, from its `/proc/<pid>/stat` line.
