@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import MailComposer from 'nodemailer/lib/mail-composer'
-import { authSender, rendersAuthMails } from './auth'
+import { authMailerOptions, authSender } from './auth'
 import { AUTH_SAMPLES } from './auth-samples'
 import { escapeHtml as escape } from './escape'
 import { outbox } from './outbox'
@@ -195,7 +195,7 @@ function mailPage(mail: SentMail, phone: boolean, relay: Relay, outcome?: Outcom
 async function mailFiles(): Promise<string[]> {
   const own = (await Array.fromAsync(KAY_FILE.scan({ cwd: join(process.cwd(), MAILS_DIR), onlyFiles: true }))).toSorted()
 
-  return rendersAuthMails() ? [...own, ...Object.keys(AUTH_SAMPLES)] : own
+  return authMailerOptions() ? [...own, ...Object.keys(AUTH_SAMPLES)] : own
 }
 
 const previewOf = (file: string): string => file.replace(KAY_EXTENSION, '.preview.ts')
@@ -206,7 +206,7 @@ async function sample(file: string, render: (message: Message) => Promise<Mail>)
 
   // In the site's default language, which the English sample may not be one of.
   if (auth !== undefined)
-    return { mail: await authSender(async message => render({ ...message, lang: undefined } as Message)).send(auth), sampled: true }
+    return { mail: await authSender(async message => render({ ...message, lang: undefined } as Message), authMailerOptions()).send(auth), sampled: true }
 
   const props = join(process.cwd(), MAILS_DIR, previewOf(file))
   const view = (await import(join(process.cwd(), MAILS_DIR, file))).default

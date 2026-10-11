@@ -46,16 +46,16 @@ export interface AuthMailerOptions {
 // A mailer's `send`, `enqueue` or `render`.
 type Send<R> = <P extends object>(message: Message<P>) => R | Promise<R>
 
-// Set once an app hands kayjs-auth a mailer of this, so the samples page lists the views it renders.
-let rendersAuth = false
+// Set once an app hands kayjs-auth a mailer of this, so the samples page lists the views it renders, with the app's own.
+let authOptions: AuthMailerOptions | undefined
 
-export function rendersAuthMails(): boolean {
-  return rendersAuth
+export function authMailerOptions(): AuthMailerOptions | undefined {
+  return authOptions
 }
 
 // kayjs-auth's `email.mailer`, rendering each mail through the shipped components, themed by the app's mail settings and in the mail's language, and handing it to `send`, a mailer's `send` or `enqueue`.
 export function authMailer<R>(send: Send<R>, options: AuthMailerOptions = {}): { send: (mail: AuthMail) => Promise<R> } {
-  rendersAuth = true
+  authOptions = options
 
   return authSender(send, options)
 }

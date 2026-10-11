@@ -13,16 +13,16 @@ export function ghostTable(width: number): [open: JSX.Element, close: JSX.Elemen
   ]
 }
 
-// Fonts every Windows since 7 has, which Outlook for Windows can show.
+// Fonts every Windows since 7 ships.
 const WINDOWS_FONTS = new Set(['arial', 'segoe ui', 'calibri', 'cambria', 'candara', 'consolas', 'constantia', 'corbel', 'courier new', 'georgia', 'lucida console', 'lucida sans unicode', 'palatino linotype', 'tahoma', 'times new roman', 'trebuchet ms', 'verdana'])
 const GENERIC = { 'sans-serif': 'Arial', 'serif': 'Georgia', 'monospace': '\'Courier New\'' } as Record<string, string>
 const QUOTES = /^['"]|['"]$/g
 
-// The fonts of a stack Windows has, and its generic family: Outlook for Windows tries the first font alone, and shows Times New Roman when it lacks it, as it lacks `system-ui` or a web font.
+// The fonts of a stack Windows has, and its generic family: Outlook for Windows is known to try the first font alone and fall back to Times New Roman when it lacks it, as with `system-ui` or a web font.
 export function windowsStack(stack: string): string {
   const families = stack.split(',').map(family => family.trim())
   const kept = families.filter(family => WINDOWS_FONTS.has(family.replace(QUOTES, '').toLowerCase()))
-  const generic = families.map(family => family.toLowerCase()).find(family => family in GENERIC) ?? 'sans-serif'
+  const generic = families.map(family => family.toLowerCase()).find(family => Object.hasOwn(GENERIC, family)) ?? 'sans-serif'
 
   return [...kept.length > 0 ? kept : [GENERIC[generic]!], generic].join(', ')
 }

@@ -271,20 +271,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
       return delivery
     }
 
-    let delivery: Delivery
+    const delivery = await transport.send(mail)
+    // A transport naming no recipient either way took them all.
+    const accepted = delivery.accepted.length > 0 || delivery.rejected.length > 0 ? delivery.accepted : [recipientsOf(mail)]
 
-    try {
-      delivery = await transport.send(mail)
-    }
-    catch (error) {
-      console.error(`kayjs-mail: ${quoted(mail.subject)} to ${recipientsOf(mail)} was not sent: ${reason(error)}`)
-
-      throw error
-    }
-
-    const accepted = delivery.accepted.length > 0 ? delivery.accepted.join(', ') : recipientsOf(mail)
-
-    console.info(`kayjs-mail: ${quoted(mail.subject)} sent to ${accepted}${delivery.response ? `: ${delivery.response}` : ''}`)
+    if (accepted.length > 0)
+      console.info(`kayjs-mail: ${quoted(mail.subject)} sent to ${accepted.join(', ')}${delivery.response ? `: ${delivery.response}` : ''}`)
 
     // Logged rather than thrown: a retry would send the mail again to those who already have it.
     if (delivery.rejected.length > 0)
@@ -310,7 +302,17 @@ export function mailer(options: MailerOptions = {}): Mailer {
     send: async <P extends object>(message: Message<P>) => {
       ready(message)
 
-      return deliver(await render(message))
+      const mail = await render(message)
+
+      // Here rather than in `deliver`, which the queue runs too: a queued mail's failures are logged by the queue as it retries, and once given up.
+      try {
+        return await deliver(mail)
+      }
+      catch (error) {
+        console.error(`kayjs-mail: ${quoted(mail.subject)} to ${recipientsOf(mail)} was not sent: ${reason(error)}`)
+
+        throw error
+      }
     },
     enqueue: async <P extends object>(message: Message<P>, enqueueOptions?: EnqueueOptions) => {
       ready(message)

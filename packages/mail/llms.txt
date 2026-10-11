@@ -77,7 +77,7 @@ Layout(preheader="Your account is ready")
 ```
 
 - `Layout` fills the window with the background colour and centres a card; `preheader` is the line clients show beside the subject, hidden in the mail itself; `@footer` sits under the card.
-- They hold in Outlook for Windows, which renders mails with Word: the card keeps its width through a table only Outlook reads, and the button stays padded and clickable as a whole. The document carries the head Outlook needs to keep its scale. Outlook tries a stack's first font alone and shows Times New Roman when Windows lacks it, as it lacks `system-ui` or a web font, so `Layout` gives it the settings' `font` and `mono` cut down to the fonts Windows has; a stack left with none gets Arial, Georgia or Courier New, by its generic family.
+- They hold in Outlook for Windows, which renders mails with Word: the card keeps its width through a table only Outlook reads, and the button stays padded and clickable as a whole. The document carries the head Outlook needs to keep its scale. Outlook is known to try a stack's first font alone and show Times New Roman when Windows lacks it, as with `system-ui` or a web font, so `Layout` gives it the settings' `font` and `mono` cut down to the fonts Windows has; a stack left with none gets Arial, Georgia or Courier New, by its generic family.
 - `Heading` (`level` 1, 2 or 3, 1 by default), `Paragraph` (`muted` for the small print), `Button(href)` and `Link(href)` take their text as children; `Link` sits inside a paragraph: `Paragraph Read #[Link(href={url}) the guide].`
 - `Code` shows a one-time or verification code, large, spaced and in `mono`, selected whole by one click where the client allows it: `Code {code}`.
 - `Divider` is a line across the card.
@@ -217,6 +217,6 @@ export const auth = createAuth({
 - The mail's `locale` becomes its `lang`, its `<html lang>` and the locale its view renders `t()` in, so kayjs-auth's `email.locales` must be among the site's.
 - `authMailer(send, { views: { 'reset-password': ResetPassword } })` renders a kind through the app's own `.kay` view, given `{ mail }`: `mail.subject`, `mail.url`, `mail.code` and kayjs-auth's wording in `mail.parts` (the `AuthMail` type).
 - kayjs-auth gives its wording in parts from 0.10; an older one, and a kind its `templates` option replaces, give none, so their html is sent as it is.
-- Once an app uses it, `/_kay/mail/samples` lists the views with a sample of each: `kayjs-auth/verify-email`, `kayjs-auth/magic-link`, `kayjs-auth/invitation` and `kayjs-auth/new-sign-in`, rendered in the site's default language.
+- Once an app uses it, `/_kay/mail/samples` lists the views with a sample of each, through the app's own `views` where it gives them: `kayjs-auth/verify-email`, `kayjs-auth/magic-link`, `kayjs-auth/invitation` and `kayjs-auth/new-sign-in`, rendered in the site's default language.
 
 `{ send: mail.enqueue }` also fits `email.mailer` as it is, sending kayjs-auth's own html.

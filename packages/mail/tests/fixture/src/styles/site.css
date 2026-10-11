@@ -1,9 +1,12 @@
+.btn--color-brand:hover { color: red; }
+
 @theme {
   /* The site's palette, which the mail settings read their accent from. */
   --blue: #0047ff;
   --color-brand: var(--blue);
   --color-ink: oklch(20% 0 0);
   --color-paper: var(--missing, white);
+  --color-nested: var(--missing, var(--blue, red));
   --color-shade: rgb(0 0 0 / 0.5);
   --space: 12px;
   --loop-a: var(--loop-b);

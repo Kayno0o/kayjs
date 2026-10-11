@@ -2,11 +2,11 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const COMMENT = /\/\*[\s\S]*?\*\//g
-const DECLARATION = /(--[\w-]+)\s*:([^;{}]*)/g
+const DECLARATION = /(?<![\w-])(--[\w-]+)\s*:([^;{}]*)/g
 const VARIABLE = /var\(\s*(--[\w-]+)\s*(?:,([^()]*(?:\([^()]*\)[^()]*)*))?\)/g
 const OPAQUE = 255
 
-// Reads the colours an app's mail settings take from its site's stylesheet, whose custom properties mail clients cannot: `colour('--brand')` gives the property's first declaration in the file, its `var()`s followed, as a hex colour, so the dark colours derive from it. A file that cannot be read, or a property missing or no opaque colour, throws naming it as the server boots.
+// The colours of a stylesheet's custom properties, read as the server boots: `colour('--brand')` gives the property's first declaration, its `var()`s followed, as hex. A file that cannot be read, or a property missing or no opaque colour, throws naming it.
 export function cssColours(file: string | URL): (property: string) => string {
   const path = file instanceof URL ? fileURLToPath(file) : file
   let css: string
@@ -25,7 +25,12 @@ export function cssColours(file: string | URL): (property: string) => string {
       declared.set(name!, value!.trim())
   }
 
-  const resolve = (property: string, seen: string[]): string => {
+  // Each `var()` in `text` replaced by its property's value, else its fallback, both followed in turn.
+  function expand(text: string, seen: string[]): string {
+    return text.replace(VARIABLE, (_, inner: string, fallback: string | undefined) => declared.has(inner) || fallback === undefined ? resolve(inner, seen) : expand(fallback.trim(), seen))
+  }
+
+  function resolve(property: string, seen: string[]): string {
     const value = declared.get(property)
 
     if (value === undefined)
@@ -34,7 +39,7 @@ export function cssColours(file: string | URL): (property: string) => string {
     if (seen.includes(property))
       throw new Error(`kayjs-mail: ${[...seen, property].join(' -> ')} in ${path} refers to itself`)
 
-    return value.replace(VARIABLE, (_, inner: string, fallback: string | undefined) => declared.has(inner) || fallback === undefined ? resolve(inner, [...seen, property]) : fallback.trim())
+    return expand(value, [...seen, property])
   }
 
   return (property) => {

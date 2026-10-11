@@ -6,9 +6,10 @@ const SITE = new URL('fixture/src/styles/site.css', import.meta.url)
 describe('cssColours', () => {
   const colour = cssColours(SITE)
 
-  it('gives a custom property\'s first declaration as hex, its var()s and their fallbacks followed', () => {
+  it('gives a custom property\'s first declaration as hex, its var()s and their fallbacks followed, a selector holding its name aside', () => {
     expect(colour('--color-brand')).toBe('#0047ff')
     expect(colour('--color-paper')).toBe('#ffffff')
+    expect(colour('--color-nested')).toBe('#0047ff')
     expect(colour('--color-ink')).toMatch(/^#[\da-f]{6}$/)
   })
 
