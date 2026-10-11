@@ -3,8 +3,9 @@ import type { JSX } from 'kay'
 import { effect, untrack } from 'kay'
 
 const { value, onInput, onChange, type = 'text', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange' | 'onBlur'> & {
-  value: string
-  onInput: (value: string) => void
+  // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
+  value?: string | undefined
+  onInput?: ((value: string) => void) | undefined
   // Called once the value is committed, on blur or Enter, after `onInput`.
   onChange?: ((value: string) => void) | undefined
   type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number' | 'date' | 'datetime-local' | 'time' | 'month' | 'week' | undefined
@@ -25,8 +26,8 @@ function reads(input: HTMLInputElement, next: string): boolean {
 effect(() => {
   const next = value
 
-  if (box && !reads(box, next))
+  if (box && next !== undefined && !reads(box, next))
     box.value = next
 })
 ---
-input.kui-field-input({...rest} ref={element => box = element} type={type} value={untrack(() => value)} class={className} onInput={event => halfTyped(event.currentTarget) || onInput(event.currentTarget.value)} onChange={event => halfTyped(event.currentTarget) || onChange?.(event.currentTarget.value)} onBlur={event => event.currentTarget.type === 'number' && (event.currentTarget.value = value)})
+input.kui-field-input({...rest} ref={element => box = element} type={type} value={untrack(() => value)} class={className} onInput={event => halfTyped(event.currentTarget) || onInput?.(event.currentTarget.value)} onChange={event => halfTyped(event.currentTarget) || onChange?.(event.currentTarget.value)} onBlur={event => event.currentTarget.type === 'number' && value !== undefined && (event.currentTarget.value = value)})

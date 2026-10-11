@@ -155,6 +155,12 @@ describe('FormField', () => {
   })
 })
 
+test('TextInput and Textarea without onInput render plain fields whose attributes post with the form', async () => {
+  const plain = (await element('/form', 'plain')).replaceAll(/<\/?slot[^>]*>/g, '')
+
+  expect(plain).toBe('<section id="plain"><input name="email" required autocomplete="email" aria-label="Email" type="email" class="kui-field-input"><textarea name="bio" rows="3" aria-label="Bio" class="kui-field-input">Hi</textarea></section>')
+})
+
 describe('layout', () => {
   const page = async (id: string) => (await element('/layout', id)).replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<svg[^>]*>.*?<\/svg>/g, '<svg/>')
 

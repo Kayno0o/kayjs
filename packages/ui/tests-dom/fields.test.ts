@@ -19,7 +19,7 @@ async function fields() {
   return mounted.root
 }
 
-function type(input: HTMLInputElement, value: string, event = 'input') {
+function type(input: HTMLInputElement | HTMLTextAreaElement, value: string, event = 'input') {
   input.value = value
   input.dispatchEvent(new Event(event, { bubbles: true }))
 }
@@ -53,6 +53,40 @@ describe('TextInput', () => {
 
     expect(root.querySelector('#figure')?.textContent).toBe('2.5')
     expect(input.value).toBe('2.50')
+  })
+  test('keeps what is typed with no value nor onInput, as a plain field of a form', async () => {
+    const root = await fields()
+    const input = root.querySelector<HTMLInputElement>('#plain')!
+
+    expect(input.value).toBe('')
+
+    type(input, 'ada@kaynooo.fr')
+    type(input, 'ada@kaynooo.fr', 'change')
+    input.dispatchEvent(new Event('blur'))
+    await settle()
+
+    expect(input.value).toBe('ada@kaynooo.fr')
+  })
+})
+
+describe('Textarea', () => {
+  test('leaves the box as typed while focused, and takes the parent\'s reading of it once left', async () => {
+    const root = await fields()
+    const area = root.querySelector<HTMLTextAreaElement>('#roster')!
+
+    expect(area.value).toBe('Ada\nGrace')
+
+    area.focus()
+    type(area, 'Ada\nGrace\n\nLin ')
+    await settle()
+
+    expect(root.querySelector('#names')?.textContent).toBe('Ada\nGrace\nLin')
+    expect(area.value).toBe('Ada\nGrace\n\nLin ')
+
+    area.blur()
+    await settle()
+
+    expect(area.value).toBe('Ada\nGrace\nLin')
   })
 })
 

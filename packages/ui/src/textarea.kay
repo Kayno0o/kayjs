@@ -1,0 +1,26 @@
+---
+import type { JSX } from 'kay'
+import { effect, untrack } from 'kay'
+
+const { value, onInput, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange' | 'onBlur'> & {
+  // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
+  value?: string | undefined
+  onInput?: ((value: string) => void) | undefined
+  // Called once the value is committed, on blur, after `onInput`.
+  onChange?: ((value: string) => void) | undefined
+  class?: string | undefined
+}>()
+
+let box: HTMLTextAreaElement | undefined
+
+// The parent may write back its own reading of the text, such as without the blank line just typed: the box takes it once left, never while focused, which would throw the caret to the end.
+function sync(left = false) {
+  const next = value
+
+  if (box && next !== undefined && box.value !== next && (left || document.activeElement !== box))
+    box.value = next
+}
+
+effect(() => sync())
+---
+textarea.kui-field-input({...rest} ref={element => box = element} value={untrack(() => value)} class={className} onInput={event => onInput?.(event.currentTarget.value)} onChange={event => onChange?.(event.currentTarget.value)} onBlur={() => sync(true)})
