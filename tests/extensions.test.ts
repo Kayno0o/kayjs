@@ -383,14 +383,22 @@ describe('a library\'s routes', () => {
 const LOCAL_CHECKED: Record<string, string> = {
   'app/package.json': JSON.stringify({ name: 'app', dependencies: { 'linked-lib': 'link:../linked' } }),
   'app/tsconfig.json': TSCONFIG,
-  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { linkedPages } from \'linked-lib\'\n\nexport default defineConfig({ extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/auth\' } }, linkedPages()] })\n',
+  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { linkedPages } from \'linked-lib\'\n\nexport default defineConfig({ extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/auth\' } }, linkedPages(), { name: \'abs\', routes: { dir: `${import.meta.dir}/../abs/routes`, prefix: \'/abs\' } }, { name: \'sub\', routes: { dir: \'../abs/sub/routes\', prefix: \'/sub\' } }] })\n',
   'app/src/routes/index.kay': 'p.home home\n',
+  'app/src/params/code.ts': 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n',
   'lib/package.json': JSON.stringify({ name: 'lib' }),
   'lib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\np.card {title}\n',
   'lib/routes/login.kay': '---\nimport Card from \'../card.kay\'\n---\nCard(title="Sign in")\n',
   // Typed by its own path: `id` is no param of it.
   'lib/routes/[slug].kay': '--- server\nconst slug: string = ctx.params.slug\nconst id = ctx.params.id\n---\np {slug} {id}\n',
   'lib/routes/broken.kay': '---\nconst wrong: number = \'beside\'\n---\np {wrong}\n',
+  // The app's matchers type an extension's params as they do its own.
+  'lib/routes/codes/[id=code].kay': '--- server\nconst id: number = ctx.params.id\n---\np {id}\n',
+  // Two package roots, one inside the other, each listing pages.
+  'abs/package.json': JSON.stringify({ name: 'abs' }),
+  'abs/routes/broken.kay': '---\nconst wrong: number = \'absolute\'\n---\np {wrong}\n',
+  'abs/sub/package.json': JSON.stringify({ name: 'sub' }),
+  'abs/sub/routes/photo.kay': 'img(src="https://example.com/photo.png")\n',
   'linked/package.json': JSON.stringify({ name: 'linked-lib', type: 'module', exports: { '.': './index.ts' }, peerDependencies: { kay: '*' } }),
   'linked/index.ts': 'import type { KayExtension } from \'kay/server\'\n\nexport const linkedPages = (): KayExtension => ({ name: \'linked-lib\', routes: { dir: `${import.meta.dir}/routes`, prefix: \'/linked\' } })\n',
   'linked/routes/broken.kay': '---\nconst wrong: number = \'linked\'\n---\np {wrong}\n',
@@ -412,9 +420,11 @@ describe('an extension listed from beside the app', () => {
       const output = `${stdout}${stderr}`
 
       expect(code).toBe(1)
-      expect([...output.matchAll(/\| const wrong: number = '(\w+)'/g)].map(match => match[1]).sort()).toEqual(['beside', 'linked', 'reached'])
+      expect([...output.matchAll(/\| const wrong: number = '(\w+)'/g)].map(match => match[1]).sort()).toEqual(['absolute', 'beside', 'linked', 'reached'])
+      expect(output.split('error[missing-alt]').length).toBe(2)
+      expect(output).not.toContain('codes/[id=code].kay')
       expect(output).toContain('--> ../lib/routes/[slug].kay:3:')
-      expect(output).toContain('4 errors')
+      expect(output).toContain('6 errors')
     }
     finally {
       await rm(dir, { recursive: true, force: true })

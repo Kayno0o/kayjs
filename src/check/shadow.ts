@@ -67,9 +67,9 @@ export function readShadowSettings(root: string): ShadowSettings {
   }
 }
 
-// Compiles one .kay file for type checking, its route params typed when it is a page under `routesDir`; `insideIsland` for a static component only islands render.
-export function compileShadow(root: string, routesDir: string, file: string, source: string, insideIsland = false, lints?: LintLevels, signals: ImportedSignals = importedSignals(file, source)): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
-  const route = file.startsWith(routesDir + sep) ? routeOf(routesDir, file) : undefined
+// Compiles one .kay file for type checking, its route params typed when it is a page under `pagesDir`, the routes directory or an extension's, by the matchers beside `routesDir`; `insideIsland` for a static component only islands render.
+export function compileShadow(root: string, routesDir: string, file: string, source: string, insideIsland = false, lints?: LintLevels, signals: ImportedSignals = importedSignals(file, source), pagesDir = routesDir): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
+  const route = file.startsWith(pagesDir + sep) ? routeOf(pagesDir, file) : undefined
   const shadowDir = dirname(shadowPath(root, file))
   // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
   const relocateImport = (specifier: string) => {

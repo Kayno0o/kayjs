@@ -116,7 +116,7 @@ export async function bothBundles<Islands extends Promise<unknown> | undefined, 
   const [scripts, sheets] = await Promise.allSettled([islands, styles])
 
   if (scripts.status === 'rejected' && sheets.status === 'rejected')
-    throw new AggregateError([scripts.reason, sheets.reason].flatMap((reason: unknown): unknown[] => reason instanceof AggregateError ? reason.errors as unknown[] : [reason]), (scripts.reason as Error).message)
+    throw new AggregateError([scripts.reason, sheets.reason].flatMap((reason: unknown): unknown[] => reason instanceof AggregateError ? reason.errors as unknown[] : [reason]), scripts.reason instanceof Error ? scripts.reason.message : String(scripts.reason))
 
   if (scripts.status === 'rejected')
     throw scripts.reason

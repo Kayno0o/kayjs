@@ -96,8 +96,11 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await tree.write(SETTINGS_CHECK, replaced.code)
   await tree.write(EXPORTS_CHECK, exported.code)
-  // TypeScript leaves out what an `include` reaches through a `node_modules`, as a linked library's pages are shadowed: nothing else imports them.
-  await tree.write(EXTENSION_PAGES, libraries.pages.map(file => `import ${JSON.stringify(`./${relative(projectPaths(root).types, shadowPath(root, file)).slice(0, -'.tsx'.length)}`)}\n`).join(''))
+
+  // TypeScript skips the files an `include` reaches only through a `node_modules`, where a linked library's pages are shadowed, so they are imported.
+  if (libraries.pages.length > 0)
+    await tree.write(EXTENSION_PAGES, libraries.pages.map(file => `import ${JSON.stringify(`./${relative(projectPaths(root).types, shadowPath(root, file)).slice(0, -'.tsx'.length)}`)}\n`).join(''))
+
   await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, { routesDir, islandOnly: own.islandOnly, lints: options.lints }))
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
@@ -144,7 +147,7 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree,
 
   for (const file of files) {
     const source = sources.get(file)!
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDirOf(file, routesDir, mounts), file, source, islandOnly.has(file), options.lints)
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDir, file, source, islandOnly.has(file), options.lints, pagesDirOf(file, routesDir, mounts))
 
     await tree.shadow(shadow, shadowPath(root, file))
     for (const diagnostic of compileDiagnostics)
@@ -162,7 +165,8 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   // The app's own directories are checked already; a linked library has its real path outside any `node_modules`, an installed one inside.
   const local = mounts.filter(mount => !ownFile(root, mount.dir) && existsSync(mount.dir) && !realpathSync(mount.dir).split(sep).includes('node_modules'))
   const followed = [...libraries, ...await extensionPackages(root, libraries, local)]
-  const pages = followed.flatMap(library => library.files).filter(file => local.some(mount => file.startsWith(mount.dir + sep)))
+  const files = [...new Set(followed.flatMap(library => library.files))]
+  const pages = files.filter(file => local.some(mount => file.startsWith(mount.dir + sep)))
   const reached = new Set([...pages, ...(await reachableLibraryFiles(root, followed, [...own, ...pages])).components.map((file) => {
     const library = libraryOf(followed, file)
 
@@ -171,9 +175,9 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   const diagnostics: CheckDiagnostic[] = []
   const unreached = new Set<string>()
 
-  await Promise.all(followed.flatMap(library => library.files).map(async (file) => {
+  await Promise.all(files.map(async (file) => {
     const source = await Bun.file(file).text()
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDirOf(file, routesDir, mounts), file, source, false, options.lints)
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDir, file, source, false, options.lints, pagesDirOf(file, routesDir, mounts))
 
     await tree.shadow(shadow, shadowPath(root, file))
 
@@ -195,8 +199,8 @@ async function extensionPackages(root: string, libraries: KayLibrary[], mounts: 
   const dirs = new Set(mounts.filter(mount => libraryOf(libraries, join(mount.dir, 'page.kay')) === undefined).map(mount => packageRoot(mount.dir)))
 
   return Promise.all([...dirs].map(async (dir) => {
-    // The app itself, when the package holds it as a fixture, and the other projects inside it are left to their own checks.
-    const files = (await findKayFiles(dir, { project: true, ownOnly: true, ownKayOnly: true })).filter(file => !file.startsWith(root + sep))
+    // The app itself, when the package holds it as a fixture, and the other projects inside it are left to their own checks, a kay library's files to the library.
+    const files = (await findKayFiles(dir, { project: true, ownOnly: true, ownKayOnly: true })).filter(file => !file.startsWith(root + sep) && libraryOf(libraries, file) === undefined)
 
     return { name: basename(dir), dir, realDir: dir, files, specifiers: new Map<string, string>() }
   }))
@@ -212,8 +216,8 @@ function packageRoot(dir: string): string {
   }
 }
 
-// The routes directory a page compiles under, for its params: the app's, or that of the extension mounting it.
-function routesDirOf(file: string, routesDir: string, mounts: RouteMount[]): string {
+// The directory a page's path, and so its params, is read from: the app's routes, or those of the extension mounting it. Its matchers are the app's either way.
+function pagesDirOf(file: string, routesDir: string, mounts: RouteMount[]): string {
   return mounts.find(mount => file.startsWith(mount.dir + sep))?.dir ?? routesDir
 }
 
@@ -250,17 +254,17 @@ async function rendersAsIslandCached(cacheDir: string, file: string, source: str
 }
 
 // `compileShadow` through the build's cache of compiles. A page's params are typed by the matchers they name, so where each one is found, if anywhere, is part of the key, as are the signals of the modules it imports.
-async function compileShadowCached(cacheDir: string, root: string, routesDir: string, file: string, source: string, insideIsland: boolean, lints?: LintLevels): Promise<ReturnType<typeof compileShadow>> {
-  const route = file.startsWith(routesDir + sep) ? routeOf(routesDir, file) : undefined
+async function compileShadowCached(cacheDir: string, root: string, routesDir: string, file: string, source: string, insideIsland: boolean, lints?: LintLevels, pagesDir = routesDir): Promise<ReturnType<typeof compileShadow>> {
+  const route = file.startsWith(pagesDir + sep) ? routeOf(pagesDir, file) : undefined
   const matchers = Object.values(route?.matchers ?? {}).map(matcher => matcherSource(routesDir, matcher) ?? '')
   const signals = importedSignals(file, source)
-  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, insideIsland, lints ?? {}, matchers, signals, source]))
+  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, pagesDir, insideIsland, lints ?? {}, matchers, signals, source]))
   const cached = await readCacheEntry<{ tsx: string, map: ReturnType<SourceMap['toJSON']>, diagnostics: Diagnostic[] }>(slot)
 
   if (cached !== undefined)
     return { shadow: { source, file, tsx: cached.tsx, map: SourceMap.fromJSON(cached.map) }, diagnostics: cached.diagnostics }
 
-  const compiled = compileShadow(root, routesDir, file, source, insideIsland, lints, signals)
+  const compiled = compileShadow(root, routesDir, file, source, insideIsland, lints, signals, pagesDir)
 
   await writeCacheEntry(slot, { tsx: compiled.shadow.tsx, map: compiled.shadow.map, diagnostics: compiled.diagnostics })
 
