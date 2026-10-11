@@ -1,6 +1,6 @@
 import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
-import { fragment, insert, markers } from './dom'
+import { fragment, insert, localizeLinks, markers } from './dom'
 import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 import { createSignal, effect, memo, onCleanup, onMount } from './reactive'
 
@@ -74,6 +74,8 @@ export function localizedHref(href: string): string {
 
   return settings ? localizedLink(settings, href, pageLocale, location.host) : href
 }
+
+localizeLinks(localizedHref)
 
 export function locale(): Locale {
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them

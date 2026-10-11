@@ -2,16 +2,16 @@
 // A dynamic part sits between `<!--[-->` and `<!--]-->` comments unless it is the only content of its element; hydration walks the server's nodes in the order the generated code asks for them.
 
 import { rebasedAttribute } from './base'
-import { flattenClasses } from './classes'
-import { localizedHref } from './i18n.client'
 import { imageSource } from './image'
+import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
+import { attributeValue, classText, eachChild, merge, styleText } from './values'
 
-export { componentClass } from './classes'
 export { renderEffect as effect, memo, untrack } from './reactive'
 export { transition } from './transition'
+export { componentClass, merge, omit } from './values'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.
 export class Range {
@@ -32,12 +32,9 @@ export class HydrationMismatch extends Error {
 }
 
 const TAG_END = /[\s>]/
-const ARIA = /^aria-/i
 // What `img(src={hero})` sets, its size left alone when the template gives one.
 const IMAGE_SOURCE = ['src', 'srcset', 'sizes']
 const SIZED_IMAGE = ['src', 'srcset', 'sizes', 'width', 'height']
-const START = '['
-const END = ']'
 const VOID_PROPERTIES = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText'])
 // Events handled by one listener on the document, as most pages bind them on many elements at once.
@@ -62,9 +59,13 @@ let transitions: Transitions | undefined
 export function playTransitions(given: Transitions): void {
   transitions = given
 }
-// The comment `FAILED_MARKER` of kay/html holds.
-const FAILED_MARKER_DATA = 'kay-failed'
-const ISLAND_SLOT = 'slot[data-component]'
+
+// Gives a link an island writes its copy in the page's locale, set by kay/i18n, so a page of an app without locales ships none of its code.
+let localizeHref: ((href: string) => string) | undefined
+
+export function localizeLinks(given: (href: string) => string): void {
+  localizeHref = given
+}
 
 type ElementRecord = Element & Record<string, unknown>
 
@@ -142,9 +143,9 @@ export function close(start: Node): Node {
 
     const data = (node as Comment).data
 
-    if (data === START)
+    if (data === PART_START)
       depth++
-    else if (data === END && depth-- === 0)
+    else if (data === PART_END && depth-- === 0)
       return node
   }
 
@@ -251,7 +252,7 @@ export function markers(parent: Node): [start: Node, end: Node] {
   if (claim) {
     const start = claimNode()
 
-    if (start.nodeType !== 8 || (start as Comment).data !== START)
+    if (start.nodeType !== 8 || (start as Comment).data !== PART_START)
       throw new HydrationMismatch(`expected the start of a dynamic part where the server markup holds ${start.nodeName}`)
 
     const end = close(start)
@@ -261,8 +262,8 @@ export function markers(parent: Node): [start: Node, end: Node] {
     return [start, end]
   }
 
-  const start = document.createComment(START)
-  const end = document.createComment(END)
+  const start = document.createComment(PART_START)
+  const end = document.createComment(PART_END)
 
   parent.appendChild(start)
   parent.appendChild(end)
@@ -399,48 +400,30 @@ function lastOf(unit: Unit): Node {
   return unit instanceof Range ? unit.last : unit
 }
 
-// The units a value renders to: text for strings and numbers, nothing for `null`, `undefined` and booleans, functions read for what they return.
-function units(value: unknown, out: Unit[] = []): Unit[] {
-  if (value == null || typeof value === 'boolean')
-    return out
+// The units a value renders to, read by `eachChild`: a text node for its text, a node or a range as it is.
+function units(value: unknown): Unit[] {
+  const out: Unit[] = []
 
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') {
-    out.push(claim ? claimText(String(value)) : document.createTextNode(String(value)))
+  eachChild(value, (part) => {
+    if (typeof part === 'string') {
+      out.push(claim ? claimText(part) : document.createTextNode(part))
+    }
+    else if (part instanceof Range) {
+      out.push(part)
+    }
+    else if (part instanceof Node) {
+      // Already in place, as a static slot's nodes are: claimed as they are.
+      if (claim?.next === part)
+        claim.next = part.nextSibling
 
-    return out
-  }
+      const { firstChild, lastChild } = part
 
-  if (typeof value === 'function')
-    return units((value as () => unknown)(), out)
-
-  if (Array.isArray(value)) {
-    for (const item of value)
-      units(item, out)
-
-    return out
-  }
-
-  if (value instanceof Range) {
-    out.push(value)
-
-    return out
-  }
-
-  if (value instanceof Node) {
-    // Already in place, as a static slot's nodes are: claimed as they are.
-    if (claim?.next === value)
-      claim.next = value.nextSibling
-
-    if (value.nodeType === 11) {
-      const { firstChild, lastChild } = value
-
-      if (firstChild && lastChild)
+      if (part.nodeType !== 11)
+        out.push(part)
+      else if (firstChild && lastChild)
         out.push(firstChild === lastChild ? firstChild : new Range(firstChild, lastChild))
     }
-    else {
-      out.push(value)
-    }
-  }
+  })
 
   return out
 }
@@ -1076,13 +1059,13 @@ export function attempt(element: Node | null, start: Node | null, end: Node | nu
 
 // The island a node sits in, named in what an error report says.
 function islandOf(node: Node): string | undefined {
-  return (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>(ISLAND_SLOT)?.dataset.component
+  return (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>(ISLAND)?.dataset.component
 }
 
 function failedOnServer(region: Region): boolean {
   const first = region.start ? region.start.nextSibling : region.element!.firstChild
 
-  return first?.nodeType === 8 && (first as Comment).data === FAILED_MARKER_DATA
+  return first?.nodeType === 8 && (first as Comment).data === FAILED
 }
 
 // ---- components
@@ -1113,37 +1096,18 @@ function createElement(tag: string): Element {
   return element instanceof HTMLUnknownElement && !tag.includes('-') ? document.createElementNS('http://www.w3.org/2000/svg', tag) : element
 }
 
-// Props from several objects, later ones winning, each keeping its getters, so a prop stays live and children build only when read.
-export function merge(...sources: readonly object[]): Record<string, unknown> {
-  const props = {}
-
-  for (const source of sources) {
-    if (source != null)
-      Object.defineProperties(props, Object.getOwnPropertyDescriptors(source))
-  }
-
-  return props
-}
-
-export function omit(props: object, ...keys: string[]): Record<string, unknown> {
-  const descriptors = Object.getOwnPropertyDescriptors(props)
-
-  for (const key of keys)
-    delete descriptors[key]
-
-  return Object.defineProperties({}, descriptors)
-}
-
 // ---- attributes and events
 
 // A link's href goes to the page's locale's copy, as the server writes it, unless `written`: the link carries `hreflang`. An ARIA state takes a boolean as `"true"` or `"false"`.
 export function attribute(element: Element, name: string, value: unknown, written = false): void {
-  if (value == null || (value === false && !ARIA.test(name)))
+  const given = attributeValue(name, value)
+
+  if (given === false)
     element.removeAttribute(name)
-  else if (value === true && !ARIA.test(name))
+  else if (given === true)
     element.setAttribute(name, '')
   else
-    element.setAttribute(name, safeUrl(name, rebasedAttribute(name, name === 'href' && !written && element.localName === 'a' ? localizedHref(String(value)) : String(value))))
+    element.setAttribute(name, safeUrl(name, rebasedAttribute(name, name === 'href' && !written && localizeHref && element.localName === 'a' ? localizeHref(given) : given)))
 }
 
 // An `img` source, with the variants, `sizes` and size of an imported image; a later source clears what an earlier one set.
@@ -1168,30 +1132,9 @@ export function property(element: Element, name: string, value: unknown, written
     attribute(element, name, value, written)
 }
 
-export function className(value: unknown): string {
-  if (typeof value === 'number')
-    return String(value)
-
-  if (value == null || value === false || value === '')
-    return ''
-
-  if (typeof value === 'string')
-    return value
-
-  const classes = Array.isArray(value) ? flattenClasses(value, {}) : value as Record<string, unknown>
-  let result = ''
-
-  for (const key of Object.keys(classes)) {
-    if (key && key !== 'undefined' && Boolean(classes[key]))
-      result += result ? ` ${key}` : key
-  }
-
-  return result
-}
-
 // A class bound to an expression is never in the template, so a fresh element starts with none; a claimed one has the server's, set again.
 export function setClass(element: Element, value: unknown): void {
-  const name = className(value)
+  const name = classText(value)
   const record = element as Element & { _$c?: string }
 
   if (record._$c === name || (record._$c === undefined && name === '' && !claim)) {
@@ -1209,26 +1152,10 @@ export function setClass(element: Element, value: unknown): void {
 }
 
 export function setStyle(element: Element, value: unknown): void {
-  if (Boolean(value) === false) {
+  if (Boolean(value) === false)
     element.removeAttribute('style')
-
-    return
-  }
-
-  if (typeof value === 'string') {
-    element.setAttribute('style', value)
-
-    return
-  }
-
-  let text = ''
-
-  for (const [name, property] of Object.entries(value as Record<string, unknown>)) {
-    if (property != null)
-      text += `${text ? ';' : ''}${name}:${String(property)}`
-  }
-
-  element.setAttribute('style', text)
+  else
+    element.setAttribute('style', styleText(value))
 }
 
 // `onClick` listens for `click`: through the document's one listener for the common events, on the element for the others.

@@ -1,5 +1,6 @@
 import { withBase } from './base'
 import { dispatch, hydrate, render } from './dom'
+import { ISLAND } from './markers'
 import { batch, createSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { decodeValue } from './wire'
@@ -24,7 +25,6 @@ const IDLE_FALLBACK_MS = 200
 const started = new WeakSet<HTMLElement>()
 // What disposes each hydrated island, so a page swap can end the ones it takes away: their effects, timers and connections.
 const disposers = new WeakMap<HTMLElement, () => void>()
-const ISLAND = 'slot[data-component]'
 // Where the browser sends the errors it meets, for the server's `onError`.
 const ERROR_URL = '/_kay/error'
 

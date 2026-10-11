@@ -2,6 +2,7 @@ import type { Swap } from './navigate'
 import type { FetchedPage } from './swap'
 import { withoutBase } from './base'
 import { focusInvalid } from './focus'
+import { ISLAND } from './markers'
 import { busyForms, checkedForms, leave, navigation, pageKey, restoreScroll, saveScroll, submitNatively, swappable, takeFormChecks, writeHistory } from './navigate'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { decodeValue } from './wire'
@@ -19,10 +20,9 @@ interface Answer {
   work: string | null
 }
 
-const ISLAND = 'slot[data-component]'
 const PERSISTENT = 'slot[data-persist]'
 // What the morph never keeps across pages: islands are kept by `persist` or a refresh alone, and a script or a template is put in afresh.
-const OPAQUE = 'slot[data-component],slot[data-kay-server],script,template'
+const OPAQUE = `${ISLAND},slot[data-kay-server],script,template`
 const PREFETCH_TTL_MS = 30_000
 const STYLESHEET_TIMEOUT_MS = 3000
 const HTML = /^text\/html\b/

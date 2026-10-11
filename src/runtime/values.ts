@@ -1,0 +1,109 @@
+// How both renderers read the values a template gives, kay/html into markup and kay/dom into nodes, so a page hydrates into what the server wrote.
+
+const ARIA = /^aria-/i
+
+// Props from several objects, later ones winning, each keeping its getters, so a prop stays live and a spread `children` renders only when read.
+export function merge(...sources: readonly object[]): Record<string, unknown> {
+  const props = {}
+
+  for (const source of sources) {
+    if (source != null)
+      Object.defineProperties(props, Object.getOwnPropertyDescriptors(source))
+  }
+
+  return props
+}
+
+// The props a component left out of its destructuring, getters kept.
+export function omit(props: object, ...keys: string[]): Record<string, unknown> {
+  const descriptors = Object.getOwnPropertyDescriptors(props)
+
+  for (const key of keys)
+    delete descriptors[key]
+
+  return Object.defineProperties({}, descriptors)
+}
+
+// What an attribute is given: `false` leaves it out, as `null` and `undefined` do, and `true` writes it bare, but for an ARIA state, which takes them as `"true"` or `"false"`.
+export function attributeValue(name: string, value: unknown): string | boolean {
+  if (value == null || (value === false && !ARIA.test(name)))
+    return false
+
+  return value === true && !ARIA.test(name) ? true : String(value)
+}
+
+// A `class` given as an array: nested arrays flattened, an object's keys kept with their values, other truthy values as names.
+export function flattenClasses(list: readonly unknown[], result: Record<string, unknown>): Record<string, unknown> {
+  for (const item of list) {
+    if (Array.isArray(item))
+      flattenClasses(item, result)
+    else if (typeof item === 'object' && item !== null)
+      Object.assign(result, item)
+    else if (typeof item !== 'boolean' && (Boolean(item) || item === 0))
+      result[String(item)] = true
+  }
+
+  return result
+}
+
+// A `class` value: a string, or an array or object of classes, an object's keys kept when their value is truthy.
+export function classText(value: unknown): string {
+  if (typeof value === 'number')
+    return String(value)
+
+  if (value == null || value === false || value === '')
+    return ''
+
+  if (typeof value === 'string')
+    return value
+
+  const classes = Array.isArray(value) ? flattenClasses(value, {}) : value as Record<string, unknown>
+  let result = ''
+
+  for (const key of Object.keys(classes)) {
+    if (key !== '' && key !== 'undefined' && Boolean(classes[key]))
+      result += result ? ` ${key}` : key
+  }
+
+  return result
+}
+
+// The `class` a component gets when its call merges a shorthand, a `class` attribute or a spread's: one string, as a `class?: string` prop takes it, or none when nothing is set.
+export function componentClass(list: readonly unknown[]): string | undefined {
+  return classText(list) || undefined
+}
+
+// A `style` value: a string, or an object of properties, each kept unless `null` or `undefined`; empty when it is falsy.
+export function styleText(value: unknown): string {
+  if (Boolean(value) === false)
+    return ''
+
+  if (typeof value === 'string')
+    return value
+
+  let result = ''
+
+  for (const [name, property] of Object.entries(value as Record<string, unknown>)) {
+    if (property != null)
+      result += `${result ? ';' : ''}${name}:${String(property)}`
+  }
+
+  return result
+}
+
+// A child value, part by part: a string or a number as its text, `null`, `undefined`, a boolean and a symbol as nothing, a function as what it returns, an array item by item; any other object as it is, for the renderer to read.
+export function eachChild(value: unknown, part: (part: string | object) => void): void {
+  if (value == null || typeof value === 'boolean' || typeof value === 'symbol')
+    return
+
+  if (typeof value === 'function') {
+    eachChild((value as () => unknown)(), part)
+  }
+  else if (Array.isArray(value)) {
+    for (const item of value)
+      eachChild(item, part)
+  }
+  else {
+    part(typeof value === 'object' ? value : String(value))
+  }
+}

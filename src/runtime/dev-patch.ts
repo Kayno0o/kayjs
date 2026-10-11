@@ -1,5 +1,6 @@
 // Loaded by `kay dev` pages that have no page swap: applies what changed between the page's previous and its new server render to the live page, so a node whose server markup did not change keeps what scripts did to it.
 // It runs in the browser from its own route, so it imports nothing.
+// markers.ts's ISLAND, copied as this file imports nothing.
 const ISLAND = 'slot[data-component]'
 const UNSAFE = `${ISLAND},script`
 // The path of `DEV_EVENTS`, which names the live-reload script.

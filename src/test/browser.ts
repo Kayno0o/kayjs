@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { ISLAND } from '../runtime/markers'
 
 export interface BrowserOptions {
   // The Chrome or Chromium executable, else `BUN_CHROME_PATH`, else the first one found on the PATH or where it usually installs.
@@ -85,7 +86,7 @@ const POLL_MS = 25
 // What `within` resolves with when the page did not answer in time.
 const TIMED_OUT = Symbol('timed out')
 // Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
-const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('slot[data-component]:not([data-hydrate=visible]):not([data-hydrate=idle])')].every(island => island._$k)`
+const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle])')].every(island => island._$k)`
 
 // The browser pages are opened in, or undefined when there is none: for `describe.skipIf(!browserPath())`.
 export function browserPath(path?: string): string | undefined {

@@ -1,8 +1,9 @@
+import { ISLAND } from './markers'
+
 // The comments around a static slot in an island's markup: the children or a slot without parameters a static parent passed it, which the server rendered, `kay-slot:<index>` opening it.
 export const SLOT_START = 'kay-slot:'
 export const SLOT_END = '/kay-slot'
 
-const ISLAND = 'slot[data-component]'
 const slotsOf = new WeakMap<HTMLElement, Record<string, () => Node[]>>()
 
 // The nodes of each static slot the server rendered in an island's own markup, by index, the markers included, past the islands nested in them.

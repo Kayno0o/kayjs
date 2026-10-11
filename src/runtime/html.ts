@@ -3,29 +3,30 @@
 
 import type { FieldSchema } from './form'
 import { isAction } from './action'
-import { flattenClasses } from './classes'
 import { escape, escapeAttribute } from './escape'
 import { nativeConstraints } from './form'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
 import { localeState } from './locale-state'
 import { kayLog } from './log'
+import { FAILED } from './markers'
 import { currentServerScope, scope } from './reactive'
 import { ISLAND_PARAM } from './server-islands'
 import { failedIds, idMark } from './uid'
 import { safeUrl } from './url'
+import { attributeValue, classText, eachChild, styleText } from './values'
 
-export { componentClass } from './classes'
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
 export { memo, untrack } from './reactive'
+export { componentClass, merge, omit } from './values'
 
 export interface Html {
   t: string
 }
 
 // Leads the markup of a `try` block the server rendered its `catch` block for.
-export const FAILED_MARKER = '<!--kay-failed-->'
+export const FAILED_MARKER = `<!--${FAILED}-->`
 const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 // Properties that set an element's content rather than an attribute.
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
@@ -41,75 +42,38 @@ const TAGS = /<[^>]*>/g
 const SPACES = /\s+/g
 const HTML_ENTITY = /&(?:amp|lt|gt|quot|#39);/g
 const TRAILING_SLASH = /(?<=.)\/$/
-const ARIA = /^aria-/i
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'' }
 const LINK_TAG = /<a\s[^>]*>/gi
 const LINK_HREF = /(\shref=")([^"]*)"/i
 const HREFLANG = /\shreflang=/i
 
-// A child value's markup: text escaped, numbers as they are, `null`, `undefined` and booleans as nothing, arrays item by item, functions as what they return.
+// A child value's markup: text escaped, any other object as the markup it holds.
 export function child(value: unknown): string {
-  switch (typeof value) {
-    case 'string':
-      return escape(value)
-    case 'number':
-    case 'bigint':
-      return String(value)
-    case 'function':
-      return child((value as () => unknown)())
-    case 'object':
-      if (value === null)
-        return ''
+  if (typeof value === 'string')
+    return escape(value)
 
-      if (Array.isArray(value)) {
-        let markup = ''
+  if (typeof value === 'number')
+    return String(value)
 
-        for (const item of value)
-          markup += child(item)
+  let markup = ''
 
-        return markup
-      }
+  eachChild(value, (part) => {
+    markup += typeof part === 'string' ? escape(part) : rendered(part)
+  })
 
-      return rendered(value)
-    case 'boolean':
-    case 'symbol':
-    case 'undefined':
-    default:
-      return ''
-  }
+  return markup
 }
 
 // Inside `script` and `style`, whose text the browser never decodes: a value may not close the element or open a comment there.
 // `\/` and `\!` read as `/` and `!` in JavaScript strings and in CSS alike.
 export function raw(value: unknown): string {
-  switch (typeof value) {
-    case 'string':
-      return value.replace(RAW_TEXT_BREAK, match => match === '<!--' ? '<\\!--' : '<\\/')
-    case 'number':
-    case 'bigint':
-      return String(value)
-    case 'function':
-      return raw((value as () => unknown)())
-    case 'object':
-      if (value === null)
-        return ''
+  let markup = ''
 
-      if (Array.isArray(value)) {
-        let markup = ''
+  eachChild(value, (part) => {
+    markup += typeof part === 'string' ? part.replace(RAW_TEXT_BREAK, match => match === '<!--' ? '<\\!--' : '<\\/') : rendered(part)
+  })
 
-        for (const item of value)
-          markup += raw(item)
-
-        return markup
-      }
-
-      return rendered(value)
-    case 'boolean':
-    case 'symbol':
-    case 'undefined':
-    default:
-      return ''
-  }
+  return markup
 }
 
 function rendered(value: object): string {
@@ -120,10 +84,12 @@ function rendered(value: object): string {
 
 // ` name="value"`, ` name` for `true`, nothing for `null`, `undefined` and `false`; an ARIA state takes a boolean as `"true"` or `"false"`.
 export function attribute(name: string, value: unknown): string {
-  if (value == null || (value === false && !ARIA.test(name)))
+  const given = attributeValue(name, value)
+
+  if (given === false)
     return ''
 
-  return value === true && !ARIA.test(name) ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, String(value)))}"`
+  return given === true ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, given))}"`
 }
 
 // A link of the site in the locale of the page rendering it; see `localizedLink`.
@@ -153,46 +119,12 @@ export function currentPage(href: unknown): string {
 
 // A `class` value: a string, or an array or object of classes, an object's keys kept when their value is truthy.
 export function className(value: unknown): string {
-  if (typeof value === 'number')
-    return String(value)
-
-  if (value == null || value === false || value === '')
-    return ''
-
-  if (typeof value === 'string')
-    return escapeAttribute(value)
-
-  const classes = Array.isArray(value) ? flattenClasses(value, {}) : value as Record<string, unknown>
-  let result = ''
-
-  for (const key of Object.keys(classes)) {
-    if (key === '' || key === 'undefined' || Boolean(classes[key]) === false)
-      continue
-
-    result += result ? ` ${escapeAttribute(key)}` : escapeAttribute(key)
-  }
-
-  return result
+  return escapeAttribute(classText(value))
 }
 
 // A `style` value: a string, or an object of properties, each kept unless `null` or `undefined`.
 export function style(value: unknown): string {
-  if (Boolean(value) === false)
-    return ''
-
-  if (typeof value === 'string')
-    return escapeAttribute(value)
-
-  let result = ''
-
-  for (const [name, property] of Object.entries(value as Record<string, unknown>)) {
-    if (property == null)
-      continue
-
-    result += `${result ? ';' : ''}${escapeAttribute(name)}:${escapeAttribute(String(property))}`
-  }
-
-  return result
+  return escapeAttribute(styleText(value))
 }
 
 // ` class="..."` from what `className` or `style` made of a value, or nothing for an empty one, which the browser leaves out too.
@@ -376,28 +308,6 @@ export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: Serve
   const placeholder = mode === 'defer' ? `<slot data-kay-server="${index}" inert>${html.replace(POSTING_TAG, tag => tag.replace(POSTING_ATTRIBUTE, ''))}</slot>${noscript == null ? '' : `<noscript><a href="?${ISLAND_PARAM}" rel="nofollow">${child(noscript)}</a></noscript>`}` : ''
 
   return { t: `<!--kay-server:${index}-->${placeholder}<!--/kay-server:${index}-->` }
-}
-
-// Props from several objects, later ones winning, each keeping its getters, so a spread `children` still renders only when read.
-export function merge(...sources: readonly object[]): object {
-  const props = {}
-
-  for (const source of sources) {
-    if (source != null)
-      Object.defineProperties(props, Object.getOwnPropertyDescriptors(source))
-  }
-
-  return props
-}
-
-// The props a component left out of its destructuring, getters kept.
-export function omit(props: object, ...keys: string[]): object {
-  const descriptors = Object.getOwnPropertyDescriptors(props)
-
-  for (const key of keys)
-    delete descriptors[key]
-
-  return Object.defineProperties({}, descriptors)
 }
 
 // A `try` block: what it renders, or once that throws, its `catch` block, the error reported. The marker tells an island hydrating to keep that markup as it came, since the error stayed on the server.

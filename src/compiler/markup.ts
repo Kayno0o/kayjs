@@ -1,5 +1,6 @@
 import type { ElementNode, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
 import type { CodeBuilder } from './mapping'
+import { PART_END, PART_START } from '../runtime/markers'
 import { actionOf } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 
@@ -14,8 +15,8 @@ const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
 const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }
 
 // Around a dynamic part of an island's markup, so the browser finds where it starts and ends.
-export const START_MARKER = '<!--[-->'
-export const END_MARKER = '<!--]-->'
+export const START_MARKER = `<!--${PART_START}-->`
+export const END_MARKER = `<!--${PART_END}-->`
 
 // The name a runtime helper is imported under.
 export function helperName(helper: string): string {

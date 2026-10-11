@@ -1,6 +1,7 @@
 // Loaded by every page `kay dev` serves: holding Alt outlines the element under the pointer with the `.kay` line that wrote it, Alt+click opens that line in the editor, and a button lists the page's islands with the values their signals hold.
 // It runs in the browser from its own route, so it imports nothing; its elements live in a shadow root outside the body, which a page swap replaces.
 const SOURCE = 'data-kay-src'
+// markers.ts's ISLAND, copied as this file imports nothing.
 const ISLAND = 'slot[data-component]'
 const OPEN_URL = '/_kay/dev/open'
 // A cross-site page cannot send this header without a preflight the dev server never answers.

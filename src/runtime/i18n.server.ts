@@ -4,6 +4,7 @@ import type { LocaleState } from './locale-state'
 import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, richMessage, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState } from './locale-state'
+import { PART_END, PART_START } from './markers'
 
 export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions, RichText } from './i18n'
 export { defineMessages } from './i18n'
@@ -37,7 +38,7 @@ export const T = ((props: { key: string }) => {
   noteMessage(props.key)
 
   // The markers the browser's T fills again between, when a placeholder changes.
-  return [{ t: '<!--[-->' }, richMessage(state, props.key, props), { t: '<!--]-->' }] as JSX.Element
+  return [{ t: `<!--${PART_START}-->` }, richMessage(state, props.key, props), { t: `<!--${PART_END}-->` }] as JSX.Element
 }) as RichText
 
 export function locale(): Locale {
