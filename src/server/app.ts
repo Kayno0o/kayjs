@@ -270,7 +270,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const favicon = faviconSource(root, options.favicon, options.manifest)
 
   if (favicon !== undefined)
-    serveFavicons(app, served, { source: favicon, builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
+    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
 
   const prerendered = await loadPrerendered(client)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))

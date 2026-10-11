@@ -1,10 +1,12 @@
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdtemp, readdir, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { bootProblems } from '../src/check/boot'
 import { pages } from '../src/server'
-import { faviconFiles, manifestJson, writeFavicons } from '../src/server/favicon'
+import { FAVICON_DIR, faviconFiles, manifestJson, writeFavicons } from '../src/server/favicon'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 const SOURCE = 'tests/fixtures/seo/src/favicon.png'
@@ -192,6 +194,35 @@ describe('favicon', () => {
     await writeFavicons({ image: svg, svg }, join(scratch, 'built-only-svg'))
 
     expect((await readdir(join(scratch, 'built-only-svg'))).sort()).toEqual(['apple-touch-icon.png', 'favicon.ico', 'favicon.svg', 'icon-192.png', 'icon-512.png'])
+  })
+
+  it('makes the icons from the source on a server not serving a build, past the files an older build wrote', async () => {
+    const stale = join(scratch, 'stale.svg')
+    const svg = join(scratch, 'current.svg')
+    // One process serves one project, so the older build goes where this checkout's would, the one there set aside meanwhile.
+    const built = join(outputDir(process.cwd()), FAVICON_DIR)
+    const aside = `${built}-aside`
+
+    await Bun.write(stale, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#c00"/></svg>')
+    await Bun.write(svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#0c0"/></svg>')
+    const hadBuild = existsSync(built)
+
+    if (hadBuild)
+      await rename(built, aside)
+
+    try {
+      await writeFavicons({ image: stale, svg: stale }, built)
+
+      const own = await pages({ routes: ROUTES, prebuilt: false, favicon: svg })
+
+      expect(await (await own.handle(new Request('http://localhost/favicon.svg'))).text()).toBe(await Bun.file(svg).text())
+    }
+    finally {
+      await rm(built, { recursive: true, force: true })
+
+      if (hadBuild)
+        await rename(aside, built)
+    }
   })
 
   it('reads an SVG\'s size off its root tag past a comment and a quoted >, and warns of text, which it draws as nothing, as kay check does without logging it', async () => {

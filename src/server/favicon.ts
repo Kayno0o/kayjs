@@ -58,8 +58,8 @@ export function faviconSource(root: string, favicon: string | FaviconConfig | fa
 
 export interface FaviconOptions {
   source: FaviconSource
-  // Where `kay build` wrote the files, read instead of the source when there.
-  builtDir: string
+  // Where `kay build` wrote the files, read instead of the source when there; a server not serving a build leaves it out, so an older build never shadows the source.
+  builtDir?: string | undefined
   name?: string | undefined
   description?: string | undefined
   manifest?: ManifestConfig | undefined
@@ -224,6 +224,9 @@ export function serveFavicons(app: Elysia, served: ServedPaths, options: Favicon
   let files: Promise<Map<string, Uint8Array<ArrayBuffer>>> | undefined
   const paths = [...Object.keys(PNG_FILES), ICO, ...options.source.svg === undefined ? [] : [SVG], ...options.source.maskable === undefined ? [] : Object.keys(MASKABLE_FILES)]
   const read = async () => {
+    if (options.builtDir === undefined)
+      return faviconFiles(options.source)
+
     const built = new Map<string, Uint8Array<ArrayBuffer>>()
 
     for (const path of paths) {
