@@ -64,7 +64,7 @@ test('IconButton names its action for screen readers and as its tooltip', async 
 })
 
 test('Toaster is an island rendering an empty manual popover, filled in the browser only', async () => {
-  expect(await element('/buttons', 'toasts')).toMatch(/^<div id="toasts"><slot data-component="[^"]*\/toaster\.kay"[^>]*><div class="kui-toaster" popover="manual"><\/div>/)
+  expect(await element('/buttons', 'toasts')).toMatch(/^<div id="toasts"><slot data-component="[^"]*\/toaster\.kay"[^>]*><!--\[--><div class="kui-toaster" popover="manual"><\/div>/)
 })
 
 test('Table renders sorted on the server from a static page, its sortable headers buttons and the rest text', async () => {

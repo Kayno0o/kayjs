@@ -38,7 +38,7 @@ The stylesheet the root layout imports brings the theme in right after Tailwind.
 
 ## A first component
 
-The root layout renders the toasts and tooltips once:
+The root layout renders the toasts and tooltips once. A second Toaster or TooltipHost, such as a kay extension's own, renders nothing while the first is mounted:
 
 ```kay
 ---

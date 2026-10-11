@@ -63,3 +63,25 @@ test('the toasts hold while the pointer rests on them, and run out once it leave
     jest.useRealTimers()
   }
 })
+
+test('a second Toaster renders nothing while the first is mounted, and takes over once it unmounts', async () => {
+  mounted = await mount('src/components/hosts.kay')
+  const { root } = mounted
+  const toasters = () => [...root.querySelectorAll('.kui-toaster')]
+
+  click(root.querySelector('#saved'))
+  await settle()
+
+  const [first] = toasters()
+
+  expect(toasters()).toHaveLength(1)
+  expect([...root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Saved'])
+
+  click(root.querySelector('#unmount'))
+  await settle()
+
+  expect(toasters()).toHaveLength(1)
+  expect(toasters()[0]).not.toBe(first)
+  expect(toasters()[0]?.matches(':popover-open')).toBe(true)
+  expect([...root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Saved'])
+})

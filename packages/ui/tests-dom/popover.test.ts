@@ -75,3 +75,27 @@ describe('TooltipHost', () => {
     expect(button.style.getPropertyValue('anchor-name')).toBe('')
   })
 })
+
+test('a second TooltipHost renders nothing while the first is mounted, and takes over once it unmounts', async () => {
+  mounted = await mount('src/components/hosts.kay')
+  const { root } = mounted
+  const tip = root.querySelector('#tip')!
+  const tooltips = () => [...root.querySelectorAll('.kui-tooltip')]
+
+  async function hover(target: Element) {
+    target.dispatchEvent(new Event('pointerover', { bubbles: true }))
+    await Bun.sleep(100)
+    await settle()
+  }
+
+  await hover(tip)
+
+  expect(tooltips().map(item => [item.textContent, item.matches(':popover-open')])).toEqual([['Copy', true]])
+
+  click(root.querySelector('#unmount'))
+  await settle()
+  await hover(root.querySelector('#saved')!)
+  await hover(tip)
+
+  expect(tooltips().map(item => [item.textContent, item.matches(':popover-open')])).toEqual([['Copy', true]])
+})

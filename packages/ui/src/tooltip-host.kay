@@ -1,5 +1,6 @@
 ---
-import { effect, onCleanup, onMount, signal } from 'kay'
+import { effect, onCleanup, signal } from 'kay'
+import { claim } from './claim'
 
 // An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default.
 const CARRIER = '[data-tooltip]'
@@ -10,7 +11,8 @@ const SHOW_DELAY_MS = 80
 const aimed = signal<{ element: HTMLElement, text: string } | null>(null)
 let at: HTMLElement | null = null
 let timer: ReturnType<typeof setTimeout> | undefined
-let panel: HTMLElement | undefined
+const panel = signal<HTMLElement>()
+const owns = claim('tooltips')
 
 // The element carrying a tooltip that an event's target is, or sits inside.
 function found(event: Event): HTMLElement | null {
@@ -60,7 +62,10 @@ function over(event: PointerEvent) {
 }
 
 // One set of listeners for every element carrying a tooltip, rather than a set each.
-onMount(() => {
+effect(() => {
+  if (!owns())
+    return
+
   document.addEventListener('pointerover', over)
   document.addEventListener('focusin', focused)
   document.addEventListener('focusout', blurred)
@@ -80,12 +85,15 @@ onMount(() => {
 effect(() => {
   const target = aimed()
 
-  if (!panel)
+  const element = panel()
+
+  // The element is gone while another TooltipHost owns the job, and a detached one cannot show as a popover.
+  if (!element?.isConnected)
     return
 
   if (!target) {
-    if (panel.matches(':popover-open'))
-      panel.hidePopover()
+    if (element.matches(':popover-open'))
+      element.hidePopover()
 
     return
   }
@@ -94,10 +102,10 @@ effect(() => {
   const own = target.element.style.getPropertyValue('anchor-name')
 
   target.element.style.setProperty('anchor-name', own ? `${own}, ${ANCHOR}` : ANCHOR)
-  panel.style.setProperty('position-area', target.element.dataset.tooltipPlacement ?? 'top')
+  element.style.setProperty('position-area', target.element.dataset.tooltipPlacement ?? 'top')
 
-  if (!panel.matches(':popover-open'))
-    panel.showPopover()
+  if (!element.matches(':popover-open'))
+    element.showPopover()
 
   onCleanup(() => {
     if (own)
@@ -107,5 +115,6 @@ effect(() => {
   })
 })
 ---
-// Rendered once, in the root layout: it shows the tooltip of whichever element the pointer or a tab lands on.
-.kui-tooltip(ref={element => panel = element} popover="manual" role="tooltip") {aimed()?.text}
+// Rendered in the root layout, it shows the tooltip of whichever element the pointer or a tab lands on. A second one, such as an extension's, renders nothing while the first is mounted.
+if owns()
+  .kui-tooltip(ref={element => panel.set(element)} popover="manual" role="tooltip") {aimed()?.text}
