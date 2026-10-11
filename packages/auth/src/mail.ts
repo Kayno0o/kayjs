@@ -3,7 +3,7 @@ import type { LinkType } from './store'
 import { language, pickLocale } from './locale'
 
 // A change to what protects an account, mailed to its verified address and given to `onEvent`.
-export type SecurityEvent = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'account-deleted'
+export type SecurityEvent = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'account-deleted'
 
 // What a mail is about: a link to follow, news of a change to the account, or an invitation to join an organization.
 export type MailKind = LinkType | SecurityEvent | 'invitation'
@@ -158,6 +158,7 @@ export const defaultTemplates: Templates = {
   'passkey-added': data => noticeMail(en, data, 'New passkey', `A passkey named ${data.detail} can now sign into your ${data.site} account.`),
   'passkey-removed': data => noticeMail(en, data, 'Passkey removed', `The passkey named ${data.detail} no longer signs into your ${data.site} account.`),
   'token-created': data => noticeMail(en, data, 'New access token', `An access token named ${data.detail} was created for your ${data.site} account.`),
+  'signed-out-everywhere': data => noticeMail(en, data, 'Signed out everywhere', `Your ${data.site} account was signed out everywhere: every session and access token it had has ended.`),
   'account-deleted': data => noticeMail(en, data, 'Account deleted', `Your ${data.site} account was deleted.`, en.contactSite),
 }
 
@@ -181,6 +182,7 @@ export const frenchTemplates: Templates = {
   'passkey-added': data => noticeMail(fr, data, 'Nouvelle clé d\'accès', `Une clé d'accès nommée ${data.detail} peut désormais se connecter à votre compte ${data.site}.`),
   'passkey-removed': data => noticeMail(fr, data, 'Clé d\'accès supprimée', `La clé d'accès nommée ${data.detail} ne permet plus de se connecter à votre compte ${data.site}.`),
   'token-created': data => noticeMail(fr, data, 'Nouveau jeton d\'accès', `Un jeton d'accès nommé ${data.detail} a été créé pour votre compte ${data.site}.`),
+  'signed-out-everywhere': data => noticeMail(fr, data, 'Déconnexion partout', `Votre compte ${data.site} a été déconnecté partout : toutes ses sessions et tous ses jetons d'accès ont pris fin.`),
   'account-deleted': data => noticeMail(fr, data, 'Compte supprimé', `Votre compte ${data.site} a été supprimé.`, fr.contactSite),
 }
 

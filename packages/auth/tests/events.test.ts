@@ -69,14 +69,14 @@ describe('events', () => {
   })
 
   test('signing out everywhere says whether this session stayed', async () => {
-    const { browser, said } = setup()
+    const { browser, events } = setup()
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
     await ada.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
     await ada.fetch('/sign-out-everywhere', { method: 'POST' })
 
-    expect(said().slice(1)).toEqual([['signed-out', 'everywhere-else'], ['signed-out', 'everywhere']])
+    expect(events.filter(entry => entry.event === 'signed-out-everywhere').map(entry => [entry.event, entry.detail])).toEqual([['signed-out-everywhere', 'this-one-kept'], ['signed-out-everywhere', undefined]])
   })
 
   test('an onEvent that throws is logged through the app\'s log setting, and the sign-in goes on', async () => {

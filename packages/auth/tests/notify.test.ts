@@ -96,6 +96,15 @@ describe('changes to what protects the account', () => {
     expect(events.find(entry => entry.event === 'token-created')?.detail).toBe('Phone')
   })
 
+  test('signing out everywhere, so the owner hears of it after a scare as of a password change', async () => {
+    const { ada, notices, events } = await verified()
+
+    await ada.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
+
+    expect(notices()).toEqual(['signed-out-everywhere'])
+    expect(events.at(-1)).toEqual({ event: 'signed-out-everywhere', detail: 'this-one-kept' })
+  })
+
   test('an unverified address is never mailed a notice, though the app still hears of it', async () => {
     const mails: Mail[] = []
     const events: AuthEvent[] = []

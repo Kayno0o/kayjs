@@ -320,6 +320,7 @@ A change to what protects an account is mailed to its verified address, never an
 
 - `new-sign-in`: a device or network the account had not used before; the first sign-in has nothing to compare against. The mail links to `sessionsPage` when the app has one.
 - `password-changed`, `two-factor-enabled`, `two-factor-disabled`, `recovery-code-used`, `recovery-codes-regenerated`, `account-deleted`.
+- `signed-out-everywhere`, from `signOutEverywhere` and the sessions page's button, `detail` `this-one-kept` when the session asking stayed signed in.
 - `email-changed`, mailed to the address left, `detail` the new one.
 - `provider-linked` and `provider-unlinked`, `detail` the provider; `passkey-added` and `passkey-removed`, `detail` its name; `token-created`, `detail` its label.
 
@@ -328,7 +329,7 @@ A change to what protects an account is mailed to its verified address, never an
 `onEvent(event, user, detail, context)` hears every security mail's event above, mailed or not, and these, never mailed:
 
 - `signed-in`, `detail` how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `oauth:<provider>`, `passkey`, `guest`, or `app` for `auth.signIn`. A sign-in through the second factor is heard once it is answered, with its first factor.
-- `signed-out`; `detail` `everywhere` or `everywhere-else` from `signOutEverywhere`.
+- `signed-out`.
 - `sign-in-failed`, for an account that exists only: `detail` `password`, `two-factor` or `passkey`.
 - An admin's doing, `actor` the admin: `role-granted` and `role-revoked`, `detail` the role; `banned`, `detail` the reason; `unbanned`; `impersonation-started` and `impersonation-ended`.
 - In an organization, `detail` its id: `organization-created` and `organization-deleted`; `member-joined` and `member-roles-changed`, `detail` the id then the roles given, space-separated; `member-left`; `member-removed`. A manager's doing names them as `actor`.
