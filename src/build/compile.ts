@@ -22,19 +22,27 @@ export interface CompileOptions {
 
 // Bun embeds an asset directory under its last path component, beside the executable's entry.
 const CLIENT_ASSETS = 'client'
-// What bundles the client and loads `.kay` files at boot, which bring the compiler: a server reading the build it embeds imports neither.
-const COMPILER_MODULES = new Set([join(import.meta.dir, 'client.ts'), join(import.meta.dir, 'plugin.ts')])
+// What a server reading the build it embeds never runs, each with what it says if called: the client bundler and the `.kay` loader, which bring the compiler, and the SVG favicon drawer, which brings resvg.
+const LEFT_OUT_MODULES = new Map([
+  [join(import.meta.dir, 'client.ts'), 'an executable serves the build it embeds, and carries no compiler'],
+  [join(import.meta.dir, 'plugin.ts'), 'an executable serves the build it embeds, and carries no compiler'],
+  [join(import.meta.dir, '../server/svg-icon.ts'), 'an executable serves the favicons `kay build` drew, and carries no SVG drawer'],
+])
 const LEFT_OUT = 'kay-left-out'
 const RELATIVE = /^\.\.?\//
 const ANY = /.*/
 
-// Leaves the compiler out of the executable: 2 MB the server never runs.
+// Leaves the compiler and resvg out of the executable: megabytes the server never runs.
 function withoutCompiler(): BunPlugin {
   return {
     name: 'kay-without-compiler',
     setup(build) {
-      build.onResolve({ filter: RELATIVE }, ({ path, importer }) => COMPILER_MODULES.has(`${resolve(dirname(importer), path)}.ts`) ? { path, namespace: LEFT_OUT } : undefined)
-      build.onLoad({ filter: ANY, namespace: LEFT_OUT }, () => ({ contents: 'throw new Error(\'kay: an executable serves the build it embeds, and carries no compiler\')', loader: 'js' }))
+      build.onResolve({ filter: RELATIVE }, ({ path, importer }) => {
+        const file = `${resolve(dirname(importer), path)}.ts`
+
+        return LEFT_OUT_MODULES.has(file) ? { path: file, namespace: LEFT_OUT } : undefined
+      })
+      build.onLoad({ filter: ANY, namespace: LEFT_OUT }, ({ path }) => ({ contents: `throw new Error(${JSON.stringify(`kay: ${LEFT_OUT_MODULES.get(path)}`)})`, loader: 'js' }))
     },
   }
 }

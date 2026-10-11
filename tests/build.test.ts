@@ -1050,3 +1050,41 @@ process.exit(0)
     }
   }, 60_000)
 })
+
+describe('a compiled server with an SVG favicon', () => {
+  it('serves the icons kay build drew from it, carrying no resvg', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { favicon: \'src/favicon.svg\' }\n',
+      'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#c00"/></svg>',
+      'src/routes/index.kay': 'h1 Home\n',
+      'src/server.ts': `import process from 'node:process'
+import { Elysia } from 'elysia'
+import { pages } from 'kay/server'
+
+const app = new Elysia().use(await pages({ security: false }))
+const statuses = await Promise.all(['/favicon.ico', '/icon-512.png', '/favicon.svg'].map(async path => (await app.handle(new Request(\`http://localhost\${path}\`))).status))
+
+console.log(JSON.stringify(statuses))
+process.exit(0)
+`,
+    })
+
+    try {
+      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+
+      expect(report).not.toContain('error')
+      expect(code).toBe(0)
+      await rename(join(root, 'src'), join(root, 'moved'))
+      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual([200, 200, 200])
+      expect((await Bun.file(join(root, 'server')).text()).includes('resvg-js')).toBe(false)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+})

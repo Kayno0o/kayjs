@@ -23,6 +23,7 @@ const ICO_SIZES = [16, 32, 48]
 // The widest icon kay writes, which the source must reach so none is upscaled.
 const LARGEST = 512
 const ICO = '/favicon.ico'
+const SVG_FILE = /\.svg$/i
 
 // Every path the favicon serves, an SVG one adding its SVG and a maskable manifest icon its own icons.
 export const FAVICON_PATHS = [ICO, ...Object.keys(PNG_FILES), MANIFEST, SVG, ...Object.keys(MASKABLE_FILES)]
@@ -34,9 +35,9 @@ export interface FaviconSource {
   maskable?: string | undefined
 }
 
-// Whether a `favicon` setting serves an SVG: kay's mark does, and a project's own when it names one.
+// Whether a `favicon` setting serves an SVG: kay's mark does, and a project's own when it names one or is one.
 function servesSvg(favicon: string | FaviconConfig | undefined): boolean {
-  return typeof favicon !== 'string'
+  return typeof favicon !== 'string' || SVG_FILE.test(favicon)
 }
 
 // The favicon's source: the project's own, kay's mark when it names none, or none once turned off.
@@ -49,7 +50,10 @@ export function faviconSource(root: string, favicon: string | FaviconConfig | fa
   if (favicon === undefined)
     return { image: DEFAULT_FAVICON, svg: DEFAULT_SVG, ...maskable }
 
-  return typeof favicon === 'string' ? { image: resolve(root, favicon), ...maskable } : { image: resolve(root, favicon.image), svg: resolve(root, favicon.svg), ...maskable }
+  if (typeof favicon === 'string')
+    return { image: resolve(root, favicon), ...SVG_FILE.test(favicon) && { svg: resolve(root, favicon) }, ...maskable }
+
+  return { image: resolve(root, favicon.image), svg: resolve(root, favicon.svg), ...maskable }
 }
 
 export interface FaviconOptions {
@@ -65,26 +69,64 @@ export interface FaviconOptions {
 
 // The favicon in the sizes browsers ask for: an ICO of PNGs, the Apple touch icon and the manifest's icons, maskable ones included.
 export async function faviconFiles({ image: source, svg, maskable }: FaviconSource): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
-  await checkSquare(source, 'favicon')
-
-  if (maskable !== undefined)
-    await checkSquare(maskable, 'maskable icon')
-
+  const png = await drawer(source, 'favicon')
+  const maskablePng = maskable === undefined ? undefined : await drawer(maskable, 'maskable icon')
   const files = new Map<string, Uint8Array<ArrayBuffer>>()
-  const png = async (image: string, size: number) => new Uint8Array(await new Bun.Image(image).resize(size, size).png().bytes())
 
   for (const [path, size] of Object.entries(PNG_FILES))
-    files.set(path, await png(source, size))
+    files.set(path, await png(size))
 
-  files.set(ICO, ico(await Promise.all(ICO_SIZES.map(async size => png(source, size))), ICO_SIZES))
+  files.set(ICO, ico(await Promise.all(ICO_SIZES.map(async size => png(size))), ICO_SIZES))
 
   if (svg !== undefined)
     files.set(SVG, await Bun.file(svg).bytes())
 
-  for (const [path, size] of maskable === undefined ? [] : Object.entries(MASKABLE_FILES))
-    files.set(path, await png(maskable!, size))
+  if (maskablePng !== undefined) {
+    for (const [path, size] of Object.entries(MASKABLE_FILES))
+      files.set(path, await maskablePng(size))
+  }
 
   return files
+}
+
+// Draws the image at each size: an SVG drawn at it, so even the 16-pixel icon is sharp, an image resized to it once checked square.
+async function drawer(image: string, what: string): Promise<(size: number) => Promise<Uint8Array<ArrayBuffer>>> {
+  if (SVG_FILE.test(image)) {
+    const draw = await svgIconOf(image, what)
+
+    return async size => draw(size)
+  }
+
+  await checkSquare(image, what)
+
+  return async size => new Uint8Array(await new Bun.Image(image).resize(size, size).png().bytes())
+}
+
+// The SVG's drawing, through a module an executable leaves out, as it serves the icons `kay build` drew.
+async function svgIconOf(file: string, what: string): Promise<(size: number) => Uint8Array<ArrayBuffer>> {
+  const { svgIcon } = await import('./svg-icon')
+
+  return svgIcon(file, what)
+}
+
+// What `kay check` reports of a favicon or maskable icon given as an SVG: one with no size, not square or not drawable.
+export async function svgFaviconProblems(source: FaviconSource | undefined): Promise<{ file: string, message: string }[]> {
+  const icons: [string | undefined, string][] = [[source?.image, 'favicon'], [source?.maskable, 'maskable icon']]
+  const problems = await Promise.all(icons.map(async ([file, what]) => {
+    if (file === undefined || !SVG_FILE.test(file))
+      return []
+
+    try {
+      await svgIconOf(file, what)
+
+      return []
+    }
+    catch (error) {
+      return [{ file, message: error instanceof Error ? error.message : String(error) }]
+    }
+  }))
+
+  return problems.flat()
 }
 
 async function checkSquare(source: string, what: string): Promise<void> {

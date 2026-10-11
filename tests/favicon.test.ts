@@ -2,6 +2,7 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { bootProblems } from '../src/check/boot'
 import { pages } from '../src/server'
 import { faviconFiles, manifestJson, writeFavicons } from '../src/server/favicon'
 
@@ -169,6 +170,44 @@ describe('favicon', () => {
     await writeFavicons({ image: SOURCE, svg }, join(scratch, 'built-svg'))
 
     expect(await Bun.file(join(scratch, 'built-svg/favicon.svg')).text()).toBe(await Bun.file(svg).text())
+  })
+
+  it('makes every icon from an SVG named alone, drawn at each size, and serves and links the SVG as it is', async () => {
+    const svg = join(scratch, 'only.svg')
+
+    await Bun.write(svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#c00"/></svg>')
+
+    const own = await pages({ routes: ROUTES, prebuilt: false, favicon: svg })
+    const served = await own.handle(new Request('http://localhost/favicon.svg'))
+    const files = await faviconFiles({ image: svg, svg })
+    const ico = files.get('/favicon.ico')!
+    const view = new DataView(ico.buffer)
+
+    expect(await served.text()).toBe(await Bun.file(svg).text())
+    expect(await (await own.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
+    expect(await widthOf(await (await own.handle(new Request('http://localhost/icon-192.png'))).bytes())).toBe(192)
+    expect(await Promise.all([0, 1, 2].map(async index => widthOf(ico.slice(view.getUint32(6 + 16 * index + 12, true), view.getUint32(6 + 16 * index + 12, true) + view.getUint32(6 + 16 * index + 8, true)))))).toEqual([16, 32, 48])
+    expect(await Promise.all(['/apple-touch-icon.png', '/icon-512.png'].map(async path => widthOf(files.get(path)!)))).toEqual([180, 512])
+
+    await writeFavicons({ image: svg, svg }, join(scratch, 'built-only-svg'))
+
+    expect((await readdir(join(scratch, 'built-only-svg'))).sort()).toEqual(['apple-touch-icon.png', 'favicon.ico', 'favicon.svg', 'icon-192.png', 'icon-512.png'])
+  })
+
+  it('refuses an SVG favicon with no size, not square or not drawable, naming it, as kay check reports it', async () => {
+    const svgs: Record<string, [string, string]> = {
+      'unsized.svg': ['<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect width="10" height="10"/></svg>', 'has no viewBox, nor a width and height, so it has no size to draw at'],
+      'wide.svg': ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 32"/>', 'is 64x32; it has to be square'],
+      'broken.svg': ['not an svg', 'is not an SVG kay can draw'],
+    }
+
+    for (const [name, [source, message]] of Object.entries(svgs)) {
+      const file = join(scratch, name)
+
+      await Bun.write(file, source)
+      await expect(faviconFiles({ image: file, svg: file })).rejects.toThrow(`kay: the favicon ${file} ${message}`)
+      expect((await bootProblems(scratch, { favicon: name })).filter(problem => problem.file === file).map(problem => problem.message)).toEqual([expect.stringContaining(`kay: the favicon ${file} ${message}`)])
+    }
   })
 
   it('gives every page the theme colour with the favicon turned off, the site linking its own', async () => {

@@ -13,6 +13,7 @@ import { actionClash } from '../server/actions'
 import { basePath } from '../server/base'
 import { claimEndpoints } from '../server/endpoints'
 import { PUBLIC_ENV_PATH } from '../server/env'
+import { faviconSource, svgFaviconProblems } from '../server/favicon'
 import { localeSettings, refuseLocaleClashes } from '../server/i18n'
 import { shutdownSeconds } from '../server/lifecycle'
 import { claimPublic, publicFiles } from '../server/public'
@@ -47,6 +48,10 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
   if (shutdownTimeout !== undefined)
     refused(config, () => shutdownSeconds(shutdownTimeout))
+
+  // An SVG favicon is drawn by `kay build`, which it would fail.
+  for (const { file, message } of await svgFaviconProblems(faviconSource(root, options.favicon, options.manifest)))
+    diagnostics.push({ file, line: 1, column: 1, message })
 
   let settings: LocaleSettings | undefined
 

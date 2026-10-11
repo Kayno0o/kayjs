@@ -1466,9 +1466,9 @@ describe('compression', () => {
 })
 
 describe('footprint', () => {
-  it('serves without loading the compiler, which only development and the build need', async () => {
+  it('serves without loading the compiler or resvg, which only development and the build need', async () => {
     // A process of its own, as this one compiled `.kay` files already; Babel is CommonJS, so loading it fills require.cache.
-    const probe = Bun.spawn(['bun', '-e', 'await import(\'./src/server/index.ts\'); await import(\'./src/server/internal.ts\'); console.log(Object.keys(require.cache).filter(key => key.includes(\'@babel\')).join(\'\\n\'))'], { stdout: 'pipe' })
+    const probe = Bun.spawn(['bun', '-e', 'await import(\'./src/server/index.ts\'); await import(\'./src/server/internal.ts\'); console.log(Object.keys(require.cache).filter(key => key.includes(\'@babel\') || key.includes(\'@resvg\')).join(\'\\n\'))'], { stdout: 'pipe' })
 
     expect((await new Response(probe.stdout).text()).trim()).toBe('')
     expect(await probe.exited).toBe(0)

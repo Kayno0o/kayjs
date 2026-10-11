@@ -34,7 +34,7 @@ export interface KayConfig {
   // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
   head?: HeadTag[] | undefined
   images?: ImagesConfig | undefined
-  // A square image, relative to the root, 512 pixels wide or more for sharp icons, a smaller one enlarged with a warning: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. `{ image, svg }` adds an SVG of it, served as `/favicon.svg` and linked after the ICO. Defaults to kay's own mark; `false` serves none.
+  // A square image, relative to the root, 512 pixels wide or more for sharp icons, a smaller one enlarged with a warning: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. `{ image, svg }` adds an SVG of it, served as `/favicon.svg` and linked after the ICO; a square SVG alone is both, every icon drawn from it. Defaults to kay's own mark; `false` serves none.
   favicon?: string | FaviconConfig | false | undefined
   // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
   manifest?: ManifestConfig | undefined
@@ -180,7 +180,7 @@ export interface FontsourceConfig {
   display?: FontConfig['display'] | undefined
 }
 
-// A favicon with an SVG of it: kay makes the ICO and the PNG icons from `image`, since it draws no SVG, and serves `svg` as it is.
+// A favicon with an SVG of it: kay makes the ICO and the PNG icons from `image`, and serves `svg` as it is.
 export interface FaviconConfig {
   image: string
   svg: string
