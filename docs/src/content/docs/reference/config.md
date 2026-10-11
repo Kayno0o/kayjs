@@ -82,7 +82,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 
 | Option | Effect |
 | --- | --- |
-| `security` | The CSP and security headers every response carries, or `false` for none. See [Deployment](/guides/deployment) |
+| `security` | The CSP and security headers every response carries, or `false` for none; `X-Frame-Options` follows the policy's `frame-ancestors`. See [Deployment](/guides/deployment) |
 | `proxy` | The proxies in front of the server, for the client address rate limits count |
 | `compress` | Brotli and gzip for pages rendered per request, when no proxy does it |
 | `health` | The route a load balancer polls, `/_kay/health` by default |

@@ -40,6 +40,7 @@ const SCRIPT_DIRECTIVES = ['script-src', 'script-src-elem']
 const STYLE_DIRECTIVES = ['style-src', 'style-src-elem']
 const UNSAFE_INLINE = '\'unsafe-inline\''
 const NONE = '\'none\''
+const SELF = '\'self\''
 
 // The directives a browser reads in turn in place of one the policy lacks, as CSP3 has them, which a page adding sources to it starts from; any other fetch directive falls back to `default-src` alone.
 const FALLBACKS: Record<string, string[]> = {
@@ -55,7 +56,7 @@ const FETCH_DIRECTIVE = /-src(?:-elem|-attr)?$/
 const HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
-  // `frame-ancestors` for browsers that predate it.
+  // `frame-ancestors` for browsers that predate it, following the policy's: see `frameOptions`.
   'x-frame-options': 'SAMEORIGIN',
   // A page this site opens in another window, or that opens one of its pages, gets no handle on it: no `window.opener` across sites.
   'cross-origin-opener-policy': 'same-origin',
@@ -85,11 +86,20 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
 
   const added = pages.flatMap(page => page.csp ? [page.csp] : [])
 
-  if (csp !== false)
-    headers['content-security-policy'] = policy([csp ?? {}], hashes, styles, reportTo, options.islands, added)
+  if (csp !== false) {
+    const directives = policy([csp ?? {}], hashes, styles, reportTo, options.islands, added)
+    const frames = frameOptions(directives.get('frame-ancestors'))
+
+    headers['content-security-policy'] = serialized(directives)
+
+    if (frames === undefined)
+      delete headers['x-frame-options']
+    else
+      headers['x-frame-options'] = frames
+  }
 
   if (reportOnly)
-    headers['content-security-policy-report-only'] = policy([csp === false || csp === undefined ? {} : csp, reportOnly], hashes, styles, reportTo, options.islands, added)
+    headers['content-security-policy-report-only'] = serialized(policy([csp === false || csp === undefined ? {} : csp, reportOnly], hashes, styles, reportTo, options.islands, added))
 
   return withHeaders(headers, [options.security?.headers ?? {}, ...pageHeaders])
 }
@@ -138,7 +148,7 @@ export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<st
 // A hash switches `'unsafe-inline'` off, so a style directive allowing it gets none.
 // A page's sources are then added to what the site's directives hold.
 // `report-uri` is for browsers that predate `report-to`, which those that know it read instead.
-function policy(layers: Record<string, string[] | false>[], hashes: string[], styles: string[], reportTo: string | undefined, islands: Record<string, string[]> = {}, added: Record<string, string[] | false>[] = []): string {
+function policy(layers: Record<string, string[] | false>[], hashes: string[], styles: string[], reportTo: string | undefined, islands: Record<string, string[]> = {}, added: Record<string, string[] | false>[] = []): Map<string, string[]> {
   const directives = new Map(Object.entries(DIRECTIVES))
   const removed = new Set<string>()
 
@@ -199,7 +209,19 @@ function policy(layers: Record<string, string[] | false>[], hashes: string[], st
       directives.set(name, [...sources, ...styles])
   }
 
+  return directives
+}
+
+function serialized(directives: Map<string, string[]>): string {
   return [...directives].map(([name, sources]) => sources.length > 0 ? `${name} ${sources.join(' ')}` : name).join('; ')
+}
+
+// What X-Frame-Options says of the policy's `frame-ancestors`: DENY for `'none'`, SAMEORIGIN for `'self'` alone, and nothing for any other source, which it cannot name, or without the directive.
+function frameOptions(sources: string[] | undefined): string | undefined {
+  if (sources?.length !== 1)
+    return undefined
+
+  return sources[0] === NONE ? 'DENY' : sources[0] === SELF ? 'SAMEORIGIN' : undefined
 }
 
 // What the browser enforces for a fetch directive the policy lacks: that of the directive it falls back to, or nothing for any other.

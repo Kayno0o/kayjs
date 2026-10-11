@@ -104,6 +104,19 @@ describe('security headers', () => {
     expect(securityHeaders({ islands, security: false })).toBeUndefined()
   })
 
+  it('sends X-Frame-Options as frame-ancestors says, under the app\'s own', () => {
+    const frames = (csp: Record<string, string[] | false> | false, headers?: Record<string, string | false>, page?: Record<string, string[]>) => securityHeaders({ security: { csp, headers } }, page ? [{ csp: page }] : [])!['x-frame-options']
+
+    expect(frames({})).toBe('SAMEORIGIN')
+    expect(frames({ 'frame-ancestors': ['\'none\''] })).toBe('DENY')
+    expect(frames({ 'frame-ancestors': ['\'self\'', 'https://cms.example.com'] })).toBeUndefined()
+    expect(frames({ 'frame-ancestors': ['https://cms.example.com'] })).toBeUndefined()
+    expect(frames({ 'frame-ancestors': false })).toBeUndefined()
+    expect(frames({}, {}, { 'frame-ancestors': ['https://cms.example.com'] })).toBeUndefined()
+    expect(frames({ 'frame-ancestors': ['\'none\''] }, { 'x-frame-options': 'SAMEORIGIN' })).toBe('SAMEORIGIN')
+    expect(frames(false)).toBe('SAMEORIGIN')
+  })
+
   it('starts a directive a page adds from the policy before the page, whatever order the page lists its directives in', () => {
     const policy = (csp: Record<string, string[]>) => directives(securityHeaders({}, [{ csp }])!['content-security-policy']!)
     const cdn = 'https://cdn.example.com'
