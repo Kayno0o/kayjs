@@ -7,6 +7,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import { emptyValue, itemAt } from '../fields'
@@ -60,7 +61,7 @@ function setJson(next: string): void {
           FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(path, child.key)})
     when 'textarea'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
-        textarea.kui-field-input(rows="4" value={text()} onInput={event => set(event.currentTarget.value)})
+        Textarea(rows="4" value={text()} onInput={set})
     when 'markdown'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
         MarkdownEditor(value={text()} onInput={set})
@@ -81,7 +82,7 @@ function setJson(next: string): void {
         FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} onChange={set})
     when 'json'
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={current.required})
-        textarea.kui-field-input.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={event => setJson(event.currentTarget.value)})
+        Textarea.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={setJson})
     else
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
         TextInput(value={text()} onInput={set})
