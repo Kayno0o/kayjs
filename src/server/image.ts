@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
-import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
 import { inLocale, passGuards } from './actions'
 import { AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
@@ -136,7 +136,8 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
     if (animated)
       return
 
-    const variants = [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name)]
+    // A width below the ladder a page asked for may be the image's own, written already.
+    const variants = [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name).filter(variant => variant === 'card' || variant.aspect !== undefined || variant.width < width)]
     // The share card stays a JPEG, which social sites read best.
     const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(quality) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${avif}s${AVIF_SPEED}` }]])
     const missing: { variant: number | ImageVariant, format: VariantFormat, target: string, cached: string | undefined }[] = []
@@ -179,7 +180,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
   return encoded
 }
 
-// `/_kay/image?src=...&w=640` answers a WebP, or an AVIF to a browser that reads it when `avif` is set, of an imported image, or of one in a directory of runtime images or on a host `images.remote` lists, at a width of the ladder or its own; `&crop=16x9` cuts it to an aspect ratio `images.aspects` allows, and `?src=...&card` answers its 1200x630 JPEG share card.
+// `/_kay/image?src=...&w=640` answers a WebP, or an AVIF to a browser that reads it when `avif` is set, of an imported image, or of one in a directory of runtime images or on a host `images.remote` lists, at a width of the ladder, a multiple of 16 below it or its own; `&crop=16x9` cuts it to an aspect ratio `images.aspects` allows, and `?src=...&card` answers its 1200x630 JPEG share card.
 export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const pending = new Map<string, Promise<void>>()
   const allowed = new Set((options.aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!)))
@@ -372,7 +373,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   }
 }
 
-// The variant a request asks for, or why it is refused: a width of the ladder below the image's own, or its own, cut or not to an allowed aspect ratio, or the share card.
+// The variant a request asks for, or why it is refused: a width of the ladder or a multiple of `SMALL_STEP` below it, narrower than the image's own, or its own, cut or not to an allowed aspect ratio, or the share card.
 function requestedVariant(url: URL, own: { width: number, height: number }, allowed: ReadonlySet<string>): ImageVariant | string {
   if (url.searchParams.has('card'))
     return 'card'
@@ -390,10 +391,14 @@ function requestedVariant(url: URL, own: { width: number, height: number }, allo
   const width = Number(url.searchParams.get('w'))
   const most = aspect ? croppedSize(own, aspect).width : own.width
 
-  if (!Number.isInteger(width) || (width !== most && !(LADDER.has(width) && width < most)))
-    return `Width ${url.searchParams.get('w')} is neither one of ${IMAGE_WIDTHS.join(', ')} below the image's own nor its own, ${most}`
+  if (!Number.isInteger(width) || (width !== most && !(madeWidth(width) && width < most)))
+    return `Width ${url.searchParams.get('w')} is neither one of ${IMAGE_WIDTHS.join(', ')} or a multiple of ${SMALL_STEP} under ${IMAGE_WIDTHS[0]} below the image's own, nor its own, ${most}`
 
   return aspect ? { width, aspect } : { width }
+}
+
+function madeWidth(width: number): boolean {
+  return LADDER.has(width) || (width > 0 && width < IMAGE_WIDTHS[0] && width % SMALL_STEP === 0)
 }
 
 // The WebP variant `kay build` wrote for an image route URL naming an imported image, or undefined for any other.

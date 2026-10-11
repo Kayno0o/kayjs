@@ -94,6 +94,8 @@ import hero from '../hero.jpg'
 img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 ```
 
+An image always drawn at one width in pixels, such as a logo with `sizes="95px"`, gets one variant per screen density instead, from 1x to `images.maxDensity`, each rounded up to a width the image route makes, a multiple of 16 below 320: `96w` and `192w` for that logo, never wider than the image itself.
+
 `image(hero, { aspect: '16/9' })` from `kay/image` cuts the variants to a shape instead of relying on `object-fit`. Spread its result on the element:
 
 ```kay

@@ -86,6 +86,28 @@ describe('image()', () => {
     expect(image('/uploads/a.jpg')).toEqual({ src: '/uploads/a.jpg' })
     expect(image(registerImage('/_kay/assets/icon-1.svg', 24, 24))).toEqual({ src: '/_kay/assets/icon-1.svg', width: 24, height: 24 })
   })
+
+  it('gives an image drawn at a fixed width one variant per density, at the narrowest width the route makes, none past its own', () => {
+    const widths = (sizes: string, width = 2000) => image('/uploads/logo.png', { width, height: 1000, sizes }).srcset!.split(', ').map(entry => entry.slice(entry.indexOf(' ') + 1))
+
+    expect(widths('95px')).toEqual(['96w', '192w'])
+    expect(widths(' 95PX ')).toEqual(['96w', '192w'])
+    expect(widths('95px', 150)).toEqual(['96w', '150w'])
+    expect(widths('95px', 60)).toEqual(['60w'])
+    expect(widths('200px')).toEqual(['208w', '640w'])
+    expect(widths('30rem')).toEqual(['320w', '640w', '960w', '1280w', '1920w', '2000w'])
+    expect(image('/uploads/logo.png', { width: 2000, height: 1000, sizes: '95px' }).sizes).toBe(cappedSizes('95px', 2))
+
+    try {
+      setMaxDensity(Infinity)
+      expect(widths('95px')).toEqual(['96w', '192w', '288w'])
+      setMaxDensity(2.5)
+      expect(widths('95px')).toEqual(['96w', '192w', '240w'])
+    }
+    finally {
+      setMaxDensity(2)
+    }
+  })
 })
 
 describe('density cap', () => {
@@ -160,10 +182,11 @@ describe('image route', () => {
     }
   })
 
-  it('takes the image\'s own width, and refuses one off the ladder or above it', async () => {
+  it('takes the image\'s own width and a multiple of 16 below the ladder, and refuses any other width or one above its own', async () => {
     expect((await new Bun.Image(await (await get(heroAt(1000))).bytes()).metadata()).width).toBe(1000)
+    expect((await new Bun.Image(await (await get(heroAt(96))).bytes()).metadata()).width).toBe(96)
 
-    for (const width of [700, 1280, 0, -320, 'x', ''])
+    for (const width of [700, 1280, 100, 0, -320, -16, 'x', ''])
       expect((await get(heroAt(width))).status).toBe(400)
   })
 
@@ -515,16 +538,17 @@ describe('crops and share cards', () => {
     expect(await processImage(Bun.file(join(uploads, 'thin.png')), { width: 400, height: 400, fit: 'cover' })).toMatchObject({ width: 400, height: 400 })
   })
 
-  it('writes at build time the crops and cards pages asked for', async () => {
+  it('writes at build time the crops, cards and widths below the ladder pages asked for', async () => {
     const client = await mkdtemp(join(tmpdir(), 'kay-client-'))
 
     try {
       await Bun.write(join(client, 'assets', 'crop-abc.png'), Bun.file(HERO))
       image(hero, { aspect: '16/9' })
       shareImage(hero)
+      image(hero, { sizes: '95px' })
       await writeImageVariants(client)
 
-      expect(await readdir(join(client, 'images'))).toEqual(expect.arrayContaining(['crop-abc-320.webp', 'crop-abc-320-16x9.webp', 'crop-abc-1000-16x9.webp', 'crop-abc-card.jpg']))
+      expect(await readdir(join(client, 'images'))).toEqual(expect.arrayContaining(['crop-abc-320.webp', 'crop-abc-320-16x9.webp', 'crop-abc-1000-16x9.webp', 'crop-abc-96.webp', 'crop-abc-192.webp', 'crop-abc-card.jpg']))
       expect(await new Bun.Image(Bun.file(join(client, 'images', 'crop-abc-640-16x9.webp'))).metadata()).toEqual({ width: 640, height: 360, format: 'webp' })
       expect(await new Bun.Image(Bun.file(join(client, 'images', 'crop-abc-card.jpg'))).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
     }

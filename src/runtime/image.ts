@@ -1,6 +1,13 @@
 import { kayLog } from './log'
 // The widths an image is resized to, the only ones the image route makes: a fixed ladder keeps how many files one image can turn into bounded.
 export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560, 3840] as const
+// Below the ladder, the route also makes the multiples of this, for an image drawn at a fixed width: still a bounded number of files, none much wider than drawn.
+export const SMALL_STEP = 16
+// A `sizes` that is one length in pixels; `rem` and `em` follow the font size.
+const FIXED_SIZE = /^\s*(\d+(?:\.\d+)?)px\s*$/i
+// The densities an image drawn at a fixed width gets variants for when `images.maxDensity` leaves the browser's choice.
+const UNCAPPED_DENSITY = 3
+
 export const IMAGE_ROUTE = '/_kay/image'
 export const CARD_ROUTE = '/_kay/card'
 // Where imported images are served, and the variants `kay build` writes of them.
@@ -221,7 +228,7 @@ export function storedSize(src: string): { width: number, height: number } | und
   return match ? { width: Number(match[1]), height: Number(match[2]) } : undefined
 }
 
-// An imported or stored image, or one from a directory in `images.dirs` or a host in `images.remote` given its size, served as WebP variants at each width of the ladder up to its own.
+// An imported or stored image, or one from a directory in `images.dirs` or a host in `images.remote` given its size, served as WebP variants at each width of the ladder up to its own; drawn at a fixed width, `sizes: '95px'`, at that width for each density up to `images.maxDensity`.
 export function image(src: string, options: ImageOptions = {}): ImageProps {
   const own = sizes.get(src) ?? storedSize(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
 
@@ -230,7 +237,8 @@ export function image(src: string, options: ImageOptions = {}): ImageProps {
 
   const aspect = options.aspect === undefined ? undefined : allowedAspect(options.aspect)
   const size = aspect ? croppedSize(own, aspect) : own
-  const widths = [...IMAGE_WIDTHS.filter(width => width < size.width), size.width]
+  const fixed = FIXED_SIZE.exec(options.sizes ?? '')
+  const widths = fixed ? fixedWidths(Number(fixed[1]), currentMaxDensity(), size.width) : [...IMAGE_WIDTHS.filter(width => width < size.width), size.width]
 
   return {
     src: imageUrl(src, widths.findLast(width => width <= FALLBACK_WIDTH) ?? widths[0]!, aspect),
@@ -239,6 +247,19 @@ export function image(src: string, options: ImageOptions = {}): ImageProps {
     width: size.width,
     height: size.height,
   }
+}
+
+// The widths an image drawn `drawn` pixels wide needs, from 1x to the densest screen it is loaded for, each the narrowest the route makes at or above it, none past the image's own.
+function fixedWidths(drawn: number, density: number, most: number): number[] {
+  const densest = Number.isFinite(density) ? density : UNCAPPED_DENSITY
+  const densities = [...Array.from({ length: Math.floor(densest) }, (_, index) => index + 1), densest]
+
+  return [...new Set(densities.map(at => Math.min(most, routeWidth(drawn * at))))].sort((a, b) => a - b)
+}
+
+// The narrowest width the route makes at or above `width`, past the ladder the image's own.
+function routeWidth(width: number): number {
+  return width < IMAGE_WIDTHS[0] ? Math.max(1, Math.ceil(width / SMALL_STEP)) * SMALL_STEP : IMAGE_WIDTHS.find(step => step >= width) ?? Infinity
 }
 
 function allowedAspect(text: string): Aspect {
@@ -390,7 +411,8 @@ export function imageUrl(src: string, width: number, aspect?: Aspect): string {
 }
 
 function variantUrl(src: string, variant: ImageVariant): string {
-  const cut = variant === 'card' || variant.aspect !== undefined
+  // A crop, a card or a width below the ladder, which only pages ask for.
+  const asked = variant === 'card' || variant.aspect !== undefined || variant.width < IMAGE_WIDTHS[0]
 
   if (variantFiles && REMOTE.test(src)) {
     requestedRemote.set(src, (requestedRemote.get(src) ?? new Map<string, ImageVariant>()).set(variantSuffix(variant), variant))
@@ -398,11 +420,11 @@ function variantUrl(src: string, variant: ImageVariant): string {
     return `${VARIANTS}${remoteVariantName(src, variant)}`
   }
 
-  if (src.startsWith(IMPORTED) && (cut || variantFiles)) {
+  if (src.startsWith(IMPORTED) && (asked || variantFiles)) {
     const name = decodeURIComponent(src.slice(IMPORTED.length).replace(QUERY, ''))
 
-    // The ladder is written for every imported image; a crop or a card only for those a page asks for.
-    if (cut)
+    // The ladder is written for every imported image, the rest only for those a page asks for.
+    if (asked)
       requested.set(name, (requested.get(name) ?? new Map<string, ImageVariant>()).set(variantSuffix(variant), variant))
 
     if (variantFiles)
