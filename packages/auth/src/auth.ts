@@ -944,6 +944,14 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       }
     },
 
+    // Who opened a websocket, read off the session cookie or bearer token its upgrade carried, which the plugin hands the socket as `ws.data.auth`: null for an anonymous one, or a socket opened on an app without the plugin.
+    async socketUser(ws: { data?: unknown }): Promise<User | null> {
+      const data = ws.data
+      const state = typeof data === 'object' && data !== null && 'auth' in data ? data.auth : undefined
+
+      return state instanceof Auth ? state.user() : null
+    },
+
     // The user a bearer token belongs to, for a websocket handshake sending one in its first message.
     async userFromToken(token: string): Promise<User | null> {
       const owner = await tokenUser(core, token)

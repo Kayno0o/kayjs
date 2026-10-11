@@ -108,6 +108,7 @@ else
 - `signOut()` signs this session out under a new session id, keeping the rest of the app's session data, and takes it off the user's sessions, so a copy of the cookie is worth nothing either. `signOutEverywhere()` ends every session of the user, copied cookies included, and every bearer token they hold; `signOutEverywhere({ keepThisOne: true })` keeps this session, the tokens still ending.
 - `signIn({ id })` signs a user in directly, without their second factor, for a way of signing in the app proves itself. kayjs-auth's own flows all go through the second factor.
 - A deleted user, one signed out everywhere since, or a session ended or unseen past its lifetime, reads as `null`, and the stale entry leaves the session.
+- A websocket route on an app using the plugin reads its user as `await ws.data.auth.user()`, off the cookie or token its upgrade carried. `auth.socketUser(ws)` does the same for a handler typed for any socket, `null` for an anonymous one or one opened without the plugin.
 
 ## Sessions
 
@@ -312,7 +313,7 @@ Changing what protects the account takes a `proof`: `changePassword`, `changeEma
 - `scopes: ['posts:read', 'posts:write']` in `createAuth` declares what a token may be limited to, typed from then on. A token given `scopes` passes a gated route only when the route names one of them, `.get('/posts', handler, { scope: ['posts:read', 'posts:write'] })`, any one passing; a route naming none refuses it with a 403, so a route that forgets `scope:` stays closed to limited tokens, and `scope: false` lets every token through. `auth.gate({ scope })` sets the scope of its routes naming none, and `auth.guard({ scope })` does the same for pages. A token made without `scopes`, and a session, pass every scope. `auth.scopes()` answers the request's token's scopes, null for a session or a token with every scope, and `auth.hasScope(scope)` checks one, for an app's own checks.
 - An expired token reads as no token at all, in `user()`, gates and `userFromToken`.
 - `tokens()` lists `{ id, label, scopes, createdAt, lastUsedAt, expiresAt, expired }`, since only the token's digest is stored; `revokeToken(id)` revokes one. A use is recorded at most every five minutes. A token ends with a password change, a reset and `signOutEverywhere`, each of which may answer a stolen device, so the devices sign in again after one.
-- A token reads as its user in `user()`, guards and gates. A websocket checks the token its first message carries with `auth.userFromToken(token)`, which `createWsAuthStore(verify)` keeps per connection.
+- A token reads as its user in `user()`, guards and gates. A websocket checks the token its first message carries with `auth.userFromToken(token)`, which `createWsAuthStore(verify)` keeps per connection: the handshake for a client that cannot send a cookie or a header with its upgrade, such as a device's browser widget on another origin.
 
 ## Security mails
 

@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+import { Elysia } from 'elysia'
 import { createWsAuthStore } from '../src/wsAuth'
+import { testApp, userRecord } from './helpers/app'
 
 describe('createWsAuthStore', () => {
   const ws = (id: string) => {
@@ -37,5 +39,52 @@ describe('createWsAuthStore', () => {
 
     store.forget(a.ws)
     expect(store.get(a.ws)).toBeUndefined()
+  })
+})
+
+describe('socketUser', () => {
+  const app = testApp()
+
+  // Opens a socket with `cookie`, and gives what the server read as its user.
+  async function openedAs(cookie: string | undefined): Promise<unknown> {
+    const { promise, resolve } = Promise.withResolvers<unknown>()
+    const server = new Elysia()
+      .use(app.app)
+      .ws('/socket', {
+        async open(ws) {
+          ws.send(JSON.stringify(await app.auth.socketUser(ws)))
+        },
+      })
+      .listen(0)
+
+    try {
+      // Bun's WebSocket takes headers, which the DOM typing it shares does not know.
+      const socket = new WebSocket(`ws://localhost:${server.server!.port}/socket`, cookie === undefined ? undefined : { headers: { cookie } } as never)
+
+      socket.addEventListener('message', event => resolve(JSON.parse(String(event.data))))
+      const user = await promise
+
+      socket.close()
+
+      return user
+    }
+    finally {
+      await server.stop()
+    }
+  }
+
+  test('reads who opened the socket off the cookie its upgrade carried, null for an anonymous one', async () => {
+    await app.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+    const ada = app.browser()
+
+    await ada.fetch('/sign-in/u1', { method: 'POST' })
+
+    expect(await openedAs([...ada.cookies].map(([name, value]) => `${name}=${value}`).join('; '))).toMatchObject({ id: 'u1', email: 'ada@example.com' })
+    expect(await openedAs(undefined)).toBeNull()
+  })
+
+  test('answers null for a socket opened without the plugin', async () => {
+    expect(await app.auth.socketUser({ data: {} })).toBeNull()
+    expect(await app.auth.socketUser({})).toBeNull()
   })
 })
