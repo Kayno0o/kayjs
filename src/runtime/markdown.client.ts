@@ -1,6 +1,6 @@
-import type { RendererObject, Token, Tokens } from 'marked'
+import type { RendererObject, Token, TokenizerObject, Tokens } from 'marked'
 import type { SafeHtml } from './checks'
-import { Marked } from 'marked'
+import { Marked, Tokenizer } from 'marked'
 import { sanitizedMarkdown } from './markdown'
 
 const ESCAPED = /[&<>"]/g
@@ -8,9 +8,6 @@ const TEXT_ESCAPED = /&(?![a-z][a-z\d]{1,31};)|[<>"]/gi
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
 const REFERENCE = /&(?:#(\d{1,7})|#x([\da-f]{1,6})|(amp|lt|gt|quot|apos|nbsp));/gi
 const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: '\u00A0' }
-const SLUG_DROPPED = /[^a-z\d\s-]/g
-const SLUG_SEPARATORS = /[\s-]+/g
-const EDGE_DASHES = /^-|-$/g
 const FIRST_WORD = /^\S*/
 const BARE_TASK = /^\[([ x])\]$/i
 const TRAILING_LINES = /\n+$/
@@ -51,18 +48,6 @@ function plainText(tokens: Token[] | undefined): string {
   }).join('')
 }
 
-// Bun.markdown's ids: lowercase letters and digits, words joined by one dash, and a counter from the second heading of a slug on.
-let slugs = new Map<string, number>()
-
-function slug(text: string): string {
-  const base = text.toLowerCase().replace(SLUG_DROPPED, '').replace(SLUG_SEPARATORS, '-').replace(EDGE_DASHES, '')
-  const seen = slugs.get(base)
-
-  slugs.set(base, (seen ?? -1) + 1)
-
-  return seen === undefined ? base : `${base}-${seen + 1}`
-}
-
 function href(url: string): string {
   return escape(encodeURI(decode(url)).replaceAll('%25', '%'))
 }
@@ -83,9 +68,7 @@ const checkbox = (checked: boolean | undefined) => `<input type="checkbox" class
 // marked writing the HTML Bun.markdown writes for the same source, so an island renders what the server does.
 const renderer: RendererObject<string, string> = {
   heading({ depth, tokens }) {
-    const id = slug(plainText(tokens))
-
-    return `<h${depth} id="${id}"><a href="#${id}">${this.parser.parseInline(tokens)}</a></h${depth}>\n`
+    return `<h${depth}>${this.parser.parseInline(tokens)}</h${depth}>\n`
   },
   code({ text, lang }) {
     const language = lang?.match(FIRST_WORD)?.[0] ?? ''
@@ -142,11 +125,39 @@ const renderer: RendererObject<string, string> = {
   },
 }
 
-const marked = new Marked({ gfm: true, async: false, renderer })
+// How far an emphasis or a strikethrough looks for its closing mark: marked looks to the end of the block from every opening one, which takes seconds on a few thousand of them.
+const DELIMITER_REACH = 1000
+// What an island formats at most, about a second of marked's work on the worst Markdown; longer text shows as it is written.
+const MAX_LENGTH = 100_000
+const DEFAULTS = Tokenizer.prototype
 
-// Markdown rendered as `renderMarkdown` renders it, then sanitized for `innerHTML`: formatted text, tables, images and task lists, sync so it renders again on each chunk of a stream.
+function within(src: string, maskedSrc: string): [string, string] {
+  return [src.slice(0, DELIMITER_REACH), maskedSrc.slice(0, maskedSrc.length - src.length + Math.min(src.length, DELIMITER_REACH))]
+}
+
+const tokenizer: TokenizerObject = {
+  emStrong(src, maskedSrc, prevChar) {
+    return src.length > DELIMITER_REACH && DEFAULTS.emStrong.call(this, ...within(src, maskedSrc), prevChar)
+  },
+  del(src, maskedSrc, prevChar) {
+    return src.length > DELIMITER_REACH && DEFAULTS.del.call(this, ...within(src, maskedSrc), prevChar)
+  },
+}
+
+const marked = new Marked({ gfm: true, async: false, renderer, tokenizer })
+
+const asWritten = (markdown: string) => `<p>${escape(markdown)}</p>\n` as SafeHtml
+
+// Markdown rendered as `renderMarkdown` renders it, headings without anchors, then sanitized for `innerHTML`: formatted text, tables, images and task lists, sync so it renders again on each chunk of a stream.
 export function markdownHtml(markdown: string): SafeHtml {
-  slugs = new Map()
+  if (markdown.length > MAX_LENGTH)
+    return asWritten(markdown)
 
-  return sanitizedMarkdown(marked.parse(markdown) as string)
+  try {
+    return sanitizedMarkdown(marked.parse(markdown) as string)
+  }
+  // Thousands of nested quotes overflow marked's stack.
+  catch {
+    return asWritten(markdown)
+  }
 }

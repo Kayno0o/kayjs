@@ -164,7 +164,9 @@ textarea(aria-label="Note" value={text()} onInput={e => text.set(e.currentTarget
 div(innerHTML={markdownHtml(text())})
 ```
 
-The server renders it with Bun.markdown, the island with marked, writing the same HTML; only the islands importing it load marked, about 15 KB gzipped. It is sync, so it can run again on every chunk of a stream.
+The server renders it with Bun.markdown, the island with marked, writing the same HTML; only the islands importing it load marked, about 15 KB gzipped. It is sync, so it can run again on every chunk of a stream. Headings come out plain, with no id or anchor.
+
+The two differ only where Bun.markdown is odd: a named reference such as `&copy;` stays written in the island, which the browser shows the same; a URL with parentheses or a `"` in its path, and one still being typed, without a dot yet or ending in `=`, is a link in the island alone; a task item whose text the next line underlines as a heading is not a task in the island. The island also keeps marked linear on hostile input: an emphasis or a strikethrough closes within 1,000 characters there, and text past 100,000 characters, or nested too deep for marked, shows as it is written.
 
 ## Preview mode
 

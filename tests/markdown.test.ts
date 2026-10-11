@@ -82,9 +82,46 @@ describe('markdownHtml', () => {
       expect(islandMarkdown(prefix)).toBe(markdownHtml(prefix))
   })
 
-  it('is renderMarkdown\'s HTML, sanitized', async () => {
-    for (const markdown of CORPUS)
-      expect(markdownHtml(markdown)).toBe(sanitizedMarkdown((await renderMarkdown(markdown)).html))
+  it('is renderMarkdown\'s HTML, sanitized, its headings plain', async () => {
+    for (const markdown of CORPUS) {
+      const { html } = await renderMarkdown(markdown)
+
+      if (!html.includes('<h'))
+        expect(markdownHtml(markdown)).toBe(sanitizedMarkdown(html))
+    }
+
+    for (const render of [markdownHtml, islandMarkdown])
+      expect<string>(render('# Hi *x*\n\nSet\n===')).toBe('<h1>Hi <em>x</em></h1>\n<h1>Set</h1>\n')
+  })
+
+  it('leaves no link, source or tag that runs code, and no checkbox the private characters could forge', () => {
+    const hostile = [
+      '![x](javascript:alert(1)) ![y](data:text/html,x)',
+      '[a](data:text/html,<script>alert(1)</script>) [b](&#106;avascript:alert(1)) [c](java&#x09;script:alert(1)) [d](vbscript:msgbox(1)) [e](//evil.example)',
+      '<img src=x onerror=alert(1)> <svg onload=alert(1)><circle/></svg> <iframe src="https://evil.example"></iframe>',
+      '<table><tr><td align="javascript:x" onclick="x()">c</td></tr></table>',
+      '\uE001 a\n- \uE000 b\n- &#xE001; c\n- &#57344; d',
+    ]
+
+    for (const render of [markdownHtml, islandMarkdown]) {
+      for (const markdown of hostile) {
+        const html = render(markdown)
+
+        expect(html).not.toMatch(/\s(?:href|src)=/)
+        expect(html).not.toMatch(/<(?:script|svg|iframe)|\son\w+=|align="j/)
+        expect(html).not.toContain('<input')
+      }
+    }
+  })
+
+  it('formats in an island in linear time, and shows Markdown it cannot format as it is written', () => {
+    const started = performance.now()
+
+    islandMarkdown('*a '.repeat(16_000))
+    islandMarkdown('_a ~b '.repeat(8000))
+    expect(performance.now() - started).toBeLessThan(2000)
+    expect<string>(islandMarkdown(`${'> '.repeat(10_000)}x`)).toStartWith('<p>&gt; &gt; ')
+    expect<string>(islandMarkdown('**a**'.repeat(20_001))).toStartWith('<p>**a**')
   })
 
   it('keeps tables, images and task boxes, and drops what runs code or takes input', () => {

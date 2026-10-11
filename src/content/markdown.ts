@@ -1,6 +1,7 @@
 // Markdown entries compiled once into what renders them: the HTML around the kay components they use, plus their headings.
 import type { SafeHtml } from '../runtime/checks'
 import { escape, escapeAttribute } from '../runtime/escape'
+import { MARKDOWN_OPTIONS } from '../runtime/markdown'
 
 export interface Heading {
   depth: number
@@ -91,7 +92,7 @@ export interface RenderedMarkdown {
 // The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`, and the headings may be ones a user typed as raw tags.
 // The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
 export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined } = {}): Promise<RenderedMarkdown> {
-  const html = Bun.markdown.html(markdown, { headings: { ids: true, autolink: true }, autolinks: true })
+  const html = Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } })
   const headings: Heading[] = []
 
   for (const { open: [, depth, id], inner } of elements(html, HEADING_OPEN, ([, depth]) => `</a></h${depth}>`))

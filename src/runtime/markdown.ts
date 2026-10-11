@@ -7,10 +7,14 @@ const KEPT: SanitizeOptions = { tags: ['img', 'table', 'thead', 'tbody', 'tr', '
 const TASK = /<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled( checked)?>/g
 const MARKS = /[\uE000\uE001]/g
 const MARKED_TASK = /<li>([\uE000\uE001])/g
+const ODD_ALIGN = / align="(?!(?:left|center|right)")[^"]*"/g
+
+// What Bun.markdown renders a user's Markdown with on the server, heading anchors aside.
+export const MARKDOWN_OPTIONS = { autolinks: true }
 
 // Markdown's HTML through `sanitizeHtml`, a task's checkbox held as a private character the user's own text cannot hold.
 export function sanitizedMarkdown(html: string): SafeHtml {
   const held = html.replace(MARKS, mark => `&#${mark.codePointAt(0)};`).replace(TASK, (_, checked: string | undefined) => checked !== undefined ? '<li>\uE001' : '<li>\uE000')
 
-  return sanitizeHtml(held, KEPT).replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`) as SafeHtml
+  return sanitizeHtml(held, KEPT).replace(ODD_ALIGN, '').replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`) as SafeHtml
 }
