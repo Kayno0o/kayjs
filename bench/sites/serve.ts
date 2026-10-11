@@ -1,6 +1,6 @@
 import type { Subprocess } from 'bun'
 import type { Variant } from './sites'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { run, VARIANTS, WORK } from './sites'
 
@@ -8,6 +8,10 @@ const NGINX = join(WORK, 'nginx')
 const READY_TIMEOUT_MS = 20_000
 const VM_RSS = /VmRSS:\s+(\d+)/
 const VM_HWM = /VmHWM:\s+(\d+)/
+const PSS = /^Pss:\s+(\d+)/m
+// A process's parent, after the name in parentheses, which may hold spaces and parentheses of its own.
+const STAT_PARENT = /^\) \S (\d+)/
+const DIGITS = /^\d+$/
 // Where nginx keeps its dynamic modules: Arch's and Debian's path unless `NGINX_MODULES` says otherwise.
 const MODULES = process.env.NGINX_MODULES ?? '/usr/lib/nginx/modules'
 const NOT_WORD = /\W/g
@@ -57,6 +61,53 @@ export function memory(pid: number): { rss: number, peak: number } {
   const read = (field: RegExp) => Number(field.exec(status)![1]) * 1024
 
   return { rss: read(VM_RSS), peak: read(VM_HWM) }
+}
+
+// A process and every process it started, still running.
+export function processTree(pid: number): number[] {
+  const children = new Map<number, number[]>()
+
+  for (const name of readdirSync('/proc')) {
+    if (!DIGITS.test(name))
+      continue
+
+    let stat: string
+
+    try {
+      stat = readFileSync(`/proc/${name}/stat`, 'utf8')
+    }
+    catch {
+      continue
+    }
+
+    const parent = Number(STAT_PARENT.exec(stat.slice(stat.lastIndexOf(')')))?.[1])
+
+    children.set(parent, [...children.get(parent) ?? [], Number(name)])
+  }
+
+  const tree = [pid]
+
+  for (const member of tree)
+    tree.push(...children.get(member) ?? [])
+
+  return tree
+}
+
+// Proportional and resident memory of a process tree, in bytes: resident memory counts the pages its processes share once each, which proportional memory divides between them.
+export function treeMemory(pid: number): { pss: number, rss: number, processes: number } {
+  const tree = processTree(pid)
+  let pss = 0
+  let rss = 0
+
+  for (const member of tree) {
+    try {
+      pss += Number(PSS.exec(readFileSync(`/proc/${member}/smaps_rollup`, 'utf8'))![1]) * 1024
+      rss += memory(member).rss
+    }
+    catch {}
+  }
+
+  return { pss, rss, processes: tree.length }
 }
 
 function upstream(variant: Variant): string {

@@ -1,6 +1,7 @@
 import type { Browser } from 'playwright-core'
 import type { Vitals } from './browser'
 import type { BuildTime, Footprint } from './build'
+import type { DevResult } from './dev'
 import type { ColdStart, Load } from './load'
 import type { Variant } from './sites'
 import type { Weight } from './weigh'
@@ -10,9 +11,10 @@ import { launch } from '../browser'
 import { kilobytes, milliseconds, table } from '../format'
 import { PROFILES, vitals } from './browser'
 import { buildCommands, footprint, timeBuild } from './build'
+import { development, devSection } from './dev'
 import { coldStart, load } from './load'
 import { memory, startAll } from './serve'
-import { commitOf, kayVersion, KIND, label, prepare, SITES, VARIANTS } from './sites'
+import { commitOf, kayVersion, KIND, label, PHASE, prepare, SITES, VARIANTS } from './sites'
 import { VIEWPORTS, weigh } from './weigh'
 
 interface Result {
@@ -45,8 +47,9 @@ if ((process.env.SKIP_PREPARE ?? '') === '') {
 }
 
 const results = new Map<Variant, Result>()
+const producing = PHASE !== 'dev'
 
-for (const variant of VARIANTS) {
+for (const variant of producing ? VARIANTS : []) {
   console.error(`builds: ${label(variant)}`)
 
   const builds: BuildTime[] = []
@@ -56,37 +59,37 @@ for (const variant of VARIANTS) {
   results.set(variant, { builds, footprint: footprint(variant), weights: [], cold: { ms: 0, rss: 0 }, loads: [], memory: { rss: 0, peak: 0 }, vitals: {} })
 }
 
-for (const variant of VARIANTS) {
+for (const variant of producing ? VARIANTS : []) {
   console.error(`cold start: ${label(variant)}`)
   results.get(variant)!.cold = await coldStart(variant)
 }
 
-const lab = await startAll()
+const lab = producing ? await startAll() : undefined
 let browser: Browser
 
 try {
   browser = await launch()
 }
 catch (error) {
-  lab.stop()
+  lab?.stop()
 
   throw error
 }
 
 try {
-  for (const variant of VARIANTS) {
+  for (const variant of producing ? VARIANTS : []) {
     const result = results.get(variant)!
-    const server = lab.servers.get(variant)!
+    const server = lab!.servers.get(variant)!
 
     console.error(`weight and load: ${label(variant)}`)
     for (const path of variant.site.pages)
       result.weights.push(await weigh(variant, path))
     for (const path of [...variant.site.loaded ?? variant.site.pages.slice(0, 2), await stylesheet(variant)])
-      result.loads.push(await load(variant, path, server, lab.nginx))
+      result.loads.push(await load(variant, path, server, lab!.nginx))
     result.memory = memory(server.pid)
   }
 
-  for (const profile of PROFILES) {
+  for (const profile of producing ? PROFILES : []) {
     for (const variant of VARIANTS) {
       console.error(`browser ${profile.name}: ${label(variant)}`)
       results.get(variant)!.vitals[profile.name] = []
@@ -95,6 +98,10 @@ try {
     }
   }
 
+  // The dev servers run on a machine the production servers left.
+  lab?.stop()
+
+  const dev = PHASE === 'prod' ? new Map<Variant, DevResult>() : await development(browser)
   const header = ['', ...VARIANTS.map(label)]
   const row = (name: string, value: (result: Result, variant: Variant) => string) => [name, ...VARIANTS.map(variant => value(results.get(variant)!, variant))]
   const averageOf = (pick: (weight: Weight) => number) => (result: Result) => kilobytes(average(result.weights.map(pick)))
@@ -109,72 +116,78 @@ try {
     })),
     `run on ${new Date().toISOString().slice(0, 10)}`,
   ]
+  const production = !producing
+    ? []
+    : [
+      'Each site as it last ran on Astro, then on kay, built and served as it deploys: Astro\'s standalone server under Bun, kay\'s one executable, both behind an nginx set up for production (HTTP/2 over TLS, brotli and gzip at level 6). kay is the version each site pins, not this checkout. Reproduce with `bun run bench:sites`, the sites listed in a config as `bench/sites/sites.config.example.ts` shows, given nginx with the brotli module (`NGINX_MODULES` if not under /usr/lib/nginx/modules), openssl, playwright-core\'s Chromium, and cloc for the line counts.',
+      '',
+      '## What a page downloads',
+      '',
+      `Average over every page: text as brotli at quality 11 sends it, images as served at each viewport (${VIEWPORTS.map(viewport => `${viewport.name} ${viewport.width} px at ${viewport.dpr}x`).join(', ')}), and the fonts the stylesheets can load for Latin text.`,
+      '',
+      table(header, [
+        row('HTML', averageOf(weight => weight.html)),
+        row('CSS', averageOf(weight => weight.css)),
+        row('JS', averageOf(weight => weight.js)),
+        row('JS files', result => average(result.weights.map(weight => weight.jsFiles)).toFixed(1)),
+        ...VIEWPORTS.map(viewport => row(`images, ${viewport.name}`, averageOf(weight => weight.images[viewport.name]!))),
+        row('fonts', averageOf(weight => weight.fonts)),
+      ]),
+      '',
+      '## In a browser',
+      '',
+      `Every page loaded cold, ${process.env.RUNS ?? 5} times in a fresh context, medians averaged over the pages, with Lighthouse's throttling: a phone on slow 4G with a 4x slower CPU, and a desktop on cable. Total blocking time counts long tasks from the first paint on.`,
+      '',
+      table(header, PROFILES.flatMap(profile => [
+        row(`${profile.name} first paint (ms)`, vitalsOf(profile.name, page => page.fcp, milliseconds)),
+        row(`${profile.name} largest paint (ms)`, vitalsOf(profile.name, page => page.lcp, milliseconds)),
+        row(`${profile.name} blocking time (ms)`, vitalsOf(profile.name, page => page.tbt, milliseconds)),
+        row(`${profile.name} layout shift`, vitalsOf(profile.name, page => page.cls, value => value.toFixed(3))),
+        row(`${profile.name} load (ms)`, vitalsOf(profile.name, page => page.load, milliseconds)),
+        row(`${profile.name} transferred`, vitalsOf(profile.name, page => page.bytes, kilobytes)),
+        row(`${profile.name} requests`, vitalsOf(profile.name, page => page.requests, value => value.toFixed(1))),
+      ])),
+      '',
+      '## Server',
+      '',
+      'Cold start is from spawning the server to its first 200 on the home page, median of 7. Under load, 32 clients request one URL through nginx for 5 s over keepalive HTTP/1.1, accepting brotli; CPU is per request, of the site\'s server and of nginx, which compresses what the server sent uncompressed. The client is Bun\'s fetch, which tops out near 40,000 requests a second.',
+      '',
+      table(header, [
+        row('cold start', result => `${milliseconds(result.cold.ms)} ms`),
+        row('memory once started', result => megabytes(result.cold.rss)),
+        row('memory after load (peak)', result => `${megabytes(result.memory.rss)} (${megabytes(result.memory.peak)})`),
+      ]),
+      '',
+      table(['', 'URL', 'req/s', 'p50 (ms)', 'p99 (ms)', 'server CPU (µs/req)', 'nginx CPU (µs/req)'], VARIANTS.flatMap(variant => results.get(variant)!.loads.map(entry => [label(variant), `\`${entry.url}\``, entry.rps.toFixed(0), milliseconds(entry.p50), milliseconds(entry.p99), entry.serverCpu.toFixed(0), entry.nginxCpu.toFixed(0)]))),
+      '',
+      '## Build and code',
+      '',
+      'Clean builds, median of 3. `kay build` runs `kay check` first, which `astro build` has no equivalent of. Lines are cloc\'s code lines of `src` and the config files.',
+      '',
+      table(['', 'command', 'wall (s)', 'CPU (s)', 'peak memory'], VARIANTS.flatMap(variant => results.get(variant)!.builds.map(build => [label(variant), `\`${build.command}\``, build.wall.toFixed(2), build.cpu.toFixed(1), megabytes(build.rss)]))),
+      '',
+      table(header, [
+        row('lines of code', result => String(result.footprint.lines ?? '-')),
+        row('lines of tests', result => String(result.footprint.testLines ?? '-')),
+        row('deployed', (result, variant) => `${megabytes(result.footprint.deploy)} ${variant.kind === 'astro' ? '(dist and production node_modules)' : '(one executable)'}`),
+      ]),
+      '',
+    ]
   const markdown = [
     '# Benchmark: the sites before and after kay',
     '',
     ...environment.map(line => `- ${line}`),
     '',
-    'Each site as it last ran on Astro, then on kay, built and served as it deploys: Astro\'s standalone server under Bun, kay\'s one executable, both behind an nginx set up for production (HTTP/2 over TLS, brotli and gzip at level 6). kay is the version each site pins, not this checkout. Reproduce with `bun run bench:sites`, the sites listed in a config as `bench/sites/sites.config.example.ts` shows, given nginx with the brotli module (`NGINX_MODULES` if not under /usr/lib/nginx/modules), openssl, playwright-core\'s Chromium, and cloc for the line counts.',
-    '',
-    '## What a page downloads',
-    '',
-    `Average over every page: text as brotli at quality 11 sends it, images as served at each viewport (${VIEWPORTS.map(viewport => `${viewport.name} ${viewport.width} px at ${viewport.dpr}x`).join(', ')}), and the fonts the stylesheets can load for Latin text.`,
-    '',
-    table(header, [
-      row('HTML', averageOf(weight => weight.html)),
-      row('CSS', averageOf(weight => weight.css)),
-      row('JS', averageOf(weight => weight.js)),
-      row('JS files', result => average(result.weights.map(weight => weight.jsFiles)).toFixed(1)),
-      ...VIEWPORTS.map(viewport => row(`images, ${viewport.name}`, averageOf(weight => weight.images[viewport.name]!))),
-      row('fonts', averageOf(weight => weight.fonts)),
-    ]),
-    '',
-    '## In a browser',
-    '',
-    `Every page loaded cold, ${process.env.RUNS ?? 5} times in a fresh context, medians averaged over the pages, with Lighthouse's throttling: a phone on slow 4G with a 4x slower CPU, and a desktop on cable. Total blocking time counts long tasks from the first paint on.`,
-    '',
-    table(header, PROFILES.flatMap(profile => [
-      row(`${profile.name} first paint (ms)`, vitalsOf(profile.name, page => page.fcp, milliseconds)),
-      row(`${profile.name} largest paint (ms)`, vitalsOf(profile.name, page => page.lcp, milliseconds)),
-      row(`${profile.name} blocking time (ms)`, vitalsOf(profile.name, page => page.tbt, milliseconds)),
-      row(`${profile.name} layout shift`, vitalsOf(profile.name, page => page.cls, value => value.toFixed(3))),
-      row(`${profile.name} load (ms)`, vitalsOf(profile.name, page => page.load, milliseconds)),
-      row(`${profile.name} transferred`, vitalsOf(profile.name, page => page.bytes, kilobytes)),
-      row(`${profile.name} requests`, vitalsOf(profile.name, page => page.requests, value => value.toFixed(1))),
-    ])),
-    '',
-    '## Server',
-    '',
-    'Cold start is from spawning the server to its first 200 on the home page, median of 7. Under load, 32 clients request one URL through nginx for 5 s over keepalive HTTP/1.1, accepting brotli; CPU is per request, of the site\'s server and of nginx, which compresses what the server sent uncompressed. The client is Bun\'s fetch, which tops out near 40,000 requests a second.',
-    '',
-    table(header, [
-      row('cold start', result => `${milliseconds(result.cold.ms)} ms`),
-      row('memory once started', result => megabytes(result.cold.rss)),
-      row('memory after load (peak)', result => `${megabytes(result.memory.rss)} (${megabytes(result.memory.peak)})`),
-    ]),
-    '',
-    table(['', 'URL', 'req/s', 'p50 (ms)', 'p99 (ms)', 'server CPU (µs/req)', 'nginx CPU (µs/req)'], VARIANTS.flatMap(variant => results.get(variant)!.loads.map(entry => [label(variant), `\`${entry.url}\``, entry.rps.toFixed(0), milliseconds(entry.p50), milliseconds(entry.p99), entry.serverCpu.toFixed(0), entry.nginxCpu.toFixed(0)]))),
-    '',
-    '## Build and code',
-    '',
-    'Clean builds, median of 3. `kay build` runs `kay check` first, which `astro build` has no equivalent of. Lines are cloc\'s code lines of `src` and the config files.',
-    '',
-    table(['', 'command', 'wall (s)', 'CPU (s)', 'peak memory'], VARIANTS.flatMap(variant => results.get(variant)!.builds.map(build => [label(variant), `\`${build.command}\``, build.wall.toFixed(2), build.cpu.toFixed(1), megabytes(build.rss)]))),
-    '',
-    table(header, [
-      row('lines of code', result => String(result.footprint.lines ?? '-')),
-      row('lines of tests', result => String(result.footprint.testLines ?? '-')),
-      row('deployed', (result, variant) => `${megabytes(result.footprint.deploy)} ${variant.kind === 'astro' ? '(dist and production node_modules)' : '(one executable)'}`),
-    ]),
-    '',
+    ...production,
+    ...devSection(dev),
   ].join('\n')
 
-  await Bun.write(join(import.meta.dir, KIND === undefined ? 'results.md' : `results.${KIND}.md`), markdown)
+  await Bun.write(join(import.meta.dir, `${['results', KIND, PHASE].filter(part => part !== undefined).join('.')}.md`), markdown)
   console.log(markdown)
 }
 finally {
   await browser.close()
-  lab.stop()
+  lab?.stop()
 }
 
 // nginx prints its version on stderr.
