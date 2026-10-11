@@ -29,7 +29,7 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({ extensions: [mailExtension(async () => (await import('./src/mail')).mail)] })
 ```
 
-- `mailExtension(load)` hands the mailer to `pages()`, which uses it before the pages: `src/server.ts` needs no `.use(mail)`. `load` imports the module only as `pages()` builds the app, never as `kay check`, the editor or `kay build` read the config: a `.kay` mail imported while the config loads comes before kay compiles any, so `kay.config.ts` never imports `src/mail.ts` itself.
+- `mailExtension(load)` hands the mailer to `pages()`, which uses it before the pages: `src/server.ts` needs no `.use(mail)`. `load` imports the module only as `pages()` builds the app, never as `kay check`, the editor or `kay build` read the config: a `.kay` mail imported while the config loads comes before kay compiles any, so `kay.config.ts` never imports `src/mail.ts` itself. It also brings the `mail.auth` messages kayjs-auth's mails are written in, in English and French (see kayjs-auth below): a site in another language fills them in its own messages for `kay check`.
 - An Elysia app not served by `pages()` uses it as a plugin instead: `new Elysia().use(mail)`.
 
 - `mailer(options)` returns an Elysia plugin: the server using it, through `mailExtension` or `.use(mail)`, runs the queue `enqueue` fills and, in development, serves the outbox page. A script that only sends need not use it.
@@ -198,7 +198,7 @@ export default { name: 'Ada', url: 'https://example.com/confirm' } satisfies Par
 
 ## kayjs-auth
 
-`authMailer(send)` is kayjs-auth's `email.mailer`, rendering its verification, password reset, magic link, code, security and invitation mails through the components above, themed by the app's mail settings, rather than kayjs-auth's own html:
+`authMailer(send)` is kayjs-auth's `email.mailer`, rendering its verification, password reset, magic link, code, security and invitation mails through the components above, in wording the app overrides line by line, themed by the app's mail settings, rather than kayjs-auth's own html. It needs kayjs-auth 0.11 or later, and `mailExtension` in `kay.config.ts`'s `extensions`, which brings its wording:
 
 ```ts
 // src/auth.ts
@@ -213,10 +213,40 @@ export const auth = createAuth({
 ```
 
 - `authMailer(mail.enqueue)` renders each mail at once and leaves it to the queue, which retries a mail server that is away; `authMailer(mail.send)` sends it before kayjs-auth's call answers.
-- The wording is kayjs-auth's own, in English or French as it writes it, and so is the text part: a mail with a link shows a button, the link written out and the code when it carries one; news of a change to the account shows the link to review it. Each ends on how long the link or code works, or on what to do when it was not the user.
-- The mail's `locale` becomes its `lang`, its `<html lang>` and the locale its view renders `t()` in, so kayjs-auth's `email.locales` must be among the site's.
-- `authMailer(send, { views: { 'reset-password': ResetPassword } })` renders a kind through the app's own `.kay` view, given `{ mail }`: `mail.subject`, `mail.url`, `mail.code` and kayjs-auth's wording in `mail.parts` (the `AuthMail` type).
-- kayjs-auth gives its wording in parts from 0.10; an older one, and a kind its `templates` option replaces, give none, so their html is sent as it is.
-- Once an app uses it, `/_kay/mail/samples` lists the views with a sample of each, through the app's own `views` where it gives them: `kayjs-auth/verify-email`, `kayjs-auth/magic-link`, `kayjs-auth/invitation` and `kayjs-auth/new-sign-in`, rendered in the site's default language.
+- A mail with a link shows a button, the link written out and the code when it carries one; news of a change to the account shows the link to review it when it carries one. Each ends on how long the link or code works, then on what to do when it was not asked for or not the user. The text part is drawn from the html, as for any view.
+- The mail's `locale` becomes its `lang`, its `<html lang>` and the locale its subject and view render `t()` in, so kayjs-auth's `email.locales` must be among the site's. kayjs-auth's `templates` and `translations` options do not reach these mails.
+
+Overriding a line: the wording is kayjs-mail's `mail.auth` messages, in English and French, which the app's `src/messages/<locale>.ts` overrides key by key; a site in another language writes them all in its own file, as `kay check` asks. Each kind (`verify-email`, `reset-password`, `magic-link`, `change-email`, `invitation`, and the events `new-sign-in`, `password-changed`, `email-changed`, `two-factor-enabled`, `two-factor-disabled`, `recovery-code-used`, `recovery-codes-regenerated`, `provider-linked`, `provider-unlinked`, `passkey-added`, `passkey-removed`, `token-created`, `account-deleted`) has a `subject`, a `lead` and an `ending`, and a link's a `button` and `lasts`, how long it works (empty to leave it unsaid); `orPaste`, `yourCode`, `orTypeCode`, `linkWorks`, `codeWorks` and `review` are shared. Placeholders are `{site}`, `{email}`, the address written to, and `{detail}`, the organization, provider, passkey, token or new address the mail is about:
+
+```ts
+// src/messages/en.ts
+export default defineMessages({
+  mail: { auth: { 'reset-password': { lead: 'Forgot your {site} password? It happens.' } } },
+})
+```
+
+Keeping the layout around the app's own lines: `AuthLink` (a link or a code) and `AuthNotice` (news of a change) are the views `authMailer` ships, taking `mail` and any line as a prop over the default wording (`heading`, `lead`, `button` or `review`, `ending`), and children, which go under the lead. `authWords(mail)` gives the default wording of a mail in the language it renders in, for a view written from scratch.
+
+Replacing a kind: `views` takes the app's own `.kay` view for any kind, imported once its first mail goes, as a module imported with kay.config.ts cannot load a `.kay` file. The view gets `{ mail }` (the `AuthMail` type): `mail.site`, `mail.to`, `mail.url`, `mail.code`, `mail.detail` and `mail.kind`; its subject stays the messages' `subject`:
+
+```ts
+authMailer(mail.enqueue, { views: { 'reset-password': () => import('./mails/auth/reset-password.kay') } })
+```
+
+```kay
+---
+// src/mails/auth/reset-password.kay
+import type { AuthMail } from '@kaynooo/kayjs-mail'
+import AuthLink from '@kaynooo/kayjs-mail/auth-link.kay'
+import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+
+const { mail } = props<{ mail: AuthMail }>()
+---
+AuthLink(mail={mail} lead={t('resetLead', { site: mail.site })})
+  Paragraph {t('neverByMail')}
+```
+
+- A kind kayjs-mail does not know, as one a later kayjs-auth adds, goes as kayjs-auth wrote it.
+- Once an app uses it, `/_kay/mail/samples` lists every kind as `kayjs-auth/<kind>`, rendered through the app's own views in the site's default language with sample data, and gives the app's view of a kind under `src/mails/auth/<kind>.kay` that sample as its props when it has no `.preview.ts`.
 
 `{ send: mail.enqueue }` also fits `email.mailer` as it is, sending kayjs-auth's own html.

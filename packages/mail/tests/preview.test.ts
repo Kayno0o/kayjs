@@ -1,3 +1,4 @@
+import type { AuthView } from '../src/auth'
 import { createHash } from 'node:crypto'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
@@ -203,10 +204,10 @@ describe('the mail samples page', () => {
     expect(outbox.mails).toEqual([])
   })
 
-  it('lists the views kayjs-auth\'s mails render through once an app uses authMailer, each with a sample of its wording', async () => {
+  it('lists every kind of kayjs-auth\'s mails once an app uses authMailer, through the app\'s own views, and gives an app\'s view of a kind a sample', async () => {
     const mail = mailer({ from: 'dev@example.com' })
 
-    authMailer(mail.enqueue)
+    authMailer(mail.enqueue, { views: { 'reset-password': async () => await import('./fixture/src/mails/auth/reset-password.kay' as string) as { default: AuthView } } })
 
     const list = await (await get(mail, '/_kay/mail/samples')).text()
     const page = await (await get(mail, '/_kay/mail/samples?mail=kayjs-auth%2Fverify-email')).text()
@@ -214,8 +215,11 @@ describe('the mail samples page', () => {
 
     expect(list).toContain('<a href="/_kay/mail/samples?mail=kayjs-auth%2Fverify-email">kayjs-auth/verify-email</a>')
     expect(list).toContain('<a href="/_kay/mail/samples?mail=kayjs-auth%2Finvitation">kayjs-auth/invitation</a>')
+    expect(list).toContain('<a href="/_kay/mail/samples?mail=kayjs-auth%2Faccount-deleted">kayjs-auth/account-deleted</a>')
+    expect(await (await get(mail, '/_kay/mail/samples/html?mail=kayjs-auth%2Freset-password')).text()).toContain('Forgot your Example password?')
+    expect(await (await get(mail, '/_kay/mail/samples?mail=auth%2Freset-password.kay')).text()).toContain('<th>Props</th><td>a sample of kayjs-auth\'s reset-password</td>')
     expect(page).toContain('<th>Props</th><td>a sample of kayjs-auth\'s, through authMailer</td>')
-    expect(page).toContain('Or type this code where you asked for it: 482913')
+    expect(page).toContain('Or type this code where you asked for it:\n\n482913')
     expect(frame).toContain('<html lang="en"')
     expect(frame).toContain('See where your account is signed in, and end what you do not know: <a class="km-link"')
     expect(outbox.mails).toEqual([])

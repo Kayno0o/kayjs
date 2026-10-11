@@ -194,10 +194,10 @@ function relay(options: MailerOptions): Relay {
   }
 }
 
-// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`.
+// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`, and brings the `mail.auth` messages `authMailer` writes in.
 // It is loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
 export function mailExtension(load: () => Promise<Mailer>): KayExtension<Mailer> {
-  return { name: '@kaynooo/kayjs-mail', server: load }
+  return { name: '@kaynooo/kayjs-mail', server: load, messages: `${import.meta.dir}/messages` }
 }
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and in development lists the outbox at `/_kay/mail`.

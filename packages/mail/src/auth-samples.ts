@@ -1,54 +1,29 @@
-import type { AuthMail } from './auth'
+import type { AuthKind, AuthMail } from './auth'
+import { AUTH_LINK_KINDS, AUTH_NOTICE_KINDS } from './auth'
 
-const SITE = 'Example'
-const EMAIL = 'ada@example.com'
-const URL = 'https://example.com/verify?token=sample'
+const LINK = 'https://example.com/auth?token=sample'
+const CODE = '482913'
 
-// The text kayjs-auth writes beside its html.
-function withText(mail: Omit<AuthMail, 'text'>): AuthMail {
-  const { parts, url, code } = mail
-  const lines = parts?.type === 'notice' ? [parts.lead, url === undefined ? undefined : `${parts.review} ${url}`, parts.ending] : [parts?.lead, url, code === undefined ? undefined : `${parts?.codeLead} ${code}`, parts?.ending]
-
-  return { ...mail, text: lines.filter(line => line !== undefined).join('\n\n') }
+// What a sample of each kind carries beyond the site and the address, as kayjs-auth fills it.
+const CARRIES: Partial<Record<AuthKind, Partial<AuthMail>>> = {
+  'verify-email': { url: LINK, code: CODE },
+  'reset-password': { url: LINK },
+  'magic-link': { url: LINK, code: CODE },
+  'change-email': { url: LINK },
+  'invitation': { url: 'https://example.com/invitation?invitation=sample', detail: 'Acme' },
+  'new-sign-in': { url: 'https://example.com/account/sessions' },
+  'email-changed': { detail: 'ada@example.org' },
+  'provider-linked': { detail: 'GitHub' },
+  'provider-unlinked': { detail: 'GitHub' },
+  'passkey-added': { detail: 'Laptop' },
+  'passkey-removed': { detail: 'Laptop' },
+  'token-created': { detail: 'Deploys' },
 }
 
-// One mail of each shape `authMailer` renders, in kayjs-auth's English wording, which the samples page shows once an app uses it.
-export const AUTH_SAMPLES: Record<string, AuthMail> = {
-  'kayjs-auth/verify-email': withText({
-    to: EMAIL,
-    kind: 'verify-email',
-    locale: 'en',
-    subject: `Confirm your email for ${SITE}`,
-    html: '',
-    url: URL,
-    code: '482913',
-    parts: { type: 'link', lead: `Confirm ${EMAIL} as the address of your ${SITE} account.`, button: 'Confirm my email', orPaste: 'Or paste this into your browser:', codeLead: 'Or type this code where you asked for it:', ending: 'The link works for 24 hours. The code works for 10 minutes, typed where you asked for it. If you did not create an account, ignore this mail.' },
-  }),
-  'kayjs-auth/magic-link': withText({
-    to: EMAIL,
-    kind: 'magic-link',
-    locale: 'en',
-    subject: `Sign in to ${SITE}`,
-    html: '',
-    code: '482913',
-    parts: { type: 'link', lead: `Here is your code to sign in to ${SITE}.`, button: 'Sign in', orPaste: 'Or paste this into your browser:', codeLead: 'Your code:', ending: 'The code works for 10 minutes, typed where you asked for it. If you did not ask for it, ignore this mail.' },
-  }),
-  'kayjs-auth/invitation': withText({
-    to: EMAIL,
-    kind: 'invitation',
-    locale: 'en',
-    subject: `Join Acme on ${SITE}`,
-    html: '',
-    url: 'https://example.com/invitation?invitation=sample',
-    parts: { type: 'link', lead: `You are invited to join Acme on ${SITE}, with an account at ${EMAIL}.`, button: 'See the invitation', orPaste: 'Or paste this into your browser:', codeLead: 'Your code:', ending: 'If you did not expect it, ignore this mail.' },
-  }),
-  'kayjs-auth/new-sign-in': withText({
-    to: EMAIL,
-    kind: 'new-sign-in',
-    locale: 'en',
-    subject: `New sign-in on ${SITE}`,
-    html: '',
-    url: 'https://example.com/account/sessions',
-    parts: { type: 'notice', lead: `Your ${SITE} account was just signed into from a device or network it had not used before.`, review: 'See where your account is signed in, and end what you do not know:', ending: 'If this was not you, reset your password and check your account at once.' },
-  }),
+// A mail of `kind` as kayjs-auth hands it, for the samples page, which renders it in the site's default language: its locale, subject, text and html go unread.
+export function authSample(kind: AuthKind): AuthMail {
+  return { to: 'ada@example.com', kind, site: 'Example', locale: '', subject: '', text: '', html: '', ...CARRIES[kind] }
 }
+
+// The samples page's names for kayjs-auth's mails, every kind of it.
+export const AUTH_SAMPLES = new Map<string, AuthKind>([...AUTH_LINK_KINDS, ...AUTH_NOTICE_KINDS].map(kind => [`kayjs-auth/${kind}`, kind]))

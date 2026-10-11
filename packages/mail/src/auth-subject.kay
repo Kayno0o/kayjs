@@ -1,0 +1,7 @@
+---
+import type { AuthMail } from './auth'
+import { authWords } from './auth-words'
+
+const { mail } = props<{ mail: AuthMail }>()
+---
+{authWords(mail).subject}

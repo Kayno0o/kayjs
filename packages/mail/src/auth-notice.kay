@@ -1,15 +1,19 @@
 ---
-import type { AuthMail, AuthNoticeParts } from './auth'
+import type { AuthMail } from './auth'
+import { authWords } from './auth-words'
 import Heading from './heading.kay'
 import Layout from './layout.kay'
 import Link from './link.kay'
 import Paragraph from './paragraph.kay'
 
-const { mail, parts } = props<{ mail: AuthMail, parts: AuthNoticeParts }>()
+// Each line a prop left out keeps kayjs-mail's wording, which the app's messages override; children go under the lead.
+const { mail, heading, lead, review, ending } = props<{ mail: AuthMail, heading?: string | undefined, lead?: string | undefined, review?: string | undefined, ending?: string | undefined }>()
+const words = authWords(mail)
 ---
-Layout(preheader={parts.lead})
-  Heading {mail.subject}
-  Paragraph {parts.lead}
+Layout(preheader={lead ?? words.lead})
+  Heading {heading ?? words.subject}
+  Paragraph {lead ?? words.lead}
+  slot
   if mail.url as url
-    Paragraph {parts.review} #[Link(href={url}) {url}]
-  Paragraph(muted) {parts.ending}
+    Paragraph {review ?? words.review} #[Link(href={url}) {url}]
+  Paragraph(muted) {ending ?? words.ending}

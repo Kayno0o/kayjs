@@ -1,5 +1,7 @@
-export type { AuthLinkParts, AuthMail, AuthMailerOptions, AuthNoticeParts, AuthView } from './auth'
+export type { AuthKind, AuthLinkKind, AuthMail, AuthMailerOptions, AuthNoticeKind, AuthView } from './auth'
 export { authMailer } from './auth'
+export type { AuthWords } from './auth-words'
+export { authWords } from './auth-words'
 export { cssColours } from './css'
 export { darkPalette } from './dark'
 export type { Palette, Settings } from './defaults'

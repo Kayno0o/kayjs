@@ -1,89 +1,72 @@
 import type { JSX } from 'kay'
 import type { Message } from './types'
+import { renderToString } from 'kay/server'
 
-// kayjs-auth's wording for a link to follow or a code to type, its `MailParts` of type `link`.
-export interface AuthLinkParts {
-  type: 'link'
-  lead: string
-  button: string
-  orPaste: string
-  codeLead: string
-  ending: string
-}
+// kayjs-auth's kinds of mail: a link to follow or a code to type, then news of a change to the account.
+export type AuthLinkKind = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email' | 'invitation'
+export type AuthNoticeKind = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'account-deleted'
+export type AuthKind = AuthLinkKind | AuthNoticeKind
 
-// kayjs-auth's wording for news of a change to the account, its `MailParts` of type `notice`.
-export interface AuthNoticeParts {
-  type: 'notice'
-  lead: string
-  review: string
-  ending: string
-}
+export const AUTH_LINK_KINDS: readonly AuthLinkKind[] = ['verify-email', 'reset-password', 'magic-link', 'change-email', 'invitation']
+export const AUTH_NOTICE_KINDS: readonly AuthNoticeKind[] = ['new-sign-in', 'password-changed', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'account-deleted']
+
+const LINK_KINDS = new Set<string>(AUTH_LINK_KINDS)
+const NOTICE_KINDS = new Set<string>(AUTH_NOTICE_KINDS)
 
 // A mail kayjs-auth hands its mailer, typed by its shape so neither package depends on the other.
 export interface AuthMail {
   to: string
   kind: string
+  // The site's name.
+  site: string
   locale: string
   subject: string
   text: string
   html: string
   url?: string | undefined
   code?: string | undefined
-  // Left out by an app's own kayjs-auth templates, whose html is then sent as it is.
-  parts?: AuthLinkParts | AuthNoticeParts | undefined
+  // The organization an invitation is to, or the provider, passkey, token or new address an event is about.
+  detail?: string | undefined
 }
 
 export type AuthView = (props: { mail: AuthMail }) => JSX.Element
 
-type LinkView = (props: { mail: AuthMail, parts: AuthLinkParts }) => JSX.Element
-type NoticeView = (props: { mail: AuthMail, parts: AuthNoticeParts }) => JSX.Element
-
 export interface AuthMailerOptions {
-  // An app's own view for any kind, `reset-password` say, in place of the shipped one.
-  views?: Partial<Record<string, AuthView>> | undefined
+  // An app's own view for any kind, imported once its first mail goes: `{ 'reset-password': () => import('./mails/auth/reset-password.kay') }`.
+  views?: Partial<Record<AuthKind, () => Promise<{ default: AuthView }>>> | undefined
 }
 
 // A mailer's `send`, `enqueue` or `render`.
 type Send<R> = <P extends object>(message: Message<P>) => R | Promise<R>
 
-// Set once an app hands kayjs-auth a mailer of this, so the samples page lists the views it renders, with the app's own.
+const ENTITY = /&(?:amp|lt|gt|quot|#39);/g
+const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'' }
+
+// Set once an app hands kayjs-auth a mailer of this, so the samples page lists kayjs-auth's mails, through the app's own views.
 let authOptions: AuthMailerOptions | undefined
 
 export function authMailerOptions(): AuthMailerOptions | undefined {
   return authOptions
 }
 
-// kayjs-auth's `email.mailer`, rendering each mail through the shipped components, themed by the app's mail settings and in the mail's language, and handing it to `send`, a mailer's `send` or `enqueue`.
+// kayjs-auth's `email.mailer`, rendering each mail through the app's view for its kind or the shipped one, in kayjs-mail's wording the app's messages override, themed by the app's mail settings and in the mail's language, and handing it to `send`, a mailer's `send` or `enqueue`.
 export function authMailer<R>(send: Send<R>, options: AuthMailerOptions = {}): { send: (mail: AuthMail) => Promise<R> } {
   authOptions = options
 
-  return authSender(send, options)
+  return { send: async mail => await send(await authMessage(mail, options, mail.locale)) }
 }
 
-// `authMailer` without listing its views on the samples page, which renders them through it.
-export function authSender<R>(send: Send<R>, options: AuthMailerOptions = {}): { send: (mail: AuthMail) => Promise<R> } {
-  return {
-    send: async (mail) => {
-      const envelope = { to: mail.to, subject: mail.subject, lang: mail.locale }
-      const own = options.views?.[mail.kind]
+// The message `authMailer` sends for a mail, rendered in `lang`, the site's default language when undefined. A kind it does not know goes as kayjs-auth wrote it.
+export async function authMessage(mail: AuthMail, options: AuthMailerOptions, lang: string | undefined): Promise<Message<{ mail: AuthMail }>> {
+  if (!LINK_KINDS.has(mail.kind) && !NOTICE_KINDS.has(mail.kind))
+    return { to: mail.to, subject: mail.subject, lang, html: mail.html, text: mail.text }
 
-      if (own !== undefined)
-        return await send({ ...envelope, view: own, props: { mail } })
+  const own = options.views?.[mail.kind as AuthKind]
+  // Imported here, as the module loads with kay.config.ts before kay compiles any .kay file; typed by hand, as kay check types a package's .kay files for the apps importing them alone.
+  const view = own === undefined ? (await (LINK_KINDS.has(mail.kind) ? import('./auth-link.kay' as string) : import('./auth-notice.kay' as string)) as { default: AuthView }).default : (await own()).default
+  const subject = (await import('./auth-subject.kay' as string) as { default: AuthView }).default
+  // The subject goes through the messages as the view does, in the same language.
+  const written = await renderToString(subject, { mail }, { locale: lang })
 
-      // Imported here rather than at the top, as the module loads with kay.config.ts, before kay compiles any .kay file; typed by hand, as kay check types a package's .kay files for the apps importing them alone.
-      if (mail.parts?.type === 'link') {
-        const view = (await import('./auth-link.kay' as string) as { default: LinkView }).default
-
-        return await send({ ...envelope, view, props: { mail, parts: mail.parts }, text: mail.text })
-      }
-
-      if (mail.parts?.type === 'notice') {
-        const view = (await import('./auth-notice.kay' as string) as { default: NoticeView }).default
-
-        return await send({ ...envelope, view, props: { mail, parts: mail.parts }, text: mail.text })
-      }
-
-      return await send({ ...envelope, html: mail.html, text: mail.text })
-    },
-  }
+  return { to: mail.to, subject: written.replace(ENTITY, entity => ENTITIES[entity]!), lang, view, props: { mail } }
 }

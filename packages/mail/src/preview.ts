@@ -1,3 +1,4 @@
+import type { AuthKind } from './auth'
 import type { SentMail } from './outbox'
 import type { Address, Attachment, Delivery, Mail, Message } from './types'
 import { createHash } from 'node:crypto'
@@ -5,8 +6,8 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import MailComposer from 'nodemailer/lib/mail-composer'
-import { authMailerOptions, authSender } from './auth'
-import { AUTH_SAMPLES } from './auth-samples'
+import { authMailerOptions, authMessage } from './auth'
+import { AUTH_SAMPLES, authSample } from './auth-samples'
 import { escapeHtml as escape } from './escape'
 import { outbox } from './outbox'
 import { nodemailerMessage } from './smtp'
@@ -21,6 +22,8 @@ export const SAMPLES_PATH = `${PREVIEW_PATH}/samples`
 const MAILS_DIR = 'src/mails'
 const KAY_FILE = new Bun.Glob('**/*.kay')
 const KAY_EXTENSION = /\.kay$/
+// An app's own view of a kayjs-auth kind, `auth/reset-password.kay`.
+const AUTH_VIEW = /^auth\/([\w-]+)\.kay$/
 const SAMPLE_ADDRESS = 'sample@localhost'
 // One address, as the send form takes: a comma or a name would add a recipient.
 const ONE_ADDRESS = /^[^\s<>@,]+@[^\s<>@,]+$/
@@ -195,25 +198,29 @@ function mailPage(mail: SentMail, phone: boolean, relay: Relay, outcome?: Outcom
 async function mailFiles(): Promise<string[]> {
   const own = (await Array.fromAsync(KAY_FILE.scan({ cwd: join(process.cwd(), MAILS_DIR), onlyFiles: true }))).toSorted()
 
-  return authMailerOptions() ? [...own, ...Object.keys(AUTH_SAMPLES)] : own
+  return authMailerOptions() ? [...own, ...AUTH_SAMPLES.keys()] : own
 }
 
 const previewOf = (file: string): string => file.replace(KAY_EXTENSION, '.preview.ts')
 
-// A mail rendered as the mailer renders it, with the props its `<name>.preview.ts` default-exports, or none, and whether it had them.
-async function sample(file: string, render: (message: Message) => Promise<Mail>): Promise<{ mail: Mail, sampled: boolean }> {
-  const auth = AUTH_SAMPLES[file]
+// A mail rendered as the mailer renders it, with the props its `<name>.preview.ts` default-exports, else a kayjs-auth sample for the app's view of a kind, else none, and where they came from.
+async function sample(file: string, render: (message: Message) => Promise<Mail>): Promise<{ mail: Mail, props: string }> {
+  const kind = AUTH_SAMPLES.get(file)
 
-  // In the site's default language, which the English sample may not be one of.
-  if (auth !== undefined)
-    return { mail: await authSender(async message => render({ ...message, lang: undefined } as Message), authMailerOptions()).send(auth), sampled: true }
+  if (kind !== undefined)
+    return { mail: await render(await authMessage(authSample(kind), authMailerOptions() ?? {}, undefined) as Message), props: 'a sample of kayjs-auth\'s, through authMailer' }
 
-  const props = join(process.cwd(), MAILS_DIR, previewOf(file))
+  const preview = join(process.cwd(), MAILS_DIR, previewOf(file))
   const view = (await import(join(process.cwd(), MAILS_DIR, file))).default
-  const sampled = await Bun.file(props).exists()
-  const mail = await render({ to: SAMPLE_ADDRESS, subject: file, view, props: sampled ? (await import(props)).default : undefined })
+  const own = AUTH_VIEW.exec(file)?.[1]
 
-  return { mail, sampled }
+  if (await Bun.file(preview).exists())
+    return { mail: await render({ to: SAMPLE_ADDRESS, subject: file, view, props: (await import(preview)).default }), props: escape(previewOf(file)) }
+
+  if (own !== undefined && AUTH_SAMPLES.has(`kayjs-auth/${own}`))
+    return { mail: await render({ to: SAMPLE_ADDRESS, subject: file, view, props: { mail: authSample(own as AuthKind) } }), props: `a sample of kayjs-auth's ${escape(own)}` }
+
+  return { mail: await render({ to: SAMPLE_ADDRESS, subject: file, view }), props: `none, as there is no ${escape(previewOf(file))}` }
 }
 
 function samplesPage(files: string[]): Response {
@@ -234,8 +241,7 @@ async function samplePage(file: string, phone: boolean, render: (message: Messag
   const back = `<div class="bar"><a href="${SAMPLES_PATH}">Mail samples</a></div>`
 
   try {
-    const { mail, sampled } = await sample(file, render)
-    const props = file in AUTH_SAMPLES ? 'a sample of kayjs-auth\'s, through authMailer' : sampled ? escape(previewOf(file)) : `none, as there is no ${escape(previewOf(file))}`
+    const { mail, props } = await sample(file, render)
 
     return page(file, `${back}<h1>${escape(file)}</h1><table><tbody><tr><th>Props</th><td>${props}</td></tr><tr><th>Size</th><td>${sizeOf(mail)}</td></tr></tbody></table>${sendForm(relay, `${SAMPLES_PATH}/send?mail=${encodeURIComponent(file)}`, outcome)}${rendered(mail, phone => phone ? `${self}&amp;view=phone` : self, `${SAMPLES_PATH}/html?mail=${encodeURIComponent(file)}`, phone)}`, status, live)
   }
