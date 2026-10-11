@@ -286,12 +286,13 @@ describe('preview mode', () => {
     expect((await get('/marks/launch', edit)).html).toContain('>Launch day</h1>')
     expect(await (await post({ path: '/marks/later', entries: [{ collection: 'news', slug: 'later', data: { title: 'Later on', published: false, tags: [] } }] })).text()).toContain('>Later on</h1>')
 
-    const refused = await post({ path: '/marks/launch', entries: [{ collection: 'news', slug: 'launch', data: { title: 3, published: true, tags: [1] } }, { collection: 'posts', slug: 'first', data: {} }] })
+    const refused = await post({ path: '/marks/launch', entries: [{ collection: 'news', slug: 'launch', data: { title: 3, published: true, tags: [1] } }, { collection: 'articles', slug: 'hello', locale: 'fr', data: {} }, { collection: 'posts', slug: 'first', data: {} }] })
 
     expect(refused.status).toBe(422)
     expect(await refused.json()).toEqual({ issues: [
       { collection: 'news', slug: 'launch', path: 'title', message: expect.any(String) },
       { collection: 'news', slug: 'launch', path: 'tags.0', message: expect.any(String) },
+      { collection: 'articles', slug: 'hello', locale: 'fr', path: 'title', message: expect.any(String) },
       { collection: 'posts', slug: 'first', path: '', message: 'names no collection the content config exports' },
     ] })
     expect((await post(draft, preview)).status).toBe(403)

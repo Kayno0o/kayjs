@@ -85,14 +85,15 @@ export function serveDrafts(app: Elysia, collections: Collection<unknown>[]): vo
 
     for (const { collection, slug, locale, data, body } of posted.entries) {
       const found = collections.find(each => exportNameOf(each.name) === collection)
+      const entry = { collection, slug, ...locale !== undefined && { locale } }
 
       if (!found) {
-        issues.push({ collection, slug, path: '', message: 'names no collection the content config exports' })
+        issues.push({ ...entry, path: '', message: 'names no collection the content config exports' })
 
         continue
       }
 
-      issues.push(...dataIssues(found.options.schema, data).map(issue => ({ collection, slug, ...issue })))
+      issues.push(...dataIssues(found.options.schema, data).map(issue => ({ ...entry, ...issue })))
       drafts.set(found.name, [...drafts.get(found.name) ?? [], { slug, locale, data, body }])
     }
 

@@ -15,6 +15,7 @@ export interface DraftEntry {
 export interface DraftIssue {
   collection: string
   slug: string
+  locale?: string
   path: string
   message: string
 }
