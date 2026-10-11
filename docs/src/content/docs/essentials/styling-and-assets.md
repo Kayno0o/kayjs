@@ -8,7 +8,7 @@ Styles and assets are imported where they are used, and Bun bundles them.
 
 ## Component styles
 
-A component script imports its stylesheet. Each page links one stylesheet per layout, then its own, holding the CSS of every component it renders.
+A component script imports its stylesheet. Each page links one stylesheet per layout, then its own, holding the CSS of every component it renders, those its server fence imports included.
 
 ```kay
 ---

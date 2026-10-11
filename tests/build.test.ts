@@ -222,6 +222,31 @@ describe('kay build', () => {
     }
   })
 
+  it('puts the stylesheets of the components and the stylesheets a server fence imports in the page, and none of its modules\'', async () => {
+    // Beside the fixtures, where `kay` resolves, rather than under node_modules, whose components the stylesheet build never follows.
+    const project = await mkdtemp(join(import.meta.dir, 'fixtures/server-styles-'))
+    const files = {
+      'src/layout.kay': '---\nimport \'./layout.css\'\n---\nmain\n  slot\n',
+      'src/layout.css': '.layout-marker { color: red }\n',
+      'src/page.css': '.page-marker { color: red }\n',
+      'src/data.ts': 'import \'./data.css\'\n\nexport const title = \'Home\'\n',
+      'src/data.css': '.data-marker { color: red }\n',
+      'src/routes/index.kay': '--- server\nimport Layout from \'../layout.kay\'\nimport { title } from \'../data\'\nimport \'../page.css\'\n---\nLayout\n  h1 {title}\n',
+    }
+
+    await Promise.all(Object.entries(files).map(async ([file, content]) => Bun.write(join(project, file), content)))
+
+    try {
+      const client = await buildClient(project)
+      const css = await Bun.file(join(client.dir, client.styles.get(join(project, 'src/routes/index.kay'))!.slice('/_kay/'.length))).text()
+
+      expect([...css.matchAll(/\.([a-z]+)-marker/g)].map(match => match[1]).toSorted()).toEqual(['layout', 'page'])
+    }
+    finally {
+      await rm(project, { recursive: true, force: true })
+    }
+  })
+
   it('writes the files pages import, through a server fence\'s modules too, for a production server that never writes', async () => {
     const site = join(import.meta.dir, 'fixtures/site')
 
