@@ -1150,7 +1150,7 @@ describe('route scan', () => {
     }
   })
 
-  it('reads layouts: false among the keys of page, or exported on its own, and no other text saying it', async () => {
+  it('reads layouts: false among the keys of page, and no other text saying it, an export of its own included', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-routes-'))
     const pages = {
       keyed: 'export const page = { noindex: true, layouts: false }',
@@ -1166,7 +1166,7 @@ describe('route scan', () => {
 
       const routes = await scanRoutes(dir)
 
-      expect(Object.fromEntries(Object.keys(pages).map(name => [name, routes.find(route => route.pattern === `/${name}`)!.layouts.length]))).toEqual({ keyed: 0, quoted: 0, own: 0, nested: 1, text: 1 })
+      expect(Object.fromEntries(Object.keys(pages).map(name => [name, routes.find(route => route.pattern === `/${name}`)!.layouts.length]))).toEqual({ keyed: 0, quoted: 0, own: 1, nested: 1, text: 1 })
     }
     finally {
       await rm(dir, { recursive: true, force: true })

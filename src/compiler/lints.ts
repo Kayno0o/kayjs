@@ -185,15 +185,8 @@ export const LINTS = {
     level: 'warn',
     group: 'code',
     summary: 'The schema builder imported from `kay` as `t`, its name before `s`, which leaves `t` to translations. `kay check --fix` renames it, in `.kay` fences and `.ts` modules alike.',
-    wrong: '--- server\nimport { t } from \'kay\'\n\nexport const query = t.Object({ page: t.Integer({ minimum: 1 }) })\n---\np Page',
-    right: '--- server\nimport { s } from \'kay\'\n\nexport const query = s.Object({ page: s.Integer({ minimum: 1 }) })\n---\np Page',
-  },
-  'deprecated-page-export': {
-    level: 'warn',
-    group: 'code',
-    summary: 'A page setting exported under its own name, as before `export const page` held them all. `kay check --fix` moves it into `page`.',
-    wrong: '--- server\nexport const prerender = true\n---\np About',
-    right: '--- server\nexport const page = { prerender: true }\n---\np About',
+    wrong: '--- server\nimport { t } from \'kay\'\n\nexport const page = { query: t.Object({ page: t.Integer({ minimum: 1 }) }) }\n---\np Page',
+    right: '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Integer({ minimum: 1 }) }) }\n---\np Page',
   },
   'positional-key': {
     level: 'warn',
@@ -310,9 +303,9 @@ export const LINTS = {
     level: 'warn',
     group: 'seo',
     site: true,
-    summary: 'A prerendered page whose head says `noindex` while the sitemap lists it, which asks search engines to crawl what they may not index. `export const noindex = true` sets the tag and leaves the page out of the sitemap.',
+    summary: 'A prerendered page whose head says `noindex` while the sitemap lists it, which asks search engines to crawl what they may not index. `export const page = { noindex: true }` sets the tag and leaves the page out of the sitemap.',
     wrong: 'head\n  meta(name="robots" content="noindex")',
-    right: '--- server\nexport const noindex = true\n---',
+    right: '--- server\nexport const page = { noindex: true }\n---',
   },
 } as const satisfies Record<string, Lint>
 

@@ -70,7 +70,7 @@ export const page = { prerender: true, revalidate: '1h' }
 ---
 ```
 
-The keys are `prerender` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), and `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)). `kay check` types the object, so the editor completes the keys and an unknown one is an error. The separate exports, `export const prerender = true` and the like, still work but are deprecated: `kay check` warns of each and `kay check --fix` moves them into `page`.
+The keys are `prerender` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), and `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)). `kay check` types the object, so the editor completes the keys and an unknown one is an error. A setting exported under its own name, `export const prerender = true`, is a compile error, and `kay check --fix` moves it into `page`.
 
 ## Loading data
 

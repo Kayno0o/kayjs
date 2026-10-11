@@ -30,7 +30,7 @@ export default (value: string) =>
 
 A URL a matcher refuses falls through to the page without one serving the same path, `items/[slug].kay` beside `items/[id=integer].kay`, and is a 404 when none does; several pages with matchers on one path are tried in the order of their file paths. Two pages serving one path, neither with a matcher, stop the server, whatever they name their params: `todos/[id].kay` and `todos/[slug].kay`, `blog/index.kay` and `blog/[[page]].kay`, `about.kay` and `(site)/about.kay`. A `prerender` list leaves an optional param out to prerender the path without it, and an entry a matcher refuses fails the build.
 
-A page's settings are the keys of one object its server fence exports, `export const page = { prerender: true, revalidate: '1h' }`. `kay` exports the type `PageSettings`, which `kay check` types the object by (`satisfies PageSettings`): the editor completes the keys and an unknown one is a type error. Kay reads the object as written, a literal with no spread, computed key or method. A layout takes `layouts` alone, and `query` on a layout or a special page is reported. The separate exports (`export const prerender = true` and the like) still work but are deprecated: the lint `deprecated-page-export` reports each, `kay check --fix` moves them into `page` unless the fence names a value `page` itself or reads the setting, and a later minor removes them.
+A page's settings are the keys of one object its server fence exports, `export const page = { prerender: true, revalidate: '1h' }`. `kay` exports the type `PageSettings`, which `kay check` types the object by (`satisfies PageSettings`): the editor completes the keys and an unknown one is a type error. Kay reads the object as written, a literal with no spread, computed key or method. A layout takes `layouts` alone, and `query` on a layout or a special page is reported. A setting exported under its own name, `export const prerender = true` or `export async function prerender()`, is a compile error; `kay check --fix` moves it into `page`, a function as an arrow, unless the fence names a value `page` itself or reads the setting.
 
 | Key | Value | Detailed in |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ A page's settings are the keys of one object its server fence exports, `export c
 | `sitemap` | what `prerender` takes, or `false` | [Head and SEO](head.md) |
 | `noindex` | `true` to keep the page from search engines and the sitemap | [Head and SEO](head.md) |
 
-A page or a layout whose `page` has `layouts: false` among its keys is wrapped by none of the layouts above it: `export const page = { layouts: false }` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header. The old `export const layouts = false` still reads, deprecated.
+A page or a layout whose `page` has `layouts: false` among its keys is wrapped by none of the layouts above it: `export const page = { layouts: false }` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
 
 Other files starting with `_` are not routes. Every top-level name the server fence declares reaches the template, typed. The fence runs per request and may use top-level `await` and the `ctx` object, except what an export such as an action reads: that runs once, when the module loads, so it may neither await nor read `ctx`, which `kay check` reports. The fence's `ctx`:
 

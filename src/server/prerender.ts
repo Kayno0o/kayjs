@@ -252,5 +252,5 @@ async function exportsPrerender(file: string): Promise<boolean> {
 
   const server = analyzeServer(source, parseKay(source).server)
 
-  return server?.page?.settings.has('prerender') === true || server?.exportNames.includes('prerender') === true
+  return server?.page?.settings.has('prerender') === true
 }

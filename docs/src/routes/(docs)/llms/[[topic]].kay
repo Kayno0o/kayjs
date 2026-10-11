@@ -4,8 +4,10 @@ import { reference } from '../../../content.config'
 import { FORGE, FORGE_ROOT, neighbours } from '../../../pages'
 import { llmsHref } from '../../../reference'
 
-export async function prerender() {
-  return (await reference.all()).map(topic => topic.slug === 'overview' ? {} : { topic: topic.slug })
+export const page = {
+  prerender: async () => {
+    return (await reference.all()).map(topic => topic.slug === 'overview' ? {} : { topic: topic.slug })
+  },
 }
 
 const topic = await reference.get(ctx.params.topic ?? 'overview') ?? ctx.notFound()

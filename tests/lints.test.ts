@@ -126,15 +126,25 @@ describe('deprecated-schema-name', () => {
   })
 })
 
-describe('deprecated-page-export', () => {
-  it('moves the settings exported under their own names into page, all at once, a value over several lines one level deeper', () => {
+describe('page settings', () => {
+  it('refuses a setting exported under its own name, its fix moving every one into page at once, all at once, a value over several lines one level deeper', () => {
     const one = '--- server\nexport const prerender = true\n---\np x'
     const several = '--- server\nimport { s } from \'kay\'\n\n// The search\nexport const query = s.Object({\n  page: s.Integer(),\n})\nexport const revalidate = \'1h\'\n---\np x'
     const moved = '--- server\nimport { s } from \'kay\'\n\nexport const page = {\n  query: s.Object({\n    page: s.Integer(),\n  }),\n  revalidate: \'1h\',\n}\n---\np x'
 
-    expect(lints(one)).toEqual([{ code: 'deprecated-page-export', severity: 'warning', at: 'prerender' }])
+    expect(lints(one)).toEqual([{ code: undefined, severity: undefined, at: 'prerender' }])
+    expect(compileKay(one, 'list.kay').diagnostics.map(d => d.message)).toEqual(['`prerender` is a setting of `page`, not an export of its own'])
     expect(fixed(one)).toEqual(['--- server\nexport const page = { prerender: true }\n---\np x'])
     expect(fixed(several)).toEqual([moved, moved])
+  })
+
+  it('moves a setting declared as a function as an arrow, leaving a generator', () => {
+    const declared = '--- server\nexport async function prerender(): Promise<{ slug: string }[]> {\n  return [{ slug: \'a\' }]\n}\n---\np x'
+
+    expect(lints(declared)).toEqual([{ code: undefined, severity: undefined, at: 'prerender' }])
+    expect(fixed(declared)).toEqual(['--- server\nexport const page = {\n  prerender: async (): Promise<{ slug: string }[]> => {\n    return [{ slug: \'a\' }]\n  },\n}\n---\np x'])
+    expect(fixed('--- server\nexport function sitemap(locale = \'en\') {\n  return [{ locale }]\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  sitemap: (locale = \'en\') => {\n    return [{ locale }]\n  },\n}\n---\np x'])
+    expect(fixed('--- server\nexport function* prerender() {\n  yield { slug: \'a\' }\n}\n---\np x')).toEqual([])
   })
 
   it('adds to the page export there is, on its line or one key a line', () => {
@@ -149,7 +159,7 @@ describe('deprecated-page-export', () => {
 
     const twice = '--- server\nexport const page = { prerender: true }\nexport const prerender = false\n---\np x'
 
-    expect(lints(twice)).toEqual([{ code: undefined, severity: undefined, at: 'prerender' }, { code: 'deprecated-page-export', severity: 'warning', at: 'prerender' }])
+    expect(compileKay(twice, 'list.kay').diagnostics.map(d => d.message)).toEqual(['`prerender` is set twice, in `page` and on its own'])
     expect(fixed(twice)).toEqual([])
   })
 

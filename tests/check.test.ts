@@ -358,7 +358,7 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('reports a key page does not take, and still types a setting exported under its own name, warning that it moved', async () => {
+  it('reports a key page does not take, and a setting exported under its own name as an error', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': '--- server\nexport const page = { prerender: true, prerendr: 1 }\n---\np x\n',
       'src/routes/old.kay': '--- server\nimport { s } from \'kay\'\n\nexport const query = s.Object({ n: s.Integer() })\n\nconst label: string = ctx.query.n\n---\np {label}\n',
@@ -366,9 +366,8 @@ describe('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([
-        ['old.kay', 4, 'deprecated-page-export'],
+        ['old.kay', 4, '`query` is a setting of `page`, not an export of its own'],
         ['index.kay', 2, 'TS2561'],
-        ['old.kay', 6, 'TS2322'],
       ])
     }
     finally {

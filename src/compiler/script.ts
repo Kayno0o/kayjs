@@ -176,11 +176,15 @@ export interface PageSettings {
 }
 
 // A setting exported under its own name, as before `page` held them.
-export interface SeparateSetting {
+// The source from the start of `first` to the end of `last`.
+type TextOf = (first: t.Node, last?: t.Node) => string
+
+interface SeparateSetting {
   name: PageSettingName
   local: Span
   statement: Span
-  value: Span
+  // Its value as a key of `page`, a function declaration's as an arrow.
+  value: string
   // Nothing else reads it and it has no type of its own, so it moves into `page` as it is.
   movable: boolean
 }
@@ -193,12 +197,9 @@ export interface ServerAnalysis {
   exports: Span[]
   // Names the exports declare: actions the server registers and browser builds replace with fetch stubs.
   exportNames: string[]
-  // Where each of those names is declared.
-  exportSpans: Map<string, Span>
   // The exports declared as `action(...)` calls, the ones `kay check` compares URLs of.
   actionNames: string[]
   page?: PageSettings | undefined
-  separateSettings: SeparateSetting[]
   // Statements that run per request, inside `load(ctx)`.
   body: Span[]
   // What the fence reads of SERVER_GLOBALS without declaring or importing it.
@@ -213,13 +214,15 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], exportSpans: new Map(), actionNames: [], separateSettings: [], body: [], implicit: [], data: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], body: [], implicit: [], data: [], diagnostics: [] }
   const parsed = parseFence(source, server, analysis.diagnostics)
 
   if (!parsed)
     return analysis
 
   const { ast, shift } = parsed
+  const separate: SeparateSetting[] = []
+  const text: TextOf = (first, last = first) => source.slice(shift(first).start, shift(last).end)
   const local = bodyTypes(ast.program.body, [], shift, analysis.diagnostics)
   const exported = ast.program.body.filter(statement => !isHoisted(statement, local) && statement.type === 'ExportNamedDeclaration' && statement.declaration !== null && statement.declaration !== undefined)
   const perRequest = ast.program.body.filter(statement => !isHoisted(statement, local) && !isExport(statement))
@@ -240,7 +243,6 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
       analysis.exports.push(span)
       for (const identifier of declaredIdentifiers(statement.declaration)) {
         analysis.exportNames.push(identifier.name)
-        analysis.exportSpans.set(identifier.name, nameSpan(identifier, shift))
       }
 
       if (statement.declaration.type === 'VariableDeclaration') {
@@ -249,7 +251,10 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
             analysis.actionNames.push(declarator.id.name)
         }
 
-        pageSettings(ast, statement, statement.declaration, span, shift, analysis)
+        pageSettings(ast, statement, statement.declaration, span, shift, text, analysis, separate)
+      }
+      else if (statement.declaration.type === 'FunctionDeclaration' && statement.declaration.id && (PAGE_SETTINGS as readonly string[]).includes(statement.declaration.id.name)) {
+        separate.push(separateFunction(ast, statement, statement.declaration, span, shift, text))
       }
     }
     else if (isExport(statement)) {
@@ -276,16 +281,13 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
     cursor = span.end
   }
 
-  for (const setting of analysis.separateSettings) {
-    if (analysis.page?.settings.has(setting.name))
-      analysis.diagnostics.push({ ...setting.local, message: `\`${setting.name}\` is set twice, in \`page\` and on its own`, help: 'keep the one in `page`' })
-  }
+  analysis.diagnostics.push(...separatePageSettings(source, analysis, separate))
 
   return analysis
 }
 
-// Reads `export const page` as written, and the settings still exported under their own names.
-function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declaration: t.VariableDeclaration, span: Span, shift: (node: t.Node) => Span, analysis: ServerAnalysis): void {
+// Reads `export const page` as written, and the settings exported under their own names, as they were before `page`.
+function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declaration: t.VariableDeclaration, span: Span, shift: (node: t.Node) => Span, text: TextOf, analysis: ServerAnalysis, separate: SeparateSetting[]): void {
   for (const declarator of declaration.declarations) {
     if (declarator.id.type !== 'Identifier' || !declarator.init)
       continue
@@ -323,9 +325,19 @@ function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declarat
     else if ((PAGE_SETTINGS as readonly string[]).includes(name)) {
       const references = declaration.declarations.length === 1 && !declarator.id.typeAnnotation ? referenceCount(ast, statement, name) : 1
 
-      analysis.separateSettings.push({ name: name as PageSettingName, local: shift(declarator.id), statement: span, value: shift(declarator.init), movable: references === 0 })
+      separate.push({ name: name as PageSettingName, local: shift(declarator.id), statement: span, value: text(declarator.init), movable: references === 0 })
     }
   }
+}
+
+// `export async function prerender() { ... }`, which moves into `page` as an arrow, unless it is a generator, which has none.
+function separateFunction(ast: ParseResult<t.File>, statement: t.Statement, declaration: t.FunctionDeclaration, span: Span, shift: (node: t.Node) => Span, text: TextOf): SeparateSetting {
+  const id = declaration.id!
+  const params = declaration.params.length > 0 ? text(declaration.params[0]!, declaration.params.at(-1)) : ''
+  const value = `${declaration.async ? 'async ' : ''}(${params})${declaration.returnType ? text(declaration.returnType) : ''} => ${text(declaration.body)}`
+  const movable = !declaration.generator && !declaration.typeParameters && referenceCount(ast, statement, id.name) === 0
+
+  return { name: id.name as PageSettingName, local: shift(id), statement: span, value, movable }
 }
 
 function keyName(key: t.Node): string | undefined {
@@ -356,25 +368,28 @@ function referenceCount(ast: ParseResult<t.File>, statement: t.Statement, name: 
 }
 
 // Settings exported under their own names, with a fix moving every one it can into `page` at once: each diagnostic carries the same fix, applied once.
-export function separatePageSettings(source: string, server: ServerAnalysis): Diagnostic[] {
+function separatePageSettings(source: string, server: ServerAnalysis, separate: SeparateSetting[]): Diagnostic[] {
   // A fence naming a value `page` itself, as a paginated list often does, renames it before `page` can hold the settings.
   const taken = !server.page && (server.data.some(data => data.name === PAGE) || server.imports.some(binding => binding.local === PAGE))
-  const movable = taken ? [] : server.separateSettings.filter(setting => setting.movable && !server.page?.settings.has(setting.name))
+  const movable = taken ? [] : separate.filter(setting => setting.movable && !server.page?.settings.has(setting.name))
   const fix = movable.length > 0 ? moveIntoPage(source, server.page, movable) : undefined
 
-  return server.separateSettings.map(setting => ({
-    ...setting.local,
-    code: 'deprecated-page-export',
-    message: `\`export const ${setting.name}\` is a setting of \`page\` now`,
-    note: 'one `export const page = { ... }` holds every setting of a page, typed and completed in the editor',
-    help: taken ? `rename the fence's own \`page\`, then move it into \`export const page = { ${setting.name}: ... }\`` : `move it into \`export const page = { ${setting.name}: ... }\``,
-    fixes: fix && movable.includes(setting) ? [fix] : [],
-    checkOnly: true,
-  }))
+  return separate.map((setting) => {
+    if (server.page?.settings.has(setting.name))
+      return { ...setting.local, message: `\`${setting.name}\` is set twice, in \`page\` and on its own`, help: 'keep the one in `page`' }
+
+    return {
+      ...setting.local,
+      message: `\`${setting.name}\` is a setting of \`page\`, not an export of its own`,
+      note: 'one `export const page = { ... }` holds every setting of a page, typed and completed in the editor',
+      help: taken ? `rename the fence's own \`page\`, then move it into \`export const page = { ${setting.name}: ... }\`` : `move it into \`export const page = { ${setting.name}: ... }\``,
+      fixes: fix && movable.includes(setting) ? [fix] : [],
+    }
+  })
 }
 
 function moveIntoPage(source: string, page: PageSettings | undefined, settings: SeparateSetting[]): Fix {
-  const entries = settings.map(setting => `${setting.name}: ${indentValue(source.slice(setting.value.start, setting.value.end))}`)
+  const entries = settings.map(setting => `${setting.name}: ${indentValue(setting.value)}`)
   const removals = settings.map(setting => ({ start: setting.statement.start, end: lineEnd(source, setting.statement.end), text: '' }))
   const title = `Move ${settings.length === 1 ? 'it' : 'them'} into \`page\``
 

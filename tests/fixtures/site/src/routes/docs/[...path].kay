@@ -1,6 +1,8 @@
 --- server
-export async function prerender() {
-  return [{ path: 'guide/intro' }, { path: 'a b' }, { path: 'a@b+c/d,e' }]
+export const page = {
+  prerender: async () => {
+    return [{ path: 'guide/intro' }, { path: 'a b' }, { path: 'a@b+c/d,e' }]
+  },
 }
 
 const path = ctx.params.path

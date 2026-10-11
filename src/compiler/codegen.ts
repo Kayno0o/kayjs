@@ -319,7 +319,7 @@ class Generator {
 
   // The type of the page's query schema, when it declares one; a layout's or special page's declaration is reported.
   private declaresQuery(): string | undefined {
-    const span = this.server?.page?.settings.get(QUERY)?.key ?? this.server?.exportSpans.get(QUERY)
+    const span = this.server?.page?.settings.get(QUERY)?.key
 
     if (span && this.options.special) {
       this.error(span, 'Only a page declares its query', { help: 'read the page\'s query through `ctx.query`' })
@@ -330,12 +330,9 @@ class Generator {
     return this.settingType(QUERY)
   }
 
-  // What `load` types a setting from: its key of `page`, else its export of its own.
+  // What `load` types a setting from: its key of `page`.
   private settingType(name: PageSettingName): string | undefined {
-    if (this.server?.page?.settings.has(name))
-      return `typeof ${PAGE}.${name}`
-
-    return this.server?.exportNames.includes(name) ? `typeof ${name}` : undefined
+    return this.server?.page?.settings.has(name) ? `typeof ${PAGE}.${name}` : undefined
   }
 
   // The final pass builds what runs; the analysis pass always generates JSX.

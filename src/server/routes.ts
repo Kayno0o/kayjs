@@ -60,8 +60,7 @@ const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]$/i
 const OPTIONAL_SEGMENT = /^\[\[([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]\]$/i
 // `(marketing)`: groups pages for their layouts and guards, adding nothing to the URL.
 const GROUP_SEGMENT = /^\(.+\)$/
-// A file setting this is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones.
-const NO_LAYOUTS = /^export\s+const\s+layouts\s*=\s*false\b/m
+// A file whose `page` sets `layouts: false` is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones.
 const PAGE_EXPORT = /^export\s+const\s+page\s*=\s*\{/m
 const NO_LAYOUTS_KEY = /(?:layouts|'layouts'|"layouts")\s*:\s*false\b/y
 const QUOTES = new Set(['"', '\'', '`'])
@@ -332,7 +331,7 @@ function setsNoLayouts(source: string): boolean {
   const found = PAGE_EXPORT.exec(source)
 
   if (!found)
-    return NO_LAYOUTS.test(source)
+    return false
 
   let depth = 1
   // Where a key of the object itself may start: past its brace or a comma.
@@ -383,7 +382,7 @@ function setsNoLayouts(source: string): boolean {
     }
   }
 
-  return NO_LAYOUTS.test(source)
+  return false
 }
 
 function guardsOf(trees: RouteMount[], at: string, read: LayoutsRead): GuardFile[] {

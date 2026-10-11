@@ -76,8 +76,8 @@ A project with a `site` serves `/sitemap.xml` and `/robots.txt`, which allows ev
 --- server
 import { listPosts } from '../../data'
 
-export async function sitemap() {
-  return (await listPosts()).map(post => ({ slug: post.slug }))
+export const page = {
+  sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })),
 }
 ---
 ```

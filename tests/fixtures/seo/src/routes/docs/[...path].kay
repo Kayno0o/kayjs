@@ -1,6 +1,8 @@
 --- server
-export async function prerender() {
-  return [{ path: 'guide/start' }]
+export const page = {
+  prerender: async () => {
+    return [{ path: 'guide/start' }]
+  },
 }
 ---
 h1 {ctx.params.path}
